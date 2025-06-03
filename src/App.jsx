@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { useUrlState } from './hooks/useUrlState';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
 
@@ -17,9 +18,22 @@ function App() {
 
     console.log('📊 Loaded projects:', projects.length);
 
-    // UI state
-    const [selectedProject, setSelectedProject] = useState(null);
-    const [activeView, setActiveView] = useState('projects'); // 'projects' | 'dashboard'
+    // URL-based state management
+    const { urlParams, navigateToProjects, navigateToProject } = useUrlState();
+    
+    // Derived state from URL parameters
+    const activeView = urlParams.view;
+    const selectedProject = urlParams.projectId 
+        ? projects.find(p => p.id === urlParams.projectId) 
+        : null;
+
+    // Handle case where project in URL doesn't exist (e.g., deleted project)
+    useEffect(() => {
+        if (urlParams.projectId && urlParams.view === 'dashboard' && !selectedProject) {
+            console.warn('Project not found, redirecting to projects view');
+            navigateToProjects();
+        }
+    }, [urlParams.projectId, urlParams.view, selectedProject, navigateToProjects]);
 
     /**
      * Handle data import from ExportImport component
@@ -56,10 +70,7 @@ function App() {
                         
                         <div className="flex space-x-4">
                             <button
-                                onClick={() => {
-                                    setActiveView('projects');
-                                    setSelectedProject(null);
-                                }}
+                                onClick={navigateToProjects}
                                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                                     activeView === 'projects'
                                         ? 'bg-blue-100 text-blue-700'
@@ -81,8 +92,7 @@ function App() {
                         setProjects={setProjects}
                         tasks={tasks}
                         onSelectProject={(project) => {
-                            setSelectedProject(project);
-                            setActiveView('dashboard');
+                            navigateToProject(project.id);
                         }}
                         onImport={handleImport}
                     />
@@ -99,10 +109,7 @@ function App() {
                         setTimeEntries={setTimeEntries}
                         currentTimer={currentTimer}
                         setCurrentTimer={setCurrentTimer}
-                        onBackToProjects={() => {
-                            setSelectedProject(null);
-                            setActiveView('projects');
-                        }}
+                        onBackToProjects={navigateToProjects}
                     />
                 )}
             </main>
