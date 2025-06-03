@@ -25,8 +25,21 @@ function App() {
      * Handle data import from ExportImport component
      */
     const handleImport = (importData) => {
-        setProjects(importData.projects || []);
-        setTasks(importData.tasks || []);
+        // Migrate tasks to include new fields if needed
+        const migratedTasks = (importData.tasks || []).map(task => ({
+            ...task,
+            completed: task.completed || false,
+            archived: task.archived || false
+        }));
+
+        // Migrate projects to include invoices if needed
+        const migratedProjects = (importData.projects || []).map(project => ({
+            ...project,
+            invoices: project.invoices || []
+        }));
+
+        setProjects(migratedProjects);
+        setTasks(migratedTasks);
         setTimeEntries([]); // Clear time entries on import
         setCurrentTimer(null); // Clear any active timer
     };

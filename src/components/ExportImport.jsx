@@ -15,7 +15,7 @@ function ExportImport({ projects, tasks = [], onImport }) {
      */
     const handleExport = () => {
         const exportData = {
-            version: '1.0',
+            version: '2.0',
             exportDate: new Date().toISOString(),
             projects: projects,
             tasks: tasks

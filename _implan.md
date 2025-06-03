@@ -1,17 +1,19 @@
 # Project Plan
 
-- Here's a project plan I have setup for a base tast time tracker & invoice system. Please use Vite to create the app, and make sure to install all necessary npm packages that are required in the project. Please also make sure to have a nice modern UI using tailwind and if necessary from ready made components. This is a local-first project and does not require a dedicated landing page. Initially we'll just offer the service upfront, so that you can start creating and timing tasks immediately. Let's make a clean and nice looking intuitive UI/UX please. Keep in mind all the necessary functionality such as the creating of tasks & subtasks, the timer per tasks, total calculations, the invoice client details submission, and so on. Make sure all this functionality works well.
+- Here's a project plan I have setup for a comprehensive task time tracker & invoice system with advanced features. The application now includes task completion tracking, archiving functionality, real-time timer displays, advanced invoice generation with time modification capabilities, and complete state preservation. Please use Vite to create the app, and make sure to install all necessary npm packages that are required in the project. Please also make sure to have a nice modern UI using tailwind and if necessary from ready made components. This is a local-first project and does not require a dedicated landing page. Initially we'll just offer the service upfront, so that you can start creating and timing tasks immediately. Let's make a clean and nice looking intuitive UI/UX please. Keep in mind all the necessary functionality such as the creating of tasks & subtasks, task completion tracking, archiving system, real-time timers with seconds, advanced invoice modification, and so on. Make sure all this functionality works well.
 
 ## Project Overview
-- **Project Name:** Task Time Track
+- **Project Name:** Task Time Tracker & Invoice System
+- **Version:** 2.0 (Enhanced Features)
 - **Description:**  
-  A local-only, minimalist React app for managing projects with task hierarchies, tracking time per task, and auto-generating invoices based on logged hours and project rate. Users can export/import data as JSON for backup.
+  A local-only, comprehensive React app for managing projects with task hierarchies, completion tracking, archiving system, real-time timing with seconds precision, and advanced invoice generation with time modification capabilities. Users can export/import complete data including all new features as JSON for backup.
 - **Target Audience:**  
-  Freelancers and small teams who need a lightweight, privacy-focused task/time tracker with integrated invoicing.
+  Freelancers and small teams who need a complete, privacy-focused task/time tracker with integrated invoicing and advanced project management features.
 - **Timeline:**  
-  - MVP core (task tree + timer + basic invoice PDF): 1 week  
-  - Polish & export/import JSON: +2 days  
-  - Extended metrics (today/week/month/year) & sub-task support: +3 days
+  - Enhanced MVP (task completion + archive + real-time timer): 2 weeks  
+  - Advanced invoice generation with time modification: +1 week
+  - Complete state preservation & data migration: +3 days  
+  - UI polish & comprehensive testing: +2 days
 
 ## Technical Stack
 - **Frontend:**  
@@ -29,17 +31,23 @@
   - Heroicons (SVG icons for timers, buttons)
 
 ## Features & Functionality
-- [ ] **Project Management**  
-  - Create/edit/delete projects  
+- **Project Management**
+  - Create/edit/delete projects
   - Each project has a title, hourly rate, and metadata (e.g., currency)
-- [ ] **Task Tree**  
-  - Parent task with a single level of sub-tasks  
-  - Add/edit/delete tasks and subtasks  
-  - Hovering over a task shows a “Start Timer” button/icon
-- [ ] **Time Tracking**  
-  - Start / Pause / Stop controls per task  
-  - When a task’s timer is running, all other tasks are shown at reduced opacity  
-  - Parent task time = sum of its sub-task times 
+- **Task Tree**
+  - Parent task with a single level of sub-tasks
+  - Add/edit/delete tasks and subtasks
+  - Modern checkboxes for task completion status
+  - Strike-through styling for completed tasks
+  - Archive functionality for parent tasks
+  - Collapsible archived tasks section
+  - Hovering over a task shows a "Start Timer" button/icon
+- **Advanced Time Tracking**
+  - Start / Pause / Stop controls per task
+  - Real-time timer display with seconds precision (HH:MM:SS)
+  - When a task's timer is running, all other tasks are shown at reduced opacity
+  - Parent task time = sum of its sub-task times
+  - Completed tasks cannot be timed
   - Store each time entry with: `{ taskId, startTimestamp, endTimestamp }`
 - [ ] **Dashboard Metrics**  
   - For each project, display total time and earnings (time × rate) for:  
@@ -48,48 +56,64 @@
     - This month  
     - Last month  
     - This year
-- [ ] **Invoice Generator**  
-  - Select a project → auto-fetch all time entries since last invoice date  
-  - Calculate total billable hours and amount  
-  - Populate invoice template (project info, client info fields, line items per task or aggregate)  
-  - Generate/download as PDF (html2pdf.js)  
-  - Emit a JSON record of “last billed timestamp” per project
-- [ ] **JSON Export / Import**  
-  - Export all projects, tasks, and time entries as a single `backup.json`  
-  - Import from `backup.json` to restore or migrate data (overwrites localStorage)
-- [ ] **Minimal UI / UX**  
-  - Clean, modern layout with Tailwind utility classes  
-  - Use neutral colors, subtle hover effects, clear typography  
+- **Advanced Invoice Generator**
+  - Select a project → auto-fetch all time entries since last invoice date
+  - Edit time entries for each task before generating invoice (for rounding)
+  - Calculate total billable hours and amount with modified times
+  - Store generated invoices within each project
+  - Preview previously generated invoices
+  - Collapsible invoice section at bottom of project dashboard
+  - Populate invoice template (project info, client info fields, line items per task or aggregate)
+  - Generate/download as PDF (html2pdf.js)
+  - Emit a JSON record of "last billed timestamp" per project
+- **Enhanced JSON Export / Import**
+  - Export all projects, tasks, time entries, completion status, archive status, and invoices as `backup.json`
+  - Import from `backup.json` to restore or migrate data with automatic version migration
+  - Data version 2.0 support with backward compatibility
+- **Modern UI / UX**
+  - Clean, modern layout with Tailwind utility classes
+  - Modern checkboxes with proper styling
+  - Collapsible sections for better organization
+  - Real-time updates and visual feedback
+  - Use neutral colors, subtle hover effects, clear typography
   - No sign-up or back-end login; entirely client-side
 
 ## File Structure
+```
 tasktime/
 ├── public/
-│ ├── index.html
-│ └── favicon.ico
+│   ├── index.html
+│   └── favicon.ico
 ├── src/
-│ ├── components/
-│ │ ├── ProjectList.jsx
-│ │ ├── ProjectDashboard.jsx
-│ │ ├── TaskTree.jsx
-│ │ ├── TaskItem.jsx
-│ │ ├── TimerControls.jsx
-│ │ ├── InvoiceGenerator.jsx
-│ │ ├── ExportImport.jsx
-│ │ └── MetricsDisplay.jsx
-│ ├── hooks/
-│ │ └── useLocalStorage.js
-│ ├── utils/
-│ │ ├── dateUtils.js
-│ │ ├── pdfUtils.js
-│ │ └── idUtils.js
-│ ├── App.jsx
-│ ├── index.jsx
-│ └── tailwind.css
+│   ├── components/
+│   │   ├── ExportImport.jsx
+│   │   ├── InvoiceGenerator.jsx
+│   │   ├── MetricsDisplay.jsx
+│   │   ├── ProjectDashboard.jsx
+│   │   ├── ProjectList.jsx
+│   │   ├── TaskItem.jsx
+│   │   ├── TaskTree.jsx
+│   │   ├── TimerControls.jsx
+│   ├── hooks/
+│   │   └── useLocalStorage.js
+│   ├── utils/
+│   │   ├── dateUtils.js
+│   │   ├── idUtils.js
+│   │   ├── pdfUtils.js
+│   ├── App.jsx
+│   ├── App.css
+│   ├── index.css
+│   ├── main.jsx
+│   └── assets/
+│       ├── react.svg
 ├── .gitignore
 ├── package.json
-└── README.md
-
+├── tailwind.config.js
+├── postcss.config.js
+├── vite.config.js
+├── README.md
+└── _implan.md
+```
 
 ## Resources & Assets
 - **Design/Mockups:**  

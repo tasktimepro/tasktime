@@ -101,6 +101,36 @@ export const formatDuration = (milliseconds) => {
 };
 
 /**
+ * Format milliseconds to hours, minutes, and seconds
+ * @param {number} milliseconds - Duration in milliseconds
+ * @returns {string} Formatted time string (e.g., "2h 30m 45s")
+ */
+export const formatDurationWithSeconds = (milliseconds) => {
+    const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+
+    const parts = [];
+    
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+    
+    return parts.join(' ');
+};
+
+/**
+ * Format current timer duration in real-time (for active timers)
+ * @param {number} startTime - Timer start timestamp
+ * @returns {string} Formatted duration string
+ */
+export const formatActiveTimer = (startTime) => {
+    const now = Date.now();
+    const elapsed = now - startTime;
+    return formatDurationWithSeconds(elapsed);
+};
+
+/**
  * Convert milliseconds to decimal hours
  * @param {number} milliseconds - Duration in milliseconds
  * @returns {number} Duration in decimal hours

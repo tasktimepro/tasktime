@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import TaskItem from './TaskItem';
 import { generateId } from '../utils/idUtils';
 
@@ -16,16 +16,18 @@ const TaskTree = ({
     setCurrentTimer
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
-
     const [newTaskTitle, setNewTaskTitle] = useState('');
-
     const [creatingSubtaskFor, setCreatingSubtaskFor] = useState(null);
+    const [showArchivedTasks, setShowArchivedTasks] = useState(false);
 
     // Get tasks for this project
     const projectTasks = tasks.filter(task => task.projectId === project.id);
 
-    // Get parent tasks (tasks without parentTaskId)
-    const parentTasks = projectTasks.filter(task => !task.parentTaskId);
+    // Get parent tasks (tasks without parentTaskId) that are not archived
+    const parentTasks = projectTasks.filter(task => !task.parentTaskId && !task.archived);
+
+    // Get archived parent tasks
+    const archivedTasks = projectTasks.filter(task => !task.parentTaskId && task.archived);
 
     /**
      * Create a new task
@@ -50,6 +52,28 @@ const TaskTree = ({
         setShowCreateForm(false);
 
         setCreatingSubtaskFor(null);
+    };
+
+    /**
+     * Archive a task
+     */
+    const handleArchiveTask = (taskId) => {
+        if (window.confirm('Are you sure you want to archive this task? It will be moved to the archived section.')) {
+            const updatedTasks = tasks.map(task =>
+                task.id === taskId ? { ...task, archived: true } : task
+            );
+            setTasks(updatedTasks);
+        }
+    };
+
+    /**
+     * Unarchive a task
+     */
+    const handleUnarchiveTask = (taskId) => {
+        const updatedTasks = tasks.map(task =>
+            task.id === taskId ? { ...task, archived: false } : task
+        );
+        setTasks(updatedTasks);
     };
 
     /**
@@ -149,7 +173,7 @@ const TaskTree = ({
             )}
 
             {/* Tasks List */}
-            {parentTasks.length === 0 ? (
+            {parentTasks.length === 0 && archivedTasks.length === 0 ? (
                 <div className="text-center py-8">
                     <div className="mx-auto h-12 w-12 text-gray-400">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -162,23 +186,76 @@ const TaskTree = ({
                     <p className="mt-1 text-sm text-gray-500">Get started by creating your first task.</p>
                 </div>
             ) : (
-                <div className="space-y-2">
-                    {parentTasks.map((task) => (
-                        <TaskItem
-                            key={task.id}
-                            task={task}
-                            tasks={tasks}
-                            setTasks={setTasks}
-                            timeEntries={timeEntries}
-                            setTimeEntries={setTimeEntries}
-                            currentTimer={currentTimer}
-                            setCurrentTimer={setCurrentTimer}
-                            onDelete={() => handleDeleteTask(task.id)}
-                            onCreateSubtask={() => startCreatingSubtask(task.id)}
-                            allTasks={projectTasks}
-                        />
-                    ))}
-                </div>
+                <>
+                    {/* Active Tasks */}
+                    {parentTasks.length > 0 && (
+                        <div className="space-y-2">
+                            {parentTasks.map((task) => (
+                                <TaskItem
+                                    key={task.id}
+                                    task={task}
+                                    tasks={tasks}
+                                    setTasks={setTasks}
+                                    timeEntries={timeEntries}
+                                    setTimeEntries={setTimeEntries}
+                                    currentTimer={currentTimer}
+                                    setCurrentTimer={setCurrentTimer}
+                                    onDelete={() => handleDeleteTask(task.id)}
+                                    onCreateSubtask={() => startCreatingSubtask(task.id)}
+                                    onArchive={() => handleArchiveTask(task.id)}
+                                    allTasks={projectTasks}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Archived Tasks Section */}
+                    {archivedTasks.length > 0 && (
+                        <div className="mt-8 border-t pt-6">
+                            <button
+                                onClick={() => setShowArchivedTasks(!showArchivedTasks)}
+                                className="flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 mb-4"
+                            >
+                                {showArchivedTasks ? (
+                                    <ChevronDownIcon className="h-4 w-4 mr-1" />
+                                ) : (
+                                    <ChevronRightIcon className="h-4 w-4 mr-1" />
+                                )}
+                                Archived Tasks ({archivedTasks.length})
+                            </button>
+
+                            {showArchivedTasks && (
+                                <div className="space-y-2 opacity-75">
+                                    {archivedTasks.map((task) => (
+                                        <div key={task.id} className="relative">
+                                            <TaskItem
+                                                task={task}
+                                                tasks={tasks}
+                                                setTasks={setTasks}
+                                                timeEntries={timeEntries}
+                                                setTimeEntries={setTimeEntries}
+                                                currentTimer={currentTimer}
+                                                setCurrentTimer={setCurrentTimer}
+                                                onDelete={() => handleDeleteTask(task.id)}
+                                                onCreateSubtask={() => startCreatingSubtask(task.id)}
+                                                allTasks={projectTasks}
+                                            />
+                                            
+                                            {/* Unarchive Button */}
+                                            <button
+                                                onClick={() => handleUnarchiveTask(task.id)}
+                                                className="absolute top-2 right-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded"
+                                                title="Unarchive Task"
+                                            >
+                                                Unarchive
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

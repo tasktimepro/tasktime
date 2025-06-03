@@ -83,6 +83,19 @@ const ProjectDashboard = ({
                     />
                 </div>
             </div>
+
+            {/* Invoices Section */}
+            <div className="bg-white shadow rounded-lg">
+                <div className="px-6 py-4">
+                    <InvoiceGenerator
+                        project={project}
+                        projects={projects}
+                        setProjects={setProjects}
+                        tasks={projectTasks}
+                        timeEntries={projectTimeEntries}
+                    />
+                </div>
+            </div>
         </div>
     );
 };
