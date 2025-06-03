@@ -266,7 +266,7 @@ const ProjectList = ({ projects, setProjects, tasks = [], onSelectProject, onImp
                                     <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
                                         <button
                                             onClick={() => startEditing(project)}
-                                            className="text-gray-400 hover:text-gray-600"
+                                            className="text-gray-400 hover:text-yellow-600"
                                         >
                                             <PencilIcon className="h-4 w-4" />
                                         </button>

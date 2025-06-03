@@ -27,12 +27,11 @@ const TaskItem = ({
     allTasks
 }) => {
     const [isEditing, setIsEditing] = useState(false);
-
     const [editTitle, setEditTitle] = useState(task.title);
-
     const [currentTime, setCurrentTime] = useState(Date.now());
-
     const [showTimeEditModal, setShowTimeEditModal] = useState(false);
+    const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
+    const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
     // Update current time every second for active timer display
     useEffect(() => {
@@ -182,15 +181,39 @@ const TaskItem = ({
      */
     const cancelEdit = () => {
         setEditTitle(task.title);
-
         setIsEditing(false);
+    };
+
+    /**
+     * Handle creating a subtask
+     */
+    const handleCreateSubtask = (e) => {
+        e.preventDefault();
+        
+        if (!newSubtaskTitle.trim()) return;
+
+        onCreateSubtask({
+            parentTaskId: task.id,
+            title: newSubtaskTitle
+        });
+
+        setNewSubtaskTitle('');
+        setShowCreateSubtaskForm(false);
+    };
+
+    /**
+     * Cancel subtask creation
+     */
+    const cancelCreateSubtask = () => {
+        setNewSubtaskTitle('');
+        setShowCreateSubtaskForm(false);
     };
 
     // Calculate active timer display
     const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
 
     return (
-        <div className={`border border-gray-200 rounded-lg ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
+        <div className={`border border-gray-200 rounded-lg hover:shadow-md transition-shadow ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
             {/* Main Task */}
             <div className="p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
@@ -298,14 +321,6 @@ const TaskItem = ({
                                         setCurrentTimer={setCurrentTimer}
                                     />
 
-                                    <button
-                                        onClick={() => setIsEditing(true)}
-                                        className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
-                                        title="Edit Task"
-                                    >
-                                        <PencilIcon className="h-5 w-5 group-hover:text-gray-600" />
-                                    </button>
-
                                     {totalTime > 0 && (
                                         <button
                                             onClick={() => setShowTimeEditModal(true)}
@@ -315,6 +330,14 @@ const TaskItem = ({
                                             <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
                                         </button>
                                     )}
+
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className="p-1 text-gray-400 hover:bg-yellow-100 rounded-full transition-colors group"
+                                        title="Edit Task"
+                                    >
+                                        <PencilIcon className="h-5 w-5 group-hover:text-yellow-600" />
+                                    </button>
 
                                     <button
                                         onClick={onDelete}
@@ -340,7 +363,7 @@ const TaskItem = ({
             />
 
             {/* Subtasks */}
-            {subtasks.length > 0 && (
+            {(subtasks.length > 0 || (!task.completed && onCreateSubtask)) && (
                 <div className="border-t border-gray-100 bg-gray-50">
                     <div className="pl-8 pr-4 py-2 space-y-2">
                         {subtasks.map((subtask) => (
@@ -370,6 +393,44 @@ const TaskItem = ({
                                 }}
                             />
                         ))}
+                        
+                        {/* Add Subtask Section */}
+                        {!task.completed && onCreateSubtask && (
+                            showCreateSubtaskForm ? (
+                                <form onSubmit={handleCreateSubtask} className="space-y-3">
+                                    <div className="flex space-x-3">
+                                        <input
+                                            type="text"
+                                            value={newSubtaskTitle}
+                                            onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                                            placeholder="Enter subtask title"
+                                            className="flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-1.5"
+                                            autoFocus
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        >
+                                            Add
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={cancelCreateSubtask}
+                                            className="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <button
+                                    onClick={() => setShowCreateSubtaskForm(true)}
+                                    className="w-full text-left py-2 px-3 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors border border-dashed border-gray-300 hover:border-gray-400"
+                                >
+                                    + Add subtask
+                                </button>
+                            )
+                        )}
                     </div>
                 </div>
             )}
@@ -597,14 +658,6 @@ const SubtaskItem = ({
                                 currentTimer={currentTimer}
                                 setCurrentTimer={setCurrentTimer}
                             />
-                            
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
-                                title="Edit Subtask"
-                            >
-                                <PencilIcon className="h-5 w-5 group-hover:text-gray-600" />
-                            </button>
 
                             {totalTime > 0 && (
                                 <button
@@ -615,6 +668,14 @@ const SubtaskItem = ({
                                     <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
                                 </button>
                             )}
+                            
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="p-1 text-gray-400 hover:bg-yellow-100 rounded-full transition-colors group"
+                                title="Edit Subtask"
+                            >
+                                <PencilIcon className="h-5 w-5 group-hover:text-yellow-600" />
+                            </button>
 
                             <button
                                 onClick={onDelete}

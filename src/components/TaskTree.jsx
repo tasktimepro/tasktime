@@ -17,7 +17,6 @@ const TaskTree = ({
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
-    const [creatingSubtaskFor, setCreatingSubtaskFor] = useState(null);
     const [showArchivedTasks, setShowArchivedTasks] = useState(false);
 
     // Get tasks for this project
@@ -32,26 +31,33 @@ const TaskTree = ({
     /**
      * Create a new task
      */
-    const handleCreateTask = (e) => {
-        e.preventDefault();
-
-        if (!newTaskTitle.trim()) return;
-
+    const handleCreateTask = (taskData) => {
         const newTask = {
             id: generateId(),
             projectId: project.id,
-            parentTaskId: creatingSubtaskFor,
-            title: newTaskTitle.trim(),
+            parentTaskId: taskData.parentTaskId,
+            title: taskData.title.trim(),
             createdAt: Date.now()
         };
 
         setTasks([...tasks, newTask]);
+    };
+
+    /**
+     * Create a new main task
+     */
+    const handleCreateMainTask = (e) => {
+        e.preventDefault();
+
+        if (!newTaskTitle.trim()) return;
+
+        handleCreateTask({
+            parentTaskId: null,
+            title: newTaskTitle
+        });
 
         setNewTaskTitle('');
-
         setShowCreateForm(false);
-
-        setCreatingSubtaskFor(null);
     };
 
     /**
@@ -106,11 +112,8 @@ const TaskTree = ({
      * Start creating a subtask for a parent task
      */
     const startCreatingSubtask = (parentTaskId) => {
-        setCreatingSubtaskFor(parentTaskId);
-
-        setShowCreateForm(true);
-
-        setNewTaskTitle('');
+        // This will now be handled by the TaskItem component
+        // No need to set global state
     };
 
     /**
@@ -118,9 +121,6 @@ const TaskTree = ({
      */
     const cancelCreate = () => {
         setShowCreateForm(false);
-
-        setCreatingSubtaskFor(null);
-
         setNewTaskTitle('');
     };
 
@@ -130,10 +130,10 @@ const TaskTree = ({
             {showCreateForm && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <h3 className="text-sm font-medium text-gray-900 mb-3">
-                        {creatingSubtaskFor ? 'Create Subtask' : 'Create New Task'}
+                        Create New Task
                     </h3>
 
-                    <form onSubmit={handleCreateTask} className="flex space-x-3">
+                    <form onSubmit={handleCreateMainTask} className="flex space-x-3">
                         <input
                             type="text"
                             value={newTaskTitle}
@@ -189,35 +189,22 @@ const TaskTree = ({
                 <>
                     {/* Active Tasks */}
                     {parentTasks.length > 0 && (
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                             {parentTasks.map((task) => (
-                                <div key={task.id} className="space-y-1">
-                                    <TaskItem
-                                        task={task}
-                                        tasks={tasks}
-                                        setTasks={setTasks}
-                                        timeEntries={timeEntries}
-                                        setTimeEntries={setTimeEntries}
-                                        currentTimer={currentTimer}
-                                        setCurrentTimer={setCurrentTimer}
-                                        onDelete={() => handleDeleteTask(task.id)}
-                                        onCreateSubtask={() => startCreatingSubtask(task.id)}
-                                        onArchive={() => handleArchiveTask(task.id)}
-                                        allTasks={projectTasks}
-                                    />
-                                    
-                                    {/* Add Subtask Row */}
-                                    {!task.completed && (
-                                        <div className="ml-4 border-l-2 border-gray-200 pl-4">
-                                            <button
-                                                onClick={() => startCreatingSubtask(task.id)}
-                                                className="w-full text-left py-2 px-3 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors border border-dashed border-gray-300 hover:border-gray-400"
-                                            >
-                                                + Add subtask
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
+                                <TaskItem
+                                    key={task.id}
+                                    task={task}
+                                    tasks={tasks}
+                                    setTasks={setTasks}
+                                    timeEntries={timeEntries}
+                                    setTimeEntries={setTimeEntries}
+                                    currentTimer={currentTimer}
+                                    setCurrentTimer={setCurrentTimer}
+                                    onDelete={() => handleDeleteTask(task.id)}
+                                    onCreateSubtask={handleCreateTask}
+                                    onArchive={() => handleArchiveTask(task.id)}
+                                    allTasks={projectTasks}
+                                />
                             ))}
                         </div>
                     )}
@@ -250,7 +237,7 @@ const TaskTree = ({
                                                 currentTimer={currentTimer}
                                                 setCurrentTimer={setCurrentTimer}
                                                 onDelete={() => handleDeleteTask(task.id)}
-                                                onCreateSubtask={() => startCreatingSubtask(task.id)}
+                                                onCreateSubtask={handleCreateTask}
                                                 allTasks={projectTasks}
                                             />
                                             
