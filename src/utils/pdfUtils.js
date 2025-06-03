@@ -1,4 +1,5 @@
 import html2pdf from 'html2pdf.js';
+import { getCurrencySymbol } from './currencyUtils';
 
 /**
  * Generate and download a PDF from HTML content
@@ -83,7 +84,7 @@ export const createInvoiceHTML = (invoiceData) => {
                 <div style="text-align: right;">
                     <h3 style="color: #333; margin-bottom: 10px;">Project:</h3>
                     <p style="margin: 0; font-weight: bold;">${project.title}</p>
-                    <p style="margin: 0; color: #666;">Rate: $${project.hourlyRate}/${project.currency || 'USD'} per hour</p>
+                    <p style="margin: 0; color: #666;">Rate: ${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency || 'USD'} per hour</p>
                 </div>
             </div>
             
@@ -101,8 +102,8 @@ export const createInvoiceHTML = (invoiceData) => {
                         <tr>
                             <td style="padding: 8px; border-bottom: 1px solid #eee;">${task.title}</td>
                             <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${task.hours.toFixed(2)}</td>
-                            <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">$${project.hourlyRate}</td>
-                            <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">$${(task.hours * project.hourlyRate).toFixed(2)}</td>
+                            <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${getCurrencySymbol(project.currency)}${project.hourlyRate}</td>
+                            <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${getCurrencySymbol(project.currency)}${(task.hours * project.hourlyRate).toFixed(2)}</td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -110,7 +111,7 @@ export const createInvoiceHTML = (invoiceData) => {
             
             <div style="text-align: right; margin-bottom: 30px;">
                 <p style="margin: 0; font-size: 18px;"><strong>Total Hours: ${totalHours.toFixed(2)}</strong></p>
-                <p style="margin: 0; font-size: 24px; color: #333;"><strong>Total Amount: $${totalAmount.toFixed(2)}</strong></p>
+                <p style="margin: 0; font-size: 24px; color: #333;"><strong>Total Amount: ${getCurrencySymbol(project.currency)}${totalAmount.toFixed(2)}</strong></p>
             </div>
             
             <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666;">

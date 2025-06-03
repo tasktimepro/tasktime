@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
-import ExportImport from './ExportImport';
+import ExportImport from './ExportImport.jsx';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 
 /**
  * ProjectList component - Displays and manages the list of projects
@@ -280,7 +281,7 @@ const ProjectList = ({ projects, setProjects, tasks = [], onSelectProject, onImp
                                 </div>
 
                                 <p className="mt-2 text-sm text-gray-500">
-                                    ${project.hourlyRate}/{project.currency} per hour
+                                    {getCurrencySymbol(project.currency)}{project.hourlyRate}/{project.currency} per hour
                                 </p>
 
                                 <p className="mt-1 text-xs text-gray-400">

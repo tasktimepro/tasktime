@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
@@ -108,7 +109,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                                             {invoice.invoiceNumber}
                                         </h3>
                                         <p className="text-sm text-gray-500">
-                                            {invoice.date} • ${invoice.totalAmount.toFixed(2)} • {invoice.totalHours.toFixed(2)} hours
+                                            {invoice.date} • {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)} • {invoice.totalHours.toFixed(2)} hours
                                         </p>
                                         <p className="text-xs text-gray-400">
                                             Client: {invoice.clientInfo?.name || invoice.client?.name}
@@ -207,7 +208,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                                             <h3 className="text-sm font-medium text-gray-900 mb-2">Project:</h3>
                                             <div className="text-sm text-gray-600">
                                                 <p>{selectedInvoice.project?.title || 'Unknown Project'}</p>
-                                                <p>Rate: ${selectedInvoice.project?.hourlyRate || 0}/{selectedInvoice.project?.currency || 'USD'} per hour</p>
+                                                <p>Rate: {getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}{selectedInvoice.project?.hourlyRate || 0}/{selectedInvoice.project?.currency || 'USD'} per hour</p>
                                             </div>
                                         </div>
                                     </div>
@@ -227,7 +228,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                                     <div className="border-t pt-2">
                                         <div className="flex justify-between text-sm font-medium">
                                             <span>Total: {selectedInvoice.totalHours?.toFixed(2) || 0} hours</span>
-                                            <span>${selectedInvoice.totalAmount?.toFixed(2) || 0}</span>
+                                            <span>{getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}{selectedInvoice.totalAmount?.toFixed(2) || 0}</span>
                                         </div>
                                     </div>
                                 </div>

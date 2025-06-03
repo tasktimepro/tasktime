@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -297,7 +298,7 @@ const InvoiceGenerator = ({
                     Generate Invoice
                     {unbilledHours > 0 && (
                         <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full">
-                            ${unbilledAmount.toFixed(2)}
+                            {getCurrencySymbol(project.currency)}{unbilledAmount.toFixed(2)}
                         </span>
                     )}
                 </button>
@@ -367,7 +368,7 @@ const InvoiceGenerator = ({
                                             <div className="flex justify-between text-sm">
                                                 <span>Total Amount:</span>
                                                 <span className="font-medium">
-                                                    ${(invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0) * project.hourlyRate).toFixed(2)}
+                                                    {getCurrencySymbol(project.currency)}{(invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0) * project.hourlyRate).toFixed(2)}
                                                 </span>
                                             </div>
                                         </div>

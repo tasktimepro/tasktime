@@ -4,6 +4,7 @@ import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -56,7 +57,7 @@ const ProjectDashboard = ({
                         <h1 className="text-3xl font-bold text-gray-900">{project.title}</h1>
 
                         <p className="text-sm text-gray-500">
-                            ${project.hourlyRate}/{project.currency} per hour
+                            {getCurrencySymbol(project.currency)}{project.hourlyRate}/{project.currency} per hour
                         </p>
                     </div>
                 </div>

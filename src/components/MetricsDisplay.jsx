@@ -7,6 +7,7 @@ import {
     formatDuration,
     millisecondsToHours
 } from '../utils/dateUtils';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 
 /**
  * MetricsDisplay component - Shows time and earnings metrics for different periods
@@ -81,7 +82,7 @@ const MetricsDisplay = ({ project, tasks, timeEntries }) => {
                             </div>
 
                             <div className="text-sm text-gray-600">
-                                ${metric.earnings.toFixed(2)}
+                                {getCurrencySymbol(project.currency)}{metric.earnings.toFixed(2)}
                             </div>
                         </dd>
                     </div>
@@ -117,7 +118,7 @@ const MetricsDisplay = ({ project, tasks, timeEntries }) => {
                         </dt>
 
                         <dd className="mt-1 text-2xl font-semibold text-gray-900">
-                            ${project.hourlyRate}/{project.currency}
+                            {getCurrencySymbol(project.currency)}{project.hourlyRate}/{project.currency}
                         </dd>
                     </div>
                 </div>
