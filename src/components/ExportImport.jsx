@@ -127,7 +127,7 @@ function ExportImport({ projects, tasks = [], onImport }) {
                 {/* Data Summary */}
                 {projects.length > 0 && (
                     <div className="p-4 bg-blue-50 rounded-lg">
-                        <h4 className="font-medium text-blue-900 mb-2">Current Data</h4>
+                        <h4 className="font-medium text-blue-700 mb-2">Current Data</h4>
                         <div className="text-sm text-blue-700 space-y-1">
                             <p>{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
                             <p>{tasks.length} total tasks</p>
@@ -138,7 +138,7 @@ function ExportImport({ projects, tasks = [], onImport }) {
 
             {/* Import Modal */}
             {showImportModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 !mt-0">
                     <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Import Data</h3>
                         

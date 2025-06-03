@@ -83,9 +83,11 @@ const InvoiceGenerator = ({
      * Handle hours modification for invoice tasks
      */
     const handleHoursChange = (taskId, newHours) => {
+        const parsedHours = parseFloat(newHours) || 0;
+        const roundedHours = Math.round(parsedHours * 100) / 100; // Round to 2 decimal places
         setEditableHours(prev => ({
             ...prev,
-            [taskId]: parseFloat(newHours) || 0
+            [taskId]: roundedHours
         }));
     };
 
@@ -119,14 +121,15 @@ const InvoiceGenerator = ({
             const task = tasks.find(t => t.id === taskId);
             const totalTime = taskTimeMap[taskId];
             const calculatedHours = millisecondsToHours(totalTime);
-            const editedHours = editableHours[taskId] !== undefined ? editableHours[taskId] : calculatedHours;
+            const roundedHours = Math.round(calculatedHours * 100) / 100; // Round to 2 decimal places
+            const editedHours = editableHours[taskId] !== undefined ? editableHours[taskId] : roundedHours;
 
             return {
                 id: taskId,
                 title: task ? task.title : 'Unknown Task',
-                originalHours: calculatedHours,
+                originalHours: roundedHours,
                 hours: editedHours,
-                isEdited: editedHours !== calculatedHours
+                isEdited: editedHours !== roundedHours
             };
         }).filter(task => task.originalHours > 0);
 
@@ -231,7 +234,7 @@ const InvoiceGenerator = ({
             setInvoiceTasks(editingInvoice.tasks || []);
             const initialHours = {};
             (editingInvoice.tasks || []).forEach(task => {
-                initialHours[task.id] = task.hours;
+                initialHours[task.id] = Math.round((task.hours || 0) * 100) / 100; // Round to 2 decimal places
             });
             setEditableHours(initialHours);
         } else {
@@ -306,7 +309,7 @@ const InvoiceGenerator = ({
 
             {/* Invoice Generation Modal */}
             {showInvoiceForm && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 !mt-0">
                     <div className="relative mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white my-8">
                         <div className="mt-3">
                             <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -347,7 +350,7 @@ const InvoiceGenerator = ({
                                                             type="number"
                                                             step="0.25"
                                                             min="0"
-                                                            value={editableHours[task.id] || task.hours}
+                                                            value={(editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours).toFixed(2)}
                                                             onChange={(e) => handleHoursChange(task.id, e.target.value)}
                                                             className="w-20 text-sm border-gray-300 rounded-md"
                                                         />
@@ -387,7 +390,7 @@ const InvoiceGenerator = ({
                                                     value={clientInfo.name}
                                                     onChange={handleClientChange}
                                                     required
-                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                                     placeholder="Enter client name"
                                                 />
                                             </div>
@@ -401,7 +404,7 @@ const InvoiceGenerator = ({
                                                     name="email"
                                                     value={clientInfo.email}
                                                     onChange={handleClientChange}
-                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                                     placeholder="client@example.com"
                                                 />
                                             </div>
@@ -415,7 +418,7 @@ const InvoiceGenerator = ({
                                                     name="address"
                                                     value={clientInfo.address}
                                                     onChange={handleClientChange}
-                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                                     placeholder="Street address"
                                                 />
                                             </div>
@@ -429,7 +432,7 @@ const InvoiceGenerator = ({
                                                     name="city"
                                                     value={clientInfo.city}
                                                     onChange={handleClientChange}
-                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                                 />
                                             </div>
 
@@ -443,7 +446,7 @@ const InvoiceGenerator = ({
                                                         name="state"
                                                         value={clientInfo.state}
                                                         onChange={handleClientChange}
-                                                        className="mt-1 flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
+                                                        className="mt-1 flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                                         placeholder="State"
                                                     />
                                                     <input
@@ -451,7 +454,7 @@ const InvoiceGenerator = ({
                                                         name="zip"
                                                         value={clientInfo.zip}
                                                         onChange={handleClientChange}
-                                                        className="mt-1 w-24 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
+                                                        className="mt-1 w-24 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                                         placeholder="ZIP"
                                                     />
                                                 </div>

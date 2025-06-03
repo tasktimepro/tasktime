@@ -50,7 +50,7 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 !mt-0">
             <div className="bg-white rounded-lg p-6 w-96 max-w-md mx-4">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-medium text-gray-900">
@@ -77,7 +77,7 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                                 min="0"
                                 value={editHours}
                                 onChange={(e) => setEditHours(Math.max(0, parseInt(e.target.value) || 0))}
-                                className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-5 py-1.5"
+                                className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                             />
                         </div>
 
@@ -92,7 +92,7 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                                 max="59"
                                 value={editMinutes}
                                 onChange={(e) => setEditMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
-                                className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-5 py-1.5"
+                                className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                             />
                         </div>
 
@@ -107,7 +107,7 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                                 max="59"
                                 value={editSeconds}
                                 onChange={(e) => setEditSeconds(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
-                                className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-5 py-1.5"
+                                className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                             />
                         </div>
                     </div>

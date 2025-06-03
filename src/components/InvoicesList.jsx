@@ -158,7 +158,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
 
             {/* Invoice Preview Modal */}
             {showPreview && selectedInvoice && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 !mt-0">
                     <div className="relative mx-auto p-5 border max-w-4xl shadow-lg rounded-md bg-white my-8">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-medium text-gray-900">

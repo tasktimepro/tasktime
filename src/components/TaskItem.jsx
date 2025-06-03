@@ -234,7 +234,7 @@ const TaskItem = ({
                                         type="text"
                                         value={editTitle}
                                         onChange={(e) => setEditTitle(e.target.value)}
-                                        className="flex-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-5 py-1.5"
+                                        className="flex-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                                         autoFocus
                                         disabled={isCompleted}
                                     />
@@ -404,7 +404,7 @@ const TaskItem = ({
                                             value={newSubtaskTitle}
                                             onChange={(e) => setNewSubtaskTitle(e.target.value)}
                                             placeholder="Enter subtask title"
-                                            className="flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-1.5"
+                                            className="flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                             autoFocus
                                         />
                                         <button
@@ -583,7 +583,7 @@ const SubtaskItem = ({
                                 type="text"
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
-                                className="flex-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-5 py-1.5"
+                                className="flex-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                                 autoFocus
                                 disabled={isCompleted}
                             />
