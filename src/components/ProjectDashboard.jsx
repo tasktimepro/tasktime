@@ -1,7 +1,9 @@
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { useState } from 'react';
 import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
+import InvoicesList from './InvoicesList';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -18,6 +20,16 @@ const ProjectDashboard = ({
     setCurrentTimer,
     onBackToProjects
 }) => {
+    // Invoice editing state
+    const [editingInvoice, setEditingInvoice] = useState(null);
+    
+    /**
+     * Handle editing an existing invoice
+     */
+    const handleEditInvoice = (invoice) => {
+        setEditingInvoice(invoice);
+    };
+    
     // Get tasks for this project
     const projectTasks = tasks.filter(task => task.projectId === project.id);
 
@@ -86,13 +98,30 @@ const ProjectDashboard = ({
 
             {/* Invoices Section */}
             <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4">
-                    <InvoiceGenerator
+                <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-medium text-gray-900">
+                            Invoices ({project.invoices?.length || 0})
+                        </h2>
+                        
+                        <InvoiceGenerator
+                            project={project}
+                            projects={projects}
+                            setProjects={setProjects}
+                            tasks={projectTasks}
+                            timeEntries={projectTimeEntries}
+                            editingInvoice={editingInvoice}
+                            onInvoiceSaved={() => setEditingInvoice(null)}
+                        />
+                    </div>
+                </div>
+
+                <div className="p-6">
+                    <InvoicesList
                         project={project}
                         projects={projects}
                         setProjects={setProjects}
-                        tasks={projectTasks}
-                        timeEntries={projectTimeEntries}
+                        onEditInvoice={handleEditInvoice}
                     />
                 </div>
             </div>

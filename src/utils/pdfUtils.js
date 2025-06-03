@@ -7,17 +7,43 @@ import html2pdf from 'html2pdf.js';
  * @param {Object} options - PDF generation options
  */
 export const generatePDF = (htmlContent, filename = 'invoice.pdf', options = {}) => {
-    const defaultOptions = {
-        margin: 1,
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
+    return new Promise((resolve, reject) => {
+        try {
+            if (!htmlContent) {
+                reject(new Error('No HTML content provided'));
+                return;
+            }
 
-    const finalOptions = { ...defaultOptions, ...options };
+            const defaultOptions = {
+                margin: 1,
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
 
-    html2pdf().set(finalOptions).from(htmlContent).save();
+            const finalOptions = { ...defaultOptions, ...options };
+
+            console.log('Generating PDF with options:', finalOptions);
+            console.log('HTML content length:', htmlContent.length);
+
+            html2pdf()
+                .set(finalOptions)
+                .from(htmlContent)
+                .save()
+                .then(() => {
+                    console.log('PDF generated successfully');
+                    resolve();
+                })
+                .catch((error) => {
+                    console.error('PDF generation failed:', error);
+                    reject(error);
+                });
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            reject(error);
+        }
+    });
 };
 
 /**

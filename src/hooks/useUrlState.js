@@ -57,6 +57,13 @@ export const useUrlState = () => {
     }, [updateUrl]);
 
     /**
+     * Navigate to invoices view
+     */
+    const navigateToInvoices = useCallback(() => {
+        updateUrl({ view: 'invoices', project: null });
+    }, [updateUrl]);
+
+    /**
      * Handle browser back/forward navigation
      */
     useEffect(() => {
@@ -76,6 +83,7 @@ export const useUrlState = () => {
         urlParams,
         navigateToProjects,
         navigateToProject,
+        navigateToInvoices,
         updateUrl
     };
 };

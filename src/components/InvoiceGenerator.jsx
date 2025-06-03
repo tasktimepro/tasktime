@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
@@ -11,21 +11,57 @@ const InvoiceGenerator = ({
     projects, 
     setProjects, 
     tasks, 
-    timeEntries 
+    timeEntries,
+    editingInvoice,
+    onInvoiceSaved 
 }) => {
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
-    const [showInvoicePreview, setShowInvoicePreview] = useState(false);
-    const [showPreviousInvoices, setShowPreviousInvoices] = useState(false);
-    const [selectedInvoice, setSelectedInvoice] = useState(null);
 
-    const [clientInfo, setClientInfo] = useState({
-        name: '',
-        email: '',
-        address: '',
-        city: '',
-        state: '',
-        zip: ''
-    });
+    /**
+     * Initialize client info based on previous invoices or editing invoice
+     */
+    const initializeClientInfo = () => {
+        // If editing an invoice, use its client info
+        if (editingInvoice) {
+            return editingInvoice.clientInfo || editingInvoice.client || {
+                name: '',
+                email: '',
+                address: '',
+                city: '',
+                state: '',
+                zip: ''
+            };
+        }
+        
+        const previousInvoices = project.invoices || [];
+        if (previousInvoices.length > 0) {
+            // Get the most recent invoice's client info
+            const latestInvoice = previousInvoices[previousInvoices.length - 1];
+            return latestInvoice.clientInfo || latestInvoice.client || {
+                name: '',
+                email: '',
+                address: '',
+                city: '',
+                state: '',
+                zip: ''
+            };
+        }
+        return {
+            name: '',
+            email: '',
+            address: '',
+            city: '',
+            state: '',
+            zip: ''
+        };
+    };
+
+    const [clientInfo, setClientInfo] = useState(initializeClientInfo);
+
+    // Update client info when editing invoice changes
+    useEffect(() => {
+        setClientInfo(initializeClientInfo());
+    }, [editingInvoice]);
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
@@ -97,9 +133,9 @@ const InvoiceGenerator = ({
     };
 
     /**
-     * Generate invoice PDF and store in project
+     * Save invoice (create new or update existing)
      */
-    const handleGenerateInvoice = (e) => {
+    const handleSaveInvoice = (e) => {
         e.preventDefault();
 
         if (!clientInfo.name.trim()) {
@@ -112,35 +148,58 @@ const InvoiceGenerator = ({
             return;
         }
 
-        const totalHours = invoiceTasks.reduce((sum, task) => sum + task.hours, 0);
+        const totalHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.originalHours), 0);
         const totalAmount = totalHours * project.hourlyRate;
 
         const invoiceData = {
-            id: `INV-${project.id.slice(-8)}-${Date.now()}`,
+            id: editingInvoice ? editingInvoice.id : `INV-${project.id.slice(-8)}-${Date.now()}`,
             project: project,
-            client: clientInfo,
-            tasks: invoiceTasks,
+            clientInfo: clientInfo,
+            tasks: invoiceTasks.map(task => ({
+                ...task,
+                hours: editableHours[task.id] || task.originalHours
+            })),
             totalHours: totalHours,
             totalAmount: totalAmount,
-            invoiceNumber: `INV-${project.id.slice(-8)}-${Date.now()}`,
-            date: new Date().toLocaleDateString(),
-            createdAt: Date.now()
+            invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
+            date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
+            createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
+            htmlContent: createInvoiceHTML({
+                id: editingInvoice ? editingInvoice.id : `INV-${project.id.slice(-8)}-${Date.now()}`,
+                project: project,
+                client: clientInfo,
+                tasks: invoiceTasks.map(task => ({
+                    ...task,
+                    hours: editableHours[task.id] || task.originalHours
+                })),
+                totalHours: totalHours,
+                totalAmount: totalAmount,
+                invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
+                date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
+                createdAt: editingInvoice ? editingInvoice.createdAt : Date.now()
+            })
         };
-
-        // Generate PDF
-        const htmlContent = createInvoiceHTML(invoiceData);
-        const filename = `${project.title.replace(/[^a-z0-9]/gi, '_')}_invoice_${new Date().toISOString().slice(0, 10)}.pdf`;
-
-        generatePDF(htmlContent, filename);
 
         // Store invoice in project
         const projectInvoices = project.invoices || [];
+        let updatedInvoices;
+        
+        if (editingInvoice) {
+            // Update existing invoice
+            updatedInvoices = projectInvoices.map(inv => 
+                inv.id === editingInvoice.id ? invoiceData : inv
+            );
+        } else {
+            // Add new invoice
+            updatedInvoices = [...projectInvoices, invoiceData];
+        }
+
         const updatedProjects = projects.map(p => 
             p.id === project.id 
                 ? { 
                     ...p, 
-                    lastBilledAt: Date.now(),
-                    invoices: [...projectInvoices, invoiceData]
+                    lastBilledAt: editingInvoice ? p.lastBilledAt : Date.now(),
+                    invoices: updatedInvoices
                 }
                 : p
         );
@@ -151,36 +210,65 @@ const InvoiceGenerator = ({
         setShowInvoiceForm(false);
         setInvoiceTasks([]);
         setEditableHours({});
-        setClientInfo({
-            name: '',
-            email: '',
-            address: '',
-            city: '',
-            state: '',
-            zip: ''
-        });
-
-        alert('Invoice generated and saved successfully!');
+        // Don't reset client info so it stays for next invoice
+        
+        // Call callback if provided
+        if (onInvoiceSaved) {
+            onInvoiceSaved();
+        }
+        
+        const action = editingInvoice ? 'updated' : 'saved';
+        alert(`Invoice ${action} successfully! You can view, edit, or download it from the Invoices tab.`);
     };
 
     /**
-     * Open invoice form with prepared data
+     * Open invoice form with prepared data or for editing
      */
     const openInvoiceForm = () => {
-        const tasksData = prepareInvoiceData();
-        if (!tasksData) {
-            alert('No billable time entries found since last invoice');
-            return;
+        if (editingInvoice) {
+            // Open form with existing invoice data
+            setInvoiceTasks(editingInvoice.tasks || []);
+            const initialHours = {};
+            (editingInvoice.tasks || []).forEach(task => {
+                initialHours[task.id] = task.hours;
+            });
+            setEditableHours(initialHours);
+        } else {
+            // Open form with new invoice data
+            const tasksData = prepareInvoiceData();
+            if (!tasksData) {
+                alert('No billable time entries found since last invoice');
+                return;
+            }
+            
+            setInvoiceTasks(tasksData);
+            // Initialize editable hours with original hours
+            const initialHours = {};
+            tasksData.forEach(task => {
+                initialHours[task.id] = task.originalHours;
+            });
+            setEditableHours(initialHours);
         }
-        
-        setInvoiceTasks(tasksData);
-        // Initialize editable hours with original hours
-        const initialHours = {};
-        tasksData.forEach(task => {
-            initialHours[task.id] = task.originalHours;
-        });
-        setEditableHours(initialHours);
         setShowInvoiceForm(true);
+    };
+
+    // Auto-open form when editing an invoice
+    useEffect(() => {
+        if (editingInvoice) {
+            openInvoiceForm();
+        }
+    }, [editingInvoice]);
+
+    /**
+     * Handle canceling the form
+     */
+    const handleCancel = () => {
+        setShowInvoiceForm(false);
+        setInvoiceTasks([]);
+        setEditableHours({});
+        if (onInvoiceSaved) {
+            onInvoiceSaved(); // This will clear the editing state
+        }
     };
 
     // Calculate unbilled time
@@ -213,42 +301,7 @@ const InvoiceGenerator = ({
                         </span>
                     )}
                 </button>
-
-                {/* Previous Invoices Toggle */}
-                {project.invoices && project.invoices.length > 0 && (
-                    <button
-                        onClick={() => setShowPreviousInvoices(!showPreviousInvoices)}
-                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                        Previous Invoices ({project.invoices.length})
-                    </button>
-                )}
             </div>
-
-            {/* Previous Invoices Section */}
-            {showPreviousInvoices && project.invoices && project.invoices.length > 0 && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-900 mb-3">Previous Invoices</h4>
-                    <div className="space-y-2">
-                        {project.invoices.map((invoice) => (
-                            <div key={invoice.id} className="flex items-center justify-between py-2 px-3 bg-white rounded border">
-                                <div>
-                                    <p className="text-sm font-medium">{invoice.invoiceNumber}</p>
-                                    <p className="text-xs text-gray-500">
-                                        {invoice.date} • ${invoice.totalAmount.toFixed(2)} • {invoice.totalHours.toFixed(2)}h
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => setSelectedInvoice(invoice)}
-                                    className="text-xs text-blue-600 hover:text-blue-800"
-                                >
-                                    Preview
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
 
             {/* Invoice Generation Modal */}
             {showInvoiceForm && (
@@ -256,14 +309,14 @@ const InvoiceGenerator = ({
                     <div className="relative mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white my-8">
                         <div className="mt-3">
                             <h3 className="text-lg font-medium text-gray-900 mb-4">
-                                Generate Invoice
+                                {editingInvoice ? 'Edit Invoice' : 'Save Invoice'}
                             </h3>
 
                             {invoiceTasks.length === 0 ? (
                                 <div className="text-center py-4">
                                     <p className="text-gray-500">No billable time entries found.</p>
                                     <button
-                                        onClick={() => setShowInvoiceForm(false)}
+                                        onClick={handleCancel}
                                         className="mt-4 px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
                                     >
                                         Close
@@ -320,7 +373,7 @@ const InvoiceGenerator = ({
                                         </div>
                                     </div>
 
-                                    <form onSubmit={handleGenerateInvoice} className="space-y-4">
+                                    <form onSubmit={handleSaveInvoice} className="space-y-4">
                                         {/* Client Information Form */}
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="col-span-2">
@@ -409,7 +462,7 @@ const InvoiceGenerator = ({
                                         <div className="flex justify-end space-x-3 mt-6">
                                             <button
                                                 type="button"
-                                                onClick={() => setShowInvoiceForm(false)}
+                                                onClick={handleCancel}
                                                 className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                                             >
                                                 Cancel
@@ -419,67 +472,12 @@ const InvoiceGenerator = ({
                                                 type="submit"
                                                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
                                             >
-                                                Generate PDF
+                                                {editingInvoice ? 'Update Invoice' : 'Save Invoice'}
                                             </button>
                                         </div>
                                     </form>
                                 </div>
                             )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Invoice Preview Modal */}
-            {selectedInvoice && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white my-8">
-                        <div className="mt-3">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-medium text-gray-900">
-                                    Invoice Preview
-                                </h3>
-                                <button
-                                    onClick={() => setSelectedInvoice(null)}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <div className="mb-4">
-                                    <h4 className="font-medium">{selectedInvoice.invoiceNumber}</h4>
-                                    <p className="text-sm text-gray-600">Date: {selectedInvoice.date}</p>
-                                </div>
-
-                                <div className="mb-4">
-                                    <h5 className="text-sm font-medium text-gray-900">Client:</h5>
-                                    <p className="text-sm text-gray-600">{selectedInvoice.client.name}</p>
-                                    {selectedInvoice.client.email && (
-                                        <p className="text-sm text-gray-600">{selectedInvoice.client.email}</p>
-                                    )}
-                                </div>
-
-                                <div className="mb-4">
-                                    <h5 className="text-sm font-medium text-gray-900">Tasks:</h5>
-                                    <div className="space-y-1">
-                                        {selectedInvoice.tasks.map((task, index) => (
-                                            <div key={index} className="flex justify-between text-sm">
-                                                <span>{task.title}</span>
-                                                <span>{task.hours.toFixed(2)}h</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="border-t pt-2">
-                                    <div className="flex justify-between text-sm font-medium">
-                                        <span>Total: {selectedInvoice.totalHours.toFixed(2)} hours</span>
-                                        <span>${selectedInvoice.totalAmount.toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
