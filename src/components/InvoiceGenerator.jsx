@@ -253,7 +253,7 @@ const InvoiceGenerator = ({
             {/* Invoice Generation Modal */}
             {showInvoiceForm && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-10 mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white">
+                    <div className="relative mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white my-8">
                         <div className="mt-3">
                             <h3 className="text-lg font-medium text-gray-900 mb-4">
                                 Generate Invoice
@@ -333,7 +333,7 @@ const InvoiceGenerator = ({
                                                     value={clientInfo.name}
                                                     onChange={handleClientChange}
                                                     required
-                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
                                                     placeholder="Enter client name"
                                                 />
                                             </div>
@@ -347,7 +347,7 @@ const InvoiceGenerator = ({
                                                     name="email"
                                                     value={clientInfo.email}
                                                     onChange={handleClientChange}
-                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
                                                     placeholder="client@example.com"
                                                 />
                                             </div>
@@ -361,7 +361,7 @@ const InvoiceGenerator = ({
                                                     name="address"
                                                     value={clientInfo.address}
                                                     onChange={handleClientChange}
-                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
                                                     placeholder="Street address"
                                                 />
                                             </div>
@@ -375,7 +375,7 @@ const InvoiceGenerator = ({
                                                     name="city"
                                                     value={clientInfo.city}
                                                     onChange={handleClientChange}
-                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
                                                 />
                                             </div>
 
@@ -389,7 +389,7 @@ const InvoiceGenerator = ({
                                                         name="state"
                                                         value={clientInfo.state}
                                                         onChange={handleClientChange}
-                                                        className="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                        className="mt-1 flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
                                                         placeholder="State"
                                                     />
                                                     <input
@@ -397,12 +397,14 @@ const InvoiceGenerator = ({
                                                         name="zip"
                                                         value={clientInfo.zip}
                                                         onChange={handleClientChange}
-                                                        className="w-24 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                        className="mt-1 w-24 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
                                                         placeholder="ZIP"
                                                     />
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <br />
 
                                         <div className="flex justify-end space-x-3 mt-6">
                                             <button
@@ -431,7 +433,7 @@ const InvoiceGenerator = ({
             {/* Invoice Preview Modal */}
             {selectedInvoice && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-10 mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white">
+                    <div className="relative mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white my-8">
                         <div className="mt-3">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-medium text-gray-900">

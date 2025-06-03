@@ -158,7 +158,7 @@ const ProjectList = ({ projects, setProjects, tasks = [], onSelectProject, onImp
                                 value={formData.title}
                                 onChange={handleInputChange}
                                 required
-                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
                                 placeholder="Enter project title"
                             />
                         </div>
@@ -178,7 +178,7 @@ const ProjectList = ({ projects, setProjects, tasks = [], onSelectProject, onImp
                                     required
                                     min="0"
                                     step="0.01"
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
                                     placeholder="0.00"
                                 />
                             </div>
@@ -193,11 +193,12 @@ const ProjectList = ({ projects, setProjects, tasks = [], onSelectProject, onImp
                                     name="currency"
                                     value={formData.currency}
                                     onChange={handleInputChange}
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-5 py-1.5"
                                 >
                                     <option value="USD">USD</option>
                                     <option value="EUR">EUR</option>
                                     <option value="GBP">GBP</option>
+                                    <option value="CHF">CHF</option>
                                     <option value="CAD">CAD</option>
                                     <option value="AUD">AUD</option>
                                 </select>

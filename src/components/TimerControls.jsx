@@ -1,28 +1,53 @@
-import { PlayIcon, PauseIcon, StopIcon } from '@heroicons/react/24/outline';
+import { PlayIcon, PauseIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 
+/**
+ * TimerControls component - Handles task timer functionality
+ * @param {Object} props - Component props
+ * @param {Object} props.task - Task object
+ * @param {Array} props.timeEntries - Array of time entries
+ * @param {Function} props.setTimeEntries - Function to update time entries
+ * @param {Object} props.currentTimer - Current active timer
+ * @param {Function} props.setCurrentTimer - Function to update current timer
+ * @param {string} props.size - Size variant ('sm' or normal)
+ */
 function TimerControls({
     task,
     timeEntries,
     setTimeEntries,
     currentTimer,
-    setCurrentTimer
+    setCurrentTimer,
+    size = 'normal'
 }) {
     const isTimerActive = currentTimer && currentTimer.taskId === task.id;
 
+    /**
+     * Start timer for current task
+     */
     const startTimer = () => {
         // Stop any existing timer first
         if (currentTimer) {
-            stopTimer();
+            // Create time entry for the previous session
+            const timeEntry = {
+                id: generateId(),
+                taskId: currentTimer.taskId,
+                start: currentTimer.startTime,
+                end: Date.now()
+            };
+
+            setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
         }
 
         // Start new timer
         setCurrentTimer({
             taskId: task.id,
-            start: Date.now()
+            startTime: Date.now()
         });
     };
 
+    /**
+     * Pause timer and create time entry
+     */
     const pauseTimer = () => {
         if (!currentTimer || currentTimer.taskId !== task.id) return;
 
@@ -30,57 +55,36 @@ function TimerControls({
         const timeEntry = {
             id: generateId(),
             taskId: task.id,
-            start: currentTimer.start,
+            start: currentTimer.startTime,
             end: Date.now()
         };
 
         setTimeEntries([...timeEntries, timeEntry]);
+
         setCurrentTimer(null);
     };
 
-    const stopTimer = () => {
-        if (!currentTimer) return;
-
-        // Create time entry for the stopped session
-        const timeEntry = {
-            id: generateId(),
-            taskId: currentTimer.taskId,
-            start: currentTimer.start,
-            end: Date.now()
-        };
-
-        setTimeEntries([...timeEntries, timeEntry]);
-        setCurrentTimer(null);
-    };
+    // Determine icon size based on size prop
+    const iconSize = size === 'sm' ? 'h-5 w-5' : 'h-5 w-5';
 
     return (
         <div className="flex items-center space-x-1">
             {!isTimerActive ? (
                 <button
                     onClick={startTimer}
-                    className="p-1 text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+                    className="p-1 text-green-600 hover:bg-green-100 rounded-full transition-colors group"
                     title="Start Timer"
                 >
-                    <PlayIcon className="h-4 w-4" />
+                    <PlayIcon className={`${iconSize} group-hover:text-green-700`} />
                 </button>
             ) : (
-                <>
-                    <button
-                        onClick={pauseTimer}
-                        className="p-1 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50 rounded transition-colors"
-                        title="Pause Timer"
-                    >
-                        <PauseIcon className="h-4 w-4" />
-                    </button>
-
-                    <button
-                        onClick={stopTimer}
-                        className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                        title="Stop Timer"
-                    >
-                        <StopIcon className="h-4 w-4" />
-                    </button>
-                </>
+                <button
+                    onClick={pauseTimer}
+                    className="p-1 text-yellow-600 hover:bg-yellow-100 rounded-full transition-colors group"
+                    title="Pause Timer"
+                >
+                    <PauseIcon className={`${iconSize} group-hover:text-yellow-700`} />
+                </button>
             )}
         </div>
     );
