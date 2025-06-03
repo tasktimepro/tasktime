@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { 
-    PlusIcon, 
     PencilIcon, 
     TrashIcon,
     ArchiveBoxIcon,
@@ -65,14 +64,44 @@ const TaskItem = ({
 
     // Calculate total time for this task (including subtasks)
     const taskTime = taskTimeEntries.reduce((total, entry) => {
-        return total + (entry.end - entry.start);
+        // Ensure both start and end are valid numbers
+        if (entry && typeof entry.start === 'number' && typeof entry.end === 'number' && 
+            !isNaN(entry.start) && !isNaN(entry.end)) {
+            return total + (entry.end - entry.start);
+        }
+        return total;
     }, 0);
 
     const subtaskTime = subtaskTimeEntries.reduce((total, entry) => {
-        return total + (entry.end - entry.start);
+        // Ensure both start and end are valid numbers
+        if (entry && typeof entry.start === 'number' && typeof entry.end === 'number' && 
+            !isNaN(entry.start) && !isNaN(entry.end)) {
+            return total + (entry.end - entry.start);
+        }
+        return total;
     }, 0);
 
     const totalTime = taskTime + subtaskTime;
+
+    // Debug logging for parent tasks (temporary)
+    if (!task.parentTaskId && (taskTime > 0 || subtaskTime > 0 || taskTimeEntries.length > 0)) {
+        console.log(`Parent Task "${task.title}":`, {
+            taskTime,
+            subtaskTime,
+            totalTime,
+            taskTimeEntries: taskTimeEntries.length,
+            subtaskTimeEntries: subtaskTimeEntries.length
+        });
+        
+        // Log problematic entries
+        const problematicEntries = taskTimeEntries.filter(entry => 
+            !entry || typeof entry.start !== 'number' || typeof entry.end !== 'number' || 
+            isNaN(entry.start) || isNaN(entry.end)
+        );
+        if (problematicEntries.length > 0) {
+            console.log(`Problematic entries for "${task.title}":`, problematicEntries);
+        }
+    }
 
     // Check if this task's timer is active
     const isTimerActive = currentTimer && currentTimer.taskId === task.id;
@@ -268,14 +297,6 @@ const TaskItem = ({
                                         currentTimer={currentTimer}
                                         setCurrentTimer={setCurrentTimer}
                                     />
-                                    
-                                    <button
-                                        onClick={onCreateSubtask}
-                                        className="p-1 text-gray-400 hover:bg-blue-100 rounded-full transition-colors group"
-                                        title="Add Subtask"
-                                    >
-                                        <PlusIcon className="h-5 w-5 group-hover:text-blue-600" />
-                                    </button>
 
                                     <button
                                         onClick={() => setIsEditing(true)}
@@ -396,7 +417,12 @@ const SubtaskItem = ({
     const taskTimeEntries = timeEntries.filter(entry => entry.taskId === task.id);
 
     const totalTime = taskTimeEntries.reduce((total, entry) => {
-        return total + (entry.end - entry.start);
+        // Ensure both start and end are valid numbers
+        if (entry && typeof entry.start === 'number' && typeof entry.end === 'number' && 
+            !isNaN(entry.start) && !isNaN(entry.end)) {
+            return total + (entry.end - entry.start);
+        }
+        return total;
     }, 0);
 
     // Check if this subtask's timer is active

@@ -59,7 +59,7 @@ function TimerControls({
             end: Date.now()
         };
 
-        setTimeEntries([...timeEntries, timeEntry]);
+        setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
 
         setCurrentTimer(null);
     };

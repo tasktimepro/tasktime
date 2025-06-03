@@ -191,20 +191,33 @@ const TaskTree = ({
                     {parentTasks.length > 0 && (
                         <div className="space-y-2">
                             {parentTasks.map((task) => (
-                                <TaskItem
-                                    key={task.id}
-                                    task={task}
-                                    tasks={tasks}
-                                    setTasks={setTasks}
-                                    timeEntries={timeEntries}
-                                    setTimeEntries={setTimeEntries}
-                                    currentTimer={currentTimer}
-                                    setCurrentTimer={setCurrentTimer}
-                                    onDelete={() => handleDeleteTask(task.id)}
-                                    onCreateSubtask={() => startCreatingSubtask(task.id)}
-                                    onArchive={() => handleArchiveTask(task.id)}
-                                    allTasks={projectTasks}
-                                />
+                                <div key={task.id} className="space-y-1">
+                                    <TaskItem
+                                        task={task}
+                                        tasks={tasks}
+                                        setTasks={setTasks}
+                                        timeEntries={timeEntries}
+                                        setTimeEntries={setTimeEntries}
+                                        currentTimer={currentTimer}
+                                        setCurrentTimer={setCurrentTimer}
+                                        onDelete={() => handleDeleteTask(task.id)}
+                                        onCreateSubtask={() => startCreatingSubtask(task.id)}
+                                        onArchive={() => handleArchiveTask(task.id)}
+                                        allTasks={projectTasks}
+                                    />
+                                    
+                                    {/* Add Subtask Row */}
+                                    {!task.completed && (
+                                        <div className="ml-4 border-l-2 border-gray-200 pl-4">
+                                            <button
+                                                onClick={() => startCreatingSubtask(task.id)}
+                                                className="w-full text-left py-2 px-3 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors border border-dashed border-gray-300 hover:border-gray-400"
+                                            >
+                                                + Add subtask
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             ))}
                         </div>
                     )}
