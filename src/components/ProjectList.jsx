@@ -3,11 +3,12 @@ import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 import ExportImport from './ExportImport.jsx';
 import { getCurrencySymbol } from '../utils/currencyUtils';
+import { millisecondsToHours } from '../utils/dateUtils';
 
 /**
  * ProjectList component - Displays and manages the list of projects
  */
-const ProjectList = ({ projects, setProjects, tasks = [], onSelectProject, onImport }) => {
+const ProjectList = ({ projects, setProjects, tasks = [], timeEntries = [], onSelectProject, onImport }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
 
     const [editingProject, setEditingProject] = useState(null);
@@ -122,6 +123,42 @@ const ProjectList = ({ projects, setProjects, tasks = [], onSelectProject, onImp
         if (window.confirm('This will replace all current data. Are you sure?')) {
             onImport(importData);
         }
+    };
+
+    /**
+     * Calculate unbilled amount for a project
+     */
+    const calculateUnbilledAmount = (project) => {
+        // Get time entries for this project's tasks
+        const projectTaskIds = tasks
+            .filter(task => task.projectId === project.id)
+            .map(task => task.id);
+
+        const projectTimeEntries = timeEntries.filter(entry => 
+            projectTaskIds.includes(entry.taskId)
+        );
+
+        // Get billable time entries (since last billing)
+        const lastBilledAt = project.lastBilledAt || project.createdAt;
+        const unbilledEntries = projectTimeEntries.filter(entry => 
+            entry.start > lastBilledAt
+        );
+
+        const unbilledTime = unbilledEntries.reduce((total, entry) => {
+            return total + (entry.end - entry.start);
+        }, 0);
+
+        const unbilledHours = millisecondsToHours(unbilledTime);
+        return unbilledHours * project.hourlyRate;
+    };
+
+    /**
+     * Handle clicking on billable amount to generate invoice
+     */
+    const handleGenerateInvoice = (e, project) => {
+        e.stopPropagation();
+        // Select the project and navigate to dashboard where invoice generation is available
+        onSelectProject(project);
     };
 
     return (
@@ -254,7 +291,7 @@ const ProjectList = ({ projects, setProjects, tasks = [], onSelectProject, onImp
                     {projects.map((project) => (
                         <div
                             key={project.id}
-                            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
                             onClick={() => onSelectProject(project)}
                         >
                             <div className="p-6">
@@ -287,6 +324,19 @@ const ProjectList = ({ projects, setProjects, tasks = [], onSelectProject, onImp
                                 <p className="mt-1 text-xs text-gray-400">
                                     Created {new Date(project.createdAt).toLocaleDateString()}
                                 </p>
+
+                                {/* Billable Amount Tag */}
+                                {calculateUnbilledAmount(project) > 0 && (
+                                    <div className="absolute bottom-4 right-4">
+                                        <button
+                                            onClick={(e) => handleGenerateInvoice(e, project)}
+                                            className="inline-flex items-center px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-full hover:bg-green-700 transition-colors"
+                                            title="Click to generate invoice"
+                                        >
+                                            {getCurrencySymbol(project.currency)}{calculateUnbilledAmount(project).toFixed(2)}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}

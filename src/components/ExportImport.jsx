@@ -101,7 +101,7 @@ function ExportImport({ projects, tasks = [], onImport }) {
                     
                     <button
                         onClick={handleExport}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 border border-yellow-600 text-yellow-600 bg-transparent rounded-lg hover:bg-yellow-50 transition-colors"
                     >
                         <ArrowDownTrayIcon className="w-4 h-4" />
                         Export
@@ -117,7 +117,7 @@ function ExportImport({ projects, tasks = [], onImport }) {
                     
                     <button
                         onClick={() => setShowImportModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 bg-transparent rounded-lg hover:bg-blue-50 transition-colors"
                     >
                         <ArrowUpTrayIcon className="w-4 h-4" />
                         Import

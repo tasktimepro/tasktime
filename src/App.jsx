@@ -91,6 +91,7 @@ function App() {
                         projects={projects}
                         setProjects={setProjects}
                         tasks={tasks}
+                        timeEntries={timeEntries}
                         onSelectProject={(project) => {
                             navigateToProject(project.id);
                         }}
