@@ -244,7 +244,7 @@ const TaskTree = ({
                                             {/* Unarchive Button */}
                                             <button
                                                 onClick={() => handleUnarchiveTask(task.id)}
-                                                className="absolute top-2 right-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded"
+                                                className="absolute top-4 right-4 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded"
                                                 title="Unarchive Task"
                                             >
                                                 Unarchive
