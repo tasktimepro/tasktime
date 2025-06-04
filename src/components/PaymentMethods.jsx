@@ -304,14 +304,12 @@ const PaymentMethods = ({
             {(showCreateForm || editingPaymentMethod) && (
                 <div className="bg-white shadow rounded-lg p-6 max-w-3xl mx-auto">
                     <h4 className="text-lg font-medium text-gray-900 mb-4">
-                        {editingPaymentMethod ? 'Edit Payment Method' : 'Create New Payment Method'}
+                        {editingPaymentMethod ? 'Edit Payment Method' : 'New Payment Method'}
                     </h4>
 
-                    <form onSubmit={editingPaymentMethod ? handleUpdatePaymentMethod : handleCreatePaymentMethod} className="space-y-6">
+                    <form onSubmit={editingPaymentMethod ? handleUpdatePaymentMethod : handleCreatePaymentMethod} className="space-y-8">
                         {/* Standard Fields */}
                         <div className="space-y-4">
-                            <h5 className="text-sm font-medium text-gray-900">Standard Information</h5>
-                            
                             <div>
                                 <label htmlFor="title" className="block text-sm font-medium text-gray-700">
                                     Payment Method Title <span className="text-red-500">*</span>

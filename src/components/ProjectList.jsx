@@ -123,6 +123,8 @@ const ProjectList = ({
         setEditingProject(null);
 
         setFormData({ title: '', hourlyRate: '', currency: 'USD' });
+
+        showSuccess('Project updated successfully!');
     };
 
     /**
