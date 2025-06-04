@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { ArrowDownTrayIcon, ArrowUpTrayIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowUpTrayIcon, CreditCardIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
 import ExportImport from './ExportImport';
 import PaymentMethods from './PaymentMethods';
+import BusinessInfo from './BusinessInfo';
 
 /**
  * Account component - Main account management page with side navigation
@@ -13,7 +14,9 @@ const Account = ({
     timeEntries, 
     onImport,
     paymentMethods,
-    setPaymentMethods 
+    setPaymentMethods,
+    businessInfos,
+    setBusinessInfos
 }) => {
     const { urlParams, updateUrl } = useUrlState();
     
@@ -30,14 +33,20 @@ const Account = ({
             name: 'Payment Methods',
             icon: CreditCardIcon,
             description: 'Manage payment methods for invoices'
+        },
+        {
+            id: 'business-info',
+            name: 'Your Business Info',
+            icon: BuildingOfficeIcon,
+            description: 'Manage business information for invoices'
         }
     ];
     
     // Get current section from URL or default to first section
     const activeTab = urlParams.section || sideNavItems[0].id;
     
-    // Check URL parameters for auto-opening create payment method form
-    const autoOpenCreate = urlParams.create === 'payment-method';
+    // Check URL parameters for auto-opening create forms
+    const autoOpenCreate = urlParams.create === 'payment-method' || urlParams.create === 'business-info';
 
     // Function to handle section changes
     const handleSectionChange = (sectionId) => {
@@ -79,7 +88,15 @@ const Account = ({
                     <PaymentMethods 
                         paymentMethods={paymentMethods} 
                         setPaymentMethods={setPaymentMethods}
-                        autoOpenCreate={autoOpenCreate}
+                        autoOpenCreate={urlParams.create === 'payment-method'}
+                    />
+                );
+            case 'business-info':
+                return (
+                    <BusinessInfo 
+                        businessInfos={businessInfos} 
+                        setBusinessInfos={setBusinessInfos}
+                        autoOpenCreate={urlParams.create === 'business-info'}
                     />
                 );
             default:
