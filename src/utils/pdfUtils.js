@@ -115,7 +115,7 @@ export const createInvoiceHTML = (invoiceData) => {
             </div>
             
             <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666;">
-                <p style="margin: 0;">Thank you for your business!</p>
+                <p style="margin: 0;">www.TaskTimeTrack.com</p>
             </div>
         </div>
     `;

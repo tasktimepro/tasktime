@@ -11,6 +11,9 @@ import CustomCheckbox from './CustomCheckbox.jsx';
 import TimeEditModal from './TimeEditModal.jsx';
 import { formatDurationWithSeconds, formatActiveTimer } from '../utils/dateUtils';
 
+// Create a custom event for dropdown management
+const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
+
 /**
  * TaskItem component - Displays individual task with timer controls and subtasks
  */
@@ -52,19 +55,30 @@ const TaskItem = ({
         };
     }, [currentTimer, task.id]);
 
-    // Close dropdown when clicking outside
+    // Close dropdown when clicking outside or when another dropdown opens
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (showDropdown && !event.target.closest('.dropdown-container')) {
                 setShowDropdown(false);
             }
         };
+        
+        // Handle when another dropdown is opened
+        const handleDropdownToggle = (event) => {
+            // If this is not our dropdown being toggled (different task ID) and it's being opened, close this one
+            if (event.detail.taskId !== task.id && event.detail.open) {
+                setShowDropdown(false);
+            }
+        };
 
         document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
+        
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
         };
-    }, [showDropdown]);
+    }, [showDropdown, task.id]);
 
     // Get subtasks for this task
     const subtasks = allTasks.filter(t => t.parentTaskId === task.id);
@@ -286,7 +300,7 @@ const TaskItem = ({
 
                                     <button
                                         type="submit"
-                                        className="text-green-600 hover:text-green-800 text-sm"
+                                        className="px-3 py-2 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                     >
                                         Save
                                     </button>
@@ -294,7 +308,7 @@ const TaskItem = ({
                                     <button
                                         type="button"
                                         onClick={cancelEdit}
-                                        className="text-gray-600 hover:text-gray-800 text-sm"
+                                        className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                     >
                                         Cancel
                                     </button>
@@ -313,31 +327,26 @@ const TaskItem = ({
                                             /* Main task - show both main task time and total time */
                                             <>
                                                 {(mainTaskTime > 0 || totalTimeWithSubtasks > 0) && (
-                                                    <div className="flex items-center space-x-2">
+                                                    <div className="flex ml-2 items-center space-x-2">
                                                         {mainTaskTime > 0 && (
                                                             <button
                                                                 onClick={() => setShowTimeEditModal(true)}
-                                                                className="hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                                                                className="hover:bg-gray-100 rounded transition-colors"
                                                                 title="Click to edit main task time (excluding subtasks)"
                                                                 disabled={isCompleted}
                                                             >
-                                                                <span className="text-blue-600">
+                                                                <span className="text-gray-500">
                                                                     {formatDurationWithSeconds(mainTaskTime)}
                                                                 </span>
                                                             </button>
                                                         )}
+                                                        {mainTaskTime > 0 && (
+                                                            <span>•</span>
+                                                        )}
                                                         {totalTimeWithSubtasks > mainTaskTime && (
                                                             <span 
-                                                                className="text-gray-400"
+                                                                className="text-blue-600 font-medium"
                                                                 title="Total time including subtasks"
-                                                            >
-                                                                (Total: {formatDurationWithSeconds(totalTimeWithSubtasks)})
-                                                            </span>
-                                                        )}
-                                                        {mainTaskTime === 0 && totalTimeWithSubtasks > 0 && (
-                                                            <span 
-                                                                className="text-gray-400"
-                                                                title="Total time from subtasks only"
                                                             >
                                                                 Total: {formatDurationWithSeconds(totalTimeWithSubtasks)}
                                                             </span>
@@ -361,7 +370,7 @@ const TaskItem = ({
                                         
                                         {/* Active Timer Display */}
                                         {activeTimerDisplay && (
-                                            <span className="text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">
+                                                <span className="text-yellow-600 font-medium bg-yellow-50 px-2 py-1 rounded">
                                                 {activeTimerDisplay}
                                             </span>
                                         )}
@@ -439,7 +448,15 @@ const TaskItem = ({
                                     {/* Three-dot dropdown menu for Edit and Delete */}
                                     <div className="relative dropdown-container">
                                         <button
-                                            onClick={() => setShowDropdown(!showDropdown)}
+                                            onClick={() => {
+                                                setShowDropdown(!showDropdown);
+
+                                                // Dispatch a custom event to close other dropdowns
+                                                const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
+                                                    detail: { taskId: task.id, open: !showDropdown }
+                                                });
+                                                document.dispatchEvent(event);
+                                            }}
                                             className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
                                             title="More actions"
                                         >
@@ -607,19 +624,30 @@ const SubtaskItem = ({
         };
     }, [currentTimer, task.id]);
 
-    // Close dropdown when clicking outside
+    // Close dropdown when clicking outside or when another dropdown opens
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (showDropdown && !event.target.closest('.dropdown-container')) {
                 setShowDropdown(false);
             }
         };
+        
+        // Handle when another dropdown is opened
+        const handleDropdownToggle = (event) => {
+            // If this is not our dropdown being toggled (different task ID) and it's being opened, close this one
+            if (event.detail.taskId !== task.id && event.detail.open) {
+                setShowDropdown(false);
+            }
+        };
 
         document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
+        
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
         };
-    }, [showDropdown]);
+    }, [showDropdown, task.id]);
 
     // Get time entries for this subtask
     const taskTimeEntries = timeEntries.filter(entry => entry.taskId === task.id);
@@ -756,7 +784,7 @@ const SubtaskItem = ({
 
                             <button
                                 type="submit"
-                                className="text-green-600 hover:text-green-800 text-xs"
+                                className="px-3 py-2 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                             >
                                 Save
                             </button>
@@ -764,7 +792,7 @@ const SubtaskItem = ({
                             <button
                                 type="button"
                                 onClick={cancelEdit}
-                                className="text-gray-600 hover:text-gray-800 text-xs"
+                                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                             >
                                 Cancel
                             </button>
@@ -792,7 +820,7 @@ const SubtaskItem = ({
                                 
                                 {/* Active Timer Display */}
                                 {activeTimerDisplay && (
-                                    <span className="text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">
+                                    <span className="text-yellow-600 font-medium bg-yellow-50 px-2 py-1 rounded">
                                         {activeTimerDisplay}
                                     </span>
                                 )}
@@ -842,7 +870,15 @@ const SubtaskItem = ({
                             {/* Three-dot dropdown menu for Edit and Delete */}
                             <div className="relative dropdown-container">
                                 <button
-                                    onClick={() => setShowDropdown(!showDropdown)}
+                                    onClick={() => {
+                                        setShowDropdown(!showDropdown);
+
+                                        // Dispatch a custom event to close other dropdowns
+                                        const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
+                                            detail: { taskId: task.id, open: !showDropdown }
+                                        });
+                                        document.dispatchEvent(event);
+                                    }}
                                     className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
                                     title="More actions"
                                 >

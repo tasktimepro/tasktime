@@ -3,6 +3,7 @@ import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours, formatDurationWithSeconds, hoursToMinutes } from '../utils/dateUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
+import { useToast } from './ToastContainer';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -17,6 +18,7 @@ const InvoiceGenerator = ({
     onInvoiceSaved 
 }) => {
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+    const { showSuccess, showError } = useToast();
 
     /**
      * Initialize client info based on previous invoices or editing invoice
@@ -145,12 +147,12 @@ const InvoiceGenerator = ({
         e.preventDefault();
 
         if (!clientInfo.name.trim()) {
-            alert('Please enter client name');
+            showError('Please enter client name');
             return;
         }
 
         if (invoiceTasks.length === 0) {
-            alert('No billable time entries found since last invoice');
+            showError('No billable time entries found since last invoice');
             return;
         }
 
@@ -223,8 +225,12 @@ const InvoiceGenerator = ({
             onInvoiceSaved();
         }
         
-        const action = editingInvoice ? 'updated' : 'saved';
-        alert(`Invoice ${action} successfully! You can view, edit, or download it from the Invoices tab.`);
+        // Show appropriate toast notification based on action (new or update)
+        if (editingInvoice) {
+            showSuccess('Invoice updated successfully!');
+        } else {
+            showSuccess('Invoice saved successfully! You can view, edit, or download it from the Invoices tab.');
+        }
     };
 
     /**
@@ -246,7 +252,7 @@ const InvoiceGenerator = ({
             // Open form with new invoice data
             const tasksData = prepareInvoiceData();
             if (!tasksData) {
-                alert('No billable time entries found since last invoice');
+                showError('No billable time entries found since last invoice');
                 return;
             }
             
@@ -259,7 +265,7 @@ const InvoiceGenerator = ({
             setEditableHours(initialHours);
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, showError]);
 
     // Keep track of whether we've handled the current editing invoice
     const [handledEditingInvoice, setHandledEditingInvoice] = useState(null);
