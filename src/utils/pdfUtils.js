@@ -61,14 +61,16 @@ export const createInvoiceHTML = (invoiceData) => {
         totalAmount,
         invoiceNumber,
         date,
-        paymentMethod
+        paymentMethod,
+        businessInfo
     } = invoiceData;
 
     return `
         <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
             <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #333; margin-bottom: 10px;">INVOICE</h1>
-                <p style="color: #666; margin: 0;">Invoice #${invoiceNumber}</p>
+                <h1 style="color: #333; margin-bottom: 10px; font-size: 28px; font-weight: bold;">INVOICE</h1>
+                <p style="color: #666; margin: 0;">Invoice: #${invoiceNumber}</p>
+                <p style="color: #666; margin: 0;">Project: ${project.title}</p>
                 <p style="color: #666; margin: 0;">Date: ${date}</p>
             </div>
             
@@ -83,9 +85,24 @@ export const createInvoiceHTML = (invoiceData) => {
                     </p>
                 </div>
                 <div style="text-align: right;">
-                    <h3 style="color: #333; margin-bottom: 10px;"><strong>Project:</strong></h3>
-                    <p style="margin: 0;">${project.title}</p>
-                    <p style="margin: 0; color: #666;">Rate: ${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency || 'USD'} per hour</p>
+                    ${businessInfo ? `
+                        <h3 style="color: #333; margin-bottom: 10px;"><strong>Invoice From:</strong></h3>
+                        <p style="margin: 0; line-height: 1.5;">
+                            ${businessInfo.businessName ? businessInfo.businessName + '<br>' : ''}
+                            ${businessInfo.address ? businessInfo.address + '<br>' : ''}
+                            ${(businessInfo.city || businessInfo.state || businessInfo.zip) ? 
+                                `${businessInfo.city ? businessInfo.city + ', ' : ''}${businessInfo.state ? businessInfo.state + ' ' : ''}${businessInfo.zip || ''}<br>` : ''
+                            }
+                            ${businessInfo.email ? businessInfo.email + '<br>' : ''}
+                            ${businessInfo.phone ? businessInfo.phone + '<br>' : ''}
+                            ${businessInfo.registrationNumber ? 'Reg: ' + businessInfo.registrationNumber + '<br>' : ''}
+                            ${businessInfo.vat ? 'VAT: ' + businessInfo.vat + '<br>' : ''}
+                            ${businessInfo.taxNumber ? 'Tax: ' + businessInfo.taxNumber + '<br>' : ''}
+                            ${businessInfo.custom && businessInfo.custom.length > 0 ? 
+                                businessInfo.custom.map(field => field.label + ': ' + field.value).join('<br>') + '<br>' : ''
+                            }
+                        </p>
+                    ` : ''}
                 </div>
             </div>
             
@@ -94,7 +111,6 @@ export const createInvoiceHTML = (invoiceData) => {
                     <tr style="background-color: #f8f9fa;">
                         <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Task</th>
                         <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Hours</th>
-                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Rate</th>
                         <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Amount</th>
                     </tr>
                 </thead>
@@ -103,7 +119,6 @@ export const createInvoiceHTML = (invoiceData) => {
                         <tr>
                             <td style="padding: 8px; border-bottom: 1px solid #eee;">${task.title}</td>
                             <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${task.hours.toFixed(2)}</td>
-                            <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${getCurrencySymbol(project.currency)}${project.hourlyRate}</td>
                             <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${getCurrencySymbol(project.currency)}${(task.hours * project.hourlyRate).toFixed(2)}</td>
                         </tr>
                     `).join('')}

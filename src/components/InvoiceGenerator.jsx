@@ -17,10 +17,13 @@ const InvoiceGenerator = ({
     editingInvoice,
     onInvoiceSaved,
     paymentMethods = [],
-    onNavigateToPaymentMethods
+    onNavigateToPaymentMethods,
+    businessInfos = [],
+    onNavigateToBusinessInfo
 }) => {
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+    const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
     const { showSuccess, showError } = useToast();
 
     /**
@@ -54,6 +57,38 @@ const InvoiceGenerator = ({
         // No previous payment method found
         setSelectedPaymentMethod(null);
     }, [editingInvoice, project.invoices, paymentMethods]);
+
+    /**
+     * Initialize business info based on previous invoices or editing invoice
+     */
+    const initializeBusinessInfo = useCallback(() => {
+        // If editing an invoice, use its business info
+        if (editingInvoice && editingInvoice.businessInfoId) {
+            const businessInfo = businessInfos.find(bi => bi.id === editingInvoice.businessInfoId);
+            if (businessInfo) {
+                setSelectedBusinessInfo(businessInfo);
+                return;
+            }
+        }
+        
+        // Look for last used business info in previous invoices
+        const previousInvoices = project.invoices || [];
+        if (previousInvoices.length > 0) {
+            for (let i = previousInvoices.length - 1; i >= 0; i--) {
+                const invoice = previousInvoices[i];
+                if (invoice.businessInfoId) {
+                    const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                    if (businessInfo) {
+                        setSelectedBusinessInfo(businessInfo);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // No previous business info found
+        setSelectedBusinessInfo(null);
+    }, [editingInvoice, project.invoices, businessInfos]);
 
     /**
      * Initialize client info based on previous invoices or editing invoice
@@ -105,6 +140,11 @@ const InvoiceGenerator = ({
     useEffect(() => {
         initializePaymentMethod();
     }, [initializePaymentMethod]);
+
+    // Initialize business info when component mounts or dependencies change
+    useEffect(() => {
+        initializeBusinessInfo();
+    }, [initializeBusinessInfo]);
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
@@ -210,6 +250,7 @@ const InvoiceGenerator = ({
             totalHours: totalHours,
             totalAmount: totalAmount,
             paymentMethodId: selectedPaymentMethod?.id || null,
+            businessInfoId: selectedBusinessInfo?.id || null,
             invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
             date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
@@ -224,6 +265,7 @@ const InvoiceGenerator = ({
                 totalHours: totalHours,
                 totalAmount: totalAmount,
                 paymentMethod: selectedPaymentMethod,
+                businessInfo: selectedBusinessInfo,
                 invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
                 date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
                 createdAt: editingInvoice ? editingInvoice.createdAt : Date.now()
@@ -465,6 +507,63 @@ const InvoiceGenerator = ({
                                 </div>
 
                                 <form onSubmit={handleSaveInvoice} className="space-y-4">
+                                    {/* Business Info Selection */}
+                                    <div className="mb-6">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <h4 className="text-sm font-medium text-gray-900">
+                                                Business Information
+                                            </h4>
+                                            <button
+                                                type="button"
+                                                onClick={onNavigateToBusinessInfo}
+                                                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                            >
+                                                + New Business Info
+                                            </button>
+                                        </div>
+                                        
+                                        {businessInfos.length === 0 ? (
+                                            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                                                <p className="text-sm text-yellow-800 mb-3">
+                                                    No business information found. Create one to include your business details in the invoice.
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={onNavigateToBusinessInfo}
+                                                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
+                                                >
+                                                    Create Business Info
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <select
+                                                    value={selectedBusinessInfo?.id || ''}
+                                                    onChange={(e) => {
+                                                        const businessInfo = businessInfos.find(bi => bi.id === e.target.value);
+                                                        setSelectedBusinessInfo(businessInfo || null);
+                                                    }}
+                                                    className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
+                                                >
+                                                    <option value="">Select business info (optional)</option>
+                                                    {businessInfos.map(info => (
+                                                        <option key={info.id} value={info.id}>
+                                                            {info.title}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                
+                                                {selectedBusinessInfo && (
+                                                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                                                        <p className="text-sm text-green-800">
+                                                            <strong>{selectedBusinessInfo.title}</strong> will be included as "Invoice From" in the invoice.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {/* Payment Method Selection */}
                                     <div className="mb-6">
                                         <div className="flex justify-between items-center mb-1">

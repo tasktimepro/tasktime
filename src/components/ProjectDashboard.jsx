@@ -21,7 +21,9 @@ const ProjectDashboard = ({
     setCurrentTimer,
     onBackToProjects,
     paymentMethods,
-    onNavigateToPaymentMethods
+    onNavigateToPaymentMethods,
+    businessInfos,
+    onNavigateToBusinessInfo
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -77,6 +79,8 @@ const ProjectDashboard = ({
                     timeEntries={projectTimeEntries}
                     paymentMethods={paymentMethods}
                     onNavigateToPaymentMethods={onNavigateToPaymentMethods}
+                    businessInfos={businessInfos}
+                    onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                 />
             </div>
 
@@ -125,6 +129,8 @@ const ProjectDashboard = ({
                             onInvoiceSaved={() => setEditingInvoice(null)}
                             paymentMethods={paymentMethods}
                             onNavigateToPaymentMethods={onNavigateToPaymentMethods}
+                            businessInfos={businessInfos}
+                            onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                         />
                     </div>
                 </div>
@@ -134,6 +140,7 @@ const ProjectDashboard = ({
                         project={project}
                         onEditInvoice={handleEditInvoice}
                         paymentMethods={paymentMethods}
+                        businessInfos={businessInfos}
                     />
                 </div>
             </div>

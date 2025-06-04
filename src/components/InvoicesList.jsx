@@ -6,7 +6,7 @@ import { getCurrencySymbol } from '../utils/currencyUtils';
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
  */
-const InvoicesList = ({ project, onEditInvoice, paymentMethods = [] }) => {
+const InvoicesList = ({ project, onEditInvoice, paymentMethods = [], businessInfos = [] }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
 
@@ -27,6 +27,10 @@ const InvoicesList = ({ project, onEditInvoice, paymentMethods = [] }) => {
                 const paymentMethod = invoice.paymentMethodId ? 
                     paymentMethods.find(pm => pm.id === invoice.paymentMethodId) : null;
                 
+                // Find the business info if one is associated with this invoice
+                const businessInfo = invoice.businessInfoId ? 
+                    businessInfos.find(bi => bi.id === invoice.businessInfoId) : null;
+                
                 // Recreate the HTML content from the invoice data
                 htmlContent = createInvoiceHTML({
                     project: invoice.project,
@@ -36,7 +40,8 @@ const InvoicesList = ({ project, onEditInvoice, paymentMethods = [] }) => {
                     totalAmount: invoice.totalAmount,
                     invoiceNumber: invoice.invoiceNumber,
                     date: invoice.date,
-                    paymentMethod: paymentMethod
+                    paymentMethod: paymentMethod,
+                    businessInfo: businessInfo
                 });
             }
             
@@ -111,6 +116,14 @@ const InvoicesList = ({ project, onEditInvoice, paymentMethods = [] }) => {
                                             <p>
                                                 Client: <span className="font-medium text-gray-600">{invoice.clientInfo?.name || invoice.client?.name}</span>
                                             </p>
+                                            {invoice.businessInfoId && (() => {
+                                                const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                                                return businessInfo ? (
+                                                    <p>
+                                                        Business: <span className="font-medium text-gray-600">{businessInfo.title}</span>
+                                                    </p>
+                                                ) : null;
+                                            })()}
                                             {invoice.paymentMethodId && (() => {
                                                 const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
                                                 return paymentMethod ? (

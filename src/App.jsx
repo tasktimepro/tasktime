@@ -47,6 +47,13 @@ function App() {
     };
 
     /**
+     * Handle navigation to business info creation from invoice generator
+     */
+    const handleNavigateToBusinessInfo = () => {
+        navigateToAccount({ section: 'business-info', create: 'business-info' });
+    };
+
+    /**
      * Handle data import from ExportImport component
      */
     const handleImport = (importData) => {
@@ -138,6 +145,8 @@ function App() {
                         onBackToProjects={navigateToProjects}
                         paymentMethods={paymentMethods}
                         onNavigateToPaymentMethods={handleNavigateToPaymentMethods}
+                        businessInfos={businessInfos}
+                        onNavigateToBusinessInfo={handleNavigateToBusinessInfo}
                     />
                 )}
 
