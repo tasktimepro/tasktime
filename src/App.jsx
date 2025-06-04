@@ -19,6 +19,7 @@ function App() {
     const [currentTimer, setCurrentTimer] = useLocalStorage('currentTimer', null);
     const [paymentMethods, setPaymentMethods] = useLocalStorage('paymentMethods', []);
     const [businessInfos, setBusinessInfos] = useLocalStorage('businessInfos', []);
+    const [clientInfos, setClientInfos] = useLocalStorage('clientInfos', []);
 
     console.log('📊 Loaded projects:', projects.length);
 
@@ -160,6 +161,8 @@ function App() {
                         setPaymentMethods={setPaymentMethods}
                         businessInfos={businessInfos}
                         setBusinessInfos={setBusinessInfos}
+                        clientInfos={clientInfos}
+                        setClientInfos={setClientInfos}
                     />
                 )}
             </main>

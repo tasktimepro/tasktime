@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { ArrowDownTrayIcon, ArrowUpTrayIcon, CreditCardIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowUpTrayIcon, CreditCardIcon, BuildingOfficeIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
 import ExportImport from './ExportImport';
 import PaymentMethods from './PaymentMethods';
 import BusinessInfo from './BusinessInfo';
+import ClientInfo from './ClientInfo';
 
 /**
  * Account component - Main account management page with side navigation
@@ -16,7 +17,9 @@ const Account = ({
     paymentMethods,
     setPaymentMethods,
     businessInfos,
-    setBusinessInfos
+    setBusinessInfos,
+    clientInfos,
+    setClientInfos
 }) => {
     const { urlParams, updateUrl } = useUrlState();
     
@@ -39,6 +42,12 @@ const Account = ({
             name: 'Your Business Info',
             icon: BuildingOfficeIcon,
             description: 'Manage business information for invoices'
+        },
+        {
+            id: 'client-info',
+            name: 'Client Info',
+            icon: UserGroupIcon,
+            description: 'Manage client information for invoices'
         }
     ];
     
@@ -46,7 +55,7 @@ const Account = ({
     const activeTab = urlParams.section || sideNavItems[0].id;
     
     // Check URL parameters for auto-opening create forms
-    const autoOpenCreate = urlParams.create === 'payment-method' || urlParams.create === 'business-info';
+    const autoOpenCreate = urlParams.create === 'payment-method' || urlParams.create === 'business-info' || urlParams.create === 'client-info';
 
     // Function to handle section changes
     const handleSectionChange = (sectionId) => {
@@ -99,6 +108,14 @@ const Account = ({
                         autoOpenCreate={urlParams.create === 'business-info'}
                     />
                 );
+            case 'client-info':
+                return (
+                    <ClientInfo 
+                        clientInfos={clientInfos} 
+                        setClientInfos={setClientInfos}
+                        autoOpenCreate={urlParams.create === 'client-info'}
+                    />
+                );
             default:
                 return null;
         }
@@ -107,7 +124,7 @@ const Account = ({
     return (
         <div className="flex h-full">
             {/* Side Navigation */}
-            <div className="w-64 bg-white shadow-sm border-r border-gray-200">
+            <div className="w-64 bg-white shadow-sm border-r border-gray-200 pb-4">
                 <div className="px-6 py-6">
                     <h1 className="text-2xl font-bold text-gray-900">Account</h1>
                     <p className="mt-1 text-sm text-gray-600">Manage your account settings</p>
