@@ -103,7 +103,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                         <div className="flex items-center justify-between">
                             <div className="flex-1">
                                 <div className="flex items-center space-x-3">
-                                    <DocumentTextIcon className="h-5 w-5 text-gray-400" />
+                                    <DocumentTextIcon className="h-6 w-6 text-gray-400" />
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-900">
                                             {invoice.invoiceNumber}

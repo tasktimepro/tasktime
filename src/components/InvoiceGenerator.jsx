@@ -324,7 +324,7 @@ const InvoiceGenerator = ({
                     onClick={openInvoiceForm}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
-                    <DocumentTextIcon className="h-4 w-4 mr-2" />
+                    <DocumentTextIcon className="h-5 w-5 mr-2" />
                     Generate Invoice
                     {unbilledHours > 0 && (
                         <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full">
