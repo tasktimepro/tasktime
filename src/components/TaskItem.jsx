@@ -100,12 +100,16 @@ const TaskItem = ({
 
     const totalTime = taskTime + subtaskTime;
 
+    // For main tasks, distinguish between main task time and total time with subtasks
+    const mainTaskTime = taskTime; // Time logged directly to this task
+    const totalTimeWithSubtasks = totalTime; // Main task time + subtask time
+
     // Debug logging for parent tasks (temporary)
     if (!task.parentTaskId && (taskTime > 0 || subtaskTime > 0 || taskTimeEntries.length > 0)) {
         console.log(`Parent Task "${task.title}":`, {
-            taskTime,
+            mainTaskTime,
             subtaskTime,
-            totalTime,
+            totalTimeWithSubtasks,
             taskTimeEntries: taskTimeEntries.length,
             subtaskTimeEntries: subtaskTimeEntries.length
         });
@@ -170,8 +174,11 @@ const TaskItem = ({
      * Handle editing time for task
      */
     const handleTimeEdit = (newTime) => {
+        // For main tasks, only edit the main task's own time (not including subtasks)
+        const currentEditableTime = !task.parentTaskId ? mainTaskTime : totalTimeWithSubtasks;
+        
         // Calculate the difference between new and old time
-        const timeDifference = newTime - totalTime;
+        const timeDifference = newTime - currentEditableTime;
 
         if (timeDifference !== 0) {
             // Create a new time entry to adjust the total time
@@ -302,15 +309,54 @@ const TaskItem = ({
 
                                     {/* Time Display */}
                                     <div className="flex items-center space-x-2 text-xs text-gray-500">
-                                        {totalTime > 0 && (
-                                            <button
-                                                onClick={() => setShowTimeEditModal(true)}
-                                                className="hover:bg-gray-100 px-2 py-1 rounded transition-colors"
-                                                title="Click to edit time"
-                                                disabled={isCompleted}
-                                            >
-                                                {formatDurationWithSeconds(totalTime)}
-                                            </button>
+                                        {!task.parentTaskId ? (
+                                            /* Main task - show both main task time and total time */
+                                            <>
+                                                {(mainTaskTime > 0 || totalTimeWithSubtasks > 0) && (
+                                                    <div className="flex items-center space-x-2">
+                                                        {mainTaskTime > 0 && (
+                                                            <button
+                                                                onClick={() => setShowTimeEditModal(true)}
+                                                                className="hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                                                                title="Click to edit main task time (excluding subtasks)"
+                                                                disabled={isCompleted}
+                                                            >
+                                                                <span className="text-blue-600">
+                                                                    {formatDurationWithSeconds(mainTaskTime)}
+                                                                </span>
+                                                            </button>
+                                                        )}
+                                                        {totalTimeWithSubtasks > mainTaskTime && (
+                                                            <span 
+                                                                className="text-gray-400"
+                                                                title="Total time including subtasks"
+                                                            >
+                                                                (Total: {formatDurationWithSeconds(totalTimeWithSubtasks)})
+                                                            </span>
+                                                        )}
+                                                        {mainTaskTime === 0 && totalTimeWithSubtasks > 0 && (
+                                                            <span 
+                                                                className="text-gray-400"
+                                                                title="Total time from subtasks only"
+                                                            >
+                                                                Total: {formatDurationWithSeconds(totalTimeWithSubtasks)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            /* Subtask - show only subtask time */
+                                            totalTimeWithSubtasks > 0 && (
+                                                <button
+                                                    onClick={() => setShowTimeEditModal(true)}
+                                                    className="hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                                                    title="Click to edit time"
+                                                    disabled={isCompleted}
+                                                >
+                                                    {formatDurationWithSeconds(totalTimeWithSubtasks)}
+                                                </button>
+                                            )
                                         )}
                                         
                                         {/* Active Timer Display */}
@@ -438,9 +484,10 @@ const TaskItem = ({
             <TimeEditModal
                 isOpen={showTimeEditModal}
                 onClose={() => setShowTimeEditModal(false)}
-                currentTime={totalTime}
+                currentTime={!task.parentTaskId ? mainTaskTime : totalTimeWithSubtasks}
                 onSave={handleTimeEdit}
-                taskTitle={task.title}
+                taskTitle={!task.parentTaskId && subtasks.length > 0 ? 
+                    `${task.title} (Main Task Time Only)` : task.title}
             />
 
             {/* Subtasks */}

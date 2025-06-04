@@ -343,7 +343,7 @@ const InvoiceGenerator = ({
                                 {/* Tasks with Editable Hours */}
                                 <div className="mb-6">
                                     <h4 className="text-sm font-medium text-gray-900 mb-3">
-                                        Tasks & Hours
+                                        Tasks & Time
                                     </h4>
                                     <div className="space-y-2 max-h-60 overflow-y-auto">
                                         {invoiceTasks.map((task) => {

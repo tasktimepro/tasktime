@@ -174,7 +174,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                             </button>
                         </div>
 
-                        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 max-h-96 overflow-y-auto">
+                        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 max-h-[40rem] overflow-y-auto">
                             {selectedInvoice.htmlContent ? (
                                 <div dangerouslySetInnerHTML={{ __html: selectedInvoice.htmlContent }} />
                             ) : (
@@ -187,7 +187,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                                     
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <h3 className="text-sm font-medium text-gray-900 mb-2">Bill To:</h3>
+                                                <h3 className="text-sm font-medium text-gray-900 mb-2">Invoice To:</h3>
                                             <div className="text-sm text-gray-600">
                                                 <p>{(selectedInvoice.clientInfo || selectedInvoice.client)?.name}</p>
                                                 {(selectedInvoice.clientInfo || selectedInvoice.client)?.email && (

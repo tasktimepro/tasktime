@@ -73,7 +73,7 @@ export const createInvoiceHTML = (invoiceData) => {
             
             <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
                 <div>
-                    <h3 style="color: #333; margin-bottom: 10px;">Bill To:</h3>
+                    <h3 style="color: #333; margin-bottom: 10px;">Invoice To:</h3>
                     <p style="margin: 0; line-height: 1.5;">
                         ${client.name}<br>
                         ${client.email ? client.email + '<br>' : ''}
