@@ -24,7 +24,7 @@ const CustomCheckbox = ({ checked, onChange, disabled = false, className = "" })
                     : 'bg-white border-gray-300 hover:border-blue-400'
                 }
                 ${disabled 
-                    ? 'opacity-50 cursor-not-allowed' 
+                    ? 'opacity-50' 
                     : 'cursor-pointer'
                 }
                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1

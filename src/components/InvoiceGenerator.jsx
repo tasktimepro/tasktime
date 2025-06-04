@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
-import { millisecondsToHours } from '../utils/dateUtils';
+import { millisecondsToHours, formatDurationWithSeconds, hoursToMinutes } from '../utils/dateUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 
 /**
@@ -21,7 +21,7 @@ const InvoiceGenerator = ({
     /**
      * Initialize client info based on previous invoices or editing invoice
      */
-    const initializeClientInfo = () => {
+    const initializeClientInfo = useCallback(() => {
         // If editing an invoice, use its client info
         if (editingInvoice) {
             return editingInvoice.clientInfo || editingInvoice.client || {
@@ -55,14 +55,14 @@ const InvoiceGenerator = ({
             state: '',
             zip: ''
         };
-    };
+    }, [editingInvoice, project.invoices]);
 
     const [clientInfo, setClientInfo] = useState(initializeClientInfo);
 
     // Update client info when editing invoice changes
     useEffect(() => {
         setClientInfo(initializeClientInfo());
-    }, [editingInvoice]);
+    }, [initializeClientInfo]);
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
@@ -94,12 +94,13 @@ const InvoiceGenerator = ({
     /**
      * Prepare invoice data
      */
-    const prepareInvoiceData = () => {
+    const prepareInvoiceData = useCallback(() => {
         // Get billable time entries (since last billing)
         const lastBilledAt = project.lastBilledAt || project.createdAt;
 
+        // Only include completed entries (with end time) that are after last billing
         const billableEntries = timeEntries.filter(entry => 
-            entry.start > lastBilledAt
+            entry.start > lastBilledAt && entry.end && entry.end > entry.start
         );
 
         if (billableEntries.length === 0) {
@@ -128,13 +129,14 @@ const InvoiceGenerator = ({
                 id: taskId,
                 title: task ? task.title : 'Unknown Task',
                 originalHours: roundedHours,
+                originalTimeMs: totalTime, // Keep the original milliseconds for accurate time display
                 hours: editedHours,
                 isEdited: editedHours !== roundedHours
             };
         }).filter(task => task.originalHours > 0);
 
         return tasksData;
-    };
+    }, [project.lastBilledAt, project.createdAt, timeEntries, tasks, editableHours]);
 
     /**
      * Save invoice (create new or update existing)
@@ -228,7 +230,7 @@ const InvoiceGenerator = ({
     /**
      * Open invoice form with prepared data or for editing
      */
-    const openInvoiceForm = () => {
+    const openInvoiceForm = useCallback(() => {
         if (editingInvoice) {
             // Open form with existing invoice data
             setInvoiceTasks(editingInvoice.tasks || []);
@@ -254,14 +256,14 @@ const InvoiceGenerator = ({
             setEditableHours(initialHours);
         }
         setShowInvoiceForm(true);
-    };
+    }, [editingInvoice, prepareInvoiceData]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {
         if (editingInvoice) {
             openInvoiceForm();
         }
-    }, [editingInvoice]);
+    }, [editingInvoice, openInvoiceForm]);
 
     /**
      * Handle canceling the form
@@ -279,14 +281,24 @@ const InvoiceGenerator = ({
     const lastBilledAt = project.lastBilledAt || project.createdAt;
 
     const unbilledEntries = timeEntries.filter(entry => 
-        entry.start > lastBilledAt
+        entry.start > lastBilledAt && entry.end && entry.end > entry.start
     );
 
-    const unbilledTime = unbilledEntries.reduce((total, entry) => {
-        return total + (entry.end - entry.start);
-    }, 0);
+    // Group unbilled entries by task and round each task's hours (same logic as invoice)
+    const taskTimeMap = {};
+    unbilledEntries.forEach(entry => {
+        if (!taskTimeMap[entry.taskId]) {
+            taskTimeMap[entry.taskId] = 0;
+        }
+        taskTimeMap[entry.taskId] += (entry.end - entry.start);
+    });
 
-    const unbilledHours = millisecondsToHours(unbilledTime);
+    // Calculate total rounded hours (matching invoice calculation)
+    const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+        const taskHours = millisecondsToHours(taskTime);
+        const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+        return total + roundedTaskHours;
+    }, 0);
 
     const unbilledAmount = unbilledHours * project.hourlyRate;
 
@@ -331,33 +343,45 @@ const InvoiceGenerator = ({
                                 {/* Tasks with Editable Hours */}
                                 <div className="mb-6">
                                     <h4 className="text-sm font-medium text-gray-900 mb-3">
-                                        Tasks & Hours (Click to modify)
+                                        Tasks & Hours
                                     </h4>
                                     <div className="space-y-2 max-h-60 overflow-y-auto">
-                                        {invoiceTasks.map((task) => (
-                                            <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                                                    <p className="text-xs text-gray-500">
-                                                        Original: {task.originalHours.toFixed(2)}h
-                                                        {task.isEdited && (
-                                                            <span className="text-blue-600 ml-2">(Modified)</span>
-                                                        )}
-                                                    </p>
+                                        {invoiceTasks.map((task) => {
+                                            const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
+                                            const currentMinutes = hoursToMinutes(currentHours);
+                                            // For existing invoices, calculate originalTimeMs from originalHours if not present
+                                            const originalTimeMs = task.originalTimeMs || (task.originalHours * 60 * 60 * 1000);
+                                            
+                                            return (
+                                                <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                                                    <div className="flex-1">
+                                                        <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                                                        <p className="text-xs text-gray-500">
+                                                            Original: {formatDurationWithSeconds(originalTimeMs)}
+                                                            {task.isEdited && (
+                                                                <span className="text-blue-600 ml-2">(Modified)</span>
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <div className="text-right">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={currentHours.toFixed(2)}
+                                                                onChange={(e) => handleHoursChange(task.id, e.target.value)}
+                                                                className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 text-0">
+                                                            <span className="text-sm text-gray-500">hours</span>
+                                                            <div className="text-xs text-gray-400">({currentMinutes}min)</div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center space-x-2">
-                                                    <input
-                                                        type="number"
-                                                        step="0.25"
-                                                        min="0"
-                                                        value={(editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours).toFixed(2)}
-                                                        onChange={(e) => handleHoursChange(task.id, e.target.value)}
-                                                        className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
-                                                    />
-                                                    <span className="text-sm text-gray-500">hours</span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                     
                                     {/* Updated Totals */}

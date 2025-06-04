@@ -25,7 +25,22 @@ const MetricsDisplay = ({ project, timeEntries }) => {
             return total + (entry.end - entry.start);
         }, 0);
 
-        const totalHours = millisecondsToHours(totalTime);
+        // Use task-by-task rounding for consistency with invoice generation
+        // Group entries by task first
+        const taskTimeMap = {};
+        entriesInRange.forEach(entry => {
+            if (!taskTimeMap[entry.taskId]) {
+                taskTimeMap[entry.taskId] = 0;
+            }
+            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+        });
+
+        // Calculate total rounded hours (matching invoice calculation)
+        const totalHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+            const taskHours = millisecondsToHours(taskTime);
+            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+            return total + roundedTaskHours;
+        }, 0);
 
         const totalEarnings = totalHours * project.hourlyRate;
 

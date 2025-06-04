@@ -138,3 +138,12 @@ export const formatActiveTimer = (startTime) => {
 export const millisecondsToHours = (milliseconds) => {
     return milliseconds / (1000 * 60 * 60);
 };
+
+/**
+ * Convert decimal hours to total minutes
+ * @param {number} hours - Duration in decimal hours
+ * @returns {number} Duration in total minutes
+ */
+export const hoursToMinutes = (hours) => {
+    return Math.round(hours * 60);
+};

@@ -64,12 +64,10 @@ const TaskTree = ({
      * Archive a task
      */
     const handleArchiveTask = (taskId) => {
-        if (window.confirm('Are you sure you want to archive this task? It will be moved to the archived section.')) {
-            const updatedTasks = tasks.map(task =>
-                task.id === taskId ? { ...task, archived: true } : task
-            );
-            setTasks(updatedTasks);
-        }
+        const updatedTasks = tasks.map(task =>
+            task.id === taskId ? { ...task, archived: true } : task
+        );
+        setTasks(updatedTasks);
     };
 
     /**

@@ -138,17 +138,28 @@ const ProjectList = ({ projects, setProjects, tasks = [], timeEntries = [], onSe
             projectTaskIds.includes(entry.taskId)
         );
 
-        // Get billable time entries (since last billing)
+        // Get billable time entries (since last billing) - only completed entries
         const lastBilledAt = project.lastBilledAt || project.createdAt;
         const unbilledEntries = projectTimeEntries.filter(entry => 
-            entry.start > lastBilledAt
+            entry.start > lastBilledAt && entry.end && entry.end > entry.start
         );
 
-        const unbilledTime = unbilledEntries.reduce((total, entry) => {
-            return total + (entry.end - entry.start);
+        // Group unbilled entries by task and round each task's hours (same logic as invoice)
+        const taskTimeMap = {};
+        unbilledEntries.forEach(entry => {
+            if (!taskTimeMap[entry.taskId]) {
+                taskTimeMap[entry.taskId] = 0;
+            }
+            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+        });
+
+        // Calculate total rounded hours (matching invoice calculation)
+        const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+            const taskHours = millisecondsToHours(taskTime);
+            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+            return total + roundedTaskHours;
         }, 0);
 
-        const unbilledHours = millisecondsToHours(unbilledTime);
         return unbilledHours * project.hourlyRate;
     };
 

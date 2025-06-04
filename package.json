@@ -1,11 +1,10 @@
 {
   "name": "tasktime",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:clean": "lsof -ti:5173 | xargs kill -9 2>/dev/null || true && vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
