@@ -31,7 +31,8 @@ const TaskItem = ({
     onCreateSubtask,
     onArchive,
     onUnarchive,
-    allTasks
+    allTasks,
+    project
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
@@ -198,22 +199,72 @@ const TaskItem = ({
         const timeDifference = newTime - currentEditableTime;
 
         if (timeDifference !== 0) {
-            // Create a new time entry to adjust the total time
-            const adjustmentEntry = {
-                id: `adjustment-${Date.now()}`,
-                taskId: task.id,
-                start: Date.now() - Math.abs(timeDifference),
-                end: Date.now()
-            };
-
-            // If we need to reduce time, create a negative entry by swapping start/end
-            if (timeDifference < 0) {
-                adjustmentEntry.start = Date.now();
-
-                adjustmentEntry.end = Date.now() - Math.abs(timeDifference);
+            const now = Date.now();
+            
+            // Get billing cutoff date (same logic as invoice generation)
+            const billingCutoffDate = project?.lastBilledAt || project?.createdAt || 0;
+            
+            if (timeDifference > 0) {
+                // Adding time - ensure start time is after billing cutoff while preserving duration
+                const proposedStartTime = now - timeDifference;
+                
+                if (proposedStartTime > billingCutoffDate) {
+                    // Normal case - no adjustment needed
+                    const adjustmentEntry = {
+                        id: `adjustment-${now}`,
+                        taskId: task.id,
+                        start: proposedStartTime,
+                        end: now
+                    };
+                    setTimeEntries([...timeEntries, adjustmentEntry]);
+                } else {
+                    // Start time would be before billing cutoff - adjust both start and end to preserve duration
+                    const startTime = billingCutoffDate + 1;
+                    const endTime = startTime + timeDifference;
+                    
+                    const adjustmentEntry = {
+                        id: `adjustment-${now}`,
+                        taskId: task.id,
+                        start: startTime,
+                        end: endTime
+                    };
+                    setTimeEntries([...timeEntries, adjustmentEntry]);
+                }
+            } else {
+                // Reducing time - replace existing entries with a new single entry
+                if (newTime > 0) {
+                    // Remove existing entries for this task and create a new one with the exact time
+                    const otherEntries = timeEntries.filter(entry => entry.taskId !== task.id);
+                    const proposedStartTime = now - newTime;
+                    
+                    if (proposedStartTime > billingCutoffDate) {
+                        // Normal case - no adjustment needed
+                        const newEntry = {
+                            id: `manual-${now}`,
+                            taskId: task.id,
+                            start: proposedStartTime,
+                            end: now
+                        };
+                        setTimeEntries([...otherEntries, newEntry]);
+                    } else {
+                        // Start time would be before billing cutoff - adjust both start and end to preserve duration
+                        const startTime = billingCutoffDate + 1;
+                        const endTime = startTime + newTime;
+                        
+                        const newEntry = {
+                            id: `manual-${now}`,
+                            taskId: task.id,
+                            start: startTime,
+                            end: endTime
+                        };
+                        setTimeEntries([...otherEntries, newEntry]);
+                    }
+                } else {
+                    // Remove all time entries for this task
+                    const otherEntries = timeEntries.filter(entry => entry.taskId !== task.id);
+                    setTimeEntries(otherEntries);
+                }
             }
-
-            setTimeEntries([...timeEntries, adjustmentEntry]);
         }
     };
 
@@ -467,7 +518,7 @@ const TaskItem = ({
                                         </button>
 
                                         {showDropdown && (
-                                            <div className="absolute right-0 mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                                            <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
                                                 <div className="py-1">
                                                     <button
                                                         onClick={() => {
@@ -524,6 +575,7 @@ const TaskItem = ({
                                 setTimeEntries={setTimeEntries}
                                 currentTimer={currentTimer}
                                 setCurrentTimer={setCurrentTimer}
+                                project={project}
                                 onDelete={() => {
                                     if (window.confirm('Are you sure you want to delete this subtask?')) {
                                         const result = deleteTaskWithCleanup(
@@ -604,6 +656,7 @@ const SubtaskItem = ({
     setTimeEntries,
     currentTimer,
     setCurrentTimer,
+    project,
     onDelete
 }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -714,22 +767,72 @@ const SubtaskItem = ({
         const timeDifference = newTime - totalTime;
 
         if (timeDifference !== 0) {
-            // Create a new time entry to adjust the total time
-            const adjustmentEntry = {
-                id: `adjustment-${Date.now()}`,
-                taskId: task.id,
-                start: Date.now() - Math.abs(timeDifference),
-                end: Date.now()
-            };
-
-            // If we need to reduce time, create a negative entry by swapping start/end
-            if (timeDifference < 0) {
-                adjustmentEntry.start = Date.now();
-
-                adjustmentEntry.end = Date.now() - Math.abs(timeDifference);
+            const now = Date.now();
+            
+            // Get billing cutoff date (same logic as invoice generation)
+            const billingCutoffDate = project?.lastBilledAt || project?.createdAt || 0;
+            
+            if (timeDifference > 0) {
+                // Adding time - ensure start time is after billing cutoff while preserving duration
+                const proposedStartTime = now - timeDifference;
+                
+                if (proposedStartTime > billingCutoffDate) {
+                    // Normal case - no adjustment needed
+                    const adjustmentEntry = {
+                        id: `adjustment-${now}`,
+                        taskId: task.id,
+                        start: proposedStartTime,
+                        end: now
+                    };
+                    setTimeEntries([...timeEntries, adjustmentEntry]);
+                } else {
+                    // Start time would be before billing cutoff - adjust both start and end to preserve duration
+                    const startTime = billingCutoffDate + 1;
+                    const endTime = startTime + timeDifference;
+                    
+                    const adjustmentEntry = {
+                        id: `adjustment-${now}`,
+                        taskId: task.id,
+                        start: startTime,
+                        end: endTime
+                    };
+                    setTimeEntries([...timeEntries, adjustmentEntry]);
+                }
+            } else {
+                // Reducing time - replace existing entries with a new single entry
+                if (newTime > 0) {
+                    // Remove existing entries for this task and create a new one with the exact time
+                    const otherEntries = timeEntries.filter(entry => entry.taskId !== task.id);
+                    const proposedStartTime = now - newTime;
+                    
+                    if (proposedStartTime > billingCutoffDate) {
+                        // Normal case - no adjustment needed
+                        const newEntry = {
+                            id: `manual-${now}`,
+                            taskId: task.id,
+                            start: proposedStartTime,
+                            end: now
+                        };
+                        setTimeEntries([...otherEntries, newEntry]);
+                    } else {
+                        // Start time would be before billing cutoff - adjust both start and end to preserve duration
+                        const startTime = billingCutoffDate + 1;
+                        const endTime = startTime + newTime;
+                        
+                        const newEntry = {
+                            id: `manual-${now}`,
+                            taskId: task.id,
+                            start: startTime,
+                            end: endTime
+                        };
+                        setTimeEntries([...otherEntries, newEntry]);
+                    }
+                } else {
+                    // Remove all time entries for this task
+                    const otherEntries = timeEntries.filter(entry => entry.taskId !== task.id);
+                    setTimeEntries(otherEntries);
+                }
             }
-
-            setTimeEntries([...timeEntries, adjustmentEntry]);
         }
     };
 
@@ -890,7 +993,7 @@ const SubtaskItem = ({
                                 </button>
 
                                 {showDropdown && (
-                                    <div className="absolute right-0 mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                                    <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
                                         <div className="py-1">
                                             <button
                                                 onClick={() => {

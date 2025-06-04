@@ -200,6 +200,7 @@ const TaskTree = ({
                                     onArchive={() => handleArchiveTask(task.id)}
                                     onUnarchive={() => handleUnarchiveTask(task.id)}
                                     allTasks={projectTasks}
+                                    project={project}
                                 />
                             ))}
                         </div>
@@ -236,6 +237,7 @@ const TaskTree = ({
                                             onCreateSubtask={handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
                                             allTasks={projectTasks}
+                                            project={project}
                                         />
                                     ))}
                                 </div>
