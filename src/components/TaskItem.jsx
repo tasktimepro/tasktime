@@ -11,6 +11,7 @@ import CustomCheckbox from './CustomCheckbox.jsx';
 import TimeEditModal from './TimeEditModal.jsx';
 import { formatDurationWithSeconds, formatActiveTimer } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
+import { deleteTaskWithCleanup } from '../utils/taskUtils';
 
 // Create a custom event for dropdown management
 const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
@@ -342,7 +343,7 @@ const TaskItem = ({
                                                                 </span>
                                                             </button>
                                                         )}
-                                                        {mainTaskTime > 0 && (
+                                                        {totalTimeWithSubtasks > mainTaskTime && (
                                                             <span>•</span>
                                                         )}
                                                         {totalTimeWithSubtasks > mainTaskTime && (
@@ -525,20 +526,18 @@ const TaskItem = ({
                                 setCurrentTimer={setCurrentTimer}
                                 onDelete={() => {
                                     if (window.confirm('Are you sure you want to delete this subtask?')) {
-                                        const updatedTasks = tasks.filter(t => t.id !== subtask.id);
-
-                                        setTasks(updatedTasks);
-
-                                        // Remove time entries for this subtask
-                                        setTimeEntries(timeEntries.filter(entry => entry.taskId !== subtask.id));
-
-                                        // Clear current timer if it's for this subtask
-                                        if (currentTimer && currentTimer.taskId === subtask.id) {
-                                            setCurrentTimer(null);
-                                        }
+                                        const result = deleteTaskWithCleanup(
+                                            subtask.id,
+                                            tasks,
+                                            timeEntries,
+                                            currentTimer,
+                                            setTasks,
+                                            setTimeEntries,
+                                            setCurrentTimer
+                                        );
                                         
                                         // Show success toast
-                                        showSuccess(`Subtask "${subtask.title}" deleted successfully`);
+                                        showSuccess(`Subtask "${result.taskTitle}" deleted successfully`);
                                     }
                                 }}
                             />

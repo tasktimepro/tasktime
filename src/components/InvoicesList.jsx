@@ -1,16 +1,14 @@
 import { useState } from 'react';
-import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
-import { useToast } from '../hooks/useToast';
 
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
  */
-const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
+const InvoicesList = ({ project, onEditInvoice }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
-    const { showSuccess } = useToast();
 
     const invoices = project.invoices || [];
 
@@ -67,25 +65,6 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
         }
     };
 
-    /**
-     * Handle invoice deletion
-     */
-    const handleDelete = (invoiceId) => {
-        if (window.confirm('Are you sure you want to delete this invoice?')) {
-            const updatedProject = {
-                ...project,
-                invoices: project.invoices.filter(inv => inv.id !== invoiceId)
-            };
-
-            const updatedProjects = projects.map(p => 
-                p.id === project.id ? updatedProject : p
-            );
-
-            setProjects(updatedProjects);
-            showSuccess('Invoice deleted successfully');
-        }
-    };
-
     if (invoices.length === 0) {
         return (
             <div className="text-center py-8">
@@ -100,6 +79,15 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
 
     return (
         <div>
+            {/* Info about invoice management */}
+            {invoices.length > 0 && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-xs text-blue-600">
+                        <strong>Note:</strong> Invoices preserve billing history and cannot be deleted. You can edit invoice details or create corrections as needed.
+                    </p>
+                </div>
+            )}
+            
             <div className="space-y-4">
                 {invoices.map((invoice) => (
                     <div key={invoice.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -146,13 +134,8 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                                     <ArrowDownTrayIcon className="h-5 w-5" />
                                 </button>
 
-                                <button
-                                    onClick={() => handleDelete(invoice.id)}
-                                    className="p-2 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50"
-                                    title="Delete Invoice"
-                                >
-                                    <TrashIcon className="h-5 w-5" />
-                                </button>
+                                {/* Removed delete button to maintain billing integrity */}
+                                {/* Once an invoice is generated, it should not be deleted to preserve billing history */}
                             </div>
                         </div>
                     </div>

@@ -5,11 +5,23 @@ import ExportImport from './ExportImport.jsx';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
+import { getTaskIdsToDelete } from '../utils/taskUtils';
 
 /**
  * ProjectList component - Displays and manages the list of projects
  */
-const ProjectList = ({ projects, setProjects, tasks = [], timeEntries = [], onSelectProject, onImport }) => {
+const ProjectList = ({ 
+    projects, 
+    setProjects, 
+    tasks = [], 
+    setTasks, 
+    timeEntries = [], 
+    setTimeEntries, 
+    currentTimer, 
+    setCurrentTimer, 
+    onSelectProject, 
+    onImport 
+}) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
     const { showSuccess } = useToast();
@@ -83,12 +95,44 @@ const ProjectList = ({ projects, setProjects, tasks = [], timeEntries = [], onSe
     };
 
     /**
-     * Delete a project
+     * Delete a project and all associated tasks and time entries
      */
     const handleDeleteProject = (projectId) => {
         if (window.confirm('Are you sure you want to delete this project? All associated tasks and time entries will be lost.')) {
+            // Get all task IDs that need to be deleted (including subtasks)
+            const projectTasks = tasks.filter(task => task.projectId === projectId);
+            const allTaskIdsToDelete = new Set();
+            
+            // Add all project tasks and their subtasks
+            projectTasks.forEach(task => {
+                const taskIds = getTaskIdsToDelete(task.id, tasks);
+                taskIds.forEach(id => allTaskIdsToDelete.add(id));
+            });
+
+            // Check if current timer is running on any task that will be deleted
+            if (currentTimer && allTaskIdsToDelete.has(currentTimer.taskId)) {
+                setCurrentTimer(null);
+            }
+
+            // Remove the project
             setProjects(projects.filter(project => project.id !== projectId));
-            showSuccess('Project deleted successfully');
+            
+            // Remove all tasks for this project (including subtasks)
+            const updatedTasks = tasks.filter(task => !allTaskIdsToDelete.has(task.id));
+            setTasks(updatedTasks);
+            
+            // Remove all time entries for deleted tasks
+            const updatedTimeEntries = timeEntries.filter(entry => 
+                !allTaskIdsToDelete.has(entry.taskId)
+            );
+            setTimeEntries(updatedTimeEntries);
+            
+            const deletedTaskCount = allTaskIdsToDelete.size;
+            const deletedTimeEntriesCount = timeEntries.length - updatedTimeEntries.length;
+            
+            showSuccess(
+                `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`
+            );
         }
     };
 

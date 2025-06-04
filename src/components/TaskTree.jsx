@@ -3,6 +3,7 @@ import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from '
 import TaskItem from './TaskItem';
 import { generateId } from '../utils/idUtils';
 import { useToast } from '../hooks/useToast';
+import { deleteTaskWithCleanup } from '../utils/taskUtils';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -87,31 +88,22 @@ const TaskTree = ({
      */
     const handleDeleteTask = (taskId) => {
         if (window.confirm('Are you sure you want to delete this task? All subtasks and time entries will be lost.')) {
-            // Get the task title before deletion for the toast message
-            const taskToDelete = tasks.find(t => t.id === taskId);
-            const taskTitle = taskToDelete ? taskToDelete.title : 'Task';
+            const result = deleteTaskWithCleanup(
+                taskId,
+                tasks,
+                timeEntries,
+                currentTimer,
+                setTasks,
+                setTimeEntries,
+                setCurrentTimer
+            );
+
+            // Show appropriate success message
+            const message = result.isMainTask && result.deletedCount > 1
+                ? `Task "${result.taskTitle}" and ${result.deletedCount - 1} subtask(s) deleted successfully`
+                : `Task "${result.taskTitle}" deleted successfully`;
             
-            // Get all subtask IDs
-            const subtaskIds = projectTasks
-                .filter(task => task.parentTaskId === taskId)
-                .map(task => task.id);
-
-            // All task IDs to delete (task + its subtasks)
-            const taskIdsToDelete = [taskId, ...subtaskIds];
-
-            // Remove tasks
-            setTasks(tasks.filter(task => !taskIdsToDelete.includes(task.id)));
-
-            // Remove time entries for these tasks
-            setTimeEntries(timeEntries.filter(entry => !taskIdsToDelete.includes(entry.taskId)));
-
-            // Clear current timer if it's for one of these tasks
-            if (currentTimer && taskIdsToDelete.includes(currentTimer.taskId)) {
-                setCurrentTimer(null);
-            }
-
-            // Show toast notification | Used for main tasks & archived tasks
-            showSuccess(`Task "${taskTitle}" deleted successfully`);
+            showSuccess(message);
         }
     };
 

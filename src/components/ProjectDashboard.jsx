@@ -126,8 +126,6 @@ const ProjectDashboard = ({
                 <div className="p-6">
                     <InvoicesList
                         project={project}
-                        projects={projects}
-                        setProjects={setProjects}
                         onEditInvoice={handleEditInvoice}
                     />
                 </div>

@@ -93,7 +93,11 @@ function App() {
                         projects={projects}
                         setProjects={setProjects}
                         tasks={tasks}
+                        setTasks={setTasks}
                         timeEntries={timeEntries}
+                        setTimeEntries={setTimeEntries}
+                        currentTimer={currentTimer}
+                        setCurrentTimer={setCurrentTimer}
                         onSelectProject={(project) => {
                             navigateToProject(project.id);
                         }}
