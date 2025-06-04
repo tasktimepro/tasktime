@@ -1,4 +1,4 @@
-# Task Time Tracker & Invoice System
+# Task. Time. Track. & Invoice System
 
 A modern, local-first task time tracking and invoice generation application built with React, Vite, and Tailwind CSS.
 

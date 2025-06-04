@@ -3,7 +3,7 @@
 - Here's a project plan I have setup for a comprehensive task time tracker & invoice system with advanced features. The application now includes task completion tracking, archiving functionality, real-time timer displays, advanced invoice generation with time modification capabilities, and complete state preservation. Please use Vite to create the app, and make sure to install all necessary npm packages that are required in the project. Please also make sure to have a nice modern UI using tailwind and if necessary from ready made components. This is a local-first project and does not require a dedicated landing page. Initially we'll just offer the service upfront, so that you can start creating and timing tasks immediately. Let's make a clean and nice looking intuitive UI/UX please. Keep in mind all the necessary functionality such as the creating of tasks & subtasks, task completion tracking, archiving system, real-time timers with seconds, advanced invoice modification, and so on. Make sure all this functionality works well.
 
 ## Project Overview
-- **Project Name:** Task Time Tracker & Invoice System
+- **Project Name:** Task. Time. Track. & Invoice System
 - **Version:** 2.0 (Enhanced Features)
 - **Description:**  
   A local-only, comprehensive React app for managing projects with task hierarchies, completion tracking, archiving system, real-time timing with seconds precision, and advanced invoice generation with time modification capabilities. Users can export/import complete data including all new features as JSON for backup.
@@ -235,11 +235,3 @@ tasktime/
 - Keep color palette neutral (gray/blue accents) to avoid distraction.
 - Subtle hover/focus states to enhance interactivity.
 - Responsive layout for mobile usability.
-
-## Future Upsell Ideas (IGNORE THIS SECTION)
-
-- Dark mode / theme customization
-- Email invoices directly via mailto or client SMTP
-  - Create email template, Client email, Click generate, confirm, send
-- Optional cloud sync and backups (with backend or storage services)
-- Additional invoice templates (premium)

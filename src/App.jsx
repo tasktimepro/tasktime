@@ -5,7 +5,7 @@ import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
 
 /**
- * Main App component - Entry point for the Task Time Tracker
+ * Main App component - Entry point for the Task. Time. Track.
  */
 function App() {
     console.log('✅ App component is rendering successfully');
@@ -65,7 +65,7 @@ function App() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center py-4">
                         <h1 className="text-2xl font-bold text-gray-900">
-                            Task Time Tracker
+                            Task. Time. Track.
                         </h1>
                         
                         <div className="flex space-x-4">

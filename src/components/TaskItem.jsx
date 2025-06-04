@@ -8,7 +8,7 @@ import {
 import TimerControls from './TimerControls.jsx';
 import CustomCheckbox from './CustomCheckbox.jsx';
 import TimeEditModal from './TimeEditModal.jsx';
-import { formatDuration, formatDurationWithSeconds, formatActiveTimer } from '../utils/dateUtils';
+import { formatDurationWithSeconds, formatActiveTimer } from '../utils/dateUtils';
 
 /**
  * TaskItem component - Displays individual task with timer controls and subtasks
@@ -28,6 +28,7 @@ const TaskItem = ({
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
+    // eslint-disable-next-line no-unused-vars
     const [currentTime, setCurrentTime] = useState(Date.now());
     const [showTimeEditModal, setShowTimeEditModal] = useState(false);
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
@@ -113,18 +114,29 @@ const TaskItem = ({
         currentTimer && currentTimer.taskId === subtask.id
     );
 
-    // Don't dim parent task if its subtask timer is active
-    const shouldDimTask = anyTimerActive && !isTimerActive && !subtaskTimerActive;
-
     // Check if task is completed or archived
     const isCompleted = task.completed || false;
-
     const isArchived = task.archived || false;
+
+    // Don't dim parent task if its subtask timer is active, but skip archived tasks
+    const shouldDimTask = anyTimerActive && !isTimerActive && !subtaskTimerActive && !isArchived;
 
     /**
      * Toggle task completion status
      */
     const handleToggleComplete = () => {
+        // If timer is active for this task, stop it before completing
+        if (isTimerActive && currentTimer) {
+            const timeEntry = {
+                id: `completion-${Date.now()}`,
+                taskId: task.id,
+                start: currentTimer.startTime,
+                end: Date.now()
+            };
+            setTimeEntries([...timeEntries, timeEntry]);
+            setCurrentTimer(null);
+        }
+
         const updatedTasks = tasks.map(t =>
             t.id === task.id ? { ...t, completed: !isCompleted } : t
         );
@@ -215,7 +227,11 @@ const TaskItem = ({
     return (
         <div className={`border border-gray-200 rounded-lg hover:shadow-md transition-shadow ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
             {/* Main Task */}
-            <div className="p-4 hover:bg-gray-50 transition-colors">
+            <div className={`p-4 transition-colors ${
+                (subtaskTimerActive || isTimerActive) && !isArchived
+                ? 'bg-gray-100 opacity-50 pointer-events-none' 
+                : 'hover:bg-gray-50'
+            }`}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3 flex-1 min-w-0">
                         {/* Completion Checkbox */}
@@ -223,7 +239,7 @@ const TaskItem = ({
                             <CustomCheckbox
                                 checked={isCompleted}
                                 onChange={handleToggleComplete}
-                                disabled={isEditing}
+                                disabled={isEditing || isArchived}
                             />
                         </div>
 
@@ -310,8 +326,11 @@ const TaskItem = ({
                                         <ArchiveBoxIcon className="h-5 w-5 group-hover:text-yellow-700" />
                                     </button>
                                 )
+                            ) : anyTimerActive ? (
+                                /* When any timer is active, hide all action buttons */
+                                null
                             ) : (
-                                /* Show all action buttons when not completed and timer not active */
+                                /* Show all action buttons when not completed and no timer active */
                                 <>
                                     <TimerControls
                                         task={task}
@@ -423,12 +442,18 @@ const TaskItem = ({
                                     </div>
                                 </form>
                             ) : (
-                                <button
-                                    onClick={() => setShowCreateSubtaskForm(true)}
-                                    className="w-full text-left py-2 px-3 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors border border-dashed border-gray-300 hover:border-gray-400"
-                                >
-                                    + Add subtask
-                                </button>
+                                <div className={`${
+                                    anyTimerActive 
+                                    ? 'opacity-50 pointer-events-none' 
+                                    : ''
+                                }`}>
+                                    <button
+                                        onClick={() => setShowCreateSubtaskForm(true)}
+                                        className="w-full text-left py-2 px-3 text-sm text-gray-500 rounded-md transition-colors border border-dashed border-gray-300"
+                                    >
+                                        + Add subtask
+                                    </button>
+                                </div>
                             )
                         )}
                     </div>
@@ -452,11 +477,9 @@ const SubtaskItem = ({
     onDelete
 }) => {
     const [isEditing, setIsEditing] = useState(false);
-
     const [editTitle, setEditTitle] = useState(task.title);
-
+    // eslint-disable-next-line no-unused-vars
     const [currentTime, setCurrentTime] = useState(Date.now());
-
     const [showTimeEditModal, setShowTimeEditModal] = useState(false);
 
     // Update current time every second for active timer display
@@ -497,10 +520,25 @@ const SubtaskItem = ({
     // Check if subtask is completed
     const isCompleted = task.completed || false;
 
+    // Check if subtask is archived (either the subtask itself or its parent task)
+    const isArchived = task.archived || false;
+
     /**
      * Toggle subtask completion status
      */
     const handleToggleComplete = () => {
+        // If timer is active for this subtask, stop it before completing
+        if (isTimerActive && currentTimer) {
+            const timeEntry = {
+                id: `completion-${Date.now()}`,
+                taskId: task.id,
+                start: currentTimer.startTime,
+                end: Date.now()
+            };
+            setTimeEntries([...timeEntries, timeEntry]);
+            setCurrentTimer(null);
+        }
+
         const updatedTasks = tasks.map(t =>
             t.id === task.id ? { ...t, completed: !isCompleted } : t
         );
@@ -572,7 +610,7 @@ const SubtaskItem = ({
                     <CustomCheckbox
                         checked={isCompleted}
                         onChange={handleToggleComplete}
-                        disabled={isEditing}
+                        disabled={isEditing || isArchived}
                     />
                 </div>
 
@@ -648,8 +686,14 @@ const SubtaskItem = ({
                             currentTimer={currentTimer}
                             setCurrentTimer={setCurrentTimer}
                         />
-                    ) : !isCompleted ? (
-                        /* Show all action buttons when not completed and timer not active */
+                    ) : isCompleted ? (
+                        /* No actions for completed subtasks */
+                        null
+                    ) : anyTimerActive ? (
+                        /* When any timer is active, hide all action buttons */
+                        null
+                    ) : (
+                        /* Show all action buttons when not completed and no timer active */
                         <>
                             <TimerControls
                                 task={task}
@@ -685,7 +729,7 @@ const SubtaskItem = ({
                                 <TrashIcon className="h-5 w-5 group-hover:text-red-600" />
                             </button>
                         </>
-                    ) : null}
+                    )}
                 </div>
             )}
 

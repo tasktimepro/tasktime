@@ -13,7 +13,7 @@ import { generateId } from '../utils/idUtils';
  */
 function TimerControls({
     task,
-    timeEntries,
+    // timeEntries,
     setTimeEntries,
     currentTimer,
     setCurrentTimer,
@@ -80,10 +80,11 @@ function TimerControls({
             ) : (
                 <button
                     onClick={pauseTimer}
-                    className="p-1 text-yellow-600 hover:bg-yellow-100 rounded-full transition-colors group"
+                    className="flex items-center space-x-1 px-2 py-1 text-yellow-600 hover:bg-yellow-100 rounded-md transition-colors group"
                     title="Pause Timer"
                 >
                     <PauseIcon className={`${iconSize} group-hover:text-yellow-700`} />
+                    <span className="text-xs font-medium group-hover:text-yellow-700">Pause</span>
                 </button>
             )}
         </div>

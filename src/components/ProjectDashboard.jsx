@@ -41,6 +41,11 @@ const ProjectDashboard = ({
         projectTaskIds.includes(entry.taskId)
     );
 
+    // Count visible tasks (not completed and not archived, including both parent tasks and subtasks)
+    const visibleTasksCount = projectTasks.filter(task => 
+        !task.completed && !task.archived
+    ).length;
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -71,17 +76,12 @@ const ProjectDashboard = ({
                 />
             </div>
 
-            {/* Metrics Display */}
-            <MetricsDisplay
-                project={project}
-                tasks={projectTasks}
-                timeEntries={projectTimeEntries}
-            />
-
             {/* Task Tree */}
             <div className="bg-white shadow rounded-lg">
                 <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-lg font-medium text-gray-900">Tasks</h2>
+                    <h2 className="text-lg font-medium text-gray-900">
+                        Tasks ({visibleTasksCount})
+                    </h2>
                 </div>
 
                 <div className="p-6">
@@ -96,6 +96,12 @@ const ProjectDashboard = ({
                     />
                 </div>
             </div>
+
+            {/* Metrics Display */}
+            <MetricsDisplay
+                project={project}
+                timeEntries={projectTimeEntries}
+            />
 
             {/* Invoices Section */}
             <div className="bg-white shadow rounded-lg">
