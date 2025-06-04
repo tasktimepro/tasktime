@@ -39,6 +39,13 @@ function App() {
     }, [urlParams.projectId, urlParams.view, selectedProject, navigateToProjects]);
 
     /**
+     * Handle navigation to payment methods creation from invoice generator
+     */
+    const handleNavigateToPaymentMethods = () => {
+        navigateToAccount({ create: 'payment-method' });
+    };
+
+    /**
      * Handle data import from ExportImport component
      */
     const handleImport = (importData) => {
@@ -129,7 +136,7 @@ function App() {
                         setCurrentTimer={setCurrentTimer}
                         onBackToProjects={navigateToProjects}
                         paymentMethods={paymentMethods}
-                        setPaymentMethods={setPaymentMethods}
+                        onNavigateToPaymentMethods={handleNavigateToPaymentMethods}
                     />
                 )}
 

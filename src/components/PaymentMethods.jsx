@@ -11,12 +11,20 @@ const DROPDOWN_TOGGLE_EVENT = 'payment-dropdown-toggle';
  */
 const PaymentMethods = ({ 
     paymentMethods, 
-    setPaymentMethods 
+    setPaymentMethods,
+    autoOpenCreate = false
 }) => {
-    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [showCreateForm, setShowCreateForm] = useState(autoOpenCreate);
     const [editingPaymentMethod, setEditingPaymentMethod] = useState(null);
     const [showDropdown, setShowDropdown] = useState({}); // Track dropdown states by payment method ID
     const { showSuccess } = useToast();
+
+    // Auto-open create form when autoOpenCreate prop changes
+    useEffect(() => {
+        if (autoOpenCreate && !showCreateForm && !editingPaymentMethod) {
+            setShowCreateForm(true);
+        }
+    }, [autoOpenCreate, showCreateForm, editingPaymentMethod]);
 
     const [formData, setFormData] = useState({
         title: '',

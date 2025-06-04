@@ -64,10 +64,10 @@ export const useUrlState = () => {
     }, [updateUrl]);
 
     /**
-     * Navigate to account view
+     * Navigate to account view with optional parameters
      */
-    const navigateToAccount = useCallback(() => {
-        updateUrl({ view: 'account', project: null });
+    const navigateToAccount = useCallback((params = {}) => {
+        updateUrl({ view: 'account', project: null, ...params });
     }, [updateUrl]);
 
     /**

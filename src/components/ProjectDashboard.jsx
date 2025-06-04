@@ -21,7 +21,7 @@ const ProjectDashboard = ({
     setCurrentTimer,
     onBackToProjects,
     paymentMethods,
-    setPaymentMethods
+    onNavigateToPaymentMethods
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -76,7 +76,7 @@ const ProjectDashboard = ({
                     tasks={projectTasks}
                     timeEntries={projectTimeEntries}
                     paymentMethods={paymentMethods}
-                    setPaymentMethods={setPaymentMethods}
+                    onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                 />
             </div>
 
@@ -124,7 +124,7 @@ const ProjectDashboard = ({
                             editingInvoice={editingInvoice}
                             onInvoiceSaved={() => setEditingInvoice(null)}
                             paymentMethods={paymentMethods}
-                            setPaymentMethods={setPaymentMethods}
+                            onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                         />
                     </div>
                 </div>

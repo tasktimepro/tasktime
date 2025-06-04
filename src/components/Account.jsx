@@ -15,6 +15,10 @@ const Account = ({
     setPaymentMethods 
 }) => {
     const [activeTab, setActiveTab] = useState('payment-methods');
+    
+    // Check URL parameters for auto-opening create payment method form
+    const urlParams = new URLSearchParams(window.location.search);
+    const autoOpenCreate = urlParams.get('create') === 'payment-method';
 
     const sideNavItems = [
         {
@@ -54,7 +58,8 @@ const Account = ({
                 return (
                     <PaymentMethods 
                         paymentMethods={paymentMethods} 
-                        setPaymentMethods={setPaymentMethods} 
+                        setPaymentMethods={setPaymentMethods}
+                        autoOpenCreate={autoOpenCreate}
                     />
                 );
             default:
