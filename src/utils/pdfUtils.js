@@ -16,11 +16,11 @@ export const generatePDF = (htmlContent, filename = 'invoice.pdf', options = {})
             }
 
             const defaultOptions = {
-                margin: 1,
+                margin: [15, 20, 15, 20],  // top, right, bottom, left margins in mm
                 filename: filename,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2 },
-                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
             const finalOptions = { ...defaultOptions, ...options };

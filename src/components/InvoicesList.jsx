@@ -233,16 +233,17 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                             )}
                         </div>
 
-                        <div className="flex justify-end space-x-6 mt-4">
+                        <div className="flex justify-end space-x-4 mt-4">
                             <button
                                 onClick={() => handleDownload(selectedInvoice)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                className="px-4 py-2 bg-purple-600 text-sm font-medium text-white rounded-md hover:bg-purple-700 flex items-center space-x-2"
                             >
-                                Download PDF
+                                <ArrowDownTrayIcon className="h-5 w-5" />
+                                <span>Download PDF</span>
                             </button>
                             <button
                                 onClick={() => setShowPreview(false)}
-                                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                                className="px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400"
                             >
                                 Close
                             </button>
