@@ -3,7 +3,8 @@ import {
     PencilIcon, 
     TrashIcon,
     ArchiveBoxIcon,
-    ClockIcon
+    ClockIcon,
+    EllipsisHorizontalIcon
 } from '@heroicons/react/24/outline';
 import TimerControls from './TimerControls.jsx';
 import CustomCheckbox from './CustomCheckbox.jsx';
@@ -24,6 +25,7 @@ const TaskItem = ({
     onDelete,
     onCreateSubtask,
     onArchive,
+    onUnarchive,
     allTasks
 }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -33,6 +35,7 @@ const TaskItem = ({
     const [showTimeEditModal, setShowTimeEditModal] = useState(false);
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+    const [showDropdown, setShowDropdown] = useState(false);
 
     // Update current time every second for active timer display
     useEffect(() => {
@@ -48,6 +51,20 @@ const TaskItem = ({
             if (interval) clearInterval(interval);
         };
     }, [currentTimer, task.id]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showDropdown && !event.target.closest('.dropdown-container')) {
+                setShowDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showDropdown]);
 
     // Get subtasks for this task
     const subtasks = allTasks.filter(t => t.parentTaskId === task.id);
@@ -320,6 +337,26 @@ const TaskItem = ({
                                     currentTimer={currentTimer}
                                     setCurrentTimer={setCurrentTimer}
                                 />
+                            ) : isArchived ? (
+                                /* Show unarchive and delete buttons for archived tasks in flex layout */
+                                <div className="flex items-center space-x-2">
+                                    {onUnarchive && (
+                                        <button
+                                            onClick={onUnarchive}
+                                            className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded"
+                                            title="Unarchive Task"
+                                        >
+                                            Unarchive
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={onDelete}
+                                        className="text-xs text-red-600 hover:text-red-800 bg-red-50 px-2 py-1 rounded"
+                                        title="Delete Task"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
                             ) : isCompleted ? (
                                 /* Only show archive button when completed */
                                 !task.parentTaskId && onArchive && (
@@ -345,31 +382,51 @@ const TaskItem = ({
                                         setCurrentTimer={setCurrentTimer}
                                     />
 
-                                    {totalTime > 0 && (
+                                    <button
+                                        onClick={() => setShowTimeEditModal(true)}
+                                        className="p-1 text-gray-400 hover:bg-blue-100 rounded-full transition-colors group"
+                                        title="Edit Time"
+                                    >
+                                        <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
+                                    </button>
+
+                                    {/* Three-dot dropdown menu for Edit and Delete */}
+                                    <div className="relative dropdown-container">
                                         <button
-                                            onClick={() => setShowTimeEditModal(true)}
-                                            className="p-1 text-gray-400 hover:bg-blue-100 rounded-full transition-colors group"
-                                            title="Edit Time"
+                                            onClick={() => setShowDropdown(!showDropdown)}
+                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
+                                            title="More actions"
                                         >
-                                            <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
+                                            <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
                                         </button>
-                                    )}
 
-                                    <button
-                                        onClick={() => setIsEditing(true)}
-                                        className="p-1 text-gray-400 hover:bg-yellow-100 rounded-full transition-colors group"
-                                        title="Edit Task"
-                                    >
-                                        <PencilIcon className="h-5 w-5 group-hover:text-yellow-600" />
-                                    </button>
-
-                                    <button
-                                        onClick={onDelete}
-                                        className="p-1 text-gray-400 hover:bg-red-100 rounded-full transition-colors group"
-                                        title="Delete Task"
-                                    >
-                                        <TrashIcon className="h-5 w-5 group-hover:text-red-600" />
-                                    </button>
+                                        {showDropdown && (
+                                            <div className="absolute right-0 mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                                                <div className="py-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setIsEditing(true);
+                                                            setShowDropdown(false);
+                                                        }}
+                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"
+                                                    >
+                                                        <PencilIcon className="h-4 w-4" />
+                                                        <span>Edit</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            onDelete();
+                                                            setShowDropdown(false);
+                                                        }}
+                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
+                                                    >
+                                                        <TrashIcon className="h-4 w-4" />
+                                                        <span>Delete</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </>
                             )}
                         </div>
@@ -387,7 +444,7 @@ const TaskItem = ({
             />
 
             {/* Subtasks */}
-            {(subtasks.length > 0 || (!task.completed && onCreateSubtask)) && (
+            {!isArchived && (subtasks.length > 0 || (!task.completed && onCreateSubtask)) && (
                 <div className="border-t border-gray-100 bg-gray-50">
                     <div className="pl-8 pr-4 py-2 space-y-2">
                         {subtasks.map((subtask) => (
@@ -486,6 +543,7 @@ const SubtaskItem = ({
     // eslint-disable-next-line no-unused-vars
     const [currentTime, setCurrentTime] = useState(Date.now());
     const [showTimeEditModal, setShowTimeEditModal] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
 
     // Update current time every second for active timer display
     useEffect(() => {
@@ -501,6 +559,20 @@ const SubtaskItem = ({
             if (interval) clearInterval(interval);
         };
     }, [currentTimer, task.id]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showDropdown && !event.target.closest('.dropdown-container')) {
+                setShowDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showDropdown]);
 
     // Get time entries for this subtask
     const taskTimeEntries = timeEntries.filter(entry => entry.taskId === task.id);
@@ -530,8 +602,7 @@ const SubtaskItem = ({
     // 1. Not dim if this subtask's timer is active
     // 2. Always dim if any timer is active and it's not this subtask's timer
     // 3. Don't dim if the task is archived
-    const isRelatedToActiveTimer = isTimerActive;
-    const shouldDimTask = anyTimerActive && !isRelatedToActiveTimer && !isArchived;
+    const shouldDimTask = anyTimerActive && !isTimerActive && !isArchived;
 
     /**
      * Toggle subtask completion status
@@ -613,7 +684,7 @@ const SubtaskItem = ({
     const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
 
     return (
-        <div className={`flex items-center justify-between py-2 ${(shouldDimTask && isRelatedToActiveTimer) ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
+        <div className={`flex items-center justify-between py-2 ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
             <div className="flex items-center space-x-3 flex-1 min-w-0">
                 {/* Completion Checkbox */}
                 <div className="flex-shrink-0">
@@ -713,31 +784,51 @@ const SubtaskItem = ({
                                 setCurrentTimer={setCurrentTimer}
                             />
 
-                            {totalTime > 0 && (
-                                <button
-                                    onClick={() => setShowTimeEditModal(true)}
-                                    className="p-1 text-gray-400 hover:bg-blue-100 rounded-full transition-colors group"
-                                    title="Edit Time"
-                                >
-                                    <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
-                                </button>
-                            )}
+                            <button
+                                onClick={() => setShowTimeEditModal(true)}
+                                className="p-1 text-gray-400 hover:bg-blue-100 rounded-full transition-colors group"
+                                title="Edit Time"
+                            >
+                                <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
+                            </button>
                             
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="p-1 text-gray-400 hover:bg-yellow-100 rounded-full transition-colors group"
-                                title="Edit Subtask"
-                            >
-                                <PencilIcon className="h-5 w-5 group-hover:text-yellow-600" />
-                            </button>
+                            {/* Three-dot dropdown menu for Edit and Delete */}
+                            <div className="relative dropdown-container">
+                                <button
+                                    onClick={() => setShowDropdown(!showDropdown)}
+                                    className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
+                                    title="More actions"
+                                >
+                                    <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
+                                </button>
 
-                            <button
-                                onClick={onDelete}
-                                className="p-1 text-gray-400 hover:bg-red-100 rounded-full transition-colors group"
-                                title="Delete Subtask"
-                            >
-                                <TrashIcon className="h-5 w-5 group-hover:text-red-600" />
-                            </button>
+                                {showDropdown && (
+                                    <div className="absolute right-0 mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                                        <div className="py-1">
+                                            <button
+                                                onClick={() => {
+                                                    setIsEditing(true);
+                                                    setShowDropdown(false);
+                                                }}
+                                                className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"
+                                            >
+                                                <PencilIcon className="h-4 w-4" />
+                                                <span>Edit</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    onDelete();
+                                                    setShowDropdown(false);
+                                                }}
+                                                className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
+                                            >
+                                                <TrashIcon className="h-4 w-4" />
+                                                <span>Delete</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </>
                     )}
                 </div>

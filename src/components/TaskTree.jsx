@@ -197,6 +197,7 @@ const TaskTree = ({
                                     onDelete={() => handleDeleteTask(task.id)}
                                     onCreateSubtask={handleCreateTask}
                                     onArchive={() => handleArchiveTask(task.id)}
+                                    onUnarchive={() => handleUnarchiveTask(task.id)}
                                     allTasks={projectTasks}
                                 />
                             ))}
@@ -221,29 +222,20 @@ const TaskTree = ({
                             {showArchivedTasks && (
                                 <div className="space-y-2 opacity-75">
                                     {archivedTasks.map((task) => (
-                                        <div key={task.id} className="relative">
-                                            <TaskItem
-                                                task={task}
-                                                tasks={tasks}
-                                                setTasks={setTasks}
-                                                timeEntries={timeEntries}
-                                                setTimeEntries={setTimeEntries}
-                                                currentTimer={currentTimer}
-                                                setCurrentTimer={setCurrentTimer}
-                                                onDelete={() => handleDeleteTask(task.id)}
-                                                onCreateSubtask={handleCreateTask}
-                                                allTasks={projectTasks}
-                                            />
-                                            
-                                            {/* Unarchive Button */}
-                                            <button
-                                                onClick={() => handleUnarchiveTask(task.id)}
-                                                className="absolute top-4 right-4 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded"
-                                                title="Unarchive Task"
-                                            >
-                                                Unarchive
-                                            </button>
-                                        </div>
+                                        <TaskItem
+                                            key={task.id}
+                                            task={task}
+                                            tasks={tasks}
+                                            setTasks={setTasks}
+                                            timeEntries={timeEntries}
+                                            setTimeEntries={setTimeEntries}
+                                            currentTimer={currentTimer}
+                                            setCurrentTimer={setCurrentTimer}
+                                            onDelete={() => handleDeleteTask(task.id)}
+                                            onCreateSubtask={handleCreateTask}
+                                            onUnarchive={() => handleUnarchiveTask(task.id)}
+                                            allTasks={projectTasks}
+                                        />
                                     ))}
                                 </div>
                             )}
