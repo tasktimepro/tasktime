@@ -118,8 +118,13 @@ const TaskItem = ({
     const isCompleted = task.completed || false;
     const isArchived = task.archived || false;
 
-    // Don't dim parent task if its subtask timer is active, but skip archived tasks
-    const shouldDimTask = anyTimerActive && !isTimerActive && !subtaskTimerActive && !isArchived;
+    // Task dimming logic:
+    // 1. If this task's timer is active, don't dim it
+    // 2. If this task's subtask has an active timer, don't dim this task
+    // 3. If any timer is active and it's not related to this task, dim it
+    // 4. Don't dim archived tasks regardless
+    const isRelatedToActiveTimer = isTimerActive || subtaskTimerActive;
+    const shouldDimTask = anyTimerActive && !isRelatedToActiveTimer && !isArchived;
 
     /**
      * Toggle task completion status
@@ -228,7 +233,7 @@ const TaskItem = ({
         <div className={`border border-gray-200 rounded-lg hover:shadow-md transition-shadow ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
             {/* Main Task */}
             <div className={`p-4 transition-colors ${
-                (subtaskTimerActive || isTimerActive) && !isArchived
+                (subtaskTimerActive) && !isArchived
                 ? 'bg-gray-100 opacity-50 pointer-events-none' 
                 : 'hover:bg-gray-50'
             }`}>
@@ -443,7 +448,7 @@ const TaskItem = ({
                                 </form>
                             ) : (
                                 <div className={`${
-                                    anyTimerActive 
+                                    (anyTimerActive && isRelatedToActiveTimer)
                                     ? 'opacity-50 pointer-events-none' 
                                     : ''
                                 }`}>
@@ -514,14 +519,19 @@ const SubtaskItem = ({
 
     // Check if any timer is active (to dim other tasks)
     const anyTimerActive = currentTimer !== null;
-
-    const shouldDimTask = anyTimerActive && !isTimerActive;
-
+    
     // Check if subtask is completed
     const isCompleted = task.completed || false;
 
     // Check if subtask is archived (either the subtask itself or its parent task)
     const isArchived = task.archived || false;
+    
+    // For subtasks, we should:
+    // 1. Not dim if this subtask's timer is active
+    // 2. Always dim if any timer is active and it's not this subtask's timer
+    // 3. Don't dim if the task is archived
+    const isRelatedToActiveTimer = isTimerActive;
+    const shouldDimTask = anyTimerActive && !isRelatedToActiveTimer && !isArchived;
 
     /**
      * Toggle subtask completion status
@@ -603,7 +613,7 @@ const SubtaskItem = ({
     const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
 
     return (
-        <div className={`flex items-center justify-between py-2 ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
+        <div className={`flex items-center justify-between py-2 ${(shouldDimTask && isRelatedToActiveTimer) ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
             <div className="flex items-center space-x-3 flex-1 min-w-0">
                 {/* Completion Checkbox */}
                 <div className="flex-shrink-0">
