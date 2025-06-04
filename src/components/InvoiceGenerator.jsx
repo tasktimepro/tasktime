@@ -61,7 +61,7 @@ const InvoiceGenerator = ({
 
     // Update client info when editing invoice changes
     useEffect(() => {
-        setClientInfo(initializeClientInfo());
+        setClientInfo(initializeClientInfo);
     }, [initializeClientInfo]);
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
@@ -231,6 +231,9 @@ const InvoiceGenerator = ({
      * Open invoice form with prepared data or for editing
      */
     const openInvoiceForm = useCallback(() => {
+        // Don't open again if it's already open to avoid re-rendering issues
+        if (showInvoiceForm) return;
+        
         if (editingInvoice) {
             // Open form with existing invoice data
             setInvoiceTasks(editingInvoice.tasks || []);
@@ -256,25 +259,37 @@ const InvoiceGenerator = ({
             setEditableHours(initialHours);
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm]);
 
+    // Keep track of whether we've handled the current editing invoice
+    const [handledEditingInvoice, setHandledEditingInvoice] = useState(null);
+    
     // Auto-open form when editing an invoice
     useEffect(() => {
-        if (editingInvoice) {
+        // Only open if we have a new editing invoice and the modal isn't already shown
+        if (editingInvoice && !showInvoiceForm && editingInvoice.id !== handledEditingInvoice) {
+            setHandledEditingInvoice(editingInvoice.id);
             openInvoiceForm();
+        } else if (!editingInvoice) {
+            // Reset the handled state when not editing
+            setHandledEditingInvoice(null);
         }
-    }, [editingInvoice, openInvoiceForm]);
+    }, [editingInvoice, openInvoiceForm, showInvoiceForm, handledEditingInvoice]);
 
     /**
      * Handle canceling the form
      */
     const handleCancel = () => {
+        // First, clear the editing state immediately if we're in edit mode
+        // This prevents another modal from opening with "Save Invoice" state
+        if (editingInvoice && onInvoiceSaved) {
+            onInvoiceSaved(); // This will clear the editing state
+        }
+        
+        // Close the modal and reset state
         setShowInvoiceForm(false);
         setInvoiceTasks([]);
         setEditableHours({});
-        if (onInvoiceSaved) {
-            onInvoiceSaved(); // This will clear the editing state
-        }
     };
 
     // Calculate unbilled time

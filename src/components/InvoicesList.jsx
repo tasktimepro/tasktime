@@ -138,7 +138,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                                 <button
                                     onClick={() => handleDownload(invoice)}
                                     className="p-2 text-gray-400 hover:text-purple-600 rounded-md hover:bg-purple-50"
-                                    title="Download PDF"
+                                    title="Download as PDF"
                                 >
                                     <ArrowDownTrayIcon className="h-5 w-5" />
                                 </button>
@@ -233,7 +233,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
                             )}
                         </div>
 
-                        <div className="flex justify-end space-x-3 mt-4">
+                        <div className="flex justify-end space-x-6 mt-4">
                             <button
                                 onClick={() => handleDownload(selectedInvoice)}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
