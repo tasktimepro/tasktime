@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
-import ExportImport from './ExportImport.jsx';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
@@ -22,8 +21,7 @@ const ProjectList = ({
     setTimeEntries, 
     currentTimer, 
     setCurrentTimer, 
-    onSelectProject, 
-    onImport 
+    onSelectProject
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
@@ -193,15 +191,6 @@ const ProjectList = ({
         setEditingProject(null);
 
         setFormData({ title: '', hourlyRate: '', currency: 'USD' });
-    };
-
-    /**
-     * Handle data import
-     */
-    const handleImport = (importData) => {
-        if (window.confirm('This will replace all current data. Are you sure?')) {
-            onImport(importData);
-        }
     };
 
     /**
@@ -463,9 +452,6 @@ const ProjectList = ({
                     ))}
                 </div>
             )}
-
-            {/* Export/Import Section */}
-            <ExportImport projects={projects} tasks={tasks} timeEntries={timeEntries} onImport={handleImport} />
         </div>
     );
 };

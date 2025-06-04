@@ -3,6 +3,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { useUrlState } from './hooks/useUrlState';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
+import Account from './components/Account';
 import { ToastProvider } from './components/ToastContainer';
 
 /**
@@ -20,7 +21,7 @@ function App() {
     console.log('📊 Loaded projects:', projects.length);
 
     // URL-based state management
-    const { urlParams, navigateToProjects, navigateToProject } = useUrlState();
+    const { urlParams, navigateToProjects, navigateToProject, navigateToAccount } = useUrlState();
     
     // Derived state from URL parameters
     const activeView = urlParams.view;
@@ -81,6 +82,16 @@ function App() {
                             >
                                 Projects
                             </button>
+                            <button
+                                onClick={navigateToAccount}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                    activeView === 'account'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Account
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -101,7 +112,6 @@ function App() {
                         onSelectProject={(project) => {
                             navigateToProject(project.id);
                         }}
-                        onImport={handleImport}
                     />
                 )}
 
@@ -117,6 +127,15 @@ function App() {
                         currentTimer={currentTimer}
                         setCurrentTimer={setCurrentTimer}
                         onBackToProjects={navigateToProjects}
+                    />
+                )}
+
+                {activeView === 'account' && (
+                    <Account
+                        projects={projects}
+                        tasks={tasks}
+                        timeEntries={timeEntries}
+                        onImport={handleImport}
                     />
                 )}
             </main>

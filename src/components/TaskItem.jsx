@@ -394,7 +394,7 @@ const TaskItem = ({
                                                                 </span>
                                                             </button>
                                                         )}
-                                                        {totalTimeWithSubtasks > mainTaskTime && (
+                                                        {(totalTimeWithSubtasks > mainTaskTime) && (mainTaskTime > 0) && (
                                                             <span>•</span>
                                                         )}
                                                         {totalTimeWithSubtasks > mainTaskTime && (
@@ -557,8 +557,7 @@ const TaskItem = ({
                 onClose={() => setShowTimeEditModal(false)}
                 currentTime={!task.parentTaskId ? mainTaskTime : totalTimeWithSubtasks}
                 onSave={handleTimeEdit}
-                taskTitle={!task.parentTaskId && subtasks.length > 0 ? 
-                    `${task.title} (Main Task Time Only)` : task.title}
+                taskTitle={task.title}
             />
 
             {/* Subtasks */}

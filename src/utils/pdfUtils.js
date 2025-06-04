@@ -113,10 +113,6 @@ export const createInvoiceHTML = (invoiceData) => {
                 <p style="margin: 0; font-size: 18px;"><strong>Total Hours: ${totalHours.toFixed(2)}</strong></p>
                 <p style="margin: 0; font-size: 24px; color: #333;"><strong>Total Amount: ${getCurrencySymbol(project.currency)}${totalAmount.toFixed(2)}</strong></p>
             </div>
-            
-            <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666;">
-                <p style="margin: 0;">www.TaskTimeTrack.com</p>
-            </div>
         </div>
     `;
 };

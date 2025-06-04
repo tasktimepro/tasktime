@@ -64,6 +64,13 @@ export const useUrlState = () => {
     }, [updateUrl]);
 
     /**
+     * Navigate to account view
+     */
+    const navigateToAccount = useCallback(() => {
+        updateUrl({ view: 'account', project: null });
+    }, [updateUrl]);
+
+    /**
      * Handle browser back/forward navigation
      */
     useEffect(() => {
@@ -84,6 +91,7 @@ export const useUrlState = () => {
         navigateToProjects,
         navigateToProject,
         navigateToInvoices,
+        navigateToAccount,
         updateUrl
     };
 };
