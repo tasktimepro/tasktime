@@ -4,14 +4,15 @@ import { generateId } from '../utils/idUtils';
 import ExportImport from './ExportImport.jsx';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
+import { useToast } from './ToastContainer';
 
 /**
  * ProjectList component - Displays and manages the list of projects
  */
 const ProjectList = ({ projects, setProjects, tasks = [], timeEntries = [], onSelectProject, onImport }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
-
     const [editingProject, setEditingProject] = useState(null);
+    const { showSuccess } = useToast();
 
     const [formData, setFormData] = useState({
         title: '',
@@ -87,6 +88,7 @@ const ProjectList = ({ projects, setProjects, tasks = [], timeEntries = [], onSe
     const handleDeleteProject = (projectId) => {
         if (window.confirm('Are you sure you want to delete this project? All associated tasks and time entries will be lost.')) {
             setProjects(projects.filter(project => project.id !== projectId));
+            showSuccess('Project deleted successfully');
         }
     };
 

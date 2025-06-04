@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
+import { useToast } from './ToastContainer';
 
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
@@ -9,6 +10,7 @@ import { getCurrencySymbol } from '../utils/currencyUtils';
 const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
+    const { showSuccess } = useToast();
 
     const invoices = project.invoices || [];
 
@@ -80,6 +82,7 @@ const InvoicesList = ({ project, projects, setProjects, onEditInvoice }) => {
             );
 
             setProjects(updatedProjects);
+            showSuccess('Invoice deleted successfully');
         }
     };
 

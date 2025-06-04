@@ -10,6 +10,7 @@ import TimerControls from './TimerControls.jsx';
 import CustomCheckbox from './CustomCheckbox.jsx';
 import TimeEditModal from './TimeEditModal.jsx';
 import { formatDurationWithSeconds, formatActiveTimer } from '../utils/dateUtils';
+import { useToast } from './ToastContainer';
 
 // Create a custom event for dropdown management
 const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
@@ -33,6 +34,7 @@ const TaskItem = ({
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
+    const { showSuccess } = useToast();
     // eslint-disable-next-line no-unused-vars
     const [currentTime, setCurrentTime] = useState(Date.now());
     const [showTimeEditModal, setShowTimeEditModal] = useState(false);
@@ -534,6 +536,9 @@ const TaskItem = ({
                                         if (currentTimer && currentTimer.taskId === subtask.id) {
                                             setCurrentTimer(null);
                                         }
+                                        
+                                        // Show success toast
+                                        showSuccess(`Subtask "${subtask.title}" deleted successfully`);
                                     }
                                 }}
                             />

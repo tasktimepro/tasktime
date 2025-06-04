@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import TaskItem from './TaskItem';
 import { generateId } from '../utils/idUtils';
+import { useToast } from './ToastContainer';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -18,6 +19,7 @@ const TaskTree = ({
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [showArchivedTasks, setShowArchivedTasks] = useState(false);
+    const { showSuccess } = useToast();
 
     // Get tasks for this project
     const projectTasks = tasks.filter(task => task.projectId === project.id);
@@ -85,6 +87,10 @@ const TaskTree = ({
      */
     const handleDeleteTask = (taskId) => {
         if (window.confirm('Are you sure you want to delete this task? All subtasks and time entries will be lost.')) {
+            // Get the task title before deletion for the toast message
+            const taskToDelete = tasks.find(t => t.id === taskId);
+            const taskTitle = taskToDelete ? taskToDelete.title : 'Task';
+            
             // Get all subtask IDs
             const subtaskIds = projectTasks
                 .filter(task => task.parentTaskId === taskId)
@@ -103,6 +109,9 @@ const TaskTree = ({
             if (currentTimer && taskIdsToDelete.includes(currentTimer.taskId)) {
                 setCurrentTimer(null);
             }
+
+            // Show toast notification | Used for main tasks & archived tasks
+            showSuccess(`Task "${taskTitle}" deleted successfully`);
         }
     };
 
