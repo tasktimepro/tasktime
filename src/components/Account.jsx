@@ -14,7 +14,7 @@ const Account = ({
     paymentMethods,
     setPaymentMethods 
 }) => {
-    const [activeTab, setActiveTab] = useState('backup');
+    const [activeTab, setActiveTab] = useState('payment-methods');
 
     const sideNavItems = [
         {
@@ -24,10 +24,10 @@ const Account = ({
             description: 'Export and import your data'
         },
         {
-            id: 'billing',
-            name: 'Billing',
+            id: 'payment-methods',
+            name: 'Payment Methods',
             icon: CreditCardIcon,
-            description: 'Manage billing and subscription'
+            description: 'Manage payment methods for invoices'
         }
     ];
 
@@ -50,20 +50,12 @@ const Account = ({
                         />
                     </div>
                 );
-            case 'billing':
+            case 'payment-methods':
                 return (
-                    <div>
-                        <div className="mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900">Billing</h2>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Manage your billing information and payment methods.
-                            </p>
-                        </div>
-                        <PaymentMethods 
-                            paymentMethods={paymentMethods} 
-                            setPaymentMethods={setPaymentMethods} 
-                        />
-                    </div>
+                    <PaymentMethods 
+                        paymentMethods={paymentMethods} 
+                        setPaymentMethods={setPaymentMethods} 
+                    />
                 );
             default:
                 return null;

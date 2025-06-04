@@ -19,7 +19,8 @@ const PaymentMethods = ({
     const { showSuccess } = useToast();
 
     const [formData, setFormData] = useState({
-        name: '',
+        title: '',
+        fullName: '',
         bank: '',
         iban: '',
         swift: '',
@@ -127,7 +128,7 @@ const PaymentMethods = ({
     const handleCreatePaymentMethod = (e) => {
         e.preventDefault();
 
-        if (!formData.name.trim()) {
+        if (!formData.title.trim()) {
             return;
         }
 
@@ -144,7 +145,8 @@ const PaymentMethods = ({
 
         const newPaymentMethod = {
             id: generateId(),
-            name: formData.name.trim(),
+            title: formData.title.trim(),
+            fullName: formData.fullName.trim(),
             bank: formData.bank.trim(),
             iban: formData.iban.trim(),
             swift: formData.swift.trim(),
@@ -157,7 +159,8 @@ const PaymentMethods = ({
         setPaymentMethods([...paymentMethods, newPaymentMethod]);
 
         setFormData({
-            name: '',
+            title: '',
+            fullName: '',
             bank: '',
             iban: '',
             swift: '',
@@ -177,7 +180,7 @@ const PaymentMethods = ({
     const handleUpdatePaymentMethod = (e) => {
         e.preventDefault();
 
-        if (!formData.name.trim()) {
+        if (!formData.title.trim()) {
             return;
         }
 
@@ -196,7 +199,8 @@ const PaymentMethods = ({
             method.id === editingPaymentMethod.id
                 ? {
                     ...method,
-                    name: formData.name.trim(),
+                    title: formData.title.trim(),
+                    fullName: formData.fullName.trim(),
                     bank: formData.bank.trim(),
                     iban: formData.iban.trim(),
                     swift: formData.swift.trim(),
@@ -212,7 +216,8 @@ const PaymentMethods = ({
         setEditingPaymentMethod(null);
 
         setFormData({
-            name: '',
+            title: '',
+            fullName: '',
             bank: '',
             iban: '',
             swift: '',
@@ -242,7 +247,8 @@ const PaymentMethods = ({
         setEditingPaymentMethod(paymentMethod);
 
         setFormData({
-            name: paymentMethod.name,
+            title: paymentMethod.title || paymentMethod.name, // Handle legacy data
+            fullName: paymentMethod.fullName || '',
             bank: paymentMethod.bank,
             iban: paymentMethod.iban,
             swift: paymentMethod.swift,
@@ -263,7 +269,8 @@ const PaymentMethods = ({
         setEditingPaymentMethod(null);
 
         setFormData({
-            name: '',
+            title: '',
+            fullName: '',
             bank: '',
             iban: '',
             swift: '',
@@ -274,11 +281,11 @@ const PaymentMethods = ({
     };
 
     return (
-        <div className="space-y-6">
+        <div className={`${(showCreateForm || editingPaymentMethod) ? 'space-y-8' : 'space-y-6'}`}>
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h3 className="text-lg font-medium text-gray-900">Payment Methods</h3>
+                    <h2 className="text-2xl font-bold text-gray-900">Payment Methods</h2>
                     <p className="mt-1 text-sm text-gray-600">
                         Manage reusable payment methods for your invoices
                     </p>
@@ -295,7 +302,7 @@ const PaymentMethods = ({
 
             {/* Create/Edit Form */}
             {(showCreateForm || editingPaymentMethod) && (
-                <div className="bg-white shadow rounded-lg p-6">
+                <div className="bg-white shadow rounded-lg p-6 max-w-3xl mx-auto">
                     <h4 className="text-lg font-medium text-gray-900 mb-4">
                         {editingPaymentMethod ? 'Edit Payment Method' : 'Create New Payment Method'}
                     </h4>
@@ -306,54 +313,52 @@ const PaymentMethods = ({
                             <h5 className="text-sm font-medium text-gray-900">Standard Information</h5>
                             
                             <div>
-                                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                                    Name <span className="text-red-500">*</span>
+                                <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                                    Payment Method Title <span className="text-red-500">*</span>
                                 </label>
 
                                 <input
                                     type="text"
-                                    id="name"
-                                    name="name"
-                                    value={formData.name}
+                                    id="title"
+                                    name="title"
+                                    value={formData.title}
                                     onChange={handleInputChange}
                                     required
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="Enter name for this payment method"
+                                    placeholder="Enter title for this payment method"
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="bank" className="block text-sm font-medium text-gray-700">
-                                        Bank Name
-                                    </label>
+                            <div>
+                                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                                    Full Name
+                                </label>
 
-                                    <input
-                                        type="text"
-                                        id="bank"
-                                        name="bank"
-                                        value={formData.bank}
-                                        onChange={handleInputChange}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                        placeholder="Bank name"
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    id="fullName"
+                                    name="fullName"
+                                    value={formData.fullName}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    placeholder="Full name of the person sending the invoice"
+                                />
+                            </div>
 
-                                <div>
-                                    <label htmlFor="paypal" className="block text-sm font-medium text-gray-700">
-                                        PayPal Email
-                                    </label>
+                            <div>
+                                <label htmlFor="bank" className="block text-sm font-medium text-gray-700">
+                                    Bank Name
+                                </label>
 
-                                    <input
-                                        type="email"
-                                        id="paypal"
-                                        name="paypal"
-                                        value={formData.paypal}
-                                        onChange={handleInputChange}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                        placeholder="paypal@example.com"
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    id="bank"
+                                    name="bank"
+                                    value={formData.bank}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    placeholder="Bank name"
+                                />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -407,6 +412,22 @@ const PaymentMethods = ({
                                     rows={3}
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                     placeholder="123 Bank Street, City, Country"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="paypal" className="block text-sm font-medium text-gray-700">
+                                    PayPal Email
+                                </label>
+
+                                <input
+                                    type="email"
+                                    id="paypal"
+                                    name="paypal"
+                                    value={formData.paypal}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    placeholder="paypal@example.com"
                                 />
                             </div>
                         </div>
@@ -513,12 +534,14 @@ const PaymentMethods = ({
                                             <CreditCardIcon className="h-6 w-6 text-gray-400" />
                                             <div>
                                                 <h4 className="text-lg font-medium text-gray-900">
-                                                    {method.name}
+                                                    {method.title || method.name}
                                                 </h4>
                                                 <div className="mt-1 text-sm text-gray-500 space-y-1">
+                                                    {method.fullName && <p>Full Name: {method.fullName}</p>}
                                                     {method.bank && <p>Bank: {method.bank}</p>}
                                                     {method.iban && <p>IBAN: {method.iban}</p>}
                                                     {method.swift && <p>SWIFT: {method.swift}</p>}
+                                                    {method.bankAddress && <p>Bank Address: {method.bankAddress}</p>}
                                                     {method.paypal && <p>PayPal: {method.paypal}</p>}
                                                     {method.custom.length > 0 && (
                                                         <div className="space-y-1">
