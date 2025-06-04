@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import ExportImport from './ExportImport';
+import PaymentMethods from './PaymentMethods';
 
 /**
  * Account component - Main account management page with side navigation
@@ -9,7 +10,9 @@ const Account = ({
     projects, 
     tasks, 
     timeEntries, 
-    onImport 
+    onImport,
+    paymentMethods,
+    setPaymentMethods 
 }) => {
     const [activeTab, setActiveTab] = useState('backup');
 
@@ -53,18 +56,13 @@ const Account = ({
                         <div className="mb-6">
                             <h2 className="text-2xl font-bold text-gray-900">Billing</h2>
                             <p className="mt-1 text-sm text-gray-600">
-                                Manage your billing information and subscription settings.
+                                Manage your billing information and payment methods.
                             </p>
                         </div>
-                        <div className="bg-white rounded-lg border border-gray-200 p-6">
-                            <div className="text-center py-12">
-                                <CreditCardIcon className="mx-auto h-12 w-12 text-gray-400" />
-                                <h3 className="mt-4 text-lg font-medium text-gray-900">Billing Management</h3>
-                                <p className="mt-2 text-sm text-gray-500">
-                                    Billing features will be available soon. Stay tuned for subscription plans and payment management.
-                                </p>
-                            </div>
-                        </div>
+                        <PaymentMethods 
+                            paymentMethods={paymentMethods} 
+                            setPaymentMethods={setPaymentMethods} 
+                        />
                     </div>
                 );
             default:

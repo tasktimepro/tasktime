@@ -17,6 +17,7 @@ function App() {
     const [tasks, setTasks] = useLocalStorage('tasks', []);
     const [timeEntries, setTimeEntries] = useLocalStorage('timeEntries', []);
     const [currentTimer, setCurrentTimer] = useLocalStorage('currentTimer', null);
+    const [paymentMethods, setPaymentMethods] = useLocalStorage('paymentMethods', []);
 
     console.log('📊 Loaded projects:', projects.length);
 
@@ -136,6 +137,8 @@ function App() {
                         tasks={tasks}
                         timeEntries={timeEntries}
                         onImport={handleImport}
+                        paymentMethods={paymentMethods}
+                        setPaymentMethods={setPaymentMethods}
                     />
                 )}
             </main>
