@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect } from 'react';
+import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 import ExportImport from './ExportImport.jsx';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { getTaskIdsToDelete } from '../utils/taskUtils';
+
+// Event name for dropdown coordination
+const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
 
 /**
  * ProjectList component - Displays and manages the list of projects
@@ -24,6 +27,7 @@ const ProjectList = ({
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
+    const [showDropdown, setShowDropdown] = useState({}); // Track dropdown states by project ID
     const { showSuccess } = useToast();
 
     const [formData, setFormData] = useState({
@@ -31,6 +35,35 @@ const ProjectList = ({
         hourlyRate: '',
         currency: 'USD'
     });
+
+    // Close dropdown when clicking outside or when another dropdown opens
+    useEffect(() => {
+        const handleDropdownToggle = (event) => {
+            const { taskId, open } = event.detail;
+            if (!open) {
+                // Close all dropdowns when any dropdown is closed
+                setShowDropdown({});
+            } else {
+                // Close other dropdowns when a new one opens
+                setShowDropdown({ [taskId]: true });
+            }
+        };
+
+        const handleClickOutside = (event) => {
+            // Close dropdowns when clicking outside
+            if (!event.target.closest('.dropdown-container')) {
+                setShowDropdown({});
+            }
+        };
+
+        document.addEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
+        document.addEventListener('click', handleClickOutside);
+        
+        return () => {
+            document.removeEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
+            document.removeEventListener('click', handleClickOutside);
+        };
+    }, []);
 
     /**
      * Handle form input changes
@@ -348,29 +381,60 @@ const ProjectList = ({
                     {projects.map((project) => (
                         <div
                             key={project.id}
-                            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
+                            className="bg-white shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
                             onClick={() => onSelectProject(project)}
                         >
-                            <div className="p-6">
+                            <div className="p-5">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-lg font-medium text-gray-900 truncate">
                                         {project.title}
                                     </h3>
 
-                                    <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
+                                    {/* Three-dot dropdown menu for Edit and Delete */}
+                                    <div className="relative dropdown-container" onClick={(e) => e.stopPropagation()}>
                                         <button
-                                            onClick={() => startEditing(project)}
-                                            className="p-1 text-gray-400 hover:text-yellow-600"
+                                            onClick={() => {
+                                                const newState = !showDropdown[project.id];
+                                                setShowDropdown(newState ? { [project.id]: true } : {});
+
+                                                // Dispatch a custom event to close other dropdowns
+                                                const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
+                                                    detail: { taskId: project.id, open: newState }
+                                                });
+                                                document.dispatchEvent(event);
+                                            }}
+                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
+                                            title="More actions"
                                         >
-                                            <PencilIcon className="h-4 w-4" />
+                                            <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
                                         </button>
 
-                                        <button
-                                            onClick={() => handleDeleteProject(project.id)}
-                                            className="p-1 text-gray-400 hover:text-red-600"
-                                        >
-                                            <TrashIcon className="h-4 w-4" />
-                                        </button>
+                                        {showDropdown[project.id] && (
+                                            <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                                                <div className="py-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            startEditing(project);
+                                                            setShowDropdown({});
+                                                        }}
+                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"
+                                                    >
+                                                        <PencilIcon className="h-4 w-4" />
+                                                        <span>Edit</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleDeleteProject(project.id);
+                                                            setShowDropdown({});
+                                                        }}
+                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
+                                                    >
+                                                        <TrashIcon className="h-4 w-4" />
+                                                        <span>Delete</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
