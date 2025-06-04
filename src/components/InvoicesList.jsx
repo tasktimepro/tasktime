@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
-import { useToast } from './ToastContainer';
+import { useToast } from '../hooks/useToast';
 
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options

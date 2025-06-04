@@ -1,8 +1,6 @@
-import { useState, createContext, useContext } from 'react';
+import { useState } from 'react';
 import Toast from './Toast';
-
-// Create context for toast management
-const ToastContext = createContext();
+import { ToastContext } from '../contexts/ToastContext';
 
 /**
  * Toast provider component that manages toasts across the application
@@ -43,15 +41,4 @@ export const ToastProvider = ({ children }) => {
       </div>
     </ToastContext.Provider>
   );
-};
-
-/**
- * Hook to use toast functionality
- */
-export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
 };

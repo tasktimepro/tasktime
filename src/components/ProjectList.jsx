@@ -4,7 +4,7 @@ import { generateId } from '../utils/idUtils';
 import ExportImport from './ExportImport.jsx';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
-import { useToast } from './ToastContainer';
+import { useToast } from '../hooks/useToast';
 
 /**
  * ProjectList component - Displays and manages the list of projects
@@ -313,17 +313,17 @@ const ProjectList = ({ projects, setProjects, tasks = [], timeEntries = [], onSe
                                         {project.title}
                                     </h3>
 
-                                    <div className="flex space-x-4" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
                                         <button
                                             onClick={() => startEditing(project)}
-                                            className="text-gray-400 hover:text-yellow-600"
+                                            className="p-1 text-gray-400 hover:text-yellow-600"
                                         >
                                             <PencilIcon className="h-4 w-4" />
                                         </button>
 
                                         <button
                                             onClick={() => handleDeleteProject(project.id)}
-                                            className="text-gray-400 hover:text-red-600"
+                                            className="p-1 text-gray-400 hover:text-red-600"
                                         >
                                             <TrashIcon className="h-4 w-4" />
                                         </button>

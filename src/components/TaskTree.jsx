@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import TaskItem from './TaskItem';
 import { generateId } from '../utils/idUtils';
-import { useToast } from './ToastContainer';
+import { useToast } from '../hooks/useToast';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure

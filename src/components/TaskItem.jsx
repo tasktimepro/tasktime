@@ -10,7 +10,7 @@ import TimerControls from './TimerControls.jsx';
 import CustomCheckbox from './CustomCheckbox.jsx';
 import TimeEditModal from './TimeEditModal.jsx';
 import { formatDurationWithSeconds, formatActiveTimer } from '../utils/dateUtils';
-import { useToast } from './ToastContainer';
+import { useToast } from '../hooks/useToast';
 
 // Create a custom event for dropdown management
 const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';

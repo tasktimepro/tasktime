@@ -3,7 +3,7 @@ import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours, formatDurationWithSeconds, hoursToMinutes } from '../utils/dateUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
-import { useToast } from './ToastContainer';
+import { useToast } from '../hooks/useToast';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
