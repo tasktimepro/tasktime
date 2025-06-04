@@ -6,7 +6,7 @@ import { getCurrencySymbol } from '../utils/currencyUtils';
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
  */
-const InvoicesList = ({ project, onEditInvoice, paymentMethods = [], businessInfos = [] }) => {
+const InvoicesList = ({ project, onEditInvoice, paymentMethods = [], businessInfos = [], clientInfos = [] }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
 
@@ -31,10 +31,24 @@ const InvoicesList = ({ project, onEditInvoice, paymentMethods = [], businessInf
                 const businessInfo = invoice.businessInfoId ? 
                     businessInfos.find(bi => bi.id === invoice.businessInfoId) : null;
                 
+                // Find the client info if one is associated with this invoice
+                const clientInfoData = invoice.clientInfoId ? 
+                    clientInfos.find(ci => ci.id === invoice.clientInfoId) : null;
+                
+                // Prepare client data for PDF generation
+                const clientData = clientInfoData ? {
+                    name: clientInfoData.clientName || '',
+                    email: clientInfoData.email || '',
+                    address: clientInfoData.address || '',
+                    city: clientInfoData.city || '',
+                    state: clientInfoData.state || '',
+                    zip: clientInfoData.zip || ''
+                } : (invoice.clientInfo || invoice.client);
+                
                 // Recreate the HTML content from the invoice data
                 htmlContent = createInvoiceHTML({
                     project: invoice.project,
-                    client: invoice.clientInfo || invoice.client, // Handle both formats
+                    client: clientData,
                     tasks: invoice.tasks,
                     totalHours: invoice.totalHours,
                     totalAmount: invoice.totalAmount,
@@ -114,7 +128,19 @@ const InvoicesList = ({ project, onEditInvoice, paymentMethods = [], businessInf
                                         </p>
                                         <div className="text-xs text-gray-400 mt-1">
                                             <p>
-                                                Client: <span className="font-medium text-gray-600">{invoice.clientInfo?.name || invoice.client?.name}</span>
+                                                Client: <span className="font-medium text-gray-600">
+                                                    {(() => {
+                                                        // Try to get client name from clientInfoId first
+                                                        if (invoice.clientInfoId) {
+                                                            const clientInfo = clientInfos.find(ci => ci.id === invoice.clientInfoId);
+                                                            if (clientInfo) {
+                                                                return clientInfo.clientName;
+                                                            }
+                                                        }
+                                                        // Fallback to stored client info or manual entry
+                                                        return invoice.clientInfo?.name || invoice.client?.name || 'Unknown';
+                                                    })()}
+                                                </span>
                                             </p>
                                             {invoice.businessInfoId && (() => {
                                                 const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);

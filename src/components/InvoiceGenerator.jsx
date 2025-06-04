@@ -19,12 +19,19 @@ const InvoiceGenerator = ({
     paymentMethods = [],
     onNavigateToPaymentMethods,
     businessInfos = [],
-    onNavigateToBusinessInfo
+    onNavigateToBusinessInfo,
+    clientInfos = [],
+    onNavigateToClientInfo
 }) => {
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
+    const [selectedClientInfo, setSelectedClientInfo] = useState(null);
     const { showSuccess, showError } = useToast();
+
+    // Debug logging
+    console.log('🔍 InvoiceGenerator - clientInfos:', clientInfos);
+    console.log('🔍 InvoiceGenerator - clientInfos.length:', clientInfos.length);
 
     /**
      * Initialize payment method based on previous invoices or editing invoice
@@ -91,50 +98,45 @@ const InvoiceGenerator = ({
     }, [editingInvoice, project.invoices, businessInfos]);
 
     /**
-     * Initialize client info based on previous invoices or editing invoice
+     * Initialize selected client info based on previous invoices or editing invoice
      */
-    const initializeClientInfo = useCallback(() => {
-        // If editing an invoice, use its client info
-        if (editingInvoice) {
-            return editingInvoice.clientInfo || editingInvoice.client || {
-                name: '',
-                email: '',
-                address: '',
-                city: '',
-                state: '',
-                zip: ''
-            };
+    const initializeSelectedClientInfo = useCallback(() => {
+        if (clientInfos.length === 0) {
+            setSelectedClientInfo(null);
+            return;
+        }
+
+        // If editing an invoice, use its client info ID
+        if (editingInvoice && editingInvoice.clientInfoId) {
+            const clientInfo = clientInfos.find(ci => ci.id === editingInvoice.clientInfoId);
+            if (clientInfo) {
+                setSelectedClientInfo(clientInfo);
+                return;
+            }
         }
         
+        // Look for last used client info in previous invoices
         const previousInvoices = project.invoices || [];
         if (previousInvoices.length > 0) {
-            // Get the most recent invoice's client info
-            const latestInvoice = previousInvoices[previousInvoices.length - 1];
-            return latestInvoice.clientInfo || latestInvoice.client || {
-                name: '',
-                email: '',
-                address: '',
-                city: '',
-                state: '',
-                zip: ''
-            };
+            for (let i = previousInvoices.length - 1; i >= 0; i--) {
+                const invoice = previousInvoices[i];
+                if (invoice.clientInfoId) {
+                    const clientInfo = clientInfos.find(ci => ci.id === invoice.clientInfoId);
+                    if (clientInfo) {
+                        setSelectedClientInfo(clientInfo);
+                        return;
+                    }
+                }
+            }
         }
-        return {
-            name: '',
-            email: '',
-            address: '',
-            city: '',
-            state: '',
-            zip: ''
-        };
-    }, [editingInvoice, project.invoices]);
-
-    const [clientInfo, setClientInfo] = useState(initializeClientInfo);
-
-    // Update client info when editing invoice changes
-    useEffect(() => {
-        setClientInfo(initializeClientInfo);
-    }, [initializeClientInfo]);
+        
+        // No previous client info found, but auto-select the first one if available
+        if (clientInfos.length > 0) {
+            setSelectedClientInfo(clientInfos[0]);
+        } else {
+            setSelectedClientInfo(null);
+        }
+    }, [editingInvoice, project.invoices, clientInfos]);
 
     // Initialize payment method when component mounts or dependencies change
     useEffect(() => {
@@ -146,19 +148,20 @@ const InvoiceGenerator = ({
         initializeBusinessInfo();
     }, [initializeBusinessInfo]);
 
+    // Initialize selected client info when component mounts or dependencies change
+    useEffect(() => {
+        initializeSelectedClientInfo();
+    }, [initializeSelectedClientInfo]);
+
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
 
     /**
-     * Handle client info input changes
+     * Handle client info selection from dropdown
      */
-    const handleClientChange = (e) => {
-        const { name, value } = e.target;
-
-        setClientInfo(prev => ({
-            ...prev,
-            [name]: value
-        }));
+    const handleClientInfoSelection = (clientInfoId) => {
+        const clientInfo = clientInfos.find(ci => ci.id === clientInfoId);
+        setSelectedClientInfo(clientInfo || null);
     };
 
     /**
@@ -226,8 +229,9 @@ const InvoiceGenerator = ({
     const handleSaveInvoice = (e) => {
         e.preventDefault();
 
-        if (!clientInfo.name.trim()) {
-            showError('Please enter client name');
+        // Validate client information - must have selected client info
+        if (!selectedClientInfo) {
+            showError('Please select client information');
             return;
         }
 
@@ -242,7 +246,14 @@ const InvoiceGenerator = ({
         const invoiceData = {
             id: editingInvoice ? editingInvoice.id : `INV-${project.id.slice(-8)}-${Date.now()}`,
             project: project,
-            clientInfo: clientInfo,
+            clientInfo: {
+                name: selectedClientInfo.clientName || '',
+                email: selectedClientInfo.email || '',
+                address: selectedClientInfo.address || '',
+                city: selectedClientInfo.city || '',
+                state: selectedClientInfo.state || '',
+                zip: selectedClientInfo.zip || ''
+            },
             tasks: invoiceTasks.map(task => ({
                 ...task,
                 hours: editableHours[task.id] || task.originalHours
@@ -251,13 +262,21 @@ const InvoiceGenerator = ({
             totalAmount: totalAmount,
             paymentMethodId: selectedPaymentMethod?.id || null,
             businessInfoId: selectedBusinessInfo?.id || null,
+            clientInfoId: selectedClientInfo?.id || null,
             invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
             date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
             htmlContent: createInvoiceHTML({
                 id: editingInvoice ? editingInvoice.id : `INV-${project.id.slice(-8)}-${Date.now()}`,
                 project: project,
-                client: clientInfo,
+                client: {
+                    name: selectedClientInfo.clientName || '',
+                    email: selectedClientInfo.email || '',
+                    address: selectedClientInfo.address || '',
+                    city: selectedClientInfo.city || '',
+                    state: selectedClientInfo.state || '',
+                    zip: selectedClientInfo.zip || ''
+                },
                 tasks: invoiceTasks.map(task => ({
                     ...task,
                     hours: editableHours[task.id] || task.originalHours
@@ -302,7 +321,7 @@ const InvoiceGenerator = ({
         setShowInvoiceForm(false);
         setInvoiceTasks([]);
         setEditableHours({});
-        // Don't reset client info so it stays for next invoice
+        // Keep selected client info so it stays for next invoice
         
         // Call callback if provided
         if (onInvoiceSaved) {
@@ -507,6 +526,61 @@ const InvoiceGenerator = ({
                                 </div>
 
                                 <form onSubmit={handleSaveInvoice} className="space-y-4">
+                                    {/* Client Info Selection */}
+                                    <div className="mb-6">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <h4 className="text-sm font-medium text-gray-900">
+                                                Client Information
+                                            </h4>
+                                            <button
+                                                type="button"
+                                                onClick={onNavigateToClientInfo}
+                                                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                            >
+                                                + New Client Info
+                                            </button>
+                                        </div>
+                                        
+                                        {clientInfos.length === 0 ? (
+                                            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                                                <p className="text-sm text-yellow-800 mb-3">
+                                                    No client information found. Create one to include client details in the invoice.
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={onNavigateToClientInfo}
+                                                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
+                                                >
+                                                    Create Client Info
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <select
+                                                    value={selectedClientInfo?.id || ''}
+                                                    onChange={(e) => handleClientInfoSelection(e.target.value)}
+                                                    className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
+                                                    required
+                                                >
+                                                    <option value="" disabled>Select client information</option>
+                                                    {clientInfos.map(clientInfo => (
+                                                        <option key={clientInfo.id} value={clientInfo.id}>
+                                                            {clientInfo.clientName.trim()}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                
+                                                {selectedClientInfo && (
+                                                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                                                        <p className="text-sm text-green-800">
+                                                            <strong>{selectedClientInfo.clientName}</strong> will be used for the invoice "Invoice To" section.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {/* Business Info Selection */}
                                     <div className="mb-6">
                                         <div className="flex justify-between items-center mb-1">
@@ -621,88 +695,30 @@ const InvoiceGenerator = ({
                                         )}
                                     </div>
 
-                                    {/* Client Information Form */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="col-span-2">
-                                            <label className="block text-sm font-medium text-gray-700">
-                                                Client Name *
-                                            </label>
-                                            <input
-                                                type="text"
-                                                name="name"
-                                                value={clientInfo.name}
-                                                onChange={handleClientChange}
-                                                required
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                                placeholder="Enter client name"
-                                            />
-                                        </div>
-
-                                        <div className="col-span-2">
-                                            <label className="block text-sm font-medium text-gray-700">
-                                                Email
-                                            </label>
-                                            <input
-                                                type="email"
-                                                name="email"
-                                                value={clientInfo.email}
-                                                onChange={handleClientChange}
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                                placeholder="client@example.com"
-                                            />
-                                        </div>
-
-                                        <div className="col-span-2">
-                                            <label className="block text-sm font-medium text-gray-700">
-                                                Address
-                                            </label>
-                                            <input
-                                                type="text"
-                                                name="address"
-                                                value={clientInfo.address}
-                                                onChange={handleClientChange}
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                                placeholder="Street address"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">
-                                                City
-                                            </label>
-                                            <input
-                                                type="text"
-                                                name="city"
-                                                value={clientInfo.city}
-                                                onChange={handleClientChange}
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">
-                                                State/ZIP
-                                            </label>
-                                            <div className="flex space-x-2">
-                                                <input
-                                                    type="text"
-                                                    name="state"
-                                                    value={clientInfo.state}
-                                                    onChange={handleClientChange}
-                                                    className="mt-1 flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                                    placeholder="State"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    name="zip"
-                                                    value={clientInfo.zip}
-                                                    onChange={handleClientChange}
-                                                    className="mt-1 w-24 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                                    placeholder="ZIP"
-                                                />
+                                    {/* Selected Client Information Display */}
+                                    {selectedClientInfo && (
+                                        <div className="mb-6">
+                                            <h4 className="text-sm font-medium text-gray-900 mb-3">Selected Client Information</h4>
+                                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                                                <p className="text-sm text-blue-800">
+                                                    <strong>{selectedClientInfo.clientName}</strong><br/>
+                                                    {selectedClientInfo.email && (
+                                                        <span>{selectedClientInfo.email}<br/></span>
+                                                    )}
+                                                    {selectedClientInfo.address && (
+                                                        <span>{selectedClientInfo.address}<br/></span>
+                                                    )}
+                                                    {(selectedClientInfo.city || selectedClientInfo.state || selectedClientInfo.zip) && (
+                                                        <span>
+                                                            {selectedClientInfo.city ? selectedClientInfo.city + ', ' : ''}
+                                                            {selectedClientInfo.state ? selectedClientInfo.state + ' ' : ''}
+                                                            {selectedClientInfo.zip || ''}
+                                                        </span>
+                                                    )}
+                                                </p>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     <br />
 

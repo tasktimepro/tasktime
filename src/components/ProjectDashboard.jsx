@@ -23,7 +23,9 @@ const ProjectDashboard = ({
     paymentMethods,
     onNavigateToPaymentMethods,
     businessInfos,
-    onNavigateToBusinessInfo
+    onNavigateToBusinessInfo,
+    clientInfos,
+    onNavigateToClientInfo
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -81,6 +83,8 @@ const ProjectDashboard = ({
                     onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                     businessInfos={businessInfos}
                     onNavigateToBusinessInfo={onNavigateToBusinessInfo}
+                    clientInfos={clientInfos}
+                    onNavigateToClientInfo={onNavigateToClientInfo}
                 />
             </div>
 
@@ -131,6 +135,8 @@ const ProjectDashboard = ({
                             onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                             businessInfos={businessInfos}
                             onNavigateToBusinessInfo={onNavigateToBusinessInfo}
+                            clientInfos={clientInfos}
+                            onNavigateToClientInfo={onNavigateToClientInfo}
                         />
                     </div>
                 </div>
@@ -141,6 +147,7 @@ const ProjectDashboard = ({
                         onEditInvoice={handleEditInvoice}
                         paymentMethods={paymentMethods}
                         businessInfos={businessInfos}
+                        clientInfos={clientInfos}
                     />
                 </div>
             </div>

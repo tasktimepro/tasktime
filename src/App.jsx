@@ -55,6 +55,13 @@ function App() {
     };
 
     /**
+     * Handle navigation to client info creation from invoice generator
+     */
+    const handleNavigateToClientInfo = () => {
+        navigateToAccount({ section: 'client-info', create: 'client-info' });
+    };
+
+    /**
      * Handle data import from ExportImport component
      */
     const handleImport = (importData) => {
@@ -76,6 +83,8 @@ function App() {
         setTimeEntries([]); // Clear time entries on import
         setCurrentTimer(null); // Clear any active timer
     };
+
+    console.log('🔍 App - clientInfos:', clientInfos);
 
     return (
         <ToastProvider>
@@ -148,6 +157,8 @@ function App() {
                         onNavigateToPaymentMethods={handleNavigateToPaymentMethods}
                         businessInfos={businessInfos}
                         onNavigateToBusinessInfo={handleNavigateToBusinessInfo}
+                        clientInfos={clientInfos}
+                        onNavigateToClientInfo={handleNavigateToClientInfo}
                     />
                 )}
 
