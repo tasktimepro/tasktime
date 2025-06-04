@@ -1,9 +1,209 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DocumentTextIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours, formatDurationWithSeconds, hoursToMinutes } from '../utils/dateUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
+import { generateId } from '../utils/idUtils';
+
+/**
+ * Modal component for creating a new payment method
+ */
+const CreatePaymentMethodModal = ({ onClose, onSave }) => {
+    const [formData, setFormData] = useState({
+        title: '',
+        fullName: '',
+        bank: '',
+        iban: '',
+        swift: '',
+        bankAddress: '',
+        paypal: '',
+        custom: []
+    });
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        
+        if (!formData.title.trim()) {
+            return;
+        }
+
+        const newPaymentMethod = {
+            id: generateId(),
+            title: formData.title.trim(),
+            fullName: formData.fullName.trim(),
+            bank: formData.bank.trim(),
+            iban: formData.iban.trim(),
+            swift: formData.swift.trim(),
+            bankAddress: formData.bankAddress.trim(),
+            paypal: formData.paypal.trim(),
+            custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
+            createdAt: Date.now()
+        };
+
+        onSave(newPaymentMethod);
+    };
+
+    const addCustomField = () => {
+        setFormData(prev => ({
+            ...prev,
+            custom: [...prev.custom, { label: '', value: '' }]
+        }));
+    };
+
+    const removeCustomField = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            custom: prev.custom.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleCustomFieldChange = (index, field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            custom: prev.custom.map((item, i) => 
+                i === index ? { ...item, [field]: value } : item
+            )
+        }));
+    };
+
+    return (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[60]">
+            <div className="relative mx-auto p-5 border max-w-md shadow-lg rounded-md bg-white my-8">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    Create Payment Method
+                </h3>
+                
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                            Title *
+                        </label>
+                        <input
+                            type="text"
+                            name="title"
+                            value={formData.title}
+                            onChange={handleInputChange}
+                            required
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                            placeholder="e.g., Business Bank Account"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                            Account Holder Name
+                        </label>
+                        <input
+                            type="text"
+                            name="fullName"
+                            value={formData.fullName}
+                            onChange={handleInputChange}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                            Bank Name
+                        </label>
+                        <input
+                            type="text"
+                            name="bank"
+                            value={formData.bank}
+                            onChange={handleInputChange}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                            IBAN
+                        </label>
+                        <input
+                            type="text"
+                            name="iban"
+                            value={formData.iban}
+                            onChange={handleInputChange}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                            PayPal Email
+                        </label>
+                        <input
+                            type="email"
+                            name="paypal"
+                            value={formData.paypal}
+                            onChange={handleInputChange}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                        />
+                    </div>
+
+                    {formData.custom.map((field, index) => (
+                        <div key={index} className="flex space-x-2">
+                            <input
+                                type="text"
+                                value={field.label}
+                                onChange={(e) => handleCustomFieldChange(index, 'label', e.target.value)}
+                                placeholder="Field name"
+                                className="flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                            />
+                            <input
+                                type="text"
+                                value={field.value}
+                                onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
+                                placeholder="Value"
+                                className="flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => removeCustomField(index)}
+                                className="px-2 py-1 text-red-600 hover:text-red-800"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    ))}
+
+                    <button
+                        type="button"
+                        onClick={addCustomField}
+                        className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                        + Add custom field
+                    </button>
+
+                    <div className="flex justify-end space-x-3 pt-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                        >
+                            Create
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -15,10 +215,46 @@ const InvoiceGenerator = ({
     tasks, 
     timeEntries,
     editingInvoice,
-    onInvoiceSaved 
+    onInvoiceSaved,
+    paymentMethods = [],
+    setPaymentMethods
 }) => {
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+    const [showCreatePaymentMethod, setShowCreatePaymentMethod] = useState(false);
     const { showSuccess, showError } = useToast();
+
+    /**
+     * Initialize payment method based on previous invoices or editing invoice
+     */
+    const initializePaymentMethod = useCallback(() => {
+        // If editing an invoice, use its payment method
+        if (editingInvoice && editingInvoice.paymentMethodId) {
+            const paymentMethod = paymentMethods.find(pm => pm.id === editingInvoice.paymentMethodId);
+            if (paymentMethod) {
+                setSelectedPaymentMethod(paymentMethod);
+                return;
+            }
+        }
+        
+        // Look for last used payment method in previous invoices
+        const previousInvoices = project.invoices || [];
+        if (previousInvoices.length > 0) {
+            for (let i = previousInvoices.length - 1; i >= 0; i--) {
+                const invoice = previousInvoices[i];
+                if (invoice.paymentMethodId) {
+                    const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                    if (paymentMethod) {
+                        setSelectedPaymentMethod(paymentMethod);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // No previous payment method found
+        setSelectedPaymentMethod(null);
+    }, [editingInvoice, project.invoices, paymentMethods]);
 
     /**
      * Initialize client info based on previous invoices or editing invoice
@@ -65,6 +301,11 @@ const InvoiceGenerator = ({
     useEffect(() => {
         setClientInfo(initializeClientInfo);
     }, [initializeClientInfo]);
+
+    // Initialize payment method when component mounts or dependencies change
+    useEffect(() => {
+        initializePaymentMethod();
+    }, [initializePaymentMethod]);
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
@@ -169,6 +410,7 @@ const InvoiceGenerator = ({
             })),
             totalHours: totalHours,
             totalAmount: totalAmount,
+            paymentMethodId: selectedPaymentMethod?.id || null,
             invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
             date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
@@ -182,6 +424,7 @@ const InvoiceGenerator = ({
                 })),
                 totalHours: totalHours,
                 totalAmount: totalAmount,
+                paymentMethod: selectedPaymentMethod,
                 invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
                 date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
                 createdAt: editingInvoice ? editingInvoice.createdAt : Date.now()
@@ -423,6 +666,65 @@ const InvoiceGenerator = ({
                                 </div>
 
                                 <form onSubmit={handleSaveInvoice} className="space-y-4">
+                                    {/* Payment Method Selection */}
+                                    <div className="mb-6">
+                                        <h4 className="text-sm font-medium text-gray-900 mb-3">
+                                            Payment Method
+                                        </h4>
+                                        
+                                        {paymentMethods.length === 0 ? (
+                                            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                                                <p className="text-sm text-yellow-800 mb-3">
+                                                    No payment methods found. Create one to include payment details in your invoice.
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowCreatePaymentMethod(true)}
+                                                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
+                                                >
+                                                    <PlusIcon className="h-4 w-4 mr-2" />
+                                                    Create Payment Method
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div className="flex items-center space-x-3">
+                                                    <select
+                                                        value={selectedPaymentMethod?.id || ''}
+                                                        onChange={(e) => {
+                                                            const paymentMethod = paymentMethods.find(pm => pm.id === e.target.value);
+                                                            setSelectedPaymentMethod(paymentMethod || null);
+                                                        }}
+                                                        className="flex-1 block border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
+                                                    >
+                                                        <option value="">Select payment method (optional)</option>
+                                                        {paymentMethods.map(method => (
+                                                            <option key={method.id} value={method.id}>
+                                                                {method.title}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowCreatePaymentMethod(true)}
+                                                        className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                                                        title="Create new payment method"
+                                                    >
+                                                        <PlusIcon className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                                
+                                                {selectedPaymentMethod && (
+                                                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                                                        <p className="text-sm text-green-800">
+                                                            <strong>{selectedPaymentMethod.title}</strong> will be included in the invoice payment details.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {/* Client Information Form */}
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="col-span-2">
@@ -529,6 +831,19 @@ const InvoiceGenerator = ({
                         )}
                     </div>
                 </div>
+            )}
+
+            {/* Create Payment Method Modal */}
+            {showCreatePaymentMethod && (
+                <CreatePaymentMethodModal
+                    onClose={() => setShowCreatePaymentMethod(false)}
+                    onSave={(newPaymentMethod) => {
+                        setPaymentMethods(prev => [...prev, newPaymentMethod]);
+                        setSelectedPaymentMethod(newPaymentMethod);
+                        setShowCreatePaymentMethod(false);
+                        showSuccess('Payment method created successfully!');
+                    }}
+                />
             )}
         </div>
     );

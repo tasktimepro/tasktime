@@ -128,6 +128,8 @@ function App() {
                         currentTimer={currentTimer}
                         setCurrentTimer={setCurrentTimer}
                         onBackToProjects={navigateToProjects}
+                        paymentMethods={paymentMethods}
+                        setPaymentMethods={setPaymentMethods}
                     />
                 )}
 

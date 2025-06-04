@@ -6,7 +6,7 @@ import { getCurrencySymbol } from '../utils/currencyUtils';
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
  */
-const InvoicesList = ({ project, onEditInvoice }) => {
+const InvoicesList = ({ project, onEditInvoice, paymentMethods = [] }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
 
@@ -23,6 +23,10 @@ const InvoicesList = ({ project, onEditInvoice }) => {
             let htmlContent = invoice.htmlContent;
             if (!htmlContent) {
                 console.log('No htmlContent found, recreating...');
+                // Find the payment method if one is associated with this invoice
+                const paymentMethod = invoice.paymentMethodId ? 
+                    paymentMethods.find(pm => pm.id === invoice.paymentMethodId) : null;
+                
                 // Recreate the HTML content from the invoice data
                 htmlContent = createInvoiceHTML({
                     project: invoice.project,
@@ -31,7 +35,8 @@ const InvoicesList = ({ project, onEditInvoice }) => {
                     totalHours: invoice.totalHours,
                     totalAmount: invoice.totalAmount,
                     invoiceNumber: invoice.invoiceNumber,
-                    date: invoice.date
+                    date: invoice.date,
+                    paymentMethod: paymentMethod
                 });
             }
             
@@ -100,11 +105,21 @@ const InvoicesList = ({ project, onEditInvoice }) => {
                                             {invoice.invoiceNumber}
                                         </h3>
                                         <p className="text-sm text-gray-500">
-                                            {invoice.date} • {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)} • {invoice.totalHours.toFixed(2)} hours
+                                            {invoice.date} <span className="mx-1">•</span> {invoice.totalHours.toFixed(2)} hours <span className="mx-1">•</span> {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)}
                                         </p>
-                                        <p className="text-xs text-gray-400">
-                                            Client: {invoice.clientInfo?.name || invoice.client?.name}
-                                        </p>
+                                        <div className="text-xs text-gray-400 mt-1">
+                                            <p>
+                                                Client: <span className="font-medium text-gray-600">{invoice.clientInfo?.name || invoice.client?.name}</span>
+                                            </p>
+                                            {invoice.paymentMethodId && (() => {
+                                                const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                                                return paymentMethod ? (
+                                                    <p>
+                                                        Payment Method: <span className="font-medium text-gray-600">{paymentMethod.title}</span>
+                                                    </p>
+                                                ) : null;
+                                            })()}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

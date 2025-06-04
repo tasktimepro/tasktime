@@ -60,7 +60,8 @@ export const createInvoiceHTML = (invoiceData) => {
         totalHours,
         totalAmount,
         invoiceNumber,
-        date
+        date,
+        paymentMethod
     } = invoiceData;
 
     return `
@@ -73,7 +74,7 @@ export const createInvoiceHTML = (invoiceData) => {
             
             <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
                 <div>
-                    <h3 style="color: #333; margin-bottom: 10px;">Invoice To:</h3>
+                    <h3 style="color: #333; margin-bottom: 10px;"><strong>Invoice To:</strong></h3>
                     <p style="margin: 0; line-height: 1.5;">
                         ${client.name}<br>
                         ${client.email ? client.email + '<br>' : ''}
@@ -82,8 +83,8 @@ export const createInvoiceHTML = (invoiceData) => {
                     </p>
                 </div>
                 <div style="text-align: right;">
-                    <h3 style="color: #333; margin-bottom: 10px;">Project:</h3>
-                    <p style="margin: 0; font-weight: bold;">${project.title}</p>
+                    <h3 style="color: #333; margin-bottom: 10px;"><strong>Project:</strong></h3>
+                    <p style="margin: 0;">${project.title}</p>
                     <p style="margin: 0; color: #666;">Rate: ${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency || 'USD'} per hour</p>
                 </div>
             </div>
@@ -113,6 +114,27 @@ export const createInvoiceHTML = (invoiceData) => {
                 <p style="margin: 0; font-size: 18px;"><strong>Total Hours: ${totalHours.toFixed(2)}</strong></p>
                 <p style="margin: 0; font-size: 24px; color: #333;"><strong>Total Amount: ${getCurrencySymbol(project.currency)}${totalAmount.toFixed(2)}</strong></p>
             </div>
+            
+            ${paymentMethod ? `
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
+                <h3 style="color: #333; margin-bottom: 15px;"><strong>Payment Details:</strong></h3>
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+                    
+                    ${paymentMethod.fullName ? `<p style="margin: 5px 0;"><strong>Account Holder:</strong> ${paymentMethod.fullName}</p>` : ''}
+                    ${paymentMethod.bank ? `<p style="margin: 5px 0;"><strong>Bank:</strong> ${paymentMethod.bank}</p>` : ''}
+                    ${paymentMethod.iban ? `<p style="margin: 5px 0;"><strong>IBAN:</strong> ${paymentMethod.iban}</p>` : ''}
+                    ${paymentMethod.swift ? `<p style="margin: 5px 0;"><strong>SWIFT/BIC:</strong> ${paymentMethod.swift}</p>` : ''}
+                    ${paymentMethod.bankAddress ? `<p style="margin: 5px 0;"><strong>Bank Address:</strong> ${paymentMethod.bankAddress}</p>` : ''}
+                    ${paymentMethod.paypal ? `<p style="margin: 5px 0;"><strong>PayPal:</strong> ${paymentMethod.paypal}</p>` : ''}
+                    
+                    ${paymentMethod.custom && paymentMethod.custom.length > 0 ? 
+                        paymentMethod.custom.map(field => 
+                            `<p style="margin: 5px 0;"><strong>${field.label}:</strong> ${field.value}</p>`
+                        ).join('') : ''
+                    }
+                </div>
+            </div>
+            ` : ''}
         </div>
     `;
 };
