@@ -355,7 +355,7 @@ const ProjectList = ({ projects, setProjects, tasks = [], timeEntries = [], onSe
             )}
 
             {/* Export/Import Section */}
-            <ExportImport projects={projects} tasks={tasks} onImport={handleImport} />
+            <ExportImport projects={projects} tasks={tasks} timeEntries={timeEntries} onImport={handleImport} />
         </div>
     );
 };

@@ -1,14 +1,37 @@
 import React, { useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { formatDuration, millisecondsToHours } from '../utils/dateUtils';
 
 /**
  * ExportImport component for backing up and restoring application data
  * Provides JSON export/import functionality for projects and tasks
  */
-function ExportImport({ projects, tasks = [], onImport }) {
+function ExportImport({ projects, tasks = [], timeEntries = [], onImport }) {
     const [showImportModal, setShowImportModal] = useState(false);
     const [importData, setImportData] = useState('');
     const [importError, setImportError] = useState('');
+    
+    /**
+     * Calculate total time across all projects
+     * @returns {string} Formatted total time
+     */
+    const calculateTotalTimeAcrossAllProjects = () => {
+        const totalMilliseconds = timeEntries.reduce((total, entry) => {
+            // Check if entry has valid start and end times
+            if (entry && typeof entry.start === 'number' && typeof entry.end === 'number' && 
+                !isNaN(entry.start) && !isNaN(entry.end)) {
+                return total + (entry.end - entry.start);
+            }
+            return total;
+        }, 0);
+        
+        // Convert to decimal hours
+        const totalHours = millisecondsToHours(totalMilliseconds);
+        const roundedHours = Math.round(totalHours * 100) / 100; // Round to 2 decimal places
+        
+        // Format the time as hours and minutes, plus show decimal hours
+        return `${formatDuration(totalMilliseconds)} (${roundedHours.toFixed(2)} hours)`;
+    };
 
     /**
      * Export all project data as JSON file
@@ -129,8 +152,9 @@ function ExportImport({ projects, tasks = [], onImport }) {
                     <div className="p-4 bg-blue-50 rounded-lg">
                         <h4 className="font-medium text-blue-700 mb-2">Current Data</h4>
                         <div className="text-sm text-blue-700 space-y-1">
-                            <p>{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
-                            <p>{tasks.length} total tasks</p>
+                            <p>Projects: <span className="font-medium">{projects.length}</span></p>
+                            <p>Tasks: <span className="font-medium">{tasks.length}</span></p>
+                            <p>Time: <span className="font-medium">{calculateTotalTimeAcrossAllProjects()}</span></p>
                         </div>
                     </div>
                 )}
