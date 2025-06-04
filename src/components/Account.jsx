@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { useUrlState } from '../hooks/useUrlState';
 import ExportImport from './ExportImport';
 import PaymentMethods from './PaymentMethods';
 
@@ -14,12 +15,9 @@ const Account = ({
     paymentMethods,
     setPaymentMethods 
 }) => {
-    const [activeTab, setActiveTab] = useState('payment-methods');
+    const { urlParams, updateUrl } = useUrlState();
     
-    // Check URL parameters for auto-opening create payment method form
-    const urlParams = new URLSearchParams(window.location.search);
-    const autoOpenCreate = urlParams.get('create') === 'payment-method';
-
+    // Define sections in order (first will be default)
     const sideNavItems = [
         {
             id: 'backup',
@@ -34,6 +32,28 @@ const Account = ({
             description: 'Manage payment methods for invoices'
         }
     ];
+    
+    // Get current section from URL or default to first section
+    const activeTab = urlParams.section || sideNavItems[0].id;
+    
+    // Check URL parameters for auto-opening create payment method form
+    const autoOpenCreate = urlParams.create === 'payment-method';
+
+    // Function to handle section changes
+    const handleSectionChange = (sectionId) => {
+        updateUrl({ section: sectionId, create: null });
+    };
+
+    // Clear the create parameter after auto-opening to prevent re-opening
+    useEffect(() => {
+        if (autoOpenCreate) {
+            // Clear the create parameter after a short delay to allow the component to process it
+            const timer = setTimeout(() => {
+                updateUrl({ create: null });
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [autoOpenCreate, updateUrl]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -83,7 +103,7 @@ const Account = ({
                             return (
                                 <li key={item.id}>
                                     <button
-                                        onClick={() => setActiveTab(item.id)}
+                                        onClick={() => handleSectionChange(item.id)}
                                         className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                                             activeTab === item.id
                                                 ? 'bg-blue-50 text-blue-700 border-blue-200'

@@ -42,7 +42,7 @@ function App() {
      * Handle navigation to payment methods creation from invoice generator
      */
     const handleNavigateToPaymentMethods = () => {
-        navigateToAccount({ create: 'payment-method' });
+        navigateToAccount({ section: 'payment-methods', create: 'payment-method' });
     };
 
     /**
@@ -81,7 +81,7 @@ function App() {
                         
                         <div className="flex space-x-4">
                             <button
-                                onClick={navigateToProjects}
+                                onClick={() => navigateToProjects()}
                                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                                     activeView === 'projects'
                                         ? 'bg-blue-100 text-blue-700'
@@ -91,7 +91,7 @@ function App() {
                                 Projects
                             </button>
                             <button
-                                onClick={navigateToAccount}
+                                onClick={() => navigateToAccount()}
                                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                                     activeView === 'account'
                                         ? 'bg-blue-100 text-blue-700'

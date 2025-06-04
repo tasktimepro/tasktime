@@ -9,7 +9,9 @@ export const useUrlState = () => {
         const params = new URLSearchParams(window.location.search);
         return {
             view: params.get('view') || 'projects',
-            projectId: params.get('project') || null
+            projectId: params.get('project') || null,
+            section: params.get('section') || null,
+            create: params.get('create') || null
         };
     });
 
@@ -37,7 +39,9 @@ export const useUrlState = () => {
             window.history.pushState({}, '', newUrl);
             setUrlParams({
                 view: searchParams.get('view') || 'projects',
-                projectId: searchParams.get('project') || null
+                projectId: searchParams.get('project') || null,
+                section: searchParams.get('section') || null,
+                create: searchParams.get('create') || null
             });
         }
     }, []);
@@ -46,21 +50,21 @@ export const useUrlState = () => {
      * Navigate to projects view
      */
     const navigateToProjects = useCallback(() => {
-        updateUrl({ view: 'projects', project: null });
+        updateUrl({ view: 'projects', project: null, section: null, create: null });
     }, [updateUrl]);
 
     /**
      * Navigate to project dashboard
      */
     const navigateToProject = useCallback((projectId) => {
-        updateUrl({ view: 'dashboard', project: projectId });
+        updateUrl({ view: 'dashboard', project: projectId, section: null, create: null });
     }, [updateUrl]);
 
     /**
      * Navigate to invoices view
      */
     const navigateToInvoices = useCallback(() => {
-        updateUrl({ view: 'invoices', project: null });
+        updateUrl({ view: 'invoices', project: null, section: null, create: null });
     }, [updateUrl]);
 
     /**
@@ -78,7 +82,9 @@ export const useUrlState = () => {
             const params = new URLSearchParams(window.location.search);
             setUrlParams({
                 view: params.get('view') || 'projects',
-                projectId: params.get('project') || null
+                projectId: params.get('project') || null,
+                section: params.get('section') || null,
+                create: params.get('create') || null
             });
         };
 
