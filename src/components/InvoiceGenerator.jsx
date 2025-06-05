@@ -29,14 +29,18 @@ const InvoiceGenerator = ({
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
     const [selectedClientInfo, setSelectedClientInfo] = useState(null);
+    const [selectedProject, setSelectedProject] = useState(project); // Initialize with current project
+    const [isProjectContextFixed, setIsProjectContextFixed] = useState(true); // Track if opened from project context
     const { showSuccess, showError } = useToast();
 
     // Get project invoices from the new structure - memoized to prevent unnecessary re-renders
     const projectInvoices = useMemo(() => {
+        // Use the selected project if available, otherwise fall back to the initially passed project
+        const currentProject = selectedProject || project;
         return invoices.filter(invoice => 
-            (project.invoiceIds || []).includes(invoice.id)
+            (currentProject.invoiceIds || []).includes(invoice.id)
         );
-    }, [invoices, project.invoiceIds]);
+    }, [invoices, selectedProject, project]);
 
     // Debug logging
     console.log('🔍 InvoiceGenerator - clientInfos:', clientInfos);
@@ -164,6 +168,23 @@ const InvoiceGenerator = ({
         }
     }, [editingInvoice, projectInvoices, clientInfos, selectedClientInfo]);
 
+    /**
+     * Initialize selected project based on current project or editing invoice
+     */
+    const initializeSelectedProject = useCallback(() => {
+        // If editing an invoice, use its project
+        if (editingInvoice && editingInvoice.projectId) {
+            const invoiceProject = projects.find(p => p.id === editingInvoice.projectId);
+            if (invoiceProject) {
+                setSelectedProject(invoiceProject);
+                return;
+            }
+        }
+        
+        // Otherwise, use the current project
+        setSelectedProject(project);
+    }, [editingInvoice, project, projects]);
+
     // Track when the form gets shown so we can initialize only then
     const [hasInitialized, setHasInitialized] = useState(false);
 
@@ -177,6 +198,7 @@ const InvoiceGenerator = ({
                 initializePaymentMethod();
                 initializeBusinessInfo();
                 initializeSelectedClientInfo();
+                initializeSelectedProject();
                 setHasInitialized(true);
             }
         } else {
@@ -189,6 +211,7 @@ const InvoiceGenerator = ({
         initializePaymentMethod, 
         initializeBusinessInfo, 
         initializeSelectedClientInfo,
+        initializeSelectedProject,
         paymentMethods.length,
         businessInfos.length,
         clientInfos.length,
@@ -197,6 +220,52 @@ const InvoiceGenerator = ({
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
+    
+    // Pricing & Totals state
+    const [pricingCollapsed, setPricingCollapsed] = useState(true);
+    const [discountType, setDiscountType] = useState('percentage'); // 'percentage' or 'fixed'
+    const [discountValue, setDiscountValue] = useState(0);
+    const [shippingAmount, setShippingAmount] = useState(0);
+    const [taxOverride, setTaxOverride] = useState({
+        enabled: false,
+        label: '',
+        rate: 0
+    });
+
+    /**
+     * Initialize pricing state when editing an invoice
+     */
+    useEffect(() => {
+        if (editingInvoice) {
+            // Initialize discount settings
+            if (editingInvoice.discountType) {
+                setDiscountType(editingInvoice.discountType);
+            }
+            if (editingInvoice.discountValue !== undefined) {
+                setDiscountValue(editingInvoice.discountValue);
+            }
+            
+            // Initialize shipping
+            if (editingInvoice.shipping !== undefined) {
+                setShippingAmount(editingInvoice.shipping);
+            }
+            
+            // Initialize tax override
+            if (editingInvoice.taxOverride) {
+                setTaxOverride(editingInvoice.taxOverride);
+            }
+        } else {
+            // Reset pricing state for new invoices
+            setDiscountType('percentage');
+            setDiscountValue(0);
+            setShippingAmount(0);
+            setTaxOverride({
+                enabled: false,
+                label: '',
+                rate: 0
+            });
+        }
+    }, [editingInvoice]);
 
     /**
      * Handle client info selection from dropdown
@@ -208,6 +277,20 @@ const InvoiceGenerator = ({
             const clientInfo = clientInfos.find(ci => ci.id === clientInfoId);
             if (clientInfo) {
                 setSelectedClientInfo(clientInfo);
+            }
+        }
+    };
+
+    /**
+     * Handle project selection from dropdown
+     */
+    const handleProjectSelection = (projectId) => {
+        if (projectId === "") {
+            setSelectedProject(null);
+        } else {
+            const selectedProj = projects.find(p => p.id === projectId);
+            if (selectedProj) {
+                setSelectedProject(selectedProj);
             }
         }
     };
@@ -225,11 +308,70 @@ const InvoiceGenerator = ({
     };
 
     /**
+     * Calculate pricing breakdown: Subtotal → Discount → Shipping → Tax → Total
+     */
+    const calculatePricing = useMemo(() => {
+        if (!selectedProject || invoiceTasks.length === 0) {
+            return {
+                subtotal: 0,
+                discount: 0,
+                shipping: 0,
+                tax: 0,
+                total: 0,
+                taxRate: 0,
+                taxLabel: 'VAT'
+            };
+        }
+
+        const totalHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0);
+        const subtotal = totalHours * selectedProject.hourlyRate;
+
+        // Calculate discount
+        const discount = discountType === 'percentage' 
+            ? (subtotal * (discountValue / 100))
+            : discountValue;
+
+        // Subtotal after discount
+        const afterDiscount = subtotal - discount;
+
+        // Add shipping
+        const shipping = parseFloat(shippingAmount) || 0;
+        const afterShipping = afterDiscount + shipping;
+
+        // Calculate tax
+        let taxRate = 0;
+        let taxLabel = 'VAT';
+        
+        if (taxOverride.enabled) {
+            taxRate = parseFloat(taxOverride.rate) || 0;
+            taxLabel = taxOverride.label || 'Tax';
+        } else if (selectedProject.taxEnabled) {
+            taxRate = parseFloat(selectedProject.taxRate) || 0;
+            taxLabel = selectedProject.taxLabel || 'VAT';
+        }
+
+        const tax = (afterShipping * (taxRate / 100));
+        const total = afterShipping + tax;
+
+        return {
+            subtotal: Math.round(subtotal * 100) / 100,
+            discount: Math.round(discount * 100) / 100,
+            shipping: Math.round(shipping * 100) / 100,
+            tax: Math.round(tax * 100) / 100,
+            total: Math.round(total * 100) / 100,
+            taxRate,
+            taxLabel
+        };
+    }, [selectedProject, invoiceTasks, editableHours, discountType, discountValue, shippingAmount, taxOverride]);
+
+    /**
      * Prepare invoice data
      */
     const prepareInvoiceData = useCallback(() => {
+        if (!selectedProject) return null;
+        
         // Get billable time entries (since last billing)
-        const lastBilledAt = project.lastBilledAt || project.createdAt;
+        const lastBilledAt = selectedProject.lastBilledAt || selectedProject.createdAt;
 
         // Only include completed entries (with end time) that are after last billing
         const billableEntries = timeEntries.filter(entry => 
@@ -269,7 +411,7 @@ const InvoiceGenerator = ({
         }).filter(task => task.originalHours > 0);
 
         return tasksData;
-    }, [project.lastBilledAt, project.createdAt, timeEntries, tasks, editableHours]);
+    }, [selectedProject, timeEntries, tasks, editableHours]);
 
     /**
      * Save invoice (create new or update existing)
@@ -277,9 +419,14 @@ const InvoiceGenerator = ({
     const handleSaveInvoice = (e) => {
         e.preventDefault();
 
-        // Validate client information - must have selected client info
+        // Validate required information
         if (!selectedClientInfo) {
             showError('Please select client information');
+            return;
+        }
+
+        if (!selectedProject) {
+            showError('Please select a project');
             return;
         }
 
@@ -288,12 +435,13 @@ const InvoiceGenerator = ({
             return;
         }
 
+        const pricing = calculatePricing;
         const totalHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.originalHours), 0);
-        const totalAmount = totalHours * project.hourlyRate;
 
         const invoiceData = {
-            id: editingInvoice ? editingInvoice.id : `INV-${project.id.slice(-8)}-${Date.now()}`,
-            project: project,
+            id: editingInvoice ? editingInvoice.id : `INV-${selectedProject.id.slice(-8)}-${Date.now()}`,
+            project: selectedProject,
+            projectId: selectedProject.id,
             clientInfo: {
                 name: selectedClientInfo.clientName || '',
                 email: selectedClientInfo.email || '',
@@ -307,16 +455,26 @@ const InvoiceGenerator = ({
                 hours: editableHours[task.id] || task.originalHours
             })),
             totalHours: totalHours,
-            totalAmount: totalAmount,
+            totalAmount: pricing.total,
+            // Add new pricing breakdown fields
+            subtotal: pricing.subtotal,
+            discount: pricing.discount,
+            discountType: discountType,
+            discountValue: discountValue,
+            shipping: pricing.shipping,
+            tax: pricing.tax,
+            taxRate: pricing.taxRate,
+            taxLabel: pricing.taxLabel,
+            taxOverride: taxOverride.enabled ? taxOverride : null,
             paymentMethodId: selectedPaymentMethod?.id || null,
             businessInfoId: selectedBusinessInfo?.id || null,
             clientInfoId: selectedClientInfo?.id || null,
-            invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
+            invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${selectedProject.id.slice(-8)}-${Date.now()}`,
             date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
             htmlContent: createInvoiceHTML({
-                id: editingInvoice ? editingInvoice.id : `INV-${project.id.slice(-8)}-${Date.now()}`,
-                project: project,
+                id: editingInvoice ? editingInvoice.id : `INV-${selectedProject.id.slice(-8)}-${Date.now()}`,
+                project: selectedProject,
                 client: {
                     name: selectedClientInfo.clientName || '',
                     email: selectedClientInfo.email || '',
@@ -330,7 +488,14 @@ const InvoiceGenerator = ({
                     hours: editableHours[task.id] || task.originalHours
                 })),
                 totalHours: totalHours,
-                totalAmount: totalAmount,
+                totalAmount: pricing.total,
+                // Add pricing breakdown for PDF
+                subtotal: pricing.subtotal,
+                discount: pricing.discount,
+                shipping: pricing.shipping,
+                tax: pricing.tax,
+                taxRate: pricing.taxRate,
+                taxLabel: pricing.taxLabel,
                 paymentMethod: selectedPaymentMethod,
                 businessInfo: selectedBusinessInfo,
                 invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
@@ -348,11 +513,11 @@ const InvoiceGenerator = ({
             updatedInvoices = invoices.map(inv => 
                 inv.id === editingInvoice.id ? invoiceData : inv
             );
-            updatedProjectInvoiceIds = project.invoiceIds || [];
+            updatedProjectInvoiceIds = selectedProject.invoiceIds || [];
         } else {
             // Add new invoice
             updatedInvoices = [...invoices, invoiceData];
-            updatedProjectInvoiceIds = [...(project.invoiceIds || []), invoiceData.id];
+            updatedProjectInvoiceIds = [...(selectedProject.invoiceIds || []), invoiceData.id];
         }
 
         // Update invoices storage - check if setInvoices is a function
@@ -362,7 +527,7 @@ const InvoiceGenerator = ({
 
         // Update project to include invoice ID
         const updatedProjects = projects.map(p => 
-            p.id === project.id 
+            p.id === selectedProject.id 
                 ? { 
                     ...p, 
                     lastBilledAt: editingInvoice ? p.lastBilledAt : Date.now(),
@@ -407,6 +572,17 @@ const InvoiceGenerator = ({
                 initialHours[task.id] = Math.round((task.hours || 0) * 100) / 100; // Round to 2 decimal places
             });
             setEditableHours(initialHours);
+            
+            // If the invoice has a projectId, set the selected project
+            if (editingInvoice.projectId) {
+                const invoiceProject = projects.find(p => p.id === editingInvoice.projectId);
+                if (invoiceProject) {
+                    setSelectedProject(invoiceProject);
+                }
+            }
+            
+            // When editing, project selection is allowed
+            setIsProjectContextFixed(false);
         } else {
             // Open form with new invoice data
             const tasksData = prepareInvoiceData();
@@ -422,9 +598,12 @@ const InvoiceGenerator = ({
                 initialHours[task.id] = task.originalHours;
             });
             setEditableHours(initialHours);
+            
+            // When opened from a project context, lock the project selection
+            setIsProjectContextFixed(true);
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, showError]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, showError, projects, setIsProjectContextFixed]);
 
     // Keep track of whether we've handled the current editing invoice
     const [handledEditingInvoice, setHandledEditingInvoice] = useState(null);
@@ -457,8 +636,9 @@ const InvoiceGenerator = ({
         setEditableHours({});
     };
 
-    // Calculate unbilled time
-    const lastBilledAt = project.lastBilledAt || project.createdAt;
+    // Calculate unbilled time - initially using the current project (will update when a project is selected)
+    const currentProjectForCalculation = selectedProject || project;
+    const lastBilledAt = currentProjectForCalculation.lastBilledAt || currentProjectForCalculation.createdAt;
 
     const unbilledEntries = timeEntries.filter(entry => 
         entry.start > lastBilledAt && entry.end && entry.end > entry.start
@@ -480,7 +660,7 @@ const InvoiceGenerator = ({
         return total + roundedTaskHours;
     }, 0);
 
-    const unbilledAmount = unbilledHours * project.hourlyRate;
+    const unbilledAmount = unbilledHours * currentProjectForCalculation.hourlyRate;
 
     return (
         <div className="space-y-4">
@@ -493,7 +673,7 @@ const InvoiceGenerator = ({
                     Generate Invoice
                     {unbilledHours > 0 && (
                         <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full">
-                            {getCurrencySymbol(project.currency)}{unbilledAmount.toFixed(2)}
+                            {getCurrencySymbol(currentProjectForCalculation.currency)}{unbilledAmount.toFixed(2)}
                         </span>
                     )}
                 </button>
@@ -599,6 +779,40 @@ const InvoiceGenerator = ({
                                         )}
                                     </div>
 
+                                    {/* Project Selection */}
+                                    <div className="mb-6">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <h4 className="text-sm font-medium text-gray-900">
+                                                Project
+                                            </h4>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <select
+                                                value={selectedProject?.id || ''}
+                                                onChange={(e) => handleProjectSelection(e.target.value)}
+                                                className={`block w-full border ${isProjectContextFixed ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
+                                                required
+                                                disabled={isProjectContextFixed}
+                                            >
+                                                <option value="">Select project</option>
+                                                {projects.map(proj => (
+                                                    <option key={proj.id} value={proj.id}>
+                                                        {proj.title}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            
+                                            {selectedProject && (
+                                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                                    <p className="text-sm text-blue-800">
+                                                        <strong>{selectedProject.title}</strong><br/>
+                                                        Rate: {getCurrencySymbol(selectedProject.currency)}{selectedProject.hourlyRate}/hour
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
                                     {/* Tasks with Editable Hours */}
                                     <div className="mb-6">
                                         <h4 className="text-sm font-medium text-gray-900 mb-3">
@@ -643,19 +857,155 @@ const InvoiceGenerator = ({
                                             })}
                                         </div>
                                         
-                                        {/* Updated Totals */}
-                                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                            <div className="flex justify-between text-sm text-blue-800">
-                                                <span>Total Hours:</span>
-                                                <span className="font-medium">
-                                                    {invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0).toFixed(2)}h
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between text-sm text-blue-800">
-                                                <span>Total Amount:</span>
-                                                <span className="font-medium">
-                                                    {getCurrencySymbol(project.currency)}{(invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0) * project.hourlyRate).toFixed(2)}
-                                                </span>
+                                        {/* Comprehensive Pricing & Totals Section */}
+                                        <div className="mt-4">
+                                            <div className="border border-gray-200 rounded-lg">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPricingCollapsed(!pricingCollapsed)}
+                                                    className="w-full px-4 py-3 text-left border-b border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="text-sm font-medium text-gray-900">Pricing & Totals</h4>
+                                                        <div className="flex items-center space-x-3">
+                                                            <span className="text-sm font-medium text-blue-600">
+                                                                {selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.total.toFixed(2)}
+                                                            </span>
+                                                            <svg 
+                                                                className={`w-5 h-5 text-gray-500 transform transition-transform ${pricingCollapsed ? '' : 'rotate-180'}`} 
+                                                                fill="none" 
+                                                                stroke="currentColor" 
+                                                                viewBox="0 0 24 24"
+                                                            >
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </div>
+                                                    </div>
+                                                </button>
+
+                                                {!pricingCollapsed && (
+                                                    <div className="p-4 space-y-4">
+                                                        {/* Discount Settings */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Discount</label>
+                                                            <div className="flex space-x-2">
+                                                                <select
+                                                                    value={discountType}
+                                                                    onChange={(e) => setDiscountType(e.target.value)}
+                                                                    className="w-24 text-sm border border-gray-300 rounded-md px-2 py-1"
+                                                                >
+                                                                    <option value="percentage">%</option>
+                                                                    <option value="fixed">{selectedProject ? getCurrencySymbol(selectedProject.currency) : '$'}</option>
+                                                                </select>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={discountValue}
+                                                                    onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                                                                    className="flex-1 text-sm border border-gray-300 rounded-md px-2 py-1"
+                                                                    placeholder={discountType === 'percentage' ? '0.00' : '0.00'}
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Shipping */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Shipping</label>
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={shippingAmount}
+                                                                onChange={(e) => setShippingAmount(parseFloat(e.target.value) || 0)}
+                                                                className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
+                                                                placeholder="0.00"
+                                                            />
+                                                        </div>
+
+                                                        {/* Tax Override */}
+                                                        <div>
+                                                            <div className="flex items-center space-x-2 mb-2">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id="taxOverrideEnabled"
+                                                                    checked={taxOverride.enabled}
+                                                                    onChange={(e) => setTaxOverride(prev => ({ ...prev, enabled: e.target.checked }))}
+                                                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                                />
+                                                                <label htmlFor="taxOverrideEnabled" className="text-sm font-medium text-gray-700">
+                                                                    Override tax settings
+                                                                </label>
+                                                            </div>
+                                                            
+                                                            {taxOverride.enabled && (
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <div>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={taxOverride.label}
+                                                                            onChange={(e) => setTaxOverride(prev => ({ ...prev, label: e.target.value }))}
+                                                                            className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
+                                                                            placeholder="Tax label"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            max="100"
+                                                                            value={taxOverride.rate}
+                                                                            onChange={(e) => setTaxOverride(prev => ({ ...prev, rate: parseFloat(e.target.value) || 0 }))}
+                                                                            className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
+                                                                            placeholder="Rate %"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {!taxOverride.enabled && selectedProject?.taxEnabled && (
+                                                                <div className="text-xs text-gray-500">
+                                                                    Using project tax: {selectedProject.taxLabel} {selectedProject.taxRate}%
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Pricing Breakdown */}
+                                                        <div className="border-t pt-3 space-y-2">
+                                                            <div className="flex justify-between text-sm">
+                                                                <span>Subtotal ({invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0).toFixed(2)}h):</span>
+                                                                <span>{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.subtotal.toFixed(2)}</span>
+                                                            </div>
+                                                            
+                                                            {calculatePricing.discount > 0 && (
+                                                                <div className="flex justify-between text-sm text-red-600">
+                                                                    <span>Discount ({discountType === 'percentage' ? `${discountValue}%` : getCurrencySymbol(selectedProject?.currency || 'USD') + discountValue}):</span>
+                                                                    <span>-{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.discount.toFixed(2)}</span>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {calculatePricing.shipping > 0 && (
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span>Shipping:</span>
+                                                                    <span>{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.shipping.toFixed(2)}</span>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {calculatePricing.tax > 0 && (
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span>{calculatePricing.taxLabel} ({calculatePricing.taxRate}%):</span>
+                                                                    <span>{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.tax.toFixed(2)}</span>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            <div className="flex justify-between text-base font-medium border-t pt-2">
+                                                                <span>Total:</span>
+                                                                <span>{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.total.toFixed(2)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

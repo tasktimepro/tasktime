@@ -16,7 +16,7 @@ export const generatePDF = (htmlContent, filename = 'invoice.pdf', options = {})
             }
 
             const defaultOptions = {
-                margin: [15, 20, 15, 20],  // top, right, bottom, left margins in mm
+                margin: [5, 20, 10, 20],  // top, right, bottom, left margins in mm
                 filename: filename,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2 },
@@ -62,7 +62,13 @@ export const createInvoiceHTML = (invoiceData) => {
         invoiceNumber,
         date,
         paymentMethod,
-        businessInfo
+        businessInfo,
+        subtotal,
+        discount,
+        shipping,
+        tax,
+        taxRate,
+        taxLabel
     } = invoiceData;
 
     return `
@@ -106,12 +112,12 @@ export const createInvoiceHTML = (invoiceData) => {
                 </div>
             </div>
             
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                 <thead>
                     <tr style="background-color: #f8f9fa;">
-                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Task</th>
-                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Hours</th>
-                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Amount</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #ddd;">Task</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Hours</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -125,9 +131,28 @@ export const createInvoiceHTML = (invoiceData) => {
                 </tbody>
             </table>
             
-            <div style="text-align: right; margin-bottom: 30px;">
-                <p style="margin: 0; font-size: 18px;"><strong>Total Hours: ${totalHours.toFixed(2)}</strong></p>
-                <p style="margin: 0; font-size: 24px; color: #333;"><strong>Total Amount: ${getCurrencySymbol(project.currency)}${totalAmount.toFixed(2)}</strong></p>
+            <div style="text-align: right; margin-bottom: 20px;">
+                <div style="border-top: 1px solid #ddd; padding-top: 15px;">
+                    ${subtotal ? `
+                        <p style="margin: 5px 0; font-size: 16px;">Subtotal (${totalHours.toFixed(2)} hours): <strong>${getCurrencySymbol(project.currency)}${subtotal.toFixed(2)}</strong></p>
+                        
+                        ${discount && discount > 0 ? `
+                            <p style="margin: 5px 0; font-size: 16px; color: #dc2626;">Discount: <strong>-${getCurrencySymbol(project.currency)}${discount.toFixed(2)}</strong></p>
+                        ` : ''}
+                        
+                        ${shipping && shipping > 0 ? `
+                            <p style="margin: 5px 0; font-size: 16px;">Shipping: <strong>${getCurrencySymbol(project.currency)}${shipping.toFixed(2)}</strong></p>
+                        ` : ''}
+                        
+                        ${tax && tax > 0 ? `
+                            <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(project.currency)}${tax.toFixed(2)}</strong></p>
+                        ` : ''}
+                        
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333; border-top: 1px solid #ddd; padding-top: 10px;"><strong>Total: ${getCurrencySymbol(project.currency)}${totalAmount.toFixed(2)}</strong></p>
+                    ` : `
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333;"><strong>Total (${totalHours.toFixed(2)} hours): ${getCurrencySymbol(project.currency)}${totalAmount.toFixed(2)}</strong></p>
+                    `}
+                </div>
             </div>
             
             ${paymentMethod ? `

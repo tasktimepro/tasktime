@@ -55,7 +55,14 @@ const InvoicesList = ({ projectInvoices = [], onEditInvoice, paymentMethods = []
                     invoiceNumber: invoice.invoiceNumber,
                     date: invoice.date,
                     paymentMethod: paymentMethod,
-                    businessInfo: businessInfo
+                    businessInfo: businessInfo,
+                    // Include pricing breakdown if available (for backward compatibility)
+                    subtotal: invoice.subtotal,
+                    discount: invoice.discount,
+                    shipping: invoice.shipping,
+                    tax: invoice.tax,
+                    taxRate: invoice.taxRate,
+                    taxLabel: invoice.taxLabel
                 });
             }
             

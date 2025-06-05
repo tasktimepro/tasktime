@@ -31,7 +31,10 @@ const ProjectList = ({
     const [formData, setFormData] = useState({
         title: '',
         hourlyRate: '',
-        currency: 'USD'
+        currency: 'USD',
+        taxEnabled: false,
+        taxLabel: 'VAT',
+        taxRate: 0
     });
 
     // Close dropdown when clicking outside or when another dropdown opens
@@ -88,13 +91,16 @@ const ProjectList = ({
             title: formData.title,
             hourlyRate: parseFloat(formData.hourlyRate),
             currency: formData.currency,
+            taxEnabled: formData.taxEnabled,
+            taxLabel: formData.taxLabel,
+            taxRate: parseFloat(formData.taxRate) || 0,
             createdAt: Date.now(),
             lastBilledAt: null
         };
 
         setProjects([...projects, newProject]);
 
-        setFormData({ title: '', hourlyRate: '', currency: 'USD' });
+        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0 });
 
         setShowCreateForm(false);
     };
@@ -113,7 +119,10 @@ const ProjectList = ({
                     ...project,
                     title: formData.title,
                     hourlyRate: parseFloat(formData.hourlyRate),
-                    currency: formData.currency
+                    currency: formData.currency,
+                    taxEnabled: formData.taxEnabled,
+                    taxLabel: formData.taxLabel,
+                    taxRate: parseFloat(formData.taxRate) || 0
                 }
                 : project
         );
@@ -122,7 +131,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: 'USD' });
+        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0 });
 
         showSuccess('Project updated successfully!');
     };
@@ -178,7 +187,10 @@ const ProjectList = ({
         setFormData({
             title: project.title,
             hourlyRate: project.hourlyRate.toString(),
-            currency: project.currency
+            currency: project.currency,
+            taxEnabled: project.taxEnabled || false,
+            taxLabel: project.taxLabel || 'VAT',
+            taxRate: project.taxRate || 0
         });
 
         setShowCreateForm(false);
@@ -192,7 +204,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: 'USD' });
+        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0 });
     };
 
     /**
@@ -321,6 +333,69 @@ const ProjectList = ({
                                     <option value="CAD">CAD</option>
                                     <option value="AUD">AUD</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        {/* Tax Settings */}
+                        <div className="space-y-4">
+                            <div className="border-t pt-4">
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">Tax Settings</h4>
+                                
+                                <div className="flex items-center space-x-3 mb-4">
+                                    <input
+                                        type="checkbox"
+                                        id="taxEnabled"
+                                        name="taxEnabled"
+                                        checked={formData.taxEnabled}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, taxEnabled: e.target.checked }))}
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    />
+                                    <label htmlFor="taxEnabled" className="text-sm font-medium text-gray-700">
+                                        Enable tax for this project
+                                    </label>
+                                </div>
+
+                                {formData.taxEnabled && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="taxLabel" className="block text-sm font-medium text-gray-700">
+                                                Tax Label
+                                            </label>
+                                            <select
+                                                id="taxLabel"
+                                                name="taxLabel"
+                                                value={formData.taxLabel}
+                                                onChange={handleInputChange}
+                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                            >
+                                                <option value="VAT">VAT</option>
+                                                <option value="GST">GST</option>
+                                                <option value="MOMS">MOMS</option>
+                                                <option value="BTW">BTW</option>
+                                                <option value="Tax">Tax</option>
+                                                <option value="Sales Tax">Sales Tax</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="taxRate" className="block text-sm font-medium text-gray-700">
+                                                Tax Rate (%)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="taxRate"
+                                                name="taxRate"
+                                                value={formData.taxRate}
+                                                onChange={handleInputChange}
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
