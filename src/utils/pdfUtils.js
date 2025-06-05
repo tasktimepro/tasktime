@@ -116,30 +116,56 @@ export const createInvoiceHTML = (invoiceData) => {
                 </div>
             </div>
             
+            ${(() => {
+                // Determine if we have any hourly tasks
+                const allTasks = [...tasks, ...additionalTasks];
+                const invoiceCurrency = project?.currency || currency;
+                
+                // We'll show the hours and rate columns when any task is using hourly billing
+                // Check either for tasks with hours > 0 or tasks that are explicitly NOT using flat rate
+                const hasHourlyTasks = allTasks.some(task => {
+                    // Has hours or is explicitly set to use hourly rate
+                    return task.hours > 0 || 
+                           (task.useFlatRate === false) || 
+                           (task.hourlyRate !== undefined && task.hourlyRate > 0);
+                });
+                
+                // If we have hourly tasks, show all 4 columns, otherwise just Description and Total
+                if (hasHourlyTasks) {
+                    return `
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                 <thead>
                     <tr style="background-color: #f8f9fa;">
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #ddd;">Task</th>
-                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">${project && project.hourlyRate ? 'Hours' : 'Quantity'}</th>
-                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Amount</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #ddd;">Description</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Hours</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Rate</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Total</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${tasks.map((task, index) => {
                         const isLastTask = index === tasks.length - 1 && additionalTasks.length === 0;
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
-                        const invoiceCurrency = project?.currency || currency;
                         
                         // Check if this task uses flat rate
-                        const usesFlatRate = !project || !project.hourlyRate || (taskFlatRates && taskFlatRates[task.id]);
+                        const usesFlatRate = task.useFlatRate === true || 
+                                           (taskFlatRates && taskFlatRates[task.id] !== undefined) || 
+                                           task.flatRate !== undefined;
                         const taskAmount = usesFlatRate ? 
-                            (taskFlatRates && taskFlatRates[task.id] ? taskFlatRates[task.id] : (task.flatRate || 0)) :
-                            (task.hours * project.hourlyRate);
+                            (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
+                            (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
+                        
+                        // For flat rate tasks, show dash symbols; for hourly tasks, show the hours and rate
+                        const hours = usesFlatRate ? '—' : task.hours.toFixed(2);
+                        const rate = usesFlatRate ? '—' : getCurrencySymbol(invoiceCurrency) + (task.hourlyRate || project?.hourlyRate || 0).toFixed(2);
+                        // Don't show hours in title when we have Hours column
+                        const taskTitle = task.title;
                         
                         return `
                         <tr>
-                            <td style="padding: 8px; ${borderStyle}">${task.title}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${usesFlatRate ? '1' : task.hours.toFixed(2)}</td>
+                            <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${hours}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${rate}</td>
                             <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
@@ -147,29 +173,99 @@ export const createInvoiceHTML = (invoiceData) => {
                     ${additionalTasks.map((task, index) => {
                         const isLastTask = index === additionalTasks.length - 1;
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
-                        const invoiceCurrency = project?.currency || currency;
                         
                         // Check if this additional task uses flat rate
-                        const usesFlatRate = !project || !project.hourlyRate || task.flatRate !== undefined;
+                        const usesFlatRate = task.useFlatRate === true || 
+                                           task.flatRate !== undefined ||
+                                           (taskFlatRates && taskFlatRates[task.id] !== undefined);
                         const taskAmount = usesFlatRate ? 
-                            (task.flatRate || 0) :
-                            (task.hours * project.hourlyRate);
+                            (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
+                            (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
+                        
+                        // For flat rate tasks, show dash symbols; for hourly tasks, show the correct values
+                        const hours = usesFlatRate ? '—' : task.hours.toFixed(2);
+                        const rate = usesFlatRate ? '—' : getCurrencySymbol(invoiceCurrency) + (task.hourlyRate || project?.hourlyRate || 0).toFixed(2);
+                        // Don't show hours in title when we have Hours column
+                        const taskTitle = task.title;
                         
                         return `
                         <tr>
-                            <td style="padding: 8px; ${borderStyle}">${task.title}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${usesFlatRate ? '1' : task.hours.toFixed(2)}</td>
+                            <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${hours}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${rate}</td>
                             <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
                     }).join('')}
                 </tbody>
-            </table>
+            </table>`;
+                } else {
+                    // Only flat rate tasks, show simplified table with just Description and Total
+                    return `
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #ddd;">Description</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tasks.map((task, index) => {
+                        const isLastTask = index === tasks.length - 1 && additionalTasks.length === 0;
+                        const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
+                        
+                        // Check if this task uses flat rate
+                        const usesFlatRate = task.useFlatRate === true || 
+                                           (taskFlatRates && taskFlatRates[task.id] !== undefined) || 
+                                           task.flatRate !== undefined;
+                        
+                        // Calculate task amount based on whether it uses flat rate or hourly
+                        const taskAmount = usesFlatRate ? 
+                            (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
+                            (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
+                        
+                        // Include hours in the title only when using simplified table without hours column
+                        const taskTitle = task.hours > 0 ? `${task.title} (${task.hours.toFixed(2)}h)` : task.title;
+                        
+                        return `
+                        <tr>
+                            <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
+                        </tr>
+                    `;
+                    }).join('')}
+                    ${additionalTasks.map((task, index) => {
+                        const isLastTask = index === additionalTasks.length - 1;
+                        const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
+                        
+                        // Check if this task uses flat rate
+                        const usesFlatRate = task.useFlatRate === true || 
+                                           task.flatRate !== undefined || 
+                                           (taskFlatRates && taskFlatRates[task.id] !== undefined);
+                        
+                        // Calculate task amount based on whether it uses flat rate or hourly
+                        const taskAmount = usesFlatRate ? 
+                            (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
+                            (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
+                        // Include hours in the title only when using simplified table without hours column
+                        const taskTitle = task.hours > 0 ? `${task.title} (${task.hours.toFixed(2)}h)` : task.title;
+                        
+                        return `
+                        <tr>
+                            <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
+                        </tr>
+                    `;
+                    }).join('')}
+                </tbody>
+            </table>`;
+                }
+            })()}
             
             <div style="text-align: right; margin-bottom: 10px;">
                 <div style="border-top: 1px solid #ddd; padding-top: 8px;">
                     ${subtotal ? `
-                        <p style="margin: 5px 0; font-size: 16px;">Subtotal${totalHours && totalHours > 0 ? ` (${totalHours.toFixed(2)} hours)` : ''}: <strong>${getCurrencySymbol(project?.currency || currency)}${subtotal.toFixed(2)}</strong></p>
+                        <p style="margin: 5px 0; font-size: 16px;">Subtotal: <strong>${getCurrencySymbol(project?.currency || currency)}${subtotal.toFixed(2)}</strong></p>
                         
                         ${discount && discount > 0 ? `
                             <p style="margin: 5px 0; font-size: 16px; color: #dc2626;">Discount: <strong>-${getCurrencySymbol(project?.currency || currency)}${discount.toFixed(2)}</strong></p>

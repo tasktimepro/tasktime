@@ -28,8 +28,12 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
      * Handle saving edited time
      */
     const handleSave = () => {
-        // Convert back to milliseconds
-        const newTime = (editHours * 60 * 60 + editMinutes * 60 + editSeconds) * 1000;
+        // Convert back to milliseconds, treating empty strings as 0
+        const hoursValue = editHours === '' ? 0 : editHours;
+        const minutesValue = editMinutes === '' ? 0 : editMinutes;
+        const secondsValue = editSeconds === '' ? 0 : editSeconds;
+        
+        const newTime = (hoursValue * 60 * 60 + minutesValue * 60 + secondsValue) * 1000;
 
         onSave(newTime);
 
@@ -75,8 +79,15 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                             <input
                                 type="number"
                                 min="0"
-                                value={editHours}
-                                onChange={(e) => setEditHours(Math.max(0, parseInt(e.target.value) || 0))}
+                                value={editHours === '' ? '' : editHours}
+                                onChange={(e) => {
+                                    const newValue = e.target.value;
+                                    if (newValue === '') {
+                                        setEditHours('');
+                                    } else {
+                                        setEditHours(Math.max(0, parseInt(newValue) || 0));
+                                    }
+                                }}
                                 className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                             />
                         </div>
@@ -90,8 +101,15 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                                 type="number"
                                 min="0"
                                 max="59"
-                                value={editMinutes}
-                                onChange={(e) => setEditMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                                value={editMinutes === '' ? '' : editMinutes}
+                                onChange={(e) => {
+                                    const newValue = e.target.value;
+                                    if (newValue === '') {
+                                        setEditMinutes('');
+                                    } else {
+                                        setEditMinutes(Math.max(0, Math.min(59, parseInt(newValue) || 0)));
+                                    }
+                                }}
                                 className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                             />
                         </div>
@@ -105,8 +123,15 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                                 type="number"
                                 min="0"
                                 max="59"
-                                value={editSeconds}
-                                onChange={(e) => setEditSeconds(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                                value={editSeconds === '' ? '' : editSeconds}
+                                onChange={(e) => {
+                                    const newValue = e.target.value;
+                                    if (newValue === '') {
+                                        setEditSeconds('');
+                                    } else {
+                                        setEditSeconds(Math.max(0, Math.min(59, parseInt(newValue) || 0)));
+                                    }
+                                }}
                                 className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                             />
                         </div>

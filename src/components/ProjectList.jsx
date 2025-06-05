@@ -5,6 +5,7 @@ import { getCurrencySymbol } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { getTaskIdsToDelete } from '../utils/taskUtils';
+import CustomCheckbox from './CustomCheckbox';
 
 // Event name for dropdown coordination
 const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
@@ -348,13 +349,9 @@ const ProjectList = ({
                                 <h4 className="text-sm font-medium text-gray-900 mb-3">Tax Settings</h4>
                                 
                                 <div className="flex items-center space-x-3 mb-4">
-                                    <input
-                                        type="checkbox"
-                                        id="taxEnabled"
-                                        name="taxEnabled"
+                                    <CustomCheckbox
                                         checked={formData.taxEnabled}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, taxEnabled: e.target.checked }))}
-                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        onChange={() => setFormData(prev => ({ ...prev, taxEnabled: !prev.taxEnabled }))}
                                     />
                                     <label htmlFor="taxEnabled" className="text-sm font-medium text-gray-700">
                                         Enable tax for this project

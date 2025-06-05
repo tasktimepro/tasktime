@@ -149,6 +149,11 @@ const InvoicesList = ({ projectInvoices = [], onEditInvoice, paymentMethods = []
                                                     })()}
                                                 </span>
                                             </p>
+                                            <p>
+                                                Project: <span className="font-medium text-gray-600">
+                                                    {invoice.project?.title || 'Unknown Project'}
+                                                </span>
+                                            </p>
                                             {invoice.businessInfoId && (() => {
                                                 const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
                                                 return businessInfo ? (
