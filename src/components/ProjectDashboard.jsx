@@ -165,6 +165,7 @@ const ProjectDashboard = ({
                         paymentMethods={paymentMethods}
                         businessInfos={businessInfos}
                         clientInfos={clientInfos}
+                        hideNewInvoiceButton={true}
                     />
                 </div>
             </div>

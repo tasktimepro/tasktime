@@ -6,7 +6,14 @@ import { getCurrencySymbol } from '../utils/currencyUtils';
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
  */
-const InvoicesList = ({ projectInvoices = [], onEditInvoice, paymentMethods = [], businessInfos = [], clientInfos = [] }) => {
+const InvoicesList = ({ 
+    projectInvoices = [], 
+    onEditInvoice, 
+    paymentMethods = [], 
+    businessInfos = [], 
+    clientInfos = [],
+    hideNewInvoiceButton = false 
+}) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
 
@@ -104,13 +111,15 @@ const InvoicesList = ({ projectInvoices = [], onEditInvoice, paymentMethods = []
                 <p className="mt-1 text-sm text-gray-500">
                     Get started by generating your first invoice.
                 </p>
-                <button
-                    onClick={() => onEditInvoice && onEditInvoice(null)}
-                    className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" />
-                    New Invoice
-                </button>
+                {!hideNewInvoiceButton && (
+                    <button
+                        onClick={() => onEditInvoice && onEditInvoice(null)}
+                        className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                        <DocumentTextIcon className="h-5 w-5 mr-2" />
+                        New Invoice
+                    </button>
+                )}
             </div>
         );
     }
