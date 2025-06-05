@@ -86,6 +86,7 @@ const ProjectDashboard = ({
                     projects={projects}
                     setProjects={setProjects}
                     tasks={projectTasks}
+                    setTasks={setTasks}
                     timeEntries={projectTimeEntries}
                     paymentMethods={paymentMethods}
                     onNavigateToPaymentMethods={onNavigateToPaymentMethods}
@@ -139,6 +140,7 @@ const ProjectDashboard = ({
                             projects={projects}
                             setProjects={setProjects}
                             tasks={projectTasks}
+                            setTasks={setTasks}
                             timeEntries={projectTimeEntries}
                             editingInvoice={editingInvoice}
                             onInvoiceSaved={() => setEditingInvoice(null)}

@@ -121,14 +121,9 @@ export const createInvoiceHTML = (invoiceData) => {
                 const allTasks = [...tasks, ...additionalTasks];
                 const invoiceCurrency = project?.currency || currency;
                 
-                // We'll show the hours and rate columns when any task is using hourly billing
-                // Check either for tasks with hours > 0 or tasks that are explicitly NOT using flat rate
-                const hasHourlyTasks = allTasks.some(task => {
-                    // Has hours or is explicitly set to use hourly rate
-                    return task.hours > 0 || 
-                           (task.useFlatRate === false) || 
-                           (task.hourlyRate !== undefined && task.hourlyRate > 0);
-                });
+                // We'll show the hours and rate columns as long as any task has hours > 0
+                // This includes both hourly rate tasks and flat rate tasks with tracked hours
+                const hasHourlyTasks = allTasks.some(task => task.hours > 0);
                 
                 // If we have hourly tasks, show all 4 columns, otherwise just Description and Total
                 if (hasHourlyTasks) {
@@ -155,7 +150,6 @@ export const createInvoiceHTML = (invoiceData) => {
                             (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
                             (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
                         
-                        // For flat rate tasks, show dash symbols; for hourly tasks, show the hours and rate
                         const hours = usesFlatRate ? '—' : task.hours.toFixed(2);
                         const rate = usesFlatRate ? '—' : getCurrencySymbol(invoiceCurrency) + (task.hourlyRate || project?.hourlyRate || 0).toFixed(2);
                         // Don't show hours in title when we have Hours column
@@ -175,14 +169,11 @@ export const createInvoiceHTML = (invoiceData) => {
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
                         
                         // Check if this additional task uses flat rate
-                        const usesFlatRate = task.useFlatRate === true || 
-                                           task.flatRate !== undefined ||
-                                           (taskFlatRates && taskFlatRates[task.id] !== undefined);
+                        const usesFlatRate = task.useFlatRate === true || task.flatRate !== undefined;
                         const taskAmount = usesFlatRate ? 
-                            (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
+                            (task.flatRate || 0) * (task.quantity || 1) :
                             (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
                         
-                        // For flat rate tasks, show dash symbols; for hourly tasks, show the correct values
                         const hours = usesFlatRate ? '—' : task.hours.toFixed(2);
                         const rate = usesFlatRate ? '—' : getCurrencySymbol(invoiceCurrency) + (task.hourlyRate || project?.hourlyRate || 0).toFixed(2);
                         // Don't show hours in title when we have Hours column
@@ -214,17 +205,10 @@ export const createInvoiceHTML = (invoiceData) => {
                         const isLastTask = index === tasks.length - 1 && additionalTasks.length === 0;
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
                         
-                        // Check if this task uses flat rate
-                        const usesFlatRate = task.useFlatRate === true || 
-                                           (taskFlatRates && taskFlatRates[task.id] !== undefined) || 
-                                           task.flatRate !== undefined;
+                        const taskAmount = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
+                            taskFlatRates[task.id] : 
+                            (task.flatRate || 0);
                         
-                        // Calculate task amount based on whether it uses flat rate or hourly
-                        const taskAmount = usesFlatRate ? 
-                            (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
-                            (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
-                        
-                        // Include hours in the title only when using simplified table without hours column
                         const taskTitle = task.hours > 0 ? `${task.title} (${task.hours.toFixed(2)}h)` : task.title;
                         
                         return `
@@ -238,16 +222,7 @@ export const createInvoiceHTML = (invoiceData) => {
                         const isLastTask = index === additionalTasks.length - 1;
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
                         
-                        // Check if this task uses flat rate
-                        const usesFlatRate = task.useFlatRate === true || 
-                                           task.flatRate !== undefined || 
-                                           (taskFlatRates && taskFlatRates[task.id] !== undefined);
-                        
-                        // Calculate task amount based on whether it uses flat rate or hourly
-                        const taskAmount = usesFlatRate ? 
-                            (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
-                            (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
-                        // Include hours in the title only when using simplified table without hours column
+                        const taskAmount = (task.flatRate || 0) * (task.quantity || 1);
                         const taskTitle = task.hours > 0 ? `${task.title} (${task.hours.toFixed(2)}h)` : task.title;
                         
                         return `
@@ -287,7 +262,7 @@ export const createInvoiceHTML = (invoiceData) => {
             </div>
             
             ${note ? `
-            <div style="width: 50%; margin-top: 10px; text-align: left;">
+            <div style="width: 60%; margin-top: 10px; text-align: left;">
                 <p style="font-style: italic; color: #666; font-size: 14px; margin: 5px 0;">${note}</p>
             </div>
             ` : ''}

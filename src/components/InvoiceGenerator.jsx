@@ -258,6 +258,7 @@ const InvoiceGenerator = ({
     const [taskFlatRates, setTaskFlatRates] = useState({}); // For flat rate pricing per task
     const [useFlatRate, setUseFlatRate] = useState({}); // Track which tasks use flat rate vs hourly
     const [taskHourlyRates, setTaskHourlyRates] = useState({}); // For custom hourly rates per task
+    const [taskQuantities, setTaskQuantities] = useState({}); // For quantities on flat rate tasks
     
     // Additional tasks state (not related to project)
     const [additionalTasks, setAdditionalTasks] = useState([]);
@@ -266,6 +267,7 @@ const InvoiceGenerator = ({
     const [newTaskHours, setNewTaskHours] = useState('');
     const [newTaskUseFlatRate, setNewTaskUseFlatRate] = useState(false); // Toggle for new tasks
     const [newTaskHourlyRate, setNewTaskHourlyRate] = useState(''); // Hourly rate for new tasks
+    const [newTaskQuantity, setNewTaskQuantity] = useState(1); // Quantity for new flat rate tasks
     
     // Task selection state for selective billing
     const [selectedTasksForBilling, setSelectedTasksForBilling] = useState({});
@@ -355,6 +357,7 @@ const InvoiceGenerator = ({
         setTaskFlatRates({});
         setUseFlatRate({});
         setTaskHourlyRates({});
+        setTaskQuantities({}); // Reset task quantities
         setAdditionalTasks([]);
         setInvoiceNote('');
         setDiscountType('percentage');
@@ -366,6 +369,7 @@ const InvoiceGenerator = ({
             rate: 0
         });
         setSelectedTasksForBilling({}); // Reset task selection
+        setNewTaskQuantity(1); // Reset new task quantity to default
         // Don't clear selections here as they will be handled by project selection logic
     };
 
@@ -502,6 +506,25 @@ const InvoiceGenerator = ({
     };
 
     /**
+     * Handle quantity modification for flat rate tasks
+     */
+    const handleQuantityChange = (taskId, newQuantity) => {
+        if (newQuantity === '') {
+            setTaskQuantities(prev => ({
+                ...prev,
+                [taskId]: ''
+            }));
+        } else {
+            const parsedQuantity = parseFloat(newQuantity) || 1;
+            const roundedQuantity = Math.max(1, Math.round(parsedQuantity * 100) / 100); // Minimum 1, round to 2 decimal places
+            setTaskQuantities(prev => ({
+                ...prev,
+                [taskId]: roundedQuantity
+            }));
+        }
+    };
+
+    /**
      * Handle hourly rate modification for invoice tasks
      */
     const handleTaskHourlyRateChange = (taskId, newRate) => {
@@ -538,6 +561,14 @@ const InvoiceGenerator = ({
                 handleFlatRateChange(taskId, hourlyAmount);
             }
         }
+        
+        // Initialize quantity if switching to flat rate
+        if (value && !taskQuantities[taskId]) {
+            setTaskQuantities(prev => ({
+                ...prev,
+                [taskId]: 1
+            }));
+        }
     };
 
     /**
@@ -562,6 +593,7 @@ const InvoiceGenerator = ({
             hours: newTaskUseFlatRate ? 0 : roundedValue, // Use 0 hours if using flat rate
             flatRate: newTaskUseFlatRate ? roundedValue : 0, // Use user input as flat rate if flat rate is selected
             hourlyRate: newTaskUseFlatRate ? 0 : (parseFloat(newTaskHourlyRate) || selectedProject?.hourlyRate || 0),
+            quantity: newTaskUseFlatRate ? newTaskQuantity : 1, // Add quantity for flat rate tasks
             isCustom: true,
             useFlatRate: newTaskUseFlatRate
         };
@@ -580,6 +612,7 @@ const InvoiceGenerator = ({
         setNewTaskHours('');
         setNewTaskHourlyRate('');
         setNewTaskUseFlatRate(false);
+        setNewTaskQuantity(1);
         setShowAddTaskForm(false);
     };
 
@@ -620,6 +653,23 @@ const InvoiceGenerator = ({
             const roundedRate = Math.round(parsedRate * 100) / 100;
             setAdditionalTasks(prev => prev.map(task => 
                 task.id === taskId ? { ...task, flatRate: roundedRate } : task
+            ));
+        }
+    };
+
+    /**
+     * Handle editing additional task quantity
+     */
+    const handleAdditionalTaskQuantityChange = (taskId, newQuantity) => {
+        if (newQuantity === '') {
+            setAdditionalTasks(prev => prev.map(task => 
+                task.id === taskId ? { ...task, quantity: '' } : task
+            ));
+        } else {
+            const parsedQuantity = parseFloat(newQuantity) || 1;
+            const roundedQuantity = Math.max(1, Math.round(parsedQuantity * 100) / 100); // Minimum 1
+            setAdditionalTasks(prev => prev.map(task => 
+                task.id === taskId ? { ...task, quantity: roundedQuantity } : task
             ));
         }
     };
@@ -673,8 +723,9 @@ const InvoiceGenerator = ({
             totalHours += taskHours;
             
             if (useFlatRate[task.id]) {
-                // Use flat rate for this task
-                projectSubtotal += (taskFlatRates[task.id] || 0);
+                // Use flat rate for this task with quantity
+                const quantity = taskQuantities[task.id] || 1;
+                projectSubtotal += (taskFlatRates[task.id] || 0) * quantity;
             } else {
                 // Use task-specific hourly rate if available, otherwise fall back to project rate
                 const hourlyRate = taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0;
@@ -684,12 +735,16 @@ const InvoiceGenerator = ({
         
         // Calculate additional tasks subtotal
         additionalTasks.forEach(task => {
-            if (useFlatRate[task.id]) {
-                // Use flat rate
-                additionalTaskAmount += task.flatRate;
+            if (task.useFlatRate) {
+                // Use flat rate with quantity
+                const quantity = task.quantity || 1;
+                additionalTaskAmount += (task.flatRate || 0) * quantity;
             } else {
                 const hourlyRate = task.hourlyRate || selectedProject?.hourlyRate || 0;
-                additionalTaskAmount += task.hours * hourlyRate;
+                const taskHours = task.hours || 0;
+                additionalTaskAmount += taskHours * hourlyRate;
+                // Add hours to total for hourly tasks
+                totalHours += taskHours;
             }
         });
         
@@ -734,7 +789,7 @@ const InvoiceGenerator = ({
         };
     }, [selectedProject, invoiceTasks, additionalTasks, editableHours, 
         discountType, discountValue, shippingAmount, taxOverride, 
-        taskFlatRates, useFlatRate, taskHourlyRates, selectedTasksForBilling]);
+        taskFlatRates, useFlatRate, taskHourlyRates, taskQuantities, selectedTasksForBilling]);
 
     /**
      * Prepare invoice data
@@ -859,7 +914,8 @@ const InvoiceGenerator = ({
                     hours: editableHours[task.id] || task.originalHours,
                     flatRate: taskFlatRates[task.id] || 0,
                     hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0,
-                    useFlatRate: useFlatRate[task.id] || false
+                    useFlatRate: useFlatRate[task.id] || false,
+                    quantity: taskQuantities[task.id] || 1 // Include quantity for flat rate tasks
                 })),
             additionalTasks: additionalTasks.map(task => ({
                 ...task,
@@ -868,6 +924,7 @@ const InvoiceGenerator = ({
             taskFlatRates: taskFlatRates,
             useFlatRate: useFlatRate,
             taskHourlyRates: taskHourlyRates,
+            taskQuantities: taskQuantities, // Save task quantities state
             note: invoiceNote,
             totalHours: totalHours,
             totalAmount: pricing.total,
@@ -902,12 +959,16 @@ const InvoiceGenerator = ({
                     .map(task => ({
                         ...task,
                         hours: editableHours[task.id] || task.originalHours,
-                        hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
+                        hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0,
+                        quantity: taskQuantities[task.id] || 1 // Include quantity for flat rate tasks
                     })),
                 additionalTasks: additionalTasks.map(task => ({
                     ...task,
                     hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
                 })),
+                taskFlatRates: taskFlatRates,
+                useFlatRate: useFlatRate,
+                taskQuantities: taskQuantities, // Include quantities in PDF data
                 note: invoiceNote,
                 totalHours: totalHours,
                 totalAmount: pricing.total,
@@ -1028,6 +1089,7 @@ const InvoiceGenerator = ({
             const initialFlatRates = {};
             const initialFlatRateToggles = {};
             const initialHourlyRates = {};
+            const initialTaskQuantities = {};
             
             (editingInvoice.tasks || []).forEach(task => {
                 initialHours[task.id] = Math.round((task.hours || 0) * 100) / 100; // Round to 2 decimal places
@@ -1048,12 +1110,20 @@ const InvoiceGenerator = ({
                 } else if (editingInvoice.taskHourlyRates && editingInvoice.taskHourlyRates[task.id]) {
                     initialHourlyRates[task.id] = editingInvoice.taskHourlyRates[task.id];
                 }
+                
+                // Load task quantities for flat rate tasks
+                if (task.quantity) {
+                    initialTaskQuantities[task.id] = task.quantity;
+                } else if (editingInvoice.taskQuantities && editingInvoice.taskQuantities[task.id]) {
+                    initialTaskQuantities[task.id] = editingInvoice.taskQuantities[task.id];
+                }
             });
             
             setEditableHours(initialHours);
             setTaskFlatRates(initialFlatRates);
             setUseFlatRate(initialFlatRateToggles);
             setTaskHourlyRates(initialHourlyRates);
+            setTaskQuantities(initialTaskQuantities);
             
             // For editing invoices, initialize task selection based on which tasks were included in the original invoice
             const allTasksSelected = {};
@@ -1472,18 +1542,32 @@ const InvoiceGenerator = ({
                                                         </div>
                                                     
                                                         {isUsingFlatRate ? (
-                                                            // Flat rate input
-                                                            <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">{selectedProject?.currency || "USD"}</div>
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    value={currentFlatRate === '' ? '' : currentFlatRate.toFixed(2)}
-                                                                    onChange={(e) => handleFlatRateChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
-                                                                    placeholder="0.00"
-                                                                />
+                                                            // Flat rate input with quantity
+                                                            <div className="flex items-center space-x-2">
+                                                                <div className="text-right">
+                                                                    <div className="text-xs text-gray-500 mb-1 text-left">Quantity</div>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="1"
+                                                                        min="1"
+                                                                        value={taskQuantities[task.id] || 1}
+                                                                        onChange={(e) => handleQuantityChange(task.id, e.target.value)}
+                                                                        className="w-16 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                        placeholder="1"
+                                                                    />
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="text-xs text-gray-500 mb-1 text-left">Rate ({selectedProject?.currency || "USD"})</div>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        value={currentFlatRate === '' ? '' : currentFlatRate.toFixed(2)}
+                                                                        onChange={(e) => handleFlatRateChange(task.id, e.target.value)}
+                                                                        className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                        placeholder="0.00"
+                                                                    />
+                                                                </div>
                                                             </div>
                                                         ) : (
                                                             // Hours input with custom hourly rate
@@ -1558,18 +1642,32 @@ const InvoiceGenerator = ({
                                                         </div>
                                                         
                                                         {isUsingFlatRate ? (
-                                                            // Flat rate input
-                                                            <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">{selectedProject?.currency || "USD"}</div>
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    value={currentFlatRate === '' ? '' : currentFlatRate.toFixed(2)}
-                                                                    onChange={(e) => handleAdditionalTaskFlatRateChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
-                                                                    placeholder="0.00"
-                                                                />
+                                                            // Flat rate input with quantity
+                                                            <div className="flex items-center space-x-2">
+                                                                <div className="text-right">
+                                                                    <div className="text-xs text-gray-500 mb-1 text-left">Quantity</div>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="1"
+                                                                        min="1"
+                                                                        value={task.quantity || 1}
+                                                                        onChange={(e) => handleAdditionalTaskQuantityChange(task.id, e.target.value)}
+                                                                        className="w-16 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                        placeholder="1"
+                                                                    />
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="text-xs text-gray-500 mb-1 text-left">Rate ({selectedProject?.currency || "USD"})</div>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        value={currentFlatRate === '' ? '' : currentFlatRate.toFixed(2)}
+                                                                        onChange={(e) => handleAdditionalTaskFlatRateChange(task.id, e.target.value)}
+                                                                        className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                        placeholder="0.00"
+                                                                    />
+                                                                </div>
                                                             </div>
                                                         ) : (
                                                             // Hours input with custom hourly rate
@@ -1626,12 +1724,25 @@ const InvoiceGenerator = ({
                                                     <label htmlFor="new-task-flat-rate" className="text-xs text-gray-700">
                                                         Flat rate
                                                     </label>
-                                                </div>
-                                                <div className="flex space-x-2">
+                                                </div>                                                <div className="flex space-x-2">
                                                     <div className="flex space-x-2">
+                                                        {newTaskUseFlatRate && (
+                                                            <div className="text-right">
+                                                                <div className="text-xs text-gray-500 mb-1 text-left">Quantity</div>
+                                                                <input
+                                                                    type="number"
+                                                                    step="1"
+                                                                    min="1"
+                                                                    value={newTaskQuantity}
+                                                                    onChange={(e) => setNewTaskQuantity(Math.max(1, parseFloat(e.target.value) || 1))}
+                                                                    className="w-16 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                                    placeholder="1"
+                                                                />
+                                                            </div>
+                                                        )}
                                                         <div className="text-right">
                                                             <div className="text-xs text-gray-500 mb-1 text-left">
-                                                                {newTaskUseFlatRate ? (selectedProject?.currency || "USD") : `Hours ${newTaskHours ? `(${hoursToMinutes(parseFloat(newTaskHours) || 0)}min)` : ''}`}
+                                                                {newTaskUseFlatRate ? `Rate (${selectedProject?.currency || "USD"})` : `Hours ${newTaskHours ? `(${hoursToMinutes(parseFloat(newTaskHours) || 0)}min)` : ''}`}
                                                             </div>
                                                             <input
                                                                 type="number"
@@ -1701,7 +1812,7 @@ const InvoiceGenerator = ({
                                             );
                                         } else if (selectedTasksCount === 0 && additionalTasks.length === 0) {
                                             return (
-                                                <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                                                <div className="mt-2 bg-orange-50 border border-orange-200 rounded-md p-3">
                                                     <p className="text-sm text-orange-800">
                                                         Please select at least one task to bill...
                                                     </p>

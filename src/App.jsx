@@ -199,6 +199,7 @@ function App() {
                         projects={projects}
                         setProjects={setProjects}
                         tasks={tasks}
+                        setTasks={setTasks}
                         timeEntries={timeEntries}
                         invoices={invoices}
                         setInvoices={setInvoices}

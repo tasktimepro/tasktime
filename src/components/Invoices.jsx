@@ -14,6 +14,7 @@ const Invoices = ({
     projects, 
     setProjects,
     tasks,
+    setTasks,
     timeEntries,
     invoices,
     setInvoices,
@@ -189,6 +190,7 @@ const Invoices = ({
                     projects={projects}
                     setProjects={setProjects}
                     tasks={tasks}
+                    setTasks={setTasks}
                     timeEntries={timeEntries}
                     editingInvoice={editingInvoice}
                     paymentMethods={paymentMethods}
