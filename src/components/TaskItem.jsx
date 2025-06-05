@@ -31,8 +31,7 @@ const TaskItem = ({
     onCreateSubtask,
     onArchive,
     onUnarchive,
-    allTasks,
-    project
+    allTasks
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
@@ -202,7 +201,8 @@ const TaskItem = ({
             const now = Date.now();
             
             // Get billing cutoff date (same logic as invoice generation)
-            const billingCutoffDate = project?.lastBilledAt || project?.createdAt || 0;
+            // Use task-specific lastBilledAt, or task creation date if never billed
+            const billingCutoffDate = task.lastBilledAt || task.createdAt || 0;
             
             if (timeDifference > 0) {
                 // Adding time - ensure start time is after billing cutoff while preserving duration
@@ -574,7 +574,6 @@ const TaskItem = ({
                                 setTimeEntries={setTimeEntries}
                                 currentTimer={currentTimer}
                                 setCurrentTimer={setCurrentTimer}
-                                project={project}
                                 onDelete={() => {
                                     if (window.confirm('Are you sure you want to delete this subtask?')) {
                                         const result = deleteTaskWithCleanup(
@@ -655,7 +654,6 @@ const SubtaskItem = ({
     setTimeEntries,
     currentTimer,
     setCurrentTimer,
-    project,
     onDelete
 }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -769,7 +767,8 @@ const SubtaskItem = ({
             const now = Date.now();
             
             // Get billing cutoff date (same logic as invoice generation)
-            const billingCutoffDate = project?.lastBilledAt || project?.createdAt || 0;
+            // Use task-specific lastBilledAt, or task creation date if never billed
+            const billingCutoffDate = task.lastBilledAt || task.createdAt || 0;
             
             if (timeDifference > 0) {
                 // Adding time - ensure start time is after billing cutoff while preserving duration

@@ -40,7 +40,8 @@ const TaskTree = ({
             projectId: project.id,
             parentTaskId: taskData.parentTaskId,
             title: taskData.title.trim(),
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            lastBilledAt: null // Initialize as never billed
         };
 
         setTasks([...tasks, newTask]);
@@ -200,7 +201,6 @@ const TaskTree = ({
                                     onArchive={() => handleArchiveTask(task.id)}
                                     onUnarchive={() => handleUnarchiveTask(task.id)}
                                     allTasks={projectTasks}
-                                    project={project}
                                 />
                             ))}
                         </div>
@@ -237,7 +237,6 @@ const TaskTree = ({
                                             onCreateSubtask={handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
                                             allTasks={projectTasks}
-                                            project={project}
                                         />
                                     ))}
                                 </div>

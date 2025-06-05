@@ -210,29 +210,29 @@ const ProjectList = ({
         setEditingProject(null);
 
         setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0 });
-    };
-
-    /**
+    };    /**
      * Calculate unbilled amount for a project
      */
     const calculateUnbilledAmount = (project) => {
         // If no hourly rate is set, return 0
         if (!project.hourlyRate) return 0;
         
-        // Get time entries for this project's tasks
-        const projectTaskIds = tasks
-            .filter(task => task.projectId === project.id)
-            .map(task => task.id);
-
-        const projectTimeEntries = timeEntries.filter(entry => 
-            projectTaskIds.includes(entry.taskId)
-        );
-
-        // Get billable time entries (since last billing) - only completed entries
-        const lastBilledAt = project.lastBilledAt || project.createdAt;
-        const unbilledEntries = projectTimeEntries.filter(entry => 
-            entry.start > lastBilledAt && entry.end && entry.end > entry.start
-        );
+        // Get tasks for this project
+        const projectTasks = tasks.filter(task => task.projectId === project.id);
+        
+        // Get time entries for this project's tasks with task-level billing filtering
+        const unbilledEntries = timeEntries.filter(entry => {
+            // Find the task for this entry
+            const task = projectTasks.find(t => t.id === entry.taskId);
+            if (!task) return false;
+            if (!entry.end || entry.end <= entry.start) return false;
+            
+            // Use task-specific lastBilledAt, or task creation date if never billed
+            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            
+            // Only include entries created after this task's last billing date
+            return entry.start > taskLastBilledAt;
+        });
 
         // Group unbilled entries by task and round each task's hours (same logic as invoice)
         const taskTimeMap = {};

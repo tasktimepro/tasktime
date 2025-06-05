@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { DocumentTextIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours, formatDurationWithSeconds, hoursToMinutes } from '../utils/dateUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
@@ -13,7 +13,8 @@ const InvoiceGenerator = ({
     project, 
     projects, 
     setProjects, 
-    tasks, 
+    tasks,
+    setTasks,
     timeEntries,
     editingInvoice,
     onInvoiceSaved,
@@ -266,6 +267,9 @@ const InvoiceGenerator = ({
     const [newTaskUseFlatRate, setNewTaskUseFlatRate] = useState(false); // Toggle for new tasks
     const [newTaskHourlyRate, setNewTaskHourlyRate] = useState(''); // Hourly rate for new tasks
     
+    // Task selection state for selective billing
+    const [selectedTasksForBilling, setSelectedTasksForBilling] = useState({});
+    
     // Invoice note state
     const [invoiceNote, setInvoiceNote] = useState('');
     const [invoiceNoteCollapsed, setInvoiceNoteCollapsed] = useState(true);
@@ -361,6 +365,7 @@ const InvoiceGenerator = ({
             label: '',
             rate: 0
         });
+        setSelectedTasksForBilling({}); // Reset task selection
         // Don't clear selections here as they will be handled by project selection logic
     };
 
@@ -435,14 +440,27 @@ const InvoiceGenerator = ({
                     setInvoiceTasks(tasksData);
                     // Initialize editable hours with original hours
                     const initialHours = {};
+                    const initialTaskSelection = {};
                     tasksData.forEach(task => {
                         initialHours[task.id] = task.originalHours;
+                        initialTaskSelection[task.id] = true; // Select all tasks by default
                     });
                     setEditableHours(initialHours);
+                    setSelectedTasksForBilling(initialTaskSelection);
                 }
                 // If no tasks data, the form remains reset (empty)
             }
         }
+    };
+
+    /**
+     * Handle selecting/deselecting tasks for billing
+     */
+    const handleTaskSelectionForBilling = (taskId, selected) => {
+        setSelectedTasksForBilling(prev => ({
+            ...prev,
+            [taskId]: selected
+        }));
     };
 
     /**
@@ -646,8 +664,11 @@ const InvoiceGenerator = ({
         let additionalTaskAmount = 0;
         let totalHours = 0;
         
-        // Calculate regular project tasks subtotal
+        // Calculate regular project tasks subtotal (only include selected tasks)
         invoiceTasks.forEach(task => {
+            // Only include selected tasks in pricing calculation
+            if (!selectedTasksForBilling[task.id]) return;
+            
             const taskHours = editableHours[task.id] || task.hours;
             totalHours += taskHours;
             
@@ -713,7 +734,7 @@ const InvoiceGenerator = ({
         };
     }, [selectedProject, invoiceTasks, additionalTasks, editableHours, 
         discountType, discountValue, shippingAmount, taxOverride, 
-        taskFlatRates, useFlatRate, taskHourlyRates]);
+        taskFlatRates, useFlatRate, taskHourlyRates, selectedTasksForBilling]);
 
     /**
      * Prepare invoice data
@@ -723,23 +744,25 @@ const InvoiceGenerator = ({
         const projectToUse = projectForData || selectedProject;
         if (!projectToUse) return null;
         
-        // Get billable time entries (since last billing)
-        const lastBilledAt = projectToUse.lastBilledAt || projectToUse.createdAt;
-        
         // Get all tasks that belong to this project
         const projectTasks = tasks.filter(task => task.projectId === projectToUse.id);
         const projectTaskIds = projectTasks.map(task => task.id);
         
-        // Only include entries that:
-        // 1. Belong to this project's tasks
-        // 2. Were created after the last billing date
-        // 3. Are completed (have an end time)
-        const billableEntries = timeEntries.filter(entry => 
-            projectTaskIds.includes(entry.taskId) && // Filter by project tasks
-            entry.start > lastBilledAt && 
-            entry.end && 
-            entry.end > entry.start
-        );
+        // Filter billable entries based on individual task billing dates
+        const billableEntries = timeEntries.filter(entry => {
+            if (!projectTaskIds.includes(entry.taskId)) return false;
+            if (!entry.end || entry.end <= entry.start) return false;
+            
+            // Find the task for this entry
+            const task = projectTasks.find(t => t.id === entry.taskId);
+            if (!task) return false;
+            
+            // Use task-specific lastBilledAt, or task creation date if never billed
+            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            
+            // Only include entries created after this task's last billing date
+            return entry.start > taskLastBilledAt;
+        });
         
         if (billableEntries.length === 0) {
             return null;
@@ -792,9 +815,12 @@ const InvoiceGenerator = ({
             return;
         }
 
-        // Tasks are still required
-        if (invoiceTasks.length === 0 && additionalTasks.length === 0) {
-            showError('No billable time entries or additional tasks found');
+        // Check if any tasks are selected for billing
+        const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length;
+        const hasSelectedTasks = selectedTasksCount > 0 || additionalTasks.length > 0;
+        
+        if (!hasSelectedTasks) {
+            showError('Please select at least one task to bill or add additional tasks');
             return;
         }
 
@@ -826,13 +852,15 @@ const InvoiceGenerator = ({
                 state: selectedClientInfo.state || '',
                 zip: selectedClientInfo.zip || ''
             },
-            tasks: invoiceTasks.map(task => ({
-                ...task,
-                hours: editableHours[task.id] || task.originalHours,
-                flatRate: taskFlatRates[task.id] || 0,
-                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0,
-                useFlatRate: useFlatRate[task.id] || false
-            })),
+            tasks: invoiceTasks
+                .filter(task => selectedTasksForBilling[task.id]) // Only include selected tasks
+                .map(task => ({
+                    ...task,
+                    hours: editableHours[task.id] || task.originalHours,
+                    flatRate: taskFlatRates[task.id] || 0,
+                    hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0,
+                    useFlatRate: useFlatRate[task.id] || false
+                })),
             additionalTasks: additionalTasks.map(task => ({
                 ...task,
                 hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
@@ -869,11 +897,13 @@ const InvoiceGenerator = ({
                     state: selectedClientInfo.state || '',
                     zip: selectedClientInfo.zip || ''
                 },
-                tasks: invoiceTasks.map(task => ({
-                    ...task,
-                    hours: editableHours[task.id] || task.originalHours,
-                    hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
-                })),
+                tasks: invoiceTasks
+                    .filter(task => selectedTasksForBilling[task.id]) // Only include selected tasks
+                    .map(task => ({
+                        ...task,
+                        hours: editableHours[task.id] || task.originalHours,
+                        hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
+                    })),
                 additionalTasks: additionalTasks.map(task => ({
                     ...task,
                     hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
@@ -920,13 +950,39 @@ const InvoiceGenerator = ({
             setInvoices(updatedInvoices);
         }
 
-        // Update project to include invoice ID (only if we have a selected project)
-        if (selectedProject) {
+        // Update tasks to set lastBilledAt for billed tasks and projects
+        if (selectedProject && !editingInvoice) {
+            const currentTime = Date.now();
+            // Only include selected tasks that are being billed
+            const billedTaskIds = invoiceTasks
+                .filter(task => selectedTasksForBilling[task.id])
+                .map(task => task.id);
+            
+            // Update lastBilledAt for all tasks that were included in this invoice
+            const updatedTasks = tasks.map(task => {
+                if (billedTaskIds.includes(task.id)) {
+                    return { ...task, lastBilledAt: currentTime };
+                }
+                return task;
+            });
+            setTasks(updatedTasks);
+            
+            // Update project to include invoice ID (but don't update project lastBilledAt)
             const updatedProjects = projects.map(p => 
                 p.id === selectedProject.id 
                     ? { 
                         ...p, 
-                        lastBilledAt: editingInvoice ? p.lastBilledAt : Date.now(),
+                        invoiceIds: updatedProjectInvoiceIds
+                    }
+                    : p
+            );
+            setProjects(updatedProjects);
+        } else if (selectedProject) {
+            // For edited invoices, just update the project invoice IDs
+            const updatedProjects = projects.map(p => 
+                p.id === selectedProject.id 
+                    ? { 
+                        ...p, 
                         invoiceIds: updatedProjectInvoiceIds
                     }
                     : p
@@ -999,6 +1055,22 @@ const InvoiceGenerator = ({
             setUseFlatRate(initialFlatRateToggles);
             setTaskHourlyRates(initialHourlyRates);
             
+            // For editing invoices, initialize task selection based on which tasks were included in the original invoice
+            const allTasksSelected = {};
+            if (editingInvoice.tasks && editingInvoice.tasks.length > 0) {
+                // Get the IDs of tasks that were included in the original invoice
+                const originalTaskIds = editingInvoice.tasks.map(task => task.id);
+                (editingInvoice.tasks || []).forEach(task => {
+                    allTasksSelected[task.id] = originalTaskIds.includes(task.id);
+                });
+            } else {
+                // Fallback: select all tasks if no original task data
+                (editingInvoice.tasks || []).forEach(task => {
+                    allTasksSelected[task.id] = true;
+                });
+            }
+            setSelectedTasksForBilling(allTasksSelected);
+            
             // If the invoice has a projectId, set the selected project
             if (editingInvoice.projectId) {
                 const invoiceProject = projects.find(p => p.id === editingInvoice.projectId);
@@ -1019,10 +1091,13 @@ const InvoiceGenerator = ({
                 setInvoiceTasks(tasksData);
                 // Initialize editable hours with original hours
                 const initialHours = {};
+                const initialTaskSelection = {};
                 tasksData.forEach(task => {
                     initialHours[task.id] = task.originalHours;
+                    initialTaskSelection[task.id] = true; // Select all tasks by default
                 });
                 setEditableHours(initialHours);
+                setSelectedTasksForBilling(initialTaskSelection);
                 
                 // Reset flat rate data
                 setTaskFlatRates({});
@@ -1035,6 +1110,7 @@ const InvoiceGenerator = ({
                 setTaskFlatRates({});
                 setUseFlatRate({});
                 setTaskHourlyRates({});
+                setSelectedTasksForBilling({});
             }
             
             // When opened from a project context, lock the project selection
@@ -1086,11 +1162,22 @@ const InvoiceGenerator = ({
 
     // Only calculate unbilled time if we have a project context
     if (currentProjectForCalculation) {
-        const lastBilledAt = currentProjectForCalculation.lastBilledAt || currentProjectForCalculation.createdAt;
-
-        const unbilledEntries = timeEntries.filter(entry => 
-            entry.start > lastBilledAt && entry.end && entry.end > entry.start
-        );
+        // Get all tasks for this project
+        const projectTasks = tasks.filter(task => task.projectId === currentProjectForCalculation.id);
+        
+        // Filter unbilled entries based on individual task billing dates
+        const unbilledEntries = timeEntries.filter(entry => {
+            // Find the task for this entry
+            const task = projectTasks.find(t => t.id === entry.taskId);
+            if (!task) return false;
+            if (!entry.end || entry.end <= entry.start) return false;
+            
+            // Use task-specific lastBilledAt, or task creation date if never billed
+            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            
+            // Only include entries created after this task's last billing date
+            return entry.start > taskLastBilledAt;
+        });
 
         // Group unbilled entries by task and round each task's hours (same logic as invoice)
         const taskTimeMap = {};
@@ -1283,17 +1370,65 @@ const InvoiceGenerator = ({
                                 {/* Tasks with Editable Hours */}
                                 <div className="mb-6">
                                     <div className="flex justify-between items-center mb-3">
-                                        <h4 className="text-sm font-medium text-gray-900">
-                                            Tasks & Time <span className="text-red-500">*</span>
-                                        </h4>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAddTaskForm(true)}
-                                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                                        >
-                                            + Add Task
-                                        </button>
+                                        <div className="flex items-center space-x-2">
+                                            <h4 className="text-sm font-medium text-gray-900">
+                                                Tasks & Time <span className="text-red-500">*</span>
+                                            </h4>
+                                            {invoiceTasks.length > 0 && (
+                                                <div className="relative group flex">
+                                                    <button
+                                                        type="button"
+                                                        className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </button>
+                                                    <div className="absolute left-0 top-6 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10">
+                                                        ✓ Select or create the tasks you want to bill. Unchecked tasks will remain unbilled and appear in future invoices.
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center space-x-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAddTaskForm(true)}
+                                                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                            >
+                                                + Add Task
+                                            </button>
+                                        </div>
                                     </div>
+                                    {invoiceTasks.length > 0 && (
+                                        <div className="mb-3">
+                                            <div className="flex space-x-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const allSelected = {};
+                                                        invoiceTasks.forEach(task => {
+                                                            allSelected[task.id] = true;
+                                                        });
+                                                        setSelectedTasksForBilling(allSelected);
+                                                    }}
+                                                    className="text-xs text-blue-600 hover:text-blue-800"
+                                                >
+                                                    Select All
+                                                </button>
+                                                <span className="text-xs text-gray-400">|</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedTasksForBilling({});
+                                                    }}
+                                                    className="text-xs text-gray-600 hover:text-gray-800"
+                                                >
+                                                    Deselect All
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="space-y-2 max-h-60 overflow-y-auto">
                                         {invoiceTasks.map((task) => {
                                             const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
@@ -1307,14 +1442,21 @@ const InvoiceGenerator = ({
                                             
                                             return (
                                                 <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-                                                    <div className="flex-1">
-                                                        <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                                                        <p className="text-xs text-gray-500">
-                                                            Original: {formatDurationWithSeconds(originalTimeMs)}
-                                                            {task.isEdited && (
-                                                                <span className="text-blue-600 ml-2">(Modified)</span>
-                                                            )}
-                                                        </p>
+                                                    <div className="flex items-center space-x-3 flex-1">
+                                                        {/* Task selection checkbox */}
+                                                        <CustomCheckbox
+                                                            checked={selectedTasksForBilling[task.id] || false}
+                                                            onChange={() => handleTaskSelectionForBilling(task.id, !selectedTasksForBilling[task.id])}
+                                                        />
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                                                            <p className="text-xs text-gray-500">
+                                                                Original: {formatDurationWithSeconds(originalTimeMs)}
+                                                                {task.isEdited && (
+                                                                    <span className="text-blue-600 ml-2">(Modified)</span>
+                                                                )}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                     
                                                     <div className="flex items-center space-x-4">
@@ -1386,11 +1528,22 @@ const InvoiceGenerator = ({
                                             
                                             return (
                                                 <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-                                                    <div className="flex-1">
-                                                        <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                                                        <p className="text-xs text-gray-500">
-                                                            Custom task
-                                                        </p>
+                                                    <div className="flex items-center space-x-3 flex-1">
+                                                        {/* Task remove button */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveAdditionalTask(task.id)}
+                                                            className="text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded"
+                                                            title="Remove task"
+                                                        >
+                                                            <TrashIcon className="w-5 h-5" />
+                                                        </button>
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                                                            <p className="text-xs text-gray-500">
+                                                                Custom task
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                     <div className="flex items-center space-x-3">
                                                         {/* Add flat rate toggle */}
@@ -1446,16 +1599,6 @@ const InvoiceGenerator = ({
                                                                 </div>
                                                             </div>
                                                         )}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemoveAdditionalTask(task.id)}
-                                                            className="p-1 text-red-600 hover:text-red-800"
-                                                            title="Remove task"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
-                                                        </button>
                                                     </div>
                                                 </div>
                                             );
@@ -1464,7 +1607,7 @@ const InvoiceGenerator = ({
                                     
                                     {/* Add Task Form */}
                                     {showAddTaskForm && (
-                                        <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                        <div className="mt-2 5mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
                                             <div className="space-y-3">
                                                 <div>
                                                     <input
@@ -1543,14 +1686,30 @@ const InvoiceGenerator = ({
                                         </div>
                                     )}
                                     
-                                    {/* Warning message for no tasks */}
-                                    {(invoiceTasks.length + additionalTasks.length) === 0 && (
-                                        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                                            <p className="text-sm text-yellow-800">
-                                                Please add a task to continue...
-                                            </p>
-                                        </div>
-                                    )}
+                                    {/* Warning message for no tasks or no selected tasks */}
+                                    {(() => {
+                                        const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length;
+                                        const totalAvailableTasks = invoiceTasks.length + additionalTasks.length;
+                                        
+                                        if (totalAvailableTasks === 0) {
+                                            return (
+                                                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                                                    <p className="text-sm text-yellow-800">
+                                                        Please add a task to continue...
+                                                    </p>
+                                                </div>
+                                            );
+                                        } else if (selectedTasksCount === 0 && additionalTasks.length === 0) {
+                                            return (
+                                                <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                                                    <p className="text-sm text-orange-800">
+                                                        Please select at least one task to bill...
+                                                    </p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                     
                                     {/* Comprehensive Pricing & Totals Section */}
                                     <div className="mt-4">
