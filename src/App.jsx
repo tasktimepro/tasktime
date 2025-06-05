@@ -4,6 +4,7 @@ import { useUrlState } from './hooks/useUrlState';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
 import Account from './components/Account';
+import Invoices from './components/Invoices';
 import { ToastProvider } from './components/ToastContainer';
 
 /**
@@ -25,7 +26,7 @@ function App() {
     console.log('📊 Loaded projects:', projects.length);
 
     // URL-based state management
-    const { urlParams, navigateToProjects, navigateToProject, navigateToAccount } = useUrlState();
+    const { urlParams, navigateToProjects, navigateToProject, navigateToInvoices, navigateToAccount } = useUrlState();
     
     // Derived state from URL parameters
     const activeView = urlParams.view;
@@ -45,21 +46,21 @@ function App() {
      * Handle navigation to payment methods creation from invoice generator
      */
     const handleNavigateToPaymentMethods = () => {
-        navigateToAccount({ section: 'payment-methods', create: 'payment-method' });
+        navigateToInvoices({ section: 'payment-methods', create: 'payment-method' });
     };
 
     /**
      * Handle navigation to business info creation from invoice generator
      */
     const handleNavigateToBusinessInfo = () => {
-        navigateToAccount({ section: 'business-info', create: 'business-info' });
+        navigateToInvoices({ section: 'business-info', create: 'business-info' });
     };
 
     /**
      * Handle navigation to client info creation from invoice generator
      */
     const handleNavigateToClientInfo = () => {
-        navigateToAccount({ section: 'client-info', create: 'client-info' });
+        navigateToInvoices({ section: 'client-info', create: 'client-info' });
     };
 
     /**
@@ -120,6 +121,16 @@ function App() {
                                 Projects
                             </button>
                             <button
+                                onClick={() => navigateToInvoices()}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                    activeView === 'invoices'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Invoices
+                            </button>
+                            <button
                                 onClick={() => navigateToAccount()}
                                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                                     activeView === 'account'
@@ -175,6 +186,23 @@ function App() {
                     />
                 )}
 
+                {activeView === 'invoices' && (
+                    <Invoices
+                        projects={projects}
+                        setProjects={setProjects}
+                        tasks={tasks}
+                        timeEntries={timeEntries}
+                        invoices={invoices}
+                        setInvoices={setInvoices}
+                        paymentMethods={paymentMethods}
+                        setPaymentMethods={setPaymentMethods}
+                        businessInfos={businessInfos}
+                        setBusinessInfos={setBusinessInfos}
+                        clientInfos={clientInfos}
+                        setClientInfos={setClientInfos}
+                    />
+                )}
+
                 {activeView === 'account' && (
                     <Account
                         projects={projects}
@@ -182,12 +210,6 @@ function App() {
                         timeEntries={timeEntries}
                         invoices={invoices}
                         onImport={handleImport}
-                        paymentMethods={paymentMethods}
-                        setPaymentMethods={setPaymentMethods}
-                        businessInfos={businessInfos}
-                        setBusinessInfos={setBusinessInfos}
-                        clientInfos={clientInfos}
-                        setClientInfos={setClientInfos}
                     />
                 )}
             </main>

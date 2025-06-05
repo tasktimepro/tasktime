@@ -1,10 +1,6 @@
-import { useEffect } from 'react';
-import { ArrowDownTrayIcon, ArrowUpTrayIcon, CreditCardIcon, BuildingOfficeIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
 import ExportImport from './ExportImport';
-import PaymentMethods from './PaymentMethods';
-import BusinessInfo from './BusinessInfo';
-import ClientInfo from './ClientInfo';
 
 /**
  * Account component - Main account management page with side navigation
@@ -14,13 +10,7 @@ const Account = ({
     tasks, 
     timeEntries,
     invoices, 
-    onImport,
-    paymentMethods,
-    setPaymentMethods,
-    businessInfos,
-    setBusinessInfos,
-    clientInfos,
-    setClientInfos
+    onImport
 }) => {
     const { urlParams, updateUrl } = useUrlState();
     
@@ -31,48 +21,16 @@ const Account = ({
             name: 'Backup & Restore',
             icon: ArrowDownTrayIcon,
             description: 'Export and import your data'
-        },
-        {
-            id: 'payment-methods',
-            name: 'Payment Methods',
-            icon: CreditCardIcon,
-            description: 'Manage payment methods for invoices'
-        },
-        {
-            id: 'business-info',
-            name: 'Your Business Info',
-            icon: BuildingOfficeIcon,
-            description: 'Manage business information for invoices'
-        },
-        {
-            id: 'client-info',
-            name: 'Client Info',
-            icon: UserGroupIcon,
-            description: 'Manage client information for invoices'
         }
     ];
     
     // Get current section from URL or default to first section
     const activeTab = urlParams.section || sideNavItems[0].id;
-    
-    // Check URL parameters for auto-opening create forms
-    const autoOpenCreate = urlParams.create === 'payment-method' || urlParams.create === 'business-info' || urlParams.create === 'client-info';
 
     // Function to handle section changes
     const handleSectionChange = (sectionId) => {
         updateUrl({ section: sectionId, create: null });
     };
-
-    // Clear the create parameter after auto-opening to prevent re-opening
-    useEffect(() => {
-        if (autoOpenCreate) {
-            // Clear the create parameter after a short delay to allow the component to process it
-            const timer = setTimeout(() => {
-                updateUrl({ create: null });
-            }, 100);
-            return () => clearTimeout(timer);
-        }
-    }, [autoOpenCreate, updateUrl]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -93,30 +51,6 @@ const Account = ({
                             onImport={onImport} 
                         />
                     </div>
-                );
-            case 'payment-methods':
-                return (
-                    <PaymentMethods 
-                        paymentMethods={paymentMethods} 
-                        setPaymentMethods={setPaymentMethods}
-                        autoOpenCreate={urlParams.create === 'payment-method'}
-                    />
-                );
-            case 'business-info':
-                return (
-                    <BusinessInfo 
-                        businessInfos={businessInfos} 
-                        setBusinessInfos={setBusinessInfos}
-                        autoOpenCreate={urlParams.create === 'business-info'}
-                    />
-                );
-            case 'client-info':
-                return (
-                    <ClientInfo 
-                        clientInfos={clientInfos} 
-                        setClientInfos={setClientInfos}
-                        autoOpenCreate={urlParams.create === 'client-info'}
-                    />
                 );
             default:
                 return null;

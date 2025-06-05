@@ -61,10 +61,10 @@ export const useUrlState = () => {
     }, [updateUrl]);
 
     /**
-     * Navigate to invoices view
+     * Navigate to invoices view with optional parameters
      */
-    const navigateToInvoices = useCallback(() => {
-        updateUrl({ view: 'invoices', project: null, section: null, create: null });
+    const navigateToInvoices = useCallback((params = {}) => {
+        updateUrl({ view: 'invoices', project: null, ...params });
     }, [updateUrl]);
 
     /**

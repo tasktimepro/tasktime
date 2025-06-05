@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours, formatDurationWithSeconds, hoursToMinutes } from '../utils/dateUtils';
@@ -23,20 +23,25 @@ const InvoiceGenerator = ({
     clientInfos = [],
     onNavigateToClientInfo,
     invoices = [],
-    setInvoices
+    setInvoices,
+    showButton = true
 }) => {
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
     const [selectedClientInfo, setSelectedClientInfo] = useState(null);
     const [selectedProject, setSelectedProject] = useState(project); // Initialize with current project
-    const [isProjectContextFixed, setIsProjectContextFixed] = useState(true); // Track if opened from project context
+    const [isProjectContextFixed, setIsProjectContextFixed] = useState(!!project); // Track if opened from project context
     const { showSuccess, showError } = useToast();
+    const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
 
     // Get project invoices from the new structure - memoized to prevent unnecessary re-renders
     const projectInvoices = useMemo(() => {
         // Use the selected project if available, otherwise fall back to the initially passed project
         const currentProject = selectedProject || project;
+        if (!currentProject) {
+            return []; // Return empty array if no project is available
+        }
         return invoices.filter(invoice => 
             (currentProject.invoiceIds || []).includes(invoice.id)
         );
@@ -45,6 +50,20 @@ const InvoiceGenerator = ({
     // Debug logging
     console.log('🔍 InvoiceGenerator - clientInfos:', clientInfos);
     console.log('🔍 InvoiceGenerator - clientInfos.length:', clientInfos.length);
+
+    // Auto-open the form when showButton is false (modal mode)
+    useEffect(() => {
+        if (!showButton) { // Modal mode (auto-open is possible)
+            if (!showInvoiceForm && !didAutoOpenModalRef.current) {
+                setShowInvoiceForm(true);
+                didAutoOpenModalRef.current = true;
+            }
+        } else { // Button mode (auto-open is not applicable)
+            // Reset the flag if we are no longer in modal mode,
+            // so it can auto-open next time if props change to modal mode.
+            didAutoOpenModalRef.current = false;
+        }
+    }, [showButton, showInvoiceForm]); // Replaced the previous useEffect logic
 
     /**
      * Initialize payment method based on previous invoices or editing invoice
@@ -220,6 +239,7 @@ const InvoiceGenerator = ({
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
+    const [taskFlatRates, setTaskFlatRates] = useState({}); // For flat rate pricing per task
     
     // Additional tasks state (not related to project)
     const [additionalTasks, setAdditionalTasks] = useState([]);
@@ -308,10 +328,29 @@ const InvoiceGenerator = ({
     const handleProjectSelection = (projectId) => {
         if (projectId === "") {
             setSelectedProject(null);
+            setInvoiceTasks([]); // Clear tasks when no project selected
+            setEditableHours({});
         } else {
             const selectedProj = projects.find(p => p.id === projectId);
             if (selectedProj) {
                 setSelectedProject(selectedProj);
+                
+                // If we're in standalone mode (not project context fixed), load the project's tasks
+                if (!isProjectContextFixed) {
+                    const tasksData = prepareInvoiceData(selectedProj);
+                    if (tasksData && tasksData.length > 0) {
+                        setInvoiceTasks(tasksData);
+                        // Initialize editable hours with original hours
+                        const initialHours = {};
+                        tasksData.forEach(task => {
+                            initialHours[task.id] = task.originalHours;
+                        });
+                        setEditableHours(initialHours);
+                    } else {
+                        setInvoiceTasks([]);
+                        setEditableHours({});
+                    }
+                }
             }
         }
     };
@@ -329,15 +368,31 @@ const InvoiceGenerator = ({
     };
 
     /**
+     * Handle flat rate modification for invoice tasks
+     */
+    const handleFlatRateChange = (taskId, newRate) => {
+        const parsedRate = parseFloat(newRate) || 0;
+        const roundedRate = Math.round(parsedRate * 100) / 100; // Round to 2 decimal places
+        setTaskFlatRates(prev => ({
+            ...prev,
+            [taskId]: roundedRate
+        }));
+    };
+
+    /**
      * Handle adding additional custom task
      */
     const handleAddAdditionalTask = () => {
-        if (!newTaskTitle.trim() || !newTaskHours) return;
+        if (!newTaskTitle.trim()) return;
+        
+        // Determine if we should use flat rates
+        const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
         
         const newTask = {
             id: `custom-${Date.now()}`,
             title: newTaskTitle.trim(),
-            hours: parseFloat(newTaskHours),
+            hours: usesFlatRates ? 0 : (parseFloat(newTaskHours) || 0), // Hours only matter for hourly rate
+            flatRate: usesFlatRates ? (parseFloat(newTaskHours) || 0) : 0, // Use the input as flat rate if needed
             isCustom: true
         };
         
@@ -366,29 +421,61 @@ const InvoiceGenerator = ({
     };
 
     /**
+     * Handle editing additional task flat rate
+     */
+    const handleAdditionalTaskFlatRateChange = (taskId, newRate) => {
+        const parsedRate = parseFloat(newRate) || 0;
+        const roundedRate = Math.round(parsedRate * 100) / 100;
+        setAdditionalTasks(prev => prev.map(task => 
+            task.id === taskId ? { ...task, flatRate: roundedRate } : task
+        ));
+    };
+
+    /**
      * Calculate pricing breakdown: Subtotal → Discount → Shipping → Tax → Total
+     * Supports both hourly rate (from project) and flat rate (per task) pricing
      */
     const calculatePricing = useMemo(() => {
-        if (!selectedProject || (invoiceTasks.length === 0 && additionalTasks.length === 0)) {
+        if (invoiceTasks.length === 0 && additionalTasks.length === 0) {
             return {
                 subtotal: 0,
                 discount: 0,
                 shipping: 0,
                 tax: 0,
                 total: 0,
+                totalHours: 0,
                 taxRate: 0,
                 taxLabel: 'VAT'
             };
         }
 
-        // Calculate hours from project tasks
-        const projectTaskHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0);
-        const projectSubtotal = projectTaskHours * selectedProject.hourlyRate;
+        // Determine if we should use flat rates or hourly rates
+        const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
+
+        let projectSubtotal = 0;
+        let additionalTaskAmount = 0;
         
-        // Calculate additional task amounts
-        const additionalTaskAmount = additionalTasks.reduce((sum, task) => sum + (task.hours * selectedProject.hourlyRate), 0);
+        if (usesFlatRates) {
+            // Calculate using flat rates per task
+            projectSubtotal = invoiceTasks.reduce((sum, task) => {
+                const flatRate = taskFlatRates[task.id] || 0;
+                return sum + flatRate;
+            }, 0);
+            
+            additionalTaskAmount = additionalTasks.reduce((sum, task) => {
+                const flatRate = task.flatRate || 0;
+                return sum + flatRate;
+            }, 0);
+        } else {
+            // Calculate using hourly rates (original logic)
+            const projectTaskHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0);
+            projectSubtotal = projectTaskHours * (selectedProject?.hourlyRate || 0);
+            
+            additionalTaskAmount = additionalTasks.reduce((sum, task) => sum + (task.hours * (selectedProject?.hourlyRate || 0)), 0);
+        }
         
-        const totalHours = projectTaskHours + additionalTasks.reduce((sum, task) => sum + task.hours, 0);
+        const totalHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0) + 
+                          additionalTasks.reduce((sum, task) => sum + task.hours, 0);
         const subtotal = projectSubtotal + additionalTaskAmount;
 
         // Calculate discount
@@ -410,7 +497,7 @@ const InvoiceGenerator = ({
         if (taxOverride.enabled) {
             taxRate = parseFloat(taxOverride.rate) || 0;
             taxLabel = taxOverride.label || 'Tax';
-        } else if (selectedProject.taxEnabled) {
+        } else if (selectedProject && selectedProject.taxEnabled) {
             taxRate = parseFloat(selectedProject.taxRate) || 0;
             taxLabel = selectedProject.taxLabel || 'VAT';
         }
@@ -428,7 +515,7 @@ const InvoiceGenerator = ({
             taxRate,
             taxLabel
         };
-    }, [selectedProject, invoiceTasks, editableHours, discountType, discountValue, shippingAmount, taxOverride, additionalTasks]);
+    }, [selectedProject, invoiceTasks, editableHours, discountType, discountValue, shippingAmount, taxOverride, additionalTasks, taskFlatRates]);
 
     /**
      * Prepare invoice data
@@ -458,14 +545,12 @@ const InvoiceGenerator = ({
             taskTimeMap[entry.taskId] += (entry.end - entry.start);
         });
 
-        // Create invoice tasks with editable hours
-        const tasksData = Object.keys(taskTimeMap).map(taskId => {
+        // Prepare tasks data array
+        const tasksData = Object.entries(taskTimeMap).map(([taskId, totalTime]) => {
             const task = tasks.find(t => t.id === taskId);
-            const totalTime = taskTimeMap[taskId];
-            const calculatedHours = millisecondsToHours(totalTime);
-            const roundedHours = Math.round(calculatedHours * 100) / 100; // Round to 2 decimal places
+            const hours = millisecondsToHours(totalTime);
+            const roundedHours = Math.round(hours * 100) / 100;
             const editedHours = editableHours[taskId] !== undefined ? editableHours[taskId] : roundedHours;
-
             return {
                 id: taskId,
                 title: task ? task.title : 'Unknown Task',
@@ -491,11 +576,7 @@ const InvoiceGenerator = ({
             return;
         }
 
-        if (!selectedProject) {
-            showError('Please select a project');
-            return;
-        }
-
+        // For standalone invoices, project selection is optional, but tasks are still required
         if (invoiceTasks.length === 0 && additionalTasks.length === 0) {
             showError('No billable time entries or additional tasks found');
             return;
@@ -504,10 +585,23 @@ const InvoiceGenerator = ({
         const pricing = calculatePricing;
         const totalHours = pricing.totalHours;
 
+        // Generate invoice ID - use selected project or a generic format for standalone invoices
+        const invoiceId = editingInvoice 
+            ? editingInvoice.id 
+            : selectedProject 
+                ? `INV-${selectedProject.id.slice(-8)}-${Date.now()}` 
+                : `INV-${Date.now()}`;
+
+        const invoiceNumber = editingInvoice 
+            ? editingInvoice.invoiceNumber 
+            : selectedProject 
+                ? `INV-${selectedProject.id.slice(-8)}-${Date.now()}` 
+                : `INV-${Date.now()}`;
+
         const invoiceData = {
-            id: editingInvoice ? editingInvoice.id : `INV-${selectedProject.id.slice(-8)}-${Date.now()}`,
+            id: invoiceId,
             project: selectedProject,
-            projectId: selectedProject.id,
+            projectId: selectedProject?.id || null,
             clientInfo: {
                 name: selectedClientInfo.clientName || '',
                 email: selectedClientInfo.email || '',
@@ -518,9 +612,11 @@ const InvoiceGenerator = ({
             },
             tasks: invoiceTasks.map(task => ({
                 ...task,
-                hours: editableHours[task.id] || task.originalHours
+                hours: editableHours[task.id] || task.originalHours,
+                flatRate: taskFlatRates[task.id] || 0 // Include flat rate data
             })),
             additionalTasks: additionalTasks,
+            taskFlatRates: taskFlatRates, // Store flat rate data separately as well
             note: invoiceNote,
             totalHours: totalHours,
             totalAmount: pricing.total,
@@ -537,7 +633,7 @@ const InvoiceGenerator = ({
             paymentMethodId: selectedPaymentMethod?.id || null,
             businessInfoId: selectedBusinessInfo?.id || null,
             clientInfoId: selectedClientInfo?.id || null,
-            invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${selectedProject.id.slice(-8)}-${Date.now()}`,
+            invoiceNumber: invoiceNumber,
             date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
             htmlContent: createInvoiceHTML({
@@ -568,7 +664,7 @@ const InvoiceGenerator = ({
                 taxLabel: pricing.taxLabel,
                 paymentMethod: selectedPaymentMethod,
                 businessInfo: selectedBusinessInfo,
-                invoiceNumber: editingInvoice ? editingInvoice.invoiceNumber : `INV-${project.id.slice(-8)}-${Date.now()}`,
+                invoiceNumber: invoiceNumber,
                 date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
                 createdAt: editingInvoice ? editingInvoice.createdAt : Date.now()
             })
@@ -576,18 +672,22 @@ const InvoiceGenerator = ({
 
         // Store invoice in the new separate invoices structure
         let updatedInvoices;
-        let updatedProjectInvoiceIds;
+        let updatedProjectInvoiceIds = [];
         
         if (editingInvoice) {
             // Update existing invoice
             updatedInvoices = invoices.map(inv => 
                 inv.id === editingInvoice.id ? invoiceData : inv
             );
-            updatedProjectInvoiceIds = selectedProject.invoiceIds || [];
+            if (selectedProject) {
+                updatedProjectInvoiceIds = selectedProject.invoiceIds || [];
+            }
         } else {
             // Add new invoice
             updatedInvoices = [...invoices, invoiceData];
-            updatedProjectInvoiceIds = [...(selectedProject.invoiceIds || []), invoiceData.id];
+            if (selectedProject) {
+                updatedProjectInvoiceIds = [...(selectedProject.invoiceIds || []), invoiceData.id];
+            }
         }
 
         // Update invoices storage - check if setInvoices is a function
@@ -595,18 +695,19 @@ const InvoiceGenerator = ({
             setInvoices(updatedInvoices);
         }
 
-        // Update project to include invoice ID
-        const updatedProjects = projects.map(p => 
-            p.id === selectedProject.id 
-                ? { 
-                    ...p, 
-                    lastBilledAt: editingInvoice ? p.lastBilledAt : Date.now(),
-                    invoiceIds: updatedProjectInvoiceIds
-                }
-                : p
-        );
-
-        setProjects(updatedProjects);
+        // Update project to include invoice ID (only if we have a selected project)
+        if (selectedProject) {
+            const updatedProjects = projects.map(p => 
+                p.id === selectedProject.id 
+                    ? { 
+                        ...p, 
+                        lastBilledAt: editingInvoice ? p.lastBilledAt : Date.now(),
+                        invoiceIds: updatedProjectInvoiceIds
+                    }
+                    : p
+            );
+            setProjects(updatedProjects);
+        }
 
         // Reset form
         setShowInvoiceForm(false);
@@ -658,24 +759,28 @@ const InvoiceGenerator = ({
         } else {
             // Open form with new invoice data
             const tasksData = prepareInvoiceData();
-            if (!tasksData) {
-                showError('No billable time entries found since last invoice');
-                return;
-            }
             
-            setInvoiceTasks(tasksData);
-            // Initialize editable hours with original hours
-            const initialHours = {};
-            tasksData.forEach(task => {
-                initialHours[task.id] = task.originalHours;
-            });
-            setEditableHours(initialHours);
+            // Even if there are no billable tasks, we still open the form
+            // This allows users to manually add tasks with the "Add Task" feature
+            if (tasksData) {
+                setInvoiceTasks(tasksData);
+                // Initialize editable hours with original hours
+                const initialHours = {};
+                tasksData.forEach(task => {
+                    initialHours[task.id] = task.originalHours;
+                });
+                setEditableHours(initialHours);
+            } else {
+                // No billable tasks, but still continue with empty tasks array
+                setInvoiceTasks([]);
+                setEditableHours({});
+            }
             
             // When opened from a project context, lock the project selection
             setIsProjectContextFixed(true);
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, showError, projects, setIsProjectContextFixed]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed]);
 
     // Keep track of whether we've handled the current editing invoice
     const [handledEditingInvoice, setHandledEditingInvoice] = useState(null);
@@ -696,63 +801,71 @@ const InvoiceGenerator = ({
      * Handle canceling the form
      */
     const handleCancel = () => {
-        // First, clear the editing state immediately if we're in edit mode
-        // This prevents another modal from opening with "New Invoice" state
-        if (editingInvoice && onInvoiceSaved) {
-            onInvoiceSaved(); // This will clear the editing state
-        }
-        
         // Close the modal and reset state
         setShowInvoiceForm(false);
+        didAutoOpenModalRef.current = false; // Reset the flag here
         setInvoiceTasks([]);
         setEditableHours({});
         setAdditionalTasks([]);
         setInvoiceNote('');
+        
+        // Only call onInvoiceSaved to clear editing state if we're actually editing
+        // This prevents the issue where canceling triggers the same callback as saving
+        if (editingInvoice && onInvoiceSaved) {
+            onInvoiceSaved(); // This will clear the editing state in the parent component
+        }
     };
 
     // Calculate unbilled time - initially using the current project (will update when a project is selected)
     const currentProjectForCalculation = selectedProject || project;
-    const lastBilledAt = currentProjectForCalculation.lastBilledAt || currentProjectForCalculation.createdAt;
+    let unbilledHours = 0;
+    let unbilledAmount = 0;
 
-    const unbilledEntries = timeEntries.filter(entry => 
-        entry.start > lastBilledAt && entry.end && entry.end > entry.start
-    );
+    // Only calculate unbilled time if we have a project context
+    if (currentProjectForCalculation) {
+        const lastBilledAt = currentProjectForCalculation.lastBilledAt || currentProjectForCalculation.createdAt;
 
-    // Group unbilled entries by task and round each task's hours (same logic as invoice)
-    const taskTimeMap = {};
-    unbilledEntries.forEach(entry => {
-        if (!taskTimeMap[entry.taskId]) {
-            taskTimeMap[entry.taskId] = 0;
-        }
-        taskTimeMap[entry.taskId] += (entry.end - entry.start);
-    });
+        const unbilledEntries = timeEntries.filter(entry => 
+            entry.start > lastBilledAt && entry.end && entry.end > entry.start
+        );
 
-    // Calculate total rounded hours (matching invoice calculation)
-    const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
-        const taskHours = millisecondsToHours(taskTime);
-        const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
-        return total + roundedTaskHours;
-    }, 0);
+        // Group unbilled entries by task and round each task's hours (same logic as invoice)
+        const taskTimeMap = {};
+        unbilledEntries.forEach(entry => {
+            if (!taskTimeMap[entry.taskId]) {
+                taskTimeMap[entry.taskId] = 0;
+            }
+            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+        });
 
-    const unbilledAmount = unbilledHours * currentProjectForCalculation.hourlyRate;
+        // Calculate total rounded hours (matching invoice calculation)
+        unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+            const taskHours = millisecondsToHours(taskTime);
+            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+            return total + roundedTaskHours;
+        }, 0);
+
+        unbilledAmount = unbilledHours * currentProjectForCalculation.hourlyRate;
+    }
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-                <button
-                    onClick={openInvoiceForm}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" />
-                    Generate Invoice
-                    {unbilledHours > 0 && (
-                        <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full">
-                            {getCurrencySymbol(currentProjectForCalculation.currency)}{unbilledAmount.toFixed(2)}
-                        </span>
-                    )}
-                </button>
-            </div>
-
+            {showButton && (
+                <div className="flex items-center space-x-3">
+                    <button
+                        onClick={openInvoiceForm}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                        <DocumentTextIcon className="h-5 w-5 mr-2" />
+                        {currentProjectForCalculation ? 'Generate Invoice' : 'Create Invoice'}
+                        {currentProjectForCalculation && unbilledHours > 0 && (
+                            <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full">
+                                {getCurrencySymbol(currentProjectForCalculation.currency)}{unbilledAmount.toFixed(2)}
+                            </span>
+                        )}
+                    </button>
+                </div>
+            )}
             {/* Invoice Generation Modal */}
             {showInvoiceForm && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 !mt-0">
@@ -772,21 +885,18 @@ const InvoiceGenerator = ({
                             </button>
                         </div>
 
-                        {invoiceTasks.length === 0 ? (
-                            <div className="text-center py-4">
-                                <p className="text-gray-500">No billable time entries found.</p>
-                                <button
-                                    onClick={handleCancel}
-                                    className="mt-4 px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        ) : (
-                            <div>
-                                <form onSubmit={handleSaveInvoice} className="space-y-5">
-                                    {/* Client Info Selection */}
-                                    <div className="mb-6">
+                        <div>
+                            <form onSubmit={handleSaveInvoice} className="space-y-5">
+                                {invoiceTasks.length === 0 && selectedProject && (
+                                    <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                                        <p className="text-sm text-yellow-800">
+                                            No billable time entries found for this project. You can add custom tasks below.
+                                        </p>
+                                    </div>
+                                )}
+                                
+                                {/* Client Info Selection */}
+                                <div className="mb-6">
                                         <div className="flex justify-between items-center mb-1">
                                             <h4 className="text-sm font-medium text-gray-900">
                                                 Client
@@ -905,8 +1015,12 @@ const InvoiceGenerator = ({
                                             {invoiceTasks.map((task) => {
                                                 const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
                                                 const currentMinutes = hoursToMinutes(currentHours);
+                                                const currentFlatRate = taskFlatRates[task.id] || 0;
                                                 // For existing invoices, calculate originalTimeMs from originalHours if not present
                                                 const originalTimeMs = task.originalTimeMs || (task.originalHours * 60 * 60 * 1000);
+                                                
+                                                // Determine if we should use flat rates (no project selected or no hourly rate)
+                                                const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
                                                 
                                                 return (
                                                     <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
@@ -920,20 +1034,39 @@ const InvoiceGenerator = ({
                                                             </p>
                                                         </div>
                                                         <div className="flex items-center space-x-2">
-                                                            <div className="text-right">
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    value={currentHours.toFixed(2)}
-                                                                    onChange={(e) => handleHoursChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1 text-0">
-                                                                <span className="text-sm text-gray-500">hours</span>
-                                                                <div className="text-xs text-gray-400">({currentMinutes}min)</div>
-                                                            </div>
+                                                            {usesFlatRates ? (
+                                                                // Flat rate input
+                                                                <div className="text-right">
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        value={currentFlatRate.toFixed(2)}
+                                                                        onChange={(e) => handleFlatRateChange(task.id, e.target.value)}
+                                                                        className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                        placeholder="0.00"
+                                                                    />
+                                                                    <div className="text-xs text-gray-500 mt-1">flat rate</div>
+                                                                </div>
+                                                            ) : (
+                                                                // Hours input (original logic)
+                                                                <>
+                                                                    <div className="text-right">
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            value={currentHours.toFixed(2)}
+                                                                            onChange={(e) => handleHoursChange(task.id, e.target.value)}
+                                                                            className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex-1 text-0">
+                                                                        <span className="text-sm text-gray-500">hours</span>
+                                                                        <div className="text-xs text-gray-400">({currentMinutes}min)</div>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 );
@@ -941,7 +1074,11 @@ const InvoiceGenerator = ({
                                             
                                             {/* Additional Tasks */}
                                             {additionalTasks.map((task) => {
-                                                const currentMinutes = hoursToMinutes(task.hours);
+                                                const currentMinutes = hoursToMinutes(task.hours || 0);
+                                                const currentFlatRate = task.flatRate || 0;
+                                                
+                                                // Determine if we should use flat rates
+                                                const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
                                                 
                                                 return (
                                                     <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
@@ -952,20 +1089,39 @@ const InvoiceGenerator = ({
                                                             </p>
                                                         </div>
                                                         <div className="flex items-center space-x-2">
-                                                            <div className="text-right">
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    value={task.hours.toFixed(2)}
-                                                                    onChange={(e) => handleAdditionalTaskHoursChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1 text-0">
-                                                                <span className="text-sm text-gray-500">hours</span>
-                                                                <div className="text-xs text-gray-400">({currentMinutes}min)</div>
-                                                            </div>
+                                                            {usesFlatRates ? (
+                                                                // Flat rate input
+                                                                <div className="text-right">
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        value={currentFlatRate.toFixed(2)}
+                                                                        onChange={(e) => handleAdditionalTaskFlatRateChange(task.id, e.target.value)}
+                                                                        className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                        placeholder="0.00"
+                                                                    />
+                                                                    <div className="text-xs text-gray-500 mt-1">flat rate</div>
+                                                                </div>
+                                                            ) : (
+                                                                // Hours input (original logic)
+                                                                <>
+                                                                    <div className="text-right">
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            value={(task.hours || 0).toFixed(2)}
+                                                                            onChange={(e) => handleAdditionalTaskHoursChange(task.id, e.target.value)}
+                                                                            className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex-1 text-0">
+                                                                        <span className="text-sm text-gray-500">hours</span>
+                                                                        <div className="text-xs text-gray-400">({currentMinutes}min)</div>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleRemoveAdditionalTask(task.id)}
@@ -997,21 +1153,34 @@ const InvoiceGenerator = ({
                                                     </div>
                                                     <div className="flex space-x-2">
                                                         <div className="flex space-x-2">
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={newTaskHours}
-                                                                onChange={(e) => setNewTaskHours(e.target.value)}
-                                                                placeholder="Hours"
-                                                                className="w-24 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
-                                                            />
-                                                            <div className="flex items-center">
-                                                                <span className="text-sm text-gray-500 mr-1">hours</span>
-                                                                <div className="text-xs text-gray-400">
-                                                                    ({hoursToMinutes(parseFloat(newTaskHours) || 0)}min)
-                                                                </div>
-                                                            </div>
+                                                            {(() => {
+                                                                const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
+                                                                return (
+                                                                    <>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            value={newTaskHours}
+                                                                            onChange={(e) => setNewTaskHours(e.target.value)}
+                                                                            placeholder={usesFlatRates ? "Amount" : "Hours"}
+                                                                            className="w-24 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                                        />
+                                                                        <div className="flex items-center">
+                                                                            {usesFlatRates ? (
+                                                                                <span className="text-sm text-gray-500">flat rate</span>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <span className="text-sm text-gray-500 mr-1">hours</span>
+                                                                                    <div className="text-xs text-gray-400">
+                                                                                        ({hoursToMinutes(parseFloat(newTaskHours) || 0)}min)
+                                                                                    </div>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()}
                                                         </div>
                                                         <button
                                                             type="button"
@@ -1345,7 +1514,6 @@ const InvoiceGenerator = ({
                                     </div>
                                 </form>
                             </div>
-                        )}
                     </div>
                 </div>
             )}

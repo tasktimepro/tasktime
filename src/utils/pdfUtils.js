@@ -70,7 +70,9 @@ export const createInvoiceHTML = (invoiceData) => {
         shipping,
         tax,
         taxRate,
-        taxLabel
+        taxLabel,
+        taskFlatRates = {},
+        currency = 'USD'
     } = invoiceData;
 
     return `
@@ -78,7 +80,7 @@ export const createInvoiceHTML = (invoiceData) => {
             <div style="text-align: center; margin-bottom: 30px;">
                 <h1 style="color: #333; margin-bottom: 10px; font-size: 28px; font-weight: bold;">INVOICE</h1>
                 <p style="color: #666; margin: 0;">Invoice: #${invoiceNumber}</p>
-                <p style="color: #666; margin: 0;">Project: ${project.title}</p>
+                ${project ? `<p style="color: #666; margin: 0;">Project: ${project.title}</p>` : ''}
                 <p style="color: #666; margin: 0;">Date: ${date}</p>
             </div>
             
@@ -118,7 +120,7 @@ export const createInvoiceHTML = (invoiceData) => {
                 <thead>
                     <tr style="background-color: #f8f9fa;">
                         <th style="padding: 12px; text-align: left; border-bottom: 1px solid #ddd;">Task</th>
-                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Hours</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">${project && project.hourlyRate ? 'Hours' : 'Quantity'}</th>
                         <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Amount</th>
                     </tr>
                 </thead>
@@ -126,22 +128,38 @@ export const createInvoiceHTML = (invoiceData) => {
                     ${tasks.map((task, index) => {
                         const isLastTask = index === tasks.length - 1 && additionalTasks.length === 0;
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
+                        const invoiceCurrency = project?.currency || currency;
+                        
+                        // Check if this task uses flat rate
+                        const usesFlatRate = !project || !project.hourlyRate || (taskFlatRates && taskFlatRates[task.id]);
+                        const taskAmount = usesFlatRate ? 
+                            (taskFlatRates && taskFlatRates[task.id] ? taskFlatRates[task.id] : (task.flatRate || 0)) :
+                            (task.hours * project.hourlyRate);
+                        
                         return `
                         <tr>
                             <td style="padding: 8px; ${borderStyle}">${task.title}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${task.hours.toFixed(2)}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(project.currency)}${(task.hours * project.hourlyRate).toFixed(2)}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${usesFlatRate ? '1' : task.hours.toFixed(2)}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
                     }).join('')}
                     ${additionalTasks.map((task, index) => {
                         const isLastTask = index === additionalTasks.length - 1;
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
+                        const invoiceCurrency = project?.currency || currency;
+                        
+                        // Check if this additional task uses flat rate
+                        const usesFlatRate = !project || !project.hourlyRate || task.flatRate !== undefined;
+                        const taskAmount = usesFlatRate ? 
+                            (task.flatRate || 0) :
+                            (task.hours * project.hourlyRate);
+                        
                         return `
                         <tr>
                             <td style="padding: 8px; ${borderStyle}">${task.title}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${task.hours.toFixed(2)}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(project.currency)}${(task.hours * project.hourlyRate).toFixed(2)}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${usesFlatRate ? '1' : task.hours.toFixed(2)}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
                     }).join('')}
@@ -151,23 +169,23 @@ export const createInvoiceHTML = (invoiceData) => {
             <div style="text-align: right; margin-bottom: 10px;">
                 <div style="border-top: 1px solid #ddd; padding-top: 8px;">
                     ${subtotal ? `
-                        <p style="margin: 5px 0; font-size: 16px;">Subtotal (${totalHours.toFixed(2)} hours): <strong>${getCurrencySymbol(project.currency)}${subtotal.toFixed(2)}</strong></p>
+                        <p style="margin: 5px 0; font-size: 16px;">Subtotal${totalHours && totalHours > 0 ? ` (${totalHours.toFixed(2)} hours)` : ''}: <strong>${getCurrencySymbol(project?.currency || currency)}${subtotal.toFixed(2)}</strong></p>
                         
                         ${discount && discount > 0 ? `
-                            <p style="margin: 5px 0; font-size: 16px; color: #dc2626;">Discount: <strong>-${getCurrencySymbol(project.currency)}${discount.toFixed(2)}</strong></p>
+                            <p style="margin: 5px 0; font-size: 16px; color: #dc2626;">Discount: <strong>-${getCurrencySymbol(project?.currency || currency)}${discount.toFixed(2)}</strong></p>
                         ` : ''}
                         
                         ${shipping && shipping > 0 ? `
-                            <p style="margin: 5px 0; font-size: 16px;">Shipping: <strong>${getCurrencySymbol(project.currency)}${shipping.toFixed(2)}</strong></p>
+                            <p style="margin: 5px 0; font-size: 16px;">Shipping: <strong>${getCurrencySymbol(project?.currency || currency)}${shipping.toFixed(2)}</strong></p>
                         ` : ''}
                         
                         ${tax && tax > 0 ? `
-                            <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(project.currency)}${tax.toFixed(2)}</strong></p>
+                            <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(project?.currency || currency)}${tax.toFixed(2)}</strong></p>
                         ` : ''}
                         
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333; border-top: 1px solid #ddd; padding-top: 10px;"><strong>Total: ${getCurrencySymbol(project.currency)}${totalAmount.toFixed(2)}</strong></p>
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333; border-top: 1px solid #ddd; padding-top: 10px;"><strong>Total: ${getCurrencySymbol(project?.currency || currency)}${totalAmount.toFixed(2)}</strong></p>
                     ` : `
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333;"><strong>Total (${totalHours.toFixed(2)} hours): ${getCurrencySymbol(project.currency)}${totalAmount.toFixed(2)}</strong></p>
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333;"><strong>Total${totalHours && totalHours > 0 ? ` (${totalHours.toFixed(2)} hours)` : ''}: ${getCurrencySymbol(project?.currency || currency)}${totalAmount.toFixed(2)}</strong></p>
                     `}
                 </div>
             </div>
