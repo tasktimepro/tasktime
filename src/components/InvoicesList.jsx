@@ -6,11 +6,11 @@ import { getCurrencySymbol } from '../utils/currencyUtils';
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
  */
-const InvoicesList = ({ project, onEditInvoice, paymentMethods = [], businessInfos = [], clientInfos = [] }) => {
+const InvoicesList = ({ projectInvoices = [], onEditInvoice, paymentMethods = [], businessInfos = [], clientInfos = [] }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
 
-    const invoices = project.invoices || [];
+    const invoices = projectInvoices;
 
     /**
      * Handle invoice download

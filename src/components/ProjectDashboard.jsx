@@ -25,10 +25,17 @@ const ProjectDashboard = ({
     businessInfos,
     onNavigateToBusinessInfo,
     clientInfos,
-    onNavigateToClientInfo
+    onNavigateToClientInfo,
+    invoices,
+    setInvoices
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
+    
+    // Get invoices for this project
+    const projectInvoices = invoices.filter(invoice => 
+        (project.invoiceIds || []).includes(invoice.id)
+    );
     
     /**
      * Handle editing an existing invoice
@@ -85,6 +92,8 @@ const ProjectDashboard = ({
                     onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                     clientInfos={clientInfos}
                     onNavigateToClientInfo={onNavigateToClientInfo}
+                    invoices={invoices}
+                    setInvoices={setInvoices}
                 />
             </div>
 
@@ -120,7 +129,7 @@ const ProjectDashboard = ({
                 <div className="px-6 py-4 border-b border-gray-200">
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-medium text-gray-900">
-                            Invoices ({project.invoices?.length || 0})
+                            Invoices ({projectInvoices.length})
                         </h2>
                         
                         <InvoiceGenerator
@@ -137,13 +146,15 @@ const ProjectDashboard = ({
                             onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                             clientInfos={clientInfos}
                             onNavigateToClientInfo={onNavigateToClientInfo}
+                            invoices={invoices}
+                            setInvoices={setInvoices}
                         />
                     </div>
                 </div>
 
                 <div className="p-6">
                     <InvoicesList
-                        project={project}
+                        projectInvoices={projectInvoices}
                         onEditInvoice={handleEditInvoice}
                         paymentMethods={paymentMethods}
                         businessInfos={businessInfos}

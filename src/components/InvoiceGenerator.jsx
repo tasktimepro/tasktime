@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours, formatDurationWithSeconds, hoursToMinutes } from '../utils/dateUtils';
@@ -21,13 +21,22 @@ const InvoiceGenerator = ({
     businessInfos = [],
     onNavigateToBusinessInfo,
     clientInfos = [],
-    onNavigateToClientInfo
+    onNavigateToClientInfo,
+    invoices = [],
+    setInvoices
 }) => {
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
     const [selectedClientInfo, setSelectedClientInfo] = useState(null);
     const { showSuccess, showError } = useToast();
+
+    // Get project invoices from the new structure - memoized to prevent unnecessary re-renders
+    const projectInvoices = useMemo(() => {
+        return invoices.filter(invoice => 
+            (project.invoiceIds || []).includes(invoice.id)
+        );
+    }, [invoices, project.invoiceIds]);
 
     // Debug logging
     console.log('🔍 InvoiceGenerator - clientInfos:', clientInfos);
@@ -37,6 +46,12 @@ const InvoiceGenerator = ({
      * Initialize payment method based on previous invoices or editing invoice
      */
     const initializePaymentMethod = useCallback(() => {
+        // Only initialize on first mount or when editing invoice changes
+        // Don't override user selection once set
+        if (selectedPaymentMethod !== null) {
+            return; // User has already made a selection, keep it
+        }
+
         // If editing an invoice, use its payment method
         if (editingInvoice && editingInvoice.paymentMethodId) {
             const paymentMethod = paymentMethods.find(pm => pm.id === editingInvoice.paymentMethodId);
@@ -47,10 +62,9 @@ const InvoiceGenerator = ({
         }
         
         // Look for last used payment method in previous invoices
-        const previousInvoices = project.invoices || [];
-        if (previousInvoices.length > 0) {
-            for (let i = previousInvoices.length - 1; i >= 0; i--) {
-                const invoice = previousInvoices[i];
+        if (projectInvoices.length > 0) {
+            for (let i = projectInvoices.length - 1; i >= 0; i--) {
+                const invoice = projectInvoices[i];
                 if (invoice.paymentMethodId) {
                     const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
                     if (paymentMethod) {
@@ -61,14 +75,19 @@ const InvoiceGenerator = ({
             }
         }
         
-        // No previous payment method found
-        setSelectedPaymentMethod(null);
-    }, [editingInvoice, project.invoices, paymentMethods]);
+        // No need to reset to null as that's the initial state
+    }, [editingInvoice, projectInvoices, paymentMethods, selectedPaymentMethod]);
 
     /**
      * Initialize business info based on previous invoices or editing invoice
      */
     const initializeBusinessInfo = useCallback(() => {
+        // Only initialize on first mount or when editing invoice changes
+        // Don't override user selection once set
+        if (selectedBusinessInfo !== null) {
+            return; // User has already made a selection, keep it
+        }
+
         // If editing an invoice, use its business info
         if (editingInvoice && editingInvoice.businessInfoId) {
             const businessInfo = businessInfos.find(bi => bi.id === editingInvoice.businessInfoId);
@@ -79,10 +98,9 @@ const InvoiceGenerator = ({
         }
         
         // Look for last used business info in previous invoices
-        const previousInvoices = project.invoices || [];
-        if (previousInvoices.length > 0) {
-            for (let i = previousInvoices.length - 1; i >= 0; i--) {
-                const invoice = previousInvoices[i];
+        if (projectInvoices.length > 0) {
+            for (let i = projectInvoices.length - 1; i >= 0; i--) {
+                const invoice = projectInvoices[i];
                 if (invoice.businessInfoId) {
                     const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
                     if (businessInfo) {
@@ -93,17 +111,28 @@ const InvoiceGenerator = ({
             }
         }
         
-        // No previous business info found
-        setSelectedBusinessInfo(null);
-    }, [editingInvoice, project.invoices, businessInfos]);
+        // No need to reset to null as that's the initial state
+    }, [editingInvoice, projectInvoices, businessInfos, selectedBusinessInfo]);
 
     /**
      * Initialize selected client info based on previous invoices or editing invoice
      */
     const initializeSelectedClientInfo = useCallback(() => {
+        // If no client infos available, ensure selection is null
         if (clientInfos.length === 0) {
-            setSelectedClientInfo(null);
+            if (selectedClientInfo !== null) {
+                setSelectedClientInfo(null);
+            }
             return;
+        }
+
+        // If user has already made a selection and it still exists in clientInfos, keep it
+        if (selectedClientInfo !== null) {
+            const stillExists = clientInfos.some(ci => ci.id === selectedClientInfo.id);
+            if (stillExists) {
+                return; // Preserve user selection
+            }
+            // If their selection no longer exists, continue with initialization
         }
 
         // If editing an invoice, use its client info ID
@@ -116,10 +145,9 @@ const InvoiceGenerator = ({
         }
         
         // Look for last used client info in previous invoices
-        const previousInvoices = project.invoices || [];
-        if (previousInvoices.length > 0) {
-            for (let i = previousInvoices.length - 1; i >= 0; i--) {
-                const invoice = previousInvoices[i];
+        if (projectInvoices.length > 0) {
+            for (let i = projectInvoices.length - 1; i >= 0; i--) {
+                const invoice = projectInvoices[i];
                 if (invoice.clientInfoId) {
                     const clientInfo = clientInfos.find(ci => ci.id === invoice.clientInfoId);
                     if (clientInfo) {
@@ -130,28 +158,42 @@ const InvoiceGenerator = ({
             }
         }
         
-        // No previous client info found, but auto-select the first one if available
-        if (clientInfos.length > 0) {
+        // Auto-select the first client info if nothing else selected
+        if (clientInfos.length > 0 && !selectedClientInfo) {
             setSelectedClientInfo(clientInfos[0]);
-        } else {
-            setSelectedClientInfo(null);
         }
-    }, [editingInvoice, project.invoices, clientInfos]);
+    }, [editingInvoice, projectInvoices, clientInfos, selectedClientInfo]);
 
-    // Initialize payment method when component mounts or dependencies change
-    useEffect(() => {
-        initializePaymentMethod();
-    }, [initializePaymentMethod]);
+    // Track when the form gets shown so we can initialize only then
+    const [hasInitialized, setHasInitialized] = useState(false);
 
-    // Initialize business info when component mounts or dependencies change
+    // Initialize all dropdowns together, but only when showInvoiceForm becomes true,
+    // or when editing an invoice changes, or when available options change
     useEffect(() => {
-        initializeBusinessInfo();
-    }, [initializeBusinessInfo]);
-
-    // Initialize selected client info when component mounts or dependencies change
-    useEffect(() => {
-        initializeSelectedClientInfo();
-    }, [initializeSelectedClientInfo]);
+        // Only initialize when the form is shown
+        if (showInvoiceForm) {
+            // We only want to initialize once when the form opens or editing invoice changes
+            if (!hasInitialized || editingInvoice) {
+                initializePaymentMethod();
+                initializeBusinessInfo();
+                initializeSelectedClientInfo();
+                setHasInitialized(true);
+            }
+        } else {
+            // Reset the initialized flag when form is closed
+            setHasInitialized(false);
+        }
+    }, [
+        showInvoiceForm, 
+        editingInvoice, 
+        initializePaymentMethod, 
+        initializeBusinessInfo, 
+        initializeSelectedClientInfo,
+        paymentMethods.length,
+        businessInfos.length,
+        clientInfos.length,
+        hasInitialized
+    ]);
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
@@ -160,8 +202,14 @@ const InvoiceGenerator = ({
      * Handle client info selection from dropdown
      */
     const handleClientInfoSelection = (clientInfoId) => {
-        const clientInfo = clientInfos.find(ci => ci.id === clientInfoId);
-        setSelectedClientInfo(clientInfo || null);
+        if (clientInfoId === "") {
+            setSelectedClientInfo(null);
+        } else {
+            const clientInfo = clientInfos.find(ci => ci.id === clientInfoId);
+            if (clientInfo) {
+                setSelectedClientInfo(clientInfo);
+            }
+        }
     };
 
     /**
@@ -291,26 +339,34 @@ const InvoiceGenerator = ({
             })
         };
 
-        // Store invoice in project
-        const projectInvoices = project.invoices || [];
+        // Store invoice in the new separate invoices structure
         let updatedInvoices;
+        let updatedProjectInvoiceIds;
         
         if (editingInvoice) {
             // Update existing invoice
-            updatedInvoices = projectInvoices.map(inv => 
+            updatedInvoices = invoices.map(inv => 
                 inv.id === editingInvoice.id ? invoiceData : inv
             );
+            updatedProjectInvoiceIds = project.invoiceIds || [];
         } else {
             // Add new invoice
-            updatedInvoices = [...projectInvoices, invoiceData];
+            updatedInvoices = [...invoices, invoiceData];
+            updatedProjectInvoiceIds = [...(project.invoiceIds || []), invoiceData.id];
         }
 
+        // Update invoices storage - check if setInvoices is a function
+        if (typeof setInvoices === 'function') {
+            setInvoices(updatedInvoices);
+        }
+
+        // Update project to include invoice ID
         const updatedProjects = projects.map(p => 
             p.id === project.id 
                 ? { 
                     ...p, 
                     lastBilledAt: editingInvoice ? p.lastBilledAt : Date.now(),
-                    invoices: updatedInvoices
+                    invoiceIds: updatedProjectInvoiceIds
                 }
                 : p
         );
@@ -511,7 +567,8 @@ const InvoiceGenerator = ({
                                                     className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
                                                     required
                                                 >
-                                                    <option value="" disabled>Select client information</option>
+                                                    {/* Make this placeholder not disabled to allow clearing the selection if needed */}
+                                                    <option value="">Select client information</option>
                                                     {clientInfos.map(clientInfo => (
                                                         <option key={clientInfo.id} value={clientInfo.id}>
                                                             {clientInfo.clientName.trim()}
@@ -607,7 +664,7 @@ const InvoiceGenerator = ({
                                     <div className="mb-6">
                                         <div className="flex justify-between items-center mb-1">
                                             <h4 className="text-sm font-medium text-gray-900">
-                                                Business
+                                                Invoice From
                                             </h4>
                                             <button
                                                 type="button"
@@ -636,8 +693,14 @@ const InvoiceGenerator = ({
                                                 <select
                                                     value={selectedBusinessInfo?.id || ''}
                                                     onChange={(e) => {
-                                                        const businessInfo = businessInfos.find(bi => bi.id === e.target.value);
-                                                        setSelectedBusinessInfo(businessInfo || null);
+                                                        if (e.target.value === "") {
+                                                            setSelectedBusinessInfo(null);
+                                                        } else {
+                                                            const businessInfo = businessInfos.find(bi => bi.id === e.target.value);
+                                                            if (businessInfo) {
+                                                                setSelectedBusinessInfo(businessInfo);
+                                                            }
+                                                        }
                                                     }}
                                                     className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
                                                 >
@@ -693,8 +756,14 @@ const InvoiceGenerator = ({
                                                 <select
                                                     value={selectedPaymentMethod?.id || ''}
                                                     onChange={(e) => {
-                                                        const paymentMethod = paymentMethods.find(pm => pm.id === e.target.value);
-                                                        setSelectedPaymentMethod(paymentMethod || null);
+                                                        if (e.target.value === "") {
+                                                            setSelectedPaymentMethod(null);
+                                                        } else {
+                                                            const paymentMethod = paymentMethods.find(pm => pm.id === e.target.value);
+                                                            if (paymentMethod) {
+                                                                setSelectedPaymentMethod(paymentMethod);
+                                                            }
+                                                        }
                                                     }}
                                                     className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
                                                 >

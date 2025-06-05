@@ -6,7 +6,7 @@ import { formatDuration, millisecondsToHours } from '../utils/dateUtils';
  * ExportImport component for backing up and restoring application data
  * Provides JSON export/import functionality for projects and tasks
  */
-function ExportImport({ projects, tasks = [], timeEntries = [], onImport }) {
+function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], onImport }) {
     const [showImportModal, setShowImportModal] = useState(false);
     const [importData, setImportData] = useState('');
     const [importError, setImportError] = useState('');
@@ -38,10 +38,12 @@ function ExportImport({ projects, tasks = [], timeEntries = [], onImport }) {
      */
     const handleExport = () => {
         const exportData = {
-            version: '2.0',
+            version: '3.0',
             exportDate: new Date().toISOString(),
             projects: projects,
-            tasks: tasks
+            tasks: tasks,
+            timeEntries: timeEntries,
+            invoices: invoices
         };
 
         const dataStr = JSON.stringify(exportData, null, 2);
@@ -83,10 +85,22 @@ function ExportImport({ projects, tasks = [], timeEntries = [], onImport }) {
                 throw new Error('Invalid data format: tasks must be an array');
             }
 
-            // Call the import handler with both projects and tasks
+            // Validate timeEntries if present
+            if (parsedData.timeEntries && !Array.isArray(parsedData.timeEntries)) {
+                throw new Error('Invalid data format: timeEntries must be an array');
+            }
+
+            // Validate invoices if present
+            if (parsedData.invoices && !Array.isArray(parsedData.invoices)) {
+                throw new Error('Invalid data format: invoices must be an array');
+            }
+
+            // Call the import handler with all data
             onImport({
                 projects: parsedData.projects,
-                tasks: parsedData.tasks || []
+                tasks: parsedData.tasks || [],
+                timeEntries: parsedData.timeEntries || [],
+                invoices: parsedData.invoices || []
             });
             setShowImportModal(false);
             setImportData('');

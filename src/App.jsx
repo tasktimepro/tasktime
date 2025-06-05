@@ -20,6 +20,7 @@ function App() {
     const [paymentMethods, setPaymentMethods] = useLocalStorage('paymentMethods', []);
     const [businessInfos, setBusinessInfos] = useLocalStorage('businessInfos', []);
     const [clientInfos, setClientInfos] = useLocalStorage('clientInfos', []);
+    const [invoices, setInvoices] = useLocalStorage('invoices', []);
 
     console.log('📊 Loaded projects:', projects.length);
 
@@ -72,15 +73,25 @@ function App() {
             archived: task.archived || false
         }));
 
-        // Migrate projects to include invoices if needed
-        const migratedProjects = (importData.projects || []).map(project => ({
-            ...project,
-            invoices: project.invoices || []
-        }));
+        // Extract invoices from projects and migrate to separate storage
+        const allInvoices = importData.invoices || [];
+        const migratedProjects = (importData.projects || []).map(project => {
+            const projectInvoices = project.invoices || [];
+            
+            // Add project invoices to the global invoices array
+            allInvoices.push(...projectInvoices);
+            
+            // Store only invoice IDs in the project
+            return {
+                ...project,
+                invoiceIds: projectInvoices.map(invoice => invoice.id)
+            };
+        });
 
         setProjects(migratedProjects);
         setTasks(migratedTasks);
-        setTimeEntries([]); // Clear time entries on import
+        setInvoices(allInvoices);
+        setTimeEntries(importData.timeEntries || []); // Import time entries if provided
         setCurrentTimer(null); // Clear any active timer
     };
 
@@ -159,6 +170,8 @@ function App() {
                         onNavigateToBusinessInfo={handleNavigateToBusinessInfo}
                         clientInfos={clientInfos}
                         onNavigateToClientInfo={handleNavigateToClientInfo}
+                        invoices={invoices}
+                        setInvoices={setInvoices}
                     />
                 )}
 
@@ -167,6 +180,7 @@ function App() {
                         projects={projects}
                         tasks={tasks}
                         timeEntries={timeEntries}
+                        invoices={invoices}
                         onImport={handleImport}
                         paymentMethods={paymentMethods}
                         setPaymentMethods={setPaymentMethods}

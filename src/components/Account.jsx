@@ -12,7 +12,8 @@ import ClientInfo from './ClientInfo';
 const Account = ({ 
     projects, 
     tasks, 
-    timeEntries, 
+    timeEntries,
+    invoices, 
     onImport,
     paymentMethods,
     setPaymentMethods,
@@ -88,6 +89,7 @@ const Account = ({
                             projects={projects} 
                             tasks={tasks} 
                             timeEntries={timeEntries} 
+                            invoices={invoices}
                             onImport={onImport} 
                         />
                     </div>
