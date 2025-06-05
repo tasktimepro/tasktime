@@ -84,12 +84,14 @@ const ProjectList = ({
     const handleCreateProject = (e) => {
         e.preventDefault();
 
-        if (!formData.title || !formData.hourlyRate) return;
+        if (!formData.title) {
+            return; // Only title is required
+        }
 
         const newProject = {
             id: generateId(),
             title: formData.title,
-            hourlyRate: parseFloat(formData.hourlyRate),
+            hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
             currency: formData.currency,
             taxEnabled: formData.taxEnabled,
             taxLabel: formData.taxLabel,
@@ -111,14 +113,16 @@ const ProjectList = ({
     const handleUpdateProject = (e) => {
         e.preventDefault();
 
-        if (!formData.title || !formData.hourlyRate) return;
+        if (!formData.title) {
+            return; // Only title is required
+        }
 
         const updatedProjects = projects.map(project =>
             project.id === editingProject.id
                 ? {
                     ...project,
                     title: formData.title,
-                    hourlyRate: parseFloat(formData.hourlyRate),
+                    hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
                     currency: formData.currency,
                     taxEnabled: formData.taxEnabled,
                     taxLabel: formData.taxLabel,
@@ -211,6 +215,9 @@ const ProjectList = ({
      * Calculate unbilled amount for a project
      */
     const calculateUnbilledAmount = (project) => {
+        // If no hourly rate is set, return 0
+        if (!project.hourlyRate) return 0;
+        
         // Get time entries for this project's tasks
         const projectTaskIds = tasks
             .filter(task => task.projectId === project.id)
@@ -297,7 +304,7 @@ const ProjectList = ({
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
-                                    Hourly Rate
+                                    Hourly Rate (optional)
                                 </label>
 
                                 <input
@@ -306,7 +313,6 @@ const ProjectList = ({
                                     name="hourlyRate"
                                     value={formData.hourlyRate}
                                     onChange={handleInputChange}
-                                    required
                                     min="0"
                                     step="0.01"
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
@@ -505,7 +511,9 @@ const ProjectList = ({
                                 </div>
 
                                 <p className="mt-2 text-sm text-gray-500">
-                                    {getCurrencySymbol(project.currency)}{project.hourlyRate}/{project.currency} per hour
+                                    {project.hourlyRate 
+                                        ? `${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`
+                                        : 'No hourly rate set'}
                                 </p>
 
                                 <p className="mt-1 text-xs text-gray-400">

@@ -22,6 +22,7 @@ const InvoiceGenerator = ({
     onNavigateToBusinessInfo,
     clientInfos = [],
     onNavigateToClientInfo,
+    onNavigateToProjects,
     invoices = [],
     setInvoices,
     showButton = true
@@ -240,12 +241,16 @@ const InvoiceGenerator = ({
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
     const [taskFlatRates, setTaskFlatRates] = useState({}); // For flat rate pricing per task
+    const [useFlatRate, setUseFlatRate] = useState({}); // Track which tasks use flat rate vs hourly
+    const [taskHourlyRates, setTaskHourlyRates] = useState({}); // For custom hourly rates per task
     
     // Additional tasks state (not related to project)
     const [additionalTasks, setAdditionalTasks] = useState([]);
     const [showAddTaskForm, setShowAddTaskForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newTaskHours, setNewTaskHours] = useState('');
+    const [newTaskUseFlatRate, setNewTaskUseFlatRate] = useState(false); // Toggle for new tasks
+    const [newTaskHourlyRate, setNewTaskHourlyRate] = useState(''); // Hourly rate for new tasks
     
     // Invoice note state
     const [invoiceNote, setInvoiceNote] = useState('');
@@ -380,25 +385,77 @@ const InvoiceGenerator = ({
     };
 
     /**
+     * Handle hourly rate modification for invoice tasks
+     */
+    const handleTaskHourlyRateChange = (taskId, newRate) => {
+        const parsedRate = parseFloat(newRate) || 0;
+        const roundedRate = Math.round(parsedRate * 100) / 100; // Round to 2 decimal places
+        setTaskHourlyRates(prev => ({
+            ...prev,
+            [taskId]: roundedRate
+        }));
+    };
+
+    /**
+     * Toggle task between flat rate and hourly pricing
+     */
+    const handleToggleFlatRate = (taskId, value) => {
+        setUseFlatRate(prev => ({
+            ...prev,
+            [taskId]: value
+        }));
+        
+        // Initialize flat rate if switching to flat rate
+        if (value && !taskFlatRates[taskId]) {
+            // Default flat rate based on hourly calculation
+            const task = invoiceTasks.find(t => t.id === taskId);
+            if (task) {
+                const hourlyAmount = (editableHours[taskId] || task.hours) * (selectedProject?.hourlyRate || 0);
+                handleFlatRateChange(taskId, hourlyAmount);
+            }
+        }
+    };
+
+    /**
+     * Toggle new task between flat rate and hourly pricing
+     */
+    const handleToggleNewTaskFlatRate = () => {
+        setNewTaskUseFlatRate(prev => !prev);
+    };
+
+    /**
      * Handle adding additional custom task
      */
     const handleAddAdditionalTask = () => {
         if (!newTaskTitle.trim()) return;
         
-        // Determine if we should use flat rates
-        const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
+        const parsedValue = parseFloat(newTaskHours) || 0;
+        const roundedValue = Math.round(parsedValue * 100) / 100;
         
         const newTask = {
             id: `custom-${Date.now()}`,
             title: newTaskTitle.trim(),
-            hours: usesFlatRates ? 0 : (parseFloat(newTaskHours) || 0), // Hours only matter for hourly rate
-            flatRate: usesFlatRates ? (parseFloat(newTaskHours) || 0) : 0, // Use the input as flat rate if needed
-            isCustom: true
+            hours: newTaskUseFlatRate ? 0 : roundedValue, // Use 0 hours if using flat rate
+            flatRate: newTaskUseFlatRate ? roundedValue : 0, // Use user input as flat rate if flat rate is selected
+            hourlyRate: newTaskUseFlatRate ? 0 : (parseFloat(newTaskHourlyRate) || selectedProject?.hourlyRate || 0),
+            isCustom: true,
+            useFlatRate: newTaskUseFlatRate
         };
         
         setAdditionalTasks(prev => [...prev, newTask]);
+        
+        // Also update the useFlatRate state for this new task
+        if (newTaskUseFlatRate) {
+            setUseFlatRate(prev => ({
+                ...prev,
+                [newTask.id]: true
+            }));
+        }
+        
         setNewTaskTitle('');
         setNewTaskHours('');
+        setNewTaskHourlyRate('');
+        setNewTaskUseFlatRate(false);
         setShowAddTaskForm(false);
     };
 
@@ -432,6 +489,17 @@ const InvoiceGenerator = ({
     };
 
     /**
+     * Handle editing additional task hourly rate
+     */
+    const handleAdditionalTaskHourlyRateChange = (taskId, newRate) => {
+        const parsedRate = parseFloat(newRate) || 0;
+        const roundedRate = Math.round(parsedRate * 100) / 100;
+        setAdditionalTasks(prev => prev.map(task => 
+            task.id === taskId ? { ...task, hourlyRate: roundedRate } : task
+        ));
+    };
+
+    /**
      * Calculate pricing breakdown: Subtotal → Discount → Shipping → Tax → Total
      * Supports both hourly rate (from project) and flat rate (per task) pricing
      */
@@ -449,33 +517,37 @@ const InvoiceGenerator = ({
             };
         }
 
-        // Determine if we should use flat rates or hourly rates
-        const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
-
+        // Calculate project subtotal by adding up task amounts
         let projectSubtotal = 0;
         let additionalTaskAmount = 0;
+        let totalHours = 0;
         
-        if (usesFlatRates) {
-            // Calculate using flat rates per task
-            projectSubtotal = invoiceTasks.reduce((sum, task) => {
-                const flatRate = taskFlatRates[task.id] || 0;
-                return sum + flatRate;
-            }, 0);
+        // Calculate regular project tasks subtotal
+        invoiceTasks.forEach(task => {
+            const taskHours = editableHours[task.id] || task.hours;
+            totalHours += taskHours;
             
-            additionalTaskAmount = additionalTasks.reduce((sum, task) => {
-                const flatRate = task.flatRate || 0;
-                return sum + flatRate;
-            }, 0);
-        } else {
-            // Calculate using hourly rates (original logic)
-            const projectTaskHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0);
-            projectSubtotal = projectTaskHours * (selectedProject?.hourlyRate || 0);
-            
-            additionalTaskAmount = additionalTasks.reduce((sum, task) => sum + (task.hours * (selectedProject?.hourlyRate || 0)), 0);
-        }
+            if (useFlatRate[task.id]) {
+                // Use flat rate for this task
+                projectSubtotal += (taskFlatRates[task.id] || 0);
+            } else {
+                // Use task-specific hourly rate if available, otherwise fall back to project rate
+                const hourlyRate = taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0;
+                projectSubtotal += taskHours * hourlyRate;
+            }
+        });
         
-        const totalHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0) + 
-                          additionalTasks.reduce((sum, task) => sum + task.hours, 0);
+        // Calculate additional tasks subtotal
+        additionalTasks.forEach(task => {
+            if (useFlatRate[task.id]) {
+                // Use flat rate
+                additionalTaskAmount += task.flatRate;
+            } else {
+                const hourlyRate = task.hourlyRate || selectedProject?.hourlyRate || 0;
+                additionalTaskAmount += task.hours * hourlyRate;
+            }
+        });
+        
         const subtotal = projectSubtotal + additionalTaskAmount;
 
         // Calculate discount
@@ -498,8 +570,7 @@ const InvoiceGenerator = ({
             taxRate = parseFloat(taxOverride.rate) || 0;
             taxLabel = taxOverride.label || 'Tax';
         } else if (selectedProject && selectedProject.taxEnabled) {
-            taxRate = parseFloat(selectedProject.taxRate) || 0;
-            taxLabel = selectedProject.taxLabel || 'VAT';
+            taxRate = selectedProject.taxRate || 0;
         }
 
         const tax = (afterShipping * (taxRate / 100));
@@ -515,7 +586,9 @@ const InvoiceGenerator = ({
             taxRate,
             taxLabel
         };
-    }, [selectedProject, invoiceTasks, editableHours, discountType, discountValue, shippingAmount, taxOverride, additionalTasks, taskFlatRates]);
+    }, [selectedProject, invoiceTasks, additionalTasks, editableHours, 
+        discountType, discountValue, shippingAmount, taxOverride, 
+        taskFlatRates, useFlatRate, taskHourlyRates]);
 
     /**
      * Prepare invoice data
@@ -576,7 +649,13 @@ const InvoiceGenerator = ({
             return;
         }
 
-        // For standalone invoices, project selection is optional, but tasks are still required
+        // Project selection is now required
+        if (!selectedProject) {
+            showError('Please select a project');
+            return;
+        }
+
+        // Tasks are still required
         if (invoiceTasks.length === 0 && additionalTasks.length === 0) {
             showError('No billable time entries or additional tasks found');
             return;
@@ -613,14 +692,20 @@ const InvoiceGenerator = ({
             tasks: invoiceTasks.map(task => ({
                 ...task,
                 hours: editableHours[task.id] || task.originalHours,
-                flatRate: taskFlatRates[task.id] || 0 // Include flat rate data
+                flatRate: taskFlatRates[task.id] || 0,
+                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0,
+                useFlatRate: useFlatRate[task.id] || false
             })),
-            additionalTasks: additionalTasks,
-            taskFlatRates: taskFlatRates, // Store flat rate data separately as well
+            additionalTasks: additionalTasks.map(task => ({
+                ...task,
+                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
+            })),
+            taskFlatRates: taskFlatRates,
+            useFlatRate: useFlatRate,
+            taskHourlyRates: taskHourlyRates,
             note: invoiceNote,
             totalHours: totalHours,
             totalAmount: pricing.total,
-            // Add new pricing breakdown fields
             subtotal: pricing.subtotal,
             discount: pricing.discount,
             discountType: discountType,
@@ -649,13 +734,16 @@ const InvoiceGenerator = ({
                 },
                 tasks: invoiceTasks.map(task => ({
                     ...task,
-                    hours: editableHours[task.id] || task.originalHours
+                    hours: editableHours[task.id] || task.originalHours,
+                    hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
                 })),
-                additionalTasks: additionalTasks,
+                additionalTasks: additionalTasks.map(task => ({
+                    ...task,
+                    hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
+                })),
                 note: invoiceNote,
                 totalHours: totalHours,
                 totalAmount: pricing.total,
-                // Add pricing breakdown for PDF
                 subtotal: pricing.subtotal,
                 discount: pricing.discount,
                 shipping: pricing.shipping,
@@ -713,6 +801,9 @@ const InvoiceGenerator = ({
         setShowInvoiceForm(false);
         setInvoiceTasks([]);
         setEditableHours({});
+        setTaskFlatRates({});
+        setUseFlatRate({});
+        setTaskHourlyRates({});
         setAdditionalTasks([]);
         setInvoiceNote('');
         // Keep selected client info so it stays for next invoice
@@ -741,10 +832,35 @@ const InvoiceGenerator = ({
             // Open form with existing invoice data
             setInvoiceTasks(editingInvoice.tasks || []);
             const initialHours = {};
+            const initialFlatRates = {};
+            const initialFlatRateToggles = {};
+            const initialHourlyRates = {};
+            
             (editingInvoice.tasks || []).forEach(task => {
                 initialHours[task.id] = Math.round((task.hours || 0) * 100) / 100; // Round to 2 decimal places
+                
+                // Load flat rate data if available
+                if (task.flatRate) {
+                    initialFlatRates[task.id] = task.flatRate;
+                }
+                
+                // Load flat rate toggle state
+                if (task.useFlatRate || (editingInvoice.useFlatRate && editingInvoice.useFlatRate[task.id])) {
+                    initialFlatRateToggles[task.id] = true;
+                }
+                
+                // Load custom hourly rates
+                if (task.hourlyRate && task.hourlyRate !== selectedProject?.hourlyRate) {
+                    initialHourlyRates[task.id] = task.hourlyRate;
+                } else if (editingInvoice.taskHourlyRates && editingInvoice.taskHourlyRates[task.id]) {
+                    initialHourlyRates[task.id] = editingInvoice.taskHourlyRates[task.id];
+                }
             });
+            
             setEditableHours(initialHours);
+            setTaskFlatRates(initialFlatRates);
+            setUseFlatRate(initialFlatRateToggles);
+            setTaskHourlyRates(initialHourlyRates);
             
             // If the invoice has a projectId, set the selected project
             if (editingInvoice.projectId) {
@@ -770,17 +886,25 @@ const InvoiceGenerator = ({
                     initialHours[task.id] = task.originalHours;
                 });
                 setEditableHours(initialHours);
+                
+                // Reset flat rate data
+                setTaskFlatRates({});
+                setUseFlatRate({});
+                setTaskHourlyRates({});
             } else {
                 // No billable tasks, but still continue with empty tasks array
                 setInvoiceTasks([]);
                 setEditableHours({});
+                setTaskFlatRates({});
+                setUseFlatRate({});
+                setTaskHourlyRates({});
             }
             
             // When opened from a project context, lock the project selection
             setIsProjectContextFixed(true);
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject?.hourlyRate]);
 
     // Keep track of whether we've handled the current editing invoice
     const [handledEditingInvoice, setHandledEditingInvoice] = useState(null);
@@ -806,6 +930,9 @@ const InvoiceGenerator = ({
         didAutoOpenModalRef.current = false; // Reset the flag here
         setInvoiceTasks([]);
         setEditableHours({});
+        setTaskFlatRates({});
+        setUseFlatRate({});
+        setTaskHourlyRates({});
         setAdditionalTasks([]);
         setInvoiceNote('');
         
@@ -899,7 +1026,7 @@ const InvoiceGenerator = ({
                                 <div className="mb-6">
                                         <div className="flex justify-between items-center mb-1">
                                             <h4 className="text-sm font-medium text-gray-900">
-                                                Client
+                                                Client <span className="text-red-500">*</span>
                                             </h4>
                                             <button
                                                 type="button"
@@ -967,41 +1094,68 @@ const InvoiceGenerator = ({
                                     <div className="mb-6">
                                         <div className="flex justify-between items-center mb-1">
                                             <h4 className="text-sm font-medium text-gray-900">
-                                                Project
+                                                Project <span className="text-red-500">*</span>
                                             </h4>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <select
-                                                value={selectedProject?.id || ''}
-                                                onChange={(e) => handleProjectSelection(e.target.value)}
-                                                className={`block w-full border ${isProjectContextFixed ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
-                                                required
-                                                disabled={isProjectContextFixed}
-                                            >
-                                                <option value="">Select project</option>
-                                                {projects.map(proj => (
-                                                    <option key={proj.id} value={proj.id}>
-                                                        {proj.title}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            
-                                            {selectedProject && (
-                                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                                    <p className="text-sm text-blue-800">
-                                                        <strong>{selectedProject.title}</strong><br/>
-                                                        Rate: {getCurrencySymbol(selectedProject.currency)}{selectedProject.hourlyRate}/hour
-                                                    </p>
-                                                </div>
+                                            {onNavigateToProjects && !isProjectContextFixed && (
+                                                <button
+                                                    type="button"
+                                                    onClick={onNavigateToProjects}
+                                                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                                >
+                                                    + New Project
+                                                </button>
                                             )}
                                         </div>
+                                        
+                                        {projects.length === 0 ? (
+                                            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                                                <p className="text-sm text-yellow-800 mb-3">
+                                                    No projects found. Create a project to continue with invoice generation.
+                                                </p>
+                                                {onNavigateToProjects && !isProjectContextFixed && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={onNavigateToProjects}
+                                                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
+                                                    >
+                                                        Create Project
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <select
+                                                    value={selectedProject?.id || ''}
+                                                    onChange={(e) => handleProjectSelection(e.target.value)}
+                                                    className={`block w-full border ${isProjectContextFixed ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
+                                                    required
+                                                    disabled={isProjectContextFixed}
+                                                >
+                                                    <option value="" disabled>Select project</option>
+                                                    {projects.map(proj => (
+                                                        <option key={proj.id} value={proj.id}>
+                                                            {proj.title}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                
+                                                {selectedProject && (
+                                                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                                        <p className="text-sm text-blue-800">
+                                                            <strong>{selectedProject.title}</strong><br/>
+                                                            Rate: {getCurrencySymbol(selectedProject.currency)}{selectedProject.hourlyRate}/hour
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Tasks with Editable Hours */}
                                     <div className="mb-6">
                                         <div className="flex justify-between items-center mb-3">
                                             <h4 className="text-sm font-medium text-gray-900">
-                                                Tasks & Time
+                                                Tasks & Time <span className="text-red-500">*</span>
                                             </h4>
                                             <button
                                                 type="button"
@@ -1019,8 +1173,8 @@ const InvoiceGenerator = ({
                                                 // For existing invoices, calculate originalTimeMs from originalHours if not present
                                                 const originalTimeMs = task.originalTimeMs || (task.originalHours * 60 * 60 * 1000);
                                                 
-                                                // Determine if we should use flat rates (no project selected or no hourly rate)
-                                                const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
+                                                // Check if this task uses flat rate
+                                                const isUsingFlatRate = useFlatRate[task.id] || false;
                                                 
                                                 return (
                                                     <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
@@ -1033,10 +1187,26 @@ const InvoiceGenerator = ({
                                                                 )}
                                                             </p>
                                                         </div>
-                                                        <div className="flex items-center space-x-2">
-                                                            {usesFlatRates ? (
+                                                        
+                                                        <div className="flex items-center space-x-3">
+                                                            {/* Add flat rate toggle */}
+                                                            <div className="flex items-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id={`flat-rate-${task.id}`}
+                                                                    checked={isUsingFlatRate}
+                                                                    onChange={(e) => handleToggleFlatRate(task.id, e.target.checked)}
+                                                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                                />
+                                                                <label htmlFor={`flat-rate-${task.id}`} className="ml-2 text-xs text-gray-700">
+                                                                    Flat rate
+                                                                </label>
+                                                            </div>
+                                                        
+                                                            {isUsingFlatRate ? (
                                                                 // Flat rate input
                                                                 <div className="text-right">
+                                                                    <div className="text-xs text-gray-500 mb-1 text-left">{selectedProject?.currency || "USD"}</div>
                                                                     <input
                                                                         type="number"
                                                                         step="0.01"
@@ -1046,12 +1216,12 @@ const InvoiceGenerator = ({
                                                                         className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                         placeholder="0.00"
                                                                     />
-                                                                    <div className="text-xs text-gray-500 mt-1">flat rate</div>
                                                                 </div>
                                                             ) : (
-                                                                // Hours input (original logic)
-                                                                <>
+                                                                // Hours input with custom hourly rate
+                                                                <div className="flex items-center space-x-2">
                                                                     <div className="text-right">
+                                                                        <div className="text-xs text-gray-500 mb-1 text-left">Hours ({currentMinutes}min)</div>
                                                                         <input
                                                                             type="number"
                                                                             step="0.01"
@@ -1061,11 +1231,19 @@ const InvoiceGenerator = ({
                                                                             className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                         />
                                                                     </div>
-                                                                    <div className="flex-1 text-0">
-                                                                        <span className="text-sm text-gray-500">hours</span>
-                                                                        <div className="text-xs text-gray-400">({currentMinutes}min)</div>
+                                                                    <div className="text-right">
+                                                                        <div className="text-xs text-gray-500 mb-1 text-left">Hourly rate</div>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            value={(taskHourlyRates[task.id] || selectedProject?.hourlyRate || 0).toFixed(2)}
+                                                                            onChange={(e) => handleTaskHourlyRateChange(task.id, e.target.value)}
+                                                                            className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                            placeholder="0.00"
+                                                                        />
                                                                     </div>
-                                                                </>
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1077,8 +1255,8 @@ const InvoiceGenerator = ({
                                                 const currentMinutes = hoursToMinutes(task.hours || 0);
                                                 const currentFlatRate = task.flatRate || 0;
                                                 
-                                                // Determine if we should use flat rates
-                                                const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
+                                                // Check if this task uses flat rate (from task object or state)
+                                                const isUsingFlatRate = task.useFlatRate || useFlatRate[task.id] || false;
                                                 
                                                 return (
                                                     <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
@@ -1089,9 +1267,24 @@ const InvoiceGenerator = ({
                                                             </p>
                                                         </div>
                                                         <div className="flex items-center space-x-2">
-                                                            {usesFlatRates ? (
+                                                            {/* Add flat rate toggle */}
+                                                            <div className="flex items-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id={`flat-rate-${task.id}`}
+                                                                    checked={isUsingFlatRate}
+                                                                    onChange={(e) => handleToggleFlatRate(task.id, e.target.checked)}
+                                                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                                />
+                                                                <label htmlFor={`flat-rate-${task.id}`} className="ml-2 text-xs text-gray-700">
+                                                                    Flat rate
+                                                                </label>
+                                                            </div>
+                                                            
+                                                            {isUsingFlatRate ? (
                                                                 // Flat rate input
                                                                 <div className="text-right">
+                                                                    <div className="text-xs text-gray-500 mb-1 text-left">{selectedProject?.currency || "USD"}</div>
                                                                     <input
                                                                         type="number"
                                                                         step="0.01"
@@ -1101,12 +1294,12 @@ const InvoiceGenerator = ({
                                                                         className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                         placeholder="0.00"
                                                                     />
-                                                                    <div className="text-xs text-gray-500 mt-1">flat rate</div>
                                                                 </div>
                                                             ) : (
-                                                                // Hours input (original logic)
-                                                                <>
+                                                                // Hours input with custom hourly rate
+                                                                <div className="flex items-center space-x-2">
                                                                     <div className="text-right">
+                                                                        <div className="text-xs text-gray-500 mb-1 text-left">Hours ({currentMinutes}min)</div>
                                                                         <input
                                                                             type="number"
                                                                             step="0.01"
@@ -1116,11 +1309,19 @@ const InvoiceGenerator = ({
                                                                             className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                         />
                                                                     </div>
-                                                                    <div className="flex-1 text-0">
-                                                                        <span className="text-sm text-gray-500">hours</span>
-                                                                        <div className="text-xs text-gray-400">({currentMinutes}min)</div>
+                                                                    <div className="text-right">
+                                                                        <div className="text-xs text-gray-500 mb-1 text-left">Hourly rate</div>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            value={(task.hourlyRate || selectedProject?.hourlyRate || 0).toFixed(2)}
+                                                                            onChange={(e) => handleAdditionalTaskHourlyRateChange(task.id, e.target.value)}
+                                                                            className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                            placeholder="0.00"
+                                                                        />
                                                                     </div>
-                                                                </>
+                                                                </div>
                                                             )}
                                                             <button
                                                                 type="button"
@@ -1151,54 +1352,71 @@ const InvoiceGenerator = ({
                                                             className="w-full text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
                                                         />
                                                     </div>
+                                                    <div className="flex items-center space-x-2 mb-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            id="new-task-flat-rate"
+                                                            checked={newTaskUseFlatRate}
+                                                            onChange={handleToggleNewTaskFlatRate}
+                                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                        />
+                                                        <label htmlFor="new-task-flat-rate" className="text-xs text-gray-700">
+                                                            Flat rate
+                                                        </label>
+                                                    </div>
                                                     <div className="flex space-x-2">
                                                         <div className="flex space-x-2">
-                                                            {(() => {
-                                                                const usesFlatRates = !selectedProject || !selectedProject.hourlyRate;
-                                                                return (
-                                                                    <>
-                                                                        <input
-                                                                            type="number"
-                                                                            step="0.01"
-                                                                            min="0"
-                                                                            value={newTaskHours}
-                                                                            onChange={(e) => setNewTaskHours(e.target.value)}
-                                                                            placeholder={usesFlatRates ? "Amount" : "Hours"}
-                                                                            className="w-24 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
-                                                                        />
-                                                                        <div className="flex items-center">
-                                                                            {usesFlatRates ? (
-                                                                                <span className="text-sm text-gray-500">flat rate</span>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <span className="text-sm text-gray-500 mr-1">hours</span>
-                                                                                    <div className="text-xs text-gray-400">
-                                                                                        ({hoursToMinutes(parseFloat(newTaskHours) || 0)}min)
-                                                                                    </div>
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-                                                                    </>
-                                                                );
-                                                            })()}
+                                                            <div className="text-right">
+                                                                <div className="text-xs text-gray-500 mb-1 text-left">
+                                                                    {newTaskUseFlatRate ? (selectedProject?.currency || "USD") : `Hours ${newTaskHours ? `(${hoursToMinutes(parseFloat(newTaskHours) || 0)}min)` : ''}`}
+                                                                </div>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={newTaskHours}
+                                                                    onChange={(e) => setNewTaskHours(e.target.value)}
+                                                                    placeholder={newTaskUseFlatRate ? "0.00" : "Hours"}
+                                                                    className="w-24 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                                />
+                                                            </div>
                                                         </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleAddAdditionalTask}
-                                                            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                                                        >
-                                                            Add
-                                                        </button>
+                                                        {/* New Hourly Rate Input */}
+                                                        {!newTaskUseFlatRate && (
+                                                            <div className="text-right">
+                                                                <div className="text-xs text-gray-500 mb-1 text-left">Hourly rate</div>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={newTaskHourlyRate || selectedProject?.hourlyRate || 0}
+                                                                    onChange={(e) => setNewTaskHourlyRate(e.target.value)}
+                                                                    placeholder="0.00"
+                                                                    className="w-20 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex justify-end space-x-2 mt-3">
                                                         <button
                                                             type="button"
                                                             onClick={() => {
                                                                 setShowAddTaskForm(false);
                                                                 setNewTaskTitle('');
                                                                 setNewTaskHours('');
+                                                                setNewTaskHourlyRate('');
+                                                                setNewTaskUseFlatRate(false);
                                                             }}
                                                             className="px-3 py-1.5 bg-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-400"
                                                         >
                                                             Cancel
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleAddAdditionalTask}
+                                                            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                                                        >
+                                                            Add Task
                                                         </button>
                                                     </div>
                                                 </div>

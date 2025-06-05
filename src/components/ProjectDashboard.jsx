@@ -26,6 +26,7 @@ const ProjectDashboard = ({
     onNavigateToBusinessInfo,
     clientInfos,
     onNavigateToClientInfo,
+    onNavigateToProjects,
     invoices,
     setInvoices
 }) => {
@@ -92,6 +93,7 @@ const ProjectDashboard = ({
                     onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                     clientInfos={clientInfos}
                     onNavigateToClientInfo={onNavigateToClientInfo}
+                    onNavigateToProjects={onNavigateToProjects}
                     invoices={invoices}
                     setInvoices={setInvoices}
                 />

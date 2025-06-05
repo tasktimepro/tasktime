@@ -64,6 +64,13 @@ function App() {
     };
 
     /**
+     * Handle navigation to projects view with project creation
+     */
+    const handleNavigateToProjects = () => {
+        navigateToProjects();
+    };
+
+    /**
      * Handle data import from ExportImport component
      */
     const handleImport = (importData) => {
@@ -181,6 +188,7 @@ function App() {
                         onNavigateToBusinessInfo={handleNavigateToBusinessInfo}
                         clientInfos={clientInfos}
                         onNavigateToClientInfo={handleNavigateToClientInfo}
+                        onNavigateToProjects={handleNavigateToProjects}
                         invoices={invoices}
                         setInvoices={setInvoices}
                     />

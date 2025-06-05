@@ -206,6 +206,10 @@ const Invoices = ({
                         setShowInvoiceModal(false);
                         updateUrl({ section: 'client-info', create: 'client-info' });
                     }}
+                    onNavigateToProjects={() => {
+                        setShowInvoiceModal(false);
+                        updateUrl({ view: 'projects' });
+                    }}
                     invoices={invoices}
                     setInvoices={setInvoices}
                     onInvoiceSaved={() => {
