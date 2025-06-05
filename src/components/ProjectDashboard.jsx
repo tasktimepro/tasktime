@@ -75,9 +75,11 @@ const ProjectDashboard = ({
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900">{project.title}</h1>
 
-                        <p className="text-sm text-gray-500">
-                            {getCurrencySymbol(project.currency)}{project.hourlyRate}/{project.currency} per hour
-                        </p>
+                        {project.hourlyRate && (
+                            <p className="text-sm text-gray-500">
+                                {`${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`}
+                            </p>
+                        )}
                     </div>
                 </div>
 

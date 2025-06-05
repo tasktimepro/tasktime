@@ -42,7 +42,7 @@ const MetricsDisplay = ({ project, timeEntries }) => {
             return total + roundedTaskHours;
         }, 0);
 
-        const totalEarnings = totalHours * project.hourlyRate;
+        const totalEarnings = project.hourlyRate ? totalHours * project.hourlyRate : 0;
 
         return {
             time: totalTime,
@@ -96,9 +96,11 @@ const MetricsDisplay = ({ project, timeEntries }) => {
                                 {formatDuration(metric.time)}
                             </div>
 
-                            <div className="text-sm text-gray-600">
-                                {getCurrencySymbol(project.currency)}{metric.earnings.toFixed(2)}
-                            </div>
+                            {project.hourlyRate && (
+                                <div className="text-sm text-gray-600">
+                                    {`${getCurrencySymbol(project.currency)}${metric.earnings.toFixed(2)}`}
+                                </div>
+                            )}
                         </dd>
                     </div>
                 ))}

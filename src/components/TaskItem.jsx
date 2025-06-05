@@ -121,26 +121,6 @@ const TaskItem = ({
     const mainTaskTime = taskTime; // Time logged directly to this task
     const totalTimeWithSubtasks = totalTime; // Main task time + subtask time
 
-    // Debug logging for parent tasks (temporary)
-    if (!task.parentTaskId && (taskTime > 0 || subtaskTime > 0 || taskTimeEntries.length > 0)) {
-        console.log(`Parent Task "${task.title}":`, {
-            mainTaskTime,
-            subtaskTime,
-            totalTimeWithSubtasks,
-            taskTimeEntries: taskTimeEntries.length,
-            subtaskTimeEntries: subtaskTimeEntries.length
-        });
-        
-        // Log problematic entries
-        const problematicEntries = taskTimeEntries.filter(entry => 
-            !entry || typeof entry.start !== 'number' || typeof entry.end !== 'number' || 
-            isNaN(entry.start) || isNaN(entry.end)
-        );
-        if (problematicEntries.length > 0) {
-            console.log(`Problematic entries for "${task.title}":`, problematicEntries);
-        }
-    }
-
     // Check if this task's timer is active
     const isTimerActive = currentTimer && currentTimer.taskId === task.id;
 

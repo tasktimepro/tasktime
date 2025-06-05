@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { DocumentTextIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, TrashIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours, formatDurationWithSeconds, hoursToMinutes } from '../utils/dateUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
@@ -51,14 +51,11 @@ const InvoiceGenerator = ({
         );
     }, [invoices, selectedProject, project]);
 
-    // Debug logging
-    console.log('🔍 InvoiceGenerator - clientInfos:', clientInfos);
-    console.log('🔍 InvoiceGenerator - clientInfos.length:', clientInfos.length);
-
     // Auto-open the form when showButton is false (modal mode)
     useEffect(() => {
         if (!showButton) { // Modal mode (auto-open is possible)
-            if (!showInvoiceForm && !didAutoOpenModalRef.current) {
+            // Only auto-open once when first rendered
+            if (!didAutoOpenModalRef.current) {
                 setShowInvoiceForm(true);
                 didAutoOpenModalRef.current = true;
             }
@@ -67,7 +64,7 @@ const InvoiceGenerator = ({
             // so it can auto-open next time if props change to modal mode.
             didAutoOpenModalRef.current = false;
         }
-    }, [showButton, showInvoiceForm]); // Replaced the previous useEffect logic
+    }, [showButton]); // Only depend on showButton to prevent re-opening after closing
 
     /**
      * Initialize payment method based on previous invoices or editing invoice
@@ -1210,7 +1207,6 @@ const InvoiceGenerator = ({
     const handleCancel = () => {
         // Close the modal and reset state
         setShowInvoiceForm(false);
-        didAutoOpenModalRef.current = false; // Reset the flag here
         
         // Use the centralized reset function
         resetInvoiceForm();
@@ -1218,10 +1214,10 @@ const InvoiceGenerator = ({
         // Reset the project manually changed flag
         setProjectManuallyChanged(false);
         
-        // Only call onInvoiceSaved to clear editing state if we're actually editing
-        // This prevents the issue where canceling triggers the same callback as saving
-        if (editingInvoice && onInvoiceSaved) {
-            onInvoiceSaved(); // This will clear the editing state in the parent component
+        // Call onInvoiceSaved in all cases when in modal mode
+        // This signals to the parent to close the modal completely
+        if (onInvoiceSaved) {
+            onInvoiceSaved();
         }
     };
 
@@ -1278,9 +1274,15 @@ const InvoiceGenerator = ({
                     >
                         <DocumentTextIcon className="h-5 w-5 mr-2" />
                         {currentProjectForCalculation ? 'Generate Invoice' : 'Create Invoice'}
-                        {currentProjectForCalculation && unbilledHours > 0 && (
+                        {currentProjectForCalculation && unbilledHours > 0 && currentProjectForCalculation.hourlyRate && (
                             <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full">
                                 {getCurrencySymbol(currentProjectForCalculation.currency)}{unbilledAmount.toFixed(2)}
+                            </span>
+                        )}
+                        {currentProjectForCalculation && unbilledHours > 0 && !currentProjectForCalculation.hourlyRate && (
+                            <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full flex items-center">
+                                <ClockIcon className="h-3 w-3 mr-1" />
+                                {unbilledHours.toFixed(2)}h
                             </span>
                         )}
                     </button>
@@ -1359,10 +1361,19 @@ const InvoiceGenerator = ({
 
                                             {selectedProject && (
                                                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                                    <p className="text-sm text-blue-800">
-                                                        <strong>{selectedProject.title}</strong><br />
-                                                        Rate: {getCurrencySymbol(selectedProject.currency)}{selectedProject.hourlyRate}/hour
-                                                    </p>
+                                                    <div className="text-sm text-blue-800">
+                                                        {selectedProject.hourlyRate ? (
+                                                            <div className="text-sm text-blue-800">
+                                                                <strong>{selectedProject.title}</strong><br />
+                                                                Rate: {getCurrencySymbol(selectedProject.currency)}${selectedProject.hourlyRate}/hour
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-sm text-blue-800">
+                                                                <strong>{selectedProject.title}</strong><br />
+                                                                You can create invoices with custom rates
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -1714,6 +1725,7 @@ const InvoiceGenerator = ({
                                                         onChange={(e) => setNewTaskTitle(e.target.value)}
                                                         placeholder="Task description"
                                                         className="w-full text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                        required
                                                     />
                                                 </div>
                                                 <div className="flex items-center space-x-2 mb-2">
@@ -1814,7 +1826,7 @@ const InvoiceGenerator = ({
                                             return (
                                                 <div className="mt-2 bg-orange-50 border border-orange-200 rounded-md p-3">
                                                     <p className="text-sm text-orange-800">
-                                                        Please select at least one task to bill...
+                                                        Please select or create at least one task to bill...
                                                     </p>
                                                 </div>
                                             );

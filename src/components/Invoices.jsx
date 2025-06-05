@@ -146,7 +146,7 @@ const Invoices = ({
                         onClick={() => setShowInvoiceModal(true)}
                         className="mt-4 w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                     >
-                        <PlusIcon className="h-4 w-4 mr-2" />
+                        <DocumentTextIcon className="h-5 w-5 mr-2" />
                         New Invoice
                     </button>
                 </div>
@@ -217,6 +217,8 @@ const Invoices = ({
                     onInvoiceSaved={() => {
                         setShowInvoiceModal(false);
                         setEditingInvoice(null);
+                        // Add a small delay before allowing it to be opened again
+                        setTimeout(() => {}, 100);
                     }}
                     showButton={false}
                 />

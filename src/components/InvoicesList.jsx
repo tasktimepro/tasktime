@@ -104,6 +104,13 @@ const InvoicesList = ({ projectInvoices = [], onEditInvoice, paymentMethods = []
                 <p className="mt-1 text-sm text-gray-500">
                     Get started by generating your first invoice.
                 </p>
+                <button
+                    onClick={() => onEditInvoice && onEditInvoice(null)}
+                    className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" />
+                    New Invoice
+                </button>
             </div>
         );
     }
@@ -114,7 +121,7 @@ const InvoicesList = ({ projectInvoices = [], onEditInvoice, paymentMethods = []
             {invoices.length > 0 && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-xs text-blue-600">
-                        <strong>Note:</strong> Invoices preserve billing history and cannot be deleted. You can edit invoice details or create corrections as needed.
+                        <strong>Note:</strong> Invoices preserve billing history and cannot be deleted. You can edit invoice details or submit corrections as needed.
                     </p>
                 </div>
             )}
@@ -258,7 +265,11 @@ const InvoicesList = ({ projectInvoices = [], onEditInvoice, paymentMethods = []
                                             <h3 className="text-sm font-medium text-gray-900 mb-2">Project:</h3>
                                             <div className="text-sm text-gray-600">
                                                 <p>{selectedInvoice.project?.title || 'Unknown Project'}</p>
-                                                <p>Rate: {getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}{selectedInvoice.project?.hourlyRate || 0}/{selectedInvoice.project?.currency || 'USD'} per hour</p>
+                                                {selectedInvoice.project?.hourlyRate && (
+                                                    <p>
+                                                        Rate: {getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}${selectedInvoice.project.hourlyRate}/${selectedInvoice.project?.currency || 'USD'} per hour
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

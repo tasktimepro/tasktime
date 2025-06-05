@@ -103,8 +103,6 @@ function App() {
         setCurrentTimer(null); // Clear any active timer
     };
 
-    console.log('🔍 App - clientInfos:', clientInfos);
-
     return (
         <ToastProvider>
             <div className="min-h-screen bg-gray-50">

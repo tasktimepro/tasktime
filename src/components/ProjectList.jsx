@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
@@ -191,7 +191,7 @@ const ProjectList = ({
 
         setFormData({
             title: project.title,
-            hourlyRate: project.hourlyRate.toString(),
+            hourlyRate: project.hourlyRate ? project.hourlyRate.toString() : '',
             currency: project.currency,
             taxEnabled: project.taxEnabled || false,
             taxLabel: project.taxLabel || 'VAT',
@@ -251,6 +251,46 @@ const ProjectList = ({
         }, 0);
 
         return unbilledHours * project.hourlyRate;
+    };
+
+    /**
+     * Calculate unbilled hours for a project (without rate requirement)
+     */
+    const calculateUnbilledHours = (project) => {
+        // Get tasks for this project
+        const projectTasks = tasks.filter(task => task.projectId === project.id);
+        
+        // Get time entries for this project's tasks with task-level billing filtering
+        const unbilledEntries = timeEntries.filter(entry => {
+            // Find the task for this entry
+            const task = projectTasks.find(t => t.id === entry.taskId);
+            if (!task) return false;
+            if (!entry.end || entry.end <= entry.start) return false;
+            
+            // Use task-specific lastBilledAt, or task creation date if never billed
+            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            
+            // Only include entries created after this task's last billing date
+            return entry.start > taskLastBilledAt;
+        });
+
+        // Group unbilled entries by task and round each task's hours (same logic as invoice)
+        const taskTimeMap = {};
+        unbilledEntries.forEach(entry => {
+            if (!taskTimeMap[entry.taskId]) {
+                taskTimeMap[entry.taskId] = 0;
+            }
+            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+        });
+
+        // Calculate total rounded hours (matching invoice calculation)
+        const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+            const taskHours = millisecondsToHours(taskTime);
+            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+            return total + roundedTaskHours;
+        }, 0);
+
+        return unbilledHours;
     };
 
     /**
@@ -507,18 +547,18 @@ const ProjectList = ({
                                     </div>
                                 </div>
 
-                                <p className="mt-2 text-sm text-gray-500">
-                                    {project.hourlyRate 
-                                        ? `${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`
-                                        : 'No hourly rate set'}
-                                </p>
+                                {project.hourlyRate && (
+                                    <p className="mt-2 text-sm text-gray-500">
+                                        {`${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`}
+                                    </p>
+                                )}
 
                                 <p className="mt-1 text-xs text-gray-400">
                                     Created {new Date(project.createdAt).toLocaleDateString()}
                                 </p>
 
-                                {/* Billable Amount Tag */}
-                                {calculateUnbilledAmount(project) > 0 && (
+                                {/* Billable Amount Tag or Clock Icon for missing rate */}
+                                {calculateUnbilledAmount(project) > 0 ? (
                                     <div className="absolute bottom-4 right-4">
                                         <button
                                             onClick={(e) => handleGenerateInvoice(e, project)}
@@ -528,7 +568,18 @@ const ProjectList = ({
                                             {getCurrencySymbol(project.currency)}{calculateUnbilledAmount(project).toFixed(2)}
                                         </button>
                                     </div>
-                                )}
+                                ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
+                                    <div className="absolute bottom-4 right-4">
+                                        <button
+                                            onClick={(e) => handleGenerateInvoice(e, project)}
+                                            className="inline-flex items-center px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded-full hover:bg-blue-700 transition-colors"
+                                            title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
+                                        >
+                                            <ClockIcon className="h-3 w-3 mr-1" />
+                                            {calculateUnbilledHours(project).toFixed(2)}h
+                                        </button>
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
                     ))}
