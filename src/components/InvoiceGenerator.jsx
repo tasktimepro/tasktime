@@ -390,7 +390,7 @@ const InvoiceGenerator = ({
      */
     const handleCancel = () => {
         // First, clear the editing state immediately if we're in edit mode
-        // This prevents another modal from opening with "Save Invoice" state
+        // This prevents another modal from opening with "New Invoice" state
         if (editingInvoice && onInvoiceSaved) {
             onInvoiceSaved(); // This will clear the editing state
         }
@@ -448,9 +448,19 @@ const InvoiceGenerator = ({
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 !mt-0">
                     <div className="relative mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white my-8">
                         
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">
-                            {editingInvoice ? 'Edit Invoice' : 'Save Invoice'}
-                        </h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-medium text-gray-900">
+                                {editingInvoice ? 'Edit Invoice' : 'New Invoice'}
+                            </h3>
+                            <button
+                                onClick={handleCancel}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
 
                         {invoiceTasks.length === 0 ? (
                             <div className="text-center py-4">
@@ -464,73 +474,12 @@ const InvoiceGenerator = ({
                             </div>
                         ) : (
                             <div>
-                                {/* Tasks with Editable Hours */}
-                                <div className="mb-6">
-                                    <h4 className="text-sm font-medium text-gray-900 mb-3">
-                                        Tasks & Time
-                                    </h4>
-                                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                                        {invoiceTasks.map((task) => {
-                                            const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
-                                            const currentMinutes = hoursToMinutes(currentHours);
-                                            // For existing invoices, calculate originalTimeMs from originalHours if not present
-                                            const originalTimeMs = task.originalTimeMs || (task.originalHours * 60 * 60 * 1000);
-                                            
-                                            return (
-                                                <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-                                                    <div className="flex-1">
-                                                        <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                                                        <p className="text-xs text-gray-500">
-                                                            Original: {formatDurationWithSeconds(originalTimeMs)}
-                                                            {task.isEdited && (
-                                                                <span className="text-blue-600 ml-2">(Modified)</span>
-                                                            )}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex items-center space-x-2">
-                                                        <div className="text-right">
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={currentHours.toFixed(2)}
-                                                                onChange={(e) => handleHoursChange(task.id, e.target.value)}
-                                                                className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
-                                                            />
-                                                        </div>
-                                                        <div className="flex-1 text-0">
-                                                            <span className="text-sm text-gray-500">hours</span>
-                                                            <div className="text-xs text-gray-400">({currentMinutes}min)</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    
-                                    {/* Updated Totals */}
-                                    <div className="mt-4 p-3 bg-blue-50 rounded-md">
-                                        <div className="flex justify-between text-sm">
-                                            <span>Total Hours:</span>
-                                            <span className="font-medium">
-                                                {invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0).toFixed(2)}h
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span>Total Amount:</span>
-                                            <span className="font-medium">
-                                                {getCurrencySymbol(project.currency)}{(invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0) * project.hourlyRate).toFixed(2)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <form onSubmit={handleSaveInvoice} className="space-y-4">
+                                <form onSubmit={handleSaveInvoice} className="space-y-5">
                                     {/* Client Info Selection */}
                                     <div className="mb-6">
                                         <div className="flex justify-between items-center mb-1">
                                             <h4 className="text-sm font-medium text-gray-900">
-                                                Client Information
+                                                Client
                                             </h4>
                                             <button
                                                 type="button"
@@ -569,23 +518,96 @@ const InvoiceGenerator = ({
                                                         </option>
                                                     ))}
                                                 </select>
-                                                
-                                                {selectedClientInfo && (
-                                                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                                                        <p className="text-sm text-green-800">
-                                                            <strong>{selectedClientInfo.clientName}</strong> will be used for the invoice "Invoice To" section.
-                                                        </p>
-                                                    </div>
-                                                )}
+                                                         {selectedClientInfo && (
+                                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                                <p className="text-sm text-blue-800">
+                                                    <strong>{selectedClientInfo.clientName}</strong><br/>
+                                                    {selectedClientInfo.email && (
+                                                        <span>{selectedClientInfo.email}<br/></span>
+                                                    )}
+                                                    {selectedClientInfo.address && (
+                                                        <span>{selectedClientInfo.address}<br/></span>
+                                                    )}
+                                                    {(selectedClientInfo.city || selectedClientInfo.state || selectedClientInfo.zip) && (
+                                                        <span>
+                                                            {selectedClientInfo.city ? selectedClientInfo.city + ', ' : ''}
+                                                            {selectedClientInfo.state ? selectedClientInfo.state + ' ' : ''}
+                                                            {selectedClientInfo.zip || ''}
+                                                        </span>
+                                                    )}
+                                                </p>
                                             </div>
                                         )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Tasks with Editable Hours */}
+                                    <div className="mb-6">
+                                        <h4 className="text-sm font-medium text-gray-900 mb-3">
+                                            Tasks & Time
+                                        </h4>
+                                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                                            {invoiceTasks.map((task) => {
+                                                const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
+                                                const currentMinutes = hoursToMinutes(currentHours);
+                                                // For existing invoices, calculate originalTimeMs from originalHours if not present
+                                                const originalTimeMs = task.originalTimeMs || (task.originalHours * 60 * 60 * 1000);
+                                                
+                                                return (
+                                                    <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                                                            <p className="text-xs text-gray-500">
+                                                                Original: {formatDurationWithSeconds(originalTimeMs)}
+                                                                {task.isEdited && (
+                                                                    <span className="text-blue-600 ml-2">(Modified)</span>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center space-x-2">
+                                                            <div className="text-right">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={currentHours.toFixed(2)}
+                                                                    onChange={(e) => handleHoursChange(task.id, e.target.value)}
+                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 text-0">
+                                                                <span className="text-sm text-gray-500">hours</span>
+                                                                <div className="text-xs text-gray-400">({currentMinutes}min)</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        
+                                        {/* Updated Totals */}
+                                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                            <div className="flex justify-between text-sm text-blue-800">
+                                                <span>Total Hours:</span>
+                                                <span className="font-medium">
+                                                    {invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0).toFixed(2)}h
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between text-sm text-blue-800">
+                                                <span>Total Amount:</span>
+                                                <span className="font-medium">
+                                                    {getCurrencySymbol(project.currency)}{(invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0) * project.hourlyRate).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* Business Info Selection */}
                                     <div className="mb-6">
                                         <div className="flex justify-between items-center mb-1">
                                             <h4 className="text-sm font-medium text-gray-900">
-                                                Business Information
+                                                Business
                                             </h4>
                                             <button
                                                 type="button"
@@ -628,8 +650,8 @@ const InvoiceGenerator = ({
                                                 </select>
                                                 
                                                 {selectedBusinessInfo && (
-                                                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                                                        <p className="text-sm text-green-800">
+                                                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                                        <p className="text-sm text-blue-800">
                                                             <strong>{selectedBusinessInfo.title}</strong> will be included as "Invoice From" in the invoice.
                                                         </p>
                                                     </div>
@@ -685,8 +707,8 @@ const InvoiceGenerator = ({
                                                 </select>
                                                 
                                                 {selectedPaymentMethod && (
-                                                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                                                        <p className="text-sm text-green-800">
+                                                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                                        <p className="text-sm text-blue-800">
                                                             <strong>{selectedPaymentMethod.title}</strong> will be included in the invoice payment details.
                                                         </p>
                                                     </div>
@@ -694,33 +716,6 @@ const InvoiceGenerator = ({
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Selected Client Information Display */}
-                                    {selectedClientInfo && (
-                                        <div className="mb-6">
-                                            <h4 className="text-sm font-medium text-gray-900 mb-3">Selected Client Information</h4>
-                                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                                                <p className="text-sm text-blue-800">
-                                                    <strong>{selectedClientInfo.clientName}</strong><br/>
-                                                    {selectedClientInfo.email && (
-                                                        <span>{selectedClientInfo.email}<br/></span>
-                                                    )}
-                                                    {selectedClientInfo.address && (
-                                                        <span>{selectedClientInfo.address}<br/></span>
-                                                    )}
-                                                    {(selectedClientInfo.city || selectedClientInfo.state || selectedClientInfo.zip) && (
-                                                        <span>
-                                                            {selectedClientInfo.city ? selectedClientInfo.city + ', ' : ''}
-                                                            {selectedClientInfo.state ? selectedClientInfo.state + ' ' : ''}
-                                                            {selectedClientInfo.zip || ''}
-                                                        </span>
-                                                    )}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <br />
 
                                     <div className="flex justify-end space-x-3 mt-6">
                                         <button
@@ -735,7 +730,7 @@ const InvoiceGenerator = ({
                                             type="submit"
                                             className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
                                         >
-                                            {editingInvoice ? 'Update Invoice' : 'Save Invoice'}
+                                            {editingInvoice ? 'Update Invoice' : 'Generate New Invoice'}
                                         </button>
                                     </div>
                                 </form>
