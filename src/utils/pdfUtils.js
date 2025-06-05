@@ -57,6 +57,8 @@ export const createInvoiceHTML = (invoiceData) => {
         project,
         client,
         tasks,
+        additionalTasks = [],
+        note = '',
         totalHours,
         totalAmount,
         invoiceNumber,
@@ -121,18 +123,33 @@ export const createInvoiceHTML = (invoiceData) => {
                     </tr>
                 </thead>
                 <tbody>
-                    ${tasks.map(task => `
+                    ${tasks.map((task, index) => {
+                        const isLastTask = index === tasks.length - 1 && additionalTasks.length === 0;
+                        const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
+                        return `
                         <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${task.title}</td>
-                            <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${task.hours.toFixed(2)}</td>
-                            <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${getCurrencySymbol(project.currency)}${(task.hours * project.hourlyRate).toFixed(2)}</td>
+                            <td style="padding: 8px; ${borderStyle}">${task.title}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${task.hours.toFixed(2)}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(project.currency)}${(task.hours * project.hourlyRate).toFixed(2)}</td>
                         </tr>
-                    `).join('')}
+                    `;
+                    }).join('')}
+                    ${additionalTasks.map((task, index) => {
+                        const isLastTask = index === additionalTasks.length - 1;
+                        const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
+                        return `
+                        <tr>
+                            <td style="padding: 8px; ${borderStyle}">${task.title}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${task.hours.toFixed(2)}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(project.currency)}${(task.hours * project.hourlyRate).toFixed(2)}</td>
+                        </tr>
+                    `;
+                    }).join('')}
                 </tbody>
             </table>
             
-            <div style="text-align: right; margin-bottom: 20px;">
-                <div style="border-top: 1px solid #ddd; padding-top: 15px;">
+            <div style="text-align: right; margin-bottom: 10px;">
+                <div style="border-top: 1px solid #ddd; padding-top: 8px;">
                     ${subtotal ? `
                         <p style="margin: 5px 0; font-size: 16px;">Subtotal (${totalHours.toFixed(2)} hours): <strong>${getCurrencySymbol(project.currency)}${subtotal.toFixed(2)}</strong></p>
                         
@@ -155,8 +172,14 @@ export const createInvoiceHTML = (invoiceData) => {
                 </div>
             </div>
             
+            ${note ? `
+            <div style="width: 50%; margin-top: 10px; text-align: left;">
+                <p style="font-style: italic; color: #666; font-size: 14px; margin: 5px 0;">${note}</p>
+            </div>
+            ` : ''}
+            
             ${paymentMethod ? `
-            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <div style="margin-top: 10px; padding-top: 30px; border-top: 1px solid #ddd;">
                 <h3 style="color: #333; margin-bottom: 15px;"><strong>Payment Details:</strong></h3>
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
                     

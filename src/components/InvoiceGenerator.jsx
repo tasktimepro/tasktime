@@ -221,6 +221,15 @@ const InvoiceGenerator = ({
     const [invoiceTasks, setInvoiceTasks] = useState([]);
     const [editableHours, setEditableHours] = useState({});
     
+    // Additional tasks state (not related to project)
+    const [additionalTasks, setAdditionalTasks] = useState([]);
+    const [showAddTaskForm, setShowAddTaskForm] = useState(false);
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskHours, setNewTaskHours] = useState('');
+    
+    // Invoice note state
+    const [invoiceNote, setInvoiceNote] = useState('');
+    
     // Pricing & Totals state
     const [pricingCollapsed, setPricingCollapsed] = useState(true);
     const [discountType, setDiscountType] = useState('percentage'); // 'percentage' or 'fixed'
@@ -254,6 +263,16 @@ const InvoiceGenerator = ({
             if (editingInvoice.taxOverride) {
                 setTaxOverride(editingInvoice.taxOverride);
             }
+            
+            // Initialize additional tasks
+            if (editingInvoice.additionalTasks) {
+                setAdditionalTasks(editingInvoice.additionalTasks);
+            }
+            
+            // Initialize invoice note
+            if (editingInvoice.note) {
+                setInvoiceNote(editingInvoice.note);
+            }
         } else {
             // Reset pricing state for new invoices
             setDiscountType('percentage');
@@ -264,6 +283,8 @@ const InvoiceGenerator = ({
                 label: '',
                 rate: 0
             });
+            setAdditionalTasks([]);
+            setInvoiceNote('');
         }
     }, [editingInvoice]);
 
@@ -308,10 +329,47 @@ const InvoiceGenerator = ({
     };
 
     /**
+     * Handle adding additional custom task
+     */
+    const handleAddAdditionalTask = () => {
+        if (!newTaskTitle.trim() || !newTaskHours) return;
+        
+        const newTask = {
+            id: `custom-${Date.now()}`,
+            title: newTaskTitle.trim(),
+            hours: parseFloat(newTaskHours),
+            isCustom: true
+        };
+        
+        setAdditionalTasks(prev => [...prev, newTask]);
+        setNewTaskTitle('');
+        setNewTaskHours('');
+        setShowAddTaskForm(false);
+    };
+
+    /**
+     * Handle removing additional task
+     */
+    const handleRemoveAdditionalTask = (taskId) => {
+        setAdditionalTasks(prev => prev.filter(task => task.id !== taskId));
+    };
+
+    /**
+     * Handle editing additional task hours
+     */
+    const handleAdditionalTaskHoursChange = (taskId, newHours) => {
+        const parsedHours = parseFloat(newHours) || 0;
+        const roundedHours = Math.round(parsedHours * 100) / 100;
+        setAdditionalTasks(prev => prev.map(task => 
+            task.id === taskId ? { ...task, hours: roundedHours } : task
+        ));
+    };
+
+    /**
      * Calculate pricing breakdown: Subtotal → Discount → Shipping → Tax → Total
      */
     const calculatePricing = useMemo(() => {
-        if (!selectedProject || invoiceTasks.length === 0) {
+        if (!selectedProject || (invoiceTasks.length === 0 && additionalTasks.length === 0)) {
             return {
                 subtotal: 0,
                 discount: 0,
@@ -323,8 +381,15 @@ const InvoiceGenerator = ({
             };
         }
 
-        const totalHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0);
-        const subtotal = totalHours * selectedProject.hourlyRate;
+        // Calculate hours from project tasks
+        const projectTaskHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0);
+        const projectSubtotal = projectTaskHours * selectedProject.hourlyRate;
+        
+        // Calculate additional task amounts
+        const additionalTaskAmount = additionalTasks.reduce((sum, task) => sum + (task.hours * selectedProject.hourlyRate), 0);
+        
+        const totalHours = projectTaskHours + additionalTasks.reduce((sum, task) => sum + task.hours, 0);
+        const subtotal = projectSubtotal + additionalTaskAmount;
 
         // Calculate discount
         const discount = discountType === 'percentage' 
@@ -359,10 +424,11 @@ const InvoiceGenerator = ({
             shipping: Math.round(shipping * 100) / 100,
             tax: Math.round(tax * 100) / 100,
             total: Math.round(total * 100) / 100,
+            totalHours: Math.round(totalHours * 100) / 100,
             taxRate,
             taxLabel
         };
-    }, [selectedProject, invoiceTasks, editableHours, discountType, discountValue, shippingAmount, taxOverride]);
+    }, [selectedProject, invoiceTasks, editableHours, discountType, discountValue, shippingAmount, taxOverride, additionalTasks]);
 
     /**
      * Prepare invoice data
@@ -430,13 +496,13 @@ const InvoiceGenerator = ({
             return;
         }
 
-        if (invoiceTasks.length === 0) {
-            showError('No billable time entries found since last invoice');
+        if (invoiceTasks.length === 0 && additionalTasks.length === 0) {
+            showError('No billable time entries or additional tasks found');
             return;
         }
 
         const pricing = calculatePricing;
-        const totalHours = invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.originalHours), 0);
+        const totalHours = pricing.totalHours;
 
         const invoiceData = {
             id: editingInvoice ? editingInvoice.id : `INV-${selectedProject.id.slice(-8)}-${Date.now()}`,
@@ -454,6 +520,8 @@ const InvoiceGenerator = ({
                 ...task,
                 hours: editableHours[task.id] || task.originalHours
             })),
+            additionalTasks: additionalTasks,
+            note: invoiceNote,
             totalHours: totalHours,
             totalAmount: pricing.total,
             // Add new pricing breakdown fields
@@ -487,6 +555,8 @@ const InvoiceGenerator = ({
                     ...task,
                     hours: editableHours[task.id] || task.originalHours
                 })),
+                additionalTasks: additionalTasks,
+                note: invoiceNote,
                 totalHours: totalHours,
                 totalAmount: pricing.total,
                 // Add pricing breakdown for PDF
@@ -542,6 +612,8 @@ const InvoiceGenerator = ({
         setShowInvoiceForm(false);
         setInvoiceTasks([]);
         setEditableHours({});
+        setAdditionalTasks([]);
+        setInvoiceNote('');
         // Keep selected client info so it stays for next invoice
         
         // Call callback if provided
@@ -634,6 +706,8 @@ const InvoiceGenerator = ({
         setShowInvoiceForm(false);
         setInvoiceTasks([]);
         setEditableHours({});
+        setAdditionalTasks([]);
+        setInvoiceNote('');
     };
 
     // Calculate unbilled time - initially using the current project (will update when a project is selected)
@@ -815,9 +889,18 @@ const InvoiceGenerator = ({
 
                                     {/* Tasks with Editable Hours */}
                                     <div className="mb-6">
-                                        <h4 className="text-sm font-medium text-gray-900 mb-3">
-                                            Tasks & Time
-                                        </h4>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h4 className="text-sm font-medium text-gray-900">
+                                                Tasks & Time
+                                            </h4>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAddTaskForm(true)}
+                                                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                            >
+                                                + Add Task
+                                            </button>
+                                        </div>
                                         <div className="space-y-2 max-h-60 overflow-y-auto">
                                             {invoiceTasks.map((task) => {
                                                 const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
@@ -855,7 +938,103 @@ const InvoiceGenerator = ({
                                                     </div>
                                                 );
                                             })}
+                                            
+                                            {/* Additional Tasks */}
+                                            {additionalTasks.map((task) => {
+                                                const currentMinutes = hoursToMinutes(task.hours);
+                                                
+                                                return (
+                                                    <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                                                            <p className="text-xs text-gray-500">
+                                                                Custom task
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center space-x-2">
+                                                            <div className="text-right">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={task.hours.toFixed(2)}
+                                                                    onChange={(e) => handleAdditionalTaskHoursChange(task.id, e.target.value)}
+                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 text-0">
+                                                                <span className="text-sm text-gray-500">hours</span>
+                                                                <div className="text-xs text-gray-400">({currentMinutes}min)</div>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveAdditionalTask(task.id)}
+                                                                className="p-1 text-red-600 hover:text-red-800"
+                                                                title="Remove task"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
+                                        
+                                        {/* Add Task Form */}
+                                        {showAddTaskForm && (
+                                            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <input
+                                                            type="text"
+                                                            value={newTaskTitle}
+                                                            onChange={(e) => setNewTaskTitle(e.target.value)}
+                                                            placeholder="Task description"
+                                                            className="w-full text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                        />
+                                                    </div>
+                                                    <div className="flex space-x-2">
+                                                        <div className="flex space-x-2">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={newTaskHours}
+                                                                onChange={(e) => setNewTaskHours(e.target.value)}
+                                                                placeholder="Hours"
+                                                                className="w-24 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                            />
+                                                            <div className="flex items-center">
+                                                                <span className="text-sm text-gray-500 mr-1">hours</span>
+                                                                <div className="text-xs text-gray-400">
+                                                                    ({hoursToMinutes(parseFloat(newTaskHours) || 0)}min)
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleAddAdditionalTask}
+                                                            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                                                        >
+                                                            Add
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setShowAddTaskForm(false);
+                                                                setNewTaskTitle('');
+                                                                setNewTaskHours('');
+                                                            }}
+                                                            className="px-3 py-1.5 bg-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-400"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                         
                                         {/* Comprehensive Pricing & Totals Section */}
                                         <div className="mt-4">
@@ -974,7 +1153,7 @@ const InvoiceGenerator = ({
                                                         {/* Pricing Breakdown */}
                                                         <div className="border-t pt-3 space-y-2">
                                                             <div className="flex justify-between text-sm">
-                                                                <span>Subtotal ({invoiceTasks.reduce((sum, task) => sum + (editableHours[task.id] || task.hours), 0).toFixed(2)}h):</span>
+                                                                <span>Subtotal ({calculatePricing.totalHours.toFixed(2)}h):</span>
                                                                 <span>{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.subtotal.toFixed(2)}</span>
                                                             </div>
                                                             
@@ -1134,6 +1313,18 @@ const InvoiceGenerator = ({
                                                 )}
                                             </div>
                                         )}
+                                    </div>
+
+                                    {/* Invoice Note */}
+                                    <div className="mb-6">
+                                        <label className="block text-sm font-medium text-gray-900 mb-2">Invoice Note</label>
+                                        <textarea
+                                            value={invoiceNote}
+                                            onChange={(e) => setInvoiceNote(e.target.value)}
+                                            className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
+                                            rows="3"
+                                            placeholder="Add any additional notes for the invoice here..."
+                                        ></textarea>
                                     </div>
 
                                     <div className="flex justify-end space-x-3 mt-6">
