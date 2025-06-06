@@ -24,6 +24,7 @@ const ClientInfo = ({
         city: '',
         state: '',
         zip: '',
+        country: '',
         registrationNumber: '',
         vat: '',
         taxNumber: '',
@@ -165,6 +166,7 @@ const ClientInfo = ({
             city: '',
             state: '',
             zip: '',
+            country: '',
             registrationNumber: '',
             vat: '',
             taxNumber: '',
@@ -225,6 +227,7 @@ const ClientInfo = ({
             city: '',
             state: '',
             zip: '',
+            country: '',
             registrationNumber: '',
             vat: '',
             taxNumber: '',
@@ -260,6 +263,7 @@ const ClientInfo = ({
             city: clientInfo.city || '',
             state: clientInfo.state || '',
             zip: clientInfo.zip || '',
+            country: clientInfo.country || '',
             registrationNumber: clientInfo.registrationNumber || '',
             vat: clientInfo.vat || '',
             taxNumber: clientInfo.taxNumber || '',
@@ -287,6 +291,7 @@ const ClientInfo = ({
             city: '',
             state: '',
             zip: '',
+            country: '',
             registrationNumber: '',
             vat: '',
             taxNumber: '',
@@ -391,7 +396,7 @@ const ClientInfo = ({
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label htmlFor="city" className="block text-sm font-medium text-gray-700">
                                         City
@@ -412,14 +417,14 @@ const ClientInfo = ({
                                     <label className="block text-sm font-medium text-gray-700">
                                         State/ZIP
                                     </label>
-                                    <div className="flex space-x-2">
+                                    <div className="flex space-x-2 w-full">
                                         <input
                                             type="text"
                                             id="state"
                                             name="state"
                                             value={formData.state}
                                             onChange={handleInputChange}
-                                            className="mt-1 flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                            className="mt-1 flex-1 min-w-0 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                             placeholder="State"
                                         />
                                         <input
@@ -428,10 +433,26 @@ const ClientInfo = ({
                                             name="zip"
                                             value={formData.zip}
                                             onChange={handleInputChange}
-                                            className="mt-1 w-24 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                            className="mt-1 w-20 flex-shrink-0 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                             placeholder="ZIP"
                                         />
                                     </div>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                                        Country
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        id="country"
+                                        name="country"
+                                        value={formData.country}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                        placeholder="Country"
+                                    />
                                 </div>
                             </div>
 
@@ -632,6 +653,7 @@ const ClientInfo = ({
                                                     {(info.state || info.zip) && (
                                                         <p>State/ZIP: {`${info.state || ''} ${info.zip || ''}`.trim()}</p>
                                                     )}
+                                                    {info.country && <p>Country: {info.country}</p>}
                                                     {info.registrationNumber && <p>Registration: {info.registrationNumber}</p>}
                                                     {info.vat && <p>VAT: {info.vat}</p>}
                                                     {info.taxNumber && <p>Tax Number: {info.taxNumber}</p>}

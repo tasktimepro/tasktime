@@ -89,9 +89,11 @@ export const createInvoiceHTML = (invoiceData) => {
                     <h3 style="color: #333; margin-bottom: 10px;"><strong>Invoice To:</strong></h3>
                     <p style="margin: 0; line-height: 1.5;">
                         ${client.name}<br>
+                        ${client.contactPerson ? client.contactPerson + '<br>' : ''}
                         ${client.email ? client.email + '<br>' : ''}
                         ${client.address ? client.address + '<br>' : ''}
-                        ${client.city ? client.city + ', ' : ''}${client.state ? client.state + ' ' : ''}${client.zip || ''}
+                        ${client.city ? client.city + ', ' : ''}${client.state ? client.state + ' ' : ''}${client.zip || ''}${(client.city || client.state || client.zip) && client.country ? '<br>' : ''}
+                        ${client.country ? client.country : ''}
                     </p>
                 </div>
                 <div style="text-align: right;">
@@ -103,6 +105,7 @@ export const createInvoiceHTML = (invoiceData) => {
                             ${(businessInfo.city || businessInfo.state || businessInfo.zip) ? 
                                 `${businessInfo.city ? businessInfo.city + ', ' : ''}${businessInfo.state ? businessInfo.state + ' ' : ''}${businessInfo.zip || ''}<br>` : ''
                             }
+                            ${businessInfo.country ? businessInfo.country + '<br>' : ''}
                             ${businessInfo.email ? businessInfo.email + '<br>' : ''}
                             ${businessInfo.phone ? businessInfo.phone + '<br>' : ''}
                             ${businessInfo.registrationNumber ? 'Reg: ' + businessInfo.registrationNumber + '<br>' : ''}

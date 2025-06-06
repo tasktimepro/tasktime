@@ -225,8 +225,11 @@ const InvoiceModal = ({
                                                     <span>
                                                         {selectedClientInfo.city ? selectedClientInfo.city + ', ' : ''}
                                                         {selectedClientInfo.state ? selectedClientInfo.state + ' ' : ''}
-                                                        {selectedClientInfo.zip || ''}
+                                                        {selectedClientInfo.zip || ''}<br />
                                                     </span>
+                                                )}
+                                                {selectedClientInfo.country && (
+                                                    <span>{selectedClientInfo.country}</span>
                                                 )}
                                             </p>
                                         </div>

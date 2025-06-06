@@ -45,11 +45,13 @@ const InvoicesList = ({
                 // Prepare client data for PDF generation
                 const clientData = clientInfoData ? {
                     name: clientInfoData.clientName || '',
+                    contactPerson: clientInfoData.contactPerson || '',
                     email: clientInfoData.email || '',
                     address: clientInfoData.address || '',
                     city: clientInfoData.city || '',
                     state: clientInfoData.state || '',
-                    zip: clientInfoData.zip || ''
+                    zip: clientInfoData.zip || '',
+                    country: clientInfoData.country || ''
                 } : (invoice.clientInfo || invoice.client);
                 
                 // Recreate the HTML content from the invoice data

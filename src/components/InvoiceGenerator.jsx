@@ -457,15 +457,15 @@ const InvoiceGenerator = ({
         setSelectedClientInfo,
         setSelectedBusinessInfo,
         setSelectedPaymentMethod,
+        setInvoiceTasks,
+        setEditableHours,
+        setSelectedTasksForBilling,
         projects,
         invoices,
         clientInfos,
         businessInfos,
         paymentMethods,
-        prepareInvoiceData,
-        setInvoiceTasks,
-        setEditableHours,
-        setSelectedTasksForBilling
+        prepareInvoiceData
     );
     const handleCancel = InvoiceHandler.handleCancel(
         setShowInvoiceForm,
@@ -623,11 +623,13 @@ const InvoiceGenerator = ({
             projectId: selectedProject?.id || null,
             clientInfo: {
                 name: selectedClientInfo.clientName || '',
+                contactPerson: selectedClientInfo.contactPerson || '',
                 email: selectedClientInfo.email || '',
                 address: selectedClientInfo.address || '',
                 city: selectedClientInfo.city || '',
                 state: selectedClientInfo.state || '',
-                zip: selectedClientInfo.zip || ''
+                zip: selectedClientInfo.zip || '',
+                country: selectedClientInfo.country || ''
             },
             tasks: invoiceTasks
                 .filter(task => selectedTasksForBilling[task.id]) // Only include selected tasks
@@ -670,11 +672,13 @@ const InvoiceGenerator = ({
                 project: selectedProject,
                 client: {
                     name: selectedClientInfo.clientName || '',
+                    contactPerson: selectedClientInfo.contactPerson || '',
                     email: selectedClientInfo.email || '',
                     address: selectedClientInfo.address || '',
                     city: selectedClientInfo.city || '',
                     state: selectedClientInfo.state || '',
-                    zip: selectedClientInfo.zip || ''
+                    zip: selectedClientInfo.zip || '',
+                    country: selectedClientInfo.country || ''
                 },
                 tasks: invoiceTasks
                     .filter(task => selectedTasksForBilling[task.id]) // Only include selected tasks
