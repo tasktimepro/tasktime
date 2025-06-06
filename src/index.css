@@ -1,3 +1,64 @@
+@import './styles/theme.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom scrollbar styling */
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
+}
+
+/* For Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+  height: var(--scrollbar-width);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track-color);
+  border-radius: var(--border-radius-md);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-color);
+  border-radius: var(--border-radius-md);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.3s ease;
+  opacity: 0.8; /* Slightly transparent by default */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover-color);
+  background-clip: padding-box;
+  opacity: 1; /* Fully opaque on hover */
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Fix for preventing layout shifts when scrollbar appears/disappears */
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Apply scrollbar gutter to body and main content sections */
+body, main, .content-area {
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Thinner scrollbars on mobile devices */
+@media (max-width: 768px) {
+  :root {
+    --scrollbar-width: 6px; /* Thinner on mobile */
+  }
+  
+  .scrollable-container-fixed {
+    max-height: 60vh; /* Adjust height on smaller screens */
+  }
+}

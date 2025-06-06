@@ -120,15 +120,17 @@ const ProjectDashboard = ({
                 </div>
 
                 <div className="p-6">
-                    <TaskTree
-                        project={project}
-                        tasks={tasks}
-                        setTasks={setTasks}
-                        timeEntries={timeEntries}
-                        setTimeEntries={setTimeEntries}
-                        currentTimer={currentTimer}
-                        setCurrentTimer={setCurrentTimer}
-                    />
+                    <div className="scrollable-container-fixed">
+                        <TaskTree
+                            project={project}
+                            tasks={tasks}
+                            setTasks={setTasks}
+                            timeEntries={timeEntries}
+                            setTimeEntries={setTimeEntries}
+                            currentTimer={currentTimer}
+                            setCurrentTimer={setCurrentTimer}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -169,14 +171,16 @@ const ProjectDashboard = ({
                 </div>
 
                 <div className="p-6">
-                    <InvoicesList
-                        projectInvoices={projectInvoices}
-                        onEditInvoice={handleEditInvoice}
-                        paymentMethods={paymentMethods}
-                        businessInfos={businessInfos}
-                        clientInfos={clientInfos}
-                        hideNewInvoiceButton={true}
-                    />
+                    <div className="scrollable-container">
+                        <InvoicesList
+                            projectInvoices={projectInvoices}
+                            onEditInvoice={handleEditInvoice}
+                            paymentMethods={paymentMethods}
+                            businessInfos={businessInfos}
+                            clientInfos={clientInfos}
+                            hideNewInvoiceButton={true}
+                        />
+                    </div>
                 </div>
             </div>
         </div>

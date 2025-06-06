@@ -669,7 +669,7 @@ const ProjectList = ({
                             </button>
 
                             {showArchivedProjects && (
-                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 opacity-75">
+                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 opacity-75 scrollable-container">
                                     {projects.filter(p => p.archived).map((project) => (
                                         <div
                                             key={project.id}

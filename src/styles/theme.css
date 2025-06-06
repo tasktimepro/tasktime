@@ -1,0 +1,41 @@
+/* Theme variables for TaskTime app */
+
+:root {
+  /* 
+   * Main app colors - adjust these to match your app's color scheme 
+   * These will be referenced by the scrollbar variables
+   */
+  --app-primary: #2563eb;         /* Blue 600 - matches primary blue in your app */
+  --app-primary-light: #60a5fa;   /* Blue 400 - lighter shade */
+  --app-primary-lighter: #93c5fd; /* Blue 300 - even lighter shade for subtle elements */
+  --app-background: #f9fafb;      /* Gray 50 - matches your app's background */
+  --app-surface: #f3f4f6;         /* Gray 100 - for UI elements */
+  
+  /* Scrollbar specific variables */
+  --scrollbar-track-color: rgba(243, 244, 246, 0.8);  /* Semi-transparent surface color */
+  --scrollbar-thumb-color: rgba(96, 165, 250, 0.6);   /* Semi-transparent primary light */
+  --scrollbar-thumb-hover-color: rgba(37, 99, 235, 0.8); /* More opaque primary on hover */
+  --scrollbar-width: 8px;         /* Width of the scrollbar - slim but visible */
+  
+  /* Border radius for UI elements */
+  --border-radius-sm: 3px;
+  --border-radius-md: 5px;
+  --border-radius-lg: 8px;
+}
+
+/* Dark mode support - uncomment and customize if needed */
+/*
+@media (prefers-color-scheme: dark) {
+  :root {
+    --app-primary: #3b82f6;       /* Blue 500 - brighter blue for dark mode *\/
+    --app-primary-light: #93c5fd; /* Blue 300 - lighter for dark mode *\/
+    --app-primary-lighter: #bfdbfe; /* Blue 200 - even lighter for dark mode *\/
+    --app-background: #111827;    /* Gray 900 - dark background *\/
+    --app-surface: #1f2937;       /* Gray 800 - slightly lighter surface *\/
+    
+    --scrollbar-track-color: rgba(31, 41, 55, 0.8);  /* Semi-transparent dark surface *\/
+    --scrollbar-thumb-color: rgba(96, 165, 250, 0.5); /* Semi-transparent primary light *\/
+    --scrollbar-thumb-hover-color: rgba(147, 197, 253, 0.8); /* Brighter on hover *\/
+  }
+}
+*/

@@ -2,4 +2,29 @@
 #root {
   width: 100%;
   min-height: 100vh;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Apply consistent padding to prevent layout shifts from scrollbar */
+body {
+  padding-right: calc(var(--scrollbar-width) - (100vw - 100%));
+  overflow-x: hidden;
+  background-color: var(--app-background);
+}
+
+/* For components that have their own scrolling areas */
+.scrollable-container {
+  scrollbar-gutter: stable both-edges;
+  overflow-y: auto;
+  max-height: 100%;
+  padding-right: 4px; /* Small padding to prevent content touching scrollbar */
+}
+
+/* For fixed-height scrollable components */
+.scrollable-container-fixed {
+  scrollbar-gutter: stable both-edges;
+  overflow-y: auto;
+  max-height: 70vh; /* Limit height to prevent taking up the entire screen */
+  padding-right: 4px;
 }
