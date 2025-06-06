@@ -48,9 +48,10 @@ export const useUrlState = () => {
 
     /**
      * Navigate to projects view
+     * @param {Object} params - Optional parameters to include in URL
      */
-    const navigateToProjects = useCallback(() => {
-        updateUrl({ view: 'projects', project: null, section: null, create: null });
+    const navigateToProjects = useCallback((params = {}) => {
+        updateUrl({ view: 'projects', project: null, section: null, create: null, ...params });
     }, [updateUrl]);
 
     /**

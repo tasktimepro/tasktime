@@ -26,7 +26,7 @@ function App() {
     console.log('📊 Loaded projects:', projects.length);
 
     // URL-based state management
-    const { urlParams, navigateToProjects, navigateToProject, navigateToInvoices, navigateToAccount } = useUrlState();
+    const { urlParams, navigateToProjects, navigateToProject, navigateToInvoices, navigateToAccount, updateUrl } = useUrlState();
     
     // Derived state from URL parameters
     const activeView = urlParams.view;
@@ -67,7 +67,8 @@ function App() {
      * Handle navigation to projects view with project creation
      */
     const handleNavigateToProjects = () => {
-        navigateToProjects();
+        // Use the navigateToProjects function with a parameter to open the create form
+        navigateToProjects({ create: 'project' });
     };
 
     /**
@@ -168,6 +169,7 @@ function App() {
                         onSelectProject={(project) => {
                             navigateToProject(project.id);
                         }}
+                        showCreateForm={urlParams.create === 'project'}
                     />
                 )}
 
@@ -211,6 +213,8 @@ function App() {
                         setBusinessInfos={setBusinessInfos}
                         clientInfos={clientInfos}
                         setClientInfos={setClientInfos}
+                        updateUrl={updateUrl}
+                        navigateToProjects={handleNavigateToProjects}
                     />
                 )}
 

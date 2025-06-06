@@ -22,9 +22,10 @@ const ProjectList = ({
     setTimeEntries, 
     currentTimer, 
     setCurrentTimer, 
-    onSelectProject
+    onSelectProject,
+    showCreateForm: initialShowCreateForm = false
 }) => {
-    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [showCreateForm, setShowCreateForm] = useState(initialShowCreateForm);
     const [editingProject, setEditingProject] = useState(null);
     const [showDropdown, setShowDropdown] = useState({}); // Track dropdown states by project ID
     const [showArchivedProjects, setShowArchivedProjects] = useState(false);
@@ -39,6 +40,14 @@ const ProjectList = ({
         taxRate: 0
     });
 
+    // Update showCreateForm when the prop changes
+    useEffect(() => {
+        // If initialShowCreateForm becomes true, show the form
+        if (initialShowCreateForm) {
+            setShowCreateForm(true);
+        }
+    }, [initialShowCreateForm]);
+    
     // Close dropdown when clicking outside or when another dropdown opens
     useEffect(() => {
         const handleDropdownToggle = (event) => {
@@ -345,7 +354,7 @@ const ProjectList = ({
         <div className="space-y-8">
             {/* Header */}
             <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-gray-900">
+                <h2 className="text-2xl font-bold text-gray-900">
                     Projects {projects.filter(p => !p.archived).length > 0 && (
                         <span>
                             ({projects.filter(p => !p.archived).length})

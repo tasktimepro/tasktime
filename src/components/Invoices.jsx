@@ -25,7 +25,8 @@ const Invoices = ({
     businessInfos,
     setBusinessInfos,
     clientInfos,
-    setClientInfos
+    setClientInfos,
+    navigateToProjects
 }) => {
     const { urlParams, updateUrl } = useUrlState();
     const { showError } = useToast();
@@ -240,7 +241,9 @@ const Invoices = ({
                     }}
                     onNavigateToProjects={() => {
                         setShowInvoiceModal(false);
-                        updateUrl({ view: 'projects' });
+                        // Use the navigateToProjects function that's passed as a prop
+                        // and pass the create parameter to open the project form
+                        navigateToProjects({ create: 'project' });
                     }}
                     invoices={invoices}
                     setInvoices={setInvoices}
