@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CreditCardIcon, BuildingOfficeIcon, UserGroupIcon, DocumentTextIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
+import { useToast } from '../hooks/useToast';
 import PaymentMethods from './PaymentMethods';
 import BusinessInfo from './BusinessInfo';
 import ClientInfo from './ClientInfo';
@@ -16,6 +17,7 @@ const Invoices = ({
     tasks,
     setTasks,
     timeEntries,
+    currentTimer,
     invoices,
     setInvoices,
     paymentMethods,
@@ -26,10 +28,34 @@ const Invoices = ({
     setClientInfos
 }) => {
     const { urlParams, updateUrl } = useUrlState();
+    const { showError } = useToast();
     
     // State for the invoice modal
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [editingInvoice, setEditingInvoice] = useState(null);
+    
+    // Handle creating a new invoice with timer check
+    const handleCreateNewInvoice = () => {
+        // Check if a timer is currently active
+        if (currentTimer) {
+            showError('Cannot generate an invoice while a timer is active. Please stop the timer first.');
+            return;
+        }
+        
+        setShowInvoiceModal(true);
+    };
+
+    // Handle editing an invoice with timer check
+    const handleEditInvoice = (invoice) => {
+        // Check if a timer is currently active
+        if (currentTimer) {
+            showError('Cannot update an invoice while a timer is active. Please stop the timer first.');
+            return;
+        }
+        
+        setEditingInvoice(invoice);
+        setShowInvoiceModal(true);
+    };
     
     // Define sections in order (first will be default)
     const sideNavItems = [
@@ -94,10 +120,7 @@ const Invoices = ({
                         </div>
                         <InvoicesList
                             projectInvoices={invoices}
-                            onEditInvoice={(invoice) => {
-                                setEditingInvoice(invoice);
-                                setShowInvoiceModal(true);
-                            }}
+                            onEditInvoice={handleEditInvoice}
                             paymentMethods={paymentMethods}
                             businessInfos={businessInfos}
                             clientInfos={clientInfos}
@@ -143,7 +166,7 @@ const Invoices = ({
                     
                     {/* New Invoice Button */}
                     <button
-                        onClick={() => setShowInvoiceModal(true)}
+                        onClick={handleCreateNewInvoice}
                         className="mt-4 w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                     >
                         <DocumentTextIcon className="h-5 w-5 mr-2" />
@@ -192,6 +215,7 @@ const Invoices = ({
                     tasks={tasks}
                     setTasks={setTasks}
                     timeEntries={timeEntries}
+                    currentTimer={currentTimer}
                     editingInvoice={editingInvoice}
                     paymentMethods={paymentMethods}
                     onNavigateToPaymentMethods={() => {

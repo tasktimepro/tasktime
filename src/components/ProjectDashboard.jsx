@@ -5,6 +5,7 @@ import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import { getCurrencySymbol } from '../utils/currencyUtils';
+import { useToast } from '../hooks/useToast';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -32,6 +33,7 @@ const ProjectDashboard = ({
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
+    const { showError } = useToast();
     
     // Get invoices for this project
     const projectInvoices = invoices.filter(invoice => 
@@ -42,6 +44,12 @@ const ProjectDashboard = ({
      * Handle editing an existing invoice
      */
     const handleEditInvoice = (invoice) => {
+        // Check if a timer is currently active
+        if (currentTimer) {
+            showError('Cannot update an invoice while a timer is active. Please stop the timer first.');
+            return;
+        }
+        
         setEditingInvoice(invoice);
     };
     
@@ -90,6 +98,7 @@ const ProjectDashboard = ({
                     tasks={projectTasks}
                     setTasks={setTasks}
                     timeEntries={projectTimeEntries}
+                    currentTimer={currentTimer}
                     paymentMethods={paymentMethods}
                     onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                     businessInfos={businessInfos}
@@ -144,6 +153,7 @@ const ProjectDashboard = ({
                             tasks={projectTasks}
                             setTasks={setTasks}
                             timeEntries={projectTimeEntries}
+                            currentTimer={currentTimer}
                             editingInvoice={editingInvoice}
                             onInvoiceSaved={() => setEditingInvoice(null)}
                             paymentMethods={paymentMethods}

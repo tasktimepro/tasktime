@@ -199,6 +199,7 @@ function App() {
                         tasks={tasks}
                         setTasks={setTasks}
                         timeEntries={timeEntries}
+                        currentTimer={currentTimer}
                         invoices={invoices}
                         setInvoices={setInvoices}
                         paymentMethods={paymentMethods}

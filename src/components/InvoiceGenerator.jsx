@@ -17,6 +17,7 @@ const InvoiceGenerator = ({
     tasks,
     setTasks,
     timeEntries,
+    currentTimer,
     editingInvoice,
     onInvoiceSaved,
     paymentMethods = [],
@@ -803,6 +804,12 @@ const InvoiceGenerator = ({
         // Don't open again if it's already open to avoid re-rendering issues
         if (showInvoiceForm) return;
         
+        // Check if a timer is currently active
+        if (currentTimer) {
+            showError('Cannot generate an invoice while a timer is active. Please stop the timer first.');
+            return;
+        }
+        
         if (editingInvoice) {
             // Open form with existing invoice data
             setInvoiceTasks(editingInvoice.tasks || []);
@@ -908,7 +915,7 @@ const InvoiceGenerator = ({
             setIsProjectContextFixed(true);
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject?.hourlyRate]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject?.hourlyRate, currentTimer, showError]);
 
     // Keep track of whether we've handled the current editing invoice
     const [handledEditingInvoice, setHandledEditingInvoice] = useState(null);
