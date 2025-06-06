@@ -245,6 +245,30 @@ const ClientInfo = ({
     const handleDeleteClientInfo = (clientInfoId) => {
         if (window.confirm('Are you sure you want to delete this client info?')) {
             setClientInfos(prev => prev.filter(info => info.id !== clientInfoId));
+            
+            // Close the edit form if the deleted item was being edited
+            if (editingClientInfo && editingClientInfo.id === clientInfoId) {
+                setEditingClientInfo(null);
+                
+                // Reset form data
+                setFormData({
+                    title: '',
+                    clientName: '',
+                    contactPerson: '',
+                    address: '',
+                    city: '',
+                    state: '',
+                    zip: '',
+                    country: '',
+                    registrationNumber: '',
+                    vat: '',
+                    taxNumber: '',
+                    email: '',
+                    phone: '',
+                    custom: []
+                });
+            }
+
             showSuccess('Client info deleted successfully');
         }
     };

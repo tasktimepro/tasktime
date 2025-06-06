@@ -179,6 +179,21 @@ const ProjectList = ({
             const deletedTaskCount = allTaskIdsToDelete.size;
             const deletedTimeEntriesCount = timeEntries.length - updatedTimeEntries.length;
             
+            // Close the edit form if the deleted project was being edited
+            if (editingProject && editingProject.id === projectId) {
+                setEditingProject(null);
+                
+                // Reset form data
+                setFormData({ 
+                    title: '', 
+                    hourlyRate: '', 
+                    currency: 'USD', 
+                    taxEnabled: false, 
+                    taxLabel: 'VAT', 
+                    taxRate: 0 
+                });
+            }
+            
             showSuccess(
                 `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`
             );
@@ -330,7 +345,13 @@ const ProjectList = ({
         <div className="space-y-8">
             {/* Header */}
             <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-gray-900">Projects</h2>
+                <h2 className="text-3xl font-bold text-gray-900">
+                    Projects {projects.filter(p => !p.archived).length > 0 && (
+                        <span>
+                            ({projects.filter(p => !p.archived).length})
+                        </span>
+                    )}
+                </h2>
 
                 <button
                     onClick={() => setShowCreateForm(true)}

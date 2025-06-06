@@ -243,6 +243,23 @@ const PaymentMethods = ({
     const handleDeletePaymentMethod = (paymentMethodId) => {
         if (window.confirm('Are you sure you want to delete this payment method?')) {
             setPaymentMethods(paymentMethods.filter(method => method.id !== paymentMethodId));
+            
+            // Close the edit form if the deleted item was being edited
+            if (editingPaymentMethod && editingPaymentMethod.id === paymentMethodId) {
+                setEditingPaymentMethod(null);
+                
+                // Reset form data
+                setFormData({
+                    title: '',
+                    fullName: '',
+                    bank: '',
+                    iban: '',
+                    swift: '',
+                    bankAddress: '',
+                    paypal: '',
+                    custom: []
+                });
+            }
 
             showSuccess('Payment method deleted successfully');
         }

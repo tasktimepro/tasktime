@@ -130,7 +130,7 @@ const InvoiceModal = ({
                                     )}
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     <select
                                         value={selectedProject?.id || ''}
                                         onChange={(e) => handleProjectSelection(e.target.value)}
@@ -196,7 +196,7 @@ const InvoiceModal = ({
                                     </button>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     <select
                                         value={selectedClientInfo?.id || ''}
                                         onChange={(e) => handleClientInfoSelection(e.target.value)}
@@ -207,30 +207,14 @@ const InvoiceModal = ({
                                         <option value="">Select client info</option>
                                         {clientInfos.map(clientInfo => (
                                             <option key={clientInfo.id} value={clientInfo.id}>
-                                                {clientInfo.clientName.trim()}
+                                                {clientInfo.title.trim()}
                                             </option>
                                         ))}
                                     </select>
                                     {selectedClientInfo && (
                                         <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
                                             <p className="text-sm text-blue-800">
-                                                <strong>{selectedClientInfo.clientName}</strong><br />
-                                                {selectedClientInfo.email && (
-                                                    <span>{selectedClientInfo.email}<br /></span>
-                                                )}
-                                                {selectedClientInfo.address && (
-                                                    <span>{selectedClientInfo.address}<br /></span>
-                                                )}
-                                                {(selectedClientInfo.city || selectedClientInfo.state || selectedClientInfo.zip) && (
-                                                    <span>
-                                                        {selectedClientInfo.city ? selectedClientInfo.city + ', ' : ''}
-                                                        {selectedClientInfo.state ? selectedClientInfo.state + ' ' : ''}
-                                                        {selectedClientInfo.zip || ''}<br />
-                                                    </span>
-                                                )}
-                                                {selectedClientInfo.country && (
-                                                    <span>{selectedClientInfo.country}</span>
-                                                )}
+                                                <strong>{selectedClientInfo.title}</strong> will be included as "Invoice To" in the invoice.
                                             </p>
                                         </div>
                                     )}
@@ -432,7 +416,7 @@ const InvoiceModal = ({
                                             </div>
                                             <div className="flex items-center space-x-3">
                                                 {/* Add flat rate toggle */}
-                                                <div className="flex items-center">
+                                                <div className="flex items-center ">
                                                     <CustomCheckbox
                                                         checked={isUsingFlatRate}
                                                         onChange={() => handleToggleFlatRate(task.id, !isUsingFlatRate)}
@@ -506,7 +490,7 @@ const InvoiceModal = ({
 
                             {/* Add Task Form */}
                             {showAddTaskForm && (
-                                <div className="mt-2 5mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                <div className="mt-2 mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
                                     <div className="space-y-3">
                                         <div>
                                             <input
@@ -518,16 +502,20 @@ const InvoiceModal = ({
                                                 required
                                             />
                                         </div>
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <CustomCheckbox
-                                                checked={newTaskUseFlatRate}
-                                                onChange={handleToggleNewTaskFlatRate}
-                                            />
-                                            <label htmlFor="new-task-flat-rate" className="text-xs text-gray-700">
-                                                Flat rate
-                                            </label>
-                                        </div>                                                <div className="flex space-x-2">
-                                            <div className="flex space-x-2">
+
+                                        <div className="flex justify-between items-end">
+                                            {/* Checkbox + Inputs */}
+                                            <div className="flex items-center space-x-2">
+                                                <div className="flex items-center space-x-2 mr-1">
+                                                    <CustomCheckbox
+                                                        checked={newTaskUseFlatRate}
+                                                        onChange={handleToggleNewTaskFlatRate}
+                                                    />
+                                                    <label htmlFor="new-task-flat-rate" className="text-xs text-gray-700">
+                                                        Flat rate
+                                                    </label>
+                                                </div>
+
                                                 {newTaskUseFlatRate && (
                                                     <div className="text-right">
                                                         <div className="text-xs text-gray-500 mb-1 text-left">Quantity</div>
@@ -542,6 +530,7 @@ const InvoiceModal = ({
                                                         />
                                                     </div>
                                                 )}
+
                                                 <div className="text-right">
                                                     <div className="text-xs text-gray-500 mb-1 text-left">
                                                         {newTaskUseFlatRate ? `Rate (${selectedProject?.currency || "USD"})` : `Hours ${newTaskHours ? `(${hoursToMinutes(parseFloat(newTaskHours) || 0)}min)` : ''}`}
@@ -556,44 +545,47 @@ const InvoiceModal = ({
                                                         className="w-24 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
                                                     />
                                                 </div>
+
+                                                {!newTaskUseFlatRate && (
+                                                    <div className="text-right">
+                                                        <div className="text-xs text-gray-500 mb-1 text-left">Hourly rate</div>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={newTaskHourlyRate || selectedProject?.hourlyRate || 0}
+                                                            onChange={(e) => setNewTaskHourlyRate(e.target.value)}
+                                                            placeholder="0.00"
+                                                            className="w-20 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
-                                            {/* New Hourly Rate Input */}
-                                            {!newTaskUseFlatRate && (
-                                                <div className="text-right">
-                                                    <div className="text-xs text-gray-500 mb-1 text-left">Hourly rate</div>
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={newTaskHourlyRate || selectedProject?.hourlyRate || 0}
-                                                        onChange={(e) => setNewTaskHourlyRate(e.target.value)}
-                                                        placeholder="0.00"
-                                                        className="w-20 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex justify-end space-x-2 mt-3">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setShowAddTaskForm(false);
-                                                    setNewTaskTitle('');
-                                                    setNewTaskHours('');
-                                                    setNewTaskHourlyRate('');
-                                                    setNewTaskUseFlatRate(false);
-                                                }}
-                                                className="px-3 py-1.5 bg-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-400"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={handleAddAdditionalTask}
-                                                className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                                            >
-                                                Add Task
-                                            </button>
+
+                                            {/* Buttons */}
+                                            <div className="flex space-x-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowAddTaskForm(false);
+                                                        setNewTaskTitle('');
+                                                        setNewTaskHours('');
+                                                        setNewTaskHourlyRate('');
+                                                        setNewTaskUseFlatRate(false);
+                                                    }}
+                                                    className="h-[36px] px-3 bg-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-400"
+                                                >
+                                                    Cancel
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddAdditionalTask}
+                                                    className="h-[36px] px-3 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                                                >
+                                                    Add Task
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -824,7 +816,7 @@ const InvoiceModal = ({
                                     </button>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     <select
                                         value={selectedBusinessInfo?.id || ''}
                                         onChange={(e) => {
@@ -887,7 +879,7 @@ const InvoiceModal = ({
                                     </button>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     <select
                                         value={selectedPaymentMethod?.id || ''}
                                         onChange={(e) => {
@@ -913,7 +905,7 @@ const InvoiceModal = ({
                                     {selectedPaymentMethod && (
                                         <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
                                             <p className="text-sm text-blue-800">
-                                                <strong>{selectedPaymentMethod.title}</strong> will be included in the invoice payment details.
+                                                <strong>{selectedPaymentMethod.title}</strong> will be included as "Payment Details" in the invoice.
                                             </p>
                                         </div>
                                     )}

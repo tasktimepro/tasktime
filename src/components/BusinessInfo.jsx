@@ -247,6 +247,28 @@ const BusinessInfo = ({
     const handleDeleteBusinessInfo = (businessInfoId) => {
         if (window.confirm('Are you sure you want to delete this business info?')) {
             setBusinessInfos(businessInfos.filter(info => info.id !== businessInfoId));
+            
+            // Close the edit form if the deleted item was being edited
+            if (editingBusinessInfo && editingBusinessInfo.id === businessInfoId) {
+                setEditingBusinessInfo(null);
+                
+                // Reset form data
+                setFormData({
+                    title: '',
+                    businessName: '',
+                    address: '',
+                    city: '',
+                    state: '',
+                    zip: '',
+                    country: '',
+                    registrationNumber: '',
+                    vat: '',
+                    taxNumber: '',
+                    email: '',
+                    phone: '',
+                    custom: []
+                });
+            }
 
             showSuccess('Business info deleted successfully');
         }
