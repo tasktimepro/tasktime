@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
@@ -27,6 +27,7 @@ const ProjectList = ({
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
     const [showDropdown, setShowDropdown] = useState({}); // Track dropdown states by project ID
+    const [showArchivedProjects, setShowArchivedProjects] = useState(false);
     const { showSuccess } = useToast();
 
     const [formData, setFormData] = useState({
@@ -98,7 +99,8 @@ const ProjectList = ({
             taxLabel: formData.taxLabel,
             taxRate: parseFloat(formData.taxRate) || 0,
             createdAt: Date.now(),
-            lastBilledAt: null
+            lastBilledAt: null,
+            archived: false
         };
 
         setProjects([...projects, newProject]);
@@ -211,6 +213,28 @@ const ProjectList = ({
 
         setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0 });
     };    /**
+     * Archive a project
+     */
+    const handleArchiveProject = (projectId) => {
+        const updatedProjects = projects.map(project =>
+            project.id === projectId ? { ...project, archived: true } : project
+        );
+        setProjects(updatedProjects);
+        showSuccess('Project archived successfully!');
+    };
+
+    /**
+     * Unarchive a project
+     */
+    const handleUnarchiveProject = (projectId) => {
+        const updatedProjects = projects.map(project =>
+            project.id === projectId ? { ...project, archived: false } : project
+        );
+        setProjects(updatedProjects);
+        showSuccess('Project unarchived successfully!');
+    };
+
+    /**
      * Calculate unbilled amount for a project
      */
     const calculateUnbilledAmount = (project) => {
@@ -303,7 +327,7 @@ const ProjectList = ({
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             {/* Header */}
             <div className="flex justify-between items-center">
                 <h2 className="text-3xl font-bold text-gray-900">Projects</h2>
@@ -463,7 +487,7 @@ const ProjectList = ({
             )}
 
             {/* Projects Grid */}
-            {projects.length === 0 ? (
+            {projects.filter(p => !p.archived).length === 0 && projects.filter(p => p.archived).length === 0 ? (
                 <div className="text-center py-12">
                     <div className="mx-auto h-12 w-12 text-gray-400">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -486,8 +510,11 @@ const ProjectList = ({
                     </div>
                 </div>
             ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {projects.map((project) => (
+                <>
+                    {/* Active Projects */}
+                    {projects.filter(p => !p.archived).length > 0 && (
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            {projects.filter(p => !p.archived).map((project) => (
                         <div
                             key={project.id}
                             className="bg-white shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
@@ -530,6 +557,16 @@ const ProjectList = ({
                                                     >
                                                         <PencilIcon className="h-4 w-4" />
                                                         <span>Edit</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleArchiveProject(project.id);
+                                                            setShowDropdown({});
+                                                        }}
+                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors space-x-2"
+                                                    >
+                                                        <ArchiveBoxIcon className="h-4 w-4" />
+                                                        <span>Archive</span>
                                                     </button>
                                                     <button
                                                         onClick={() => {
@@ -584,6 +621,126 @@ const ProjectList = ({
                         </div>
                     ))}
                 </div>
+                    )}
+
+                    {/* Archived Projects Section */}
+                    {projects.filter(p => p.archived).length > 0 && (
+                        <div className="border-t pt-6">
+                            <button
+                                onClick={() => setShowArchivedProjects(!showArchivedProjects)}
+                                className="flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 mb-4"
+                            >
+                                {showArchivedProjects ? (
+                                    <ChevronDownIcon className="h-4 w-4 mr-1" />
+                                ) : (
+                                    <ChevronRightIcon className="h-4 w-4 mr-1" />
+                                )}
+                                Archived Projects ({projects.filter(p => p.archived).length})
+                            </button>
+
+                            {showArchivedProjects && (
+                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 opacity-75">
+                                    {projects.filter(p => p.archived).map((project) => (
+                                        <div
+                                            key={project.id}
+                                            className="bg-white shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
+                                            onClick={() => onSelectProject(project)}
+                                        >
+                                            <div className="p-5">
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="text-lg font-medium text-gray-900 truncate">
+                                                        {project.title}
+                                                    </h3>
+
+                                                    {/* Three-dot dropdown menu for Unarchive and Delete */}
+                                                    <div className="relative dropdown-container" onClick={(e) => e.stopPropagation()}>
+                                                        <button
+                                                            onClick={() => {
+                                                                const newState = !showDropdown[project.id];
+                                                                setShowDropdown(newState ? { [project.id]: true } : {});
+
+                                                                // Dispatch a custom event to close other dropdowns
+                                                                const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
+                                                                    detail: { taskId: project.id, open: newState }
+                                                                });
+                                                                document.dispatchEvent(event);
+                                                            }}
+                                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
+                                                            title="More actions"
+                                                        >
+                                                            <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
+                                                        </button>
+
+                                                        {showDropdown[project.id] && (
+                                                            <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                                                                <div className="py-1">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            handleUnarchiveProject(project.id);
+                                                                            setShowDropdown({});
+                                                                        }}
+                                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors space-x-2"
+                                                                    >
+                                                                        <ArchiveBoxIcon className="h-4 w-4" />
+                                                                        <span>Unarchive</span>
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            handleDeleteProject(project.id);
+                                                                            setShowDropdown({});
+                                                                        }}
+                                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
+                                                                    >
+                                                                        <TrashIcon className="h-4 w-4" />
+                                                                        <span>Delete</span>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {project.hourlyRate && (
+                                                    <p className="mt-2 text-sm text-gray-500">
+                                                        {`${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`}
+                                                    </p>
+                                                )}
+
+                                                <p className="mt-1 text-xs text-gray-400">
+                                                    Created {new Date(project.createdAt).toLocaleDateString()}
+                                                </p>
+
+                                                {/* Billable Amount Tag or Clock Icon for missing rate */}
+                                                {calculateUnbilledAmount(project) > 0 ? (
+                                                    <div className="absolute bottom-4 right-4">
+                                                        <button
+                                                            onClick={(e) => handleGenerateInvoice(e, project)}
+                                                            className="inline-flex items-center px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-full hover:bg-green-700 transition-colors"
+                                                            title="Click to generate invoice"
+                                                        >
+                                                            {getCurrencySymbol(project.currency)}{calculateUnbilledAmount(project).toFixed(2)}
+                                                        </button>
+                                                    </div>
+                                                ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
+                                                    <div className="absolute bottom-4 right-4">
+                                                        <button
+                                                            onClick={(e) => handleGenerateInvoice(e, project)}
+                                                            className="inline-flex items-center px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded-full hover:bg-blue-700 transition-colors"
+                                                            title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
+                                                        >
+                                                            <ClockIcon className="h-3 w-3 mr-1" />
+                                                            {calculateUnbilledHours(project).toFixed(2)}h
+                                                        </button>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
