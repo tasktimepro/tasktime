@@ -1,6 +1,7 @@
 import { TrashIcon } from '@heroicons/react/24/outline';
 import { formatDurationWithSeconds, hoursToMinutes } from '../../utils/dateUtils';
 import CustomCheckbox from '../CustomCheckbox';
+import Modal from '../Modal';
 
 const InvoiceModal = ({
     showInvoiceForm,
@@ -77,24 +78,13 @@ const InvoiceModal = ({
 }) => {
     if (!showInvoiceForm) return null;
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 !mt-0">
-            <div className="relative mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white my-8">
-
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">
-                        {editingInvoice ? 'Edit Invoice' : 'New Invoice'}
-                    </h3>
-                    <button
-                        onClick={handleCancel}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-
-                <div>
+        <Modal 
+            isOpen={showInvoiceForm}
+            onClose={handleCancel}
+            title={editingInvoice ? 'Edit Invoice' : 'New Invoice'}
+            size="2xl"
+        >
+            <div className="space-y-4">
                     <form onSubmit={handleSaveInvoice} className="space-y-5">
 
                         {/* Project Selection */}
@@ -963,8 +953,7 @@ const InvoiceModal = ({
                         </div>
                     </form>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

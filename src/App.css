@@ -15,7 +15,7 @@ body {
 
 /* For components that have their own scrolling areas */
 .scrollable-container {
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
   overflow-y: auto;
   max-height: 100%;
   padding-right: 4px; /* Small padding to prevent content touching scrollbar */
@@ -23,7 +23,7 @@ body {
 
 /* For fixed-height scrollable components */
 .scrollable-container-fixed {
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
   overflow-y: auto;
   max-height: 70vh; /* Limit height to prevent taking up the entire screen */
   padding-right: 4px;

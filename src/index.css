@@ -44,12 +44,17 @@
 /* Fix for preventing layout shifts when scrollbar appears/disappears */
 html {
   overflow-y: scroll;
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
+}
+
+/* When modals are open, prevent background scrolling */
+html.modal-open {
+  overflow: hidden;
 }
 
 /* Apply scrollbar gutter to body and main content sections */
 body, main, .content-area {
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
 }
 
 /* Thinner scrollbars on mobile devices */

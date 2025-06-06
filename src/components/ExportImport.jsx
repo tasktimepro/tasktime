@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils';
+import Modal from './Modal';
 
 /**
  * ExportImport component for backing up and restoring application data
@@ -175,80 +176,83 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
             </div>
 
             {/* Import Modal */}
-            {showImportModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 !mt-0">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Import Data</h3>
-                        
-                        <div className="space-y-4">
-                            {/* File Upload */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Upload JSON File
-                                </label>
-                                <input
-                                    type="file"
-                                    accept=".json"
-                                    onChange={handleFileUpload}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
+            <Modal 
+                isOpen={showImportModal}
+                onClose={() => {
+                    setShowImportModal(false);
+                    setImportData('');
+                    setImportError('');
+                }}
+                title="Import Data"
+                size="2xl"
+            >
+                <div className="space-y-4">
+                    {/* File Upload */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Upload JSON File
+                        </label>
+                        <input
+                            type="file"
+                            accept=".json"
+                            onChange={handleFileUpload}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
 
-                            {/* Manual Input */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Or paste JSON data
-                                </label>
-                                <textarea
-                                    value={importData}
-                                    onChange={(e) => setImportData(e.target.value)}
-                                    placeholder="Paste JSON data here..."
-                                    className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-                                />
-                            </div>
+                    {/* Manual Input */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Or paste JSON data
+                        </label>
+                        <textarea
+                            value={importData}
+                            onChange={(e) => setImportData(e.target.value)}
+                            placeholder="Paste JSON data here..."
+                            className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                        />
+                    </div>
 
-                            {/* Error Display */}
-                            {importError && (
-                                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                    <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
-                                    <p className="text-sm text-red-700">{importError}</p>
-                                </div>
-                            )}
-
-                            {/* Warning */}
-                            <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                                <div className="text-sm text-yellow-700">
-                                    <p className="font-medium">Warning:</p>
-                                    <p>Importing will replace all current data. Make sure to export your current data first if you want to keep it.</p>
-                                </div>
-                            </div>
+                    {/* Error Display */}
+                    {importError && (
+                        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
+                            <p className="text-sm text-red-700">{importError}</p>
                         </div>
+                    )}
 
-                        {/* Modal Actions */}
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={() => {
-                                    setShowImportModal(false);
-                                    setImportData('');
-                                    setImportError('');
-                                }}
-                                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            
-                            <button
-                                onClick={handleImport}
-                                disabled={!importData.trim()}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                            >
-                                Import Data
-                            </button>
+                    {/* Warning */}
+                    <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-yellow-700">
+                            <p className="font-medium">Warning:</p>
+                            <p>Importing will replace all current data. Make sure to export your current data first if you want to keep it.</p>
                         </div>
                     </div>
+
+                    {/* Modal Actions */}
+                    <div className="flex justify-end gap-3 mt-6">
+                        <button
+                            onClick={() => {
+                                setShowImportModal(false);
+                                setImportData('');
+                                setImportError('');
+                            }}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        
+                        <button
+                            onClick={handleImport}
+                            disabled={!importData.trim()}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Import Data
+                        </button>
+                    </div>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 }

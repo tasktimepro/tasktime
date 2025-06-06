@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import Pagination from './Pagination';
+import Modal from './Modal';
 
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
@@ -255,23 +256,14 @@ const InvoicesList = ({
             )}
 
             {/* Invoice Preview Modal */}
-            {showPreview && selectedInvoice && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 !mt-0">
-                    <div className="relative mx-auto p-5 border max-w-4xl shadow-lg rounded-md bg-white my-8">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-medium text-gray-900">
-                                Invoice Preview - {selectedInvoice.invoiceNumber}
-                            </h3>
-                            <button
-                                onClick={() => setShowPreview(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
+            <Modal 
+                isOpen={showPreview && !!selectedInvoice}
+                onClose={() => setShowPreview(false)}
+                title={selectedInvoice ? `Invoice Preview - ${selectedInvoice.invoiceNumber}` : ''}
+                size="4xl"
+            >
+                {selectedInvoice && (
+                    <>
                         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 max-h-[40rem] overflow-y-auto">
                             {selectedInvoice.htmlContent ? (
                                 <div dangerouslySetInnerHTML={{ __html: selectedInvoice.htmlContent }} />
@@ -285,7 +277,7 @@ const InvoicesList = ({
                                     
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                                <h3 className="text-sm font-medium text-gray-900 mb-2">Invoice To:</h3>
+                                            <h3 className="text-sm font-medium text-gray-900 mb-2">Invoice To:</h3>
                                             <div className="text-sm text-gray-600">
                                                 <p>{(selectedInvoice.clientInfo || selectedInvoice.client)?.name}</p>
                                                 {(selectedInvoice.clientInfo || selectedInvoice.client)?.email && (
@@ -350,9 +342,9 @@ const InvoicesList = ({
                                 Close
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </>
+                )}
+            </Modal>
         </div>
     );
 };
