@@ -674,6 +674,7 @@ const InvoiceGenerator = ({
             invoiceNumber: invoiceNumber,
             date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
+            paymentProcessed: editingInvoice ? editingInvoice.paymentProcessed || false : false,
             htmlContent: createInvoiceHTML({
                 id: editingInvoice ? editingInvoice.id : `INV-${selectedProject.id.slice(-8)}-${Date.now()}`,
                 project: selectedProject,

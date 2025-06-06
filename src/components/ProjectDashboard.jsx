@@ -179,6 +179,7 @@ const ProjectDashboard = ({
                             businessInfos={businessInfos}
                             clientInfos={clientInfos}
                             hideNewInvoiceButton={true}
+                            setInvoices={setInvoices}
                         />
                     </div>
                 </div>

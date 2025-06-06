@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import Pagination from './Pagination';
@@ -14,7 +14,8 @@ const InvoicesList = ({
     paymentMethods = [], 
     businessInfos = [], 
     clientInfos = [],
-    hideNewInvoiceButton = false 
+    hideNewInvoiceButton = false,
+    setInvoices
 }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
@@ -119,10 +120,44 @@ const InvoicesList = ({
      */
     const handleEdit = (invoice) => {
         if (onEditInvoice) {
+            // Show warning for paid invoices
+            if (invoice.paymentProcessed) {
+                const confirmEdit = window.confirm(
+                    "This invoice is marked as Paid. Editing a paid invoice may cause inconsistencies in your records.\n\nAre you sure you want to continue?"
+                );
+                if (!confirmEdit) {
+                    return; // User cancelled, don't proceed with edit
+                }
+            }
+            
             onEditInvoice(invoice);
         } else {
             alert('Edit functionality requires integration with the parent component.');
         }
+    };
+
+    /**
+     * Handle payment processed toggle
+     */
+    const handlePaymentProcessedToggle = (invoice) => {
+        if (!setInvoices) {
+            console.warn('setInvoices function not provided');
+            return;
+        }
+
+        // Update the invoice with the new payment processed status
+        const updatedInvoice = {
+            ...invoice,
+            paymentProcessed: !invoice.paymentProcessed
+        };
+
+        // Find the invoice in the list and update it
+        const updatedInvoices = projectInvoices.map(inv => 
+            inv.id === invoice.id ? updatedInvoice : inv
+        );
+
+        // Update the invoices state
+        setInvoices(updatedInvoices);
     };
 
     if (projectInvoices.length === 0) {
@@ -159,61 +194,91 @@ const InvoicesList = ({
             
             <div className="space-y-4">
                 {paginatedInvoices.map((invoice) => (
-                    <div key={invoice.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div className="flex-1">
+                    <div key={invoice.id} className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
+                        invoice.paymentProcessed 
+                            ? 'border-green-300 bg-white' 
+                            : 'border-gray-200 bg-white'
+                    }`}>
+                        <div className="flex flex-col space-y-4">
+                            {/* Header row with invoice number and status tag */}
+                            <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
                                     <DocumentTextIcon className="h-6 w-6 text-gray-400" />
-                                    <div>
-                                        <h3 className="text-sm font-medium text-gray-900">
-                                            {invoice.invoiceNumber}
-                                        </h3>
-                                        <p className="text-sm text-gray-500">
-                                            {invoice.date} <span className="mx-1">•</span> {invoice.totalHours.toFixed(2)} hours <span className="mx-1">•</span> {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)}
-                                        </p>
-                                        <div className="text-xs text-gray-400 mt-1">
-                                            <p>
-                                                Client: <span className="font-medium text-gray-600">
-                                                    {(() => {
-                                                        // Try to get client name from clientInfoId first
-                                                        if (invoice.clientInfoId) {
-                                                            const clientInfo = clientInfos.find(ci => ci.id === invoice.clientInfoId);
-                                                            if (clientInfo) {
-                                                                return clientInfo.clientName;
-                                                            }
-                                                        }
-                                                        // Fallback to stored client info or manual entry
-                                                        return invoice.clientInfo?.name || invoice.client?.name || 'Unknown';
-                                                    })()}
-                                                </span>
-                                            </p>
-                                            <p>
-                                                Project: <span className="font-medium text-gray-600">
-                                                    {invoice.project?.title || 'Unknown Project'}
-                                                </span>
-                                            </p>
-                                            {invoice.businessInfoId && (() => {
-                                                const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
-                                                return businessInfo ? (
-                                                    <p>
-                                                        Business: <span className="font-medium text-gray-600">{businessInfo.title}</span>
-                                                    </p>
-                                                ) : null;
-                                            })()}
-                                            {invoice.paymentMethodId && (() => {
-                                                const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                                                return paymentMethod ? (
-                                                    <p>
-                                                        Payment Method: <span className="font-medium text-gray-600">{paymentMethod.title}</span>
-                                                    </p>
-                                                ) : null;
-                                            })()}
-                                        </div>
-                                    </div>
+                                    <h3 className="text-sm font-medium text-gray-900">
+                                        {invoice.invoiceNumber}
+                                    </h3>
+                                </div>
+                                <div>
+                                    {invoice.paymentProcessed ? (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <CheckIcon className="h-3 w-3 mr-1" />
+                                            Paid
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                            Outstanding
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="flex items-center space-x-2">
+                            {/* Invoice details */}
+                            <div className="ml-9">
+                                <p className="text-sm text-gray-500">
+                                    {invoice.date} <span className="mx-1">•</span> {invoice.totalHours.toFixed(2)} hours <span className="mx-1">•</span> {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)}
+                                </p>
+                                <div className="text-xs text-gray-400 mt-1">
+                                    <p>
+                                        Client: <span className="font-medium text-gray-600">
+                                            {(() => {
+                                                // Try to get client name from clientInfoId first
+                                                if (invoice.clientInfoId) {
+                                                    const clientInfo = clientInfos.find(ci => ci.id === invoice.clientInfoId);
+                                                    if (clientInfo) {
+                                                        return clientInfo.clientName;
+                                                    }
+                                                }
+                                                // Fallback to stored client info or manual entry
+                                                return invoice.clientInfo?.name || invoice.client?.name || 'Unknown';
+                                            })()}
+                                        </span>
+                                    </p>
+                                    <p>
+                                        Project: <span className="font-medium text-gray-600">
+                                            {invoice.project?.title || 'Unknown Project'}
+                                        </span>
+                                    </p>
+                                    {invoice.businessInfoId && (() => {
+                                        const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                                        return businessInfo ? (
+                                            <p>
+                                                Business: <span className="font-medium text-gray-600">{businessInfo.title}</span>
+                                            </p>
+                                        ) : null;
+                                    })()}
+                                    {invoice.paymentMethodId && (() => {
+                                        const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                                        return paymentMethod ? (
+                                            <p>
+                                                Payment Method: <span className="font-medium text-gray-600">{paymentMethod.title}</span>
+                                            </p>
+                                        ) : null;
+                                    })()}
+                                </div>
+                            </div>
+
+                            {/* Action buttons - bottom right */}
+                            <div className="flex justify-end items-center space-x-2">
+                                {!invoice.paymentProcessed && (
+                                    <button
+                                        onClick={() => handlePaymentProcessedToggle(invoice)}
+                                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    >
+                                        <CheckIcon className="h-3 w-3 mr-1" />
+                                        Mark as Paid
+                                    </button>
+                                )}
+                                
                                 <button
                                     onClick={() => handlePreview(invoice)}
                                     className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50"
@@ -237,9 +302,6 @@ const InvoicesList = ({
                                 >
                                     <ArrowDownTrayIcon className="h-5 w-5" />
                                 </button>
-
-                                {/* Removed delete button to maintain billing integrity */}
-                                {/* Once an invoice is generated, it should not be deleted to preserve billing history */}
                             </div>
                         </div>
                     </div>

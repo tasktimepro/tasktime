@@ -131,6 +131,7 @@ const Invoices = ({
                             paymentMethods={paymentMethods}
                             businessInfos={businessInfos}
                             clientInfos={clientInfos}
+                            setInvoices={setInvoices}
                         />
                     </div>
                 );

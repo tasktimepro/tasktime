@@ -142,7 +142,7 @@ const InvoiceModal = ({
                                                 {selectedProject.hourlyRate ? (
                                                     <div className="text-sm text-blue-800">
                                                         <strong>{selectedProject.title}</strong><br />
-                                                        Rate: {getCurrencySymbol(selectedProject.currency)}${selectedProject.hourlyRate}/hour
+                                                        Rate: {getCurrencySymbol(selectedProject.currency)}{selectedProject.hourlyRate}/hour
                                                     </div>
                                                 ) : (
                                                     <div className="text-sm text-blue-800">
