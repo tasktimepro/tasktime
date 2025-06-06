@@ -221,27 +221,33 @@ const InvoiceGenerator = ({
 
     // Track when the form gets shown so we can initialize only then
     const [hasInitialized, setHasInitialized] = useState(false);
+    const [currentEditingInvoiceId, setCurrentEditingInvoiceId] = useState(null);
 
     // Initialize all dropdowns together, but only when showInvoiceForm becomes true,
     // or when editing an invoice changes, or when available options change
     useEffect(() => {
         // Only initialize when the form is shown
         if (showInvoiceForm) {
-            // We only want to initialize once when the form opens or editing invoice changes
-            if (!hasInitialized || editingInvoice) {
+            // Check if we have a new editing invoice or if we haven't initialized yet
+            const isNewEditingInvoice = editingInvoice?.id !== currentEditingInvoiceId;
+            
+            // We only want to initialize once when the form opens or when a different editing invoice is set
+            if (!hasInitialized || isNewEditingInvoice) {
                 initializePaymentMethod();
                 initializeBusinessInfo();
                 initializeSelectedClientInfo();
                 initializeSelectedProject();
                 setHasInitialized(true);
+                setCurrentEditingInvoiceId(editingInvoice?.id || null);
             }
         } else {
             // Reset the initialized flag when form is closed
             setHasInitialized(false);
+            setCurrentEditingInvoiceId(null);
         }
     }, [
         showInvoiceForm, 
-        editingInvoice, 
+        editingInvoice?.id, // Only track the ID to prevent re-initialization
         initializePaymentMethod, 
         initializeBusinessInfo, 
         initializeSelectedClientInfo,
@@ -249,7 +255,8 @@ const InvoiceGenerator = ({
         paymentMethods.length,
         businessInfos.length,
         clientInfos.length,
-        hasInitialized
+        hasInitialized,
+        currentEditingInvoiceId
     ]);
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
