@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useUrlState } from './hooks/useUrlState';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
+import GlobalTimer from './components/GlobalTimer';
 import { ToastProvider } from './components/ToastContainer';
 
 /**
@@ -22,6 +23,13 @@ function App() {
     const [businessInfos, setBusinessInfos] = useLocalStorage('businessInfos', []);
     const [clientInfos, setClientInfos] = useLocalStorage('clientInfos', []);
     const [invoices, setInvoices] = useLocalStorage('invoices', []);
+    
+    // Timer pause state (not stored in localStorage as it should reset on refresh)
+    const [isPaused, setIsPaused] = useState(false);
+    const [pausedElapsedTime, setPausedElapsedTime] = useState(0);
+
+    // State for showing/hiding global timer
+    const [showGlobalTimer, setShowGlobalTimer] = useState(false);
 
     console.log('📊 Loaded projects:', projects.length);
 
@@ -41,6 +49,13 @@ function App() {
             navigateToProjects();
         }
     }, [urlParams.projectId, urlParams.view, selectedProject, navigateToProjects]);
+
+    // Show global timer when a timer becomes active or is paused
+    useEffect(() => {
+        if (currentTimer) {
+            setShowGlobalTimer(true);
+        }
+    }, [currentTimer]);
 
     /**
      * Handle navigation to payment methods creation from invoice generator
@@ -118,6 +133,25 @@ function App() {
                             Task. Time. Track.
                         </h1>
                         
+                        {/* Global Timer Display */}
+                        {showGlobalTimer && currentTimer && (
+                            <div className="flex-1 flex justify-center">
+                                <GlobalTimer
+                                    currentTimer={currentTimer}
+                                    setCurrentTimer={setCurrentTimer}
+                                    tasks={tasks}
+                                    setTimeEntries={setTimeEntries}
+                                    isPaused={isPaused}
+                                    setIsPaused={setIsPaused}
+                                    pausedElapsedTime={pausedElapsedTime}
+                                    onClose={() => {
+                                        setShowGlobalTimer(false);
+                                        setIsPaused(false);
+                                    }}
+                                />
+                            </div>
+                        )}
+                        
                         <div className="flex space-x-4">
                             <button
                                 onClick={() => navigateToProjects()}
@@ -166,6 +200,10 @@ function App() {
                         setTimeEntries={setTimeEntries}
                         currentTimer={currentTimer}
                         setCurrentTimer={setCurrentTimer}
+                        isPaused={isPaused}
+                        setIsPaused={setIsPaused}
+                        pausedElapsedTime={pausedElapsedTime}
+                        setPausedElapsedTime={setPausedElapsedTime}
                         onSelectProject={(project) => {
                             navigateToProject(project.id);
                         }}
@@ -184,6 +222,10 @@ function App() {
                         setTimeEntries={setTimeEntries}
                         currentTimer={currentTimer}
                         setCurrentTimer={setCurrentTimer}
+                        isPaused={isPaused}
+                        setIsPaused={setIsPaused}
+                        pausedElapsedTime={pausedElapsedTime}
+                        setPausedElapsedTime={setPausedElapsedTime}
                         onBackToProjects={() => navigateToProjects()}
                         paymentMethods={paymentMethods}
                         onNavigateToPaymentMethods={handleNavigateToPaymentMethods}

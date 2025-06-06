@@ -20,6 +20,10 @@ const ProjectDashboard = ({
     setTimeEntries,
     currentTimer,
     setCurrentTimer,
+    isPaused,
+    setIsPaused,
+    pausedElapsedTime,
+    setPausedElapsedTime,
     onBackToProjects,
     paymentMethods,
     onNavigateToPaymentMethods,
@@ -129,6 +133,10 @@ const ProjectDashboard = ({
                             setTimeEntries={setTimeEntries}
                             currentTimer={currentTimer}
                             setCurrentTimer={setCurrentTimer}
+                            isPaused={isPaused}
+                            setIsPaused={setIsPaused}
+                            pausedElapsedTime={pausedElapsedTime}
+                            setPausedElapsedTime={setPausedElapsedTime}
                         />
                     </div>
                 </div>

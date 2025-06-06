@@ -15,7 +15,11 @@ const TaskTree = ({
     timeEntries,
     setTimeEntries,
     currentTimer,
-    setCurrentTimer
+    setCurrentTimer,
+    isPaused = false,
+    setIsPaused = null,
+    pausedElapsedTime = 0,
+    setPausedElapsedTime = null
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -208,6 +212,10 @@ const TaskTree = ({
                                     setTimeEntries={setTimeEntries}
                                     currentTimer={currentTimer}
                                     setCurrentTimer={setCurrentTimer}
+                                    isPaused={isPaused}
+                                    setIsPaused={setIsPaused}
+                                    pausedElapsedTime={pausedElapsedTime}
+                                    setPausedElapsedTime={setPausedElapsedTime}
                                     onDelete={() => handleDeleteTask(task.id)}
                                     onCreateSubtask={handleCreateTask}
                                     onArchive={() => handleArchiveTask(task.id)}
@@ -246,6 +254,10 @@ const TaskTree = ({
                                             setTimeEntries={setTimeEntries}
                                             currentTimer={currentTimer}
                                             setCurrentTimer={setCurrentTimer}
+                                            isPaused={isPaused}
+                                            setIsPaused={setIsPaused}
+                                            pausedElapsedTime={pausedElapsedTime}
+                                            setPausedElapsedTime={setPausedElapsedTime}
                                             onDelete={() => handleDeleteTask(task.id)}
                                             onCreateSubtask={handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}

@@ -10,7 +10,7 @@ import {
 import TimerControls from './TimerControls.jsx';
 import CustomCheckbox from './CustomCheckbox.jsx';
 import TimeEditModal from './TimeEditModal.jsx';
-import { formatDurationWithSeconds, formatActiveTimer } from '../utils/dateUtils';
+import { formatDurationWithSeconds } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { deleteTaskWithCleanup } from '../utils/taskUtils';
 
@@ -28,6 +28,10 @@ const TaskItem = ({
     setTimeEntries,
     currentTimer,
     setCurrentTimer,
+    isPaused = false,
+    setIsPaused = null,
+    pausedElapsedTime = 0,
+    setPausedElapsedTime = null,
     onDelete,
     onCreateSubtask,
     onArchive,
@@ -310,8 +314,8 @@ const TaskItem = ({
         setShowCreateSubtaskForm(false);
     };
 
-    // Calculate active timer display
-    const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
+    // Calculate active timer display - removed as requested
+    // const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
 
     return (
         <div className={`border border-gray-200 rounded-lg hover:shadow-md transition-shadow ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
@@ -413,13 +417,6 @@ const TaskItem = ({
                                                 </button>
                                             )
                                         )}
-                                        
-                                        {/* Active Timer Display */}
-                                        {activeTimerDisplay && (
-                                                <span className="text-yellow-600 font-medium bg-yellow-50 px-2 py-1 rounded">
-                                                {activeTimerDisplay}
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
                             )}
@@ -429,14 +426,18 @@ const TaskItem = ({
                     {!isEditing && (
                         <div className="flex items-center space-x-1">
                             {/* Show timer controls and action buttons conditionally */}
-                            {isTimerActive ? (
-                                /* Only show timer controls when timer is active */
+                            {isTimerActive && !isPaused ? (
+                                /* Only show timer controls when timer is actively running (not paused) */
                                 <TimerControls
                                     task={task}
                                     timeEntries={timeEntries}
                                     setTimeEntries={setTimeEntries}
                                     currentTimer={currentTimer}
                                     setCurrentTimer={setCurrentTimer}
+                                    isPaused={isPaused}
+                                    setIsPaused={setIsPaused}
+                                    pausedElapsedTime={pausedElapsedTime}
+                                    setPausedElapsedTime={setPausedElapsedTime}
                                 />
                             ) : isArchived ? (
                                 /* Show unarchive and delete buttons for archived tasks in flex layout */
@@ -469,11 +470,11 @@ const TaskItem = ({
                                         <ArchiveBoxIcon className="h-5 w-5 group-hover:text-yellow-700" />
                                     </button>
                                 )
-                            ) : anyTimerActive ? (
-                                /* When any timer is active, hide all action buttons */
+                            ) : anyTimerActive && !isTimerActive && !isPaused ? (
+                                /* When any timer is actively running and it's not this task's timer, hide all action buttons */
                                 null
                             ) : (
-                                /* Show all action buttons when not completed and no timer active */
+                                /* Show all action buttons when not completed and no timer actively running */
                                 <>
                                     <TimerControls
                                         task={task}
@@ -481,6 +482,10 @@ const TaskItem = ({
                                         setTimeEntries={setTimeEntries}
                                         currentTimer={currentTimer}
                                         setCurrentTimer={setCurrentTimer}
+                                        isPaused={isPaused}
+                                        setIsPaused={setIsPaused}
+                                        pausedElapsedTime={pausedElapsedTime}
+                                        setPausedElapsedTime={setPausedElapsedTime}
                                     />
 
                                     <button
@@ -596,6 +601,10 @@ const TaskItem = ({
                                 setTimeEntries={setTimeEntries}
                                 currentTimer={currentTimer}
                                 setCurrentTimer={setCurrentTimer}
+                                isPaused={isPaused}
+                                setIsPaused={setIsPaused}
+                                pausedElapsedTime={pausedElapsedTime}
+                                setPausedElapsedTime={setPausedElapsedTime}
                                 onToggleBillable={() => onToggleBillable && onToggleBillable(subtask.id)}
                                 onDelete={() => {
                                     if (window.confirm('Are you sure you want to delete this subtask?')) {
@@ -677,6 +686,10 @@ const SubtaskItem = ({
     setTimeEntries,
     currentTimer,
     setCurrentTimer,
+    isPaused = false,
+    setIsPaused = null,
+    pausedElapsedTime = 0,
+    setPausedElapsedTime = null,
     onToggleBillable,
     onDelete
 }) => {
@@ -894,8 +907,8 @@ const SubtaskItem = ({
         setIsEditing(false);
     };
 
-    // Calculate active timer display
-    const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
+    // Calculate active timer display - removed as requested
+    // const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
 
     return (
         <div className={`flex items-center justify-between py-2 ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
@@ -956,13 +969,6 @@ const SubtaskItem = ({
                                         {formatDurationWithSeconds(totalTime)}
                                     </button>
                                 )}
-                                
-                                {/* Active Timer Display */}
-                                {activeTimerDisplay && (
-                                    <span className="text-yellow-600 font-medium bg-yellow-50 px-2 py-1 rounded">
-                                        {activeTimerDisplay}
-                                    </span>
-                                )}
                             </div>
                         </div>
                     )}
@@ -972,23 +978,27 @@ const SubtaskItem = ({
             {!isEditing && (
                 <div className="flex items-center space-x-1">
                     {/* Show timer controls and action buttons conditionally */}
-                    {isTimerActive ? (
-                        /* Only show timer controls when timer is active */
+                    {isTimerActive && !isPaused ? (
+                        /* Only show timer controls when timer is actively running (not paused) */
                         <TimerControls
                             task={task}
                             timeEntries={timeEntries}
                             setTimeEntries={setTimeEntries}
                             currentTimer={currentTimer}
                             setCurrentTimer={setCurrentTimer}
+                            isPaused={isPaused}
+                            setIsPaused={setIsPaused}
+                            pausedElapsedTime={pausedElapsedTime}
+                            setPausedElapsedTime={setPausedElapsedTime}
                         />
                     ) : isCompleted ? (
                         /* No actions for completed subtasks */
                         null
-                    ) : anyTimerActive ? (
-                        /* When any timer is active, hide all action buttons */
+                    ) : anyTimerActive && !isTimerActive && !isPaused ? (
+                        /* When any timer is actively running and it's not this task's timer, hide all action buttons */
                         null
                     ) : (
-                        /* Show all action buttons when not completed and no timer active */
+                        /* Show all action buttons when not completed and no timer actively running */
                         <>
                             <TimerControls
                                 task={task}
@@ -996,6 +1006,10 @@ const SubtaskItem = ({
                                 setTimeEntries={setTimeEntries}
                                 currentTimer={currentTimer}
                                 setCurrentTimer={setCurrentTimer}
+                                isPaused={isPaused}
+                                setIsPaused={setIsPaused}
+                                pausedElapsedTime={pausedElapsedTime}
+                                setPausedElapsedTime={setPausedElapsedTime}
                             />
 
                             <button
