@@ -74,7 +74,8 @@ const InvoiceModal = ({
     selectedTasksForBilling,
     setSelectedTasksForBilling,
     setSelectedPaymentMethod,
-    setSelectedBusinessInfo
+    setSelectedBusinessInfo,
+    taskInputRef
 }) => {
     if (!showInvoiceForm) return null;
     return (
@@ -484,6 +485,7 @@ const InvoiceModal = ({
                                     <div className="space-y-3">
                                         <div>
                                             <input
+                                                ref={taskInputRef}
                                                 type="text"
                                                 value={newTaskTitle}
                                                 onChange={(e) => setNewTaskTitle(e.target.value)}

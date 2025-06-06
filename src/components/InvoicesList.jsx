@@ -19,23 +19,57 @@ const InvoicesList = ({
 }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
+    const [activeTab, setActiveTab] = useState('outstanding');
+    const [outstandingPage, setOutstandingPage] = useState(1);
+    const [paidPage, setPaidPage] = useState(1);
     const ITEMS_PER_PAGE = 8;
 
-    // Calculate paginated invoices
-    const paginatedInvoices = useMemo(() => {
-        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-        return projectInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-    }, [projectInvoices, currentPage]);
+    // Filter invoices by payment status
+    const outstandingInvoices = useMemo(() => 
+        projectInvoices.filter(invoice => !invoice.paymentProcessed),
+    [projectInvoices]);
 
-    // Calculate total pages
-    const totalPages = useMemo(() => 
-        Math.ceil(projectInvoices.length / ITEMS_PER_PAGE) || 1,
-    [projectInvoices.length]);
+    const paidInvoices = useMemo(() => 
+        projectInvoices.filter(invoice => invoice.paymentProcessed),
+    [projectInvoices]);
+
+    // Calculate paginated invoices for each tab
+    const paginatedOutstandingInvoices = useMemo(() => {
+        const startIndex = (outstandingPage - 1) * ITEMS_PER_PAGE;
+        return outstandingInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [outstandingInvoices, outstandingPage]);
+
+    const paginatedPaidInvoices = useMemo(() => {
+        const startIndex = (paidPage - 1) * ITEMS_PER_PAGE;
+        return paidInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [paidInvoices, paidPage]);
+
+    // Calculate total pages for each tab
+    const outstandingTotalPages = useMemo(() => 
+        Math.ceil(outstandingInvoices.length / ITEMS_PER_PAGE) || 1,
+    [outstandingInvoices.length]);
+
+    const paidTotalPages = useMemo(() => 
+        Math.ceil(paidInvoices.length / ITEMS_PER_PAGE) || 1,
+    [paidInvoices.length]);
     
-    // Handle page change
-    const handlePageChange = (pageNumber) => {
-        setCurrentPage(pageNumber);
+    // Handle page change for outstanding invoices
+    const handleOutstandingPageChange = (pageNumber) => {
+        setOutstandingPage(pageNumber);
+        // Scroll to top of the invoice list
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // Handle page change for paid invoices
+    const handlePaidPageChange = (pageNumber) => {
+        setPaidPage(pageNumber);
+        // Scroll to top of the invoice list
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // Handle tab change
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
         // Scroll to top of the invoice list
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -158,6 +192,174 @@ const InvoicesList = ({
 
         // Update the invoices state
         setInvoices(updatedInvoices);
+
+        // If marking as paid and we're on outstanding tab, and it's the last item on the page,
+        // go to previous page if available
+        if (!invoice.paymentProcessed && activeTab === 'outstanding') {
+            const remainingOutstanding = outstandingInvoices.filter(inv => inv.id !== invoice.id);
+            const newTotalPages = Math.ceil(remainingOutstanding.length / ITEMS_PER_PAGE) || 1;
+            if (outstandingPage > newTotalPages) {
+                setOutstandingPage(Math.max(1, newTotalPages));
+            }
+        }
+    };
+
+    // Render empty state for a tab
+    const renderEmptyState = (tabType) => (
+        <div className="text-center py-8">
+            <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-4 text-sm font-medium text-gray-900">
+                {tabType === 'outstanding' ? 'No outstanding invoices' : 'No paid invoices'}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+                {tabType === 'outstanding' 
+                    ? 'All your invoices have been paid.'
+                    : 'No invoices have been marked as paid yet.'
+                }
+            </p>
+        </div>
+    );
+
+    // Render invoice list for current tab
+    const renderInvoiceList = () => {
+        const currentInvoices = activeTab === 'outstanding' ? paginatedOutstandingInvoices : paginatedPaidInvoices;
+        const currentPage = activeTab === 'outstanding' ? outstandingPage : paidPage;
+        const totalPages = activeTab === 'outstanding' ? outstandingTotalPages : paidTotalPages;
+        const handlePageChange = activeTab === 'outstanding' ? handleOutstandingPageChange : handlePaidPageChange;
+        const totalInvoices = activeTab === 'outstanding' ? outstandingInvoices.length : paidInvoices.length;
+
+        if (currentInvoices.length === 0) {
+            return renderEmptyState(activeTab);
+        }
+
+        return (
+            <>
+                <div className="space-y-4">
+                    {currentInvoices.map((invoice) => (
+                        <div key={invoice.id} className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
+                            invoice.paymentProcessed 
+                                ? 'border-green-300 bg-white' 
+                                : 'border-gray-200 bg-white'
+                        }`}>
+                            <div className="flex flex-col space-y-4">
+                                {/* Header row with invoice number and status tag */}
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <DocumentTextIcon className="h-6 w-6 text-gray-400" />
+                                        <h3 className="text-sm font-medium text-gray-900">
+                                            {invoice.invoiceNumber}
+                                        </h3>
+                                    </div>
+                                    <div>
+                                        {invoice.paymentProcessed ? (
+                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                <CheckIcon className="h-3 w-3 mr-1" />
+                                                Paid
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                Outstanding
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Invoice details */}
+                                <div className="ml-9">
+                                    <p className="text-sm text-gray-500">
+                                        {invoice.date} <span className="mx-1">•</span> {invoice.totalHours.toFixed(2)} hours <span className="mx-1">•</span> {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)}
+                                    </p>
+                                    <div className="text-xs text-gray-400 mt-1">
+                                        <p>
+                                            Client: <span className="font-medium text-gray-600">
+                                                {(() => {
+                                                    // Try to get client name from clientInfoId first
+                                                    if (invoice.clientInfoId) {
+                                                        const clientInfo = clientInfos.find(ci => ci.id === invoice.clientInfoId);
+                                                        if (clientInfo) {
+                                                            return clientInfo.clientName;
+                                                        }
+                                                    }
+                                                    // Fallback to stored client info or manual entry
+                                                    return invoice.clientInfo?.name || invoice.client?.name || 'Unknown';
+                                                })()}
+                                            </span>
+                                        </p>
+                                        <p>
+                                            Project: <span className="font-medium text-gray-600">
+                                                {invoice.project?.title || 'Unknown Project'}
+                                            </span>
+                                        </p>
+                                        {invoice.businessInfoId && (() => {
+                                            const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                                            return businessInfo ? (
+                                                <p>
+                                                    Business: <span className="font-medium text-gray-600">{businessInfo.title}</span>
+                                                </p>
+                                            ) : null;
+                                        })()}
+                                        {invoice.paymentMethodId && (() => {
+                                            const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                                            return paymentMethod ? (
+                                                <p>
+                                                    Payment Method: <span className="font-medium text-gray-600">{paymentMethod.title}</span>
+                                                </p>
+                                            ) : null;
+                                        })()}
+                                    </div>
+                                </div>
+
+                                {/* Action buttons - bottom right */}
+                                <div className="flex justify-end items-center space-x-2">
+                                    {!invoice.paymentProcessed && (
+                                        <button
+                                            onClick={() => handlePaymentProcessedToggle(invoice)}
+                                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        >
+                                            <CheckIcon className="h-3 w-3 mr-1" />
+                                            Mark as Paid
+                                        </button>
+                                    )}
+                                    
+                                    <button
+                                        onClick={() => handlePreview(invoice)}
+                                        className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50"
+                                        title="Preview Invoice"
+                                    >
+                                        <EyeIcon className="h-5 w-5" />
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => handleEdit(invoice)}
+                                        className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
+                                        title="Edit Invoice"
+                                    >
+                                        <PencilIcon className="h-5 w-5" />
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => handleDownload(invoice)}
+                                        className="p-2 text-gray-400 hover:text-purple-600 rounded-md hover:bg-purple-50"
+                                        title="Download as PDF"
+                                    >
+                                        <ArrowDownTrayIcon className="h-5 w-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Pagination */}
+                {totalInvoices > ITEMS_PER_PAGE && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                    />
+                )}
+            </>
+        );
     };
 
     if (projectInvoices.length === 0) {
@@ -192,130 +394,44 @@ const InvoicesList = ({
                 </div>
             )}
             
-            <div className="space-y-4">
-                {paginatedInvoices.map((invoice) => (
-                    <div key={invoice.id} className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
-                        invoice.paymentProcessed 
-                            ? 'border-green-300 bg-white' 
-                            : 'border-gray-200 bg-white'
-                    }`}>
-                        <div className="flex flex-col space-y-4">
-                            {/* Header row with invoice number and status tag */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3">
-                                    <DocumentTextIcon className="h-6 w-6 text-gray-400" />
-                                    <h3 className="text-sm font-medium text-gray-900">
-                                        {invoice.invoiceNumber}
-                                    </h3>
-                                </div>
-                                <div>
-                                    {invoice.paymentProcessed ? (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            <CheckIcon className="h-3 w-3 mr-1" />
-                                            Paid
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                            Outstanding
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Invoice details */}
-                            <div className="ml-9">
-                                <p className="text-sm text-gray-500">
-                                    {invoice.date} <span className="mx-1">•</span> {invoice.totalHours.toFixed(2)} hours <span className="mx-1">•</span> {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)}
-                                </p>
-                                <div className="text-xs text-gray-400 mt-1">
-                                    <p>
-                                        Client: <span className="font-medium text-gray-600">
-                                            {(() => {
-                                                // Try to get client name from clientInfoId first
-                                                if (invoice.clientInfoId) {
-                                                    const clientInfo = clientInfos.find(ci => ci.id === invoice.clientInfoId);
-                                                    if (clientInfo) {
-                                                        return clientInfo.clientName;
-                                                    }
-                                                }
-                                                // Fallback to stored client info or manual entry
-                                                return invoice.clientInfo?.name || invoice.client?.name || 'Unknown';
-                                            })()}
-                                        </span>
-                                    </p>
-                                    <p>
-                                        Project: <span className="font-medium text-gray-600">
-                                            {invoice.project?.title || 'Unknown Project'}
-                                        </span>
-                                    </p>
-                                    {invoice.businessInfoId && (() => {
-                                        const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
-                                        return businessInfo ? (
-                                            <p>
-                                                Business: <span className="font-medium text-gray-600">{businessInfo.title}</span>
-                                            </p>
-                                        ) : null;
-                                    })()}
-                                    {invoice.paymentMethodId && (() => {
-                                        const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                                        return paymentMethod ? (
-                                            <p>
-                                                Payment Method: <span className="font-medium text-gray-600">{paymentMethod.title}</span>
-                                            </p>
-                                        ) : null;
-                                    })()}
-                                </div>
-                            </div>
-
-                            {/* Action buttons - bottom right */}
-                            <div className="flex justify-end items-center space-x-2">
-                                {!invoice.paymentProcessed && (
-                                    <button
-                                        onClick={() => handlePaymentProcessedToggle(invoice)}
-                                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                    >
-                                        <CheckIcon className="h-3 w-3 mr-1" />
-                                        Mark as Paid
-                                    </button>
-                                )}
-                                
-                                <button
-                                    onClick={() => handlePreview(invoice)}
-                                    className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50"
-                                    title="Preview Invoice"
-                                >
-                                    <EyeIcon className="h-5 w-5" />
-                                </button>
-                                
-                                <button
-                                    onClick={() => handleEdit(invoice)}
-                                    className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
-                                    title="Edit Invoice"
-                                >
-                                    <PencilIcon className="h-5 w-5" />
-                                </button>
-                                
-                                <button
-                                    onClick={() => handleDownload(invoice)}
-                                    className="p-2 text-gray-400 hover:text-purple-600 rounded-md hover:bg-purple-50"
-                                    title="Download as PDF"
-                                >
-                                    <ArrowDownTrayIcon className="h-5 w-5" />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                ))}
+            {/* Tab Navigation */}
+            <div className="border-b border-gray-200 mb-6">
+                <nav className="-mb-px flex space-x-8">
+                    <button
+                        onClick={() => handleTabChange('outstanding')}
+                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                            activeTab === 'outstanding'
+                                ? 'border-yellow-500 text-yellow-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                    >
+                        Outstanding
+                        {outstandingInvoices.length > 0 && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                {outstandingInvoices.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => handleTabChange('paid')}
+                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                            activeTab === 'paid'
+                                ? 'border-green-500 text-green-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                    >
+                        Paid
+                        {paidInvoices.length > 0 && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {paidInvoices.length}
+                            </span>
+                        )}
+                    </button>
+                </nav>
             </div>
 
-            {/* Pagination */}
-            {projectInvoices.length > ITEMS_PER_PAGE && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={handlePageChange}
-                />
-            )}
+            {/* Tab Content */}
+            {renderInvoiceList()}
 
             {/* Invoice Preview Modal */}
             <Modal 

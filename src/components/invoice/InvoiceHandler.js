@@ -104,8 +104,14 @@ export const handleToggleNewTaskFlatRate = (setNewTaskUseFlatRate) => () => {
 };
 
 // Handle adding additional custom task
-export const handleAddAdditionalTask = (setAdditionalTasks, setUseFlatRate, newTaskTitle, newTaskHours, newTaskUseFlatRate, newTaskHourlyRate, selectedProject, newTaskQuantity, setNewTaskTitle, setNewTaskHours, setNewTaskHourlyRate, setNewTaskUseFlatRate, setNewTaskQuantity, setShowAddTaskForm) => () => {
-    if (!newTaskTitle.trim()) return;
+export const handleAddAdditionalTask = (setAdditionalTasks, setUseFlatRate, newTaskTitle, newTaskHours, newTaskUseFlatRate, newTaskHourlyRate, selectedProject, newTaskQuantity, setNewTaskTitle, setNewTaskHours, setNewTaskHourlyRate, setNewTaskUseFlatRate, setNewTaskQuantity, setShowAddTaskForm, showError, focusTaskInput) => () => {
+    if (!newTaskTitle.trim()) {
+        showError('Task description is required');
+        if (focusTaskInput) {
+            focusTaskInput();
+        }
+        return;
+    }
     const parsedValue = parseFloat(newTaskHours) || 0;
     const roundedValue = Math.round(parsedValue * 100) / 100;
     const newTask = {

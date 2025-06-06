@@ -40,6 +40,7 @@ const InvoiceGenerator = ({
     const [projectManuallyChanged, setProjectManuallyChanged] = useState(false); // Track manual project changes
     const { showSuccess, showError } = useToast();
     const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
+    const taskInputRef = useRef(null); // Ref for task description input field
 
     // Get project invoices from the new structure - memoized to prevent unnecessary re-renders
     const projectInvoices = useMemo(() => {
@@ -206,6 +207,17 @@ const InvoiceGenerator = ({
      * Initialize selected project based on current project or editing invoice
      */
     const initializeSelectedProject = useCallback(() => {
+        // Don't override if project was manually changed (user may have gotten auto-populated values)
+        if (projectManuallyChanged && selectedProject !== null) {
+            return;
+        }
+        
+        // Only initialize on first mount or when editing invoice changes
+        // Don't override user selection once set
+        if (selectedProject !== null && !editingInvoice) {
+            return; // User has already made a selection, keep it
+        }
+
         // If editing an invoice, use its project
         if (editingInvoice && editingInvoice.projectId) {
             const invoiceProject = projects.find(p => p.id === editingInvoice.projectId);
@@ -215,9 +227,14 @@ const InvoiceGenerator = ({
             }
         }
         
-        // Otherwise, use the current project
-        setSelectedProject(project);
-    }, [editingInvoice, project, projects]);
+        // Only use the current project if it's actually provided (not null)
+        // This prevents overriding user selections when opening from invoices view
+        if (project) {
+            setSelectedProject(project);
+        }
+        // If project is null (like when opened from invoices view), don't set anything
+        // and let the user make their selection
+    }, [editingInvoice, project, projects, selectedProject, projectManuallyChanged]);
 
     // Track when the form gets shown so we can initialize only then
     const [hasInitialized, setHasInitialized] = useState(false);
@@ -419,6 +436,14 @@ const InvoiceGenerator = ({
         InvoiceHandler.handleFlatRateChange(setTaskFlatRates)
     );
     const handleToggleNewTaskFlatRate = InvoiceHandler.handleToggleNewTaskFlatRate(setNewTaskUseFlatRate);
+    
+    // Function to focus the task input field
+    const focusTaskInput = useCallback(() => {
+        if (taskInputRef.current) {
+            taskInputRef.current.focus();
+        }
+    }, []);
+    
     const handleAddAdditionalTask = InvoiceHandler.handleAddAdditionalTask(
         setAdditionalTasks,
         setUseFlatRate,
@@ -433,7 +458,9 @@ const InvoiceGenerator = ({
         setNewTaskHourlyRate,
         setNewTaskUseFlatRate,
         setNewTaskQuantity,
-        setShowAddTaskForm
+        setShowAddTaskForm,
+        showError,
+        focusTaskInput
     );
     const handleRemoveAdditionalTask = InvoiceHandler.handleRemoveAdditionalTask(setAdditionalTasks);
     const handleAdditionalTaskHoursChange = InvoiceHandler.handleAdditionalTaskHoursChange(setAdditionalTasks);
@@ -1086,6 +1113,7 @@ const InvoiceGenerator = ({
                     setSelectedBusinessInfo={setSelectedBusinessInfo}
                     setSelectedPaymentMethod={setSelectedPaymentMethod}
                     setSelectedTasksForBilling={setSelectedTasksForBilling}
+                    taskInputRef={taskInputRef}
                 />
             )}
         </div>
