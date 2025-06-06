@@ -44,6 +44,8 @@ const Toast = ({ message, type = 'success', duration = 5000, onClose }) => {
         return <CheckCircleIcon className="h-6 w-6 text-white" />;
       case 'error':
         return <ExclamationCircleIcon className="h-6 w-6 text-white" />;
+      case 'warning':
+        return <ExclamationCircleIcon className="h-6 w-6 text-white" />;
       case 'info':
       default:
         return <InformationCircleIcon className="h-6 w-6 text-white" />;
@@ -66,6 +68,13 @@ const Toast = ({ message, type = 'success', duration = 5000, onClose }) => {
           text: 'text-white',
           iconBg: 'bg-red-500',
           closeHover: 'hover:bg-red-700'
+        };
+      case 'warning':
+        return {
+          background: 'bg-amber-500',
+          text: 'text-white',
+          iconBg: 'bg-amber-400',
+          closeHover: 'hover:bg-amber-600'
         };
       case 'info':
       default:

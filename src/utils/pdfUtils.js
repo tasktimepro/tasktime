@@ -149,14 +149,24 @@ export const createInvoiceHTML = (invoiceData) => {
                         const usesFlatRate = task.useFlatRate === true || 
                                            (taskFlatRates && taskFlatRates[task.id] !== undefined) || 
                                            task.flatRate !== undefined;
+                        
+                        // Calculate task amount and hours (including merged subtasks)
+                        let displayHours = task.hours;
+                        let taskTitle = task.title;
+                        
+                        // Handle merged subtasks display
+                        if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
+                            const subtaskHours = task.mergedSubtasks.reduce((total, subtask) => total + (subtask.hours || 0), 0);
+                            displayHours = task.hours + subtaskHours;
+                            taskTitle = `${task.title} (including ${task.mergedSubtasks.length} subtask${task.mergedSubtasks.length > 1 ? 's' : ''})`;
+                        }
+                        
                         const taskAmount = usesFlatRate ? 
                             (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
-                            (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
+                            (displayHours * (task.hourlyRate || project?.hourlyRate || 0));
                         
-                        const hours = usesFlatRate ? '—' : task.hours.toFixed(2);
+                        const hours = usesFlatRate ? '—' : displayHours.toFixed(2);
                         const rate = usesFlatRate ? '—' : getCurrencySymbol(invoiceCurrency) + (task.hourlyRate || project?.hourlyRate || 0).toFixed(2);
-                        // Don't show hours in title when we have Hours column
-                        const taskTitle = task.title;
                         
                         return `
                         <tr>
@@ -212,11 +222,21 @@ export const createInvoiceHTML = (invoiceData) => {
                             taskFlatRates[task.id] : 
                             (task.flatRate || 0);
                         
-                        const taskTitle = task.hours > 0 ? `${task.title} (${task.hours.toFixed(2)}h)` : task.title;
+                        // Handle merged subtasks display
+                        let displayHours = task.hours;
+                        let taskTitle = task.title;
+                        
+                        if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
+                            const subtaskHours = task.mergedSubtasks.reduce((total, subtask) => total + (subtask.hours || 0), 0);
+                            displayHours = task.hours + subtaskHours;
+                            taskTitle = `${task.title} (including ${task.mergedSubtasks.length} subtask${task.mergedSubtasks.length > 1 ? 's' : ''})`;
+                        }
+                        
+                        const finalTitle = displayHours > 0 ? `${taskTitle} (${displayHours.toFixed(2)}h)` : taskTitle;
                         
                         return `
                         <tr>
-                            <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
+                            <td style="padding: 8px; ${borderStyle}">${finalTitle}</td>
                             <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;

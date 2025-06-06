@@ -38,7 +38,7 @@ const InvoiceGenerator = ({
     const [selectedProject, setSelectedProject] = useState(project); // Initialize with current project
     const [isProjectContextFixed, setIsProjectContextFixed] = useState(!!project); // Track if opened from project context
     const [projectManuallyChanged, setProjectManuallyChanged] = useState(false); // Track manual project changes
-    const { showSuccess, showError } = useToast();
+    const { showSuccess, showError, showWarning } = useToast();
     const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
     const taskInputRef = useRef(null); // Ref for task description input field
 
@@ -283,6 +283,9 @@ const InvoiceGenerator = ({
     const [taskHourlyRates, setTaskHourlyRates] = useState({}); // For custom hourly rates per task
     const [taskQuantities, setTaskQuantities] = useState({}); // For quantities on flat rate tasks
     
+    // Merged subtasks state
+    const [mergedSubtasks, setMergedSubtasks] = useState({}); // Track which parent tasks have merged subtasks
+    
     // Additional tasks state (not related to project)
     const [additionalTasks, setAdditionalTasks] = useState([]);
     const [showAddTaskForm, setShowAddTaskForm] = useState(false);
@@ -342,6 +345,11 @@ const InvoiceGenerator = ({
             if (editingInvoice.note) {
                 setInvoiceNote(editingInvoice.note);
             }
+            
+            // Initialize merged subtasks state
+            if (editingInvoice.mergedSubtasks) {
+                setMergedSubtasks(editingInvoice.mergedSubtasks);
+            }
         } else {
             // Reset pricing state for new invoices
             setDiscountType('percentage');
@@ -354,6 +362,7 @@ const InvoiceGenerator = ({
             });
             setAdditionalTasks([]);
             setInvoiceNote('');
+            setMergedSubtasks({});
         }
     }, [editingInvoice]);
 
@@ -408,6 +417,7 @@ const InvoiceGenerator = ({
             return {
                 id: taskId,
                 title: task ? task.title : 'Unknown Task',
+                parentTaskId: task ? task.parentTaskId : null, // Include parent task ID for subtask relationship
                 originalHours: roundedHours,
                 originalTimeMs: totalTime, // Keep the original milliseconds for accurate time display
                 hours: editedHours,
@@ -436,6 +446,14 @@ const InvoiceGenerator = ({
         InvoiceHandler.handleFlatRateChange(setTaskFlatRates)
     );
     const handleToggleNewTaskFlatRate = InvoiceHandler.handleToggleNewTaskFlatRate(setNewTaskUseFlatRate);
+    const handleToggleMergeSubtasks = InvoiceHandler.handleToggleMergeSubtasks(
+        setMergedSubtasks,
+        setSelectedTasksForBilling,
+        invoiceTasks,
+        taskHourlyRates,
+        selectedProject?.hourlyRate,
+        showWarning
+    );
     
     // Function to focus the task input field
     const focusTaskInput = useCallback(() => {
@@ -482,7 +500,8 @@ const InvoiceGenerator = ({
         setShippingAmount,
         setTaxOverride,
         setSelectedTasksForBilling,
-        setNewTaskQuantity
+        setNewTaskQuantity,
+        setMergedSubtasks
     );
     const handleProjectSelection = InvoiceHandler.handleProjectSelection(
         setSelectedProject,
@@ -536,7 +555,22 @@ const InvoiceGenerator = ({
             // Only include selected tasks in pricing calculation
             if (!selectedTasksForBilling[task.id]) return;
             
-            const taskHours = editableHours[task.id] || task.hours;
+            // Skip subtasks if their parent is merged (they're included in parent calculation)
+            if (task.parentTaskId && mergedSubtasks[task.parentTaskId]) return;
+            
+            let taskHours = editableHours[task.id] || task.hours;
+            
+            // If this task has merged subtasks, include their hours too
+            if (mergedSubtasks[task.id]) {
+                const subtasks = invoiceTasks.filter(subtask => subtask.parentTaskId === task.id);
+                const subtaskHours = subtasks.reduce((total, subtask) => {
+                    const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
+                    return total + hours;
+                }, 0);
+                taskHours += subtaskHours;
+            }
+            
+            // Always add task hours to total hours, even for flat rate tasks
             totalHours += taskHours;
             
             if (useFlatRate[task.id]) {
@@ -606,7 +640,7 @@ const InvoiceGenerator = ({
         };
     }, [selectedProject, invoiceTasks, additionalTasks, editableHours, 
         discountType, discountValue, shippingAmount, taxOverride, 
-        taskFlatRates, useFlatRate, taskHourlyRates, taskQuantities, selectedTasksForBilling]);
+        taskFlatRates, useFlatRate, taskHourlyRates, taskQuantities, selectedTasksForBilling, mergedSubtasks]);
 
     /**
      * Save invoice (create new or update existing)
@@ -673,7 +707,10 @@ const InvoiceGenerator = ({
                     flatRate: taskFlatRates[task.id] || 0,
                     hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0,
                     useFlatRate: useFlatRate[task.id] || false,
-                    quantity: taskQuantities[task.id] || 1 // Include quantity for flat rate tasks
+                    quantity: taskQuantities[task.id] || 1, // Include quantity for flat rate tasks
+                    isMerged: mergedSubtasks[task.id] || false, // Track merged status
+                    mergedSubtasks: mergedSubtasks[task.id] ? 
+                        invoiceTasks.filter(subtask => subtask.parentTaskId === task.id) : []
                 })),
             additionalTasks: additionalTasks.map(task => ({
                 ...task,
@@ -683,6 +720,7 @@ const InvoiceGenerator = ({
             useFlatRate: useFlatRate,
             taskHourlyRates: taskHourlyRates,
             taskQuantities: taskQuantities, // Save task quantities state
+            mergedSubtasks: mergedSubtasks, // Save merged subtasks state
             note: invoiceNote,
             totalHours: totalHours,
             totalAmount: pricing.total,
@@ -721,7 +759,10 @@ const InvoiceGenerator = ({
                         ...task,
                         hours: editableHours[task.id] || task.originalHours,
                         hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0,
-                        quantity: taskQuantities[task.id] || 1 // Include quantity for flat rate tasks
+                        quantity: taskQuantities[task.id] || 1, // Include quantity for flat rate tasks
+                        isMerged: mergedSubtasks[task.id] || false, // Track merged status
+                        mergedSubtasks: mergedSubtasks[task.id] ? 
+                            invoiceTasks.filter(subtask => subtask.parentTaskId === task.id) : []
                     })),
                 additionalTasks: additionalTasks.map(task => ({
                     ...task,
@@ -730,6 +771,7 @@ const InvoiceGenerator = ({
                 taskFlatRates: taskFlatRates,
                 useFlatRate: useFlatRate,
                 taskQuantities: taskQuantities, // Include quantities in PDF data
+                mergedSubtasks: mergedSubtasks, // Include merged subtasks in PDF data
                 note: invoiceNote,
                 totalHours: totalHours,
                 totalAmount: pricing.total,
@@ -775,10 +817,23 @@ const InvoiceGenerator = ({
         // Update tasks to set lastBilledAt for billed tasks and projects
         if (selectedProject && !editingInvoice) {
             const currentTime = Date.now();
-            // Only include selected tasks that are being billed
-            const billedTaskIds = invoiceTasks
-                .filter(task => selectedTasksForBilling[task.id])
-                .map(task => task.id);
+            
+            // Get all task IDs that should be marked as billed (including merged subtasks)
+            const billedTaskIds = [];
+            
+            invoiceTasks.forEach(task => {
+                if (selectedTasksForBilling[task.id]) {
+                    billedTaskIds.push(task.id);
+                    
+                    // If this parent task has merged subtasks, include them too
+                    if (mergedSubtasks[task.id]) {
+                        const subtasks = invoiceTasks.filter(subtask => subtask.parentTaskId === task.id);
+                        subtasks.forEach(subtask => {
+                            billedTaskIds.push(subtask.id);
+                        });
+                    }
+                }
+            });
             
             // Update lastBilledAt for all tasks that were included in this invoice
             const updatedTasks = tasks.map(task => {
@@ -1113,6 +1168,8 @@ const InvoiceGenerator = ({
                     setSelectedBusinessInfo={setSelectedBusinessInfo}
                     setSelectedPaymentMethod={setSelectedPaymentMethod}
                     setSelectedTasksForBilling={setSelectedTasksForBilling}
+                    mergedSubtasks={mergedSubtasks}
+                    handleToggleMergeSubtasks={handleToggleMergeSubtasks}
                     taskInputRef={taskInputRef}
                 />
             )}

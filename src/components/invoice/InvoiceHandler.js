@@ -231,7 +231,8 @@ export const handleResetInvoiceForm = (
     setShippingAmount,
     setTaxOverride,
     setSelectedTasksForBilling,
-    setNewTaskQuantity
+    setNewTaskQuantity,
+    setMergedSubtasks
 ) => () => {
     setInvoiceTasks([]);
     setEditableHours({});
@@ -251,6 +252,7 @@ export const handleResetInvoiceForm = (
     });
     setSelectedTasksForBilling({});
     setNewTaskQuantity(1);
+    setMergedSubtasks({});
 };
 
 // Handle project selection from dropdown
@@ -353,4 +355,155 @@ export const handleCancel = (
     if (onInvoiceSaved) {
         onInvoiceSaved();
     }
+};
+
+// Handle merging subtasks with parent task
+export const handleToggleMergeSubtasks = (
+    setMergedSubtasks,
+    setSelectedTasksForBilling,
+    invoiceTasks,
+    taskHourlyRates,
+    projectHourlyRate,
+    showWarning = null
+) => (parentTaskId, shouldMerge) => {
+    // Check for hourly rate mismatch when merging
+    if (shouldMerge && showWarning) {
+        const hasMismatch = checkHourlyRateMismatch(parentTaskId, invoiceTasks, taskHourlyRates, projectHourlyRate);
+        
+        if (hasMismatch) {
+            // Find the subtasks to show specific rate details
+            const subtasks = invoiceTasks.filter(task => task.parentTaskId === parentTaskId);
+            
+            // Determine parent's hourly rate
+            const parentRate = taskHourlyRates[parentTaskId] !== undefined ? 
+                parseFloat(taskHourlyRates[parentTaskId]) : 
+                projectHourlyRate || 0;
+            
+            // Find the differing subtask rates
+            const differentRateSubtasks = subtasks.filter(subtask => {
+                const subtaskRate = taskHourlyRates[subtask.id] !== undefined ?
+                    parseFloat(taskHourlyRates[subtask.id]) :
+                    projectHourlyRate || 0;
+                
+                return Math.abs(parentRate - subtaskRate) > 0.01;
+            });
+            
+            if (differentRateSubtasks.length > 0) {
+                // Show a more specific warning message
+                showWarning(`Warning: ${differentRateSubtasks.length} subtask(s) have different hourly rates than the parent task. When merged, the parent task's hourly rate (${parentRate}) will be used for all hours.`);
+            }
+        }
+    }
+    
+    setMergedSubtasks(prev => ({
+        ...prev,
+        [parentTaskId]: shouldMerge
+    }));
+    
+    if (shouldMerge) {
+        // When merging, hide subtasks from billing selection by deselecting them
+        const subtasks = invoiceTasks.filter(task => task.parentTaskId === parentTaskId);
+        const updatedSelection = {};
+        
+        subtasks.forEach(subtask => {
+            updatedSelection[subtask.id] = false;
+        });
+        
+        setSelectedTasksForBilling(prev => ({
+            ...prev,
+            ...updatedSelection
+        }));
+    } else {
+        // When unmerging, make subtasks available for selection again
+        const subtasks = invoiceTasks.filter(task => task.parentTaskId === parentTaskId);
+        const updatedSelection = {};
+        
+        subtasks.forEach(subtask => {
+            updatedSelection[subtask.id] = true; // Default to selected
+        });
+        
+        setSelectedTasksForBilling(prev => ({
+            ...prev,
+            ...updatedSelection
+        }));
+    }
+};
+
+// Check if a parent task has subtasks in the current invoice task list
+export const hasSubtasksInInvoice = (parentTaskId, invoiceTasks) => {
+    return invoiceTasks.some(task => task.parentTaskId === parentTaskId);
+};
+
+// Check if there's an hourly rate mismatch between parent and subtasks
+export const checkHourlyRateMismatch = (parentTaskId, invoiceTasks, taskHourlyRates, projectHourlyRate) => {
+    const parent = invoiceTasks.find(task => task.id === parentTaskId);
+    if (!parent) return false;
+    
+    const subtasks = invoiceTasks.filter(task => task.parentTaskId === parentTaskId);
+    if (subtasks.length === 0) return false;
+    
+    // Determine parent's hourly rate (explicit or from project)
+    const parentRate = taskHourlyRates[parentTaskId] !== undefined ? 
+        parseFloat(taskHourlyRates[parentTaskId]) : 
+        projectHourlyRate || 0;
+    
+    // Check if any subtask has a different hourly rate
+    return subtasks.some(subtask => {
+        const subtaskRate = taskHourlyRates[subtask.id] !== undefined ?
+            parseFloat(taskHourlyRates[subtask.id]) :
+            projectHourlyRate || 0;
+        
+        // Consider a difference of more than 0.01 as a mismatch to account for floating point imprecision
+        return Math.abs(parentRate - subtaskRate) > 0.01;
+    });
+};
+
+// Get subtasks for a parent task from the invoice task list
+export const getSubtasksFromInvoice = (parentTaskId, invoiceTasks) => {
+    return invoiceTasks.filter(task => task.parentTaskId === parentTaskId);
+};
+
+// Calculate merged task data (combining parent task with its subtasks)
+export const getMergedTaskData = (parentTask, subtasks, editableHours) => {
+    if (!subtasks.length) return parentTask;
+    
+    // Calculate total hours from parent and all subtasks
+    const parentHours = editableHours[parentTask.id] !== undefined ? editableHours[parentTask.id] : parentTask.hours;
+    const subtaskHours = subtasks.reduce((total, subtask) => {
+        const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
+        return total + hours;
+    }, 0);
+    
+    const totalHours = parentHours + subtaskHours;
+    
+    // Return merged task data
+    return {
+        ...parentTask,
+        hours: totalHours,
+        mergedSubtasks: subtasks,
+        isMerged: true,
+        title: `${parentTask.title} (including ${subtasks.length} subtask${subtasks.length > 1 ? 's' : ''})`
+    };
+};
+
+// Get all task IDs that should be billed (including merged subtasks)
+export const getAllBilledTaskIds = (invoiceTasks, selectedTasksForBilling, mergedSubtasks) => {
+    const billedTaskIds = [];
+    
+    invoiceTasks.forEach(task => {
+        // If task is selected for billing
+        if (selectedTasksForBilling[task.id]) {
+            billedTaskIds.push(task.id);
+            
+            // If this is a parent task with merged subtasks, include the subtask IDs too
+            if (mergedSubtasks[task.id]) {
+                const subtasks = getSubtasksFromInvoice(task.id, invoiceTasks);
+                subtasks.forEach(subtask => {
+                    billedTaskIds.push(subtask.id);
+                });
+            }
+        }
+    });
+    
+    return billedTaskIds;
 };

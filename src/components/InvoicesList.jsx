@@ -70,8 +70,6 @@ const InvoicesList = ({
     // Handle tab change
     const handleTabChange = (tab) => {
         setActiveTab(tab);
-        // Scroll to top of the invoice list
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     /**

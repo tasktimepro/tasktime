@@ -24,9 +24,10 @@ export const ToastProvider = ({ children }) => {
   const showSuccess = (message, duration = 3000) => addToast(message, 'success', duration);
   const showError = (message, duration = 3000) => addToast(message, 'error', duration);
   const showInfo = (message, duration = 3000) => addToast(message, 'info', duration);
+  const showWarning = (message, duration = 5000) => addToast(message, 'warning', duration);
 
   return (
-    <ToastContext.Provider value={{ addToast, removeToast, showSuccess, showError, showInfo }}>
+    <ToastContext.Provider value={{ addToast, removeToast, showSuccess, showError, showInfo, showWarning }}>
       {children}
       <div className="fixed bottom-0 right-0 z-50 p-4 space-y-4 flex flex-col-reverse items-end">
         {toasts.map(toast => (

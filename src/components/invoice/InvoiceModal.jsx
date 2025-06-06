@@ -75,6 +75,8 @@ const InvoiceModal = ({
     setSelectedTasksForBilling,
     setSelectedPaymentMethod,
     setSelectedBusinessInfo,
+    mergedSubtasks,
+    handleToggleMergeSubtasks,
     taskInputRef
 }) => {
     if (!showInvoiceForm) return null;
@@ -276,6 +278,7 @@ const InvoiceModal = ({
                                 </div>
                             )}
                             <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {/* Removed debug log */}
                                 {invoiceTasks.map((task) => {
                                     const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
                                     const currentMinutes = hoursToMinutes(currentHours);
@@ -285,6 +288,17 @@ const InvoiceModal = ({
 
                                     // Check if this task uses flat rate
                                     const isUsingFlatRate = useFlatRate[task.id] || false;
+                                    
+                                    // Check if this is a parent task with subtasks in the invoice
+                                    // Make sure to check all subtasks, not just selected ones
+                                    const hasSubtasksInInvoice = invoiceTasks.some(subtask => subtask.parentTaskId === task.id);
+                                    const isSubtask = Boolean(task.parentTaskId);
+                                    const isParentMerged = task.parentTaskId && mergedSubtasks[task.parentTaskId];
+                                    
+                                    // Skip rendering subtasks if their parent is merged
+                                    if (isSubtask && isParentMerged) {
+                                        return null;
+                                    }
 
                                     return (
                                         <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
@@ -295,7 +309,14 @@ const InvoiceModal = ({
                                                     onChange={() => handleTaskSelectionForBilling(task.id, !selectedTasksForBilling[task.id])}
                                                 />
                                                 <div className="flex-1">
-                                                    <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                                                    <p className="text-sm font-medium text-gray-900">
+                                                        {task.title}
+                                                        {isSubtask && (
+                                                            <span className="ml-2 text-xs text-gray-500">
+                                                                (subtask)
+                                                            </span>
+                                                        )}
+                                                    </p>
                                                     <p className="text-xs text-gray-500">
                                                         Original: {formatDurationWithSeconds(originalTimeMs)}
                                                         {task.isEdited && (
@@ -306,6 +327,20 @@ const InvoiceModal = ({
                                             </div>
 
                                             <div className="flex items-center space-x-4">
+                                                {/* Merge subtasks checkbox - only show for parent tasks with subtasks */}
+                                                {hasSubtasksInInvoice && (
+                                                    <div className="flex items-center bg-blue-50 px-2 py-2 rounded">
+                                                        <CustomCheckbox
+                                                            checked={mergedSubtasks[task.id] || false}
+                                                            onChange={() => handleToggleMergeSubtasks(task.id, !mergedSubtasks[task.id])}
+                                                            title="Merge subtasks with this parent task"
+                                                        />
+                                                        <label className="ml-2 text-xs text-blue-700 font-medium">
+                                                            Merge subtasks
+                                                        </label>
+                                                    </div>
+                                                )}
+                                                
                                                 {/* Add flat rate toggle */}
                                                 <div className="flex items-center">
                                                     <CustomCheckbox
@@ -349,14 +384,50 @@ const InvoiceModal = ({
                                                     // Hours input with custom hourly rate
                                                     <div className="flex items-center space-x-2">
                                                         <div className="text-right">
-                                                            <div className="text-xs text-gray-500 mb-1 text-left">Hours ({currentMinutes}min)</div>
+                                                            <div className="text-xs text-gray-500 mb-1 text-left">
+                                                                Hours {(() => {
+                                                                    let displayHours = currentHours;
+                                                                    let displayMinutes = currentMinutes;
+                                                                    
+                                                                    // If this task has merged subtasks, calculate total hours
+                                                                    if (mergedSubtasks[task.id]) {
+                                                                        const subtaskHours = invoiceTasks
+                                                                            .filter(subtask => subtask.parentTaskId === task.id)
+                                                                            .reduce((total, subtask) => {
+                                                                                const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
+                                                                                return total + hours;
+                                                                            }, 0);
+                                                                        displayHours = currentHours + subtaskHours;
+                                                                        displayMinutes = hoursToMinutes(displayHours);
+                                                                    }
+                                                                    
+                                                                    return `(${displayMinutes}min)`;
+                                                                })()}
+                                                            </div>
                                                             <input
                                                                 type="number"
                                                                 step="0.01"
                                                                 min="0"
-                                                                value={currentHours === '' ? '' : currentHours.toFixed(2)}
+                                                                value={(() => {
+                                                                    if (currentHours === '') return '';
+                                                                    
+                                                                    if (mergedSubtasks[task.id]) {
+                                                                        // Calculate combined hours for display purposes
+                                                                        const subtaskHours = invoiceTasks
+                                                                            .filter(subtask => subtask.parentTaskId === task.id)
+                                                                            .reduce((total, subtask) => {
+                                                                                const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
+                                                                                return total + hours;
+                                                                            }, 0);
+                                                                        const totalHours = currentHours + subtaskHours;
+                                                                        return totalHours.toFixed(2);
+                                                                    }
+                                                                    
+                                                                    return currentHours.toFixed(2);
+                                                                })()}
                                                                 onChange={(e) => handleHoursChange(task.id, e.target.value)}
                                                                 className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                title={mergedSubtasks[task.id] ? "This shows the combined hours of parent and subtasks. Editing changes the parent task hours." : ""}
                                                             />
                                                         </div>
                                                         <div className="text-right">
