@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
     PencilIcon, 
     TrashIcon,
     ArchiveBoxIcon,
     ClockIcon,
-    EllipsisHorizontalIcon
+    EllipsisHorizontalIcon,
+    CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
 import TimerControls from './TimerControls.jsx';
 import CustomCheckbox from './CustomCheckbox.jsx';
@@ -31,6 +32,7 @@ const TaskItem = ({
     onCreateSubtask,
     onArchive,
     onUnarchive,
+    onToggleBillable,
     allTasks
 }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -143,6 +145,16 @@ const TaskItem = ({
     // 4. Don't dim archived tasks regardless
     const isRelatedToActiveTimer = isTimerActive || subtaskTimerActive;
     const shouldDimTask = anyTimerActive && !isRelatedToActiveTimer && !isArchived;
+
+    // Check if task has billable time since lastBilledAt (makes it non-toggleable)
+    const hasBillableTime = useMemo(() => {
+        const taskBillableEntries = taskTimeEntries.filter(entry => {
+            if (!entry.end || entry.end <= entry.start) return false;
+            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            return entry.start > taskLastBilledAt;
+        });
+        return taskBillableEntries.length > 0;
+    }, [taskTimeEntries, task.lastBilledAt, task.createdAt]);
 
     /**
      * Toggle task completion status
@@ -479,6 +491,36 @@ const TaskItem = ({
                                         <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
                                     </button>
 
+                                    {/* Billable Toggle Button */}
+                                    {onToggleBillable && (
+                                        <button
+                                            onClick={hasBillableTime ? undefined : onToggleBillable}
+                                            className={`p-1 rounded-full transition-colors group ${
+                                                hasBillableTime
+                                                    ? 'text-green-600 bg-green-100 cursor-not-allowed'
+                                                    : task.billable
+                                                        ? 'text-green-600 bg-green-100 hover:bg-green-200'
+                                                        : 'text-gray-400 hover:bg-green-100'
+                                            }`}
+                                            title={
+                                                hasBillableTime
+                                                    ? 'Task has billable time and cannot be manually toggled'
+                                                    : task.billable
+                                                        ? 'Mark as not billable'
+                                                        : 'Mark as billable'
+                                            }
+                                            disabled={hasBillableTime}
+                                        >
+                                            <CurrencyDollarIcon className={`h-5 w-5 ${
+                                                hasBillableTime
+                                                    ? 'group-hover:text-green-600'
+                                                    : task.billable
+                                                        ? 'group-hover:text-green-700'
+                                                        : 'group-hover:text-green-600'
+                                            }`} />
+                                        </button>
+                                    )}
+
                                     {/* Three-dot dropdown menu for Edit and Delete */}
                                     <div className="relative dropdown-container">
                                         <button
@@ -554,6 +596,7 @@ const TaskItem = ({
                                 setTimeEntries={setTimeEntries}
                                 currentTimer={currentTimer}
                                 setCurrentTimer={setCurrentTimer}
+                                onToggleBillable={() => onToggleBillable && onToggleBillable(subtask.id)}
                                 onDelete={() => {
                                     if (window.confirm('Are you sure you want to delete this subtask?')) {
                                         const result = deleteTaskWithCleanup(
@@ -634,6 +677,7 @@ const SubtaskItem = ({
     setTimeEntries,
     currentTimer,
     setCurrentTimer,
+    onToggleBillable,
     onDelete
 }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -712,6 +756,16 @@ const SubtaskItem = ({
     // 2. Always dim if any timer is active and it's not this subtask's timer
     // 3. Don't dim if the task is archived
     const shouldDimTask = anyTimerActive && !isTimerActive && !isArchived;
+
+    // Check if subtask has billable time since lastBilledAt (makes it non-toggleable)
+    const hasBillableTime = useMemo(() => {
+        const taskBillableEntries = taskTimeEntries.filter(entry => {
+            if (!entry.end || entry.end <= entry.start) return false;
+            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            return entry.start > taskLastBilledAt;
+        });
+        return taskBillableEntries.length > 0;
+    }, [taskTimeEntries, task.lastBilledAt, task.createdAt]);
 
     /**
      * Toggle subtask completion status
@@ -951,6 +1005,36 @@ const SubtaskItem = ({
                             >
                                 <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
                             </button>
+
+                            {/* Billable Toggle Button */}
+                            {onToggleBillable && (
+                                <button
+                                    onClick={hasBillableTime ? undefined : onToggleBillable}
+                                    className={`p-1 rounded-full transition-colors group ${
+                                        hasBillableTime
+                                            ? 'text-green-600 bg-green-100 cursor-not-allowed'
+                                            : task.billable
+                                                ? 'text-green-600 bg-green-100 hover:bg-green-200'
+                                                : 'text-gray-400 hover:bg-green-100'
+                                    }`}
+                                    title={
+                                        hasBillableTime
+                                            ? 'Task has billable time and cannot be manually toggled'
+                                            : task.billable
+                                                ? 'Mark as not billable'
+                                                : 'Mark as billable'
+                                    }
+                                    disabled={hasBillableTime}
+                                >
+                                    <CurrencyDollarIcon className={`h-5 w-5 ${
+                                        hasBillableTime
+                                            ? 'group-hover:text-green-600'
+                                            : task.billable
+                                                ? 'group-hover:text-green-700'
+                                                : 'group-hover:text-green-600'
+                                    }`} />
+                                </button>
+                            )}
                             
                             {/* Three-dot dropdown menu for Edit and Delete */}
                             <div className="relative dropdown-container">

@@ -41,7 +41,8 @@ const TaskTree = ({
             parentTaskId: taskData.parentTaskId,
             title: taskData.title.trim(),
             createdAt: Date.now(),
-            lastBilledAt: null // Initialize as never billed
+            lastBilledAt: null, // Initialize as never billed
+            billable: false // Initialize as not billable by default
         };
 
         setTasks([...tasks, newTask]);
@@ -82,6 +83,17 @@ const TaskTree = ({
             task.id === taskId ? { ...task, archived: false } : task
         );
         setTasks(updatedTasks);
+    };
+
+    /**
+     * Toggle billable status for a task
+     */
+    const handleToggleBillable = (taskId) => {
+        const updatedTasks = tasks.map(task =>
+            task.id === taskId ? { ...task, billable: !task.billable } : task
+        );
+        setTasks(updatedTasks);
+        showSuccess('Task billable status updated');
     };
 
     /**
@@ -200,6 +212,7 @@ const TaskTree = ({
                                     onCreateSubtask={handleCreateTask}
                                     onArchive={() => handleArchiveTask(task.id)}
                                     onUnarchive={() => handleUnarchiveTask(task.id)}
+                                    onToggleBillable={() => handleToggleBillable(task.id)} // Pass the toggle handler
                                     allTasks={projectTasks}
                                 />
                             ))}
@@ -236,6 +249,7 @@ const TaskTree = ({
                                             onDelete={() => handleDeleteTask(task.id)}
                                             onCreateSubtask={handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
+                                            onToggleBillable={() => handleToggleBillable(task.id)}
                                             allTasks={projectTasks}
                                         />
                                     ))}

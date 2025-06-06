@@ -394,7 +394,11 @@ const InvoiceGenerator = ({
             return entry.start > taskLastBilledAt;
         });
         
-        if (billableEntries.length === 0) {
+        // Get manually marked billable tasks (tasks with billable: true)
+        const manuallyBillableTasks = projectTasks.filter(task => task.billable === true);
+        
+        // If no billable entries and no manually billable tasks, return null
+        if (billableEntries.length === 0 && manuallyBillableTasks.length === 0) {
             return null;
         }
 
@@ -406,6 +410,13 @@ const InvoiceGenerator = ({
                 taskTimeMap[entry.taskId] = 0;
             }
             taskTimeMap[entry.taskId] += (entry.end - entry.start);
+        });
+
+        // Add manually billable tasks to the map (even if they have no time)
+        manuallyBillableTasks.forEach(task => {
+            if (!taskTimeMap[task.id]) {
+                taskTimeMap[task.id] = 0; // 0 time for manually marked tasks
+            }
         });
 
         // Prepare tasks data array
@@ -423,7 +434,11 @@ const InvoiceGenerator = ({
                 hours: editedHours,
                 isEdited: editedHours !== roundedHours
             };
-        }).filter(task => task.originalHours > 0);
+        }).filter(task => {
+            // Include tasks with time OR manually marked as billable
+            const taskData = tasks.find(t => t.id === task.id);
+            return task.originalHours > 0 || (taskData && taskData.billable === true);
+        });
 
         return tasksData;
     }, [selectedProject, timeEntries, tasks, editableHours]);
