@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
+import Pagination from './Pagination';
 
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
@@ -16,8 +17,26 @@ const InvoicesList = ({
 }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 8;
 
-    const invoices = projectInvoices;
+    // Calculate paginated invoices
+    const paginatedInvoices = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return projectInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [projectInvoices, currentPage]);
+
+    // Calculate total pages
+    const totalPages = useMemo(() => 
+        Math.ceil(projectInvoices.length / ITEMS_PER_PAGE) || 1,
+    [projectInvoices.length]);
+    
+    // Handle page change
+    const handlePageChange = (pageNumber) => {
+        setCurrentPage(pageNumber);
+        // Scroll to top of the invoice list
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     /**
      * Handle invoice download
@@ -105,7 +124,7 @@ const InvoicesList = ({
         }
     };
 
-    if (invoices.length === 0) {
+    if (projectInvoices.length === 0) {
         return (
             <div className="text-center py-8">
                 <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
@@ -129,7 +148,7 @@ const InvoicesList = ({
     return (
         <div>
             {/* Info about invoice management */}
-            {invoices.length > 0 && (
+            {projectInvoices.length > 0 && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-xs text-blue-600">
                         <strong>Note:</strong> Invoices preserve billing history and cannot be deleted. You can edit invoice details or submit corrections as needed.
@@ -138,7 +157,7 @@ const InvoicesList = ({
             )}
             
             <div className="space-y-4">
-                {invoices.map((invoice) => (
+                {paginatedInvoices.map((invoice) => (
                     <div key={invoice.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div className="flex items-center justify-between">
                             <div className="flex-1">
@@ -225,6 +244,15 @@ const InvoicesList = ({
                     </div>
                 ))}
             </div>
+
+            {/* Pagination */}
+            {projectInvoices.length > ITEMS_PER_PAGE && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                />
+            )}
 
             {/* Invoice Preview Modal */}
             {showPreview && selectedInvoice && (
