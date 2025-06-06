@@ -184,7 +184,7 @@ function App() {
                         setTimeEntries={setTimeEntries}
                         currentTimer={currentTimer}
                         setCurrentTimer={setCurrentTimer}
-                        onBackToProjects={navigateToProjects}
+                        onBackToProjects={() => navigateToProjects()}
                         paymentMethods={paymentMethods}
                         onNavigateToPaymentMethods={handleNavigateToPaymentMethods}
                         businessInfos={businessInfos}
