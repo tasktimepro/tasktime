@@ -56,8 +56,8 @@ export const createInvoiceHTML = (invoiceData) => {
     const {
         project,
         client,
-        tasks,
-        additionalTasks = [],
+        tasks: originalTasks,
+        additionalTasks: originalAdditionalTasks = [],
         note = '',
         totalHours,
         totalAmount,
@@ -74,6 +74,17 @@ export const createInvoiceHTML = (invoiceData) => {
         taskFlatRates = {},
         currency = 'USD'
     } = invoiceData;
+    
+    // Filter out subtasks that are already merged into parent tasks
+    const mergedTaskIds = new Set();
+    originalTasks.forEach(task => {
+        if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
+            task.mergedSubtasks.forEach(subtask => mergedTaskIds.add(subtask.id));
+        }
+    });
+    
+    const tasks = originalTasks.filter(task => !mergedTaskIds.has(task.id));
+    const additionalTasks = originalAdditionalTasks.filter(task => !mergedTaskIds.has(task.id));
 
     return `
         <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
@@ -151,22 +162,36 @@ export const createInvoiceHTML = (invoiceData) => {
                                            task.flatRate !== undefined;
                         
                         // Calculate task amount and hours (including merged subtasks)
-                        let displayHours = task.hours;
+                        let displayHours = task.hours || 0;
                         let taskTitle = task.title;
                         
                         // Handle merged subtasks display
                         if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                             const subtaskHours = task.mergedSubtasks.reduce((total, subtask) => total + (subtask.hours || 0), 0);
-                            displayHours = task.hours + subtaskHours;
-                            taskTitle = `${task.title} (including ${task.mergedSubtasks.length} subtask${task.mergedSubtasks.length > 1 ? 's' : ''})`;
+                            displayHours = displayHours + subtaskHours;
+                            // Don't add "including X subtasks" text to the title
                         }
                         
-                        const taskAmount = usesFlatRate ? 
-                            (taskFlatRates && taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : (task.flatRate || 0)) :
-                            (displayHours * (task.hourlyRate || project?.hourlyRate || 0));
+                        // Determine if we should show hours and rate
+                        // Only use dash if it's a flat rate AND there are no tracked hours
+                        const hasTrackedHours = displayHours > 0;
+                        const showHoursAndRate = !usesFlatRate || hasTrackedHours;
                         
-                        const hours = usesFlatRate ? '—' : displayHours.toFixed(2);
-                        const rate = usesFlatRate ? '—' : getCurrencySymbol(invoiceCurrency) + (task.hourlyRate || project?.hourlyRate || 0).toFixed(2);
+                        // Calculate based on whether it's a flat rate task or hourly
+                        let taskAmount;
+                        if (usesFlatRate) {
+                            taskAmount = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
+                                taskFlatRates[task.id] : 
+                                (task.flatRate || 0);
+                        } else {
+                            // For hourly tasks, always multiply hours by rate
+                            const hourlyRate = task.hourlyRate || project?.hourlyRate || 0;
+                            taskAmount = displayHours * hourlyRate;
+                        }
+                        
+                        // Show hours if we have tracked time, even for flat rate tasks
+                        const hours = showHoursAndRate ? displayHours.toFixed(2) : '—';
+                        const rate = showHoursAndRate ? getCurrencySymbol(invoiceCurrency) + (task.hourlyRate || project?.hourlyRate || 0).toFixed(2) : '—';
                         
                         return `
                         <tr>
@@ -183,12 +208,25 @@ export const createInvoiceHTML = (invoiceData) => {
                         
                         // Check if this additional task uses flat rate
                         const usesFlatRate = task.useFlatRate === true || task.flatRate !== undefined;
-                        const taskAmount = usesFlatRate ? 
-                            (task.flatRate || 0) * (task.quantity || 1) :
-                            (task.hours * (task.hourlyRate || project?.hourlyRate || 0));
+                        const displayHours = task.hours || 0;
                         
-                        const hours = usesFlatRate ? '—' : task.hours.toFixed(2);
-                        const rate = usesFlatRate ? '—' : getCurrencySymbol(invoiceCurrency) + (task.hourlyRate || project?.hourlyRate || 0).toFixed(2);
+                        // Determine if we should show hours and rate
+                        const hasTrackedHours = displayHours > 0;
+                        const showHoursAndRate = !usesFlatRate || hasTrackedHours;
+                        
+                        // Calculate based on whether it's a flat rate task or hourly
+                        let taskAmount;
+                        if (usesFlatRate) {
+                            taskAmount = (task.flatRate || 0) * (task.quantity || 1);
+                        } else {
+                            // For hourly tasks, always multiply hours by rate
+                            const hourlyRate = task.hourlyRate || project?.hourlyRate || 0;
+                            taskAmount = displayHours * hourlyRate;
+                        }
+                        
+                        // Show hours if we have tracked time, even for flat rate tasks
+                        const hours = showHoursAndRate ? displayHours.toFixed(2) : '—';
+                        const rate = showHoursAndRate ? getCurrencySymbol(invoiceCurrency) + (task.hourlyRate || project?.hourlyRate || 0).toFixed(2) : '—';
                         // Don't show hours in title when we have Hours column
                         const taskTitle = task.title;
                         
@@ -218,20 +256,36 @@ export const createInvoiceHTML = (invoiceData) => {
                         const isLastTask = index === tasks.length - 1 && additionalTasks.length === 0;
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
                         
-                        const taskAmount = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
-                            taskFlatRates[task.id] : 
-                            (task.flatRate || 0);
-                        
+                        // Check if this task uses flat rate
+                        const usesFlatRate = task.useFlatRate === true || 
+                                           (taskFlatRates && taskFlatRates[task.id] !== undefined) || 
+                                           task.flatRate !== undefined;
+                                           
                         // Handle merged subtasks display
-                        let displayHours = task.hours;
+                        let displayHours = task.hours || 0;
                         let taskTitle = task.title;
+                        
+                        // Calculate task amount - consider hours for hourly tasks even in simplified table
+                        let taskAmount;
                         
                         if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                             const subtaskHours = task.mergedSubtasks.reduce((total, subtask) => total + (subtask.hours || 0), 0);
-                            displayHours = task.hours + subtaskHours;
-                            taskTitle = `${task.title} (including ${task.mergedSubtasks.length} subtask${task.mergedSubtasks.length > 1 ? 's' : ''})`;
+                            displayHours = displayHours + subtaskHours;
+                            // Don't add "including X subtasks" text to the title
                         }
                         
+                        // Calculate the task amount based on whether it's flat rate or hourly
+                        if (usesFlatRate) {
+                            taskAmount = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
+                                taskFlatRates[task.id] : 
+                                (task.flatRate || 0);
+                        } else {
+                            // For hourly tasks, multiply hours by rate
+                            const hourlyRate = task.hourlyRate || project?.hourlyRate || 0;
+                            taskAmount = displayHours * hourlyRate;
+                        }
+                        
+                        // Always show hours when they exist, even for flat rate tasks
                         const finalTitle = displayHours > 0 ? `${taskTitle} (${displayHours.toFixed(2)}h)` : taskTitle;
                         
                         return `
@@ -245,8 +299,22 @@ export const createInvoiceHTML = (invoiceData) => {
                         const isLastTask = index === additionalTasks.length - 1;
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
                         
-                        const taskAmount = (task.flatRate || 0) * (task.quantity || 1);
-                        const taskTitle = task.hours > 0 ? `${task.title} (${task.hours.toFixed(2)}h)` : task.title;
+                        const displayHours = task.hours || 0;
+                        // Check if this additional task uses flat rate
+                        const usesFlatRate = task.useFlatRate === true || task.flatRate !== undefined;
+                        
+                        // Calculate based on whether it's a flat rate task or hourly
+                        let taskAmount;
+                        if (usesFlatRate) {
+                            taskAmount = (task.flatRate || 0) * (task.quantity || 1);
+                        } else {
+                            // For hourly tasks, multiply hours by rate
+                            const hourlyRate = task.hourlyRate || project?.hourlyRate || 0;
+                            taskAmount = displayHours * hourlyRate;
+                        }
+                        
+                        // Always show hours when they exist, even for flat rate tasks
+                        const taskTitle = displayHours > 0 ? `${task.title} (${displayHours.toFixed(2)}h)` : task.title;
                         
                         return `
                         <tr>

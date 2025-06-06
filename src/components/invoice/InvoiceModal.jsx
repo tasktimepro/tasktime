@@ -140,7 +140,7 @@ const InvoiceModal = ({
                                     </select>
 
                                     {selectedProject && (
-                                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                        <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
                                             <div className="text-sm text-blue-800">
                                                 {selectedProject.hourlyRate ? (
                                                     <div className="text-sm text-blue-800">
@@ -205,7 +205,7 @@ const InvoiceModal = ({
                                         ))}
                                     </select>
                                     {selectedClientInfo && (
-                                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                        <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
                                             <p className="text-sm text-blue-800">
                                                 <strong>{selectedClientInfo.title}</strong> will be included as "Invoice To" in the invoice.
                                             </p>
@@ -903,7 +903,7 @@ const InvoiceModal = ({
                                     </select>
 
                                     {selectedBusinessInfo && (
-                                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                        <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
                                             <p className="text-sm text-blue-800">
                                                 <strong>{selectedBusinessInfo.title}</strong> will be included as "Invoice From" in the invoice.
                                             </p>
@@ -966,7 +966,7 @@ const InvoiceModal = ({
                                     </select>
 
                                     {selectedPaymentMethod && (
-                                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                        <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
                                             <p className="text-sm text-blue-800">
                                                 <strong>{selectedPaymentMethod.title}</strong> will be included as "Payment Details" in the invoice.
                                             </p>

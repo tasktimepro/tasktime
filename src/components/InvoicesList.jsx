@@ -318,6 +318,14 @@ const InvoicesList = ({
                                             Mark as Paid
                                         </button>
                                     )}
+
+                                    <button
+                                        onClick={() => handleEdit(invoice)}
+                                        className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
+                                        title="Edit Invoice"
+                                    >
+                                        <PencilIcon className="h-5 w-5" />
+                                    </button>
                                     
                                     <button
                                         onClick={() => handlePreview(invoice)}
@@ -325,14 +333,6 @@ const InvoicesList = ({
                                         title="Preview Invoice"
                                     >
                                         <EyeIcon className="h-5 w-5" />
-                                    </button>
-                                    
-                                    <button
-                                        onClick={() => handleEdit(invoice)}
-                                        className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
-                                        title="Edit Invoice"
-                                    >
-                                        <PencilIcon className="h-5 w-5" />
                                     </button>
                                     
                                     <button
