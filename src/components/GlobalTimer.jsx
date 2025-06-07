@@ -51,9 +51,12 @@ const GlobalTimer = ({
 
     // Update timer display every second
     useEffect(() => {
-        if (!currentTimer || isPaused) return;
+        if (!currentTimer) return;
+        
+        // Don't return early for isPaused, we still want the initial update
 
         const updateTimer = () => {
+            if (isPaused) return; // Only skip subsequent updates when paused
             const formattedTime = formatActiveTimer(currentTimer.startTime);
             setCurrentTime(formattedTime);
         };
@@ -115,7 +118,7 @@ const GlobalTimer = ({
                         {currentTask.title}
                     </span>
                 )}
-                <span className={`text-sm font-mono ${timeColor} px-2 py-1 rounded`}>
+                <span className={`text-sm font-mono ${timeColor} px-2 py-1 rounded min-w-[32px] inline-block text-center`}>
                     {isPaused ? pausedTime : currentTime}
                 </span>
             </div>
