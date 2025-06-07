@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, DocumentTextIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import { useToast } from '../hooks/useToast';
 import CustomCheckbox from './CustomCheckbox';
 
@@ -537,7 +537,7 @@ const InvoiceTemplates = ({
             {/* Templates List */}
             {sortedTemplates.length === 0 ? (
                 <div className="text-center py-12">
-                    <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
+                    <DocumentDuplicateIcon className="mx-auto h-12 w-12 text-gray-400" />
                     <h3 className="mt-2 text-sm font-medium text-gray-900">No templates</h3>
                     <p className="mt-1 text-sm text-gray-500">Get started by creating your first invoice template.</p>
                     <div className="mt-6">
@@ -561,7 +561,7 @@ const InvoiceTemplates = ({
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1">
                                         <div className="flex items-center space-x-3">
-                                            <DocumentTextIcon className="h-6 w-6 text-gray-400" />
+                                            <DocumentDuplicateIcon className="h-6 w-6 text-gray-400" />
                                             <div>
                                                 <div className="flex items-center">
                                                     <h4 className="text-lg font-medium text-gray-900">

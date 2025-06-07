@@ -251,7 +251,7 @@ function App() {
                                 <BoltIcon className="h-4 w-4 text-amber-500 absolute -top-1 -right-1 group-hover:text-amber-600 transition-colors" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900 leading-none">
+                                <h1 className="text-lg font-bold text-gray-900 leading-none">
                                     Task<span className="text-blue-600">Time</span>
                                 </h1>
                                 <p className="text-xs text-gray-500 leading-none mt-1">Your freelance flow simplified</p>

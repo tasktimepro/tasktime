@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CreditCardIcon, BuildingOfficeIcon, UserGroupIcon, DocumentTextIcon, PlusIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { CreditCardIcon, BuildingOfficeIcon, UserGroupIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
 import { useToast } from '../hooks/useToast';
 import PaymentMethods from './PaymentMethods';

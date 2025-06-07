@@ -88,7 +88,7 @@ const ProjectDashboard = ({
                     </button>
 
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">{project.title}</h1>
+                        <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
 
                         {project.hourlyRate && (
                             <p className="text-sm text-gray-500">
