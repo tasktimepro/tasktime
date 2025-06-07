@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useUrlState } from './hooks/useUrlState';
 import ProjectList from './components/ProjectList';
@@ -18,15 +18,61 @@ function App() {
     const [projects, setProjects] = useLocalStorage('projects', []);
     const [tasks, setTasks] = useLocalStorage('tasks', []);
     const [timeEntries, setTimeEntries] = useLocalStorage('timeEntries', []);
-    const [currentTimer, setCurrentTimer] = useLocalStorage('currentTimer', null);
     const [paymentMethods, setPaymentMethods] = useLocalStorage('paymentMethods', []);
     const [businessInfos, setBusinessInfos] = useLocalStorage('businessInfos', []);
     const [clientInfos, setClientInfos] = useLocalStorage('clientInfos', []);
     const [invoices, setInvoices] = useLocalStorage('invoices', []);
     
-    // Timer pause state (not stored in localStorage as it should reset on refresh)
-    const [isPaused, setIsPaused] = useState(false);
-    const [pausedElapsedTime, setPausedElapsedTime] = useState(0);
+    // Unified timer state (all timer-related data in one localStorage key)
+    const [timerState, setTimerState] = useLocalStorage('timer', {
+        startTime: null,
+        taskId: null,
+        paused: false,
+        elapsedTime: 0
+    });
+
+    // Derived state for backward compatibility
+    const currentTimer = useMemo(() => {
+        return timerState.startTime && timerState.taskId ? {
+            startTime: timerState.startTime,
+            taskId: timerState.taskId
+        } : null;
+    }, [timerState.startTime, timerState.taskId]);
+    
+    const isPaused = timerState.paused;
+    const pausedElapsedTime = timerState.elapsedTime;
+
+    // Helper functions to update timer state
+    const setCurrentTimer = (timer) => {
+        if (timer === null) {
+            setTimerState({
+                startTime: null,
+                taskId: null,
+                paused: false,
+                elapsedTime: 0
+            });
+        } else {
+            setTimerState(prev => ({
+                ...prev,
+                startTime: timer.startTime,
+                taskId: timer.taskId
+            }));
+        }
+    };
+
+    const setIsPaused = (paused) => {
+        setTimerState(prev => ({
+            ...prev,
+            paused
+        }));
+    };
+
+    const setPausedElapsedTime = (elapsedTime) => {
+        setTimerState(prev => ({
+            ...prev,
+            elapsedTime
+        }));
+    };
 
     // State for showing/hiding global timer
     const [showGlobalTimer, setShowGlobalTimer] = useState(false);
@@ -116,7 +162,12 @@ function App() {
         setTasks(migratedTasks);
         setInvoices(allInvoices);
         setTimeEntries(importData.timeEntries || []); // Import time entries if provided
-        setCurrentTimer(null); // Clear any active timer
+        setTimerState({
+            startTime: null,
+            taskId: null,
+            paused: false,
+            elapsedTime: 0
+        }); // Clear any active timer
     };
 
     return (
@@ -144,6 +195,7 @@ function App() {
                                     isPaused={isPaused}
                                     setIsPaused={setIsPaused}
                                     pausedElapsedTime={pausedElapsedTime}
+                                    setPausedElapsedTime={setPausedElapsedTime}
                                     onClose={() => {
                                         setShowGlobalTimer(false);
                                         setIsPaused(false);

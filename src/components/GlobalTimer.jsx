@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { StopIcon } from '@heroicons/react/24/outline';
-import { formatActiveTimer } from '../utils/dateUtils';
+import { formatActiveTimer, formatDurationWithSeconds } from '../utils/dateUtils';
 import TimerControls from './TimerControls.jsx';
 
 /**
@@ -13,6 +13,7 @@ import TimerControls from './TimerControls.jsx';
  * @param {boolean} props.isPaused - Global pause state
  * @param {Function} props.setIsPaused - Function to set global pause state
  * @param {number} props.pausedElapsedTime - Global paused elapsed time
+ * @param {Function} props.setPausedElapsedTime - Function to set global paused elapsed time
  * @param {Function} props.onClose - Function called when timer is closed
  */
 const GlobalTimer = ({
@@ -23,6 +24,7 @@ const GlobalTimer = ({
     isPaused,
     setIsPaused,
     pausedElapsedTime,
+    setPausedElapsedTime,
     onClose
 }) => {
     const [currentTime, setCurrentTime] = useState('');
@@ -49,7 +51,15 @@ const GlobalTimer = ({
         return () => clearInterval(interval);
     }, [currentTimer, isPaused]);
 
-    // When paused, save the current time display
+    // Initialize paused time display when component mounts and timer is already paused
+    useEffect(() => {
+        if (isPaused && pausedElapsedTime > 0) {
+            const formattedPausedTime = formatDurationWithSeconds(pausedElapsedTime);
+            setPausedTime(formattedPausedTime);
+        }
+    }, [isPaused, pausedElapsedTime]);
+
+    // When paused, save the current time display (for transitions from running to paused)
     useEffect(() => {
         if (isPaused && currentTime) {
             setPausedTime(currentTime);
@@ -91,6 +101,7 @@ const GlobalTimer = ({
                 isPaused={isPaused}
                 setIsPaused={setIsPaused}
                 pausedElapsedTime={pausedElapsedTime}
+                setPausedElapsedTime={setPausedElapsedTime}
                 onComplete={() => {
                     // Call onClose when timer is completely stopped
                     if (onClose) onClose();

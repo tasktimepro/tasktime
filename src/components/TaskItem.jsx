@@ -426,8 +426,8 @@ const TaskItem = ({
                     {!isEditing && (
                         <div className="flex items-center space-x-1">
                             {/* Show timer controls and action buttons conditionally */}
-                            {isTimerActive ? (
-                                /* Show timer controls when this timer is active (whether running or paused) */
+                            {isTimerActive && !isPaused ? (
+                                /* Show ONLY timer controls when this timer is actively running (not paused) */
                                 <TimerControls
                                     task={task}
                                     timeEntries={timeEntries}
@@ -978,8 +978,8 @@ const SubtaskItem = ({
             {!isEditing && (
                 <div className="flex items-center space-x-1">
                     {/* Show timer controls and action buttons conditionally */}
-                    {isTimerActive ? (
-                        /* Show timer controls when this timer is active (whether running or paused) */
+                    {isTimerActive && !isPaused ? (
+                        /* Show ONLY timer controls when this timer is actively running (not paused) */
                         <TimerControls
                             task={task}
                             timeEntries={timeEntries}

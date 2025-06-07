@@ -26,6 +26,7 @@ function TimerControls({
     isPaused = false,
     setIsPaused = null,
     pausedElapsedTime = 0,
+    setPausedElapsedTime = null,
     onComplete = null
 }) {
     const isTimerActive = currentTimer && currentTimer.taskId === task.id;
@@ -71,9 +72,9 @@ function TimerControls({
     const resumeTimer = () => {
         if (!currentTimer || !isPaused || currentTimer.taskId !== task.id) return;
         
-        // Calculate the new start time by subtracting the elapsed time from current time
-        // This preserves the timer duration
-        const adjustedStartTime = Date.now() - pausedElapsedTime;
+        // When resuming, we need to adjust the start time based on how much time was already tracked
+        // The pausedElapsedTime contains the total time that was already tracked before pausing
+        const adjustedStartTime = Date.now() - (pausedElapsedTime || 0);
         
         setCurrentTimer({
             ...currentTimer,
@@ -81,17 +82,25 @@ function TimerControls({
         });
         
         setIsPaused(false);
+        
+        // Reset the paused elapsed time since we're resuming
+        if (setPausedElapsedTime) {
+            setPausedElapsedTime(0);
+        }
     };
 
     /**
      * Pause timer but don't create time entry
-     * Instead, just mark it as paused
+     * Instead, just mark it as paused and save the elapsed time
      */
     const pauseTimer = () => {
         if (!currentTimer || currentTimer.taskId !== task.id) return;
 
         // If we have access to the isPaused state setter, use it
         if (setIsPaused) {
+            // Calculate elapsed time up to the pause moment
+            const elapsedTime = Date.now() - currentTimer.startTime;
+            
             // Create time entry for the paused session
             const timeEntry = {
                 id: generateId(),
@@ -101,6 +110,18 @@ function TimerControls({
             };
 
             setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+            
+            // Update paused state with the correct elapsed time
+            if (typeof pausedElapsedTime === 'number') {
+                // Add to existing paused time if there was any
+                const totalElapsedTime = pausedElapsedTime + elapsedTime;
+                if (typeof setPausedElapsedTime === 'function') {
+                    setPausedElapsedTime(totalElapsedTime);
+                }
+            } else if (typeof setPausedElapsedTime === 'function') {
+                // First time pausing
+                setPausedElapsedTime(elapsedTime);
+            }
             
             setIsPaused(true);
         } else {
@@ -140,9 +161,13 @@ function TimerControls({
         // Remove the timer entirely
         setCurrentTimer(null);
         
-        // Reset paused state if we have access to it
+        // Reset paused state and elapsed time if we have access to them
         if (setIsPaused) {
             setIsPaused(false);
+        }
+        
+        if (setPausedElapsedTime) {
+            setPausedElapsedTime(0);
         }
         
         // Call onComplete callback if provided
