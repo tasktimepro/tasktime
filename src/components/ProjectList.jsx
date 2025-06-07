@@ -398,24 +398,6 @@ const ProjectList = ({
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
-                                    Hourly Rate (optional)
-                                </label>
-
-                                <input
-                                    type="number"
-                                    id="hourlyRate"
-                                    name="hourlyRate"
-                                    value={formData.hourlyRate}
-                                    onChange={handleInputChange}
-                                    min="0"
-                                    step="0.01"
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="0.00"
-                                />
-                            </div>
-
-                            <div>
                                 <label htmlFor="currency" className="block text-sm font-medium text-gray-700">
                                     Currency
                                 </label>
@@ -434,6 +416,23 @@ const ProjectList = ({
                                     <option value="CAD">CAD</option>
                                     <option value="AUD">AUD</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
+                                    Hourly Rate (optional)
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="hourlyRate"
+                                    name="hourlyRate"
+                                    value={formData.hourlyRate}
+                                    onChange={handleInputChange}
+                                    min="0"
+                                    step="0.01"
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    placeholder="0.00"
+                                />
                             </div>
                         </div>
 

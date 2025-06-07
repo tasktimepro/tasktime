@@ -7,6 +7,7 @@ import Account from './components/Account';
 import Invoices from './components/Invoices';
 import GlobalTimer from './components/GlobalTimer';
 import { ToastProvider } from './components/ToastContainer';
+import { ClockIcon, BoltIcon, RocketLaunchIcon } from '@heroicons/react/24/outline';
 
 /**
  * Main App component - Entry point for the Task. Time. Track.
@@ -177,12 +178,21 @@ function App() {
             <header className="bg-white shadow-sm border-b border-gray-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center py-4">
-                        <h1 
-                            className="text-2xl font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+                        <div 
+                            className="flex items-center space-x-3 cursor-pointer hover:text-blue-600 transition-colors group"
                             onClick={() => navigateToProjects()}
                         >
-                            Task. Time. Track.
-                        </h1>
+                            <div className="relative">
+                                <ClockIcon className="h-8 w-8 text-blue-600 group-hover:text-blue-700 transition-colors" />
+                                <BoltIcon className="h-4 w-4 text-amber-500 absolute -top-1 -right-1 group-hover:text-amber-600 transition-colors" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900 leading-none">
+                                    Task<span className="text-blue-600">Time</span>Track
+                                </h1>
+                                <p className="text-xs text-gray-500 leading-none mt-1">Your freelance flow simplified</p>
+                            </div>
+                        </div>
                         
                         {/* Global Timer Display */}
                         {showGlobalTimer && currentTimer && (
