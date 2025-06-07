@@ -18,6 +18,7 @@ const Invoices = ({
     setTasks,
     timeEntries,
     currentTimer,
+    isPaused,
     invoices,
     setInvoices,
     paymentMethods,
@@ -37,9 +38,9 @@ const Invoices = ({
     
     // Handle creating a new invoice with timer check
     const handleCreateNewInvoice = () => {
-        // Check if a timer is currently active
-        if (currentTimer) {
-            showError('Cannot generate an invoice while a timer is active. Please stop the timer first.');
+        // Check if a timer is currently active (running, not paused)
+        if (currentTimer && !isPaused) {
+            showError('Cannot generate an invoice while a timer is active. Please pause the timer first.');
             return;
         }
         
@@ -48,9 +49,9 @@ const Invoices = ({
 
     // Handle editing an invoice with timer check
     const handleEditInvoice = (invoice) => {
-        // Check if a timer is currently active
-        if (currentTimer) {
-            showError('Cannot update an invoice while a timer is active. Please stop the timer first.');
+        // Check if a timer is currently active (running, not paused)
+        if (currentTimer && !isPaused) {
+            showError('Cannot update an invoice while a timer is active. Please pause the timer first.');
             return;
         }
         
@@ -224,6 +225,7 @@ const Invoices = ({
                     setTasks={setTasks}
                     timeEntries={timeEntries}
                     currentTimer={currentTimer}
+                    isPaused={isPaused}
                     editingInvoice={editingInvoice}
                     paymentMethods={paymentMethods}
                     onNavigateToPaymentMethods={() => {

@@ -160,20 +160,20 @@ function TimerControls({
                 // Start button - shown when no timer active for this task
                 <button
                     onClick={startTimer}
-                    className="p-1 text-red-600 hover:bg-red-100 rounded-md transition-colors group"
+                    className="p-1 text-green-600 hover:bg-green-100 rounded-md transition-colors group"
                     title="Start Timer"
                 >
-                    <PlayIcon className={`${iconSize} group-hover:text-red-700`} />
+                    <PlayIcon className={`${iconSize} group-hover:text-green-700`} />
                 </button>
             ) : isPaused ? (
                 // For paused state, show resume and stop buttons
                 <div className="flex space-x-1">
                     <button
                         onClick={resumeTimer}
-                        className="p-1 text-red-600 hover:bg-red-100 rounded-md transition-colors group"
+                        className="p-1 text-green-600 hover:bg-green-100 rounded-full transition-colors group"
                         title="Resume Timer"
                     >
-                        <PlayIcon className={`${iconSize} group-hover:text-red-700`} />
+                        <PlayIcon className={`${iconSize} group-hover:text-green-700`} />
                     </button>
                     {isGlobalTimer && <button
                         onClick={stopTimer}

@@ -48,9 +48,9 @@ const ProjectDashboard = ({
      * Handle editing an existing invoice
      */
     const handleEditInvoice = (invoice) => {
-        // Check if a timer is currently active
-        if (currentTimer) {
-            showError('Cannot update an invoice while a timer is active. Please stop the timer first.');
+        // Check if a timer is currently active (running, not paused)
+        if (currentTimer && !isPaused) {
+            showError('Cannot update an invoice while a timer is active. Please pause the timer first.');
             return;
         }
         
@@ -103,6 +103,7 @@ const ProjectDashboard = ({
                     setTasks={setTasks}
                     timeEntries={projectTimeEntries}
                     currentTimer={currentTimer}
+                    isPaused={isPaused}
                     paymentMethods={paymentMethods}
                     onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                     businessInfos={businessInfos}
@@ -158,6 +159,7 @@ const ProjectDashboard = ({
                             setTasks={setTasks}
                             timeEntries={projectTimeEntries}
                             currentTimer={currentTimer}
+                            isPaused={isPaused}
                             editingInvoice={editingInvoice}
                             onInvoiceSaved={() => setEditingInvoice(null)}
                             paymentMethods={paymentMethods}

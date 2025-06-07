@@ -145,10 +145,10 @@ const TaskItem = ({
     // Task dimming logic:
     // 1. If this task's timer is active, don't dim it
     // 2. If this task's subtask has an active timer, don't dim this task
-    // 3. If any timer is active and it's not related to this task, dim it
+    // 3. If any timer is active (and not paused) and it's not related to this task, dim it
     // 4. Don't dim archived tasks regardless
     const isRelatedToActiveTimer = isTimerActive || subtaskTimerActive;
-    const shouldDimTask = anyTimerActive && !isRelatedToActiveTimer && !isArchived;
+    const shouldDimTask = anyTimerActive && !isPaused && !isRelatedToActiveTimer && !isArchived;
 
     // Check if task has billable time since lastBilledAt (makes it non-toggleable)
     const hasBillableTime = useMemo(() => {
@@ -321,7 +321,7 @@ const TaskItem = ({
         <div className={`border border-gray-200 rounded-lg hover:shadow-md transition-shadow ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
             {/* Main Task */}
             <div className={`p-4 transition-colors ${
-                (subtaskTimerActive) && !isArchived
+                (subtaskTimerActive && !isPaused) && !isArchived
                 ? 'bg-gray-100 opacity-50 pointer-events-none' 
                 : 'hover:bg-gray-50'
             }`}>
@@ -426,8 +426,8 @@ const TaskItem = ({
                     {!isEditing && (
                         <div className="flex items-center space-x-1">
                             {/* Show timer controls and action buttons conditionally */}
-                            {isTimerActive && !isPaused ? (
-                                /* Only show timer controls when timer is actively running (not paused) */
+                            {isTimerActive ? (
+                                /* Show timer controls when this timer is active (whether running or paused) */
                                 <TimerControls
                                     task={task}
                                     timeEntries={timeEntries}
@@ -470,8 +470,8 @@ const TaskItem = ({
                                         <ArchiveBoxIcon className="h-5 w-5 group-hover:text-yellow-700" />
                                     </button>
                                 )
-                            ) : anyTimerActive && !isTimerActive && !isPaused ? (
-                                /* When any timer is actively running and it's not this task's timer, hide all action buttons */
+                            ) : anyTimerActive && !isPaused && !isTimerActive ? (
+                                /* When any timer is actively running (not paused) and it's not this task's timer, hide all action buttons */
                                 null
                             ) : (
                                 /* Show all action buttons when not completed and no timer actively running */
@@ -490,10 +490,10 @@ const TaskItem = ({
 
                                     <button
                                         onClick={() => setShowTimeEditModal(true)}
-                                        className="p-1 text-gray-400 hover:bg-blue-100 rounded-full transition-colors group"
+                                        className="p-1 text-gray-400 hover:bg-yellow-100 rounded-full transition-colors group"
                                         title="Edit Time"
                                     >
-                                        <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
+                                        <ClockIcon className="h-5 w-5 group-hover:text-yellow-700" />
                                     </button>
 
                                     {/* Billable Toggle Button */}
@@ -502,10 +502,10 @@ const TaskItem = ({
                                             onClick={hasBillableTime ? undefined : onToggleBillable}
                                             className={`p-1 rounded-full transition-colors group ${
                                                 hasBillableTime
-                                                    ? 'text-green-600 bg-green-100 cursor-not-allowed'
+                                                    ? 'text-blue-600 bg-blue-100 cursor-not-allowed'
                                                     : task.billable
-                                                        ? 'text-green-600 bg-green-100 hover:bg-green-200'
-                                                        : 'text-gray-400 hover:bg-green-100'
+                                                        ? 'text-blue-600 bg-blue-100 hover:bg-blue-200'
+                                                        : 'text-gray-400 hover:bg-blue-100'
                                             }`}
                                             title={
                                                 hasBillableTime
@@ -518,10 +518,10 @@ const TaskItem = ({
                                         >
                                             <CurrencyDollarIcon className={`h-5 w-5 ${
                                                 hasBillableTime
-                                                    ? 'group-hover:text-green-600'
+                                                    ? 'group-hover:text-blue-600'
                                                     : task.billable
-                                                        ? 'group-hover:text-green-700'
-                                                        : 'group-hover:text-green-600'
+                                                        ? 'group-hover:text-blue-700'
+                                                        : 'group-hover:text-blue-600'
                                             }`} />
                                         </button>
                                     )}
@@ -655,7 +655,7 @@ const TaskItem = ({
                                 </form>
                             ) : (
                                 <div className={`${
-                                    (anyTimerActive && isRelatedToActiveTimer)
+                                    (anyTimerActive && !isPaused && isRelatedToActiveTimer)
                                     ? 'opacity-50 pointer-events-none' 
                                     : ''
                                 }`}>
@@ -766,9 +766,9 @@ const SubtaskItem = ({
     
     // For subtasks, we should:
     // 1. Not dim if this subtask's timer is active
-    // 2. Always dim if any timer is active and it's not this subtask's timer
+    // 2. Only dim if any timer is actively running (not paused) and it's not this subtask's timer
     // 3. Don't dim if the task is archived
-    const shouldDimTask = anyTimerActive && !isTimerActive && !isArchived;
+    const shouldDimTask = anyTimerActive && !isPaused && !isTimerActive && !isArchived;
 
     // Check if subtask has billable time since lastBilledAt (makes it non-toggleable)
     const hasBillableTime = useMemo(() => {
@@ -978,8 +978,8 @@ const SubtaskItem = ({
             {!isEditing && (
                 <div className="flex items-center space-x-1">
                     {/* Show timer controls and action buttons conditionally */}
-                    {isTimerActive && !isPaused ? (
-                        /* Only show timer controls when timer is actively running (not paused) */
+                    {isTimerActive ? (
+                        /* Show timer controls when this timer is active (whether running or paused) */
                         <TimerControls
                             task={task}
                             timeEntries={timeEntries}
@@ -994,8 +994,8 @@ const SubtaskItem = ({
                     ) : isCompleted ? (
                         /* No actions for completed subtasks */
                         null
-                    ) : anyTimerActive && !isTimerActive && !isPaused ? (
-                        /* When any timer is actively running and it's not this task's timer, hide all action buttons */
+                    ) : anyTimerActive && !isPaused && !isTimerActive ? (
+                        /* When any timer is actively running (not paused) and it's not this task's timer, hide all action buttons */
                         null
                     ) : (
                         /* Show all action buttons when not completed and no timer actively running */
@@ -1014,10 +1014,10 @@ const SubtaskItem = ({
 
                             <button
                                 onClick={() => setShowTimeEditModal(true)}
-                                className="p-1 text-gray-400 hover:bg-blue-100 rounded-full transition-colors group"
+                                className="p-1 text-gray-400 hover:bg-yellow-100 rounded-full transition-colors group"
                                 title="Edit Time"
                             >
-                                <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
+                                <ClockIcon className="h-5 w-5 group-hover:text-yellow-700" />
                             </button>
 
                             {/* Billable Toggle Button */}
@@ -1026,10 +1026,10 @@ const SubtaskItem = ({
                                     onClick={hasBillableTime ? undefined : onToggleBillable}
                                     className={`p-1 rounded-full transition-colors group ${
                                         hasBillableTime
-                                            ? 'text-green-600 bg-green-100 cursor-not-allowed'
+                                            ? 'text-blue-600 bg-blue-100 cursor-not-allowed'
                                             : task.billable
-                                                ? 'text-green-600 bg-green-100 hover:bg-green-200'
-                                                : 'text-gray-400 hover:bg-green-100'
+                                                ? 'text-blue-600 bg-blue-100 hover:bg-blue-200'
+                                                : 'text-gray-400 hover:bg-blue-100'
                                     }`}
                                     title={
                                         hasBillableTime
@@ -1042,10 +1042,10 @@ const SubtaskItem = ({
                                 >
                                     <CurrencyDollarIcon className={`h-5 w-5 ${
                                         hasBillableTime
-                                            ? 'group-hover:text-green-600'
+                                            ? 'group-hover:text-blue-600'
                                             : task.billable
-                                                ? 'group-hover:text-green-700'
-                                                : 'group-hover:text-green-600'
+                                                ? 'group-hover:text-blue-700'
+                                                : 'group-hover:text-blue-600'
                                     }`} />
                                 </button>
                             )}
