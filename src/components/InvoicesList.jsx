@@ -289,7 +289,15 @@ const InvoicesList = ({
                                 {/* Invoice details */}
                                 <div className="ml-9">
                                     <p className="text-sm text-gray-500">
-                                        {invoice.date} <span className="mx-1">•</span> {invoice.totalHours.toFixed(2)} hours <span className="mx-1">•</span> {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)}
+                                        {invoice.date}
+                                        {invoice.totalHours > 0 && (
+                                            <>
+                                                <span className="mx-1">•</span>
+                                                {invoice.totalHours.toFixed(2)} hours
+                                            </>
+                                        )}
+                                        <span className="mx-1">•</span>
+                                        {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)}
                                     </p>
                                     {invoice.dueDate && (
                                         <p className={`text-sm mt-1 ${

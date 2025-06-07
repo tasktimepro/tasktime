@@ -29,15 +29,16 @@ export const ToastProvider = ({ children }) => {
   return (
     <ToastContext.Provider value={{ addToast, removeToast, showSuccess, showError, showInfo, showWarning }}>
       {children}
-      <div className="fixed bottom-0 right-0 z-50 w-full max-w-[450px] p-4 space-y-4 flex flex-col-reverse items-end">
-        {toasts.map(toast => (
-          <Toast
-            key={toast.id}
-            message={toast.message}
-            type={toast.type}
-            duration={toast.duration}
-            onClose={() => removeToast(toast.id)}
-          />
+      <div className="fixed bottom-0 right-0 z-50 w-full max-w-[450px] p-4 flex flex-col-reverse items-end">
+        {toasts.map((toast, index) => (
+          <div key={toast.id} className={index > 0 ? 'mb-4' : ''}>
+            <Toast
+              message={toast.message}
+              type={toast.type}
+              duration={toast.duration}
+              onClose={() => removeToast(toast.id)}
+            />
+          </div>
         ))}
       </div>
     </ToastContext.Provider>

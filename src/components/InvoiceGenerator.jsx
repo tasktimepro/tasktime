@@ -245,15 +245,16 @@ const InvoiceGenerator = ({
      * Initialize selected template based on default template or editing invoice
      */
     const initializeSelectedTemplate = useCallback(() => {
-        // Don't override if project was manually changed (user may have gotten auto-populated values)
+        // Don't override if project was manually changed and user has already made a selection
         if (projectManuallyChanged && selectedTemplate !== null) {
             return;
         }
         
         // Only initialize on first mount or when editing invoice changes
-        // Don't override user selection once set
-        if (selectedTemplate !== null && !editingInvoice) {
-            return; // User has already made a selection, keep it
+        // Don't override user selection once set, UNLESS we have a project pre-selection case
+        // (when coming from project dashboard, we want project-specific template to override any default)
+        if (selectedTemplate !== null && !editingInvoice && projectManuallyChanged) {
+            return; // User has already made a manual selection, keep it
         }
 
         // If editing an invoice and it has a template reference, use it
@@ -268,6 +269,7 @@ const InvoiceGenerator = ({
         // If not editing an invoice, we need to select a template
         if (!editingInvoice && invoiceTemplates.length > 0) {
             // If a project is selected and it has previous invoices, use the last template from that project
+            // This should take precedence over any default template selection
             if (selectedProject?.id && selectedProject.invoiceIds?.length > 0) {
                 const projectInvoices = invoices.filter(invoice => 
                     selectedProject.invoiceIds.includes(invoice.id)
@@ -280,26 +282,30 @@ const InvoiceGenerator = ({
                         const lastTemplate = invoiceTemplates.find(t => t.id === lastInvoice.templateId);
                         if (lastTemplate) {
                             setSelectedTemplate(lastTemplate);
+                            console.log(`Pre-selected template "${lastTemplate.name}" based on last invoice for project ${selectedProject.title}`);
                             return;
                         }
                     }
                 }
             }
             
-            // If no last template was found, use the default template
-            const defaultTemplate = invoiceTemplates.find(t => t.isDefault);
-            if (defaultTemplate) {
-                setSelectedTemplate(defaultTemplate);
+            // Only use default template if no project-specific template was found
+            // This prevents default template from overriding project-specific selection
+            if (selectedTemplate === null) {
+                const defaultTemplate = invoiceTemplates.find(t => t.isDefault);
+                if (defaultTemplate) {
+                    setSelectedTemplate(defaultTemplate);
+                    return;
+                }
+                
+                // If no default template, select the first one
+                setSelectedTemplate(invoiceTemplates[0]);
                 return;
             }
-            
-            // If no default template, select the first one
-            setSelectedTemplate(invoiceTemplates[0]);
-            return;
         }
         
         // No need to reset to null as that's the initial state
-    }, [editingInvoice, invoiceTemplates, selectedTemplate, projectManuallyChanged, selectedProject?.id, selectedProject?.invoiceIds, invoices]);
+    }, [editingInvoice, invoiceTemplates, selectedTemplate, projectManuallyChanged, selectedProject?.id, selectedProject?.invoiceIds, invoices, selectedProject?.title]);
 
     // Track when the form gets shown so we can initialize only then
     const [hasInitialized, setHasInitialized] = useState(false);
