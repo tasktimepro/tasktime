@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
@@ -519,9 +519,7 @@ const ProjectList = ({
             {projects.filter(p => !p.archived).length === 0 && projects.filter(p => p.archived).length === 0 ? (
                 <div className="text-center py-12">
                     <div className="mx-auto h-12 w-12 text-gray-400">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
+                        <ClipboardDocumentCheckIcon className="h-12 w-12" />
                     </div>
 
                     <h3 className="mt-2 text-sm font-medium text-gray-900">No projects</h3>
