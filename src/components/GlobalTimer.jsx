@@ -9,22 +9,26 @@ import TimerControls from './TimerControls.jsx';
  * @param {Object} props.currentTimer - Current active timer object
  * @param {Function} props.setCurrentTimer - Function to update current timer
  * @param {Array} props.tasks - All tasks array
+ * @param {Array} props.projects - All projects array
  * @param {Function} props.setTimeEntries - Function to update time entries
  * @param {boolean} props.isPaused - Global pause state
  * @param {Function} props.setIsPaused - Function to set global pause state
  * @param {number} props.pausedElapsedTime - Global paused elapsed time
  * @param {Function} props.setPausedElapsedTime - Function to set global paused elapsed time
+ * @param {Function} props.navigateToProject - Function to navigate to project page
  * @param {Function} props.onClose - Function called when timer is closed
  */
 const GlobalTimer = ({
     currentTimer,
     setCurrentTimer,
     tasks,
+    projects,
     setTimeEntries,
     isPaused,
     setIsPaused,
     pausedElapsedTime,
     setPausedElapsedTime,
+    navigateToProject,
     onClose
 }) => {
     const [currentTime, setCurrentTime] = useState('');
@@ -32,6 +36,18 @@ const GlobalTimer = ({
 
     // Find the task associated with the current timer
     const currentTask = tasks.find(task => task.id === currentTimer?.taskId);
+    
+    // Find the project associated with the current task
+    const currentProject = currentTask ? projects.find(project => project.id === currentTask.projectId) : null;
+
+    /**
+     * Handle clicking on task title to navigate to project
+     */
+    const handleTaskTitleClick = () => {
+        if (currentProject && navigateToProject) {
+            navigateToProject(currentProject.id);
+        }
+    };
 
     // Update timer display every second
     useEffect(() => {
@@ -83,9 +99,22 @@ const GlobalTimer = ({
             {/* Timer info */}
             <div className="flex items-center space-x-2">
                 <div className={`w-3 h-3 ${dotColor} rounded-full ${dotAnimation}`}></div>
-                <span className={`text-sm font-medium ${textColor} max-w-[150px] truncate`} title={currentTask.title}>
-                    {currentTask.title}
-                </span>
+                {currentProject ? (
+                    <button
+                        onClick={handleTaskTitleClick}
+                        className={`text-sm font-medium ${textColor} max-w-[150px] truncate hover:underline cursor-pointer transition-colors hover:text-blue-600`}
+                        title={`${currentTask.title} - Click to open ${currentProject.title}`}
+                    >
+                        {currentTask.title}
+                    </button>
+                ) : (
+                    <span 
+                        className={`text-sm font-medium ${textColor} max-w-[150px] truncate`} 
+                        title={currentTask.title}
+                    >
+                        {currentTask.title}
+                    </span>
+                )}
                 <span className={`text-sm font-mono ${timeColor} px-2 py-1 rounded`}>
                     {isPaused ? pausedTime : currentTime}
                 </span>
