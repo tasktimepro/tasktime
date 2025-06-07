@@ -63,6 +63,7 @@ export const createInvoiceHTML = (invoiceData) => {
         totalAmount,
         invoiceNumber,
         date,
+        dueDate,
         paymentMethod,
         businessInfo,
         subtotal,
@@ -93,6 +94,7 @@ export const createInvoiceHTML = (invoiceData) => {
                 <p style="color: #666; margin: 0;">Invoice: #${invoiceNumber}</p>
                 ${project ? `<p style="color: #666; margin: 0;">Project: ${project.title}</p>` : ''}
                 <p style="color: #666; margin: 0;">Date: ${date}</p>
+                ${dueDate ? `<p style="color: #666; margin: 0;">Due Date: ${dueDate}</p>` : ''}
             </div>
             
             <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">

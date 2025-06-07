@@ -24,6 +24,7 @@ function App() {
     const [businessInfos, setBusinessInfos] = useLocalStorage('businessInfos', []);
     const [clientInfos, setClientInfos] = useLocalStorage('clientInfos', []);
     const [invoices, setInvoices] = useLocalStorage('invoices', []);
+    const [invoiceTemplates, setInvoiceTemplates] = useLocalStorage('invoiceTemplates', []);
     
     // Unified timer state (all timer-related data in one localStorage key)
     const [timerState, setTimerState] = useLocalStorage('timer', {
@@ -179,6 +180,13 @@ function App() {
      */
     const handleNavigateToClientInfo = () => {
         navigateToInvoices({ section: 'client-info', create: 'client-info' });
+    };
+
+    /**
+     * Handle navigation to invoice templates from invoice generator
+     */
+    const handleNavigateToTemplates = () => {
+        navigateToInvoices({ section: 'templates', create: 'template' });
     };
 
     /**
@@ -356,6 +364,9 @@ function App() {
                         onNavigateToProjects={handleNavigateToProjects}
                         invoices={invoices}
                         setInvoices={setInvoices}
+                        invoiceTemplates={invoiceTemplates}
+                        setInvoiceTemplates={setInvoiceTemplates}
+                        onNavigateToTemplates={handleNavigateToTemplates}
                     />
                 )}
 
@@ -376,6 +387,8 @@ function App() {
                         setBusinessInfos={setBusinessInfos}
                         clientInfos={clientInfos}
                         setClientInfos={setClientInfos}
+                        invoiceTemplates={invoiceTemplates}
+                        setInvoiceTemplates={setInvoiceTemplates}
                         updateUrl={updateUrl}
                         navigateToProjects={handleNavigateToProjects}
                     />

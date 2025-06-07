@@ -6,6 +6,24 @@ import Pagination from './Pagination';
 import Modal from './Modal';
 
 /**
+ * Helper function to determine if an invoice is overdue
+ */
+const isInvoiceOverdue = (invoice) => {
+    if (!invoice.dueDate || invoice.paymentProcessed) {
+        return false;
+    }
+    
+    const today = new Date();
+    const dueDate = new Date(invoice.dueDate);
+    
+    // Set times to start of day for accurate date comparison
+    today.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    return today > dueDate;
+};
+
+/**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
  */
 const InvoicesList = ({ 
@@ -15,7 +33,8 @@ const InvoicesList = ({
     businessInfos = [], 
     clientInfos = [],
     hideNewInvoiceButton = false,
-    setInvoices
+    setInvoices,
+    invoiceTemplates = []
 }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
@@ -116,6 +135,7 @@ const InvoicesList = ({
                     totalAmount: invoice.totalAmount,
                     invoiceNumber: invoice.invoiceNumber,
                     date: invoice.date,
+                    dueDate: invoice.dueDate,
                     paymentMethod: paymentMethod,
                     businessInfo: businessInfo,
                     // Include pricing breakdown if available (for backward compatibility)
@@ -254,6 +274,10 @@ const InvoicesList = ({
                                                 <CheckIcon className="h-3 w-3 mr-1" />
                                                 Paid
                                             </span>
+                                        ) : isInvoiceOverdue(invoice) ? (
+                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                Overdue
+                                            </span>
                                         ) : (
                                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                                 Outstanding
@@ -267,7 +291,26 @@ const InvoicesList = ({
                                     <p className="text-sm text-gray-500">
                                         {invoice.date} <span className="mx-1">•</span> {invoice.totalHours.toFixed(2)} hours <span className="mx-1">•</span> {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)}
                                     </p>
+                                    {invoice.dueDate && (
+                                        <p className={`text-sm mt-1 ${
+                                            isInvoiceOverdue(invoice) 
+                                                ? 'text-red-600 font-medium' 
+                                                : 'text-gray-500'
+                                        }`}>
+                                            Due: {invoice.dueDate}
+                                            {isInvoiceOverdue(invoice) && (
+                                                <span className="ml-2 text-xs bg-red-100 text-red-800 px-1 py-0.5 rounded">
+                                                    OVERDUE
+                                                </span>
+                                            )}
+                                        </p>
+                                    )}
                                     <div className="text-xs text-gray-400 mt-1">
+                                        <p>
+                                            Project: <span className="font-medium text-gray-600">
+                                                {invoice.project?.title || 'Unknown Project'}
+                                            </span>
+                                        </p>
                                         <p>
                                             Client: <span className="font-medium text-gray-600">
                                                 {(() => {
@@ -283,11 +326,14 @@ const InvoicesList = ({
                                                 })()}
                                             </span>
                                         </p>
-                                        <p>
-                                            Project: <span className="font-medium text-gray-600">
-                                                {invoice.project?.title || 'Unknown Project'}
-                                            </span>
-                                        </p>
+                                        {invoice.templateId && invoiceTemplates.length > 0 && (() => {
+                                            const template = invoiceTemplates.find(t => t.id === invoice.templateId);
+                                            return template ? (
+                                                <p>
+                                                    Template: <span className="font-medium text-gray-600">{template.name}</span>
+                                                </p>
+                                            ) : null;
+                                        })()}
                                         {invoice.businessInfoId && (() => {
                                             const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
                                             return businessInfo ? (

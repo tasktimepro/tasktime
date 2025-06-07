@@ -30,6 +30,9 @@ const InvoiceGenerator = ({
     onNavigateToProjects,
     invoices = [],
     setInvoices,
+    invoiceTemplates = [],
+    setInvoiceTemplates,
+    onNavigateToTemplates,
     showButton = true
 }) => {
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
@@ -37,6 +40,7 @@ const InvoiceGenerator = ({
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
     const [selectedClientInfo, setSelectedClientInfo] = useState(null);
     const [selectedProject, setSelectedProject] = useState(project); // Initialize with current project
+    const [selectedTemplate, setSelectedTemplate] = useState(null); // Selected invoice template
     const [isProjectContextFixed, setIsProjectContextFixed] = useState(!!project); // Track if opened from project context
     const [projectManuallyChanged, setProjectManuallyChanged] = useState(false); // Track manual project changes
     const { showSuccess, showError, showWarning } = useToast();
@@ -237,6 +241,66 @@ const InvoiceGenerator = ({
         // and let the user make their selection
     }, [editingInvoice, project, projects, selectedProject, projectManuallyChanged]);
 
+    /**
+     * Initialize selected template based on default template or editing invoice
+     */
+    const initializeSelectedTemplate = useCallback(() => {
+        // Don't override if project was manually changed (user may have gotten auto-populated values)
+        if (projectManuallyChanged && selectedTemplate !== null) {
+            return;
+        }
+        
+        // Only initialize on first mount or when editing invoice changes
+        // Don't override user selection once set
+        if (selectedTemplate !== null && !editingInvoice) {
+            return; // User has already made a selection, keep it
+        }
+
+        // If editing an invoice and it has a template reference, use it
+        if (editingInvoice && editingInvoice.templateId) {
+            const template = invoiceTemplates.find(t => t.id === editingInvoice.templateId);
+            if (template) {
+                setSelectedTemplate(template);
+                return;
+            }
+        }
+        
+        // If not editing an invoice, we need to select a template
+        if (!editingInvoice && invoiceTemplates.length > 0) {
+            // If a project is selected and it has previous invoices, use the last template from that project
+            if (selectedProject?.id && selectedProject.invoiceIds?.length > 0) {
+                const projectInvoices = invoices.filter(invoice => 
+                    selectedProject.invoiceIds.includes(invoice.id)
+                );
+                
+                if (projectInvoices.length > 0) {
+                    const lastInvoice = projectInvoices[projectInvoices.length - 1];
+                    
+                    if (lastInvoice.templateId) {
+                        const lastTemplate = invoiceTemplates.find(t => t.id === lastInvoice.templateId);
+                        if (lastTemplate) {
+                            setSelectedTemplate(lastTemplate);
+                            return;
+                        }
+                    }
+                }
+            }
+            
+            // If no last template was found, use the default template
+            const defaultTemplate = invoiceTemplates.find(t => t.isDefault);
+            if (defaultTemplate) {
+                setSelectedTemplate(defaultTemplate);
+                return;
+            }
+            
+            // If no default template, select the first one
+            setSelectedTemplate(invoiceTemplates[0]);
+            return;
+        }
+        
+        // No need to reset to null as that's the initial state
+    }, [editingInvoice, invoiceTemplates, selectedTemplate, projectManuallyChanged, selectedProject?.id, selectedProject?.invoiceIds, invoices]);
+
     // Track when the form gets shown so we can initialize only then
     const [hasInitialized, setHasInitialized] = useState(false);
     const [currentEditingInvoiceId, setCurrentEditingInvoiceId] = useState(null);
@@ -255,6 +319,7 @@ const InvoiceGenerator = ({
                 initializeBusinessInfo();
                 initializeSelectedClientInfo();
                 initializeSelectedProject();
+                initializeSelectedTemplate();
                 setHasInitialized(true);
                 setCurrentEditingInvoiceId(editingInvoice?.id || null);
             }
@@ -270,6 +335,7 @@ const InvoiceGenerator = ({
         initializeBusinessInfo, 
         initializeSelectedClientInfo,
         initializeSelectedProject,
+        initializeSelectedTemplate,
         paymentMethods.length,
         businessInfos.length,
         clientInfos.length,
@@ -470,6 +536,7 @@ const InvoiceGenerator = ({
         selectedProject?.hourlyRate,
         showWarning
     );
+    const handleTemplateSelection = InvoiceHandler.handleTemplateSelection(setSelectedTemplate, invoiceTemplates);
     
     // Function to focus the task input field
     const focusTaskInput = useCallback(() => {
@@ -534,7 +601,9 @@ const InvoiceGenerator = ({
         clientInfos,
         businessInfos,
         paymentMethods,
-        prepareInvoiceData
+        prepareInvoiceData,
+        setSelectedTemplate,
+        invoiceTemplates
     );
     const handleCancel = InvoiceHandler.handleCancel(
         setShowInvoiceForm,
@@ -659,6 +728,101 @@ const InvoiceGenerator = ({
         taskFlatRates, useFlatRate, taskHourlyRates, taskQuantities, selectedTasksForBilling, mergedSubtasks]);
 
     /**
+     * Generate invoice number using template format
+     */
+    const generateInvoiceNumber = useCallback((template, project) => {
+        if (!template) {
+            // Fallback to original logic if no template
+            return project 
+                ? `INV-${project.id.slice(-8)}-${Date.now()}` 
+                : `INV-${Date.now()}`;
+        }
+
+        const now = new Date();
+        const variables = {
+            '{projectId}': project ? project.id.slice(-8) : 'NOPROJECT',
+            '{timestamp}': Date.now().toString(),
+            '{date}': now.toISOString().slice(0, 10).replace(/-/g, ''),
+            '{year}': now.getFullYear().toString(),
+            '{month}': (now.getMonth() + 1).toString().padStart(2, '0'),
+            '{day}': now.getDate().toString().padStart(2, '0'),
+            '{sequential}': template.useSequentialNumbers ? 
+                template.currentSequentialNumber.toString().padStart(4, '0') : '0001'
+        };
+
+        let format = template.invoiceNumberFormat;
+        Object.entries(variables).forEach(([key, value]) => {
+            format = format.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
+        });
+
+        return format;
+    }, []);
+
+    /**
+     * Calculate due date using template settings
+     */
+    const calculateDueDate = useCallback((template, invoiceDate = new Date()) => {
+        if (!template) {
+            // Default to 30 days if no template
+            const dueDate = new Date(invoiceDate);
+            dueDate.setDate(dueDate.getDate() + 30);
+            return dueDate.toLocaleDateString();
+        }
+
+        switch (template.dueDateType) {
+            case 'fixed-days': {
+                if (!template.dueDateDays || template.dueDateDays === 0) {
+                    return null; // No due date
+                }
+                const dueDate = new Date(invoiceDate);
+                dueDate.setDate(dueDate.getDate() + parseInt(template.dueDateDays));
+                return dueDate.toLocaleDateString();
+            }
+            
+            case 'fixed-weeks': {
+                if (!template.dueDateWeeks || template.dueDateWeeks === 0) {
+                    return null; // No due date
+                }
+                const dueDate = new Date(invoiceDate);
+                dueDate.setDate(dueDate.getDate() + (parseInt(template.dueDateWeeks) * 7));
+                return dueDate.toLocaleDateString();
+            }
+            
+            case 'precise-date': {
+                if (!template.dueDatePrecise) {
+                    return null; // No due date
+                }
+                return new Date(template.dueDatePrecise).toLocaleDateString();
+            }
+            
+            case 'none': {
+                return null; // No due date to be shown
+            }
+            
+            default: {
+                // Backward compatibility with old 'fixed' and 'net' types
+                const dueDate = new Date(invoiceDate);
+                dueDate.setDate(dueDate.getDate() + (template.dueDateDays || 30));
+                return dueDate.toLocaleDateString();
+            }
+        }
+    }, []);
+
+    /**
+     * Update template sequential number
+     */
+    const updateTemplateSequentialNumber = useCallback((template) => {
+        if (!template || !template.useSequentialNumbers) return;
+
+        const updatedTemplates = invoiceTemplates.map(t => 
+            t.id === template.id 
+                ? { ...t, currentSequentialNumber: t.currentSequentialNumber + 1 }
+                : t
+        );
+        setInvoiceTemplates(updatedTemplates);
+    }, [invoiceTemplates, setInvoiceTemplates]);
+
+    /**
      * Save invoice (create new or update existing)
      */
     const handleSaveInvoice = (e) => {
@@ -673,6 +837,12 @@ const InvoiceGenerator = ({
         // Project selection is now required
         if (!selectedProject) {
             showError('Please select a project');
+            return;
+        }
+
+        // Template selection is now required
+        if (!selectedTemplate) {
+            showError('Please select an invoice template');
             return;
         }
 
@@ -695,11 +865,19 @@ const InvoiceGenerator = ({
                 ? `INV-${selectedProject.id.slice(-8)}-${Date.now()}` 
                 : `INV-${Date.now()}`;
 
+        // Generate invoice number using template
         const invoiceNumber = editingInvoice 
             ? editingInvoice.invoiceNumber 
-            : selectedProject 
-                ? `INV-${selectedProject.id.slice(-8)}-${Date.now()}` 
-                : `INV-${Date.now()}`;
+            : generateInvoiceNumber(selectedTemplate, selectedProject);
+
+        // Calculate due date using template
+        const invoiceDate = editingInvoice ? new Date(editingInvoice.date) : new Date();
+        const dueDate = calculateDueDate(selectedTemplate, invoiceDate);
+
+        // Update template sequential number if creating new invoice
+        if (!editingInvoice) {
+            updateTemplateSequentialNumber(selectedTemplate);
+        }
 
         const invoiceData = {
             id: invoiceId,
@@ -752,8 +930,10 @@ const InvoiceGenerator = ({
             paymentMethodId: selectedPaymentMethod?.id || null,
             businessInfoId: selectedBusinessInfo?.id || null,
             clientInfoId: selectedClientInfo?.id || null,
+            templateId: selectedTemplate?.id || null,
             invoiceNumber: invoiceNumber,
             date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
+            dueDate: dueDate,
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
             paymentProcessed: editingInvoice ? editingInvoice.paymentProcessed || false : false,
             htmlContent: createInvoiceHTML({
@@ -801,6 +981,7 @@ const InvoiceGenerator = ({
                 businessInfo: selectedBusinessInfo,
                 invoiceNumber: invoiceNumber,
                 date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
+                dueDate: dueDate,
                 createdAt: editingInvoice ? editingInvoice.createdAt : Date.now()
             })
         };
@@ -1187,6 +1368,10 @@ const InvoiceGenerator = ({
                     mergedSubtasks={mergedSubtasks}
                     handleToggleMergeSubtasks={handleToggleMergeSubtasks}
                     taskInputRef={taskInputRef}
+                    invoiceTemplates={invoiceTemplates}
+                    selectedTemplate={selectedTemplate}
+                    handleTemplateSelection={handleTemplateSelection}
+                    onNavigateToTemplates={onNavigateToTemplates}
                 />
             )}
         </div>

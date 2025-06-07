@@ -271,7 +271,9 @@ export const handleProjectSelection = (
     clientInfos,
     businessInfos,
     paymentMethods,
-    prepareInvoiceData
+    prepareInvoiceData,
+    setSelectedTemplate,
+    invoiceTemplates
 ) => (projectId) => {
     if (projectId === "") {
         setSelectedProject(null);
@@ -317,6 +319,15 @@ export const handleProjectSelection = (
                     const paymentMethod = paymentMethods.find(pm => pm.id === lastInvoice.paymentMethodId);
                     if (paymentMethod) {
                         setSelectedPaymentMethod(paymentMethod);
+                    }
+                }
+                
+                // Set the previously used template for this project if available
+                if (lastInvoice.templateId && setSelectedTemplate && invoiceTemplates) {
+                    const template = invoiceTemplates.find(t => t.id === lastInvoice.templateId);
+                    if (template) {
+                        setSelectedTemplate(template);
+                        console.log(`Pre-selected template "${template.name}" based on previous invoice for project ${selectedProj.title}`);
                     }
                 }
             }
@@ -506,4 +517,16 @@ export const getAllBilledTaskIds = (invoiceTasks, selectedTasksForBilling, merge
     });
     
     return billedTaskIds;
+};
+
+// Handle template selection from dropdown
+export const handleTemplateSelection = (setSelectedTemplate, invoiceTemplates) => (templateId) => {
+    if (templateId === "") {
+        setSelectedTemplate(null);
+    } else {
+        const template = invoiceTemplates.find(t => t.id === templateId);
+        if (template) {
+            setSelectedTemplate(template);
+        }
+    }
 };

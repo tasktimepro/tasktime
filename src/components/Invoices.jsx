@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CreditCardIcon, BuildingOfficeIcon, UserGroupIcon, DocumentTextIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { CreditCardIcon, BuildingOfficeIcon, UserGroupIcon, DocumentTextIcon, PlusIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
 import { useToast } from '../hooks/useToast';
 import PaymentMethods from './PaymentMethods';
@@ -7,6 +7,7 @@ import BusinessInfo from './BusinessInfo';
 import ClientInfo from './ClientInfo';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
+import InvoiceTemplates from './InvoiceTemplates';
 
 /**
  * Invoices component - Main invoices management page with side navigation
@@ -27,6 +28,8 @@ const Invoices = ({
     setBusinessInfos,
     clientInfos,
     setClientInfos,
+    invoiceTemplates,
+    setInvoiceTemplates,
     navigateToProjects
 }) => {
     const { urlParams, updateUrl } = useUrlState();
@@ -68,6 +71,12 @@ const Invoices = ({
             description: 'View and manage all invoices'
         },
         {
+            id: 'templates',
+            name: 'Invoice Templates',
+            icon: DocumentDuplicateIcon,
+            description: 'Manage invoice templates and numbering'
+        },
+        {
             id: 'payment-methods',
             name: 'Payment Methods',
             icon: CreditCardIcon,
@@ -91,7 +100,7 @@ const Invoices = ({
     const activeTab = urlParams.section || sideNavItems[0].id;
     
     // Check URL parameters for auto-opening create forms
-    const autoOpenCreate = urlParams.create === 'payment-method' || urlParams.create === 'business-info' || urlParams.create === 'client-info';
+    const autoOpenCreate = urlParams.create === 'template' || urlParams.create === 'payment-method' || urlParams.create === 'business-info' || urlParams.create === 'client-info';
 
     // Function to handle section changes
     const handleSectionChange = (sectionId) => {
@@ -133,8 +142,17 @@ const Invoices = ({
                             businessInfos={businessInfos}
                             clientInfos={clientInfos}
                             setInvoices={setInvoices}
+                            invoiceTemplates={invoiceTemplates}
                         />
                     </div>
+                );
+            case 'templates':
+                return (
+                    <InvoiceTemplates 
+                        invoiceTemplates={invoiceTemplates} 
+                        setInvoiceTemplates={setInvoiceTemplates}
+                        autoOpenCreate={urlParams.create === 'template'}
+                    />
                 );
             case 'payment-methods':
                 return (
@@ -250,6 +268,12 @@ const Invoices = ({
                     }}
                     invoices={invoices}
                     setInvoices={setInvoices}
+                    invoiceTemplates={invoiceTemplates}
+                    setInvoiceTemplates={setInvoiceTemplates}
+                    onNavigateToTemplates={() => {
+                        setShowInvoiceModal(false);
+                        updateUrl({ section: 'templates', create: 'template' });
+                    }}
                     onInvoiceSaved={() => {
                         setShowInvoiceModal(false);
                         setEditingInvoice(null);

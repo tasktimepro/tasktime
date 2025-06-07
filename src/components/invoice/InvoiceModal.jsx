@@ -77,7 +77,11 @@ const InvoiceModal = ({
     setSelectedBusinessInfo,
     mergedSubtasks,
     handleToggleMergeSubtasks,
-    taskInputRef
+    taskInputRef,
+    invoiceTemplates,
+    selectedTemplate,
+    handleTemplateSelection,
+    onNavigateToTemplates
 }) => {
     if (!showInvoiceForm) return null;
     
@@ -231,6 +235,83 @@ const InvoiceModal = ({
                                             <p className="text-sm text-blue-800">
                                                 <strong>{selectedClientInfo.title}</strong> will be included as "Invoice To" in the invoice.
                                             </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Template Selection */}
+                        <div className="mb-6">
+                            <div className="flex justify-between items-center mb-1">
+                                <h4 className="text-sm font-medium text-gray-900">
+                                    Invoice Template <span className="text-red-500">*</span>
+                                </h4>
+                                <button
+                                    type="button"
+                                    onClick={onNavigateToTemplates}
+                                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                    + New Template
+                                </button>
+                            </div>
+
+                            {invoiceTemplates.length === 0 ? (
+                                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                                    <p className="text-sm text-yellow-800 mb-3">
+                                        No invoice templates found. Create a template to continue with invoice generation.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={onNavigateToTemplates}
+                                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
+                                    >
+                                        Create Template
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <select
+                                        value={selectedTemplate?.id || ''}
+                                        onChange={(e) => handleTemplateSelection(e.target.value)}
+                                        className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
+                                        required
+                                    >
+                                        <option value="">Select template</option>
+                                        {invoiceTemplates.map(template => (
+                                            <option key={template.id} value={template.id}>
+                                                {template.name} {template.isDefault ? '(Default)' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {selectedTemplate && (
+                                        <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
+                                            <div className="text-sm text-blue-800">
+                                                <strong>{selectedTemplate.name}</strong><br />
+                                                {selectedTemplate.description && (
+                                                    <>Description: {selectedTemplate.description}<br /></>
+                                                )}
+                                                Invoice Format: {selectedTemplate.invoiceNumberFormat}<br />
+                                                Due Date: {(() => {
+                                                    switch (selectedTemplate.dueDateType) {
+                                                        case 'fixed-days': {
+                                                            const days = parseInt(selectedTemplate.dueDateDays) || 0;
+                                                            return `${days} ${days === 1 ? 'day' : 'days'} from invoice date`;
+                                                        }
+                                                        case 'fixed-weeks': {
+                                                            const weeks = parseInt(selectedTemplate.dueDateWeeks) || 0;
+                                                            return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} from invoice date`;
+                                                        }
+                                                        case 'precise-date':
+                                                            return `Precise date: ${selectedTemplate.dueDatePrecise ? new Date(selectedTemplate.dueDatePrecise).toLocaleDateString() : 'Not set'}`;
+                                                        case 'none':
+                                                            return 'Not shown';
+                                                        default:
+                                                            // Backward compatibility
+                                                            return `${selectedTemplate.dueDateDays} days from invoice date`;
+                                                    }
+                                                })()}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -884,7 +965,7 @@ const InvoiceModal = ({
                         <div className="mb-6">
                             <div className="flex justify-between items-center mb-1">
                                 <h4 className="text-sm font-medium text-gray-900">
-                                    Invoice From
+                                    Business
                                 </h4>
                                 <button
                                     type="button"

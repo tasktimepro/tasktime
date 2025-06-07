@@ -33,7 +33,10 @@ const ProjectDashboard = ({
     onNavigateToClientInfo,
     onNavigateToProjects,
     invoices,
-    setInvoices
+    setInvoices,
+    invoiceTemplates,
+    setInvoiceTemplates,
+    onNavigateToTemplates
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -113,6 +116,9 @@ const ProjectDashboard = ({
                     onNavigateToProjects={onNavigateToProjects}
                     invoices={invoices}
                     setInvoices={setInvoices}
+                    invoiceTemplates={invoiceTemplates}
+                    setInvoiceTemplates={setInvoiceTemplates}
+                    onNavigateToTemplates={onNavigateToTemplates}
                 />
             </div>
 
@@ -170,6 +176,9 @@ const ProjectDashboard = ({
                             onNavigateToClientInfo={onNavigateToClientInfo}
                             invoices={invoices}
                             setInvoices={setInvoices}
+                            invoiceTemplates={invoiceTemplates}
+                            setInvoiceTemplates={setInvoiceTemplates}
+                            onNavigateToTemplates={onNavigateToTemplates}
                         />
                     </div>
                 </div>
@@ -184,6 +193,7 @@ const ProjectDashboard = ({
                             clientInfos={clientInfos}
                             hideNewInvoiceButton={true}
                             setInvoices={setInvoices}
+                            invoiceTemplates={invoiceTemplates}
                         />
                     </div>
                 </div>
