@@ -52,6 +52,32 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
         setEditMinutes(minutes);
         setEditSeconds(seconds);
     };
+    
+    // Footer with action buttons
+    const footer = (
+        <div className="flex justify-end space-x-3">
+            <button
+                onClick={handleReset}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            >
+                Reset
+            </button>
+
+            <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            >
+                Cancel
+            </button>
+
+            <button
+                onClick={handleSave}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+            >
+                Save
+            </button>
+        </div>
+    );
 
     return (
         <Modal 
@@ -59,6 +85,7 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
             onClose={onClose}
             title={`Edit Time - ${taskTitle}`}
             size="md"
+            footer={footer}
         >
             <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
@@ -126,29 +153,6 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                             className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                         />
                     </div>
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                    <button
-                        onClick={handleReset}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                    >
-                        Reset
-                    </button>
-
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                    >
-                        Cancel
-                    </button>
-
-                    <button
-                        onClick={handleSave}
-                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
-                    >
-                        Save
-                    </button>
                 </div>
             </div>
         </Modal>

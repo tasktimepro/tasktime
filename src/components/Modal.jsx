@@ -13,6 +13,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
  * @param {string} props.size - Modal size (sm, md, lg, xl, full)
  * @param {boolean} props.showCloseButton - Whether to show the close button
  * @param {string} props.className - Additional class names for the modal content wrapper
+ * @param {React.ReactNode} props.footer - Footer content (optional)
  */
 const Modal = ({
   isOpen,
@@ -22,6 +23,7 @@ const Modal = ({
   size = 'md',
   showCloseButton = true,
   className = '',
+  footer,
 }) => {
   // Map size prop to class names
   const sizeClasses = {
@@ -52,24 +54,25 @@ const Modal = ({
       document.documentElement.classList.add('modal-open');
       // Add ESC key event listener
       document.addEventListener('keydown', handleEscKeyPress);
+      
+      // Clean up function runs when modal is closed or component unmounts
+      return () => {
+        document.documentElement.classList.remove('modal-open');
+        document.removeEventListener('keydown', handleEscKeyPress);
+      };
     }
-    
-    // Clean up function
-    return () => {
-      // Re-enable scrolling when modal closes
-      document.documentElement.classList.remove('modal-open');
-      // Remove ESC key event listener
-      document.removeEventListener('keydown', handleEscKeyPress);
-    };
   }, [isOpen, handleEscKeyPress]);
 
   if (!isOpen) return null;
 
+  // Always use the scrollable modal layout with header and footer
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 !mt-0">
-      <div className={`bg-white rounded-lg p-6 w-full mx-4 ${sizeClasses[size]} ${className}`}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className={`bg-white rounded-lg w-full mx-auto flex flex-col ${sizeClasses[size]} ${className}`} 
+           style={{ maxHeight: 'calc(100vh - 2rem)' }}>
+        {/* Fixed Header */}
         {(title || showCloseButton) && (
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center p-3 border-b border-gray-200 flex-shrink-0">
             {title && (
               <h3 className="text-lg font-medium text-gray-900">{title}</h3>
             )}
@@ -86,7 +89,17 @@ const Modal = ({
           </div>
         )}
         
-        {children}
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {children}
+        </div>
+
+        {/* Fixed Footer */}
+        {footer && (
+          <div className="border-t border-gray-200 p-3 flex-shrink-0">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -100,6 +113,7 @@ Modal.propTypes = {
   size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', 'full']),
   showCloseButton: PropTypes.bool,
   className: PropTypes.string,
+  footer: PropTypes.node,
 };
 
 export default Modal;

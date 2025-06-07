@@ -125,6 +125,30 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
         reader.readAsText(file);
     };
 
+    // Import modal footer buttons
+    const importModalFooter = (
+        <div className="flex justify-end gap-3">
+            <button
+                onClick={() => {
+                    setShowImportModal(false);
+                    setImportData('');
+                    setImportError('');
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+                Cancel
+            </button>
+            
+            <button
+                onClick={handleImport}
+                disabled={!importData.trim()}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            >
+                Import Data
+            </button>
+        </div>
+    );
+
     return (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Backup & Restore</h3>
@@ -185,6 +209,7 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
                 }}
                 title="Import Data"
                 size="2xl"
+                footer={importModalFooter}
             >
                 <div className="space-y-4">
                     {/* File Upload */}
@@ -228,28 +253,6 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
                             <p className="font-medium">Warning:</p>
                             <p>Importing will replace all current data. Make sure to export your current data first if you want to keep it.</p>
                         </div>
-                    </div>
-
-                    {/* Modal Actions */}
-                    <div className="flex justify-end gap-3 mt-6">
-                        <button
-                            onClick={() => {
-                                setShowImportModal(false);
-                                setImportData('');
-                                setImportError('');
-                            }}
-                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        
-                        <button
-                            onClick={handleImport}
-                            disabled={!importData.trim()}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                        >
-                            Import Data
-                        </button>
                     </div>
                 </div>
             </Modal>

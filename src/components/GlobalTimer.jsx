@@ -102,7 +102,7 @@ const GlobalTimer = ({
                 {currentProject ? (
                     <button
                         onClick={handleTaskTitleClick}
-                        className={`text-sm font-medium ${textColor} max-w-[150px] truncate hover:underline cursor-pointer transition-colors hover:text-blue-600`}
+                        className={`text-sm font-medium ${textColor} max-w-[150px] truncate hover:underline cursor-pointer transition-colors`}
                         title={`${currentTask.title} - Click to open ${currentProject.title}`}
                     >
                         {currentTask.title}

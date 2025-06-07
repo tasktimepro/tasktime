@@ -360,6 +360,101 @@ const InvoicesList = ({
         );
     };
 
+    // Render the invoice preview modal
+    const renderInvoicePreview = () => {
+        if (!selectedInvoice) return null;
+
+        // Footer with action buttons for the invoice preview modal
+        const previewModalFooter = (
+            <div className="flex justify-end space-x-4">
+                <button
+                    onClick={() => handleDownload(selectedInvoice)}
+                    className="px-4 py-2 bg-purple-600 text-sm font-medium text-white rounded-md hover:bg-purple-700 flex items-center space-x-2"
+                >
+                    <ArrowDownTrayIcon className="h-5 w-5" />
+                    <span>Download PDF</span>
+                </button>
+                <button
+                    onClick={() => setShowPreview(false)}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400"
+                >
+                    Close
+                </button>
+            </div>
+        );
+
+        return (
+            <Modal 
+                isOpen={showPreview && !!selectedInvoice}
+                onClose={() => setShowPreview(false)}
+                title={selectedInvoice ? `Invoice Preview - ${selectedInvoice.invoiceNumber}` : ''}
+                size="4xl"
+                footer={previewModalFooter}
+            >
+                {selectedInvoice.htmlContent ? (
+                    <div dangerouslySetInnerHTML={{ __html: selectedInvoice.htmlContent }} />
+                ) : (
+                    <div className="space-y-4">
+                        <div className="text-center border-b pb-4">
+                            <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
+                            <p className="text-gray-600">Invoice #{selectedInvoice.invoiceNumber}</p>
+                            <p className="text-gray-600">Date: {selectedInvoice.date}</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <h3 className="text-sm font-medium text-gray-900 mb-2">Invoice To:</h3>
+                                <div className="text-sm text-gray-600">
+                                    <p>{(selectedInvoice.clientInfo || selectedInvoice.client)?.name}</p>
+                                    {(selectedInvoice.clientInfo || selectedInvoice.client)?.email && (
+                                        <p>{(selectedInvoice.clientInfo || selectedInvoice.client).email}</p>
+                                    )}
+                                    {(selectedInvoice.clientInfo || selectedInvoice.client)?.address && (
+                                        <p>{(selectedInvoice.clientInfo || selectedInvoice.client).address}</p>
+                                    )}
+                                    {(selectedInvoice.clientInfo || selectedInvoice.client)?.city && (
+                                        <p>{(selectedInvoice.clientInfo || selectedInvoice.client).city}, {(selectedInvoice.clientInfo || selectedInvoice.client).state} {(selectedInvoice.clientInfo || selectedInvoice.client).zip}</p>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h3 className="text-sm font-medium text-gray-900 mb-2">Project:</h3>
+                                <div className="text-sm text-gray-600">
+                                    <p>{selectedInvoice.project?.title || 'Unknown Project'}</p>
+                                    {selectedInvoice.project?.hourlyRate && (
+                                        <p>
+                                            Rate: {getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}${selectedInvoice.project.hourlyRate}/${selectedInvoice.project?.currency || 'USD'} per hour
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-sm font-medium text-gray-900 mb-2">Tasks:</h3>
+                            <div className="space-y-1">
+                                {selectedInvoice.tasks?.map((task, index) => (
+                                    <div key={index} className="flex justify-between text-sm py-1 border-b border-gray-200">
+                                        <span>{task.title}</span>
+                                        <span>{task.hours?.toFixed(2) || 0} hours</span>
+                                    </div>
+                                )) || <p className="text-gray-500">No tasks found</p>}
+                            </div>
+                        </div>
+
+                        <div className="border-t pt-2">
+                            <div className="flex justify-between text-sm font-medium">
+                                <span>Total: {selectedInvoice.totalHours?.toFixed(2) || 0} hours</span>
+                                <span>{getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}{selectedInvoice.totalAmount?.toFixed(2) || 0}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+        );
+    };
+
     if (projectInvoices.length === 0) {
         return (
             <div className="text-center py-8">
@@ -382,145 +477,36 @@ const InvoicesList = ({
     }
 
     return (
-        <div>
-            {/* Info about invoice management */}
-            {projectInvoices.length > 0 && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-xs text-blue-600">
-                        <strong>Note:</strong> Invoices preserve billing history and cannot be deleted. You can edit invoice details or submit corrections as needed.
-                    </p>
-                </div>
-            )}
-            
-            {/* Tab Navigation */}
-            <div className="border-b border-gray-200 mb-6">
-                <nav className="-mb-px flex space-x-8">
-                    <button
-                        onClick={() => handleTabChange('outstanding')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                            activeTab === 'outstanding'
-                                ? 'border-yellow-500 text-yellow-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                    >
-                        Outstanding
-                        {outstandingInvoices.length > 0 && (
-                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                {outstandingInvoices.length}
-                            </span>
-                        )}
-                    </button>
-                    <button
-                        onClick={() => handleTabChange('paid')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                            activeTab === 'paid'
-                                ? 'border-green-500 text-green-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                    >
-                        Paid
-                        {paidInvoices.length > 0 && (
-                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                {paidInvoices.length}
-                            </span>
-                        )}
-                    </button>
-                </nav>
+        <div className="space-y-6">
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200">
+                <button
+                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
+                        activeTab === 'outstanding'
+                            ? 'border-yellow-500 text-yellow-700'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                    onClick={() => handleTabChange('outstanding')}
+                >
+                    Outstanding ({outstandingInvoices.length})
+                </button>
+                <button
+                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
+                        activeTab === 'paid'
+                            ? 'border-green-500 text-green-700'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                    onClick={() => handleTabChange('paid')}
+                >
+                    Paid ({paidInvoices.length})
+                </button>
             </div>
 
             {/* Tab Content */}
             {renderInvoiceList()}
 
             {/* Invoice Preview Modal */}
-            <Modal 
-                isOpen={showPreview && !!selectedInvoice}
-                onClose={() => setShowPreview(false)}
-                title={selectedInvoice ? `Invoice Preview - ${selectedInvoice.invoiceNumber}` : ''}
-                size="4xl"
-            >
-                {selectedInvoice && (
-                    <>
-                        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 max-h-[40rem] overflow-y-auto">
-                            {selectedInvoice.htmlContent ? (
-                                <div dangerouslySetInnerHTML={{ __html: selectedInvoice.htmlContent }} />
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="text-center border-b pb-4">
-                                        <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
-                                        <p className="text-gray-600">Invoice #{selectedInvoice.invoiceNumber}</p>
-                                        <p className="text-gray-600">Date: {selectedInvoice.date}</p>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-900 mb-2">Invoice To:</h3>
-                                            <div className="text-sm text-gray-600">
-                                                <p>{(selectedInvoice.clientInfo || selectedInvoice.client)?.name}</p>
-                                                {(selectedInvoice.clientInfo || selectedInvoice.client)?.email && (
-                                                    <p>{(selectedInvoice.clientInfo || selectedInvoice.client).email}</p>
-                                                )}
-                                                {(selectedInvoice.clientInfo || selectedInvoice.client)?.address && (
-                                                    <p>{(selectedInvoice.clientInfo || selectedInvoice.client).address}</p>
-                                                )}
-                                                {(selectedInvoice.clientInfo || selectedInvoice.client)?.city && (
-                                                    <p>{(selectedInvoice.clientInfo || selectedInvoice.client).city}, {(selectedInvoice.clientInfo || selectedInvoice.client).state} {(selectedInvoice.clientInfo || selectedInvoice.client).zip}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-900 mb-2">Project:</h3>
-                                            <div className="text-sm text-gray-600">
-                                                <p>{selectedInvoice.project?.title || 'Unknown Project'}</p>
-                                                {selectedInvoice.project?.hourlyRate && (
-                                                    <p>
-                                                        Rate: {getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}${selectedInvoice.project.hourlyRate}/${selectedInvoice.project?.currency || 'USD'} per hour
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-sm font-medium text-gray-900 mb-2">Tasks:</h3>
-                                        <div className="space-y-1">
-                                            {selectedInvoice.tasks?.map((task, index) => (
-                                                <div key={index} className="flex justify-between text-sm py-1 border-b border-gray-200">
-                                                    <span>{task.title}</span>
-                                                    <span>{task.hours?.toFixed(2) || 0} hours</span>
-                                                </div>
-                                            )) || <p className="text-gray-500">No tasks found</p>}
-                                        </div>
-                                    </div>
-
-                                    <div className="border-t pt-2">
-                                        <div className="flex justify-between text-sm font-medium">
-                                            <span>Total: {selectedInvoice.totalHours?.toFixed(2) || 0} hours</span>
-                                            <span>{getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}{selectedInvoice.totalAmount?.toFixed(2) || 0}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex justify-end space-x-4 mt-4">
-                            <button
-                                onClick={() => handleDownload(selectedInvoice)}
-                                className="px-4 py-2 bg-purple-600 text-sm font-medium text-white rounded-md hover:bg-purple-700 flex items-center space-x-2"
-                            >
-                                <ArrowDownTrayIcon className="h-5 w-5" />
-                                <span>Download PDF</span>
-                            </button>
-                            <button
-                                onClick={() => setShowPreview(false)}
-                                className="px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </>
-                )}
-            </Modal>
+            {renderInvoicePreview()}
         </div>
     );
 };

@@ -80,15 +80,37 @@ const InvoiceModal = ({
     taskInputRef
 }) => {
     if (!showInvoiceForm) return null;
+    
+    // Footer content with action buttons
+    const footer = (
+        <div className="flex justify-end space-x-3">
+            <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="submit"
+                form="invoice-form"
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+            >
+                {editingInvoice ? 'Update Invoice' : 'Generate New Invoice'}
+            </button>
+        </div>
+    );
+
     return (
         <Modal 
             isOpen={showInvoiceForm}
             onClose={handleCancel}
             title={editingInvoice ? 'Edit Invoice' : 'New Invoice'}
             size="2xl"
+            footer={footer}
         >
-            <div className="space-y-4">
-                    <form onSubmit={handleSaveInvoice} className="space-y-5">
+            <form id="invoice-form" onSubmit={handleSaveInvoice} className="space-y-5">
 
                         {/* Project Selection */}
                         <div className="mb-6">
@@ -308,8 +330,12 @@ const InvoiceModal = ({
                                                     checked={selectedTasksForBilling[task.id] || false}
                                                     onChange={() => handleTaskSelectionForBilling(task.id, !selectedTasksForBilling[task.id])}
                                                 />
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-medium text-gray-900">
+                                                <div className="flex-1 pr-4">
+                                                    <p className="text-sm font-medium text-gray-900 overflow-hidden" style={{ 
+                                                        display: '-webkit-box', 
+                                                        WebkitLineClamp: 2, 
+                                                        WebkitBoxOrient: 'vertical' 
+                                                    }}>
                                                         {task.title}
                                                         {isSubtask && (
                                                             <span className="ml-2 text-xs text-gray-500">
@@ -469,8 +495,12 @@ const InvoiceModal = ({
                                                 >
                                                     <TrashIcon className="w-5 h-5" />
                                                 </button>
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                                                <div className="flex-1 pr-4">
+                                                    <p className="text-sm font-medium text-gray-900 overflow-hidden" style={{ 
+                                                        display: '-webkit-box', 
+                                                        WebkitLineClamp: 2, 
+                                                        WebkitBoxOrient: 'vertical' 
+                                                    }}>{task.title}</p>
                                                     <p className="text-xs text-gray-500">
                                                         Custom task
                                                     </p>
@@ -1007,25 +1037,7 @@ const InvoiceModal = ({
                                 </div>
                             )}
                         </div>
-
-                        <div className="flex justify-end space-x-3 mt-6">
-                            <button
-                                type="button"
-                                onClick={handleCancel}
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-
-                            <button
-                                type="submit"
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-                            >
-                                {editingInvoice ? 'Update Invoice' : 'Generate New Invoice'}
-                            </button>
-                        </div>
                     </form>
-                </div>
         </Modal>
     );
 };
