@@ -8,6 +8,7 @@ import Invoices from './components/Invoices';
 import GlobalTimer from './components/GlobalTimer';
 import { ToastProvider } from './components/ToastContainer';
 import { ClockIcon, BoltIcon, RocketLaunchIcon } from '@heroicons/react/24/outline';
+import { formatDurationWithSeconds } from './utils/dateUtils';
 
 /**
  * Main App component - Entry point for the Task. Time. Track.
@@ -77,6 +78,61 @@ function App() {
 
     // State for showing/hiding global timer
     const [showGlobalTimer, setShowGlobalTimer] = useState(false);
+
+    // Update browser tab title with live timer
+    useEffect(() => {
+        const originalTitle = "TaskTime - Track your time by the task. Invoice without the mess.";
+        
+        if (currentTimer && !isPaused) {
+            // Only update title if we have the task data available
+            const currentTask = tasks.find(task => task.id === currentTimer.taskId);
+            if (!currentTask) {
+                // Task data not loaded yet, don't update title
+                return;
+            }
+            
+            // Update title every second when timer is running
+            const updateTitle = () => {
+                const now = Date.now();
+                const elapsed = now - currentTimer.startTime;
+                const formattedTime = formatDurationWithSeconds(elapsed);
+                const taskName = currentTask.title;
+                
+                document.title = `▶ ${formattedTime} - ${taskName} | TaskTime`;
+            };
+            
+            // Update immediately
+            updateTitle();
+            
+            // Then update every second
+            const interval = setInterval(updateTitle, 1000);
+            
+            return () => clearInterval(interval);
+        } else if (currentTimer && isPaused) {
+            // Only update title if we have the task data available
+            const currentTask = tasks.find(task => task.id === currentTimer.taskId);
+            if (!currentTask) {
+                // Task data not loaded yet, don't update title
+                return;
+            }
+            
+            // Show paused state in title
+            const pausedTime = formatDurationWithSeconds(pausedElapsedTime);
+            const taskName = currentTask.title;
+            
+            document.title = `⏸ ${pausedTime} - ${taskName} | TaskTime`;
+        } else {
+            // Reset to original title when no timer is active
+            document.title = originalTitle;
+        }
+        
+        // Cleanup function to reset title
+        return () => {
+            if (!currentTimer) {
+                document.title = originalTitle;
+            }
+        };
+    }, [currentTimer, isPaused, pausedElapsedTime, tasks]);
 
     console.log('📊 Loaded projects:', projects.length);
 
@@ -188,7 +244,7 @@ function App() {
                             </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900 leading-none">
-                                    Task<span className="text-blue-600">Time</span>Track
+                                    Task<span className="text-blue-600">Time</span>
                                 </h1>
                                 <p className="text-xs text-gray-500 leading-none mt-1">Your freelance flow simplified</p>
                             </div>
