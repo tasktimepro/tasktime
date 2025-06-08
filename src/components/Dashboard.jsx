@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
     ChartBarIcon, 
     ClockIcon, 
@@ -54,6 +54,7 @@ const Dashboard = ({
     const [exchangeRates, setExchangeRates] = useState(null);
     const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
 
+
     // Listen for storage changes to update preferred currency
     useEffect(() => {
         const handleStorageChange = () => {
@@ -75,28 +76,28 @@ const Dashboard = ({
         };
     }, []);
 
-    // Check if we have multiple currencies in projects
-    const uniqueCurrencies = [...new Set(projects.map(p => p.currency || 'USD'))];
-    const needsExchangeRates = uniqueCurrencies.length > 1;
+    // Check if we have multiple currencies in projects and invoices
+    const needsExchangeRates = useMemo(() => {
+        const projectCurrencies = [...new Set(projects.map(p => p.currency || preferredCurrency || 'USD'))];
+        const invoiceCurrencies = [...new Set(invoices.map(i => i.project?.currency || preferredCurrency || 'USD'))];
+        const allCurrencies = [...new Set([...projectCurrencies, ...invoiceCurrencies])];
+        
+        return allCurrencies.length > 1;
+    }, [projects, invoices, preferredCurrency]);
 
     // Fetch exchange rates only if we have multiple currencies
     useEffect(() => {
         const loadExchangeRates = async () => {
             if (needsExchangeRates) {
                 setExchangeRatesLoading(true);
-                console.log('Multiple currencies detected, fetching exchange rates...');
                 const rates = await fetchExchangeRates();
                 setExchangeRates(rates);
                 setExchangeRatesLoading(false);
-                if (rates) {
-                    console.log('Exchange rates loaded successfully:', Object.keys(rates).length, 'currencies');
-                } else {
-                    console.warn('Failed to load exchange rates');
+                if (!rates) {
                     showWarning('Unable to load current exchange rates. Currency conversion may use outdated rates or show original amounts.');
                 }
             } else {
-                console.log('Single currency detected, skipping exchange rate fetch');
-                setExchangeRates({}); // Set empty object to avoid null checks
+                setExchangeRates(null);
                 setExchangeRatesLoading(false);
             }
         };
@@ -106,8 +107,49 @@ const Dashboard = ({
     /**
      * Calculate metrics for a given date range
      * When preferred currency is updated, this will be recalculated
+     * Now includes both billable time earnings AND invoice amounts
      */
-    const calculateMetrics = (startTime, endTime) => {
+    // Memoize the currency conversion function to prevent unnecessary recalculations
+    const convertToCurrency = useMemo(() => {
+        return (amountsByCurrency) => {
+            // If there's only one currency and it matches preferred, or no exchange rates needed, return as-is
+            const currencies = Object.keys(amountsByCurrency);
+            if (currencies.length === 1 && currencies[0] === preferredCurrency) {
+                return amountsByCurrency;
+            }
+            
+            // Check if we actually need to do any conversions
+            const hasNonPreferredCurrency = currencies.some(currency => currency !== preferredCurrency);
+            if (!hasNonPreferredCurrency) {
+                return amountsByCurrency;
+            }
+
+            // Only convert if we have exchange rates and actually need them
+            if (needsExchangeRates && exchangeRates) {
+                let totalInPreferredCurrency = 0;
+                Object.entries(amountsByCurrency).forEach(([currency, amount]) => {
+                    if (currency === preferredCurrency) {
+                        totalInPreferredCurrency += amount;
+                    } else {
+                        const convertedAmount = convertCurrency(
+                            amount,
+                            currency,
+                            preferredCurrency,
+                            exchangeRates
+                        );
+                        totalInPreferredCurrency += convertedAmount;
+                    }
+                });
+                const result = { [preferredCurrency]: totalInPreferredCurrency };
+                return result;
+            }
+            
+            // If we need exchange rates but don't have them, return original amounts
+            return amountsByCurrency;
+        };
+    }, [preferredCurrency, needsExchangeRates, exchangeRates]);
+
+    const calculateMetrics = useCallback((startTime, endTime) => {
         const entriesInRange = timeEntries.filter(entry => 
             entry.start >= startTime && entry.end <= endTime
         );
@@ -116,8 +158,8 @@ const Dashboard = ({
             return total + (entry.end - entry.start);
         }, 0);
 
-        // Calculate earnings by finding the task and project for each entry
-        const earningsByCurrency = {};
+        // Calculate billable time earnings by finding the task and project for each entry
+        const billableEarningsByCurrency = {};
         entriesInRange.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
             if (!task) return;
@@ -125,58 +167,70 @@ const Dashboard = ({
             const project = projects.find(p => p.id === task.projectId);
             if (!project || !project.hourlyRate) return;
 
-            const currency = project.currency || 'USD';
+            const currency = project.currency || preferredCurrency || 'USD';
             const hoursWorked = millisecondsToHours(entry.end - entry.start);
             const amount = hoursWorked * project.hourlyRate;
 
-            if (!earningsByCurrency[currency]) {
-                earningsByCurrency[currency] = 0;
+            if (!billableEarningsByCurrency[currency]) {
+                billableEarningsByCurrency[currency] = 0;
             }
-            earningsByCurrency[currency] += amount;
+            billableEarningsByCurrency[currency] += amount;
         });
 
-        // Convert earnings to preferred currency if needed
-        if (needsExchangeRates && exchangeRates) {
-            const convertedEarnings = {};
-            Object.keys(earningsByCurrency).forEach(currency => {
-                if (currency === preferredCurrency) {
-                    // If currency already matches preferred currency, no conversion needed
-                    convertedEarnings[preferredCurrency] = (convertedEarnings[preferredCurrency] || 0) + earningsByCurrency[currency];
-                } else {
-                    // Only convert if currency is different from preferred currency
-                    const convertedAmount = convertCurrency(
-                        earningsByCurrency[currency],
-                        currency,
-                        preferredCurrency,
-                        exchangeRates
-                    );
-                    convertedEarnings[preferredCurrency] = (convertedEarnings[preferredCurrency] || 0) + convertedAmount;
-                }
-            });
+        // Calculate invoice amounts in the given date range
+        const invoicesInRange = invoices.filter(invoice => {
+            if (!invoice.createdAt) return false;
+            return invoice.createdAt >= startTime && invoice.createdAt <= endTime;
+        });
+
+        // Separate paid and outstanding invoice amounts
+        const paidInvoicesByCurrency = {};
+        const outstandingInvoicesByCurrency = {};
+
+        invoicesInRange.forEach(invoice => {
+            const amount = invoice.totalAmount || 0;
+            const currency = invoice.project?.currency || preferredCurrency || 'USD';
             
-            return {
-                time: totalTime,
-                earningsByCurrency: convertedEarnings
-            };
-        } else {
-            // If only one currency or no exchange rates needed, return as-is
-            return {
-                time: totalTime,
-                earningsByCurrency
-            };
-        }
-    };
+            if (invoice.paymentProcessed) {
+                // Paid invoice
+                if (!paidInvoicesByCurrency[currency]) {
+                    paidInvoicesByCurrency[currency] = 0;
+                }
+                paidInvoicesByCurrency[currency] += amount;
+            } else {
+                // Outstanding invoice
+                if (!outstandingInvoicesByCurrency[currency]) {
+                    outstandingInvoicesByCurrency[currency] = 0;
+                }
+                outstandingInvoicesByCurrency[currency] += amount;
+            }
+        });
+
+        return {
+            time: totalTime,
+            billableEarnings: convertToCurrency(billableEarningsByCurrency),
+            paidInvoices: convertToCurrency(paidInvoicesByCurrency),
+            outstandingInvoices: convertToCurrency(outstandingInvoicesByCurrency)
+        };
+    }, [timeEntries, tasks, projects, invoices, convertToCurrency, preferredCurrency]);
 
     // Calculate date ranges statically (they don't change based on preferences)
     const thisMonthRange = useMemo(() => getThisMonthRange(), []);
     const lastMonthRange = useMemo(() => getLastMonthRange(), []);
     const thisYearRange = useMemo(() => getThisYearRange(), []);
     
-    // Calculate the metrics directly without additional useMemo
-    // They will be recalculated when preferredCurrency changes since Dashboard will rerender    
-    const thisMonthMetrics = calculateMetrics(thisMonthRange.start, thisMonthRange.end);
-    const lastMonthMetrics = calculateMetrics(lastMonthRange.start, lastMonthRange.end);
-    const thisYearMetrics = calculateMetrics(thisYearRange.start, thisYearRange.end);
+    // Calculate metrics with proper memoization
+    const thisMonthMetrics = useMemo(() => {
+        return calculateMetrics(thisMonthRange.start, thisMonthRange.end);
+    }, [thisMonthRange, calculateMetrics]);
+    
+    const lastMonthMetrics = useMemo(() => {
+        return calculateMetrics(lastMonthRange.start, lastMonthRange.end);
+    }, [lastMonthRange, calculateMetrics]);
+    
+    const thisYearMetrics = useMemo(() => {
+        return calculateMetrics(thisYearRange.start, thisYearRange.end);
+    }, [thisYearRange, calculateMetrics]);
 
     /**
      * Calculate outstanding invoices metrics
@@ -189,32 +243,37 @@ const Dashboard = ({
             return dueDate < new Date();
         });
 
-        // Convert all invoice amounts to preferred currency before summing
-        const outstandingTotal = outstanding.reduce((total, invoice) => {
+        // Group outstanding invoices by currency first
+        const outstandingByCurrency = {};
+        outstanding.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
-            const currency = invoice.currency || 'USD';
+            const currency = invoice.project?.currency || preferredCurrency || 'USD';
             
-            // Only convert if currency differs from preferred currency
-            if (currency !== preferredCurrency && needsExchangeRates && exchangeRates) {
-                const convertedAmount = convertCurrency(amount, currency, preferredCurrency, exchangeRates);
-                return total + convertedAmount;
+            if (!outstandingByCurrency[currency]) {
+                outstandingByCurrency[currency] = 0;
             }
-            // If currency matches or no conversion possible, use original amount
-            return total + (currency === preferredCurrency ? amount : 0);
-        }, 0);
+            outstandingByCurrency[currency] += amount;
+        });
 
-        const pastDueTotal = pastDue.reduce((total, invoice) => {
+        // Group past due invoices by currency first
+        const pastDueByCurrency = {};
+        pastDue.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
-            const currency = invoice.currency || 'USD';
+            const currency = invoice.project?.currency || preferredCurrency || 'USD';
             
-            // Only convert if currency differs from preferred currency
-            if (currency !== preferredCurrency && needsExchangeRates && exchangeRates) {
-                const convertedAmount = convertCurrency(amount, currency, preferredCurrency, exchangeRates);
-                return total + convertedAmount;
+            if (!pastDueByCurrency[currency]) {
+                pastDueByCurrency[currency] = 0;
             }
-            // If currency matches or no conversion possible, use original amount
-            return total + (currency === preferredCurrency ? amount : 0);
-        }, 0);
+            pastDueByCurrency[currency] += amount;
+        });
+
+        // Convert using the same logic as other metrics
+        const convertedOutstanding = convertToCurrency(outstandingByCurrency);
+        const convertedPastDue = convertToCurrency(pastDueByCurrency);
+
+        // Sum the converted amounts
+        const outstandingTotal = Object.values(convertedOutstanding).reduce((sum, amount) => sum + amount, 0);
+        const pastDueTotal = Object.values(convertedPastDue).reduce((sum, amount) => sum + amount, 0);
 
         return {
             outstanding: outstanding.length,
@@ -222,7 +281,9 @@ const Dashboard = ({
             pastDue: pastDue.length,
             pastDueTotal
         };
-    }, [invoices, needsExchangeRates, exchangeRates, preferredCurrency]);    /**
+    }, [invoices, convertToCurrency, preferredCurrency]);
+
+    /**
      * Get recent active tasks (tasks with recent time entries, not completed/archived)
      * Now includes both parent tasks and subtasks
      * Tasks completed in current session remain visible until next render
@@ -232,12 +293,10 @@ const Dashboard = ({
             (!task.completed && !task.archived) || completedInCurrentSession.has(task.id)
         );
 
-        const subtasks = activeTasks.filter(task => task.parentTaskId);
-        const parentTasks = activeTasks.filter(task => !task.parentTaskId);
-
         const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
         const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
 
+        // Calculate task activity
         const taskActivity = {};
         recentEntries.forEach(entry => {
             if (!taskActivity[entry.taskId]) {
@@ -250,69 +309,55 @@ const Dashboard = ({
             taskActivity[entry.taskId].totalTime += (entry.end - entry.start);
         });
 
-        // Consider currently running timer as the most recent activity
+        // Handle currently running timer - CRITICAL FIX: Ensure active timer is ALWAYS at the top
         if (currentTimer) {
             const currentTime = Date.now();
             if (!taskActivity[currentTimer.taskId]) {
                 taskActivity[currentTimer.taskId] = { lastActivity: 0, totalTime: 0 };
             }
             
-            // Use a timestamp far in the future (10 years) to ensure current timer is always at the top
-            // This ensures that the active timer is always considered the most recent activity
-            const farFutureTimestamp = currentTime + (10 * 365 * 24 * 60 * 60 * 1000); // 10 years in the future
-            taskActivity[currentTimer.taskId].lastActivity = farFutureTimestamp;
+            // Use far future timestamp to ensure current timer is always at the top
+            // Adding extra buffer to ensure it's always highest
+            taskActivity[currentTimer.taskId].lastActivity = currentTime + (20 * 365 * 24 * 60 * 60 * 1000);
             
             // Add current session time to total time
             const currentSessionTime = currentTime - currentTimer.startTime;
             if (!isPaused) {
                 taskActivity[currentTimer.taskId].totalTime += currentSessionTime;
             } else {
-                // If paused, add the paused elapsed time instead
                 taskActivity[currentTimer.taskId].totalTime += pausedElapsedTime;
             }
         }
 
-        // First, process all active tasks to add project information
-        const enhancedTasks = [...parentTasks, ...subtasks].map(task => {
+        // Enhance tasks with project information and activity data
+        const enhancedTasks = activeTasks.map(task => {
             const project = projects.find(p => p.id === task.projectId);
             const totalTime = taskActivity[task.id]?.totalTime || 0;
             const hours = Math.floor(millisecondsToHours(totalTime));
             const minutes = Math.floor((totalTime % (60 * 60 * 1000)) / (60 * 1000));
+
+            // Add parent task information for subtasks
+            let parentTask = null;
+            if (task.parentTaskId) {
+                parentTask = tasks.find(t => t.id === task.parentTaskId);
+                if (parentTask) {
+                    const parentProject = projects.find(p => p.id === parentTask.projectId);
+                    parentTask = { ...parentTask, project: parentProject };
+                }
+            }
 
             return {
                 ...task,
                 lastActivity: taskActivity[task.id]?.lastActivity || 0,
                 recentTime: totalTime,
                 project: project,
-                displayTime: `${hours}h ${minutes}m`
+                displayTime: `${hours}h ${minutes}m`,
+                parentTask
             };
         });
 
-        // Now that tasks have been enhanced, we can find parent tasks from the ENTIRE tasks array
-        const tasksWithParents = enhancedTasks.map(task => {
-            if (task.parentTaskId) {
-                // Look up the parent task from the complete tasks array, not just activeTasks
-                const parentTask = tasks.find(t => t.id === task.parentTaskId);
-                
-                // Find the parent's project if parent exists
-                let parentProject = null;
-                if (parentTask) {
-                    parentProject = projects.find(p => p.id === parentTask.projectId);
-                }
-                
-                return {
-                    ...task,
-                    parentTask: parentTask ? {
-                        ...parentTask,
-                        project: parentProject
-                    } : null
-                };
-            }
-            return task;
-        });
-
         // Sort by activity and limit to 10 most recent
-        const sortedTasks = tasksWithParents
+        const sortedTasks = enhancedTasks
             .sort((a, b) => b.lastActivity - a.lastActivity)
             .slice(0, 10);
 
@@ -359,16 +404,18 @@ const Dashboard = ({
         });
 
         const projectsWithActivity = projects
-            .filter(project => projectActivity[project.id])
+            .filter(project => !project.archived) // Only exclude archived projects
             .map(project => {
-                const pendingTimeHours = millisecondsToHours(projectActivity[project.id].pendingTime);
+                // Use project activity if it exists, otherwise use defaults
+                const activity = projectActivity[project.id] || { totalTime: 0, lastActivity: 0, pendingTime: 0 };
+                const pendingTimeHours = millisecondsToHours(activity.pendingTime);
                 // For recent projects, always use original currency and rate - no conversion
                 const pendingAmount = project.hourlyRate ? pendingTimeHours * project.hourlyRate : 0;
 
                 return {
                     ...project,
-                    totalTime: projectActivity[project.id].totalTime,
-                    lastActivity: projectActivity[project.id].lastActivity,
+                    totalTime: activity.totalTime,
+                    lastActivity: activity.lastActivity,
                     pendingHours: pendingTimeHours,
                     pendingAmount
                 };
@@ -386,74 +433,107 @@ const Dashboard = ({
     }, [projects, tasks, timeEntries, projectSearchQuery]);
 
     /**
-     * Start timer for a task
+     * Calculate total pending hours across all recent projects
      */
-    const handleStartTimer = (task) => {
-        // Stop any existing timer and save its time if it's paused
-        if (currentTimer) {
-            // If the current timer is paused, we need to create a time entry for it
-            if (isPaused && pausedElapsedTime > 0) {
-                // Create time entry for the paused session
-                const timeEntry = {
-                    id: `dashboard-paused-${Date.now()}`,
-                    taskId: currentTimer.taskId,
-                    start: currentTimer.startTime,
-                    end: currentTimer.startTime + pausedElapsedTime
-                };
-                setTimeEntries(prev => [...prev, timeEntry]);
-            } else if (!isPaused) {
-                // Create time entry for running timer
-                const timeEntry = {
-                    id: `dashboard-${Date.now()}`,
-                    taskId: currentTimer.taskId,
-                    start: currentTimer.startTime,
-                    end: Date.now()
-                };
-                setTimeEntries(prev => [...prev, timeEntry]);
-            }
+    const pendingHoursTotal = useMemo(() => {
+        return recentProjects.reduce((total, project) => total + project.pendingHours, 0);
+    }, [recentProjects]);
+
+    /**
+     * Calculate total pending bills amount in preferred currency
+     */
+    const pendingBillsTotal = useMemo(() => {
+        return recentProjects.reduce((total, project) => {
+            const amount = project.pendingAmount || 0;
+            const currency = project.currency || 'USD';
             
-            setCurrentTimer(null);
+            // Only convert if currency differs from preferred currency
+            if (currency !== preferredCurrency && needsExchangeRates && exchangeRates) {
+                return total + convertCurrency(amount, currency, preferredCurrency, exchangeRates);
+            }
+            // Add original amount if currency matches preferred
+            return total + (currency === preferredCurrency ? amount : 0);
+        }, 0);
+    }, [recentProjects, preferredCurrency, needsExchangeRates, exchangeRates]);
+
+    /**
+     * Create a time entry for the current timer session
+     */
+    const createTimeEntry = useCallback((taskId, startTime, endTime) => {
+        return {
+            id: `dashboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            taskId,
+            start: startTime,
+            end: endTime
+        };
+    }, []);
+
+    /**
+     * Stop any existing timer and optionally save its time
+     */
+    const stopExistingTimer = useCallback(() => {
+        if (!currentTimer) return;
+
+        const now = Date.now();
+        let timeEntry;
+
+        if (isPaused && pausedElapsedTime > 0) {
+            // Create time entry for the paused session
+            timeEntry = createTimeEntry(
+                currentTimer.taskId,
+                currentTimer.startTime,
+                currentTimer.startTime + pausedElapsedTime
+            );
+        } else if (!isPaused) {
+            // Create time entry for running timer
+            timeEntry = createTimeEntry(
+                currentTimer.taskId,
+                currentTimer.startTime,
+                now
+            );
         }
-        
-        // Reset pause state
+
+        if (timeEntry) {
+            setTimeEntries(prev => [...prev, timeEntry]);
+        }
+
+        setCurrentTimer(null);
         setIsPaused(false);
         setPausedElapsedTime(0);
+    }, [currentTimer, isPaused, pausedElapsedTime, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
+
+    /**
+     * Start timer for a task
+     */
+    const handleStartTimer = useCallback((task) => {
+        stopExistingTimer();
         
-        // Start new timer
         setCurrentTimer({
             startTime: Date.now(),
             taskId: task.id
         });
-    };
+    }, [stopExistingTimer, setCurrentTimer]);
 
     /**
      * Stop timer for a task
      */
-    const handleStopTimer = (task) => {
-        if (currentTimer && currentTimer.taskId === task.id) {            
-            // Get a timestamp that will be used consistently
+    const handleStopTimer = useCallback((task) => {
+        if (currentTimer?.taskId === task.id) {
             const now = Date.now();
+            const timeEntry = createTimeEntry(task.id, currentTimer.startTime, now);
             
-            // Create time entry for the elapsed time
-            const timeEntry = {
-                id: `dashboard-${now}`,
-                taskId: task.id,
-                start: currentTimer.startTime,
-                end: now
-            };
-            
-            setTimeEntries([...timeEntries, timeEntry]);
+            setTimeEntries(prev => [...prev, timeEntry]);
             setCurrentTimer(null);
             setIsPaused(false);
             setPausedElapsedTime(0);
         }
-    };
+    }, [currentTimer, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
 
     /**
      * Pause/Resume timer for a task
      */
-    const handleTogglePause = (task) => {
-        if (currentTimer && currentTimer.taskId === task.id) {
+    const handleTogglePause = useCallback((task) => {
+        if (currentTimer?.taskId === task.id) {
             if (isPaused) {
                 // Resume timer
                 setCurrentTimer({
@@ -469,92 +549,204 @@ const Dashboard = ({
                 setIsPaused(true);
             }
         }
-    };
+    }, [currentTimer, isPaused, pausedElapsedTime, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
 
     /**
      * Mark task as completed
      */
-    const handleCompleteTask = (task) => {
-        // Add to completed in current session to keep it visible FIRST
+    const handleCompleteTask = useCallback((task) => {
+        // Add to completed in current session to keep it visible
         setCompletedInCurrentSession(prev => new Set([...prev, task.id]));
 
         const now = Date.now();
         
         // If timer is active for this task, stop it before completing
-        if (currentTimer && currentTimer.taskId === task.id) {
-            const timeEntry = {
-                id: `completion-${now}`,
-                taskId: task.id,
-                start: currentTimer.startTime,
-                end: now
-            };
+        if (currentTimer?.taskId === task.id) {
+            const timeEntry = createTimeEntry(task.id, currentTimer.startTime, now);
             setTimeEntries(prev => [...prev, timeEntry]);
             setCurrentTimer(null);
             setIsPaused(false);
             setPausedElapsedTime(0);
         } else {
-            // If no timer was active, create a minimal time entry to update the last activity
-            // This ensures the completed task moves to the top of the list
-            const timeEntry = {
-                id: `completion-update-${now}`,
-                taskId: task.id,
-                start: now - 1000, // 1 second ago
-                end: now
-            };
+            // Create minimal time entry to update last activity
+            const timeEntry = createTimeEntry(task.id, now - 1000, now);
             setTimeEntries(prev => [...prev, timeEntry]);
         }
 
-        // Update task completion status using functional update
+        // Update task completion status
         setTasks(prevTasks => 
             prevTasks.map(t =>
                 t.id === task.id ? { ...t, completed: true } : t
             )
         );
-    };
+    }, [currentTimer, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTasks, setCompletedInCurrentSession]);
 
     /**
      * Handle clicking on task title to navigate to project
      */
-    const handleTaskTitleClick = (task) => {
-        if (task.project && navigateToProject) {
+    const handleTaskTitleClick = useCallback((task) => {
+        if (task.project?.id && navigateToProject) {
             navigateToProject(task.project.id);
         }
-    };
+    }, [navigateToProject]);
 
     /**
-     * Render earnings by currency - prioritizes preferred currency
+     * Render task timer controls
      */
-    const renderEarningsByCurrency = (earningsByCurrency) => {
-        // Use the current preferred currency from state
-        const currentPreferredCurrency = preferredCurrency;
-        
+    const renderTaskControls = useCallback((task, shouldDisable) => {
+        if (task.completed) return null;
+
+        const isTimerActive = currentTimer?.taskId === task.id;
+
+        if (isTimerActive) {
+            return (
+                <>
+                    <button
+                        onClick={() => handleTogglePause(task)}
+                        className="p-1.5 rounded-md transition-colors bg-yellow-100 text-yellow-600 hover:bg-yellow-200"
+                        title={isPaused ? "Resume timer" : "Pause timer"}
+                    >
+                        {isPaused ? (
+                            <PlayIcon className="h-4 w-4" />
+                        ) : (
+                            <PauseIcon className="h-4 w-4" />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => handleStopTimer(task)}
+                        className="p-1.5 rounded-md transition-colors bg-red-100 text-red-600 hover:bg-red-200"
+                        title="Stop timer"
+                    >
+                        <StopIcon className="h-4 w-4" />
+                    </button>
+                </>
+            );
+        }
+
+        return (
+            <button
+                onClick={() => handleStartTimer(task)}
+                className="p-1.5 rounded-md transition-colors bg-green-100 text-green-600 hover:bg-green-200"
+                title="Start timer"
+                disabled={shouldDisable}
+            >
+                <PlayIcon className="h-4 w-4" />
+            </button>
+        );
+    }, [currentTimer, isPaused, handleTogglePause, handleStopTimer, handleStartTimer]);
+
+    /**
+     * Render task title with navigation
+     */
+    const renderTaskTitle = useCallback((task, isCompleted) => {
+        const baseClasses = `text-sm font-medium truncate text-left transition-colors ${
+            isCompleted ? 'line-through text-gray-500' : 'text-gray-900'
+        }`;
+
+        const title = task.parentTaskId ? (
+            <span>
+                <span className="text-gray-400 text-xs">↳ </span>
+                {task.title}
+                {!task.parentTask && <span className="text-red-500 text-xs"> [Parent missing]</span>}
+            </span>
+        ) : (
+            task.title
+        );
+
+        if (task.project?.id) {
+            return (
+                <button
+                    onClick={() => handleTaskTitleClick(task)}
+                    className={`${baseClasses} hover:underline cursor-pointer ${
+                        isCompleted ? 'hover:text-gray-600' : 'hover:text-blue-600'
+                    }`}
+                    title={`Click to open ${task.project.title} project`}
+                >
+                    {title}
+                </button>
+            );
+        }
+
+        return <p className={baseClasses}>{title}</p>;
+    }, [handleTaskTitleClick]);
+    const renderEarningsByCurrency = useCallback((metrics, colorScheme = 'blue') => {
         // Show loading indicator if we need exchange rates and they're still loading
         if (needsExchangeRates && exchangeRatesLoading) {
             return <span className="text-gray-500 text-sm italic">Loading rates...</span>;
         }
         
-        if (!earningsByCurrency || Object.keys(earningsByCurrency).length === 0) {
-            // Force re-render when preferredCurrency changes
-            return <span className="text-gray-500" key={currentPreferredCurrency}>{formatCurrency(0, currentPreferredCurrency)}</span>;
+        const billableTotal = Object.values(metrics.billableEarnings).reduce((sum, amount) => sum + amount, 0);
+        const paidTotal = Object.values(metrics.paidInvoices).reduce((sum, amount) => sum + amount, 0);
+        const outstandingTotal = Object.values(metrics.outstandingInvoices).reduce((sum, amount) => sum + amount, 0);
+        
+        // If no earnings at all, show zero
+        if (billableTotal === 0 && paidTotal === 0 && outstandingTotal === 0) {
+            return <span className="text-gray-500">{formatCurrency(0, preferredCurrency)}</span>;
         }
 
-        // Sort currencies with preferred currency first (using the current state value)
-        const sortedEntries = Object.entries(earningsByCurrency).sort(([currencyA], [currencyB]) => {
-            if (currencyA === currentPreferredCurrency) return -1;
-            if (currencyB === currentPreferredCurrency) return 1;
-            return currencyA.localeCompare(currencyB);
-        });
+        const components = [];
+        
+        // Color mappings for different schemes
+        const colorClasses = {
+            blue: {
+                icon: 'text-blue-600',
+                text: 'text-blue-900',
+                bg: 'bg-blue-100',
+                badge: 'text-blue-800'
+            },
+            gray: {
+                icon: 'text-gray-600',
+                text: 'text-gray-900',
+                bg: 'bg-gray-100',
+                badge: 'text-gray-800'
+            },
+            green: {
+                icon: 'text-green-600',
+                text: 'text-green-900',
+                bg: 'bg-green-100',
+                badge: 'text-green-800'
+            }
+        };
+        
+        const colors = colorClasses[colorScheme] || colorClasses.blue;
+        
+        // Add paid invoices (highest priority)
+        if (paidTotal > 0) {
+            components.push(
+                <div key="paid" className="flex items-center">
+                    <BanknotesIcon className={`h-4 w-4 ${colors.icon} mr-1`} />
+                    <span className={`font-semibold ${colors.text}`}>
+                        {formatCurrency(paidTotal, preferredCurrency)}
+                    </span>
+                    <span className={`text-xs ${colors.bg} ${colors.badge} px-1.5 py-0.5 rounded ml-1`}>
+                        paid
+                    </span>
+                </div>
+            );
+        }
+        
+        // Add outstanding invoices + billable time as "pending"
+        const pendingTotal = outstandingTotal + billableTotal;
+        if (pendingTotal > 0) {
+            components.push(
+                <div key="pending" className="flex items-center">
+                    <CurrencyDollarIcon className="h-4 w-4 text-amber-600 mr-1" />
+                    <span className="font-semibold text-amber-900">
+                        {formatCurrency(pendingTotal, preferredCurrency)}
+                    </span>
+                    <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded ml-1">
+                        pending
+                    </span>
+                </div>
+            );
+        }
 
-        return sortedEntries.map(([currency, amount], index) => (
-            <span key={currency} className="inline-block">
-                {index > 0 && <span className="text-gray-400 mx-1">•</span>}
-                <span className="font-semibold">
-                    {formatCurrency(amount, currency)}
-                </span>
-                <span className="text-xs text-gray-500 ml-1">{currency}</span>
-            </span>
-        ));
-    };
+        return (
+            <div className="space-y-1">
+                {components}
+            </div>
+        );
+    }, [needsExchangeRates, exchangeRatesLoading, preferredCurrency]);
 
     return (
         <div className="space-y-6">
@@ -575,9 +767,8 @@ const Dashboard = ({
                                     <h3 className="text-sm font-medium text-blue-900">This Month</h3>
                                     <div className="mt-2">
                                         <div className="flex items-center">
-                                            <BanknotesIcon className="h-4 w-4 text-blue-600 mr-1" />
                                             <div className="text-lg font-semibold text-blue-900">
-                                                {renderEarningsByCurrency(thisMonthMetrics.earningsByCurrency)}
+                                                {renderEarningsByCurrency(thisMonthMetrics, 'blue')}
                                             </div>
                                         </div>
                                         <div className="flex items-center mt-1">
@@ -601,7 +792,7 @@ const Dashboard = ({
                                         <div className="flex items-center">
                                             <BanknotesIcon className="h-4 w-4 text-gray-600 mr-1" />
                                             <div className="text-lg font-semibold text-gray-900">
-                                                {renderEarningsByCurrency(lastMonthMetrics.earningsByCurrency)}
+                                                {renderEarningsByCurrency(lastMonthMetrics, 'gray')}
                                             </div>
                                         </div>
                                         <div className="flex items-center mt-1">
@@ -623,9 +814,9 @@ const Dashboard = ({
                                     <h3 className="text-sm font-medium text-green-900">This Year</h3>
                                     <div className="mt-2">
                                         <div className="flex items-center">
-                                            <BanknotesIcon className="h-4 w-4 text-green-600 mr-1" />
+                                            {/* <BanknotesIcon className="h-4 w-4 text-green-600 mr-1" /> */}
                                             <div className="text-lg font-semibold text-green-900">
-                                                {renderEarningsByCurrency(thisYearMetrics.earningsByCurrency)}
+                                                {renderEarningsByCurrency(thisYearMetrics, 'green')}
                                             </div>
                                         </div>
                                         <div className="flex items-center mt-1">
@@ -744,33 +935,13 @@ const Dashboard = ({
                                     <div className="flex items-center mt-2">
                                         <ClockIcon className="h-4 w-4 text-blue-600 mr-2" />
                                         <span className="text-lg font-semibold text-blue-900">
-                                            {recentProjects.reduce((total, project) => total + project.pendingHours, 0).toFixed(1)}h
+                                            {pendingHoursTotal.toFixed(1)}h
                                         </span>
                                     </div>
                                     <div className="flex items-center mt-1">
                                         <CurrencyDollarIcon className="h-4 w-4 text-blue-600 mr-2" />
                                         <span className="text-sm text-blue-700">
-                                            {(() => {
-                                                // For Pending Bills overview, convert each amount to preferred currency
-                                                const totalUnbilled = recentProjects.reduce((total, project) => {
-                                                    const amount = project.pendingAmount || 0;
-                                                    const currency = project.currency || 'USD';
-                                                    
-                                                    // Only convert if currency differs from preferred currency
-                                                    if (currency !== preferredCurrency && needsExchangeRates && exchangeRates) {
-                                                        const convertedAmount = convertCurrency(
-                                                            amount,
-                                                            currency,
-                                                            preferredCurrency,
-                                                            exchangeRates
-                                                        );
-                                                        return total + convertedAmount;
-                                                    }
-                                                    // Add original amount if currency matches preferred
-                                                    return total + (currency === preferredCurrency ? amount : 0);
-                                                }, 0);
-                                                return formatCurrency(totalUnbilled, preferredCurrency);
-                                            })()} unbilled
+                                            {formatCurrency(pendingBillsTotal, preferredCurrency)} unbilled
                                         </span>
                                     </div>
                                 </div>
@@ -819,37 +990,7 @@ const Dashboard = ({
                                                 disabled={task.completed || shouldDisable}
                                             />
                                             <div className="flex-1 min-w-0">
-                                                {task.project ? (
-                                                    <button
-                                                        onClick={() => handleTaskTitleClick(task)}
-                                                        className={`text-sm font-medium truncate text-left hover:underline cursor-pointer transition-colors ${task.completed ? 'line-through text-gray-500 hover:text-gray-600' : 'text-gray-900 hover:text-blue-600'}`}
-                                                        title={`Click to open ${task.project.title} project`}
-                                                    >
-                                                        {/* Always check parentTaskId directly - more reliable than the isSubtask property */}
-                                                        {task.parentTaskId ? (
-                                                            <span>
-                                                                <span className="text-gray-400 text-xs">↳ </span>
-                                                                {task.title}
-                                                                {!task.parentTask && <span className="text-red-500 text-xs"> [Parent missing]</span>}
-                                                            </span>
-                                                        ) : (
-                                                            task.title
-                                                        )}
-                                                    </button>
-                                                ) : (
-                                                    <p className={`text-sm font-medium truncate ${task.completed ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                                                        {/* Always check parentTaskId directly - more reliable than the isSubtask property */}
-                                                        {task.parentTaskId ? (
-                                                            <span>
-                                                                <span className="text-gray-400 text-xs">↳ </span>
-                                                                {task.title}
-                                                                {!task.parentTask && <span className="text-red-500 text-xs"> [Parent missing]</span>}
-                                                            </span>
-                                                        ) : (
-                                                            task.title
-                                                        )}
-                                                    </p>
-                                                )}
+                                                {renderTaskTitle(task, task.completed)}
                                                 <p className={`text-xs truncate ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>
                                                     {task.parentTaskId ? (
                                                         <span>
@@ -863,50 +1004,17 @@ const Dashboard = ({
                                             <div className={`text-xs ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>
                                                 {formatDurationWithSeconds(task.recentTime)}
                                             </div>
-                                            {!task.completed && (
-                                                <div className="flex space-x-1">
-                                                    {currentTimer?.taskId === task.id ? (
-                                                        <>
-                                                            <button
-                                                                onClick={() => handleTogglePause(task)}
-                                                                className="p-1.5 rounded-md transition-colors bg-yellow-100 text-yellow-600 hover:bg-yellow-200"
-                                                                title={isPaused ? "Resume timer" : "Pause timer"}
-                                                            >
-                                                                {isPaused ? (
-                                                                    <PlayIcon className="h-4 w-4" />
-                                                                ) : (
-                                                                    <PauseIcon className="h-4 w-4" />
-                                                                )}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleStopTimer(task)}
-                                                                className="p-1.5 rounded-md transition-colors bg-red-100 text-red-600 hover:bg-red-200"
-                                                                title="Stop timer"
-                                                            >
-                                                                <StopIcon className="h-4 w-4" />
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handleStartTimer(task)}
-                                                            className="p-1.5 rounded-md transition-colors bg-green-100 text-green-600 hover:bg-green-200"
-                                                            title="Start timer"
-                                                            disabled={shouldDisable}
-                                                        >
-                                                            <PlayIcon className="h-4 w-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
+                                            <div className="flex space-x-1">
+                                                {renderTaskControls(task, shouldDisable)}
+                                            </div>
                                         </div>
                                         {/* Render subtasks if present */}
                                         {task.subtasks && task.subtasks.length > 0 && (
                                             <div className="ml-8 mt-2">
                                                 {task.subtasks.map(subtask => {
-                                                    // Determine if this subtask should be disabled
-                                                    // If any timer is running (not paused) and it's not for this subtask, disable the subtask
                                                     const isTimerActive = currentTimer?.taskId === subtask.id;
                                                     const shouldDisable = currentTimer && !isPaused && !isTimerActive && !subtask.completed;
+                                                    const subtaskWithProject = { ...subtask, project: task.project };
                                                     
                                                     return (
                                                         <div key={subtask.id} className={`flex items-center space-x-3 py-2 ${shouldDisable ? 'opacity-50' : ''}`}>
@@ -917,19 +1025,7 @@ const Dashboard = ({
                                                                 disabled={subtask.completed || shouldDisable}
                                                             />
                                                             <div className="flex-1 min-w-0">
-                                                                {task.project ? (
-                                                                    <button
-                                                                        onClick={() => handleTaskTitleClick({ ...subtask, project: task.project })}
-                                                                        className={`text-sm font-medium truncate text-left hover:underline cursor-pointer transition-colors ${subtask.completed ? 'line-through text-gray-500 hover:text-gray-600' : 'text-gray-900 hover:text-blue-600'}`}
-                                                                        title={`Click to open ${task.project.title} project`}
-                                                                    >
-                                                                        {subtask.title}
-                                                                    </button>
-                                                                ) : (
-                                                                    <p className={`text-sm font-medium truncate ${subtask.completed ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                                                                        {subtask.title}
-                                                                    </p>
-                                                                )}
+                                                                {renderTaskTitle(subtaskWithProject, subtask.completed)}
                                                                 <p className={`text-xs truncate ${subtask.completed ? 'text-gray-400' : 'text-gray-500'}`}>
                                                                     {task.project ? task.project.title : 'Unknown Project'}
                                                                 </p>
@@ -937,41 +1033,9 @@ const Dashboard = ({
                                                             <div className={`text-xs ${subtask.completed ? 'text-gray-400' : 'text-gray-500'}`}>
                                                                 {formatDurationWithSeconds(subtask.recentTime)}
                                                             </div>
-                                                            {!subtask.completed && (
-                                                                <div className="flex space-x-1">
-                                                                    {currentTimer?.taskId === subtask.id ? (
-                                                                        <>
-                                                                            <button
-                                                                                onClick={() => handleTogglePause(subtask)}
-                                                                                className="p-1.5 rounded-md transition-colors bg-yellow-100 text-yellow-600 hover:bg-yellow-200"
-                                                                                title={isPaused ? "Resume timer" : "Pause timer"}
-                                                                            >
-                                                                                {isPaused ? (
-                                                                                    <PlayIcon className="h-4 w-4" />
-                                                                                ) : (
-                                                                                    <PauseIcon className="h-4 w-4" />
-                                                                                )}
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => handleStopTimer(subtask)}
-                                                                                className="p-1.5 rounded-md transition-colors bg-red-100 text-red-600 hover:bg-red-200"
-                                                                                title="Stop timer"
-                                                                            >
-                                                                                <StopIcon className="h-4 w-4" />
-                                                                            </button>
-                                                                        </>
-                                                                    ) : (
-                                                                        <button
-                                                                            onClick={() => handleStartTimer(subtask)}
-                                                                            className="p-1.5 rounded-md transition-colors bg-green-100 text-green-600 hover:bg-green-200"
-                                                                            title="Start timer"
-                                                                            disabled={shouldDisable}
-                                                                        >
-                                                                            <PlayIcon className="h-4 w-4" />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            )}
+                                                            <div className="flex space-x-1">
+                                                                {renderTaskControls(subtask, shouldDisable)}
+                                                            </div>
                                                         </div>
                                                     );
                                                 })}
