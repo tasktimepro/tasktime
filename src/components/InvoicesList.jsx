@@ -102,13 +102,17 @@ const InvoicesList = ({
             let htmlContent = invoice.htmlContent;
             if (!htmlContent) {
                 console.log('No htmlContent found, recreating...');
-                // Find the payment method if one is associated with this invoice
-                const paymentMethod = invoice.paymentMethodId ? 
-                    paymentMethods.find(pm => pm.id === invoice.paymentMethodId) : null;
                 
-                // Find the business info if one is associated with this invoice
-                const businessInfo = invoice.businessInfoId ? 
-                    businessInfos.find(bi => bi.id === invoice.businessInfoId) : null;
+                // Use stored objects first, fall back to finding by ID
+                let paymentMethod = invoice.paymentMethod;
+                if (!paymentMethod && invoice.paymentMethodId) {
+                    paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                }
+                
+                let businessInfo = invoice.businessInfo;
+                if (!businessInfo && invoice.businessInfoId) {
+                    businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                }
                 
                 // Find the client info if one is associated with this invoice
                 const clientInfoData = invoice.clientInfoId ? 
@@ -334,27 +338,82 @@ const InvoicesList = ({
                                                 })()}
                                             </span>
                                         </p>
-                                        {invoice.templateId && invoiceTemplates.length > 0 && (() => {
-                                            const template = invoiceTemplates.find(t => t.id === invoice.templateId);
+                                        {(invoice.template || (invoice.templateId && invoiceTemplates.length > 0)) && (() => {
+                                            // First try to use stored template object
+                                            let template = invoice.template;
+                                            let isDeleted = false;
+                                            
+                                            // If no stored template, try to find by ID (backward compatibility)
+                                            if (!template && invoice.templateId) {
+                                                template = invoiceTemplates.find(t => t.id === invoice.templateId);
+                                            }
+                                            
+                                            // If we have a stored template but can't find it by ID anymore, it's deleted
+                                            if (invoice.template && invoice.templateId && !invoiceTemplates.find(t => t.id === invoice.templateId)) {
+                                                isDeleted = true;
+                                            }
+                                            
                                             return template ? (
                                                 <p>
                                                     Template: <span className="font-medium text-gray-600">{template.name}</span>
+                                                    {isDeleted && (
+                                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                            deleted
+                                                        </span>
+                                                    )}
                                                 </p>
                                             ) : null;
                                         })()}
-                                        {invoice.businessInfoId && (() => {
-                                            const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                                        {(invoice.businessInfo || invoice.businessInfoId) && (() => {
+                                            // First try to use stored business info object
+                                            let businessInfo = invoice.businessInfo;
+                                            let isDeleted = false;
+                                            
+                                            // If no stored business info, try to find by ID (backward compatibility)
+                                            if (!businessInfo && invoice.businessInfoId) {
+                                                businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                                            }
+                                            
+                                            // If we have a stored business info but can't find it by ID anymore, it's deleted
+                                            if (invoice.businessInfo && invoice.businessInfoId && !businessInfos.find(bi => bi.id === invoice.businessInfoId)) {
+                                                isDeleted = true;
+                                            }
+                                            
                                             return businessInfo ? (
                                                 <p>
                                                     Business: <span className="font-medium text-gray-600">{businessInfo.title}</span>
+                                                    {isDeleted && (
+                                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                            deleted
+                                                        </span>
+                                                    )}
                                                 </p>
                                             ) : null;
                                         })()}
-                                        {invoice.paymentMethodId && (() => {
-                                            const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                                        {(invoice.paymentMethod || invoice.paymentMethodId) && (() => {
+                                            // Check if we have a stored payment method object first
+                                            let paymentMethod = invoice.paymentMethod;
+                                            let isDeleted = false;
+                                            
+                                            if (!paymentMethod && invoice.paymentMethodId) {
+                                                // Fall back to finding by ID in current payment methods
+                                                paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                                            } else if (paymentMethod && invoice.paymentMethodId) {
+                                                // Check if the stored payment method still exists in current collection
+                                                const currentPaymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                                                if (!currentPaymentMethod) {
+                                                    isDeleted = true;
+                                                }
+                                            }
+                                            
                                             return paymentMethod ? (
                                                 <p>
                                                     Payment Method: <span className="font-medium text-gray-600">{paymentMethod.title}</span>
+                                                    {isDeleted && (
+                                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                            deleted
+                                                        </span>
+                                                    )}
                                                 </p>
                                             ) : null;
                                         })()}

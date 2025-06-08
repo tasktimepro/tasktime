@@ -326,6 +326,8 @@ function App() {
                         setTasks={setTasks}
                         timeEntries={timeEntries}
                         setTimeEntries={setTimeEntries}
+                        invoices={invoices}
+                        setInvoices={setInvoices}
                         currentTimer={currentTimer}
                         setCurrentTimer={setCurrentTimer}
                         isPaused={isPaused}

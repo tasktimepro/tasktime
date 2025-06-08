@@ -1,4 +1,6 @@
+import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
+import Modal from './Modal';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
@@ -23,12 +25,16 @@ const ProjectList = ({
     currentTimer, 
     setCurrentTimer, 
     onSelectProject,
+    invoices = [],
+    setInvoices,
     showCreateForm: initialShowCreateForm = false
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(initialShowCreateForm);
     const [editingProject, setEditingProject] = useState(null);
     const [showDropdown, setShowDropdown] = useState({}); // Track dropdown states by project ID
     const [showArchivedProjects, setShowArchivedProjects] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [projectToDelete, setProjectToDelete] = useState(null);
     const { showSuccess } = useToast();
 
     const [formData, setFormData] = useState({
@@ -153,60 +159,95 @@ const ProjectList = ({
     };
 
     /**
-     * Delete a project and all associated tasks and time entries
+     * Check if a project has associated invoices
+     */
+    const projectHasInvoices = (projectId) => {
+        const project = projects.find(p => p.id === projectId);
+        return project && project.invoiceIds && project.invoiceIds.length > 0;
+    };
+
+    /**
+     * Handle project deletion - check for invoices first
      */
     const handleDeleteProject = (projectId) => {
-        if (window.confirm('Are you sure you want to delete this project? All associated tasks and time entries will be lost.')) {
-            // Get all task IDs that need to be deleted (including subtasks)
-            const projectTasks = tasks.filter(task => task.projectId === projectId);
-            const allTaskIdsToDelete = new Set();
-            
-            // Add all project tasks and their subtasks
-            projectTasks.forEach(task => {
-                const taskIds = getTaskIdsToDelete(task.id, tasks);
-                taskIds.forEach(id => allTaskIdsToDelete.add(id));
-            });
-
-            // Check if current timer is running on any task that will be deleted
-            if (currentTimer && allTaskIdsToDelete.has(currentTimer.taskId)) {
-                setCurrentTimer(null);
-            }
-
-            // Remove the project
-            setProjects(projects.filter(project => project.id !== projectId));
-            
-            // Remove all tasks for this project (including subtasks)
-            const updatedTasks = tasks.filter(task => !allTaskIdsToDelete.has(task.id));
-            setTasks(updatedTasks);
-            
-            // Remove all time entries for deleted tasks
-            const updatedTimeEntries = timeEntries.filter(entry => 
-                !allTaskIdsToDelete.has(entry.taskId)
-            );
-            setTimeEntries(updatedTimeEntries);
-            
-            const deletedTaskCount = allTaskIdsToDelete.size;
-            const deletedTimeEntriesCount = timeEntries.length - updatedTimeEntries.length;
-            
-            // Close the edit form if the deleted project was being edited
-            if (editingProject && editingProject.id === projectId) {
-                setEditingProject(null);
-                
-                // Reset form data
-                setFormData({ 
-                    title: '', 
-                    hourlyRate: '', 
-                    currency: 'USD', 
-                    taxEnabled: false, 
-                    taxLabel: 'VAT', 
-                    taxRate: 0 
-                });
-            }
-            
-            showSuccess(
-                `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`
-            );
+        // Check if project has invoices before proceeding
+        if (projectHasInvoices(projectId)) {
+            setProjectToDelete(projectId);
+            setShowDeleteModal(true);
+            return;
         }
+
+        // If no invoices, proceed with standard confirmation
+        if (window.confirm('Are you sure you want to delete this project? All associated tasks and time entries will be lost.')) {
+            performProjectDeletion(projectId);
+        }
+    };
+
+    /**
+     * Perform the actual project deletion
+     */
+    const performProjectDeletion = (projectId, deleteInvoices = false) => {
+        // Get all task IDs that need to be deleted (including subtasks)
+        const projectTasks = tasks.filter(task => task.projectId === projectId);
+        const allTaskIdsToDelete = new Set();
+        
+        // Add all project tasks and their subtasks
+        projectTasks.forEach(task => {
+            const taskIds = getTaskIdsToDelete(task.id, tasks);
+            taskIds.forEach(id => allTaskIdsToDelete.add(id));
+        });
+
+        // Check if current timer is running on any task that will be deleted
+        if (currentTimer && allTaskIdsToDelete.has(currentTimer.taskId)) {
+            setCurrentTimer(null);
+        }
+
+        // If deleteInvoices is true, remove associated invoices
+        if (deleteInvoices) {
+            const project = projects.find(p => p.id === projectId);
+            if (project && project.invoiceIds && project.invoiceIds.length > 0) {
+                const updatedInvoices = invoices.filter(invoice => 
+                    !project.invoiceIds.includes(invoice.id)
+                );
+                setInvoices(updatedInvoices);
+            }
+        }
+
+        // Remove the project
+        setProjects(projects.filter(project => project.id !== projectId));
+        
+        // Remove all tasks for this project (including subtasks)
+        const updatedTasks = tasks.filter(task => !allTaskIdsToDelete.has(task.id));
+        setTasks(updatedTasks);
+        
+        // Remove all time entries for deleted tasks
+        const updatedTimeEntries = timeEntries.filter(entry => 
+            !allTaskIdsToDelete.has(entry.taskId)
+        );
+        setTimeEntries(updatedTimeEntries);
+        
+        const deletedTaskCount = allTaskIdsToDelete.size;
+        const deletedTimeEntriesCount = timeEntries.length - updatedTimeEntries.length;
+        
+        // Close the edit form if the deleted project was being edited
+        if (editingProject && editingProject.id === projectId) {
+            setEditingProject(null);
+            
+            // Reset form data
+            setFormData({ 
+                title: '', 
+                hourlyRate: '', 
+                currency: 'USD', 
+                taxEnabled: false, 
+                taxLabel: 'VAT', 
+                taxRate: 0 
+            });
+        }
+
+        // Show appropriate success message
+        const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
+        const invoiceMessage = deleteInvoices ? ' Associated invoices were also deleted.' : '';
+        showSuccess(baseMessage + invoiceMessage);
     };
 
     /**
@@ -348,6 +389,47 @@ const ProjectList = ({
         e.stopPropagation();
         // Select the project and navigate to dashboard where invoice generation is available
         onSelectProject(project);
+    };
+
+    /**
+     * Confirm project deletion (for direct deletion without invoices)
+     */
+    const confirmDeleteProject = () => {
+        if (projectToDelete) {
+            performProjectDeletion(projectToDelete.id, false);
+            setProjectToDelete(null);
+        }
+        setShowDeleteModal(false);
+    };
+
+    /**
+     * Handle archive project from modal
+     */
+    const handleArchiveFromModal = () => {
+        if (projectToDelete) {
+            handleArchiveProject(projectToDelete.id);
+            setShowDeleteModal(false);
+            setProjectToDelete(null);
+        }
+    };
+
+    /**
+     * Handle force delete project with invoices
+     */
+    const handleForceDelete = () => {
+        if (projectToDelete) {
+            performProjectDeletion(projectToDelete.id, true);
+            setShowDeleteModal(false);
+            setProjectToDelete(null);
+        }
+    };
+
+    /**
+     * Handle cancel delete modal
+     */
+    const handleCancelDelete = () => {
+        setShowDeleteModal(false);
+        setProjectToDelete(null);
     };
 
     return (
@@ -597,7 +679,8 @@ const ProjectList = ({
                                                     </button>
                                                     <button
                                                         onClick={() => {
-                                                            handleDeleteProject(project.id);
+                                                            setProjectToDelete(project); // Set the project to be deleted
+                                                            setShowDeleteModal(true); // Show the delete confirmation modal
                                                             setShowDropdown({});
                                                         }}
                                                         className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
@@ -769,6 +852,80 @@ const ProjectList = ({
                     )}
                 </>
             )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && projectToDelete && (() => {
+                const hasInvoices = projectHasInvoices(projectToDelete.id);
+                
+                return (
+                    <Modal
+                        isOpen={showDeleteModal}
+                        onClose={handleCancelDelete}
+                        title={hasInvoices ? "⚠️ Project Has Invoices" : "Confirm Deletion"}
+                        size="md"
+                        footer={
+                            hasInvoices ? (
+                                <div className="flex justify-end space-x-3">
+                                    <button
+                                        onClick={handleCancelDelete}
+                                        className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex justify-end space-x-3">
+                                    <button
+                                        onClick={handleCancelDelete}
+                                        className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    >
+                                        Cancel
+                                    </button>
+
+                                    <button
+                                        onClick={confirmDeleteProject}
+                                        className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                    >
+                                        Delete Project
+                                    </button>
+                                </div>
+                            )
+                        }
+                    >
+                        {hasInvoices ? (
+                            <>
+                                <p className="text-sm text-gray-700 mb-4">
+                                    The project "<span className="font-semibold">{projectToDelete.title}</span>" has invoices attached to it.
+                                </p>
+
+                                <p className="text-sm text-gray-700 mb-6">
+                                    <strong>Recommended:</strong> Archive this project to preserve the invoices for record-keeping purposes.
+                                </p>
+
+                                <div className="flex flex-col space-y-3">
+                                    <button
+                                        onClick={handleArchiveFromModal}
+                                        className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    >
+                                        Archive Project (Recommended)
+                                    </button>
+
+                                    <button
+                                        onClick={handleForceDelete}
+                                        className="w-full px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                    >
+                                        Force Delete Project & All Invoices
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <p className="text-sm text-gray-700">
+                                Are you sure you want to delete the project "<span className="font-semibold">{projectToDelete.title}</span>"? This action cannot be undone.
+                            </p>
+                        )}
+                    </Modal>
+                );
+            })()}
         </div>
     );
 };

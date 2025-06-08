@@ -933,10 +933,14 @@ const InvoiceGenerator = ({
             taxRate: pricing.taxRate,
             taxLabel: pricing.taxLabel,
             taxOverride: taxOverride.enabled ? taxOverride : null,
-            paymentMethodId: selectedPaymentMethod?.id || null,
-            businessInfoId: selectedBusinessInfo?.id || null,
-            clientInfoId: selectedClientInfo?.id || null,
-            templateId: selectedTemplate?.id || null,
+            // Store full objects instead of just IDs for permanent access
+            paymentMethodId: selectedPaymentMethod?.id || null, // Keep for backward compatibility
+            paymentMethod: selectedPaymentMethod ? { ...selectedPaymentMethod } : null,
+            businessInfoId: selectedBusinessInfo?.id || null, // Keep for backward compatibility
+            businessInfo: selectedBusinessInfo ? { ...selectedBusinessInfo } : null,
+            clientInfoId: selectedClientInfo?.id || null, // Keep for backward compatibility
+            templateId: selectedTemplate?.id || null, // Keep for backward compatibility
+            template: selectedTemplate ? { ...selectedTemplate } : null,
             invoiceNumber: invoiceNumber,
             date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
             dueDate: dueDate,
