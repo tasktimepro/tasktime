@@ -487,64 +487,30 @@ const Dashboard = ({
     }, []);
 
     /**
-     * Stop any existing timer and optionally save its time
-     */
-    const stopExistingTimer = useCallback(() => {
-        if (!currentTimer) return;
-
-        const now = Date.now();
-        let timeEntry;
-
-        if (isPaused && pausedElapsedTime > 0) {
-            // Create time entry for the paused session
-            timeEntry = createTimeEntry(
-                currentTimer.taskId,
-                currentTimer.startTime,
-                currentTimer.startTime + pausedElapsedTime
-            );
-        } else if (!isPaused) {
-            // Create time entry for running timer
-            timeEntry = createTimeEntry(
-                currentTimer.taskId,
-                currentTimer.startTime,
-                now
-            );
-        }
-
-        if (timeEntry) {
-            setTimeEntries(prev => [...prev, timeEntry]);
-        }
-
-        setCurrentTimer(null);
-        setIsPaused(false);
-        setPausedElapsedTime(0);
-    }, [currentTimer, isPaused, pausedElapsedTime, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
-
-    /**
-     * Start timer for a task
-     */
-    const handleStartTimer = useCallback((task) => {
-        stopExistingTimer();
-        
-        setCurrentTimer({
-            startTime: Date.now(),
-            taskId: task.id
-        });
-    }, [stopExistingTimer, setCurrentTimer]);
-
-    /**
      * Stop timer for a task
      */
     const handleStopTimer = useCallback((task) => {
         if (currentTimer?.taskId === task.id) {
             const now = Date.now();
             
-            // Create time entry with actual timestamp
-            const timeEntry = createTimeEntry(
-                task.id,
-                currentTimer.startTime,
-                now
-            );
+            // Create time entry with proper duration based on pause state
+            let timeEntry;
+            
+            if (isPaused && pausedElapsedTime > 0) {
+                // For paused timer, use the elapsed time we already calculated
+                timeEntry = createTimeEntry(
+                    task.id,
+                    currentTimer.startTime,
+                    currentTimer.startTime + pausedElapsedTime
+                );
+            } else {
+                // For active timer, calculate duration from start to now
+                timeEntry = createTimeEntry(
+                    task.id,
+                    currentTimer.startTime,
+                    now
+                );
+            }
             
             setTimeEntries(prev => [...prev, timeEntry]);
             
@@ -559,7 +525,30 @@ const Dashboard = ({
             setIsPaused(false);
             setPausedElapsedTime(0);
         }
-    }, [currentTimer, createTimeEntry, setTimeEntries, setTasks, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
+    }, [currentTimer, isPaused, pausedElapsedTime, createTimeEntry, setTimeEntries, setTasks, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
+
+    /**
+     * Stop any existing timer and optionally save its time
+     * Used when starting a new timer (to stop previous timer)
+     */
+    const stopExistingTimer = useCallback(() => {
+        if (!currentTimer) return;
+        // Use the same task object structure that handleStopTimer expects
+        const taskToStop = { id: currentTimer.taskId };
+        handleStopTimer(taskToStop);
+    }, [currentTimer, handleStopTimer]);
+
+    /**
+     * Start timer for a task
+     */
+    const handleStartTimer = useCallback((task) => {
+        stopExistingTimer();
+        
+        setCurrentTimer({
+            startTime: Date.now(),
+            taskId: task.id
+        });
+    }, [stopExistingTimer, setCurrentTimer]);
 
     /**
      * Pause/Resume timer for a task
@@ -594,8 +583,21 @@ const Dashboard = ({
         
         // If timer is active for this task, stop it before completing
         if (currentTimer?.taskId === task.id) {
-            // End time is now, but we don't need to boost activity since it's being completed
-            const timeEntry = createTimeEntry(task.id, currentTimer.startTime, now);
+            // Create time entry with proper duration based on pause state
+            let timeEntry;
+            
+            if (isPaused && pausedElapsedTime > 0) {
+                // For paused timer, use the elapsed time we already calculated
+                timeEntry = createTimeEntry(
+                    task.id,
+                    currentTimer.startTime,
+                    currentTimer.startTime + pausedElapsedTime
+                );
+            } else {
+                // For active timer, calculate duration from start to now
+                timeEntry = createTimeEntry(task.id, currentTimer.startTime, now);
+            }
+            
             setTimeEntries(prev => [...prev, timeEntry]);
             setCurrentTimer(null);
             setIsPaused(false);
@@ -612,7 +614,7 @@ const Dashboard = ({
                 t.id === task.id ? { ...t, completed: true, lastActive: now } : t
             )
         );
-    }, [currentTimer, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTasks, setCompletedInCurrentSession]);
+    }, [currentTimer, isPaused, pausedElapsedTime, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTasks, setCompletedInCurrentSession]);
 
     /**
      * Handle clicking on task title to navigate to project
