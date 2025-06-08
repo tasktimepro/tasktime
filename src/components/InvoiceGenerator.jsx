@@ -453,12 +453,13 @@ const InvoiceGenerator = ({
         
         // Filter billable entries based on individual task billing dates
         const billableEntries = timeEntries.filter(entry => {
+            // Double check that this entry belongs to a task in the current project
             if (!projectTaskIds.includes(entry.taskId)) return false;
             if (!entry.end || entry.end <= entry.start) return false;
             
             // Find the task for this entry
             const task = projectTasks.find(t => t.id === entry.taskId);
-            if (!task) return false;
+            if (!task || task.projectId !== projectToUse.id) return false;
             
             // Use task-specific lastBilledAt, or task creation date if never billed
             const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
@@ -509,7 +510,7 @@ const InvoiceGenerator = ({
             };
         }).filter(task => {
             // Include tasks with time OR manually marked as billable
-            const taskData = tasks.find(t => t.id === task.id);
+            const taskData = tasks.find(t => t.id === task.id && t.projectId === projectToUse.id);
             return task.originalHours > 0 || (taskData && taskData.billable === true);
         });
 
@@ -1028,15 +1029,21 @@ const InvoiceGenerator = ({
             const currentTime = Date.now();
             
             // Get all task IDs that should be marked as billed (including merged subtasks)
+            // Make sure we only include tasks from the current project
             const billedTaskIds = [];
+            const projectTasks = tasks.filter(task => task.projectId === selectedProject.id);
+            const projectTaskIds = new Set(projectTasks.map(task => task.id));
             
             invoiceTasks.forEach(task => {
-                if (selectedTasksForBilling[task.id]) {
+                // Verify this task actually belongs to the current project before adding it
+                if (selectedTasksForBilling[task.id] && projectTaskIds.has(task.id)) {
                     billedTaskIds.push(task.id);
                     
                     // If this parent task has merged subtasks, include them too
                     if (mergedSubtasks[task.id]) {
-                        const subtasks = invoiceTasks.filter(subtask => subtask.parentTaskId === task.id);
+                        const subtasks = invoiceTasks.filter(subtask => 
+                            subtask.parentTaskId === task.id && projectTaskIds.has(subtask.id)
+                        );
                         subtasks.forEach(subtask => {
                             billedTaskIds.push(subtask.id);
                         });
@@ -1045,13 +1052,16 @@ const InvoiceGenerator = ({
             });
             
             // Update lastBilledAt for all tasks that were included in this invoice
-            const updatedTasks = tasks.map(task => {
-                if (billedTaskIds.includes(task.id)) {
+            // IMPORTANT: Only modify tasks from the current project to prevent affecting tasks in other projects
+            // CRITICAL FIX: Use a functional update to ensure we work with the complete tasks array
+            // The 'tasks' prop might be filtered (e.g., only current project's tasks), but setTasks 
+            // expects to receive the complete array including all projects' tasks
+            setTasks(prevTasks => prevTasks.map(task => {
+                if (billedTaskIds.includes(task.id) && task.projectId === selectedProject.id) {
                     return { ...task, lastBilledAt: currentTime };
                 }
                 return task;
-            });
-            setTasks(updatedTasks);
+            }));
             
             // Update project to include invoice ID (but don't update project lastBilledAt)
             const updatedProjects = projects.map(p => 

@@ -10,6 +10,8 @@ import {
     CheckIcon,
     MagnifyingGlassIcon,
     ExclamationTriangleIcon,
+    DocumentCheckIcon,
+    ClipboardDocumentCheckIcon,
     CurrencyDollarIcon,
     CalendarDaysIcon
 } from '@heroicons/react/24/outline';
@@ -981,7 +983,7 @@ const Dashboard = ({
                             </div>
                         ) : (
                             <div className="px-6 py-8 text-center text-gray-500">
-                                <ClockIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                <DocumentCheckIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                                 <p className="text-sm">
                                     {taskSearchQuery ? 'No tasks found matching your search' : 'No recent tasks found'}
                                 </p>
@@ -1050,7 +1052,7 @@ const Dashboard = ({
                             </div>
                         ) : (
                             <div className="px-6 py-8 text-center text-gray-500">
-                                <ChartBarIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                <ClipboardDocumentCheckIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                                 <p className="text-sm">
                                     {projectSearchQuery ? 'No projects found matching your search' : 'No recent projects found'}
                                 </p>

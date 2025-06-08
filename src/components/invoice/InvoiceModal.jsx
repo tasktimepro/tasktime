@@ -381,7 +381,7 @@ const InvoiceModal = ({
                                 {/* Removed debug log */}
                                 {invoiceTasks.map((task) => {
                                     const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
-                                    const currentMinutes = hoursToMinutes(currentHours);
+                                    const currentMinutes = hoursToMinutes(parseFloat(currentHours) || 0);
                                     const currentFlatRate = taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : '';
                                     // For existing invoices, calculate originalTimeMs from originalHours if not present
                                     const originalTimeMs = task.originalTimeMs || (task.originalHours * 60 * 60 * 1000);
@@ -490,7 +490,9 @@ const InvoiceModal = ({
                                                         <div className="text-right">
                                                             <div className="text-xs text-gray-500 mb-1 text-left">
                                                                 Hours {(() => {
-                                                                    let displayHours = currentHours;
+                                                                    // Ensure currentHours is numeric for calculations
+                                                                    const numericCurrentHours = parseFloat(currentHours) || 0;
+                                                                    let displayHours = numericCurrentHours;
                                                                     let displayMinutes = currentMinutes;
                                                                     
                                                                     // If this task has merged subtasks, calculate total hours
@@ -499,9 +501,9 @@ const InvoiceModal = ({
                                                                             .filter(subtask => subtask.parentTaskId === task.id)
                                                                             .reduce((total, subtask) => {
                                                                                 const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
-                                                                                return total + hours;
+                                                                                return total + (parseFloat(hours) || 0);
                                                                             }, 0);
-                                                                        displayHours = currentHours + subtaskHours;
+                                                                        displayHours = numericCurrentHours + subtaskHours;
                                                                         displayMinutes = hoursToMinutes(displayHours);
                                                                     }
                                                                     
@@ -515,19 +517,22 @@ const InvoiceModal = ({
                                                                 value={(() => {
                                                                     if (currentHours === '') return '';
                                                                     
+                                                                    // Ensure currentHours is a number
+                                                                    const numericCurrentHours = parseFloat(currentHours) || 0;
+                                                                    
                                                                     if (mergedSubtasks[task.id]) {
                                                                         // Calculate combined hours for display purposes
                                                                         const subtaskHours = invoiceTasks
                                                                             .filter(subtask => subtask.parentTaskId === task.id)
                                                                             .reduce((total, subtask) => {
                                                                                 const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
-                                                                                return total + hours;
+                                                                                return total + (parseFloat(hours) || 0);
                                                                             }, 0);
-                                                                        const totalHours = currentHours + subtaskHours;
+                                                                        const totalHours = numericCurrentHours + subtaskHours;
                                                                         return totalHours.toFixed(2);
                                                                     }
                                                                     
-                                                                    return currentHours.toFixed(2);
+                                                                    return numericCurrentHours.toFixed(2);
                                                                 })()}
                                                                 onChange={(e) => handleHoursChange(task.id, e.target.value)}
                                                                 className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
