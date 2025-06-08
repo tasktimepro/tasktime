@@ -63,3 +63,166 @@ export const setPreferredCurrency = (currencyCode) => {
         console.warn('Error saving preferences to localStorage:', error);
     }
 };
+
+/**
+ * Cache exchange rates in localStorage with timestamp
+ * @param {Object} rates - Exchange rates data
+ */
+const cacheExchangeRates = (rates) => {
+    try {
+        const cacheData = {
+            rates,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('exchangeRatesCache', JSON.stringify(cacheData));
+    } catch (error) {
+        console.warn('Error caching exchange rates:', error);
+    }
+};
+
+/**
+ * Get cached exchange rates if they're still valid (less than 24 hours old)
+ * @returns {Object|null} Cached exchange rates or null if cache is invalid/missing
+ */
+const getCachedExchangeRates = () => {
+    try {
+        const cacheData = JSON.parse(localStorage.getItem('exchangeRatesCache') || 'null');
+        if (!cacheData || !cacheData.rates) {
+            console.log('No cached exchange rates found');
+            return null;
+        }
+        
+        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+        if (cacheData.timestamp && cacheData.timestamp > twentyFourHoursAgo) {
+            console.log('Using cached exchange rates, cache age:', Math.round((Date.now() - cacheData.timestamp) / (60 * 60 * 1000)), 'hours');
+            return cacheData.rates;
+        }
+        
+        console.log('Cached exchange rates expired, last updated:', new Date(cacheData.timestamp).toLocaleString());
+        return null;
+    } catch (error) {
+        console.warn('Error reading cached exchange rates:', error);
+        return null;
+    }
+};
+
+/**
+ * Fetch exchange rates from a currency conversion API with caching
+ * @returns {Promise<Object>} A map of currency codes to their exchange rates relative to USD
+ */
+export const fetchExchangeRates = async () => {
+    // First try to get cached rates
+    const cachedRates = getCachedExchangeRates();
+    if (cachedRates) {
+        console.log('Using cached exchange rates');
+        return cachedRates;
+    }
+
+    // If no valid cache, fetch from API
+    const API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
+    try {
+        console.log('Fetching fresh exchange rates from API');
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+            throw new Error(`API request failed: ${response.status}`);
+        }
+        const data = await response.json();
+        
+        // Cache the rates for future use
+        cacheExchangeRates(data.rates);
+        
+        return data.rates;
+    } catch (error) {
+        console.error('Error fetching exchange rates:', error);
+        
+        // Try to return expired cached rates as fallback
+        try {
+            const fallbackCache = JSON.parse(localStorage.getItem('exchangeRatesCache') || 'null');
+            if (fallbackCache && fallbackCache.rates) {
+                console.warn('Using expired cached rates as fallback');
+                return fallbackCache.rates;
+            }
+        } catch {
+            console.warn('No fallback rates available');
+        }
+        
+        return null;
+    }
+};
+
+/**
+ * Convert an amount from one currency to another
+ * @param {number} amount - The amount to convert
+ * @param {string} fromCurrency - The currency code of the original amount
+ * @param {string} toCurrency - The currency code to convert to
+ * @param {Object} exchangeRates - A map of currency codes to their exchange rates relative to USD
+ * @returns {number} The converted amount
+ */
+export const convertCurrency = (amount, fromCurrency, toCurrency, exchangeRates) => {
+    // Handle invalid input
+    if (amount === undefined || amount === null || isNaN(amount)) {
+        console.warn('Invalid amount for currency conversion:', amount);
+        return 0;
+    }
+
+    // If converting to the same currency, return original amount
+    if (fromCurrency === toCurrency) {
+        return amount;
+    }
+    
+    // Standardize currency codes
+    const fromCurrencyStd = fromCurrency || 'USD';
+    const toCurrencyStd = toCurrency || 'USD';
+
+    // Check if we have valid exchange rates
+    if (!exchangeRates || Object.keys(exchangeRates).length === 0) {
+        console.warn('No exchange rates available for currency conversion');
+        return amount; // Return original amount if no rates available
+    }
+
+    // Handle USD as base currency
+    if (fromCurrencyStd === 'USD') {
+        const toRate = exchangeRates[toCurrencyStd];
+        if (!toRate) {
+            console.warn(`Missing exchange rate for ${toCurrencyStd}`);
+            return amount;
+        }
+        return amount * toRate;
+    }
+    
+    if (toCurrencyStd === 'USD') {
+        const fromRate = exchangeRates[fromCurrencyStd];
+        if (!fromRate) {
+            console.warn(`Missing exchange rate for ${fromCurrencyStd}`);
+            return amount;
+        }
+        return amount / fromRate;
+    }
+    
+    // For non-USD to non-USD conversion, go through USD
+    const fromRate = exchangeRates[fromCurrencyStd];
+    const toRate = exchangeRates[toCurrencyStd];
+    
+    if (!fromRate || !toRate) {
+        console.warn(`Missing exchange rate data for ${fromCurrencyStd} to ${toCurrencyStd} conversion`);
+        return amount;
+    }
+    
+    const amountInUSD = amount / fromRate;
+    return amountInUSD * toRate;
+};
+
+/**
+ * Check if we have all required exchange rates for the currencies in use
+ * @param {Array} currencies - Array of currency codes in use
+ * @param {Object} exchangeRates - Exchange rates object
+ * @returns {boolean} True if all required rates are available
+ */
+export const hasAllRequiredRates = (currencies, exchangeRates) => {
+    if (!exchangeRates || currencies.length <= 1) return true;
+    
+    return currencies.every(currency => {
+        if (currency === 'USD') return true; // USD is base currency
+        return exchangeRates[currency] !== undefined;
+    });
+};

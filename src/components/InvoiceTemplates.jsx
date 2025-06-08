@@ -266,9 +266,7 @@ const InvoiceTemplates = ({
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900">
-                        Invoice Templates {invoiceTemplates.length > 0 && (
-                            <span>({invoiceTemplates.length})</span>
-                        )}
+                        Invoice Templates
                     </h2>
                     <p className="mt-1 text-sm text-gray-600">
                         Create and manage invoice templates with custom numbering and due date settings.

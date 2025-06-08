@@ -20,7 +20,8 @@ import {
     formatDuration,
     millisecondsToHours
 } from '../utils/dateUtils';
-import { getPreferredCurrency, formatCurrency } from '../utils/currencyUtils';
+import { getPreferredCurrency, formatCurrency, fetchExchangeRates, convertCurrency } from '../utils/currencyUtils';
+import { useToast } from '../hooks/useToast';
 import CustomCheckbox from './CustomCheckbox';
 
 /**
@@ -42,10 +43,13 @@ const Dashboard = ({
     pausedElapsedTime,
     setTimeEntries
 }) => {
+    const { showWarning } = useToast();
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
     const [completedInCurrentSession, setCompletedInCurrentSession] = useState(new Set());
     const [preferredCurrency, setPreferredCurrency] = useState(getPreferredCurrency());
+    const [exchangeRates, setExchangeRates] = useState(null);
+    const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
 
     // Listen for storage changes to update preferred currency
     useEffect(() => {
@@ -68,6 +72,34 @@ const Dashboard = ({
         };
     }, []);
 
+    // Check if we have multiple currencies in projects
+    const uniqueCurrencies = [...new Set(projects.map(p => p.currency || 'USD'))];
+    const needsExchangeRates = uniqueCurrencies.length > 1;
+
+    // Fetch exchange rates only if we have multiple currencies
+    useEffect(() => {
+        const loadExchangeRates = async () => {
+            if (needsExchangeRates) {
+                setExchangeRatesLoading(true);
+                console.log('Multiple currencies detected, fetching exchange rates...');
+                const rates = await fetchExchangeRates();
+                setExchangeRates(rates);
+                setExchangeRatesLoading(false);
+                if (rates) {
+                    console.log('Exchange rates loaded successfully:', Object.keys(rates).length, 'currencies');
+                } else {
+                    console.warn('Failed to load exchange rates');
+                    showWarning('Unable to load current exchange rates. Currency conversion may use outdated rates or show original amounts.');
+                }
+            } else {
+                console.log('Single currency detected, skipping exchange rate fetch');
+                setExchangeRates({}); // Set empty object to avoid null checks
+                setExchangeRatesLoading(false);
+            }
+        };
+        loadExchangeRates();
+    }, [needsExchangeRates, showWarning]);
+
     /**
      * Calculate metrics for a given date range
      * When preferred currency is updated, this will be recalculated
@@ -81,27 +113,55 @@ const Dashboard = ({
             return total + (entry.end - entry.start);
         }, 0);
 
-        // Calculate earnings by currency
+        // Calculate earnings by finding the task and project for each entry
         const earningsByCurrency = {};
         entriesInRange.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
             if (!task) return;
-
+            
             const project = projects.find(p => p.id === task.projectId);
             if (!project || !project.hourlyRate) return;
 
-            const currency = preferredCurrency || project.currency || 'USD';
-            const duration = entry.end - entry.start;
-            const hours = millisecondsToHours(duration);
-            const earnings = hours * project.hourlyRate;
+            const currency = project.currency || 'USD';
+            const hoursWorked = millisecondsToHours(entry.end - entry.start);
+            const amount = hoursWorked * project.hourlyRate;
 
-            earningsByCurrency[currency] = (earningsByCurrency[currency] || 0) + earnings;
+            if (!earningsByCurrency[currency]) {
+                earningsByCurrency[currency] = 0;
+            }
+            earningsByCurrency[currency] += amount;
         });
 
-        return {
-            time: totalTime,
-            earningsByCurrency
-        };
+        // Convert earnings to preferred currency if needed
+        if (needsExchangeRates && exchangeRates) {
+            const convertedEarnings = {};
+            Object.keys(earningsByCurrency).forEach(currency => {
+                if (currency === preferredCurrency) {
+                    // If currency already matches preferred currency, no conversion needed
+                    convertedEarnings[preferredCurrency] = (convertedEarnings[preferredCurrency] || 0) + earningsByCurrency[currency];
+                } else {
+                    // Only convert if currency is different from preferred currency
+                    const convertedAmount = convertCurrency(
+                        earningsByCurrency[currency],
+                        currency,
+                        preferredCurrency,
+                        exchangeRates
+                    );
+                    convertedEarnings[preferredCurrency] = (convertedEarnings[preferredCurrency] || 0) + convertedAmount;
+                }
+            });
+            
+            return {
+                time: totalTime,
+                earningsByCurrency: convertedEarnings
+            };
+        } else {
+            // If only one currency or no exchange rates needed, return as-is
+            return {
+                time: totalTime,
+                earningsByCurrency
+            };
+        }
     };
 
     // Calculate date ranges statically (they don't change based on preferences)
@@ -126,12 +186,31 @@ const Dashboard = ({
             return dueDate < new Date();
         });
 
+        // Convert all invoice amounts to preferred currency before summing
         const outstandingTotal = outstanding.reduce((total, invoice) => {
-            return total + (invoice.totalAmount || 0);
+            const amount = invoice.totalAmount || 0;
+            const currency = invoice.currency || 'USD';
+            
+            // Only convert if currency differs from preferred currency
+            if (currency !== preferredCurrency && needsExchangeRates && exchangeRates) {
+                const convertedAmount = convertCurrency(amount, currency, preferredCurrency, exchangeRates);
+                return total + convertedAmount;
+            }
+            // If currency matches or no conversion possible, use original amount
+            return total + (currency === preferredCurrency ? amount : 0);
         }, 0);
 
         const pastDueTotal = pastDue.reduce((total, invoice) => {
-            return total + (invoice.totalAmount || 0);
+            const amount = invoice.totalAmount || 0;
+            const currency = invoice.currency || 'USD';
+            
+            // Only convert if currency differs from preferred currency
+            if (currency !== preferredCurrency && needsExchangeRates && exchangeRates) {
+                const convertedAmount = convertCurrency(amount, currency, preferredCurrency, exchangeRates);
+                return total + convertedAmount;
+            }
+            // If currency matches or no conversion possible, use original amount
+            return total + (currency === preferredCurrency ? amount : 0);
         }, 0);
 
         return {
@@ -140,7 +219,7 @@ const Dashboard = ({
             pastDue: pastDue.length,
             pastDueTotal
         };
-    }, [invoices]);    /**
+    }, [invoices, needsExchangeRates, exchangeRates, preferredCurrency]);    /**
      * Get recent active tasks (tasks with recent time entries, not completed/archived)
      * Now includes both parent tasks and subtasks
      * Tasks completed in current session remain visible until next render
@@ -247,7 +326,6 @@ const Dashboard = ({
      * Get recent projects with total time and pending billable amount
      */
     const recentProjects = useMemo(() => {
-        // Get projects that have been active in the last 30 days
         const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
         const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
         
@@ -279,18 +357,22 @@ const Dashboard = ({
 
         const projectsWithActivity = projects
             .filter(project => projectActivity[project.id])
-            .map(project => ({
-                ...project,
-                totalTime: projectActivity[project.id].totalTime,
-                lastActivity: projectActivity[project.id].lastActivity,
-                pendingHours: millisecondsToHours(projectActivity[project.id].pendingTime),
-                pendingAmount: project.hourlyRate ? 
-                    millisecondsToHours(projectActivity[project.id].pendingTime) * project.hourlyRate : 0
-            }))
+            .map(project => {
+                const pendingTimeHours = millisecondsToHours(projectActivity[project.id].pendingTime);
+                // For recent projects, always use original currency and rate - no conversion
+                const pendingAmount = project.hourlyRate ? pendingTimeHours * project.hourlyRate : 0;
+
+                return {
+                    ...project,
+                    totalTime: projectActivity[project.id].totalTime,
+                    lastActivity: projectActivity[project.id].lastActivity,
+                    pendingHours: pendingTimeHours,
+                    pendingAmount
+                };
+            })
             .sort((a, b) => b.lastActivity - a.lastActivity)
             .slice(0, 10);
 
-        // Filter by search query
         if (projectSearchQuery.trim()) {
             return projectsWithActivity.filter(project =>
                 project.title.toLowerCase().includes(projectSearchQuery.toLowerCase())
@@ -421,7 +503,11 @@ const Dashboard = ({
     const renderEarningsByCurrency = (earningsByCurrency) => {
         // Use the current preferred currency from state
         const currentPreferredCurrency = preferredCurrency;
-        console.log(`Rendering with preferred currency: ${currentPreferredCurrency}`);
+        
+        // Show loading indicator if we need exchange rates and they're still loading
+        if (needsExchangeRates && exchangeRatesLoading) {
+            return <span className="text-gray-500 text-sm italic">Loading rates...</span>;
+        }
         
         if (!earningsByCurrency || Object.keys(earningsByCurrency).length === 0) {
             // Force re-render when preferredCurrency changes
@@ -640,7 +726,27 @@ const Dashboard = ({
                                     <div className="flex items-center mt-1">
                                         <CurrencyDollarIcon className="h-4 w-4 text-blue-600 mr-2" />
                                         <span className="text-sm text-blue-700">
-                                            {formatCurrency(recentProjects.reduce((total, project) => total + project.pendingAmount, 0), preferredCurrency)} unbilled
+                                            {(() => {
+                                                // For Pending Bills overview, convert each amount to preferred currency
+                                                const totalUnbilled = recentProjects.reduce((total, project) => {
+                                                    const amount = project.pendingAmount || 0;
+                                                    const currency = project.currency || 'USD';
+                                                    
+                                                    // Only convert if currency differs from preferred currency
+                                                    if (currency !== preferredCurrency && needsExchangeRates && exchangeRates) {
+                                                        const convertedAmount = convertCurrency(
+                                                            amount,
+                                                            currency,
+                                                            preferredCurrency,
+                                                            exchangeRates
+                                                        );
+                                                        return total + convertedAmount;
+                                                    }
+                                                    // Add original amount if currency matches preferred
+                                                    return total + (currency === preferredCurrency ? amount : 0);
+                                                }, 0);
+                                                return formatCurrency(totalUnbilled, preferredCurrency);
+                                            })()} unbilled
                                         </span>
                                     </div>
                                 </div>

@@ -499,7 +499,7 @@ const ProjectList = ({
                                 onChange={() => setFormData(prev => ({ ...prev, flatRate: !prev.flatRate }))}
                             />
                             <label htmlFor="flatRate" className="text-sm font-medium text-gray-700">
-                                Flat rate project (not hourly based)
+                                Flat rate project (non-hourly basis)
                             </label>
                         </div>
 
