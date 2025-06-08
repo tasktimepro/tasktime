@@ -609,7 +609,9 @@ const InvoiceGenerator = ({
         paymentMethods,
         prepareInvoiceData,
         setSelectedTemplate,
-        invoiceTemplates
+        invoiceTemplates,
+        setUseFlatRate,
+        setTaskQuantities
     );
     const handleCancel = InvoiceHandler.handleCancel(
         setShowInvoiceForm,
@@ -1191,17 +1193,37 @@ const InvoiceGenerator = ({
                 // Initialize editable hours with original hours
                 const initialHours = {};
                 const initialTaskSelection = {};
+                const initialFlatRateToggles = {};
+                const initialTaskQuantities = {};
+                
                 tasksData.forEach(task => {
                     initialHours[task.id] = task.originalHours;
                     initialTaskSelection[task.id] = true; // Select all tasks by default
+                    
+                    // For flat rate projects, pre-toggle all tasks to flat rate
+                    if (selectedProject && selectedProject.flatRate) {
+                        initialFlatRateToggles[task.id] = true;
+                        initialTaskQuantities[task.id] = 1;
+                    }
                 });
+                
                 setEditableHours(initialHours);
                 setSelectedTasksForBilling(initialTaskSelection);
                 
-                // Reset flat rate data
-                setTaskFlatRates({});
-                setUseFlatRate({});
-                setTaskHourlyRates({});
+                // Apply flat rate toggles for flat rate projects
+                if (selectedProject && selectedProject.flatRate) {
+                    setUseFlatRate(initialFlatRateToggles);
+                    setTaskQuantities(initialTaskQuantities);
+                    
+                    // Also set the new task flat rate toggle to match project setting
+                    setNewTaskUseFlatRate(selectedProject.flatRate);
+                } else {
+                    // Reset flat rate data for hourly projects
+                    setTaskFlatRates({});
+                    setUseFlatRate({});
+                    setTaskHourlyRates({});
+                    setNewTaskUseFlatRate(false);
+                }
             } else {
                 // No billable tasks, but still continue with empty tasks array
                 setInvoiceTasks([]);
@@ -1216,7 +1238,7 @@ const InvoiceGenerator = ({
             setIsProjectContextFixed(true);
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject?.hourlyRate, currentTimer, isPaused, showError]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, currentTimer, isPaused, showError]);
 
     // Keep track of whether we've handled the current editing invoice
     const [handledEditingInvoice, setHandledEditingInvoice] = useState(null);

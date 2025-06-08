@@ -168,17 +168,14 @@ const InvoiceModal = ({
                                     {selectedProject && (
                                         <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
                                             <div className="text-sm text-blue-800">
-                                                {selectedProject.hourlyRate ? (
-                                                    <div className="text-sm text-blue-800">
-                                                        <strong>{selectedProject.title}</strong><br />
-                                                        Rate: {getCurrencySymbol(selectedProject.currency)}{selectedProject.hourlyRate}/hour
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-sm text-blue-800">
-                                                        <strong>{selectedProject.title}</strong><br />
-                                                        You can create invoices with custom rates
-                                                    </div>
-                                                )}
+                                                <div className="text-sm text-blue-800">
+                                                    <strong>{selectedProject.title}</strong><br />
+                                                    {!selectedProject.flatRate && selectedProject.hourlyRate ? (
+                                                        <span>Rate: {getCurrencySymbol(selectedProject.currency)}{selectedProject.hourlyRate}/hour</span>
+                                                    ) : !selectedProject.flatRate ? (
+                                                        <span>You can create invoices with custom rates</span>
+                                                    ) : null}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -385,7 +382,7 @@ const InvoiceModal = ({
                                 {invoiceTasks.map((task) => {
                                     const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
                                     const currentMinutes = hoursToMinutes(currentHours);
-                                    const currentFlatRate = taskFlatRates[task.id] || 0;
+                                    const currentFlatRate = taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : '';
                                     // For existing invoices, calculate originalTimeMs from originalHours if not present
                                     const originalTimeMs = task.originalTimeMs || (task.originalHours * 60 * 60 * 1000);
 
@@ -480,7 +477,7 @@ const InvoiceModal = ({
                                                                 type="number"
                                                                 step="0.01"
                                                                 min="0"
-                                                                value={currentFlatRate === '' ? '' : currentFlatRate.toFixed(2)}
+                                                                value={currentFlatRate}
                                                                 onChange={(e) => handleFlatRateChange(task.id, e.target.value)}
                                                                 className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                 placeholder="0.00"
@@ -543,7 +540,7 @@ const InvoiceModal = ({
                                                                 type="number"
                                                                 step="0.01"
                                                                 min="0"
-                                                                value={taskHourlyRates[task.id] === '' ? '' : (taskHourlyRates[task.id] || selectedProject?.hourlyRate || 0).toFixed(2)}
+                                                                value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : '')}
                                                                 onChange={(e) => handleTaskHourlyRateChange(task.id, e.target.value)}
                                                                 className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                 placeholder="0.00"
@@ -559,7 +556,7 @@ const InvoiceModal = ({
                                 {/* Additional Tasks */}
                                 {additionalTasks.map((task) => {
                                     const currentMinutes = hoursToMinutes(task.hours || 0);
-                                    const currentFlatRate = task.flatRate || 0;
+                                    const currentFlatRate = task.flatRate !== undefined ? task.flatRate : '';
 
                                     // Check if this task uses flat rate (from task object or state)
                                     const isUsingFlatRate = task.useFlatRate || useFlatRate[task.id] || false;
@@ -620,7 +617,7 @@ const InvoiceModal = ({
                                                                 type="number"
                                                                 step="0.01"
                                                                 min="0"
-                                                                value={currentFlatRate === '' ? '' : currentFlatRate.toFixed(2)}
+                                                                value={currentFlatRate}
                                                                 onChange={(e) => handleAdditionalTaskFlatRateChange(task.id, e.target.value)}
                                                                 className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                 placeholder="0.00"
@@ -636,7 +633,7 @@ const InvoiceModal = ({
                                                                 type="number"
                                                                 step="0.01"
                                                                 min="0"
-                                                                value={task.hours === '' ? '' : (task.hours || 0).toFixed(2)}
+                                                                value={task.hours}
                                                                 onChange={(e) => handleAdditionalTaskHoursChange(task.id, e.target.value)}
                                                                 className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                             />
@@ -647,7 +644,7 @@ const InvoiceModal = ({
                                                                 type="number"
                                                                 step="0.01"
                                                                 min="0"
-                                                                value={task.hourlyRate === '' ? '' : (task.hourlyRate || selectedProject?.hourlyRate || 0).toFixed(2)}
+                                                                value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : '')}
                                                                 onChange={(e) => handleAdditionalTaskHourlyRateChange(task.id, e.target.value)}
                                                                 className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                 placeholder="0.00"
@@ -685,7 +682,7 @@ const InvoiceModal = ({
                                                         checked={newTaskUseFlatRate}
                                                         onChange={handleToggleNewTaskFlatRate}
                                                     />
-                                                    <label htmlFor="new-task-flat-rate" className="text-xs text-gray-700">
+                                                    <label htmlFor="new-task-flat-rate" className="text-xs text-gray-700 ml-2">
                                                         Flat rate
                                                     </label>
                                                 </div>
@@ -698,7 +695,7 @@ const InvoiceModal = ({
                                                             step="1"
                                                             min="1"
                                                             value={newTaskQuantity}
-                                                            onChange={(e) => setNewTaskQuantity(Math.max(1, parseFloat(e.target.value) || 1))}
+                                                            onChange={(e) => setNewTaskQuantity(e.target.value)}
                                                             className="w-16 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
                                                             placeholder="1"
                                                         />
@@ -727,7 +724,7 @@ const InvoiceModal = ({
                                                             type="number"
                                                             step="0.01"
                                                             min="0"
-                                                            value={newTaskHourlyRate || selectedProject?.hourlyRate || 0}
+                                                            value={newTaskHourlyRate !== '' ? newTaskHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : '')}
                                                             onChange={(e) => setNewTaskHourlyRate(e.target.value)}
                                                             placeholder="0.00"
                                                             className="w-20 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"

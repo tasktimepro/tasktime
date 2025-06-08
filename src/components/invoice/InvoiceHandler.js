@@ -17,11 +17,10 @@ export const handleHoursChange = (setEditableHours) => (taskId, newHours) => {
             [taskId]: ''
         }));
     } else {
-        const parsedHours = parseFloat(newHours) || 0;
-        const roundedHours = Math.round(parsedHours * 100) / 100;
+        // Allow direct input without immediate formatting
         setEditableHours(prev => ({
             ...prev,
-            [taskId]: roundedHours
+            [taskId]: newHours
         }));
     }
 };
@@ -34,11 +33,10 @@ export const handleFlatRateChange = (setTaskFlatRates) => (taskId, newRate) => {
             [taskId]: ''
         }));
     } else {
-        const parsedRate = parseFloat(newRate) || 0;
-        const roundedRate = Math.round(parsedRate * 100) / 100;
+        // Allow direct input without immediate formatting
         setTaskFlatRates(prev => ({
             ...prev,
-            [taskId]: roundedRate
+            [taskId]: newRate
         }));
     }
 };
@@ -51,11 +49,10 @@ export const handleQuantityChange = (setTaskQuantities) => (taskId, newQuantity)
             [taskId]: ''
         }));
     } else {
-        const parsedQuantity = parseFloat(newQuantity) || 1;
-        const roundedQuantity = Math.max(1, Math.round(parsedQuantity * 100) / 100);
+        // Allow direct input without immediate formatting
         setTaskQuantities(prev => ({
             ...prev,
-            [taskId]: roundedQuantity
+            [taskId]: newQuantity
         }));
     }
 };
@@ -68,11 +65,10 @@ export const handleTaskHourlyRateChange = (setTaskHourlyRates) => (taskId, newRa
             [taskId]: ''
         }));
     } else {
-        const parsedRate = parseFloat(newRate) || 0;
-        const roundedRate = Math.round(parsedRate * 100) / 100;
+        // Allow direct input without immediate formatting
         setTaskHourlyRates(prev => ({
             ...prev,
-            [taskId]: roundedRate
+            [taskId]: newRate
         }));
     }
 };
@@ -83,13 +79,19 @@ export const handleToggleFlatRate = (setUseFlatRate, setTaskFlatRates, setTaskQu
         ...prev,
         [taskId]: value
     }));
-    if (value && !taskFlatRates[taskId]) {
+
+    if (value && taskFlatRates[taskId] === undefined) {
+        // Only set a flat rate if one doesn't exist, and only if we have a valid hourly rate
         const task = invoiceTasks.find(t => t.id === taskId);
-        if (task) {
-            const hourlyAmount = (editableHours[taskId] || task.hours) * (selectedProject?.hourlyRate || 0);
-            handleFlatRateChange(taskId, hourlyAmount);
+        if (task && selectedProject?.hourlyRate) {
+            const hourlyAmount = (editableHours[taskId] || task.hours) * selectedProject.hourlyRate;
+            handleFlatRateChange(taskId, hourlyAmount || '');
+        } else {
+            // Don't set any default value, leave it empty
+            handleFlatRateChange(taskId, '');
         }
     }
+
     if (value && !taskQuantities[taskId]) {
         setTaskQuantities(prev => ({
             ...prev,
@@ -119,7 +121,7 @@ export const handleAddAdditionalTask = (setAdditionalTasks, setUseFlatRate, newT
         title: newTaskTitle.trim(),
         hours: newTaskUseFlatRate ? 0 : roundedValue,
         flatRate: newTaskUseFlatRate ? roundedValue : 0,
-        hourlyRate: newTaskUseFlatRate ? 0 : (parseFloat(newTaskHourlyRate) || selectedProject?.hourlyRate || 0),
+        hourlyRate: newTaskUseFlatRate ? 0 : (newTaskHourlyRate !== '' ? parseFloat(newTaskHourlyRate) : (selectedProject?.hourlyRate !== undefined && selectedProject?.hourlyRate !== null ? selectedProject.hourlyRate : 0)),
         quantity: newTaskUseFlatRate ? newTaskQuantity : 1,
         isCustom: true,
         useFlatRate: newTaskUseFlatRate
@@ -151,10 +153,9 @@ export const handleAdditionalTaskHoursChange = (setAdditionalTasks) => (taskId, 
             task.id === taskId ? { ...task, hours: '' } : task
         ));
     } else {
-        const parsedHours = parseFloat(newHours) || 0;
-        const roundedHours = Math.round(parsedHours * 100) / 100;
+        // Allow direct input without immediate formatting
         setAdditionalTasks(prev => prev.map(task => 
-            task.id === taskId ? { ...task, hours: roundedHours } : task
+            task.id === taskId ? { ...task, hours: newHours } : task
         ));
     }
 };
@@ -166,10 +167,9 @@ export const handleAdditionalTaskFlatRateChange = (setAdditionalTasks) => (taskI
             task.id === taskId ? { ...task, flatRate: '' } : task
         ));
     } else {
-        const parsedRate = parseFloat(newRate) || 0;
-        const roundedRate = Math.round(parsedRate * 100) / 100;
+        // Allow direct input without immediate formatting
         setAdditionalTasks(prev => prev.map(task => 
-            task.id === taskId ? { ...task, flatRate: roundedRate } : task
+            task.id === taskId ? { ...task, flatRate: newRate } : task
         ));
     }
 };
@@ -181,10 +181,9 @@ export const handleAdditionalTaskQuantityChange = (setAdditionalTasks) => (taskI
             task.id === taskId ? { ...task, quantity: '' } : task
         ));
     } else {
-        const parsedQuantity = parseFloat(newQuantity) || 1;
-        const roundedQuantity = Math.max(1, Math.round(parsedQuantity * 100) / 100);
+        // Allow direct input without immediate formatting
         setAdditionalTasks(prev => prev.map(task => 
-            task.id === taskId ? { ...task, quantity: roundedQuantity } : task
+            task.id === taskId ? { ...task, quantity: newQuantity } : task
         ));
     }
 };
@@ -196,10 +195,9 @@ export const handleAdditionalTaskHourlyRateChange = (setAdditionalTasks) => (tas
             task.id === taskId ? { ...task, hourlyRate: '' } : task
         ));
     } else {
-        const parsedRate = parseFloat(newRate) || 0;
-        const roundedRate = Math.round(parsedRate * 100) / 100;
+        // Allow direct input without immediate formatting
         setAdditionalTasks(prev => prev.map(task =>
-            task.id === taskId ? { ...task, hourlyRate: roundedRate } : task
+            task.id === taskId ? { ...task, hourlyRate: newRate } : task
         ));
     }
 };
@@ -273,7 +271,9 @@ export const handleProjectSelection = (
     paymentMethods,
     prepareInvoiceData,
     setSelectedTemplate,
-    invoiceTemplates
+    invoiceTemplates,
+    setUseFlatRate,
+    setTaskQuantities
 ) => (projectId) => {
     if (projectId === "") {
         setSelectedProject(null);
@@ -341,12 +341,30 @@ export const handleProjectSelection = (
                 setInvoiceTasks(tasksData);
                 const initialHours = {};
                 const initialTaskSelection = {};
+                const initialFlatRateToggles = {};
+                const initialTaskQuantities = {};
+                
                 tasksData.forEach(task => {
                     initialHours[task.id] = task.originalHours;
                     initialTaskSelection[task.id] = true;
+                    
+                    // For flat rate projects, pre-toggle all tasks to flat rate
+                    if (selectedProj.flatRate) {
+                        initialFlatRateToggles[task.id] = true;
+                        initialTaskQuantities[task.id] = 1;
+                    }
                 });
+                
                 setEditableHours(initialHours);
                 setSelectedTasksForBilling(initialTaskSelection);
+                
+                // Apply flat rate toggles if project is flat rate
+                if (selectedProj.flatRate && setUseFlatRate) {
+                    setUseFlatRate(initialFlatRateToggles);
+                    if (setTaskQuantities) {
+                        setTaskQuantities(initialTaskQuantities);
+                    }
+                }
             }
         }
     }

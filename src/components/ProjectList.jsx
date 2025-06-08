@@ -39,11 +39,12 @@ const ProjectList = ({
 
     const [formData, setFormData] = useState({
         title: '',
-        hourlyRate: '',
+        hourlyRate: '', // Keep as empty string for proper placeholder behavior
         currency: 'USD',
         taxEnabled: false,
         taxLabel: 'VAT',
-        taxRate: 0
+        taxRate: 0,
+        flatRate: false
     });
 
     // Update showCreateForm when the prop changes
@@ -104,15 +105,21 @@ const ProjectList = ({
         if (!formData.title) {
             return; // Only title is required
         }
+        
+        // If not flat rate, hourly rate is required
+        if (!formData.flatRate && !formData.hourlyRate) {
+            return; // Hourly rate is required when not using flat rate
+        }
 
         const newProject = {
             id: generateId(),
             title: formData.title,
-            hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+            hourlyRate: formData.hourlyRate !== '' ? parseFloat(formData.hourlyRate) : null,
             currency: formData.currency,
             taxEnabled: formData.taxEnabled,
             taxLabel: formData.taxLabel,
             taxRate: parseFloat(formData.taxRate) || 0,
+            flatRate: formData.flatRate || false,
             createdAt: Date.now(),
             lastBilledAt: null,
             archived: false
@@ -120,7 +127,7 @@ const ProjectList = ({
 
         setProjects([...projects, newProject]);
 
-        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0 });
+        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
 
         setShowCreateForm(false);
     };
@@ -134,6 +141,11 @@ const ProjectList = ({
         if (!formData.title) {
             return; // Only title is required
         }
+        
+        // If not flat rate, hourly rate is required
+        if (!formData.flatRate && !formData.hourlyRate) {
+            return; // Hourly rate is required when not using flat rate
+        }
 
         const updatedProjects = projects.map(project =>
             project.id === editingProject.id
@@ -144,7 +156,8 @@ const ProjectList = ({
                     currency: formData.currency,
                     taxEnabled: formData.taxEnabled,
                     taxLabel: formData.taxLabel,
-                    taxRate: parseFloat(formData.taxRate) || 0
+                    taxRate: parseFloat(formData.taxRate) || 0,
+                    flatRate: formData.flatRate || false
                 }
                 : project
         );
@@ -153,7 +166,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0 });
+        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
 
         showSuccess('Project updated successfully!');
     };
@@ -240,7 +253,8 @@ const ProjectList = ({
                 currency: 'USD', 
                 taxEnabled: false, 
                 taxLabel: 'VAT', 
-                taxRate: 0 
+                taxRate: 0,
+                flatRate: false
             });
         }
 
@@ -262,7 +276,8 @@ const ProjectList = ({
             currency: project.currency,
             taxEnabled: project.taxEnabled || false,
             taxLabel: project.taxLabel || 'VAT',
-            taxRate: project.taxRate || 0
+            taxRate: project.taxRate || 0,
+            flatRate: project.flatRate || false
         });
 
         setShowCreateForm(false);
@@ -276,7 +291,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0 });
+        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
     };    /**
      * Archive a project
      */
@@ -303,8 +318,8 @@ const ProjectList = ({
      * Calculate unbilled amount for a project
      */
     const calculateUnbilledAmount = (project) => {
-        // If no hourly rate is set, return 0
-        if (!project.hourlyRate) return 0;
+        // If it's a flat rate project or no hourly rate is set, return 0 for the amount
+        if (project.flatRate || !project.hourlyRate) return 0;
         
         // Get tasks for this project
         const projectTasks = tasks.filter(task => task.projectId === project.id);
@@ -478,6 +493,16 @@ const ProjectList = ({
                             />
                         </div>
 
+                        <div className="flex items-center space-x-3 mb-4">
+                            <CustomCheckbox
+                                checked={formData.flatRate}
+                                onChange={() => setFormData(prev => ({ ...prev, flatRate: !prev.flatRate }))}
+                            />
+                            <label htmlFor="flatRate" className="text-sm font-medium text-gray-700">
+                                Flat rate project (not hourly based)
+                            </label>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="currency" className="block text-sm font-medium text-gray-700">
@@ -499,9 +524,9 @@ const ProjectList = ({
                                     <option value="AUD">AUD</option>
                                 </select>
                             </div>
-                            <div>
+                            <div className={formData.flatRate ? "hidden" : ""}>
                                 <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
-                                    Hourly Rate (optional)
+                                    Hourly Rate {!formData.flatRate && <span className="text-red-500">*</span>}
                                 </label>
 
                                 <input
@@ -514,6 +539,7 @@ const ProjectList = ({
                                     step="0.01"
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                     placeholder="0.00"
+                                    required={!formData.flatRate}
                                 />
                             </div>
                         </div>
@@ -694,7 +720,7 @@ const ProjectList = ({
                                     </div>
                                 </div>
 
-                                {project.hourlyRate && (
+                                {project.hourlyRate && !project.flatRate && (
                                     <p className="mt-2 text-sm text-gray-500">
                                         {`${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`}
                                     </p>
@@ -810,7 +836,7 @@ const ProjectList = ({
                                                     </div>
                                                 </div>
 
-                                                {project.hourlyRate && (
+                                                {project.hourlyRate && !project.flatRate && (
                                                     <p className="mt-2 text-sm text-gray-500">
                                                         {`${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`}
                                                     </p>
