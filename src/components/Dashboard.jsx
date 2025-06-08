@@ -284,8 +284,7 @@ const Dashboard = ({
     }, [invoices, convertToCurrency, preferredCurrency]);
 
     /**
-     * Get recent active tasks (tasks with recent time entries, not completed/archived)
-     * Now includes both parent tasks and subtasks
+     * Get recent active tasks sorted by their most recent activity (any interaction)
      * Tasks completed in current session remain visible until next render
      */
     const recentTasks = useMemo(() => {
@@ -296,32 +295,31 @@ const Dashboard = ({
         const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
         const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
 
-        // Calculate task activity
+        // Calculate task activity data
         const taskActivity = {};
+        
+        // First pass: collect total time for display purposes
         recentEntries.forEach(entry => {
             if (!taskActivity[entry.taskId]) {
-                taskActivity[entry.taskId] = { lastActivity: 0, totalTime: 0 };
+                taskActivity[entry.taskId] = { 
+                    totalTime: 0  // Just for display purposes
+                };
             }
-            taskActivity[entry.taskId].lastActivity = Math.max(
-                taskActivity[entry.taskId].lastActivity, 
-                entry.end
-            );
+            
+            // Track time for display
             taskActivity[entry.taskId].totalTime += (entry.end - entry.start);
         });
 
-        // Handle currently running timer - CRITICAL FIX: Ensure active timer is ALWAYS at the top
+        // For currently running timer, calculate display time
         if (currentTimer) {
-            const currentTime = Date.now();
             if (!taskActivity[currentTimer.taskId]) {
-                taskActivity[currentTimer.taskId] = { lastActivity: 0, totalTime: 0 };
+                taskActivity[currentTimer.taskId] = { 
+                    totalTime: 0 
+                };
             }
             
-            // Use far future timestamp to ensure current timer is always at the top
-            // Adding extra buffer to ensure it's always highest
-            taskActivity[currentTimer.taskId].lastActivity = currentTime + (20 * 365 * 24 * 60 * 60 * 1000);
-            
-            // Add current session time to total time
-            const currentSessionTime = currentTime - currentTimer.startTime;
+            // Add current session time to total time (for display only)
+            const currentSessionTime = Date.now() - currentTimer.startTime;
             if (!isPaused) {
                 taskActivity[currentTimer.taskId].totalTime += currentSessionTime;
             } else {
@@ -346,9 +344,15 @@ const Dashboard = ({
                 }
             }
 
+            // For sorting, use the task's built-in lastActive property,
+            // or fall back to createdAt if it doesn't exist yet
+            const activityTimestamp = task.lastActive || task.createdAt || 0;
+            
             return {
                 ...task,
-                lastActivity: taskActivity[task.id]?.lastActivity || 0,
+                // For sorting - any task activity timestamp 
+                lastActive: activityTimestamp,
+                // Just for display
                 recentTime: totalTime,
                 project: project,
                 displayTime: `${hours}h ${minutes}m`,
@@ -356,11 +360,25 @@ const Dashboard = ({
             };
         });
 
-        // Sort by activity and limit to 10 most recent
+        // If a task has a running timer, make it appear at the top
+        if (currentTimer) {
+            const currentTime = Date.now();
+            enhancedTasks.forEach(task => {
+                if (task.id === currentTimer.taskId) {
+                    task.lastActive = currentTime;
+                }
+            });
+        }
+
+        // Sort by the lastActive property (most recent activity first)
         const sortedTasks = enhancedTasks
-            .sort((a, b) => b.lastActivity - a.lastActivity)
+            .sort((a, b) => {
+                // Pure chronological sort by last activity time - highest (most recent) first
+                return b.lastActive - a.lastActive;
+            })
             .slice(0, 10);
 
+        // Apply search filter if there's a query
         if (taskSearchQuery.trim()) {
             return sortedTasks.filter(task =>
                 task.title.toLowerCase().includes(taskSearchQuery.toLowerCase())
@@ -520,14 +538,28 @@ const Dashboard = ({
     const handleStopTimer = useCallback((task) => {
         if (currentTimer?.taskId === task.id) {
             const now = Date.now();
-            const timeEntry = createTimeEntry(task.id, currentTimer.startTime, now);
+            
+            // Create time entry with actual timestamp
+            const timeEntry = createTimeEntry(
+                task.id,
+                currentTimer.startTime,
+                now
+            );
             
             setTimeEntries(prev => [...prev, timeEntry]);
+            
+            // Update the task's lastActive property to now
+            setTasks(prevTasks => 
+                prevTasks.map(t =>
+                    t.id === task.id ? { ...t, lastActive: now } : t
+                )
+            );
+            
             setCurrentTimer(null);
             setIsPaused(false);
             setPausedElapsedTime(0);
         }
-    }, [currentTimer, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
+    }, [currentTimer, createTimeEntry, setTimeEntries, setTasks, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
 
     /**
      * Pause/Resume timer for a task
@@ -562,6 +594,7 @@ const Dashboard = ({
         
         // If timer is active for this task, stop it before completing
         if (currentTimer?.taskId === task.id) {
+            // End time is now, but we don't need to boost activity since it's being completed
             const timeEntry = createTimeEntry(task.id, currentTimer.startTime, now);
             setTimeEntries(prev => [...prev, timeEntry]);
             setCurrentTimer(null);
@@ -573,10 +606,10 @@ const Dashboard = ({
             setTimeEntries(prev => [...prev, timeEntry]);
         }
 
-        // Update task completion status
+        // Update task completion status and lastActive timestamp
         setTasks(prevTasks => 
             prevTasks.map(t =>
-                t.id === task.id ? { ...t, completed: true } : t
+                t.id === task.id ? { ...t, completed: true, lastActive: now } : t
             )
         );
     }, [currentTimer, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTasks, setCompletedInCurrentSession]);

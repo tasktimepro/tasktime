@@ -9,6 +9,7 @@ import Invoices from './components/Invoices';
 import GlobalTimer from './components/GlobalTimer';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils';
+import { ClockIcon } from '@heroicons/react/24/outline';
 
 /**
  * Main App component - Entry point for the Task. Time. Track.
@@ -247,11 +248,12 @@ function App() {
                             onClick={() => navigateToDashboard()}
                         >
                             <div className="relative">
-                                <img
+                                {/* <img
                                     src="/tasktime-icon.png"
                                     alt="TaskTime Icon"
                                     className="h-8 w-8 group-hover:opacity-90 transition-opacity"
-                                />
+                                /> */}
+                                <ClockIcon className="h-8 w-8 text-blue-600" />
                             </div>
                             <div>
                                 <h1 className="text-lg font-bold text-gray-900 leading-none">

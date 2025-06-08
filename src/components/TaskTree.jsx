@@ -39,17 +39,29 @@ const TaskTree = ({
      * Create a new task
      */
     const handleCreateTask = (taskData) => {
+        const now = Date.now();
         const newTask = {
             id: generateId(),
             projectId: project.id,
             parentTaskId: taskData.parentTaskId,
             title: taskData.title.trim(),
-            createdAt: Date.now(),
+            createdAt: now,
+            lastActive: now, // Initialize lastActive to creation time
             lastBilledAt: null, // Initialize as never billed
             billable: false // Initialize as not billable by default
         };
 
-        setTasks([...tasks, newTask]);
+        // Create a new tasks array with the new task added
+        let updatedTasks = [...tasks, newTask];
+        
+        // If this is a subtask, also update the parent task's lastActive
+        if (taskData.parentTaskId) {
+            updatedTasks = updatedTasks.map(t => 
+                t.id === taskData.parentTaskId ? { ...t, lastActive: now } : t
+            );
+        }
+
+        setTasks(updatedTasks);
     };
 
     /**
@@ -73,8 +85,9 @@ const TaskTree = ({
      * Archive a task
      */
     const handleArchiveTask = (taskId) => {
+        const now = Date.now();
         const updatedTasks = tasks.map(task =>
-            task.id === taskId ? { ...task, archived: true } : task
+            task.id === taskId ? { ...task, archived: true, lastActive: now } : task
         );
         setTasks(updatedTasks);
     };
@@ -83,8 +96,9 @@ const TaskTree = ({
      * Unarchive a task
      */
     const handleUnarchiveTask = (taskId) => {
+        const now = Date.now();
         const updatedTasks = tasks.map(task =>
-            task.id === taskId ? { ...task, archived: false } : task
+            task.id === taskId ? { ...task, archived: false, lastActive: now } : task
         );
         setTasks(updatedTasks);
     };
@@ -93,8 +107,9 @@ const TaskTree = ({
      * Toggle billable status for a task
      */
     const handleToggleBillable = (taskId) => {
+        const now = Date.now();
         const updatedTasks = tasks.map(task =>
-            task.id === taskId ? { ...task, billable: !task.billable } : task
+            task.id === taskId ? { ...task, billable: !task.billable, lastActive: now } : task
         );
         setTasks(updatedTasks);
         showSuccess('Task billable status updated');

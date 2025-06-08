@@ -164,20 +164,22 @@ const TaskItem = ({
      * Toggle task completion status
      */
     const handleToggleComplete = () => {
+        const now = Date.now();
+        
         // If timer is active for this task, stop it before completing
         if (isTimerActive && currentTimer) {
             const timeEntry = {
                 id: `completion-${Date.now()}`,
                 taskId: task.id,
                 start: currentTimer.startTime,
-                end: Date.now()
+                end: now
             };
             setTimeEntries([...timeEntries, timeEntry]);
             setCurrentTimer(null);
         }
 
         const updatedTasks = tasks.map(t =>
-            t.id === task.id ? { ...t, completed: !isCompleted } : t
+            t.id === task.id ? { ...t, completed: !isCompleted, lastActive: now } : t
         );
 
         setTasks(updatedTasks);
@@ -195,6 +197,13 @@ const TaskItem = ({
 
         if (timeDifference !== 0) {
             const now = Date.now();
+            
+            // Update the task's lastActive property to now
+            setTasks(prevTasks => 
+                prevTasks.map(t =>
+                    t.id === task.id ? { ...t, lastActive: now } : t
+                )
+            );
             
             // Get billing cutoff date (same logic as invoice generation)
             // Use task-specific lastBilledAt, or task creation date if never billed
@@ -272,8 +281,9 @@ const TaskItem = ({
 
         if (!editTitle.trim()) return;
 
+        const now = Date.now();
         const updatedTasks = tasks.map(t =>
-            t.id === task.id ? { ...t, title: editTitle.trim() } : t
+            t.id === task.id ? { ...t, title: editTitle.trim(), lastActive: now } : t
         );
 
         setTasks(updatedTasks);
@@ -788,20 +798,22 @@ const SubtaskItem = ({
      * Toggle subtask completion status
      */
     const handleToggleComplete = () => {
+        const now = Date.now();
+        
         // If timer is active for this subtask, stop it before completing
         if (isTimerActive && currentTimer) {
             const timeEntry = {
                 id: `completion-${Date.now()}`,
                 taskId: task.id,
                 start: currentTimer.startTime,
-                end: Date.now()
+                end: now
             };
             setTimeEntries([...timeEntries, timeEntry]);
             setCurrentTimer(null);
         }
 
         const updatedTasks = tasks.map(t =>
-            t.id === task.id ? { ...t, completed: !isCompleted } : t
+            t.id === task.id ? { ...t, completed: !isCompleted, lastActive: now } : t
         );
 
         setTasks(updatedTasks);
@@ -816,6 +828,13 @@ const SubtaskItem = ({
 
         if (timeDifference !== 0) {
             const now = Date.now();
+            
+            // Update the task's lastActive property to now
+            setTasks(prevTasks => 
+                prevTasks.map(t =>
+                    t.id === task.id ? { ...t, lastActive: now } : t
+                )
+            );
             
             // Get billing cutoff date (same logic as invoice generation)
             // Use task-specific lastBilledAt, or task creation date if never billed
@@ -893,8 +912,9 @@ const SubtaskItem = ({
 
         if (!editTitle.trim()) return;
 
+        const now = Date.now();
         const updatedTasks = tasks.map(t =>
-            t.id === task.id ? { ...t, title: editTitle.trim() } : t
+            t.id === task.id ? { ...t, title: editTitle.trim(), lastActive: now } : t
         );
 
         setTasks(updatedTasks);
