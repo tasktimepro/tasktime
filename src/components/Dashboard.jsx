@@ -18,6 +18,7 @@ import {
     getLastMonthRange, 
     getThisYearRange,
     formatDuration,
+    formatDurationWithSeconds,
     millisecondsToHours
 } from '../utils/dateUtils';
 import { getPreferredCurrency, formatCurrency, fetchExchangeRates, convertCurrency } from '../utils/currencyUtils';
@@ -386,8 +387,29 @@ const Dashboard = ({
      * Start timer for a task
      */
     const handleStartTimer = (task) => {
-        // Stop any existing timer
+        // Stop any existing timer and save its time if it's paused
         if (currentTimer) {
+            // If the current timer is paused, we need to create a time entry for it
+            if (isPaused && pausedElapsedTime > 0) {
+                // Create time entry for the paused session
+                const timeEntry = {
+                    id: `dashboard-paused-${Date.now()}`,
+                    taskId: currentTimer.taskId,
+                    start: currentTimer.startTime,
+                    end: currentTimer.startTime + pausedElapsedTime
+                };
+                setTimeEntries(prev => [...prev, timeEntry]);
+            } else if (!isPaused) {
+                // Create time entry for running timer
+                const timeEntry = {
+                    id: `dashboard-${Date.now()}`,
+                    taskId: currentTimer.taskId,
+                    start: currentTimer.startTime,
+                    end: Date.now()
+                };
+                setTimeEntries(prev => [...prev, timeEntry]);
+            }
+            
             setCurrentTimer(null);
         }
         
@@ -837,7 +859,7 @@ const Dashboard = ({
                                                 </p>
                                             </div>
                                             <div className={`text-xs ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>
-                                                {formatDuration(task.recentTime)}
+                                                {formatDurationWithSeconds(task.recentTime)}
                                             </div>
                                             {!task.completed && (
                                                 <div className="flex space-x-1">
@@ -911,7 +933,7 @@ const Dashboard = ({
                                                                 </p>
                                                             </div>
                                                             <div className={`text-xs ${subtask.completed ? 'text-gray-400' : 'text-gray-500'}`}>
-                                                                {formatDuration(subtask.recentTime)}
+                                                                {formatDurationWithSeconds(subtask.recentTime)}
                                                             </div>
                                                             {!subtask.completed && (
                                                                 <div className="flex space-x-1">

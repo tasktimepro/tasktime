@@ -43,15 +43,30 @@ function TimerControls({
         
         // Stop any existing timer first
         if (currentTimer) {
-            // Create time entry for the previous session
-            const timeEntry = {
-                id: generateId(),
-                taskId: currentTimer.taskId,
-                start: currentTimer.startTime,
-                end: Date.now()
-            };
-
-            setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+            // Check if the existing timer is paused (for a different task)
+            if (isPaused && setIsPaused && setPausedElapsedTime) {
+                // For paused timer of different task, create time entry with paused time
+                const timeEntry = {
+                    id: generateId(),
+                    taskId: currentTimer.taskId,
+                    start: currentTimer.startTime,
+                    end: currentTimer.startTime + pausedElapsedTime
+                };
+                setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+                
+                // Reset paused state
+                setIsPaused(false);
+                setPausedElapsedTime(0);
+            } else {
+                // For running timer, create time entry with current time
+                const timeEntry = {
+                    id: generateId(),
+                    taskId: currentTimer.taskId,
+                    start: currentTimer.startTime,
+                    end: Date.now()
+                };
+                setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+            }
         }
 
         // Start new timer
@@ -63,6 +78,11 @@ function TimerControls({
         // If we have access to the isPaused state, make sure it's set to false
         if (setIsPaused) {
             setIsPaused(false);
+        }
+        
+        // Reset paused elapsed time if we have access to it
+        if (setPausedElapsedTime) {
+            setPausedElapsedTime(0);
         }
     };
 
