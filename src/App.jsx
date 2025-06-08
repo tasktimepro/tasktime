@@ -3,11 +3,11 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { useUrlState } from './hooks/useUrlState';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
+import Dashboard from './components/Dashboard';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
 import GlobalTimer from './components/GlobalTimer';
 import { ToastProvider } from './components/ToastContainer';
-import { ClockIcon, BoltIcon, RocketLaunchIcon } from '@heroicons/react/24/outline';
 import { formatDurationWithSeconds } from './utils/dateUtils';
 
 /**
@@ -138,7 +138,7 @@ function App() {
     console.log('📊 Loaded projects:', projects.length);
 
     // URL-based state management
-    const { urlParams, navigateToProjects, navigateToProject, navigateToInvoices, navigateToAccount, updateUrl } = useUrlState();
+    const { urlParams, navigateToProjects, navigateToProject, navigateToInvoices, navigateToAccount, navigateToDashboard, updateUrl } = useUrlState();
     
     // Derived state from URL parameters
     const activeView = urlParams.view;
@@ -148,7 +148,7 @@ function App() {
 
     // Handle case where project in URL doesn't exist (e.g., deleted project)
     useEffect(() => {
-        if (urlParams.projectId && urlParams.view === 'dashboard' && !selectedProject) {
+        if (urlParams.projectId && urlParams.view === 'projects' && !selectedProject) {
             console.warn('Project not found, redirecting to projects view');
             navigateToProjects();
         }
@@ -243,12 +243,15 @@ function App() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center py-4">
                         <div 
-                            className="flex items-center space-x-3 cursor-pointer hover:text-blue-600 transition-colors group"
-                            onClick={() => navigateToProjects()}
+                            className="flex items-center space-x-2 cursor-pointer hover:text-blue-600 transition-colors group"
+                            onClick={() => navigateToDashboard()}
                         >
                             <div className="relative">
-                                <ClockIcon className="h-8 w-8 text-blue-600 group-hover:text-blue-700 transition-colors" />
-                                <BoltIcon className="h-4 w-4 text-amber-500 absolute -top-1 -right-1 group-hover:text-amber-600 transition-colors" />
+                                <img
+                                    src="/tasktime-icon.png"
+                                    alt="TaskTime Icon"
+                                    className="h-8 w-8 group-hover:opacity-90 transition-opacity"
+                                />
                             </div>
                             <div>
                                 <h1 className="text-lg font-bold text-gray-900 leading-none">
@@ -281,6 +284,16 @@ function App() {
                         )}
                         
                         <div className="flex space-x-4">
+                            <button
+                                onClick={() => navigateToDashboard()}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                    activeView === 'dashboard'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Dashboard
+                            </button>
                             <button
                                 onClick={() => navigateToProjects()}
                                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -318,6 +331,25 @@ function App() {
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 content-area">
+                {activeView === 'dashboard' && (
+                    <Dashboard
+                        projects={projects}
+                        tasks={tasks}
+                        timeEntries={timeEntries}
+                        invoices={invoices}
+                        currentTimer={currentTimer}
+                        setCurrentTimer={setCurrentTimer}
+                        setTasks={setTasks}
+                        navigateToProject={navigateToProject}
+                        navigateToInvoices={navigateToInvoices}
+                        isPaused={isPaused}
+                        setIsPaused={setIsPaused}
+                        pausedElapsedTime={pausedElapsedTime}
+                        setPausedElapsedTime={setPausedElapsedTime}
+                        setTimeEntries={setTimeEntries}
+                    />
+                )}
+
                 {activeView === 'projects' && !selectedProject && (
                     <ProjectList
                         projects={projects}
@@ -341,7 +373,7 @@ function App() {
                     />
                 )}
 
-                {activeView === 'dashboard' && selectedProject && (
+                {activeView === 'projects' && selectedProject && (
                     <ProjectDashboard
                         project={selectedProject}
                         projects={projects}

@@ -151,7 +151,6 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Backup & Restore</h3>
             
             <div className="space-y-4">
                 {/* Export Section */}

@@ -8,7 +8,7 @@ export const useUrlState = () => {
     const [urlParams, setUrlParams] = useState(() => {
         const params = new URLSearchParams(window.location.search);
         return {
-            view: params.get('view') || 'projects',
+            view: params.get('view') || 'dashboard',
             projectId: params.get('project') || null,
             section: params.get('section') || null,
             create: params.get('create') || null
@@ -38,7 +38,7 @@ export const useUrlState = () => {
         if (newUrl !== window.location.pathname + window.location.search) {
             window.history.pushState({}, '', newUrl);
             setUrlParams({
-                view: searchParams.get('view') || 'projects',
+                view: searchParams.get('view') || 'dashboard',
                 projectId: searchParams.get('project') || null,
                 section: searchParams.get('section') || null,
                 create: searchParams.get('create') || null
@@ -58,7 +58,7 @@ export const useUrlState = () => {
      * Navigate to project dashboard
      */
     const navigateToProject = useCallback((projectId) => {
-        updateUrl({ view: 'dashboard', project: projectId, section: null, create: null });
+        updateUrl({ view: 'projects', project: projectId, section: null, create: null });
     }, [updateUrl]);
 
     /**
@@ -76,13 +76,20 @@ export const useUrlState = () => {
     }, [updateUrl]);
 
     /**
+     * Navigate to main dashboard view
+     */
+    const navigateToDashboard = useCallback((params = {}) => {
+        updateUrl({ view: 'dashboard', project: null, section: null, create: null, ...params });
+    }, [updateUrl]);
+
+    /**
      * Handle browser back/forward navigation
      */
     useEffect(() => {
         const handlePopState = () => {
             const params = new URLSearchParams(window.location.search);
             setUrlParams({
-                view: params.get('view') || 'projects',
+                view: params.get('view') || 'dashboard',
                 projectId: params.get('project') || null,
                 section: params.get('section') || null,
                 create: params.get('create') || null
@@ -99,6 +106,7 @@ export const useUrlState = () => {
         navigateToProject,
         navigateToInvoices,
         navigateToAccount,
+        navigateToDashboard,
         updateUrl
     };
 };

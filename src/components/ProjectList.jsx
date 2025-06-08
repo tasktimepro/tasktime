@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
-import { getCurrencySymbol } from '../utils/currencyUtils';
+import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { getTaskIdsToDelete } from '../utils/taskUtils';
@@ -40,7 +40,7 @@ const ProjectList = ({
     const [formData, setFormData] = useState({
         title: '',
         hourlyRate: '', // Keep as empty string for proper placeholder behavior
-        currency: 'USD',
+        currency: getPreferredCurrency(),
         taxEnabled: false,
         taxLabel: 'VAT',
         taxRate: 0,
@@ -127,7 +127,7 @@ const ProjectList = ({
 
         setProjects([...projects, newProject]);
 
-        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
+        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
 
         setShowCreateForm(false);
     };
@@ -166,7 +166,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
+        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
 
         showSuccess('Project updated successfully!');
     };
@@ -250,7 +250,7 @@ const ProjectList = ({
             setFormData({ 
                 title: '', 
                 hourlyRate: '', 
-                currency: 'USD', 
+                currency: getPreferredCurrency(), 
                 taxEnabled: false, 
                 taxLabel: 'VAT', 
                 taxRate: 0,
@@ -291,7 +291,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: 'USD', taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
+        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
     };    /**
      * Archive a project
      */

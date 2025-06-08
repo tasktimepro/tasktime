@@ -5,7 +5,7 @@
 /**
  * Map of currency codes to their symbols
  */
-const CURRENCY_SYMBOLS = {
+export const CURRENCY_SYMBOLS = {
     USD: '$',
     EUR: '€',
     GBP: '£',
@@ -33,4 +33,33 @@ export const getCurrencySymbol = (currencyCode) => {
 export const formatCurrency = (amount, currencyCode, decimals = 2) => {
     const symbol = getCurrencySymbol(currencyCode);
     return `${symbol}${amount.toFixed(decimals)}`;
+};
+
+/**
+ * Get the user's preferred currency from localStorage
+ * @returns {string} The preferred currency code (default: 'USD')
+ */
+export const getPreferredCurrency = () => {
+    try {
+        const preferences = JSON.parse(localStorage.getItem('preferences') || '{}');
+        const saved = preferences.currency;
+        return saved && CURRENCY_SYMBOLS[saved] ? saved : 'USD';
+    } catch (error) {
+        console.warn('Error parsing preferences from localStorage:', error);
+        return 'USD';
+    }
+};
+
+/**
+ * Set the user's preferred currency in localStorage
+ * @param {string} currencyCode - The currency code to save
+ */
+export const setPreferredCurrency = (currencyCode) => {
+    try {
+        const preferences = JSON.parse(localStorage.getItem('preferences') || '{}');
+        preferences.currency = currencyCode;
+        localStorage.setItem('preferences', JSON.stringify(preferences));
+    } catch (error) {
+        console.warn('Error saving preferences to localStorage:', error);
+    }
 };

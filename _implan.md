@@ -105,7 +105,7 @@ tasktime/
 │   ├── index.css
 │   ├── main.jsx
 │   └── assets/
-│       ├── react.svg
+│       ├── tasktime-icon.png
 ├── .gitignore
 ├── package.json
 ├── tailwind.config.js

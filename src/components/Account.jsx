@@ -1,6 +1,7 @@
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, CogIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
 import ExportImport from './ExportImport';
+import Preferences from './Preferences';
 
 /**
  * Account component - Main account management page with side navigation
@@ -17,6 +18,12 @@ const Account = ({
     // Define sections in order (first will be default)
     const sideNavItems = [
         {
+            id: 'preferences',
+            name: 'Preferences',
+            icon: CogIcon,
+            description: 'Manage your personal preferences'
+        },
+        {
             id: 'backup',
             name: 'Backup & Restore',
             icon: ArrowDownTrayIcon,
@@ -30,10 +37,10 @@ const Account = ({
     // Function to handle section changes
     const handleSectionChange = (sectionId) => {
         updateUrl({ section: sectionId, create: null });
-    };
-
-    const renderContent = () => {
+    };    const renderContent = () => {
         switch (activeTab) {
+            case 'preferences':
+                return <Preferences />;
             case 'backup':
                 return (
                     <div>
@@ -48,7 +55,7 @@ const Account = ({
                             tasks={tasks} 
                             timeEntries={timeEntries} 
                             invoices={invoices}
-                            onImport={onImport} 
+                            onImport={onImport}
                         />
                     </div>
                 );
