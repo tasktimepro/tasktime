@@ -92,9 +92,8 @@ export const createInvoiceHTML = (invoiceData) => {
             <div style="text-align: center; margin-bottom: 30px;">
                 <h1 style="color: #333; margin-bottom: 10px; font-size: 28px; font-weight: bold;">INVOICE</h1>
                 <p style="color: #666; margin: 0;">Invoice: #${invoiceNumber}</p>
+                <p style="color: #666; margin: 0;">Date: ${date}${dueDate ? ` &nbsp;•&nbsp; Due Date: ${dueDate}` : ''}</p>
                 ${project ? `<p style="color: #666; margin: 0;">Project: ${project.title}</p>` : ''}
-                <p style="color: #666; margin: 0;">Date: ${date}</p>
-                ${dueDate ? `<p style="color: #666; margin: 0;">Due Date: ${dueDate}</p>` : ''}
             </div>
             
             <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">

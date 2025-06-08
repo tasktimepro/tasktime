@@ -118,7 +118,7 @@ const GlobalTimer = ({
                         {currentTask.title}
                     </span>
                 )}
-                <span className={`text-sm font-mono ${timeColor} px-2 py-1 rounded min-w-[32px] inline-block text-center`}>
+                <span className={`text-sm font-mono ${timeColor} px-2 py-1 rounded-md min-w-[32px] inline-block text-center`}>
                     {isPaused ? pausedTime : currentTime}
                 </span>
             </div>

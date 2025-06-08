@@ -195,7 +195,7 @@ function TimerControls({
                 <div className="flex space-x-1">
                     <button
                         onClick={resumeTimer}
-                        className="p-1 text-green-600 hover:bg-green-100 rounded-full transition-colors group"
+                        className="p-1 text-green-600 hover:bg-green-100 rounded-md transition-colors group"
                         title="Resume Timer"
                     >
                         <PlayIcon className={`${iconSize} group-hover:text-green-700`} />

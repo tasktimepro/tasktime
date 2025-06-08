@@ -321,6 +321,10 @@ const TaskItem = ({
         <div className={`border border-gray-200 rounded-lg hover:shadow-md transition-shadow ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
             {/* Main Task */}
             <div className={`p-4 transition-colors ${
+                // If we have subtasks or can create them, only round the top corners
+                // Otherwise round all corners for a standalone task
+                (subtasks.length > 0 || (!task.completed && onCreateSubtask)) ? 'rounded-t-lg' : 'rounded-lg'
+            } ${
                 (subtaskTimerActive && !isPaused) && !isArchived
                 ? 'bg-gray-100 opacity-50 pointer-events-none' 
                 : 'hover:bg-gray-50'
@@ -381,7 +385,7 @@ const TaskItem = ({
                                                         {mainTaskTime > 0 && (
                                                             <button
                                                                 onClick={() => setShowTimeEditModal(true)}
-                                                                className="hover:bg-gray-100 rounded transition-colors"
+                                                                className="hover:bg-gray-100 rounded-md transition-colors"
                                                                 title="Click to edit main task time (excluding subtasks)"
                                                                 disabled={isCompleted}
                                                             >
@@ -409,7 +413,7 @@ const TaskItem = ({
                                             totalTimeWithSubtasks > 0 && (
                                                 <button
                                                     onClick={() => setShowTimeEditModal(true)}
-                                                    className="hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                                                    className="hover:bg-gray-100 px-2 py-1 rounded-md transition-colors"
                                                     title="Click to edit time"
                                                     disabled={isCompleted}
                                                 >
@@ -445,7 +449,7 @@ const TaskItem = ({
                                     {onUnarchive && (
                                         <button
                                             onClick={onUnarchive}
-                                            className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded"
+                                            className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded-md"
                                             title="Unarchive Task"
                                         >
                                             Unarchive
@@ -453,7 +457,7 @@ const TaskItem = ({
                                     )}
                                     <button
                                         onClick={onDelete}
-                                        className="text-xs text-red-600 hover:text-red-800 bg-red-50 px-2 py-1 rounded"
+                                        className="text-xs text-red-600 hover:text-red-800 bg-red-50 px-2 py-1 rounded-md"
                                         title="Delete Task"
                                     >
                                         Delete
@@ -464,7 +468,7 @@ const TaskItem = ({
                                 !task.parentTaskId && onArchive && (
                                     <button
                                         onClick={onArchive}
-                                        className="p-1 text-yellow-600 hover:bg-yellow-100 rounded-full transition-colors group"
+                                        className="p-1 text-yellow-600 hover:bg-yellow-100 rounded-md transition-colors group"
                                         title="Archive Task"
                                     >
                                         <ArchiveBoxIcon className="h-5 w-5 group-hover:text-yellow-700" />
@@ -490,7 +494,7 @@ const TaskItem = ({
 
                                     <button
                                         onClick={() => setShowTimeEditModal(true)}
-                                        className="p-1 text-gray-400 hover:bg-yellow-100 rounded-full transition-colors group"
+                                        className="p-1 text-gray-400 hover:bg-yellow-100 rounded-md transition-colors group"
                                         title="Edit Time"
                                     >
                                         <ClockIcon className="h-5 w-5 group-hover:text-yellow-700" />
@@ -500,7 +504,7 @@ const TaskItem = ({
                                     {onToggleBillable && (
                                         <button
                                             onClick={hasBillableTime ? undefined : onToggleBillable}
-                                            className={`p-1 rounded-full transition-colors group ${
+                                            className={`p-1 rounded-md transition-colors group ${
                                                 hasBillableTime
                                                     ? 'text-blue-600 bg-blue-100 cursor-not-allowed'
                                                     : task.billable
@@ -538,14 +542,14 @@ const TaskItem = ({
                                                 });
                                                 document.dispatchEvent(event);
                                             }}
-                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
+                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-md transition-colors group"
                                             title="More actions"
                                         >
                                             <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
                                         </button>
 
                                         {showDropdown && (
-                                            <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                                            <div className="absolute right-0 top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
                                                 <div className="py-1">
                                                     <button
                                                         onClick={() => {
@@ -589,7 +593,7 @@ const TaskItem = ({
 
             {/* Subtasks */}
             {!isArchived && (subtasks.length > 0 || (!task.completed && onCreateSubtask)) && (
-                <div className="border-t border-gray-100 bg-gray-50">
+                <div className="border-t border-gray-100 bg-gray-50 rounded-b-lg">
                     <div className="pl-8 pr-4 py-2 space-y-2">
                         {subtasks.map((subtask) => (
                             <SubtaskItem
@@ -661,7 +665,7 @@ const TaskItem = ({
                                 }`}>
                                     <button
                                         onClick={() => setShowCreateSubtaskForm(true)}
-                                        className="w-full text-left py-2 px-3 text-sm text-gray-500 rounded-md transition-colors border border-dashed border-gray-300"
+                                        className="w-full text-left py-2 px-3 text-sm text-gray-500 rounded-md transition-colors border border-dashed border-gray-300 hover:bg-gray-100"
                                     >
                                         + Add subtask
                                     </button>
@@ -911,7 +915,7 @@ const SubtaskItem = ({
     // const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
 
     return (
-        <div className={`flex items-center justify-between py-2 ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
+        <div className={`flex items-center justify-between py-2 rounded-md hover:bg-gray-50 transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
             <div className="flex items-center space-x-3 flex-1 min-w-0">
                 {/* Completion Checkbox */}
                 <div className="flex-shrink-0">
@@ -962,7 +966,7 @@ const SubtaskItem = ({
                                 {totalTime > 0 && (
                                     <button
                                         onClick={() => setShowTimeEditModal(true)}
-                                        className="hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                                        className="hover:bg-gray-100 px-2 py-1 rounded-md transition-colors"
                                         title="Click to edit time"
                                         disabled={isCompleted}
                                     >
@@ -1014,7 +1018,7 @@ const SubtaskItem = ({
 
                             <button
                                 onClick={() => setShowTimeEditModal(true)}
-                                className="p-1 text-gray-400 hover:bg-yellow-100 rounded-full transition-colors group"
+                                className="p-1 text-gray-400 hover:bg-yellow-100 rounded-md transition-colors group"
                                 title="Edit Time"
                             >
                                 <ClockIcon className="h-5 w-5 group-hover:text-yellow-700" />
@@ -1024,7 +1028,7 @@ const SubtaskItem = ({
                             {onToggleBillable && (
                                 <button
                                     onClick={hasBillableTime ? undefined : onToggleBillable}
-                                    className={`p-1 rounded-full transition-colors group ${
+                                    className={`p-1 rounded-md transition-colors group ${
                                         hasBillableTime
                                             ? 'text-blue-600 bg-blue-100 cursor-not-allowed'
                                             : task.billable
@@ -1062,14 +1066,14 @@ const SubtaskItem = ({
                                         });
                                         document.dispatchEvent(event);
                                     }}
-                                    className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
+                                    className="p-1 text-gray-400 hover:bg-gray-100 rounded-md transition-colors group"
                                     title="More actions"
                                 >
                                     <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
                                 </button>
 
                                 {showDropdown && (
-                                    <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                                    <div className="absolute right-0 top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
                                         <div className="py-1">
                                             <button
                                                 onClick={() => {
