@@ -112,6 +112,13 @@ const InvoiceGenerator = ({
             }
         }
         
+        // If no previous payment method, look for default payment method
+        const defaultPaymentMethod = paymentMethods.find(pm => pm.isDefault);
+        if (defaultPaymentMethod) {
+            setSelectedPaymentMethod(defaultPaymentMethod);
+            return;
+        }
+        
         // No need to reset to null as that's the initial state
     }, [editingInvoice, projectInvoices, paymentMethods, selectedPaymentMethod, projectManuallyChanged]);
 
@@ -151,6 +158,13 @@ const InvoiceGenerator = ({
                     }
                 }
             }
+        }
+        
+        // If no previous business info, look for default business info
+        const defaultBusinessInfo = businessInfos.find(bi => bi.isDefault);
+        if (defaultBusinessInfo) {
+            setSelectedBusinessInfo(defaultBusinessInfo);
+            return;
         }
         
         // No need to reset to null as that's the initial state

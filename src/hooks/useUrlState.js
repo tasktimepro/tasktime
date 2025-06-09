@@ -53,35 +53,40 @@ export const useUrlState = () => {
      * @param {Object} params - Optional parameters to include in URL
      */
     const navigateToProjects = useCallback((params = {}) => {
-        updateUrl({ view: 'projects', project: null, section: null, create: null, ...params });
+        updateUrl({ view: 'projects', project: null, section: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to project dashboard
      */
     const navigateToProject = useCallback((projectId) => {
-        updateUrl({ view: 'projects', project: projectId, section: null, create: null });
+        updateUrl({ view: 'projects', project: projectId, section: null, create: null, tab: null });
     }, [updateUrl]);
 
     /**
      * Navigate to invoices view with optional parameters
      */
     const navigateToInvoices = useCallback((params = {}) => {
-        updateUrl({ view: 'invoices', project: null, ...params });
+        // If no tab is specified in params, explicitly clear it
+        const finalParams = { view: 'invoices', project: null, ...params };
+        if (!('tab' in params)) {
+            finalParams.tab = null;
+        }
+        updateUrl(finalParams);
     }, [updateUrl]);
 
     /**
      * Navigate to account view with optional parameters
      */
     const navigateToAccount = useCallback((params = {}) => {
-        updateUrl({ view: 'account', project: null, ...params });
+        updateUrl({ view: 'account', project: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to main dashboard view
      */
     const navigateToDashboard = useCallback((params = {}) => {
-        updateUrl({ view: 'dashboard', project: null, section: null, create: null, ...params });
+        updateUrl({ view: 'dashboard', project: null, section: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**

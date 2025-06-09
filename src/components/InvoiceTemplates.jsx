@@ -183,16 +183,19 @@ const InvoiceTemplates = ({
         }
     };
 
-    // Generate preview invoice number
-    const generatePreviewInvoiceNumber = (template) => {
-        const now = new Date();
+    // Generate a static timestamp for previews that only changes when component mounts
+    const staticTimestamp = useMemo(() => Date.now().toString(), []);
+    const staticDate = useMemo(() => new Date(), []);
+
+    // Generate preview invoice number with static timestamp
+    const generatePreviewInvoiceNumber = useMemo(() => (template) => {
         const variables = {
             '{projectId}': 'ABCD1234'.slice(-8),
-            '{timestamp}': Date.now().toString(),
-            '{date}': now.toISOString().slice(0, 10).replace(/-/g, ''),
-            '{year}': now.getFullYear().toString(),
-            '{month}': (now.getMonth() + 1).toString().padStart(2, '0'),
-            '{day}': now.getDate().toString().padStart(2, '0'),
+            '{timestamp}': staticTimestamp,
+            '{date}': staticDate.toISOString().slice(0, 10).replace(/-/g, ''),
+            '{year}': staticDate.getFullYear().toString(),
+            '{month}': (staticDate.getMonth() + 1).toString().padStart(2, '0'),
+            '{day}': staticDate.getDate().toString().padStart(2, '0'),
             '{sequential}': template.useSequentialNumbers ? 
                 (template.currentSequentialNumber || template.sequentialNumberStart || 1).toString().padStart(template.sequentialNumberDigits || 4, '0') : 
                 '0001'
@@ -204,11 +207,11 @@ const InvoiceTemplates = ({
         });
 
         return format;
-    };
+    }, [staticTimestamp, staticDate]);
 
-    // Calculate due date preview showing exact text that will appear in PDF
-    const calculateDueDatePreview = (template) => {
-        const today = new Date();
+    // Calculate due date preview showing exact text that will appear in PDF (memoized for consistency)
+    const calculateDueDatePreview = useMemo(() => (template) => {
+        const today = staticDate;
         
         switch (template.dueDateType) {
             case 'fixed-days': {
@@ -249,7 +252,16 @@ const InvoiceTemplates = ({
                 return `Due date: ${defaultDate.toLocaleDateString()} (${template.dueDateDays || 30} days from invoice date)`;
             }
         }
-    };
+    }, [staticDate]);
+
+    // Memoized preview for form data that updates only when relevant fields change
+    const formPreviewInvoiceNumber = useMemo(() => {
+        return generatePreviewInvoiceNumber(formData);
+    }, [formData, generatePreviewInvoiceNumber]);
+
+    const formPreviewDueDate = useMemo(() => {
+        return calculateDueDatePreview(formData);
+    }, [formData, calculateDueDatePreview]);
 
     // Sort templates - default first, then by name
     const sortedTemplates = useMemo(() => {
@@ -347,7 +359,7 @@ const InvoiceTemplates = ({
                                         required
                                     />
                                     <p className="mt-1 text-sm text-gray-500">
-                                        Preview: <strong>{generatePreviewInvoiceNumber(formData)}</strong>
+                                        Preview: <strong>{formPreviewInvoiceNumber}</strong>
                                     </p>
                                 </div>
 
@@ -503,7 +515,7 @@ const InvoiceTemplates = ({
                                 {/* Preview - show for all types */}
                                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                                     <p className="text-sm text-blue-800">
-                                        <strong>Preview:</strong> {calculateDueDatePreview(formData)}
+                                        <strong>Preview:</strong> {formPreviewDueDate}
                                     </p>
                                 </div>
                             </div>

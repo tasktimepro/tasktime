@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 import { useToast } from '../hooks/useToast';
+import CustomCheckbox from './CustomCheckbox';
 
 // Event name for dropdown coordination
 const DROPDOWN_TOGGLE_EVENT = 'business-dropdown-toggle';
@@ -39,7 +40,8 @@ const BusinessInfo = ({
         taxNumber: '',
         email: '',
         phone: '',
-        custom: []
+        custom: [],
+        isDefault: false
     });
 
     // Close dropdown when clicking outside or when another dropdown opens
@@ -155,10 +157,21 @@ const BusinessInfo = ({
             email: formData.email.trim(),
             phone: formData.phone.trim(),
             custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
+            isDefault: formData.isDefault,
             createdAt: Date.now()
         };
 
-        setBusinessInfos([...businessInfos, newBusinessInfo]);
+        let updatedBusinessInfos = [...businessInfos, newBusinessInfo];
+
+        // If this business info is set as default, remove default from others
+        if (formData.isDefault) {
+            updatedBusinessInfos = updatedBusinessInfos.map(info => ({
+                ...info,
+                isDefault: info.id === newBusinessInfo.id
+            }));
+        }
+
+        setBusinessInfos(updatedBusinessInfos);
 
         setFormData({
             title: '',
@@ -173,7 +186,8 @@ const BusinessInfo = ({
             taxNumber: '',
             email: '',
             phone: '',
-            custom: []
+            custom: [],
+            isDefault: false
         });
 
         setShowCreateForm(false);
@@ -213,12 +227,22 @@ const BusinessInfo = ({
                     taxNumber: formData.taxNumber.trim(),
                     email: formData.email.trim(),
                     phone: formData.phone.trim(),
-                    custom: formData.custom.filter(item => item.label.trim() && item.value.trim())
+                    custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
+                    isDefault: formData.isDefault
                 }
                 : info
         );
 
-        setBusinessInfos(updatedBusinessInfos);
+        // If this business info is set as default, remove default from others
+        let finalUpdatedBusinessInfos = updatedBusinessInfos;
+        if (formData.isDefault) {
+            finalUpdatedBusinessInfos = updatedBusinessInfos.map(info => ({
+                ...info,
+                isDefault: info.id === editingBusinessInfo.id
+            }));
+        }
+
+        setBusinessInfos(finalUpdatedBusinessInfos);
 
         setEditingBusinessInfo(null);
 
@@ -235,7 +259,8 @@ const BusinessInfo = ({
             taxNumber: '',
             email: '',
             phone: '',
-            custom: []
+            custom: [],
+            isDefault: false
         });
 
         showSuccess('Business info updated successfully');
@@ -266,7 +291,8 @@ const BusinessInfo = ({
                     taxNumber: '',
                     email: '',
                     phone: '',
-                    custom: []
+                    custom: [],
+                    isDefault: false
                 });
             }
 
@@ -293,7 +319,8 @@ const BusinessInfo = ({
             taxNumber: businessInfo.taxNumber || '',
             email: businessInfo.email || '',
             phone: businessInfo.phone || '',
-            custom: [...(businessInfo.custom || [])]
+            custom: [...(businessInfo.custom || [])],
+            isDefault: businessInfo.isDefault || false
         });
 
         setShowCreateForm(false);
@@ -320,7 +347,8 @@ const BusinessInfo = ({
             taxNumber: '',
             email: '',
             phone: '',
-            custom: []
+            custom: [],
+            isDefault: false
         });
     };
 
@@ -599,6 +627,18 @@ const BusinessInfo = ({
                             )}
                         </div>
 
+                        {/* Default Checkbox */}
+                        <div className="flex items-center space-x-2">
+                            <CustomCheckbox
+                                id="isDefault"
+                                checked={formData.isDefault}
+                                onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
+                            />
+                            <label htmlFor="isDefault" className="text-sm font-medium text-gray-700">
+                                Set as default business info
+                            </label>
+                        </div>
+
                         <div className="flex justify-end space-x-3">
                             <button
                                 type="button"
@@ -649,9 +689,16 @@ const BusinessInfo = ({
                                         <div className="flex items-center space-x-3">
                                             <BuildingOfficeIcon className="h-6 w-6 text-gray-400" />
                                             <div>
-                                                <h4 className="text-lg font-medium text-gray-900">
-                                                    {info.title || info.name}
-                                                </h4>
+                                                <div className="flex items-center space-x-2">
+                                                    <h4 className="text-lg font-medium text-gray-900">
+                                                        {info.title || info.name}
+                                                    </h4>
+                                                    {info.isDefault && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                            Default
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="mt-1 text-sm text-gray-500 space-y-1">
                                                     {info.businessName && <p>Business/Name: {info.businessName}</p>}
                                                     {info.address && <p>Address: {info.address}</p>}

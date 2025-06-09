@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 import { useToast } from '../hooks/useToast';
+import CustomCheckbox from './CustomCheckbox';
 
 // Event name for dropdown coordination
 const DROPDOWN_TOGGLE_EVENT = 'payment-dropdown-toggle';
@@ -34,7 +35,8 @@ const PaymentMethods = ({
         swift: '',
         bankAddress: '',
         paypal: '',
-        custom: []
+        custom: [],
+        isDefault: false
     });
 
     // Close dropdown when clicking outside or when another dropdown opens
@@ -161,10 +163,21 @@ const PaymentMethods = ({
             bankAddress: formData.bankAddress.trim(),
             paypal: formData.paypal.trim(),
             custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
+            isDefault: formData.isDefault,
             createdAt: Date.now()
         };
 
-        setPaymentMethods([...paymentMethods, newPaymentMethod]);
+        let updatedPaymentMethods = [...paymentMethods, newPaymentMethod];
+
+        // If this payment method is set as default, remove default from others
+        if (formData.isDefault) {
+            updatedPaymentMethods = updatedPaymentMethods.map(method => ({
+                ...method,
+                isDefault: method.id === newPaymentMethod.id
+            }));
+        }
+
+        setPaymentMethods(updatedPaymentMethods);
 
         setFormData({
             title: '',
@@ -174,7 +187,8 @@ const PaymentMethods = ({
             swift: '',
             bankAddress: '',
             paypal: '',
-            custom: []
+            custom: [],
+            isDefault: false
         });
 
         setShowCreateForm(false);
@@ -214,12 +228,22 @@ const PaymentMethods = ({
                     swift: formData.swift.trim(),
                     bankAddress: formData.bankAddress.trim(),
                     paypal: formData.paypal.trim(),
-                    custom: formData.custom.filter(item => item.label.trim() && item.value.trim())
+                    custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
+                    isDefault: formData.isDefault
                 }
                 : method
         );
 
-        setPaymentMethods(updatedPaymentMethods);
+        // If this payment method is set as default, remove default from others
+        let finalUpdatedPaymentMethods = updatedPaymentMethods;
+        if (formData.isDefault) {
+            finalUpdatedPaymentMethods = updatedPaymentMethods.map(method => ({
+                ...method,
+                isDefault: method.id === editingPaymentMethod.id
+            }));
+        }
+
+        setPaymentMethods(finalUpdatedPaymentMethods);
 
         setEditingPaymentMethod(null);
 
@@ -231,7 +255,8 @@ const PaymentMethods = ({
             swift: '',
             bankAddress: '',
             paypal: '',
-            custom: []
+            custom: [],
+            isDefault: false
         });
 
         showSuccess('Payment method updated successfully');
@@ -257,7 +282,8 @@ const PaymentMethods = ({
                     swift: '',
                     bankAddress: '',
                     paypal: '',
-                    custom: []
+                    custom: [],
+                    isDefault: false
                 });
             }
 
@@ -279,7 +305,8 @@ const PaymentMethods = ({
             swift: paymentMethod.swift,
             bankAddress: paymentMethod.bankAddress,
             paypal: paymentMethod.paypal,
-            custom: [...paymentMethod.custom]
+            custom: [...paymentMethod.custom],
+            isDefault: paymentMethod.isDefault || false
         });
 
         setShowCreateForm(false);
@@ -301,7 +328,8 @@ const PaymentMethods = ({
             swift: '',
             bankAddress: '',
             paypal: '',
-            custom: []
+            custom: [],
+            isDefault: false
         });
     };
 
@@ -506,6 +534,18 @@ const PaymentMethods = ({
                             )}
                         </div>
 
+                        {/* Default Checkbox */}
+                        <div className="flex items-center space-x-2">
+                            <CustomCheckbox
+                                id="isDefault"
+                                checked={formData.isDefault}
+                                onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
+                            />
+                            <label htmlFor="isDefault" className="text-sm font-medium text-gray-700">
+                                Set as default payment method
+                            </label>
+                        </div>
+
                         <div className="flex justify-end space-x-3">
                             <button
                                 type="button"
@@ -556,9 +596,16 @@ const PaymentMethods = ({
                                         <div className="flex items-center space-x-3">
                                             <CreditCardIcon className="h-6 w-6 text-gray-400" />
                                             <div>
-                                                <h4 className="text-lg font-medium text-gray-900">
-                                                    {method.title || method.name}
-                                                </h4>
+                                                <div className="flex items-center space-x-2">
+                                                    <h4 className="text-lg font-medium text-gray-900">
+                                                        {method.title || method.name}
+                                                    </h4>
+                                                    {method.isDefault && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                            Default
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="mt-1 text-sm text-gray-500 space-y-1">
                                                     {method.fullName && <p>Full Name: {method.fullName}</p>}
                                                     {method.bank && <p>Bank: {method.bank}</p>}
