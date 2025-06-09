@@ -372,6 +372,7 @@ function App() {
                         onSelectProject={(project) => {
                             navigateToProject(project.id);
                         }}
+                        clientInfos={clientInfos}
                         showCreateForm={urlParams.create === 'project'}
                     />
                 )}

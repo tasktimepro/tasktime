@@ -297,12 +297,30 @@ export const handleProjectSelection = (
             setSelectedBusinessInfo(null);
             setSelectedPaymentMethod(null);
             
-            // Pre-populate based on last invoice for this project
+            // Pre-populate based on project's preferred client info first, then last invoice for this project
             const projectInvoicesForSelection = invoices.filter(invoice => 
                 (selectedProj.invoiceIds || []).includes(invoice.id)
             );
             
-            if (projectInvoicesForSelection.length > 0) {
+            // Check for project's preferred client info first
+            if (selectedProj.preferredClientInfoId) {
+                const preferredClientInfo = clientInfos.find(ci => ci.id === selectedProj.preferredClientInfoId);
+                if (preferredClientInfo) {
+                    setSelectedClientInfo(preferredClientInfo);
+                } else {
+                    // Preferred client no longer exists, fall back to last invoice
+                    if (projectInvoicesForSelection.length > 0) {
+                        const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
+                        if (lastInvoice.clientInfoId) {
+                            const clientInfo = clientInfos.find(ci => ci.id === lastInvoice.clientInfoId);
+                            if (clientInfo) {
+                                setSelectedClientInfo(clientInfo);
+                            }
+                        }
+                    }
+                }
+            } else if (projectInvoicesForSelection.length > 0) {
+                // No preferred client, use last invoice
                 const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
                 
                 if (lastInvoice.clientInfoId) {
@@ -311,6 +329,11 @@ export const handleProjectSelection = (
                         setSelectedClientInfo(clientInfo);
                     }
                 }
+            }
+            
+            // Handle business info and payment method selection from last invoice
+            if (projectInvoicesForSelection.length > 0) {
+                const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
                 
                 if (lastInvoice.businessInfoId) {
                     const businessInfo = businessInfos.find(bi => bi.id === lastInvoice.businessInfoId);

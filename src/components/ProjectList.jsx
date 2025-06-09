@@ -27,6 +27,7 @@ const ProjectList = ({
     onSelectProject,
     invoices = [],
     setInvoices,
+    clientInfos = [],
     showCreateForm: initialShowCreateForm = false
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(initialShowCreateForm);
@@ -44,7 +45,8 @@ const ProjectList = ({
         taxEnabled: false,
         taxLabel: 'VAT',
         taxRate: 0,
-        flatRate: false
+        flatRate: false,
+        preferredClientInfoId: ''
     });
 
     // Update showCreateForm when the prop changes
@@ -120,6 +122,7 @@ const ProjectList = ({
             taxLabel: formData.taxLabel,
             taxRate: parseFloat(formData.taxRate) || 0,
             flatRate: formData.flatRate || false,
+            preferredClientInfoId: formData.preferredClientInfoId || null,
             createdAt: Date.now(),
             lastBilledAt: null,
             archived: false
@@ -127,7 +130,7 @@ const ProjectList = ({
 
         setProjects([...projects, newProject]);
 
-        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
+        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientInfoId: '' });
 
         setShowCreateForm(false);
     };
@@ -157,7 +160,8 @@ const ProjectList = ({
                     taxEnabled: formData.taxEnabled,
                     taxLabel: formData.taxLabel,
                     taxRate: parseFloat(formData.taxRate) || 0,
-                    flatRate: formData.flatRate || false
+                    flatRate: formData.flatRate || false,
+                    preferredClientInfoId: formData.preferredClientInfoId || null
                 }
                 : project
         );
@@ -166,7 +170,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
+        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientInfoId: '' });
 
         showSuccess('Project updated successfully!');
     };
@@ -254,7 +258,8 @@ const ProjectList = ({
                 taxEnabled: false, 
                 taxLabel: 'VAT', 
                 taxRate: 0,
-                flatRate: false
+                flatRate: false,
+                preferredClientInfoId: ''
             });
         }
 
@@ -277,7 +282,8 @@ const ProjectList = ({
             taxEnabled: project.taxEnabled || false,
             taxLabel: project.taxLabel || 'VAT',
             taxRate: project.taxRate || 0,
-            flatRate: project.flatRate || false
+            flatRate: project.flatRate || false,
+            preferredClientInfoId: project.preferredClientInfoId || ''
         });
 
         setShowCreateForm(false);
@@ -291,7 +297,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false });
+        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientInfoId: '' });
     };    /**
      * Archive a project
      */
@@ -470,12 +476,12 @@ const ProjectList = ({
 
             {/* Create/Edit Form */}
             {(showCreateForm || editingProject) && (
-                <div className="bg-white shadow rounded-lg p-6">
+                <div className="bg-white shadow rounded-lg p-6 max-w-3xl mx-auto">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
                         {editingProject ? 'Edit Project' : 'Create New Project'}
                     </h3>
 
-                    <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-4">
+                    <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-5">
                         <div>
                             <label htmlFor="title" className="block text-sm font-medium text-gray-700">
                                 Project Title
@@ -603,6 +609,33 @@ const ProjectList = ({
                             </div>
                         </div>
 
+                        {/* Preferred Client Info */}
+                        <div className="space-y-4">
+                            <div className="border-t pt-4">                                
+                                <label htmlFor="preferredClientInfoId" className="block text-sm font-medium text-gray-700">
+                                    Preferred Client Info
+                                </label>
+                                <select
+                                    id="preferredClientInfoId"
+                                    name="preferredClientInfoId"
+                                    value={formData.preferredClientInfoId}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                >
+                                    <option value="">No preferred client</option>
+                                    {clientInfos.map(clientInfo => (
+                                        <option key={clientInfo.id} value={clientInfo.id}>
+                                            {clientInfo.title}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    Choose a preferred client to be pre-selected when creating invoices for this project.
+                                </p>
+                            </div>
+                        </div>
+
+                        <br />
                         <div className="flex justify-end space-x-3">
                             <button
                                 type="button"

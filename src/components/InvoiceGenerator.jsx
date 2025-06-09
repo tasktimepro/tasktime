@@ -205,6 +205,15 @@ const InvoiceGenerator = ({
             }
         }
         
+        // Check for project's preferred client info first (only if project not manually changed)
+        if (!projectManuallyChanged && selectedProject?.preferredClientInfoId) {
+            const preferredClientInfo = clientInfos.find(ci => ci.id === selectedProject.preferredClientInfoId);
+            if (preferredClientInfo) {
+                setSelectedClientInfo(preferredClientInfo);
+                return;
+            }
+        }
+        
         // Look for last used client info in previous invoices (only if project not manually changed)
         if (!projectManuallyChanged && projectInvoices.length > 0) {
             for (let i = projectInvoices.length - 1; i >= 0; i--) {
@@ -220,7 +229,7 @@ const InvoiceGenerator = ({
         }
         
         // Don't auto-select client info - user should manually select
-    }, [editingInvoice, projectInvoices, clientInfos, selectedClientInfo, projectManuallyChanged]);
+    }, [editingInvoice, projectInvoices, clientInfos, selectedClientInfo, projectManuallyChanged, selectedProject?.preferredClientInfoId]);
 
     /**
      * Initialize selected project based on current project or editing invoice
