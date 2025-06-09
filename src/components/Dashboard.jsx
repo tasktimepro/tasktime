@@ -4,9 +4,6 @@ import {
     ClockIcon, 
     BanknotesIcon, 
     DocumentTextIcon,
-    PlayIcon,
-    PauseIcon,
-    StopIcon,
     CheckIcon,
     MagnifyingGlassIcon,
     ExclamationTriangleIcon,
@@ -15,6 +12,7 @@ import {
     CurrencyDollarIcon,
     CalendarDaysIcon
 } from '@heroicons/react/24/outline';
+import TaskTimer from './TaskTimer.jsx';
 import { 
     getThisMonthRange, 
     getLastMonthRange, 
@@ -487,92 +485,6 @@ const Dashboard = ({
     }, []);
 
     /**
-     * Stop timer for a task
-     */
-    const handleStopTimer = useCallback((task) => {
-        if (currentTimer?.taskId === task.id) {
-            const now = Date.now();
-            
-            // Create time entry with proper duration based on pause state
-            let timeEntry;
-            
-            if (isPaused && pausedElapsedTime > 0) {
-                // For paused timer, use the elapsed time we already calculated
-                timeEntry = createTimeEntry(
-                    task.id,
-                    currentTimer.startTime,
-                    currentTimer.startTime + pausedElapsedTime
-                );
-            } else {
-                // For active timer, calculate duration from start to now
-                timeEntry = createTimeEntry(
-                    task.id,
-                    currentTimer.startTime,
-                    now
-                );
-            }
-            
-            setTimeEntries(prev => [...prev, timeEntry]);
-            
-            // Update the task's lastActive property to now
-            setTasks(prevTasks => 
-                prevTasks.map(t =>
-                    t.id === task.id ? { ...t, lastActive: now } : t
-                )
-            );
-            
-            setCurrentTimer(null);
-            setIsPaused(false);
-            setPausedElapsedTime(0);
-        }
-    }, [currentTimer, isPaused, pausedElapsedTime, createTimeEntry, setTimeEntries, setTasks, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
-
-    /**
-     * Stop any existing timer and optionally save its time
-     * Used when starting a new timer (to stop previous timer)
-     */
-    const stopExistingTimer = useCallback(() => {
-        if (!currentTimer) return;
-        // Use the same task object structure that handleStopTimer expects
-        const taskToStop = { id: currentTimer.taskId };
-        handleStopTimer(taskToStop);
-    }, [currentTimer, handleStopTimer]);
-
-    /**
-     * Start timer for a task
-     */
-    const handleStartTimer = useCallback((task) => {
-        stopExistingTimer();
-        
-        setCurrentTimer({
-            startTime: Date.now(),
-            taskId: task.id
-        });
-    }, [stopExistingTimer, setCurrentTimer]);
-
-    /**
-     * Pause/Resume timer for a task
-     */
-    const handleTogglePause = useCallback((task) => {
-        if (currentTimer?.taskId === task.id) {
-            if (isPaused) {
-                // Resume timer
-                setCurrentTimer({
-                    startTime: Date.now() - pausedElapsedTime,
-                    taskId: task.id
-                });
-                setIsPaused(false);
-                setPausedElapsedTime(0);
-            } else {
-                // Pause timer
-                const elapsedTime = Date.now() - currentTimer.startTime;
-                setPausedElapsedTime(elapsedTime);
-                setIsPaused(true);
-            }
-        }
-    }, [currentTimer, isPaused, pausedElapsedTime, setCurrentTimer, setIsPaused, setPausedElapsedTime]);
-
-    /**
      * Mark task as completed
      */
     const handleCompleteTask = useCallback((task) => {
@@ -630,45 +542,30 @@ const Dashboard = ({
      */
     const renderTaskControls = useCallback((task, shouldDisable) => {
         if (task.completed) return null;
-
-        const isTimerActive = currentTimer?.taskId === task.id;
-
-        if (isTimerActive) {
-            return (
-                <>
-                    <button
-                        onClick={() => handleTogglePause(task)}
-                        className="p-1.5 rounded-md transition-colors bg-yellow-100 text-yellow-600 hover:bg-yellow-200"
-                        title={isPaused ? "Resume timer" : "Pause timer"}
-                    >
-                        {isPaused ? (
-                            <PlayIcon className="h-4 w-4" />
-                        ) : (
-                            <PauseIcon className="h-4 w-4" />
-                        )}
-                    </button>
-                    <button
-                        onClick={() => handleStopTimer(task)}
-                        className="p-1.5 rounded-md transition-colors bg-red-100 text-red-600 hover:bg-red-200"
-                        title="Stop timer"
-                    >
-                        <StopIcon className="h-4 w-4" />
-                    </button>
-                </>
-            );
+        
+        // If timer is active for another task and this task should be disabled, don't render controls
+        if (shouldDisable && currentTimer && currentTimer.taskId !== task.id) {
+            return null;
         }
-
+        
         return (
-            <button
-                onClick={() => handleStartTimer(task)}
-                className="p-1.5 rounded-md transition-colors bg-green-100 text-green-600 hover:bg-green-200"
-                title="Start timer"
-                disabled={shouldDisable}
-            >
-                <PlayIcon className="h-4 w-4" />
-            </button>
+            <TaskTimer
+                task={task}
+                timeEntries={timeEntries}
+                setTimeEntries={setTimeEntries}
+                currentTimer={currentTimer}
+                setCurrentTimer={setCurrentTimer}
+                isGlobalTimer={true}
+                isPaused={isPaused}
+                setIsPaused={setIsPaused}
+                pausedElapsedTime={pausedElapsedTime}
+                setPausedElapsedTime={setPausedElapsedTime}
+                showTimeDisplay={false}
+                size="sm"
+                setTasks={setTasks}
+            />
         );
-    }, [currentTimer, isPaused, handleTogglePause, handleStopTimer, handleStartTimer]);
+    }, [currentTimer, isPaused, pausedElapsedTime, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTimeEntries, timeEntries]);
 
     /**
      * Render task title with navigation

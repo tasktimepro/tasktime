@@ -19,7 +19,8 @@ const TaskTree = ({
     isPaused = false,
     setIsPaused = null,
     pausedElapsedTime = 0,
-    setPausedElapsedTime = null
+    setPausedElapsedTime = null,
+    isGlobalTimer = false
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -231,6 +232,7 @@ const TaskTree = ({
                                     setIsPaused={setIsPaused}
                                     pausedElapsedTime={pausedElapsedTime}
                                     setPausedElapsedTime={setPausedElapsedTime}
+                                    isGlobalTimer={isGlobalTimer}
                                     onDelete={() => handleDeleteTask(task.id)}
                                     onCreateSubtask={handleCreateTask}
                                     onArchive={() => handleArchiveTask(task.id)}
@@ -273,6 +275,7 @@ const TaskTree = ({
                                             setIsPaused={setIsPaused}
                                             pausedElapsedTime={pausedElapsedTime}
                                             setPausedElapsedTime={setPausedElapsedTime}
+                                            isGlobalTimer={isGlobalTimer}
                                             onDelete={() => handleDeleteTask(task.id)}
                                             onCreateSubtask={handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}

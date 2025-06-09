@@ -277,6 +277,7 @@ function App() {
                                     pausedElapsedTime={pausedElapsedTime}
                                     setPausedElapsedTime={setPausedElapsedTime}
                                     navigateToProject={navigateToProject}
+                                    setTasks={setTasks}
                                     onClose={() => {
                                         setShowGlobalTimer(false);
                                         setIsPaused(false);

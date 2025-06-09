@@ -124,9 +124,12 @@ export const formatDurationWithSeconds = (milliseconds) => {
  * @param {number} startTime - Timer start timestamp
  * @returns {string} Formatted duration string
  */
-export const formatActiveTimer = (startTime) => {
-    const now = Date.now();
-    const elapsed = now - startTime;
+export const formatActiveTimer = (timeValue) => {
+    // If the time value is very large (a timestamp), assume it's a start time
+    // Otherwise, assume it's already the elapsed milliseconds
+    const elapsed = timeValue > 1000000000000 
+        ? Date.now() - timeValue // It's a timestamp, calculate elapsed time
+        : timeValue;             // It's already elapsed milliseconds
     return formatDurationWithSeconds(elapsed);
 };
 

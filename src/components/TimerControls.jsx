@@ -27,7 +27,8 @@ function TimerControls({
     setIsPaused = null,
     pausedElapsedTime = 0,
     setPausedElapsedTime = null,
-    onComplete = null
+    onComplete = null,
+    setTasks = null
 }) {
     const isTimerActive = currentTimer && currentTimer.taskId === task.id;
 
@@ -92,21 +93,19 @@ function TimerControls({
     const resumeTimer = () => {
         if (!currentTimer || !isPaused || currentTimer.taskId !== task.id) return;
         
-        // When resuming, we need to adjust the start time based on how much time was already tracked
-        // The pausedElapsedTime contains the total time that was already tracked before pausing
-        const adjustedStartTime = Date.now() - (pausedElapsedTime || 0);
+        // When resuming, continue the existing timer from where it was paused
+        // We need to adjust the startTime to account for the pause duration
         
+        // Calculate how much time has passed during the pause
+        const pauseDuration = Date.now() - (currentTimer.startTime + pausedElapsedTime);
+        
+        // Adjust the startTime to make sure the timer continues from the pause point
         setCurrentTimer({
             ...currentTimer,
-            startTime: adjustedStartTime
+            startTime: currentTimer.startTime + pauseDuration
         });
         
         setIsPaused(false);
-        
-        // Reset the paused elapsed time since we're resuming
-        if (setPausedElapsedTime) {
-            setPausedElapsedTime(0);
-        }
     };
 
     /**
@@ -116,34 +115,27 @@ function TimerControls({
     const pauseTimer = () => {
         if (!currentTimer || currentTimer.taskId !== task.id) return;
 
+        const now = Date.now();
+        
         // If we have access to the isPaused state setter, use it
         if (setIsPaused) {
             // Calculate elapsed time up to the pause moment
-            const elapsedTime = Date.now() - currentTimer.startTime;
+            const elapsedTime = now - currentTimer.startTime;
             
-            // Create time entry for the paused session
-            const timeEntry = {
-                id: generateId(),
-                taskId: task.id,
-                start: currentTimer.startTime,
-                end: Date.now()
-            };
-
-            setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
-            
-            // Update paused state with the correct elapsed time
-            if (typeof pausedElapsedTime === 'number') {
-                // Add to existing paused time if there was any
-                const totalElapsedTime = pausedElapsedTime + elapsedTime;
-                if (typeof setPausedElapsedTime === 'function') {
-                    setPausedElapsedTime(totalElapsedTime);
-                }
-            } else if (typeof setPausedElapsedTime === 'function') {
-                // First time pausing
+            // Store the elapsed time in the paused state
+            // We'll create the time entry only when the timer is resumed or stopped
+            if (typeof setPausedElapsedTime === 'function') {
                 setPausedElapsedTime(elapsedTime);
             }
             
             setIsPaused(true);
+            
+            // Update the task's lastActive property to keep it at the top of recent tasks
+            setTasks?.(prevTasks => 
+                prevTasks.map(t =>
+                    t.id === task.id ? { ...t, lastActive: now } : t
+                )
+            );
         } else {
             // Legacy behavior - create entry and stop timer
             // This branch should only run if called from a component that doesn't support pausing
@@ -151,7 +143,7 @@ function TimerControls({
                 id: generateId(),
                 taskId: task.id,
                 start: currentTimer.startTime,
-                end: Date.now()
+                end: now
             };
 
             setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
@@ -165,17 +157,38 @@ function TimerControls({
     const stopTimer = () => {
         if (!currentTimer || currentTimer.taskId !== task.id) return;
 
-        // If we're paused, we already have a time entry for the activity
-        if (!isPaused) {
-            // Create time entry for the session
+        const now = Date.now();
+        
+        // Create the appropriate time entry based on the timer's state
+        if (isPaused) {
+            // For paused timer, use the paused elapsed time
             const timeEntry = {
                 id: generateId(),
                 taskId: task.id,
                 start: currentTimer.startTime,
-                end: Date.now()
+                end: currentTimer.startTime + pausedElapsedTime
+            };
+            
+            setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+        } else {
+            // For active timer, calculate duration from start to now
+            const timeEntry = {
+                id: generateId(),
+                taskId: task.id,
+                start: currentTimer.startTime,
+                end: now
             };
 
             setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+        }
+        
+        // Update the task's lastActive property to keep it at the top of recent tasks
+        if (setTasks) {
+            setTasks(prevTasks => 
+                prevTasks.map(t =>
+                    t.id === task.id ? { ...t, lastActive: now } : t
+                )
+            );
         }
 
         // Remove the timer entirely
@@ -223,7 +236,7 @@ function TimerControls({
                     {isGlobalTimer && <button
                         onClick={stopTimer}
                             className="flex items-center space-x-1 p-1 text-yellow-600 hover:bg-yellow-100 rounded-md transition-colors group"
-                        title="Stop Timer"
+                        title="Close Timer"
                     >
                         <XMarkIcon className={`${iconSize} group-hover:text-yellow-700`} />
                     </button>}

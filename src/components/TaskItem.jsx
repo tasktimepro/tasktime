@@ -7,7 +7,7 @@ import {
     EllipsisHorizontalIcon,
     CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
-import TimerControls from './TimerControls.jsx';
+import TaskTimer from './TaskTimer.jsx';
 import CustomCheckbox from './CustomCheckbox.jsx';
 import TimeEditModal from './TimeEditModal.jsx';
 import { formatDurationWithSeconds } from '../utils/dateUtils';
@@ -32,6 +32,7 @@ const TaskItem = ({
     setIsPaused = null,
     pausedElapsedTime = 0,
     setPausedElapsedTime = null,
+    isGlobalTimer = false,
     onDelete,
     onCreateSubtask,
     onArchive,
@@ -442,7 +443,7 @@ const TaskItem = ({
                             {/* Show timer controls and action buttons conditionally */}
                             {isTimerActive && !isPaused ? (
                                 /* Show ONLY timer controls when this timer is actively running (not paused) */
-                                <TimerControls
+                                <TaskTimer
                                     task={task}
                                     timeEntries={timeEntries}
                                     setTimeEntries={setTimeEntries}
@@ -452,6 +453,9 @@ const TaskItem = ({
                                     setIsPaused={setIsPaused}
                                     pausedElapsedTime={pausedElapsedTime}
                                     setPausedElapsedTime={setPausedElapsedTime}
+                                    isGlobalTimer={isGlobalTimer}
+                                    showTimeDisplay={false}
+                                    setTasks={setTasks}
                                 />
                             ) : isArchived ? (
                                 /* Show unarchive and delete buttons for archived tasks in flex layout */
@@ -490,7 +494,7 @@ const TaskItem = ({
                             ) : (
                                 /* Show all action buttons when not completed and no timer actively running */
                                 <>
-                                    <TimerControls
+                                    <TaskTimer
                                         task={task}
                                         timeEntries={timeEntries}
                                         setTimeEntries={setTimeEntries}
@@ -500,6 +504,9 @@ const TaskItem = ({
                                         setIsPaused={setIsPaused}
                                         pausedElapsedTime={pausedElapsedTime}
                                         setPausedElapsedTime={setPausedElapsedTime}
+                                        isGlobalTimer={isGlobalTimer}
+                                        showTimeDisplay={false}
+                                        setTasks={setTasks}
                                     />
 
                                     <button
@@ -619,6 +626,7 @@ const TaskItem = ({
                                 setIsPaused={setIsPaused}
                                 pausedElapsedTime={pausedElapsedTime}
                                 setPausedElapsedTime={setPausedElapsedTime}
+                                isGlobalTimer={isGlobalTimer}
                                 onToggleBillable={() => onToggleBillable && onToggleBillable(subtask.id)}
                                 onDelete={() => {
                                     if (window.confirm('Are you sure you want to delete this subtask?')) {
@@ -704,6 +712,7 @@ const SubtaskItem = ({
     setIsPaused = null,
     pausedElapsedTime = 0,
     setPausedElapsedTime = null,
+    isGlobalTimer = false,
     onToggleBillable,
     onDelete
 }) => {
@@ -1004,7 +1013,7 @@ const SubtaskItem = ({
                     {/* Show timer controls and action buttons conditionally */}
                     {isTimerActive && !isPaused ? (
                         /* Show ONLY timer controls when this timer is actively running (not paused) */
-                        <TimerControls
+                        <TaskTimer
                             task={task}
                             timeEntries={timeEntries}
                             setTimeEntries={setTimeEntries}
@@ -1014,6 +1023,9 @@ const SubtaskItem = ({
                             setIsPaused={setIsPaused}
                             pausedElapsedTime={pausedElapsedTime}
                             setPausedElapsedTime={setPausedElapsedTime}
+                            isGlobalTimer={isGlobalTimer}
+                            showTimeDisplay={false}
+                            setTasks={setTasks}
                         />
                     ) : isCompleted ? (
                         /* No actions for completed subtasks */
@@ -1024,7 +1036,7 @@ const SubtaskItem = ({
                     ) : (
                         /* Show all action buttons when not completed and no timer actively running */
                         <>
-                            <TimerControls
+                            <TaskTimer
                                 task={task}
                                 timeEntries={timeEntries}
                                 setTimeEntries={setTimeEntries}
@@ -1034,6 +1046,9 @@ const SubtaskItem = ({
                                 setIsPaused={setIsPaused}
                                 pausedElapsedTime={pausedElapsedTime}
                                 setPausedElapsedTime={setPausedElapsedTime}
+                                isGlobalTimer={isGlobalTimer}
+                                showTimeDisplay={false}
+                                setTasks={setTasks}
                             />
 
                             <button

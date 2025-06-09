@@ -144,6 +144,7 @@ const ProjectDashboard = ({
                             setIsPaused={setIsPaused}
                             pausedElapsedTime={pausedElapsedTime}
                             setPausedElapsedTime={setPausedElapsedTime}
+                            isGlobalTimer={true}
                         />
                     </div>
                 </div>

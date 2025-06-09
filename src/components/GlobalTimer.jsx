@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { StopIcon } from '@heroicons/react/24/outline';
 import { formatActiveTimer, formatDurationWithSeconds } from '../utils/dateUtils';
-import TimerControls from './TimerControls.jsx';
+import TaskTimer from './TaskTimer.jsx';
 
 /**
  * GlobalTimer component - Shows active timer in the header
@@ -29,7 +28,8 @@ const GlobalTimer = ({
     pausedElapsedTime,
     setPausedElapsedTime,
     navigateToProject,
-    onClose
+    onClose,
+    setTasks
 }) => {
     const [currentTime, setCurrentTime] = useState('');
     const [pausedTime, setPausedTime] = useState('');
@@ -57,7 +57,9 @@ const GlobalTimer = ({
 
         const updateTimer = () => {
             if (isPaused) return; // Only skip subsequent updates when paused
-            const formattedTime = formatActiveTimer(currentTimer.startTime);
+            // Calculate elapsed time in ms for active timer
+            const elapsedMs = Date.now() - currentTimer.startTime;
+            const formattedTime = formatActiveTimer(elapsedMs);
             setCurrentTime(formattedTime);
         };
 
@@ -123,8 +125,8 @@ const GlobalTimer = ({
                 </span>
             </div>
 
-            {/* Control buttons - using TimerControls component */}
-            <TimerControls
+            {/* Control buttons - using TaskTimer component */}
+            <TaskTimer
                 task={currentTask}
                 setTimeEntries={setTimeEntries}
                 currentTimer={currentTimer}
@@ -134,6 +136,8 @@ const GlobalTimer = ({
                 setIsPaused={setIsPaused}
                 pausedElapsedTime={pausedElapsedTime}
                 setPausedElapsedTime={setPausedElapsedTime}
+                showTimeDisplay={false}
+                setTasks={setTasks}
                 onComplete={() => {
                     // Call onClose when timer is completely stopped
                     if (onClose) onClose();
