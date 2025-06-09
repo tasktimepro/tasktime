@@ -822,7 +822,6 @@ const Dashboard = ({
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <h3 className="text-sm font-medium text-red-900 flex items-center">
-                                            <ExclamationTriangleIcon className="h-4 w-4 mr-1" />
                                             Past Due Invoices
                                         </h3>
                                         <div className="flex items-center mt-2">

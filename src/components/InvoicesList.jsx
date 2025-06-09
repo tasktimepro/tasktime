@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
@@ -38,9 +38,28 @@ const InvoicesList = ({
 }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
-    const [activeTab, setActiveTab] = useState('outstanding');
+    
+    // Default to overdue tab if there are overdue invoices, otherwise outstanding
+    const defaultTab = useMemo(() => {
+        const hasOverdueInvoices = projectInvoices.some(invoice => 
+            !invoice.paymentProcessed && isInvoiceOverdue(invoice)
+        );
+        return hasOverdueInvoices ? 'overdue' : 'outstanding';
+    }, [projectInvoices]);
+    
+    const [activeTab, setActiveTab] = useState(defaultTab);
+    
+    // Update active tab when default tab changes (e.g., when overdue invoices appear/disappear)
+    const prevDefaultTab = useRef(defaultTab);
+    useEffect(() => {
+        if (prevDefaultTab.current !== defaultTab && activeTab === prevDefaultTab.current) {
+            setActiveTab(defaultTab);
+        }
+        prevDefaultTab.current = defaultTab;
+    }, [defaultTab, activeTab]);
     const [outstandingPage, setOutstandingPage] = useState(1);
     const [paidPage, setPaidPage] = useState(1);
+    const [overduePage, setOverduePage] = useState(1);
     const ITEMS_PER_PAGE = 8;
 
     // Filter invoices by payment status
@@ -51,6 +70,11 @@ const InvoicesList = ({
     const paidInvoices = useMemo(() => 
         projectInvoices.filter(invoice => invoice.paymentProcessed),
     [projectInvoices]);
+
+    // Filter overdue invoices (subset of outstanding)
+    const overdueInvoices = useMemo(() => 
+        outstandingInvoices.filter(invoice => isInvoiceOverdue(invoice)),
+    [outstandingInvoices]);
 
     // Calculate paginated invoices for each tab
     const paginatedOutstandingInvoices = useMemo(() => {
@@ -63,6 +87,11 @@ const InvoicesList = ({
         return paidInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [paidInvoices, paidPage]);
 
+    const paginatedOverdueInvoices = useMemo(() => {
+        const startIndex = (overduePage - 1) * ITEMS_PER_PAGE;
+        return overdueInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [overdueInvoices, overduePage]);
+
     // Calculate total pages for each tab
     const outstandingTotalPages = useMemo(() => 
         Math.ceil(outstandingInvoices.length / ITEMS_PER_PAGE) || 1,
@@ -71,6 +100,10 @@ const InvoicesList = ({
     const paidTotalPages = useMemo(() => 
         Math.ceil(paidInvoices.length / ITEMS_PER_PAGE) || 1,
     [paidInvoices.length]);
+
+    const overdueTotalPages = useMemo(() => 
+        Math.ceil(overdueInvoices.length / ITEMS_PER_PAGE) || 1,
+    [overdueInvoices.length]);
     
     // Handle page change for outstanding invoices
     const handleOutstandingPageChange = (pageNumber) => {
@@ -82,6 +115,13 @@ const InvoicesList = ({
     // Handle page change for paid invoices
     const handlePaidPageChange = (pageNumber) => {
         setPaidPage(pageNumber);
+        // Scroll to top of the invoice list
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // Handle page change for overdue invoices
+    const handleOverduePageChange = (pageNumber) => {
+        setOverduePage(pageNumber);
         // Scroll to top of the invoice list
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -215,13 +255,29 @@ const InvoicesList = ({
         // Update the invoices state
         setInvoices(updatedInvoices);
 
-        // If marking as paid and we're on outstanding tab, and it's the last item on the page,
+        // If marking as paid and we're on outstanding or overdue tab, and it's the last item on the page,
         // go to previous page if available
-        if (!invoice.paymentProcessed && activeTab === 'outstanding') {
-            const remainingOutstanding = outstandingInvoices.filter(inv => inv.id !== invoice.id);
-            const newTotalPages = Math.ceil(remainingOutstanding.length / ITEMS_PER_PAGE) || 1;
-            if (outstandingPage > newTotalPages) {
-                setOutstandingPage(Math.max(1, newTotalPages));
+        if (!invoice.paymentProcessed && (activeTab === 'outstanding' || activeTab === 'overdue')) {
+            let remainingInvoices, setPage;
+            
+            if (activeTab === 'overdue') {
+                remainingInvoices = overdueInvoices.filter(inv => inv.id !== invoice.id);
+                setPage = setOverduePage;
+                // If no more overdue invoices, switch to outstanding tab
+                if (remainingInvoices.length === 0) {
+                    setActiveTab('outstanding');
+                    return;
+                }
+            } else {
+                remainingInvoices = outstandingInvoices.filter(inv => inv.id !== invoice.id);
+                setPage = setOutstandingPage;
+            }
+            
+            const newTotalPages = Math.ceil(remainingInvoices.length / ITEMS_PER_PAGE) || 1;
+            const currentPageForTab = activeTab === 'overdue' ? overduePage : outstandingPage;
+            
+            if (currentPageForTab > newTotalPages) {
+                setPage(Math.max(1, newTotalPages));
             }
         }
     };
@@ -231,11 +287,14 @@ const InvoicesList = ({
         <div className="text-center py-8">
             <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-4 text-sm font-medium text-gray-900">
-                {tabType === 'outstanding' ? 'No outstanding invoices' : 'No paid invoices'}
+                {tabType === 'outstanding' ? 'No outstanding invoices' : 
+                 tabType === 'overdue' ? 'No overdue invoices' : 'No paid invoices'}
             </h3>
             <p className="mt-1 text-sm text-gray-500">
                 {tabType === 'outstanding' 
                     ? 'All your invoices have been paid.'
+                    : tabType === 'overdue'
+                    ? 'All your invoices are up to date.'
                     : 'No invoices have been marked as paid yet.'
                 }
             </p>
@@ -244,11 +303,27 @@ const InvoicesList = ({
 
     // Render invoice list for current tab
     const renderInvoiceList = () => {
-        const currentInvoices = activeTab === 'outstanding' ? paginatedOutstandingInvoices : paginatedPaidInvoices;
-        const currentPage = activeTab === 'outstanding' ? outstandingPage : paidPage;
-        const totalPages = activeTab === 'outstanding' ? outstandingTotalPages : paidTotalPages;
-        const handlePageChange = activeTab === 'outstanding' ? handleOutstandingPageChange : handlePaidPageChange;
-        const totalInvoices = activeTab === 'outstanding' ? outstandingInvoices.length : paidInvoices.length;
+        let currentInvoices, currentPage, totalPages, handlePageChange, totalInvoices;
+        
+        if (activeTab === 'overdue') {
+            currentInvoices = paginatedOverdueInvoices;
+            currentPage = overduePage;
+            totalPages = overdueTotalPages;
+            handlePageChange = handleOverduePageChange;
+            totalInvoices = overdueInvoices.length;
+        } else if (activeTab === 'outstanding') {
+            currentInvoices = paginatedOutstandingInvoices;
+            currentPage = outstandingPage;
+            totalPages = outstandingTotalPages;
+            handlePageChange = handleOutstandingPageChange;
+            totalInvoices = outstandingInvoices.length;
+        } else {
+            currentInvoices = paginatedPaidInvoices;
+            currentPage = paidPage;
+            totalPages = paidTotalPages;
+            handlePageChange = handlePaidPageChange;
+            totalInvoices = paidInvoices.length;
+        }
 
         if (currentInvoices.length === 0) {
             return renderEmptyState(activeTab);
@@ -310,11 +385,6 @@ const InvoicesList = ({
                                                 : 'text-gray-500'
                                         }`}>
                                             Due: {invoice.dueDate}
-                                            {isInvoiceOverdue(invoice) && (
-                                                <span className="ml-2 text-xs bg-red-100 text-red-800 px-1 py-0.5 rounded">
-                                                    OVERDUE
-                                                </span>
-                                            )}
                                         </p>
                                     )}
                                     <div className="text-xs text-gray-400 mt-1">
@@ -593,6 +663,19 @@ const InvoicesList = ({
         <div className="space-y-6">
             {/* Tabs */}
             <div className="flex border-b border-gray-200">
+                {/* Overdue tab - only show when there are overdue invoices */}
+                {overdueInvoices.length > 0 && (
+                    <button
+                        className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
+                            activeTab === 'overdue'
+                                ? 'border-red-500 text-red-700'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                        onClick={() => handleTabChange('overdue')}
+                    >
+                        Overdue ({overdueInvoices.length})
+                    </button>
+                )}
                 <button
                     className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
                         activeTab === 'outstanding'
