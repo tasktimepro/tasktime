@@ -376,7 +376,6 @@ const InvoiceGenerator = ({
     const [invoiceNoteCollapsed, setInvoiceNoteCollapsed] = useState(true);
     
     // Pricing & Totals state
-    const [pricingCollapsed, setPricingCollapsed] = useState(true);
     const [discountType, setDiscountType] = useState('percentage'); // 'percentage' or 'fixed'
     const [discountValue, setDiscountValue] = useState(0);
     const [shippingAmount, setShippingAmount] = useState(0);
@@ -1375,8 +1374,6 @@ const InvoiceGenerator = ({
                     handleAdditionalTaskFlatRateChange={handleAdditionalTaskFlatRateChange}
                     handleAdditionalTaskQuantityChange={handleAdditionalTaskQuantityChange}
                     handleAdditionalTaskHourlyRateChange={handleAdditionalTaskHourlyRateChange}
-                    pricingCollapsed={pricingCollapsed}
-                    setPricingCollapsed={setPricingCollapsed}
                     calculatePricing={calculatePricing}
                     discountType={discountType}
                     setDiscountType={setDiscountType}
