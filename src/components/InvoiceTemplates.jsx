@@ -334,10 +334,9 @@ const InvoiceTemplates = ({
                                 <CustomCheckbox
                                     checked={formData.isDefault}
                                     onChange={() => setFormData(prev => ({ ...prev, isDefault: !prev.isDefault }))}
+                                    label="Set as default template"
+                                    labelClassName="block text-sm text-gray-900"
                                 />
-                                <label className="ml-2 block text-sm text-gray-900">
-                                    Set as default template
-                                </label>
                             </div>
                         </div>
 
@@ -381,10 +380,9 @@ const InvoiceTemplates = ({
                                     <CustomCheckbox
                                         checked={formData.useSequentialNumbers}
                                         onChange={() => setFormData(prev => ({ ...prev, useSequentialNumbers: !prev.useSequentialNumbers }))}
+                                        label="Use sequential numbering"
+                                        labelClassName="block text-sm text-gray-900"
                                     />
-                                    <label className="ml-2 block text-sm text-gray-900">
-                                        Use sequential numbering
-                                    </label>
                                 </div>
 
                                 {formData.useSequentialNumbers && (
@@ -425,10 +423,9 @@ const InvoiceTemplates = ({
                                         <CustomCheckbox
                                             checked={formData.sequentialResetYearly}
                                             onChange={() => setFormData(prev => ({ ...prev, sequentialResetYearly: !prev.sequentialResetYearly }))}
+                                            label="Reset sequential number yearly"
+                                            labelClassName="block text-sm text-gray-900"
                                         />
-                                        <label className="ml-2 block text-sm text-gray-900">
-                                            Reset sequential number yearly
-                                        </label>
                                         <span className="ml-2 text-xs text-gray-500">
                                             (Restarts at starting number each new year)
                                         </span>

@@ -436,10 +436,9 @@ const InvoiceModal = ({
                                                                 checked={mergedSubtasks[task.id] || false}
                                                                 onChange={() => handleToggleMergeSubtasks(task.id, !mergedSubtasks[task.id])}
                                                                 title="Merge subtasks with this parent task"
+                                                                label="Merge subtasks"
+                                                                labelClassName="text-xs text-blue-700 font-medium"
                                                             />
-                                                            <label className="ml-2 text-xs text-blue-700 font-medium">
-                                                                Merge subtasks
-                                                            </label>
                                                         </div>
                                                     )}
                                                     
@@ -448,10 +447,10 @@ const InvoiceModal = ({
                                                         <CustomCheckbox
                                                             checked={isUsingFlatRate}
                                                             onChange={() => handleToggleFlatRate(task.id, !isUsingFlatRate)}
+                                                            label="Flat rate"
+                                                            labelClassName="text-xs text-gray-700"
+                                                            id={`flat-rate-${task.id}`}
                                                         />
-                                                        <label htmlFor={`flat-rate-${task.id}`} className="ml-2 text-xs text-gray-700">
-                                                            Flat rate
-                                                        </label>
                                                     </div>
 
                                                     {isUsingFlatRate ? (
@@ -593,10 +592,10 @@ const InvoiceModal = ({
                                                         <CustomCheckbox
                                                             checked={isUsingFlatRate}
                                                             onChange={() => handleToggleFlatRate(task.id, !isUsingFlatRate)}
+                                                            label="Flat rate"
+                                                            labelClassName="text-xs text-gray-700"
+                                                            id={`flat-rate-${task.id}`}
                                                         />
-                                                        <label htmlFor={`flat-rate-${task.id}`} className="ml-2 text-xs text-gray-700">
-                                                            Flat rate
-                                                        </label>
                                                     </div>
 
                                                     {isUsingFlatRate ? (
@@ -684,10 +683,10 @@ const InvoiceModal = ({
                                                         <CustomCheckbox
                                                             checked={newTaskUseFlatRate}
                                                             onChange={handleToggleNewTaskFlatRate}
+                                                            label="Flat rate"
+                                                            labelClassName="text-xs text-gray-700"
+                                                            id="new-task-flat-rate"
                                                         />
-                                                        <label htmlFor="new-task-flat-rate" className="text-xs text-gray-700 ml-2">
-                                                            Flat rate
-                                                        </label>
                                                     </div>
 
                                                     {newTaskUseFlatRate && (
@@ -878,10 +877,10 @@ const InvoiceModal = ({
                                     <CustomCheckbox
                                         checked={taxOverride.enabled}
                                         onChange={() => setTaxOverride(prev => ({ ...prev, enabled: !prev.enabled }))}
+                                        label="Override tax settings"
+                                        labelClassName="text-sm font-medium text-gray-700"
+                                        id="taxOverrideEnabled"
                                     />
-                                    <label htmlFor="taxOverrideEnabled" className="text-sm font-medium text-gray-700">
-                                        Override tax settings
-                                    </label>
                                 </div>
 
                                 {taxOverride.enabled && (
@@ -1227,10 +1226,9 @@ const InvoiceModal = ({
                                     <CustomCheckbox
                                         checked={useInvoiceDateOverride}
                                         onChange={() => setUseInvoiceDateOverride(!useInvoiceDateOverride)}
+                                        label="Override invoice date"
+                                        labelClassName="text-sm font-medium text-gray-700"
                                     />
-                                    <label className="text-sm font-medium text-gray-700">
-                                        Override invoice date
-                                    </label>
                                 </div>
 
                                 {useInvoiceDateOverride && (

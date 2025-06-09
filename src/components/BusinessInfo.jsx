@@ -633,10 +633,9 @@ const BusinessInfo = ({
                                 id="isDefault"
                                 checked={formData.isDefault}
                                 onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
+                                label="Set as default business info"
+                                labelClassName="text-sm font-medium text-gray-700"
                             />
-                            <label htmlFor="isDefault" className="text-sm font-medium text-gray-700">
-                                Set as default business info
-                            </label>
                         </div>
 
                         <div className="flex justify-end space-x-3">
@@ -694,7 +693,7 @@ const BusinessInfo = ({
                                                         {info.title || info.name}
                                                     </h4>
                                                     {info.isDefault && (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                                             Default
                                                         </span>
                                                     )}

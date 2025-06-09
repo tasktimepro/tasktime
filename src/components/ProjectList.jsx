@@ -497,10 +497,10 @@ const ProjectList = ({
                             <CustomCheckbox
                                 checked={formData.flatRate}
                                 onChange={() => setFormData(prev => ({ ...prev, flatRate: !prev.flatRate }))}
+                                label="Flat rate project (non-hourly basis)"
+                                labelClassName="text-sm font-medium text-gray-700"
+                                id="flatRate"
                             />
-                            <label htmlFor="flatRate" className="text-sm font-medium text-gray-700">
-                                Flat rate project (non-hourly basis)
-                            </label>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -553,10 +553,10 @@ const ProjectList = ({
                                     <CustomCheckbox
                                         checked={formData.taxEnabled}
                                         onChange={() => setFormData(prev => ({ ...prev, taxEnabled: !prev.taxEnabled }))}
+                                        label="Enable tax for this project"
+                                        labelClassName="text-sm font-medium text-gray-700"
+                                        id="taxEnabled"
                                     />
-                                    <label htmlFor="taxEnabled" className="text-sm font-medium text-gray-700">
-                                        Enable tax for this project
-                                    </label>
                                 </div>
 
                                 {formData.taxEnabled && (
