@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { CreditCardIcon, BuildingOfficeIcon, UserGroupIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
 import { useToast } from '../hooks/useToast';
@@ -63,7 +63,7 @@ const Invoices = ({
     };
     
     // Define sections in order (first will be default)
-    const sideNavItems = [
+    const sideNavItems = useMemo(() => [
         {
             id: 'invoices',
             name: 'All Invoices',
@@ -94,10 +94,17 @@ const Invoices = ({
             icon: UserGroupIcon,
             description: 'Manage client information for invoices'
         }
-    ];
+    ], []);
     
     // Get current section from URL or default to first section
     const activeTab = urlParams.section || sideNavItems[0].id;
+    
+    // Set default section if not already set
+    useEffect(() => {
+        if (!urlParams.section) {
+            updateUrl({ section: sideNavItems[0].id });
+        }
+    }, [urlParams.section, updateUrl, sideNavItems]);
     
     // Check URL parameters for auto-opening create forms
     const autoOpenCreate = urlParams.create === 'template' || urlParams.create === 'payment-method' || urlParams.create === 'business-info' || urlParams.create === 'client-info';

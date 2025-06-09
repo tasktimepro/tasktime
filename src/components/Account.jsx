@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react';
 import { ArrowDownTrayIcon, CogIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
 import ExportImport from './ExportImport';
@@ -16,7 +17,7 @@ const Account = ({
     const { urlParams, updateUrl } = useUrlState();
     
     // Define sections in order (first will be default)
-    const sideNavItems = [
+    const sideNavItems = useMemo(() => [
         {
             id: 'preferences',
             name: 'Preferences',
@@ -29,15 +30,24 @@ const Account = ({
             icon: ArrowDownTrayIcon,
             description: 'Export and import your data'
         }
-    ];
+    ], []);
     
     // Get current section from URL or default to first section
     const activeTab = urlParams.section || sideNavItems[0].id;
+    
+    // Set default section if it's not already set
+    useEffect(() => {
+        if (!urlParams.section) {
+            updateUrl({ section: sideNavItems[0].id });
+        }
+    }, [urlParams.section, updateUrl, sideNavItems]);
 
     // Function to handle section changes
     const handleSectionChange = (sectionId) => {
         updateUrl({ section: sectionId, create: null });
-    };    const renderContent = () => {
+    };
+    
+    const renderContent = () => {
         switch (activeTab) {
             case 'preferences':
                 return <Preferences />;

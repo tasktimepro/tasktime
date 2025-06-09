@@ -67,8 +67,13 @@ export const useUrlState = () => {
      * Navigate to invoices view with optional parameters
      */
     const navigateToInvoices = useCallback((params = {}) => {
-        // If no tab is specified in params, explicitly clear it
+        // Ensure we clear section if not specified
         const finalParams = { view: 'invoices', project: null, ...params };
+        // If no section is specified, set it to the default (invoices)
+        if (!('section' in params)) {
+            finalParams.section = 'invoices';
+        }
+        // If no tab is specified in params, explicitly clear it
         if (!('tab' in params)) {
             finalParams.tab = null;
         }
@@ -79,7 +84,7 @@ export const useUrlState = () => {
      * Navigate to account view with optional parameters
      */
     const navigateToAccount = useCallback((params = {}) => {
-        updateUrl({ view: 'account', project: null, tab: null, ...params });
+        updateUrl({ view: 'account', project: null, tab: null, section: 'preferences', ...params });
     }, [updateUrl]);
 
     /**
