@@ -39,11 +39,11 @@ const InvoiceModal = ({
     handleFlatRateChange,
     handleQuantityChange,
     handleTaskHourlyRateChange,
-    handleToggleFlatRate,
     handleAdditionalTaskHoursChange,
     handleAdditionalTaskFlatRateChange,
     handleAdditionalTaskQuantityChange,
     handleAdditionalTaskHourlyRateChange,
+    handleToggleAdditionalTaskFlatRate,
     calculatePricing,
     discountType,
     setDiscountType,
@@ -332,7 +332,7 @@ const InvoiceModal = ({
                         </div>
                     </button>
                     {activeSection === 'tasksTime' && (
-                        <div className="p-4 space-y-4">
+                        <div className="p-4 space-y-2">
                             {/* Select All/Deselect All and Add Task buttons */}
                             <div className="flex justify-between items-center">
                                 <div className="flex space-x-2">
@@ -366,7 +366,15 @@ const InvoiceModal = ({
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setShowAddTaskForm(true)}
+                                    onClick={() => {
+                                        setShowAddTaskForm(true);
+                                        // Use setTimeout to ensure the form is rendered before focusing
+                                        setTimeout(() => {
+                                            if (taskInputRef && taskInputRef.current) {
+                                                taskInputRef.current.focus();
+                                            }
+                                        }, 50);
+                                    }}
                                     className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                                 >
                                     + Add Task
@@ -374,7 +382,7 @@ const InvoiceModal = ({
                             </div>
                             
                             {/* Tasks with Editable Hours */}
-                            <div className="mb-6">
+                            <div className="space-y-2">
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
                                     {/* Removed debug log */}
                                     {invoiceTasks.map((task) => {
@@ -446,7 +454,7 @@ const InvoiceModal = ({
                                                     <div className="flex items-center">
                                                         <CustomCheckbox
                                                             checked={isUsingFlatRate}
-                                                            onChange={() => handleToggleFlatRate(task.id, !isUsingFlatRate)}
+                                                            onChange={() => handleToggleAdditionalTaskFlatRate(task.id, !isUsingFlatRate)}
                                                             label="Flat rate"
                                                             labelClassName="text-xs text-gray-700"
                                                             id={`flat-rate-${task.id}`}
@@ -591,7 +599,7 @@ const InvoiceModal = ({
                                                     <div className="flex items-center ">
                                                         <CustomCheckbox
                                                             checked={isUsingFlatRate}
-                                                            onChange={() => handleToggleFlatRate(task.id, !isUsingFlatRate)}
+                                                            onChange={() => handleToggleAdditionalTaskFlatRate(task.id, !isUsingFlatRate)}
                                                             label="Flat rate"
                                                             labelClassName="text-xs text-gray-700"
                                                             id={`flat-rate-${task.id}`}
@@ -673,6 +681,13 @@ const InvoiceModal = ({
                                                     placeholder="Task description"
                                                     className="w-full text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
                                                     required
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            handleAddAdditionalTask();
+                                                        }
+                                                    }}
                                                 />
                                             </div>
 
@@ -700,6 +715,13 @@ const InvoiceModal = ({
                                                                 onChange={(e) => setNewTaskQuantity(e.target.value)}
                                                                 className="w-16 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
                                                                 placeholder="1"
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        handleAddAdditionalTask();
+                                                                    }
+                                                                }}
                                                             />
                                                         </div>
                                                     )}
@@ -716,6 +738,13 @@ const InvoiceModal = ({
                                                             onChange={(e) => setNewTaskHours(e.target.value)}
                                                             placeholder={newTaskUseFlatRate ? "0.00" : "Hours"}
                                                             className="w-24 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleAddAdditionalTask();
+                                                                }
+                                                            }}
                                                         />
                                                     </div>
 
@@ -730,6 +759,13 @@ const InvoiceModal = ({
                                                                 onChange={(e) => setNewTaskHourlyRate(e.target.value)}
                                                                 placeholder="0.00"
                                                                 className="w-20 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        handleAddAdditionalTask();
+                                                                    }
+                                                                }}
                                                             />
                                                         </div>
                                                     )}
@@ -744,7 +780,7 @@ const InvoiceModal = ({
                                                             setNewTaskTitle('');
                                                             setNewTaskHours('');
                                                             setNewTaskHourlyRate('');
-                                                            setNewTaskUseFlatRate(false);
+                                                            setNewTaskUseFlatRate(selectedProject?.flatRate || false);
                                                         }}
                                                         className="h-[36px] px-3 bg-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-400"
                                                     >

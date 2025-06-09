@@ -575,17 +575,6 @@ const InvoiceGenerator = ({
     const handleFlatRateChange = InvoiceHandler.handleFlatRateChange(setTaskFlatRates);
     const handleQuantityChange = InvoiceHandler.handleQuantityChange(setTaskQuantities);
     const handleTaskHourlyRateChange = InvoiceHandler.handleTaskHourlyRateChange(setTaskHourlyRates);
-    const handleToggleFlatRate = InvoiceHandler.handleToggleFlatRate(
-        setUseFlatRate,
-        setTaskFlatRates,
-        setTaskQuantities,
-        invoiceTasks,
-        editableHours,
-        selectedProject,
-        taskFlatRates,
-        taskQuantities,
-        InvoiceHandler.handleFlatRateChange(setTaskFlatRates)
-    );
     const handleToggleNewTaskFlatRate = InvoiceHandler.handleToggleNewTaskFlatRate(setNewTaskUseFlatRate);
     const handleToggleMergeSubtasks = InvoiceHandler.handleToggleMergeSubtasks(
         setMergedSubtasks,
@@ -627,6 +616,7 @@ const InvoiceGenerator = ({
     const handleAdditionalTaskFlatRateChange = InvoiceHandler.handleAdditionalTaskFlatRateChange(setAdditionalTasks);
     const handleAdditionalTaskQuantityChange = InvoiceHandler.handleAdditionalTaskQuantityChange(setAdditionalTasks);
     const handleAdditionalTaskHourlyRateChange = InvoiceHandler.handleAdditionalTaskHourlyRateChange(setAdditionalTasks);
+    const handleToggleAdditionalTaskFlatRate = InvoiceHandler.handleToggleAdditionalTaskFlatRate(setAdditionalTasks, setUseFlatRate);
     const handleClientInfoSelection = InvoiceHandler.handleClientInfoSelection(setSelectedClientInfo, clientInfos);
     const handleResetInvoiceForm = InvoiceHandler.handleResetInvoiceForm(
         setInvoiceTasks,
@@ -666,13 +656,20 @@ const InvoiceGenerator = ({
         setSelectedTemplate,
         invoiceTemplates,
         setUseFlatRate,
-        setTaskQuantities
+        setTaskQuantities,
+        setNewTaskUseFlatRate
     );
     const handleCancel = InvoiceHandler.handleCancel(
         setShowInvoiceForm,
         handleResetInvoiceForm,
         setProjectManuallyChanged,
-        onInvoiceSaved
+        onInvoiceSaved,
+        setShowAddTaskForm,
+        setNewTaskTitle,
+        setNewTaskHours,
+        setNewTaskHourlyRate,
+        setNewTaskQuantity,
+        setNewTaskUseFlatRate
     );
 
     /**
@@ -1319,6 +1316,13 @@ const InvoiceGenerator = ({
                 setUseFlatRate({});
                 setTaskHourlyRates({});
                 setSelectedTasksForBilling({});
+                
+                // Set new task flat rate toggle based on project setting even when no billable tasks
+                if (selectedProject && selectedProject.flatRate) {
+                    setNewTaskUseFlatRate(true);
+                } else {
+                    setNewTaskUseFlatRate(false);
+                }
             }
             
             // When opened from a project context, lock the project selection
@@ -1447,11 +1451,11 @@ const InvoiceGenerator = ({
                     handleFlatRateChange={handleFlatRateChange}
                     handleQuantityChange={handleQuantityChange}
                     handleTaskHourlyRateChange={handleTaskHourlyRateChange}
-                    handleToggleFlatRate={handleToggleFlatRate}
                     handleAdditionalTaskHoursChange={handleAdditionalTaskHoursChange}
                     handleAdditionalTaskFlatRateChange={handleAdditionalTaskFlatRateChange}
                     handleAdditionalTaskQuantityChange={handleAdditionalTaskQuantityChange}
                     handleAdditionalTaskHourlyRateChange={handleAdditionalTaskHourlyRateChange}
+                    handleToggleAdditionalTaskFlatRate={handleToggleAdditionalTaskFlatRate}
                     calculatePricing={calculatePricing}
                     discountType={discountType}
                     setDiscountType={setDiscountType}

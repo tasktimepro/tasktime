@@ -136,7 +136,8 @@ export const handleAddAdditionalTask = (setAdditionalTasks, setUseFlatRate, newT
     setNewTaskTitle('');
     setNewTaskHours('');
     setNewTaskHourlyRate('');
-    setNewTaskUseFlatRate(false);
+    // Preserve the project's flat rate setting instead of always resetting to false
+    setNewTaskUseFlatRate(selectedProject?.flatRate || false);
     setNewTaskQuantity(1);
     setShowAddTaskForm(false);
 };
@@ -200,6 +201,27 @@ export const handleAdditionalTaskHourlyRateChange = (setAdditionalTasks) => (tas
             task.id === taskId ? { ...task, hourlyRate: newRate } : task
         ));
     }
+};
+
+// Toggle flat rate for additional tasks
+export const handleToggleAdditionalTaskFlatRate = (setAdditionalTasks, setUseFlatRate) => (taskId, value) => {
+    // Update the task object itself
+    setAdditionalTasks(prev => prev.map(task => 
+        task.id === taskId ? { 
+            ...task, 
+            useFlatRate: value,
+            // When switching to flat rate, convert hours to flat rate if needed
+            flatRate: value && !task.flatRate ? task.hours * (task.hourlyRate || 0) : task.flatRate,
+            // When switching to hourly, set hours to 0 if not already set
+            hours: !value && !task.hours ? 0 : task.hours
+        } : task
+    ));
+    
+    // Also update the useFlatRate state object for consistency
+    setUseFlatRate(prev => ({
+        ...prev,
+        [taskId]: value
+    }));
 };
 
 // Handle client info selection from dropdown
@@ -277,7 +299,8 @@ export const handleProjectSelection = (
     setSelectedTemplate,
     invoiceTemplates,
     setUseFlatRate,
-    setTaskQuantities
+    setTaskQuantities,
+    setNewTaskUseFlatRate
 ) => (projectId) => {
     if (projectId === "") {
         setSelectedProject(null);
@@ -393,6 +416,15 @@ export const handleProjectSelection = (
                     }
                 }
             }
+            
+            // Set new task flat rate toggle based on project setting
+            if (setNewTaskUseFlatRate) {
+                if (selectedProj.flatRate) {
+                    setNewTaskUseFlatRate(true);
+                } else {
+                    setNewTaskUseFlatRate(false);
+                }
+            }
         }
     }
 };
@@ -402,11 +434,25 @@ export const handleCancel = (
     setShowInvoiceForm,
     resetInvoiceForm,
     setProjectManuallyChanged,
-    onInvoiceSaved
+    onInvoiceSaved,
+    setShowAddTaskForm,
+    setNewTaskTitle,
+    setNewTaskHours,
+    setNewTaskHourlyRate,
+    setNewTaskQuantity,
+    setNewTaskUseFlatRate
 ) => () => {
     setShowInvoiceForm(false);
     resetInvoiceForm();
     setProjectManuallyChanged(false);
+    
+    // Reset add task form
+    setShowAddTaskForm(false);
+    setNewTaskTitle('');
+    setNewTaskHours('');
+    setNewTaskHourlyRate('');
+    setNewTaskQuantity(1);
+    setNewTaskUseFlatRate(false);
     
     if (onInvoiceSaved) {
         onInvoiceSaved();
