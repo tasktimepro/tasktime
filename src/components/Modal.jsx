@@ -5,6 +5,24 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 /**
  * Reusable Modal component with ESC key handling and background scroll prevention
  * 
+ * IMPORTANT: For consistency, always use the 'footer' prop to add action buttons (Cancel, Save, Delete, etc.)
+ * instead of including buttons directly in the modal content. This ensures consistent styling and layout
+ * across the entire application.
+ * 
+ * Example usage:
+ * ```jsx
+ * const modalFooter = (
+ *   <div className="flex justify-end space-x-3">
+ *     <button onClick={onCancel} className="...">Cancel</button>
+ *     <button onClick={onSave} className="...">Save</button>
+ *   </div>
+ * );
+ * 
+ * <Modal isOpen={true} onClose={onClose} footer={modalFooter}>
+ *   Content goes here
+ * </Modal>
+ * ```
+ * 
  * @param {Object} props - Component props
  * @param {boolean} props.isOpen - Whether the modal is open
  * @param {Function} props.onClose - Function to close the modal
@@ -13,7 +31,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
  * @param {string} props.size - Modal size (sm, md, lg, xl, full)
  * @param {boolean} props.showCloseButton - Whether to show the close button
  * @param {string} props.className - Additional class names for the modal content wrapper
- * @param {React.ReactNode} props.footer - Footer content (optional)
+ * @param {React.ReactNode} props.footer - Footer content (optional) - USE THIS FOR ACTION BUTTONS
  */
 const Modal = ({
   isOpen,

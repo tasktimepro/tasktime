@@ -439,6 +439,15 @@ function App() {
                         timeEntries={timeEntries}
                         invoices={invoices}
                         onImport={handleImport}
+                        setProjects={setProjects}
+                        setTasks={setTasks}
+                        setTimeEntries={setTimeEntries}
+                        setInvoices={setInvoices}
+                        setPaymentMethods={setPaymentMethods}
+                        setBusinessInfos={setBusinessInfos}
+                        setClientInfos={setClientInfos}
+                        setInvoiceTemplates={setInvoiceTemplates}
+                        setCurrentTimer={setCurrentTimer}
                     />
                 )}
             </main>

@@ -39,7 +39,7 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
      */
     const handleExport = () => {
         const exportData = {
-            version: '3.0',
+            version: '1.0',
             exportDate: new Date().toISOString(),
             projects: projects,
             tasks: tasks,

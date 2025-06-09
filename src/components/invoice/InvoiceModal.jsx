@@ -114,7 +114,12 @@ const InvoiceModal = ({
             setActiveSection('projectClient');
             return;
         }
-        if (invoiceTasks.length === 0) {
+        // Check if there are any tasks to bill (either from project or additional tasks)
+        const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length;
+        const hasAnyTasks = invoiceTasks.length > 0 || additionalTasks.length > 0;
+        const hasSelectedTasks = selectedTasksCount > 0 || additionalTasks.length > 0;
+        
+        if (!hasAnyTasks || !hasSelectedTasks) {
             setActiveSection('tasksTime');
             return;
         }
@@ -190,8 +195,8 @@ const InvoiceModal = ({
                                 </div>
 
                                 {projects.length === 0 ? (
-                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800 mb-3">
+                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        <p className="text-sm text-yellow-800">
                                             No projects found. Create a project to continue with invoice generation.
                                         </p>
                                         {onNavigateToProjects && !isProjectContextFixed && !editingInvoice && (
@@ -255,8 +260,8 @@ const InvoiceModal = ({
                                 </div>
 
                                 {clientInfos.length === 0 ? (
-                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800 mb-3">
+                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        <p className="text-sm text-yellow-800">
                                             No client information found. Create one to include client details in the invoice.
                                         </p>
                                         <button
@@ -1033,8 +1038,8 @@ const InvoiceModal = ({
                                 </div>
 
                                 {businessInfos.length === 0 ? (
-                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800 mb-3">
+                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        <p className="text-sm text-yellow-800">
                                             No business information found. Create one to include your business details in the invoice.
                                         </p>
                                         <button
@@ -1096,8 +1101,8 @@ const InvoiceModal = ({
                                 </div>
 
                                 {paymentMethods.length === 0 ? (
-                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800 mb-3">
+                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        <p className="text-sm text-yellow-800">
                                             No payment methods found. Create one to include payment details in your invoice.
                                         </p>
                                         <button
@@ -1183,8 +1188,8 @@ const InvoiceModal = ({
                                 </div>
 
                                 {invoiceTemplates.length === 0 ? (
-                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800 mb-3">
+                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        <p className="text-sm text-yellow-800">
                                             No invoice templates found. Create a template to continue with invoice generation.
                                         </p>
                                         <button
