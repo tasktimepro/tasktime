@@ -11,7 +11,8 @@ export const useUrlState = () => {
             view: params.get('view') || 'dashboard',
             projectId: params.get('project') || null,
             section: params.get('section') || null,
-            create: params.get('create') || null
+            create: params.get('create') || null,
+            tab: params.get('tab') || null
         };
     });
 
@@ -41,7 +42,8 @@ export const useUrlState = () => {
                 view: searchParams.get('view') || 'dashboard',
                 projectId: searchParams.get('project') || null,
                 section: searchParams.get('section') || null,
-                create: searchParams.get('create') || null
+                create: searchParams.get('create') || null,
+                tab: searchParams.get('tab') || null
             });
         }
     }, []);
@@ -92,7 +94,8 @@ export const useUrlState = () => {
                 view: params.get('view') || 'dashboard',
                 projectId: params.get('project') || null,
                 section: params.get('section') || null,
-                create: params.get('create') || null
+                create: params.get('create') || null,
+                tab: params.get('tab') || null
             });
         };
 

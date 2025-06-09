@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol } from '../utils/currencyUtils';
+import { useUrlState } from '../hooks/useUrlState';
 import Pagination from './Pagination';
 import Modal from './Modal';
 
@@ -34,18 +35,27 @@ const InvoicesList = ({
     clientInfos = [],
     hideNewInvoiceButton = false,
     setInvoices,
-    invoiceTemplates = []
+    invoiceTemplates = [],
+    selectedTab = null // New prop to preselect a tab
 }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
+    const { updateUrl } = useUrlState();
     
     // Default to overdue tab if there are overdue invoices, otherwise outstanding
+    // But allow override via selectedTab prop
     const defaultTab = useMemo(() => {
+        // If a specific tab is selected via prop, use that (if valid)
+        if (selectedTab && ['overdue', 'outstanding', 'paid'].includes(selectedTab)) {
+            return selectedTab;
+        }
+        
+        // Otherwise use the existing logic
         const hasOverdueInvoices = projectInvoices.some(invoice => 
             !invoice.paymentProcessed && isInvoiceOverdue(invoice)
         );
         return hasOverdueInvoices ? 'overdue' : 'outstanding';
-    }, [projectInvoices]);
+    }, [projectInvoices, selectedTab]);
     
     const [activeTab, setActiveTab] = useState(defaultTab);
     
@@ -129,6 +139,8 @@ const InvoicesList = ({
     // Handle tab change
     const handleTabChange = (tab) => {
         setActiveTab(tab);
+        // Update URL to reflect the selected tab
+        updateUrl({ tab });
     };
 
     /**

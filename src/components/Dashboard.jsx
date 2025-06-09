@@ -771,7 +771,7 @@ const Dashboard = ({
                         {/* Outstanding Invoices */}
                         {invoiceMetrics.outstanding > 0 ? (
                             <button
-                                onClick={() => navigateToInvoices()}
+                                onClick={() => navigateToInvoices({ section: 'invoices', tab: 'outstanding' })}
                                 className="bg-amber-50 rounded-lg p-4 text-left hover:bg-amber-100 transition-colors border border-amber-200"
                             >
                                 <div className="flex items-center justify-between">
@@ -816,7 +816,7 @@ const Dashboard = ({
                         {/* Past Due Invoices */}
                         {invoiceMetrics.pastDue > 0 ? (
                             <button
-                                onClick={() => navigateToInvoices()}
+                                onClick={() => navigateToInvoices({ section: 'invoices', tab: 'overdue' })}
                                 className="bg-red-50 rounded-lg p-4 text-left hover:bg-red-100 transition-colors border border-red-200"
                             >
                                 <div className="flex items-center justify-between">

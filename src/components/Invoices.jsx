@@ -143,6 +143,7 @@ const Invoices = ({
                             clientInfos={clientInfos}
                             setInvoices={setInvoices}
                             invoiceTemplates={invoiceTemplates}
+                            selectedTab={urlParams.tab} // Pass the tab from URL
                         />
                     </div>
                 );
