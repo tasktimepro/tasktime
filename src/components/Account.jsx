@@ -14,6 +14,11 @@ const Account = ({
     tasks, 
     timeEntries,
     invoices, 
+    paymentMethods,
+    businessInfos,
+    clientInfos,
+    invoiceTemplates,
+    preferences,
     onImport,
     setProjects,
     setTasks,
@@ -23,6 +28,7 @@ const Account = ({
     setBusinessInfos,
     setClientInfos,
     setInvoiceTemplates,
+    setPreferences,
     setCurrentTimer
 }) => {
     const { urlParams, updateUrl } = useUrlState();
@@ -85,6 +91,7 @@ const Account = ({
         setBusinessInfos([]);
         setClientInfos([]);
         setInvoiceTemplates([]);
+        setPreferences({});
         setCurrentTimer(null);
 
         // Close modal and reset state
@@ -115,7 +122,7 @@ const Account = ({
     const renderContent = () => {
         switch (activeTab) {
             case 'preferences':
-                return <Preferences />;
+                return <Preferences preferences={preferences} setPreferences={setPreferences} />;
             case 'backup':
                 return (
                     <div>
@@ -130,6 +137,11 @@ const Account = ({
                             tasks={tasks} 
                             timeEntries={timeEntries} 
                             invoices={invoices}
+                            paymentMethods={paymentMethods}
+                            businessInfos={businessInfos}
+                            clientInfos={clientInfos}
+                            invoiceTemplates={invoiceTemplates}
+                            preferences={preferences}
                             onImport={onImport}
                         />
                     </div>

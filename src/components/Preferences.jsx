@@ -1,24 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '../hooks/useToast';
-import { CURRENCY_SYMBOLS, getPreferredCurrency, setPreferredCurrency as savePreferredCurrency } from '../utils/currencyUtils';
+import { CURRENCY_SYMBOLS } from '../utils/currencyUtils';
 
 /**
  * Preferences component - Manages user preferences including preferred currency
  */
-const Preferences = () => {
+const Preferences = ({ preferences = {}, setPreferences }) => {
     const [preferredCurrency, setPreferredCurrency] = useState('USD');
     const { showSuccess } = useToast();
 
-    // Load preferred currency from localStorage on mount
+    // Load preferred currency from preferences prop on mount
     useEffect(() => {
-        setPreferredCurrency(getPreferredCurrency());
-    }, []);
+        const currency = preferences.currency || 'USD';
+        setPreferredCurrency(currency);
+    }, [preferences]);
 
-    // Save preferred currency to localStorage
+    // Save preferred currency to preferences state
     const handleCurrencyChange = (e) => {
         const newCurrency = e.target.value;
         setPreferredCurrency(newCurrency);
-        savePreferredCurrency(newCurrency);
+        
+        // Update preferences state
+        if (setPreferences) {
+            setPreferences(prev => ({
+                ...prev,
+                currency: newCurrency
+            }));
+        }
         
         // Dispatch custom event to notify other components
         window.dispatchEvent(new CustomEvent('preferenceChanged', {

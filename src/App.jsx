@@ -26,6 +26,7 @@ function App() {
     const [clientInfos, setClientInfos] = useLocalStorage('clientInfos', []);
     const [invoices, setInvoices] = useLocalStorage('invoices', []);
     const [invoiceTemplates, setInvoiceTemplates] = useLocalStorage('invoiceTemplates', []);
+    const [preferences, setPreferences] = useLocalStorage('preferences', {});
     
     // Unified timer state (all timer-related data in one localStorage key)
     const [timerState, setTimerState] = useLocalStorage('timer', {
@@ -224,16 +225,24 @@ function App() {
             };
         });
 
+        // Import all data types
         setProjects(migratedProjects);
         setTasks(migratedTasks);
         setInvoices(allInvoices);
-        setTimeEntries(importData.timeEntries || []); // Import time entries if provided
+        setTimeEntries(importData.timeEntries || []);
+        setPaymentMethods(importData.paymentMethods || []);
+        setBusinessInfos(importData.businessInfos || []);
+        setClientInfos(importData.clientInfos || []);
+        setInvoiceTemplates(importData.invoiceTemplates || []);
+        setPreferences(importData.preferences || {});
+        
+        // Clear any active timer
         setTimerState({
             startTime: null,
             taskId: null,
             paused: false,
             elapsedTime: 0
-        }); // Clear any active timer
+        });
     };
 
     return (
@@ -438,6 +447,11 @@ function App() {
                         tasks={tasks}
                         timeEntries={timeEntries}
                         invoices={invoices}
+                        paymentMethods={paymentMethods}
+                        businessInfos={businessInfos}
+                        clientInfos={clientInfos}
+                        invoiceTemplates={invoiceTemplates}
+                        preferences={preferences}
                         onImport={handleImport}
                         setProjects={setProjects}
                         setTasks={setTasks}
@@ -447,6 +461,7 @@ function App() {
                         setBusinessInfos={setBusinessInfos}
                         setClientInfos={setClientInfos}
                         setInvoiceTemplates={setInvoiceTemplates}
+                        setPreferences={setPreferences}
                         setCurrentTimer={setCurrentTimer}
                     />
                 )}

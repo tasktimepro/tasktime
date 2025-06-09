@@ -5,9 +5,25 @@ import Modal from './Modal';
 
 /**
  * ExportImport component for backing up and restoring application data
- * Provides JSON export/import functionality for projects and tasks
+ * Provides JSON export/import functionality for all application data including:
+ * - Projects, tasks, time entries, and invoices
+ * - Payment methods, business info, client info, and invoice templates  
+ * - User preferences (currency, etc.)
+ * 
+ * Note: Timer state is intentionally excluded from export/import
  */
-function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], onImport }) {
+function ExportImport({ 
+    projects, 
+    tasks = [], 
+    timeEntries = [], 
+    invoices = [], 
+    paymentMethods = [],
+    businessInfos = [],
+    clientInfos = [],
+    invoiceTemplates = [],
+    preferences = {},
+    onImport 
+}) {
     const [showImportModal, setShowImportModal] = useState(false);
     const [importData, setImportData] = useState('');
     const [importError, setImportError] = useState('');
@@ -44,7 +60,12 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
             projects: projects,
             tasks: tasks,
             timeEntries: timeEntries,
-            invoices: invoices
+            invoices: invoices,
+            paymentMethods: paymentMethods,
+            businessInfos: businessInfos,
+            clientInfos: clientInfos,
+            invoiceTemplates: invoiceTemplates,
+            preferences: preferences
         };
 
         const dataStr = JSON.stringify(exportData, null, 2);
@@ -96,12 +117,42 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
                 throw new Error('Invalid data format: invoices must be an array');
             }
 
+            // Validate paymentMethods if present
+            if (parsedData.paymentMethods && !Array.isArray(parsedData.paymentMethods)) {
+                throw new Error('Invalid data format: paymentMethods must be an array');
+            }
+
+            // Validate businessInfos if present
+            if (parsedData.businessInfos && !Array.isArray(parsedData.businessInfos)) {
+                throw new Error('Invalid data format: businessInfos must be an array');
+            }
+
+            // Validate clientInfos if present
+            if (parsedData.clientInfos && !Array.isArray(parsedData.clientInfos)) {
+                throw new Error('Invalid data format: clientInfos must be an array');
+            }
+
+            // Validate invoiceTemplates if present
+            if (parsedData.invoiceTemplates && !Array.isArray(parsedData.invoiceTemplates)) {
+                throw new Error('Invalid data format: invoiceTemplates must be an array');
+            }
+
+            // Validate preferences if present
+            if (parsedData.preferences && typeof parsedData.preferences !== 'object') {
+                throw new Error('Invalid data format: preferences must be an object');
+            }
+
             // Call the import handler with all data
             onImport({
                 projects: parsedData.projects,
                 tasks: parsedData.tasks || [],
                 timeEntries: parsedData.timeEntries || [],
-                invoices: parsedData.invoices || []
+                invoices: parsedData.invoices || [],
+                paymentMethods: parsedData.paymentMethods || [],
+                businessInfos: parsedData.businessInfos || [],
+                clientInfos: parsedData.clientInfos || [],
+                invoiceTemplates: parsedData.invoiceTemplates || [],
+                preferences: parsedData.preferences || {}
             });
             setShowImportModal(false);
             setImportData('');
@@ -157,7 +208,7 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
                         <h4 className="font-medium text-gray-900">Export Data</h4>
-                        <p className="text-sm text-gray-600">Download all your projects and tasks as JSON</p>
+                        <p className="text-sm text-gray-600">Download all your data including projects, tasks, invoices, settings, and more as JSON</p>
                     </div>
                     
                     <button
@@ -173,7 +224,7 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
                         <h4 className="font-medium text-gray-900">Import Data</h4>
-                        <p className="text-sm text-gray-600">Restore projects and tasks from JSON backup</p>
+                        <p className="text-sm text-gray-600">Restore all data including projects, tasks, invoices, settings, and more from JSON backup</p>
                     </div>
                     
                     <button
@@ -186,13 +237,19 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
                 </div>
 
                 {/* Data Summary */}
-                {projects.length > 0 && (
+                {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clientInfos.length > 0 || invoiceTemplates.length > 0) && (
                     <div className="p-4 bg-blue-50 rounded-lg">
                         <h4 className="font-medium text-blue-700 mb-2">Current Data</h4>
                         <div className="text-sm text-blue-700 space-y-1">
                             <p>Projects: <span className="font-medium">{projects.length}</span></p>
                             <p>Tasks: <span className="font-medium">{tasks.length}</span></p>
-                            <p>Time: <span className="font-medium">{calculateTotalTimeAcrossAllProjects()}</span></p>
+                            <p>Time Entries: <span className="font-medium">{timeEntries.length}</span></p>
+                            <p>Invoices: <span className="font-medium">{invoices.length}</span></p>
+                            <p>Payment Methods: <span className="font-medium">{paymentMethods.length}</span></p>
+                            <p>Business Info: <span className="font-medium">{businessInfos.length}</span></p>
+                            <p>Client Info: <span className="font-medium">{clientInfos.length}</span></p>
+                            <p>Invoice Templates: <span className="font-medium">{invoiceTemplates.length}</span></p>
+                            <p>Total Time: <span className="font-medium">{calculateTotalTimeAcrossAllProjects()}</span></p>
                         </div>
                     </div>
                 )}
@@ -250,7 +307,7 @@ function ExportImport({ projects, tasks = [], timeEntries = [], invoices = [], o
                         <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                         <div className="text-sm text-yellow-700">
                             <p className="font-medium">Warning:</p>
-                            <p>Importing will replace all current data. Make sure to export your current data first if you want to keep it.</p>
+                            <p>Importing will replace all current data including projects, tasks, invoices, payment methods, business info, client info, templates, and preferences. Make sure to export your current data first if you want to keep it.</p>
                         </div>
                     </div>
                 </div>
