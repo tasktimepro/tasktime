@@ -1,4 +1,4 @@
-import { PlayIcon, PauseIcon, StopIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PlayIcon, PauseIcon, StopIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
 
 /**
@@ -235,10 +235,10 @@ function TimerControls({
                     </button>
                     {isGlobalTimer && <button
                         onClick={stopTimer}
-                            className="flex items-center space-x-1 p-1 text-yellow-600 hover:bg-yellow-100 rounded-md transition-colors group"
-                        title="Close Timer"
+                            className="flex items-center space-x-1 p-1 text-red-600 hover:bg-red-100 rounded-md transition-colors group"
+                        title="Save & Stop Timer"
                     >
-                        <XMarkIcon className={`${iconSize} group-hover:text-yellow-700`} />
+                        <StopIcon className={`${iconSize} group-hover:text-red-700`} />
                     </button>}
                 </div>
             ) : (
@@ -255,7 +255,7 @@ function TimerControls({
                     <button
                         onClick={stopTimer}
                         className={`${isGlobalTimer ? 'p-1' : 'flex items-center space-x-1 p-1'} text-red-600 hover:bg-red-100 rounded-md transition-colors group`}
-                        title="Stop Timer"
+                        title="Save & Stop Timer"
                     >
                         <StopIcon className={`${iconSize} group-hover:text-red-700`} />
                         {!isGlobalTimer && <span className="text-xs font-medium group-hover:text-red-700">Stop</span>}

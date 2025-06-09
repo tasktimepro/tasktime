@@ -565,7 +565,7 @@ const Dashboard = ({
                 setTasks={setTasks}
             />
         );
-    }, [currentTimer, isPaused, pausedElapsedTime, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTimeEntries, timeEntries]);
+    }, [currentTimer, isPaused, pausedElapsedTime, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTimeEntries, timeEntries, setTasks]);
 
     /**
      * Render task title with navigation
@@ -687,7 +687,7 @@ const Dashboard = ({
                 <div className="px-6 py-4 border-b border-gray-200">
                     <div className="flex items-center">
                         <ChartBarIcon className="h-5 w-5 text-blue-600 mr-2" />
-                        <h2 className="text-lg font-medium text-gray-900">Metrics Overview</h2>
+                        <h2 className="text-lg font-medium text-gray-900">Reports Overview</h2>
                     </div>
                 </div>
                 <div className="p-6">
@@ -890,7 +890,10 @@ const Dashboard = ({
                 <div className="bg-white shadow rounded-lg">
                     <div className="px-6 py-4 border-b border-gray-200">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-medium text-gray-900">Recent Tasks</h2>
+                            <div className="flex items-center">
+                                <DocumentCheckIcon className="h-5 w-5 text-blue-600 mr-2" />
+                                <h2 className="text-lg font-medium text-gray-900">Recent Tasks</h2>
+                            </div>
                             <div className="relative">
                                 <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                                 <input
@@ -992,7 +995,10 @@ const Dashboard = ({
                 <div className="bg-white shadow rounded-lg">
                     <div className="px-6 py-4 border-b border-gray-200">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-medium text-gray-900">Recent Projects</h2>
+                            <div className="flex items-center">
+                                <ClipboardDocumentCheckIcon className="h-5 w-5 text-blue-600 mr-2" />
+                                <h2 className="text-lg font-medium text-gray-900">Recent Projects</h2>
+                            </div>
                             <div className="relative">
                                 <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                                 <input
