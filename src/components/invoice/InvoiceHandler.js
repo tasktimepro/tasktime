@@ -230,7 +230,9 @@ export const handleResetInvoiceForm = (
     setTaxOverride,
     setSelectedTasksForBilling,
     setNewTaskQuantity,
-    setMergedSubtasks
+    setMergedSubtasks,
+    setInvoiceDateOverride,
+    setUseInvoiceDateOverride
 ) => () => {
     setInvoiceTasks([]);
     setEditableHours({});
@@ -251,6 +253,8 @@ export const handleResetInvoiceForm = (
     setSelectedTasksForBilling({});
     setNewTaskQuantity(1);
     setMergedSubtasks({});
+    setInvoiceDateOverride('');
+    setUseInvoiceDateOverride(false);
 };
 
 // Handle project selection from dropdown

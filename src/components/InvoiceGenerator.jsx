@@ -375,6 +375,10 @@ const InvoiceGenerator = ({
     const [invoiceNote, setInvoiceNote] = useState('');
     const [invoiceNoteCollapsed, setInvoiceNoteCollapsed] = useState(true);
     
+    // Invoice date override state
+    const [invoiceDateOverride, setInvoiceDateOverride] = useState('');
+    const [useInvoiceDateOverride, setUseInvoiceDateOverride] = useState(false);
+    
     // Pricing & Totals state
     const [discountType, setDiscountType] = useState('percentage'); // 'percentage' or 'fixed'
     const [discountValue, setDiscountValue] = useState(0);
@@ -418,6 +422,30 @@ const InvoiceGenerator = ({
                 setInvoiceNote(editingInvoice.note);
             }
             
+            // Initialize invoice date override
+            if (editingInvoice.dateOverride) {
+                // Convert stored date override to YYYY-MM-DD format for date input
+                // Handle both old format (YYYY-MM-DD) and new format (MM/DD/YYYY)
+                let dateForInput;
+                try {
+                    const date = new Date(editingInvoice.dateOverride);
+                    if (isNaN(date.getTime())) {
+                        // If invalid date, don't set override
+                        setInvoiceDateOverride('');
+                        setUseInvoiceDateOverride(false);
+                    } else {
+                        // Convert to YYYY-MM-DD format for HTML date input
+                        dateForInput = date.toISOString().split('T')[0];
+                        setInvoiceDateOverride(dateForInput);
+                        setUseInvoiceDateOverride(true);
+                    }
+                } catch {
+                    // If date parsing fails, don't set override
+                    setInvoiceDateOverride('');
+                    setUseInvoiceDateOverride(false);
+                }
+            }
+            
             // Initialize merged subtasks state
             if (editingInvoice.mergedSubtasks) {
                 setMergedSubtasks(editingInvoice.mergedSubtasks);
@@ -434,6 +462,8 @@ const InvoiceGenerator = ({
             });
             setAdditionalTasks([]);
             setInvoiceNote('');
+            setInvoiceDateOverride('');
+            setUseInvoiceDateOverride(false);
             setMergedSubtasks({});
         }
     }, [editingInvoice]);
@@ -590,7 +620,9 @@ const InvoiceGenerator = ({
         setTaxOverride,
         setSelectedTasksForBilling,
         setNewTaskQuantity,
-        setMergedSubtasks
+        setMergedSubtasks,
+        setInvoiceDateOverride,
+        setUseInvoiceDateOverride
     );
     const handleProjectSelection = InvoiceHandler.handleProjectSelection(
         setSelectedProject,
@@ -863,6 +895,18 @@ const InvoiceGenerator = ({
             return;
         }
 
+        // Validate invoice date override is not in the future
+        if (useInvoiceDateOverride && invoiceDateOverride) {
+            const overrideDate = new Date(invoiceDateOverride);
+            const today = new Date();
+            today.setHours(23, 59, 59, 999); // Set to end of today for comparison
+            
+            if (overrideDate > today) {
+                showError('Invoice date cannot be set to a future date');
+                return;
+            }
+        }
+
         const pricing = calculatePricing;
         const totalHours = pricing.totalHours;
 
@@ -878,8 +922,12 @@ const InvoiceGenerator = ({
             ? editingInvoice.invoiceNumber 
             : generateInvoiceNumber(selectedTemplate, selectedProject);
 
-        // Calculate due date using template
-        const invoiceDate = editingInvoice ? new Date(editingInvoice.date) : new Date();
+        // Calculate due date using template - use override date if available
+        const invoiceDate = editingInvoice 
+            ? new Date(editingInvoice.date) 
+            : useInvoiceDateOverride && invoiceDateOverride 
+                ? new Date(invoiceDateOverride) 
+                : new Date();
         const dueDate = calculateDueDate(selectedTemplate, invoiceDate);
 
         // Update template sequential number if creating new invoice
@@ -944,7 +992,12 @@ const InvoiceGenerator = ({
             templateId: selectedTemplate?.id || null, // Keep for backward compatibility
             template: selectedTemplate ? { ...selectedTemplate } : null,
             invoiceNumber: invoiceNumber,
-            date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
+            date: useInvoiceDateOverride && invoiceDateOverride 
+                ? new Date(invoiceDateOverride).toLocaleDateString() 
+                : (editingInvoice ? editingInvoice.date : new Date().toLocaleDateString()),
+            dateOverride: useInvoiceDateOverride && invoiceDateOverride 
+                ? new Date(invoiceDateOverride).toLocaleDateString() 
+                : null,
             dueDate: dueDate,
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
             paymentProcessed: editingInvoice ? editingInvoice.paymentProcessed || false : false,
@@ -992,7 +1045,9 @@ const InvoiceGenerator = ({
                 paymentMethod: selectedPaymentMethod,
                 businessInfo: selectedBusinessInfo,
                 invoiceNumber: invoiceNumber,
-                date: editingInvoice ? editingInvoice.date : new Date().toLocaleDateString(),
+                date: useInvoiceDateOverride && invoiceDateOverride 
+                    ? new Date(invoiceDateOverride).toLocaleDateString() 
+                    : (editingInvoice ? editingInvoice.date : new Date().toLocaleDateString()),
                 dueDate: dueDate,
                 createdAt: editingInvoice ? editingInvoice.createdAt : Date.now()
             })
@@ -1411,6 +1466,10 @@ const InvoiceGenerator = ({
                     selectedTemplate={selectedTemplate}
                     handleTemplateSelection={handleTemplateSelection}
                     onNavigateToTemplates={onNavigateToTemplates}
+                    invoiceDateOverride={invoiceDateOverride}
+                    setInvoiceDateOverride={setInvoiceDateOverride}
+                    useInvoiceDateOverride={useInvoiceDateOverride}
+                    setUseInvoiceDateOverride={setUseInvoiceDateOverride}
                 />
             )}
         </div>

@@ -177,8 +177,10 @@ const Dashboard = ({
 
         // Calculate invoice amounts in the given date range
         const invoicesInRange = invoices.filter(invoice => {
-            if (!invoice.createdAt) return false;
-            return invoice.createdAt >= startTime && invoice.createdAt <= endTime;
+            // Use invoice date (which includes overrides) for accurate reporting
+            const invoiceDate = invoice.date ? new Date(invoice.date).getTime() : invoice.createdAt;
+            if (!invoiceDate) return false;
+            return invoiceDate >= startTime && invoiceDate <= endTime;
         });
 
         // Separate paid and outstanding invoice amounts
