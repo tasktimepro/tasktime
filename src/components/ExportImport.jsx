@@ -7,7 +7,7 @@ import Modal from './Modal';
  * ExportImport component for backing up and restoring application data
  * Provides JSON export/import functionality for all application data including:
  * - Projects, tasks, time entries, and invoices
- * - Payment methods, business info, client info, and invoice templates  
+ * - Payment methods, business info, clients, and invoice templates  
  * - User preferences (currency, etc.)
  * 
  * Note: Timer state is intentionally excluded from export/import
@@ -19,7 +19,7 @@ function ExportImport({
     invoices = [], 
     paymentMethods = [],
     businessInfos = [],
-    clientInfos = [],
+    clients = [],
     invoiceTemplates = [],
     preferences = {},
     onImport 
@@ -63,7 +63,7 @@ function ExportImport({
             invoices: invoices,
             paymentMethods: paymentMethods,
             businessInfos: businessInfos,
-            clientInfos: clientInfos,
+            clients: clients,
             invoiceTemplates: invoiceTemplates,
             preferences: preferences
         };
@@ -127,9 +127,9 @@ function ExportImport({
                 throw new Error('Invalid data format: businessInfos must be an array');
             }
 
-            // Validate clientInfos if present
-            if (parsedData.clientInfos && !Array.isArray(parsedData.clientInfos)) {
-                throw new Error('Invalid data format: clientInfos must be an array');
+            // Validate clients if present
+            if (parsedData.clients && !Array.isArray(parsedData.clients)) {
+                throw new Error('Invalid data format: clients must be an array');
             }
 
             // Validate invoiceTemplates if present
@@ -150,7 +150,7 @@ function ExportImport({
                 invoices: parsedData.invoices || [],
                 paymentMethods: parsedData.paymentMethods || [],
                 businessInfos: parsedData.businessInfos || [],
-                clientInfos: parsedData.clientInfos || [],
+                clients: parsedData.clients || [],
                 invoiceTemplates: parsedData.invoiceTemplates || [],
                 preferences: parsedData.preferences || {}
             });
@@ -237,7 +237,7 @@ function ExportImport({
                 </div>
 
                 {/* Data Summary */}
-                {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clientInfos.length > 0 || invoiceTemplates.length > 0) && (
+                {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clients.length > 0 || invoiceTemplates.length > 0) && (
                     <div className="p-4 bg-blue-50 rounded-lg">
                         <h4 className="font-medium text-blue-700 mb-2">Current Data</h4>
                         <div className="text-sm text-blue-700 space-y-1">
@@ -247,7 +247,7 @@ function ExportImport({
                             <p>Invoices: <span className="font-medium">{invoices.length}</span></p>
                             <p>Payment Methods: <span className="font-medium">{paymentMethods.length}</span></p>
                             <p>Business Info: <span className="font-medium">{businessInfos.length}</span></p>
-                            <p>Client Info: <span className="font-medium">{clientInfos.length}</span></p>
+                            <p>Clients: <span className="font-medium">{clients.length}</span></p>
                             <p>Invoice Templates: <span className="font-medium">{invoiceTemplates.length}</span></p>
                             <p>Total Time: <span className="font-medium">{calculateTotalTimeAcrossAllProjects()}</span></p>
                         </div>
@@ -307,7 +307,7 @@ function ExportImport({
                         <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                         <div className="text-sm text-yellow-700">
                             <p className="font-medium">Warning:</p>
-                            <p>Importing will replace all current data including projects, tasks, invoices, payment methods, business info, client info, templates, and preferences. Make sure to export your current data first if you want to keep it.</p>
+                            <p>Importing will replace all current data including projects, tasks, invoices, payment methods, business info, clients, templates, and preferences. Make sure to export your current data first if you want to keep it.</p>
                         </div>
                     </div>
                 </div>

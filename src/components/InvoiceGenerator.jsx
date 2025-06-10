@@ -25,8 +25,8 @@ const InvoiceGenerator = ({
     onNavigateToPaymentMethods,
     businessInfos = [],
     onNavigateToBusinessInfo,
-    clientInfos = [],
-    onNavigateToClientInfo,
+    clients = [],
+    onNavigateToClients,
     onNavigateToProjects,
     invoices = [],
     setInvoices,
@@ -38,7 +38,7 @@ const InvoiceGenerator = ({
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
-    const [selectedClientInfo, setSelectedClientInfo] = useState(null);
+    const [selectedClient, setSelectedClient] = useState(null);
     const [selectedProject, setSelectedProject] = useState(project); // Initialize with current project
     const [selectedTemplate, setSelectedTemplate] = useState(null); // Selected invoice template
     const [isProjectContextFixed, setIsProjectContextFixed] = useState(!!project); // Track if opened from project context
@@ -173,23 +173,23 @@ const InvoiceGenerator = ({
     /**
      * Initialize selected client info based on previous invoices or editing invoice
      */
-    const initializeSelectedClientInfo = useCallback(() => {
-        // If no client infos available, ensure selection is null
-        if (clientInfos.length === 0) {
-            if (selectedClientInfo !== null) {
-                setSelectedClientInfo(null);
+    const initializeSelectedClient = useCallback(() => {
+        // If no clients available, ensure selection is null
+        if (clients.length === 0) {
+            if (selectedClient !== null) {
+                setSelectedClient(null);
             }
             return;
         }
 
         // Don't override if project was manually changed (user may have gotten auto-populated values)
-        if (projectManuallyChanged && selectedClientInfo !== null) {
+        if (projectManuallyChanged && selectedClient !== null) {
             return;
         }
 
-        // If user has already made a selection and it still exists in clientInfos, keep it
-        if (selectedClientInfo !== null && !editingInvoice) {
-            const stillExists = clientInfos.some(ci => ci.id === selectedClientInfo.id);
+        // If user has already made a selection and it still exists in clients, keep it
+        if (selectedClient !== null && !editingInvoice) {
+            const stillExists = clients.some(ci => ci.id === selectedClient.id);
             if (stillExists) {
                 return; // Preserve user selection
             }
@@ -197,19 +197,19 @@ const InvoiceGenerator = ({
         }
 
         // If editing an invoice, use its client info ID
-        if (editingInvoice && editingInvoice.clientInfoId) {
-            const clientInfo = clientInfos.find(ci => ci.id === editingInvoice.clientInfoId);
-            if (clientInfo) {
-                setSelectedClientInfo(clientInfo);
+        if (editingInvoice && editingInvoice.clientId) {
+            const client = clients.find(ci => ci.id === editingInvoice.clientId);
+            if (client) {
+                setSelectedClient(client);
                 return;
             }
         }
         
         // Check for project's preferred client info first (only if project not manually changed)
-        if (!projectManuallyChanged && selectedProject?.preferredClientInfoId) {
-            const preferredClientInfo = clientInfos.find(ci => ci.id === selectedProject.preferredClientInfoId);
-            if (preferredClientInfo) {
-                setSelectedClientInfo(preferredClientInfo);
+        if (!projectManuallyChanged && selectedProject?.preferredClientId) {
+            const preferredClient = clients.find(ci => ci.id === selectedProject.preferredClientId);
+            if (preferredClient) {
+                setSelectedClient(preferredClient);
                 return;
             }
         }
@@ -218,10 +218,10 @@ const InvoiceGenerator = ({
         if (!projectManuallyChanged && projectInvoices.length > 0) {
             for (let i = projectInvoices.length - 1; i >= 0; i--) {
                 const invoice = projectInvoices[i];
-                if (invoice.clientInfoId) {
-                    const clientInfo = clientInfos.find(ci => ci.id === invoice.clientInfoId);
-                    if (clientInfo) {
-                        setSelectedClientInfo(clientInfo);
+                if (invoice.clientId) {
+                    const client = clients.find(ci => ci.id === invoice.clientId);
+                    if (client) {
+                        setSelectedClient(client);
                         return;
                     }
                 }
@@ -229,7 +229,7 @@ const InvoiceGenerator = ({
         }
         
         // Don't auto-select client info - user should manually select
-    }, [editingInvoice, projectInvoices, clientInfos, selectedClientInfo, projectManuallyChanged, selectedProject?.preferredClientInfoId]);
+    }, [editingInvoice, projectInvoices, clients, selectedClient, projectManuallyChanged, selectedProject?.preferredClientId]);
 
     /**
      * Initialize selected project based on current project or editing invoice
@@ -346,7 +346,7 @@ const InvoiceGenerator = ({
             if (!hasInitialized || isNewEditingInvoice) {
                 initializePaymentMethod();
                 initializeBusinessInfo();
-                initializeSelectedClientInfo();
+                initializeSelectedClient();
                 initializeSelectedProject();
                 initializeSelectedTemplate();
                 setHasInitialized(true);
@@ -362,12 +362,12 @@ const InvoiceGenerator = ({
         editingInvoice?.id, // Only track the ID to prevent re-initialization
         initializePaymentMethod, 
         initializeBusinessInfo, 
-        initializeSelectedClientInfo,
+        initializeSelectedClient,
         initializeSelectedProject,
         initializeSelectedTemplate,
         paymentMethods.length,
         businessInfos.length,
-        clientInfos.length,
+        clients.length,
         hasInitialized,
         currentEditingInvoiceId
     ]);
@@ -617,7 +617,7 @@ const InvoiceGenerator = ({
     const handleAdditionalTaskQuantityChange = InvoiceHandler.handleAdditionalTaskQuantityChange(setAdditionalTasks);
     const handleAdditionalTaskHourlyRateChange = InvoiceHandler.handleAdditionalTaskHourlyRateChange(setAdditionalTasks);
     const handleToggleAdditionalTaskFlatRate = InvoiceHandler.handleToggleAdditionalTaskFlatRate(setAdditionalTasks, setUseFlatRate);
-    const handleClientInfoSelection = InvoiceHandler.handleClientInfoSelection(setSelectedClientInfo, clientInfos);
+    const handleClientSelection = InvoiceHandler.handleClientSelection(setSelectedClient, clients);
     const handleResetInvoiceForm = InvoiceHandler.handleResetInvoiceForm(
         setInvoiceTasks,
         setEditableHours,
@@ -641,7 +641,7 @@ const InvoiceGenerator = ({
         setSelectedProject,
         setProjectManuallyChanged,
         handleResetInvoiceForm,
-        setSelectedClientInfo,
+        setSelectedClient,
         setSelectedBusinessInfo,
         setSelectedPaymentMethod,
         setInvoiceTasks,
@@ -649,7 +649,7 @@ const InvoiceGenerator = ({
         setSelectedTasksForBilling,
         projects,
         invoices,
-        clientInfos,
+        clients,
         businessInfos,
         paymentMethods,
         prepareInvoiceData,
@@ -889,7 +889,7 @@ const InvoiceGenerator = ({
         e.preventDefault();
 
         // Validate required information
-        if (!selectedClientInfo) {
+        if (!selectedClient) {
             showError('Please select client information');
             return;
         }
@@ -959,15 +959,15 @@ const InvoiceGenerator = ({
             id: invoiceId,
             project: selectedProject,
             projectId: selectedProject?.id || null,
-            clientInfo: {
-                name: selectedClientInfo.clientName || '',
-                contactPerson: selectedClientInfo.contactPerson || '',
-                email: selectedClientInfo.email || '',
-                address: selectedClientInfo.address || '',
-                city: selectedClientInfo.city || '',
-                state: selectedClientInfo.state || '',
-                zip: selectedClientInfo.zip || '',
-                country: selectedClientInfo.country || ''
+            client: {
+                name: selectedClient.clientName || '',
+                contactPerson: selectedClient.contactPerson || '',
+                email: selectedClient.email || '',
+                address: selectedClient.address || '',
+                city: selectedClient.city || '',
+                state: selectedClient.state || '',
+                zip: selectedClient.zip || '',
+                country: selectedClient.country || ''
             },
             tasks: invoiceTasks
                 .filter(task => selectedTasksForBilling[task.id]) // Only include selected tasks
@@ -1008,7 +1008,7 @@ const InvoiceGenerator = ({
             paymentMethod: selectedPaymentMethod ? { ...selectedPaymentMethod } : null,
             businessInfoId: selectedBusinessInfo?.id || null, // Keep for backward compatibility
             businessInfo: selectedBusinessInfo ? { ...selectedBusinessInfo } : null,
-            clientInfoId: selectedClientInfo?.id || null, // Keep for backward compatibility
+            clientId: selectedClient?.id || null,
             templateId: selectedTemplate?.id || null, // Keep for backward compatibility
             template: selectedTemplate ? { ...selectedTemplate } : null,
             invoiceNumber: invoiceNumber,
@@ -1025,14 +1025,14 @@ const InvoiceGenerator = ({
                 id: editingInvoice ? editingInvoice.id : `INV-${selectedProject.id.slice(-8)}-${Date.now()}`,
                 project: selectedProject,
                 client: {
-                    name: selectedClientInfo.clientName || '',
-                    contactPerson: selectedClientInfo.contactPerson || '',
-                    email: selectedClientInfo.email || '',
-                    address: selectedClientInfo.address || '',
-                    city: selectedClientInfo.city || '',
-                    state: selectedClientInfo.state || '',
-                    zip: selectedClientInfo.zip || '',
-                    country: selectedClientInfo.country || ''
+                    name: selectedClient.clientName || '',
+                    contactPerson: selectedClient.contactPerson || '',
+                    email: selectedClient.email || '',
+                    address: selectedClient.address || '',
+                    city: selectedClient.city || '',
+                    state: selectedClient.state || '',
+                    zip: selectedClient.zip || '',
+                    country: selectedClient.country || ''
                 },
                 tasks: invoiceTasks
                     .filter(task => selectedTasksForBilling[task.id]) // Only include selected tasks
@@ -1426,10 +1426,10 @@ const InvoiceGenerator = ({
                     projects={projects}
                     selectedProject={selectedProject}
                     handleProjectSelection={handleProjectSelection}
-                    clientInfos={clientInfos}
-                    selectedClientInfo={selectedClientInfo}
-                    handleClientInfoSelection={handleClientInfoSelection}
-                    onNavigateToClientInfo={onNavigateToClientInfo}
+                    clients={clients}
+                    selectedClient={selectedClient}
+                    handleClientSelection={handleClientSelection}
+                    onNavigateToClients={onNavigateToClients}
                     invoiceTasks={invoiceTasks}
                     setShowAddTaskForm={setShowAddTaskForm}
                     showAddTaskForm={showAddTaskForm}

@@ -225,13 +225,13 @@ export const handleToggleAdditionalTaskFlatRate = (setAdditionalTasks, setUseFla
 };
 
 // Handle client info selection from dropdown
-export const handleClientInfoSelection = (setSelectedClientInfo, clientInfos) => (clientInfoId) => {
-    if (clientInfoId === "") {
-        setSelectedClientInfo(null);
+export const handleClientSelection = (setSelectedClient, clients) => (clientId) => {
+    if (clientId === "") {
+        setSelectedClient(null);
     } else {
-        const clientInfo = clientInfos.find(ci => ci.id === clientInfoId);
-        if (clientInfo) {
-            setSelectedClientInfo(clientInfo);
+        const client = clients.find(ci => ci.id === clientId);
+        if (client) {
+            setSelectedClient(client);
         }
     }
 };
@@ -284,7 +284,7 @@ export const handleProjectSelection = (
     setSelectedProject,
     setProjectManuallyChanged,
     resetInvoiceForm,
-    setSelectedClientInfo,
+    setSelectedClient,
     setSelectedBusinessInfo,
     setSelectedPaymentMethod,
     setInvoiceTasks,
@@ -292,7 +292,7 @@ export const handleProjectSelection = (
     setSelectedTasksForBilling,
     projects,
     invoices,
-    clientInfos,
+    clients,
     businessInfos,
     paymentMethods,
     prepareInvoiceData,
@@ -305,7 +305,7 @@ export const handleProjectSelection = (
     if (projectId === "") {
         setSelectedProject(null);
         resetInvoiceForm();
-        setSelectedClientInfo(null);
+        setSelectedClient(null);
         setSelectedBusinessInfo(null);
         setSelectedPaymentMethod(null);
     } else {
@@ -316,7 +316,7 @@ export const handleProjectSelection = (
             
             resetInvoiceForm();
             
-            setSelectedClientInfo(null);
+            setSelectedClient(null);
             setSelectedBusinessInfo(null);
             setSelectedPaymentMethod(null);
             
@@ -326,18 +326,18 @@ export const handleProjectSelection = (
             );
             
             // Check for project's preferred client info first
-            if (selectedProj.preferredClientInfoId) {
-                const preferredClientInfo = clientInfos.find(ci => ci.id === selectedProj.preferredClientInfoId);
-                if (preferredClientInfo) {
-                    setSelectedClientInfo(preferredClientInfo);
+            if (selectedProj.preferredClientId) {
+                const preferredClient = clients.find(ci => ci.id === selectedProj.preferredClientId);
+                if (preferredClient) {
+                    setSelectedClient(preferredClient);
                 } else {
                     // Preferred client no longer exists, fall back to last invoice
                     if (projectInvoicesForSelection.length > 0) {
                         const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
-                        if (lastInvoice.clientInfoId) {
-                            const clientInfo = clientInfos.find(ci => ci.id === lastInvoice.clientInfoId);
-                            if (clientInfo) {
-                                setSelectedClientInfo(clientInfo);
+                        if (lastInvoice.clientId) {
+                            const client = clients.find(ci => ci.id === lastInvoice.clientId);
+                            if (client) {
+                                setSelectedClient(client);
                             }
                         }
                     }
@@ -346,10 +346,10 @@ export const handleProjectSelection = (
                 // No preferred client, use last invoice
                 const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
                 
-                if (lastInvoice.clientInfoId) {
-                    const clientInfo = clientInfos.find(ci => ci.id === lastInvoice.clientInfoId);
-                    if (clientInfo) {
-                        setSelectedClientInfo(clientInfo);
+                if (lastInvoice.clientId) {
+                    const client = clients.find(ci => ci.id === lastInvoice.clientId);
+                    if (client) {
+                        setSelectedClient(client);
                     }
                 }
             }

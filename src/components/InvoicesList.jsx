@@ -32,7 +32,7 @@ const InvoicesList = ({
     onEditInvoice, 
     paymentMethods = [], 
     businessInfos = [], 
-    clientInfos = [],
+    clients = [],
     hideNewInvoiceButton = false,
     setInvoices,
     invoiceTemplates = [],
@@ -166,21 +166,21 @@ const InvoicesList = ({
                     businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
                 }
                 
-                // Find the client info if one is associated with this invoice
-                const clientInfoData = invoice.clientInfoId ? 
-                    clientInfos.find(ci => ci.id === invoice.clientInfoId) : null;
+                // Find the client if one is associated with this invoice
+                const foundClient = invoice.clientId ? 
+                    clients.find(ci => ci.id === invoice.clientId) : null;
                 
                 // Prepare client data for PDF generation
-                const clientData = clientInfoData ? {
-                    name: clientInfoData.clientName || '',
-                    contactPerson: clientInfoData.contactPerson || '',
-                    email: clientInfoData.email || '',
-                    address: clientInfoData.address || '',
-                    city: clientInfoData.city || '',
-                    state: clientInfoData.state || '',
-                    zip: clientInfoData.zip || '',
-                    country: clientInfoData.country || ''
-                } : (invoice.clientInfo || invoice.client);
+                const clientData = foundClient ? {
+                    name: foundClient.clientName || '',
+                    contactPerson: foundClient.contactPerson || '',
+                    email: foundClient.email || '',
+                    address: foundClient.address || '',
+                    city: foundClient.city || '',
+                    state: foundClient.state || '',
+                    zip: foundClient.zip || '',
+                    country: foundClient.country || ''
+                } : invoice.client;
                 
                 // Recreate the HTML content from the invoice data
                 htmlContent = createInvoiceHTML({
@@ -408,15 +408,15 @@ const InvoicesList = ({
                                         <p>
                                             Client: <span className="font-medium text-gray-600">
                                                 {(() => {
-                                                    // Try to get client name from clientInfoId first
-                                                    if (invoice.clientInfoId) {
-                                                        const clientInfo = clientInfos.find(ci => ci.id === invoice.clientInfoId);
-                                                        if (clientInfo) {
-                                                            return clientInfo.clientName;
+                                                    // Try to get client name from clientId first
+                                                    if (invoice.clientId) {
+                                                        const client = clients.find(ci => ci.id === invoice.clientId);
+                                                        if (client) {
+                                                            return client.clientName;
                                                         }
                                                     }
-                                                    // Fallback to stored client info or manual entry
-                                                    return invoice.clientInfo?.name || invoice.client?.name || 'Unknown';
+                                                    // Fallback to stored client or manual entry
+                                                    return invoice.client?.name || 'Unknown';
                                                 })()}
                                             </span>
                                         </p>
@@ -600,15 +600,15 @@ const InvoicesList = ({
                             <div>
                                 <h3 className="text-sm font-medium text-gray-900 mb-2">Invoice To:</h3>
                                 <div className="text-sm text-gray-600">
-                                    <p>{(selectedInvoice.clientInfo || selectedInvoice.client)?.name}</p>
-                                    {(selectedInvoice.clientInfo || selectedInvoice.client)?.email && (
-                                        <p>{(selectedInvoice.clientInfo || selectedInvoice.client).email}</p>
+                                    <p>{selectedInvoice.client?.name}</p>
+                                    {selectedInvoice.client?.email && (
+                                        <p>{selectedInvoice.client.email}</p>
                                     )}
-                                    {(selectedInvoice.clientInfo || selectedInvoice.client)?.address && (
-                                        <p>{(selectedInvoice.clientInfo || selectedInvoice.client).address}</p>
+                                    {selectedInvoice.client?.address && (
+                                        <p>{selectedInvoice.client.address}</p>
                                     )}
-                                    {(selectedInvoice.clientInfo || selectedInvoice.client)?.city && (
-                                        <p>{(selectedInvoice.clientInfo || selectedInvoice.client).city}, {(selectedInvoice.clientInfo || selectedInvoice.client).state} {(selectedInvoice.clientInfo || selectedInvoice.client).zip}</p>
+                                    {selectedInvoice.client?.city && (
+                                        <p>{selectedInvoice.client.city}, {selectedInvoice.client.state} {selectedInvoice.client.zip}</p>
                                     )}
                                 </div>
                             </div>

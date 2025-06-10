@@ -4,7 +4,7 @@ import { useUrlState } from '../hooks/useUrlState';
 import { useToast } from '../hooks/useToast';
 import PaymentMethods from './PaymentMethods';
 import BusinessInfo from './BusinessInfo';
-import ClientInfo from './ClientInfo';
+import Clients from './Clients';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import InvoiceTemplates from './InvoiceTemplates';
@@ -26,8 +26,8 @@ const Invoices = ({
     setPaymentMethods,
     businessInfos,
     setBusinessInfos,
-    clientInfos,
-    setClientInfos,
+    clients,
+    setClients,
     invoiceTemplates,
     setInvoiceTemplates,
     navigateToProjects
@@ -89,8 +89,8 @@ const Invoices = ({
             description: 'Manage business information for invoices'
         },
         {
-            id: 'client-info',
-            name: 'Client Info',
+            id: 'clients',
+            name: 'Clients',
             icon: UserGroupIcon,
             description: 'Manage client information for invoices'
         }
@@ -107,7 +107,7 @@ const Invoices = ({
     }, [urlParams.section, updateUrl, sideNavItems]);
     
     // Check URL parameters for auto-opening create forms
-    const autoOpenCreate = urlParams.create === 'template' || urlParams.create === 'payment-method' || urlParams.create === 'business-info' || urlParams.create === 'client-info';
+    const autoOpenCreate = urlParams.create === 'template' || urlParams.create === 'payment-method' || urlParams.create === 'business-info' || urlParams.create === 'client';
 
     // Function to handle section changes
     const handleSectionChange = (sectionId) => {
@@ -147,7 +147,7 @@ const Invoices = ({
                             onEditInvoice={handleEditInvoice}
                             paymentMethods={paymentMethods}
                             businessInfos={businessInfos}
-                            clientInfos={clientInfos}
+                            clients={clients}
                             setInvoices={setInvoices}
                             invoiceTemplates={invoiceTemplates}
                             selectedTab={urlParams.tab} // Pass the tab from URL
@@ -178,12 +178,12 @@ const Invoices = ({
                         autoOpenCreate={urlParams.create === 'business-info'}
                     />
                 );
-            case 'client-info':
+            case 'clients':
                 return (
-                    <ClientInfo 
-                        clientInfos={clientInfos} 
-                        setClientInfos={setClientInfos}
-                        autoOpenCreate={urlParams.create === 'client-info'}
+                    <Clients 
+                        clients={clients} 
+                        setClients={setClients}
+                        autoOpenCreate={urlParams.create === 'client'}
                     />
                 );
             default:
@@ -263,10 +263,10 @@ const Invoices = ({
                         setShowInvoiceModal(false);
                         updateUrl({ section: 'business-info', create: 'business-info' });
                     }}
-                    clientInfos={clientInfos}
-                    onNavigateToClientInfo={() => {
+                    clients={clients}
+                    onNavigateToClients={() => {
                         setShowInvoiceModal(false);
-                        updateUrl({ section: 'client-info', create: 'client-info' });
+                        updateUrl({ section: 'clients', create: 'client' });
                     }}
                     onNavigateToProjects={() => {
                         setShowInvoiceModal(false);

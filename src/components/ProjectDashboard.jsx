@@ -29,8 +29,8 @@ const ProjectDashboard = ({
     onNavigateToPaymentMethods,
     businessInfos,
     onNavigateToBusinessInfo,
-    clientInfos,
-    onNavigateToClientInfo,
+    clients,
+    onNavigateToClients,
     onNavigateToProjects,
     invoices,
     setInvoices,
@@ -111,8 +111,8 @@ const ProjectDashboard = ({
                     onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                     businessInfos={businessInfos}
                     onNavigateToBusinessInfo={onNavigateToBusinessInfo}
-                    clientInfos={clientInfos}
-                    onNavigateToClientInfo={onNavigateToClientInfo}
+                    clients={clients}
+                    onNavigateToClients={onNavigateToClients}
                     onNavigateToProjects={onNavigateToProjects}
                     invoices={invoices}
                     setInvoices={setInvoices}
@@ -173,8 +173,8 @@ const ProjectDashboard = ({
                             onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                             businessInfos={businessInfos}
                             onNavigateToBusinessInfo={onNavigateToBusinessInfo}
-                            clientInfos={clientInfos}
-                            onNavigateToClientInfo={onNavigateToClientInfo}
+                            clients={clients}
+                            onNavigateToClients={onNavigateToClients}
                             invoices={invoices}
                             setInvoices={setInvoices}
                             invoiceTemplates={invoiceTemplates}
@@ -191,7 +191,7 @@ const ProjectDashboard = ({
                             onEditInvoice={handleEditInvoice}
                             paymentMethods={paymentMethods}
                             businessInfos={businessInfos}
-                            clientInfos={clientInfos}
+                            clients={clients}
                             hideNewInvoiceButton={true}
                             setInvoices={setInvoices}
                             invoiceTemplates={invoiceTemplates}

@@ -24,7 +24,7 @@ function App() {
     const [timeEntries, setTimeEntries] = useLocalStorage('timeEntries', []);
     const [paymentMethods, setPaymentMethods] = useLocalStorage('paymentMethods', []);
     const [businessInfos, setBusinessInfos] = useLocalStorage('businessInfos', []);
-    const [clientInfos, setClientInfos] = useLocalStorage('clientInfos', []);
+    const [clients, setClients] = useLocalStorage('clients', []);
     const [invoices, setInvoices] = useLocalStorage('invoices', []);
     const [invoiceTemplates, setInvoiceTemplates] = useLocalStorage('invoiceTemplates', []);
     const [preferences, setPreferences] = useLocalStorage('preferences', {});
@@ -153,7 +153,7 @@ function App() {
                           invoices.length > 0 || 
                           paymentMethods.length > 0 || 
                           businessInfos.length > 0 || 
-                          clientInfos.length > 0 ||
+                          clients.length > 0 ||
                           invoiceTemplates.length > 0;
 
         // Check if localStorage keys exist (even if empty) - indicates the user has used the app before
@@ -163,7 +163,7 @@ function App() {
                                 localStorage.getItem('invoices') !== null ||
                                 localStorage.getItem('paymentMethods') !== null ||
                                 localStorage.getItem('businessInfos') !== null ||
-                                localStorage.getItem('clientInfos') !== null ||
+                                localStorage.getItem('clients') !== null ||
                                 localStorage.getItem('invoiceTemplates') !== null ||
                                 localStorage.getItem('preferences') !== null;
 
@@ -179,7 +179,7 @@ function App() {
         invoices.length,
         paymentMethods.length,
         businessInfos.length,
-        clientInfos.length,
+        clients.length,
         invoiceTemplates.length
     ]);
 
@@ -244,10 +244,10 @@ function App() {
     };
 
     /**
-     * Handle navigation to client info creation from invoice generator
+     * Handle navigation to clients creation from invoice generator
      */
-    const handleNavigateToClientInfo = () => {
-        navigateToInvoices({ section: 'client-info', create: 'client-info' });
+    const handleNavigateToClients = () => {
+        navigateToInvoices({ section: 'clients', create: 'client' });
     };
 
     /**
@@ -298,7 +298,7 @@ function App() {
         setTimeEntries(importData.timeEntries || []);
         setPaymentMethods(importData.paymentMethods || []);
         setBusinessInfos(importData.businessInfos || []);
-        setClientInfos(importData.clientInfos || []);
+        setClients(importData.clients || []);
         setInvoiceTemplates(importData.invoiceTemplates || []);
         setPreferences(importData.preferences || {});
         
@@ -454,7 +454,7 @@ function App() {
                         onSelectProject={(project) => {
                             navigateToProject(project.id);
                         }}
-                        clientInfos={clientInfos}
+                        clients={clients}
                         showCreateForm={urlParams.create === 'project'}
                     />
                 )}
@@ -479,8 +479,8 @@ function App() {
                         onNavigateToPaymentMethods={handleNavigateToPaymentMethods}
                         businessInfos={businessInfos}
                         onNavigateToBusinessInfo={handleNavigateToBusinessInfo}
-                        clientInfos={clientInfos}
-                        onNavigateToClientInfo={handleNavigateToClientInfo}
+                        clients={clients}
+                        onNavigateToClients={handleNavigateToClients}
                         onNavigateToProjects={handleNavigateToProjects}
                         invoices={invoices}
                         setInvoices={setInvoices}
@@ -505,8 +505,8 @@ function App() {
                         setPaymentMethods={setPaymentMethods}
                         businessInfos={businessInfos}
                         setBusinessInfos={setBusinessInfos}
-                        clientInfos={clientInfos}
-                        setClientInfos={setClientInfos}
+                        clients={clients}
+                        setClients={setClients}
                         invoiceTemplates={invoiceTemplates}
                         setInvoiceTemplates={setInvoiceTemplates}
                         updateUrl={updateUrl}
@@ -522,7 +522,7 @@ function App() {
                         invoices={invoices}
                         paymentMethods={paymentMethods}
                         businessInfos={businessInfos}
-                        clientInfos={clientInfos}
+                        clients={clients}
                         invoiceTemplates={invoiceTemplates}
                         preferences={preferences}
                         onImport={handleImport}
@@ -532,7 +532,7 @@ function App() {
                         setInvoices={setInvoices}
                         setPaymentMethods={setPaymentMethods}
                         setBusinessInfos={setBusinessInfos}
-                        setClientInfos={setClientInfos}
+                        setClients={setClients}
                         setInvoiceTemplates={setInvoiceTemplates}
                         setPreferences={setPreferences}
                         setCurrentTimer={setCurrentTimer}

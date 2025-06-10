@@ -4,17 +4,17 @@ import { useToast } from '../hooks/useToast';
 import { generateId } from '../utils/idUtils';
 
 /**
- * ClientInfo component for managing client information
+ * Clients component for managing client information
  */
-const ClientInfo = ({ 
-    clientInfos, 
-    setClientInfos,
+const Clients = ({ 
+    clients, 
+    setClients,
     autoOpenCreate = false
 }) => {
     const { showSuccess, showError } = useToast();
     
     const [showCreateForm, setShowCreateForm] = useState(false);
-    const [editingClientInfo, setEditingClientInfo] = useState(null);
+    const [editingClient, setEditingClient] = useState(null);
     const [showDropdown, setShowDropdown] = useState({});
     const [formData, setFormData] = useState({
         title: '',
@@ -121,14 +121,14 @@ const ClientInfo = ({
     };
 
     /**
-     * Create a new client info
+     * Create a new client
      */
-    const handleCreateClientInfo = (e) => {
+    const handleCreateClient = (e) => {
         e.preventDefault();
 
         // Basic validation
         if (!formData.title.trim()) {
-            showError('Client info title is required');
+            showError('Client title is required');
             return;
         }
 
@@ -138,23 +138,23 @@ const ClientInfo = ({
         }
 
         // Check if title already exists
-        const titleExists = clientInfos.some(info => 
+        const titleExists = clients.some(info => 
             info.title.toLowerCase() === formData.title.toLowerCase()
         );
 
         if (titleExists) {
-            showError('A client info with this title already exists');
+            showError('A client with this title already exists');
             return;
         }
 
-        const newClientInfo = {
+        const newClient = {
             id: generateId(),
             ...formData,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
 
-        setClientInfos(prev => [...prev, newClientInfo]);
+        setClients(prev => [...prev, newClient]);
         setShowCreateForm(false);
 
         // Reset form
@@ -175,18 +175,18 @@ const ClientInfo = ({
             custom: []
         });
 
-        showSuccess('Client info created successfully');
+        showSuccess('Client created successfully');
     };
 
     /**
-     * Update an existing client info
+     * Update an existing client
      */
-    const handleUpdateClientInfo = (e) => {
+    const handleUpdateClient = (e) => {
         e.preventDefault();
 
         // Basic validation
         if (!formData.title.trim()) {
-            showError('Client info title is required');
+            showError('Client title is required');
             return;
         }
 
@@ -196,27 +196,27 @@ const ClientInfo = ({
         }
 
         // Check if title already exists (excluding current item)
-        const titleExists = clientInfos.some(info => 
-            info.id !== editingClientInfo.id && 
+        const titleExists = clients.some(info => 
+            info.id !== editingClient.id && 
             info.title.toLowerCase() === formData.title.toLowerCase()
         );
 
         if (titleExists) {
-            showError('A client info with this title already exists');
+            showError('A client with this title already exists');
             return;
         }
 
-        const updatedClientInfo = {
-            ...editingClientInfo,
+        const updatedClient = {
+            ...editingClient,
             ...formData,
             updatedAt: new Date().toISOString()
         };
 
-        setClientInfos(prev => prev.map(info => 
-            info.id === editingClientInfo.id ? updatedClientInfo : info
+        setClients(prev => prev.map(info => 
+            info.id === editingClient.id ? updatedClient : info
         ));
 
-        setEditingClientInfo(null);
+        setEditingClient(null);
 
         // Reset form
         setFormData({
@@ -236,19 +236,19 @@ const ClientInfo = ({
             custom: []
         });
 
-        showSuccess('Client info updated successfully');
+        showSuccess('Client updated successfully');
     };
 
     /**
-     * Delete a client info
+     * Delete a client
      */
-    const handleDeleteClientInfo = (clientInfoId) => {
-        if (window.confirm('Are you sure you want to delete this client info?')) {
-            setClientInfos(prev => prev.filter(info => info.id !== clientInfoId));
+    const handleDeleteClient = (clientId) => {
+        if (window.confirm('Are you sure you want to delete this client?')) {
+            setClients(prev => prev.filter(info => info.id !== clientId));
             
             // Close the edit form if the deleted item was being edited
-            if (editingClientInfo && editingClientInfo.id === clientInfoId) {
-                setEditingClientInfo(null);
+            if (editingClient && editingClient.id === clientId) {
+                setEditingClient(null);
                 
                 // Reset form data
                 setFormData({
@@ -269,31 +269,31 @@ const ClientInfo = ({
                 });
             }
 
-            showSuccess('Client info deleted successfully');
+            showSuccess('Client deleted successfully');
         }
     };
 
     /**
-     * Start editing a client info
+     * Start editing a client
      */
-    const startEditing = (clientInfo) => {
-        setEditingClientInfo(clientInfo);
+    const startEditing = (client) => {
+        setEditingClient(client);
 
         setFormData({
-            title: clientInfo.title || '',
-            clientName: clientInfo.clientName || '',
-            contactPerson: clientInfo.contactPerson || '',
-            address: clientInfo.address || '',
-            city: clientInfo.city || '',
-            state: clientInfo.state || '',
-            zip: clientInfo.zip || '',
-            country: clientInfo.country || '',
-            registrationNumber: clientInfo.registrationNumber || '',
-            vat: clientInfo.vat || '',
-            taxNumber: clientInfo.taxNumber || '',
-            email: clientInfo.email || '',
-            phone: clientInfo.phone || '',
-            custom: [...(clientInfo.custom || [])]
+            title: client.title || '',
+            clientName: client.clientName || '',
+            contactPerson: client.contactPerson || '',
+            address: client.address || '',
+            city: client.city || '',
+            state: client.state || '',
+            zip: client.zip || '',
+            country: client.country || '',
+            registrationNumber: client.registrationNumber || '',
+            vat: client.vat || '',
+            taxNumber: client.taxNumber || '',
+            email: client.email || '',
+            phone: client.phone || '',
+            custom: [...(client.custom || [])]
         });
 
         setShowCreateForm(false);
@@ -305,7 +305,7 @@ const ClientInfo = ({
     const cancelForm = () => {
         setShowCreateForm(false);
 
-        setEditingClientInfo(null);
+        setEditingClient(null);
 
         setFormData({
             title: '',
@@ -326,11 +326,11 @@ const ClientInfo = ({
     };
 
     return (
-        <div className={`${(showCreateForm || editingClientInfo) ? 'space-y-8' : 'space-y-6'}`}>
+        <div className={`${(showCreateForm || editingClient) ? 'space-y-8' : 'space-y-6'}`}>
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Client Info</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
                     <p className="mt-1 text-sm text-gray-600">
                         Manage client information for your invoices
                     </p>
@@ -341,23 +341,23 @@ const ClientInfo = ({
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     <PlusIcon className="h-4 w-4 mr-2" />
-                    New Client Info
+                    New Client
                 </button>
             </div>
 
             {/* Create/Edit Form */}
-            {(showCreateForm || editingClientInfo) && (
+            {(showCreateForm || editingClient) && (
                 <div className="bg-white shadow rounded-lg p-6 max-w-3xl mx-auto">
                     <h4 className="text-lg font-medium text-gray-900 mb-4">
-                        {editingClientInfo ? 'Edit Client Info' : 'New Client Info'}
+                        {editingClient ? 'Edit Client' : 'New Client'}
                     </h4>
 
-                    <form onSubmit={editingClientInfo ? handleUpdateClientInfo : handleCreateClientInfo} className="space-y-8">
+                    <form onSubmit={editingClient ? handleUpdateClient : handleCreateClient} className="space-y-8">
                         {/* Standard Fields */}
                         <div className="space-y-4">
                             <div>
                                 <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                                    Client Info Title <span className="text-red-500">*</span>
+                                    Client Title <span className="text-red-500">*</span>
                                 </label>
 
                                 <input
@@ -368,7 +368,7 @@ const ClientInfo = ({
                                     onChange={handleInputChange}
                                     required
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="Enter title for this client info"
+                                    placeholder="Enter title for this client"
                                 />
                             </div>
 
@@ -629,19 +629,19 @@ const ClientInfo = ({
                                 type="submit"
                                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                             >
-                                {editingClientInfo ? 'Update' : 'Create'} Client Info
+                                {editingClient ? 'Update' : 'Create'} Client
                             </button>
                         </div>
                     </form>
                 </div>
             )}
 
-            {/* Client Info List */}
-            {clientInfos.length === 0 ? (
+            {/* Client List */}
+            {clients.length === 0 ? (
                 <div className="text-center py-12">
                     <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <h4 className="mt-2 text-sm font-medium text-gray-900">No client info</h4>
-                    <p className="mt-1 text-sm text-gray-500">Get started by creating your first client info.</p>
+                    <h4 className="mt-2 text-sm font-medium text-gray-900">No clients</h4>
+                    <p className="mt-1 text-sm text-gray-500">Get started by creating your first client.</p>
 
                     <div className="mt-6">
                         <button
@@ -649,13 +649,13 @@ const ClientInfo = ({
                             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                             <PlusIcon className="h-4 w-4 mr-2" />
-                            New Client Info
+                            New Client
                         </button>
                     </div>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {clientInfos.map((info) => (
+                    {clients.map((info) => (
                         <div
                             key={info.id}
                             className="bg-white shadow rounded-lg hover:shadow-md transition-shadow"
@@ -732,7 +732,7 @@ const ClientInfo = ({
                                                     </button>
                                                     <button
                                                         onClick={() => {
-                                                            handleDeleteClientInfo(info.id);
+                                                            handleDeleteClient(info.id);
                                                             setShowDropdown({});
                                                         }}
                                                         className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
@@ -754,4 +754,4 @@ const ClientInfo = ({
     );
 };
 
-export default ClientInfo;
+export default Clients;

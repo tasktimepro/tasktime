@@ -16,7 +16,7 @@ const Account = ({
     invoices, 
     paymentMethods,
     businessInfos,
-    clientInfos,
+    clients,
     invoiceTemplates,
     preferences,
     onImport,
@@ -26,7 +26,7 @@ const Account = ({
     setInvoices,
     setPaymentMethods,
     setBusinessInfos,
-    setClientInfos,
+    setClients,
     setInvoiceTemplates,
     setPreferences,
     setCurrentTimer
@@ -89,7 +89,7 @@ const Account = ({
         setInvoices([]);
         setPaymentMethods([]);
         setBusinessInfos([]);
-        setClientInfos([]);
+        setClients([]);
         setInvoiceTemplates([]);
         setPreferences({});
         setCurrentTimer(null);
@@ -139,7 +139,7 @@ const Account = ({
                             invoices={invoices}
                             paymentMethods={paymentMethods}
                             businessInfos={businessInfos}
-                            clientInfos={clientInfos}
+                            clients={clients}
                             invoiceTemplates={invoiceTemplates}
                             preferences={preferences}
                             onImport={onImport}
@@ -202,7 +202,7 @@ const Account = ({
                                             </h3>
                                             <div className="mt-2 text-sm text-red-700">
                                                 <p>
-                                                    This will delete all projects, tasks, time entries, and invoices. Business info, client info, templates, and payment methods will remain intact.
+                                                    This will delete all projects, tasks, time entries, and invoices. Business info, clients, templates, and payment methods will remain intact.
                                                 </p>
                                             </div>
                                         </div>
@@ -400,8 +400,7 @@ const Account = ({
                         <p className="text-sm text-yellow-800">
                             <strong>What will be deleted:</strong> All projects ({projects.length}), all tasks ({tasks.length}), all time entries ({timeEntries.length}), and all invoices ({invoices.length}).
                         </p>
-                        <p className="text-sm text-yellow-800 mt-1">
-                            <strong>What will remain:</strong> Business info, client info, invoice templates, and payment methods.
+                        <p className="text-sm text-yellow-800 mt-1">                                            <strong>What will remain:</strong> Business info, clients, invoice templates, and payment methods.
                         </p>
                     </div>
                 </div>

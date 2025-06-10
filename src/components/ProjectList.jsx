@@ -27,7 +27,7 @@ const ProjectList = ({
     onSelectProject,
     invoices = [],
     setInvoices,
-    clientInfos = [],
+    clients = [],
     showCreateForm: initialShowCreateForm = false
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(initialShowCreateForm);
@@ -46,7 +46,7 @@ const ProjectList = ({
         taxLabel: 'VAT',
         taxRate: 0,
         flatRate: false,
-        preferredClientInfoId: ''
+        preferredClientId: ''
     });
 
     // Update showCreateForm when the prop changes
@@ -122,7 +122,7 @@ const ProjectList = ({
             taxLabel: formData.taxLabel,
             taxRate: parseFloat(formData.taxRate) || 0,
             flatRate: formData.flatRate || false,
-            preferredClientInfoId: formData.preferredClientInfoId || null,
+            preferredClientId: formData.preferredClientId || null,
             createdAt: Date.now(),
             lastBilledAt: null,
             archived: false
@@ -130,7 +130,7 @@ const ProjectList = ({
 
         setProjects([...projects, newProject]);
 
-        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientInfoId: '' });
+        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientId: '' });
 
         setShowCreateForm(false);
     };
@@ -161,7 +161,7 @@ const ProjectList = ({
                     taxLabel: formData.taxLabel,
                     taxRate: parseFloat(formData.taxRate) || 0,
                     flatRate: formData.flatRate || false,
-                    preferredClientInfoId: formData.preferredClientInfoId || null
+                    preferredClientId: formData.preferredClientId || null
                 }
                 : project
         );
@@ -170,7 +170,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientInfoId: '' });
+        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientId: '' });
 
         showSuccess('Project updated successfully!');
     };
@@ -259,7 +259,7 @@ const ProjectList = ({
                 taxLabel: 'VAT', 
                 taxRate: 0,
                 flatRate: false,
-                preferredClientInfoId: ''
+                preferredClientId: ''
             });
         }
 
@@ -283,7 +283,7 @@ const ProjectList = ({
             taxLabel: project.taxLabel || 'VAT',
             taxRate: project.taxRate || 0,
             flatRate: project.flatRate || false,
-            preferredClientInfoId: project.preferredClientInfoId || ''
+            preferredClientId: project.preferredClientId || ''
         });
 
         setShowCreateForm(false);
@@ -297,7 +297,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientInfoId: '' });
+        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientId: '' });
     };    /**
      * Archive a project
      */
@@ -612,20 +612,20 @@ const ProjectList = ({
                         {/* Preferred Client Info */}
                         <div className="space-y-4">
                             <div className="border-t pt-4">                                
-                                <label htmlFor="preferredClientInfoId" className="block text-sm font-medium text-gray-700">
-                                    Preferred Client Info
+                                <label htmlFor="preferredClientId" className="block text-sm font-medium text-gray-700">
+                                    Preferred Client
                                 </label>
                                 <select
-                                    id="preferredClientInfoId"
-                                    name="preferredClientInfoId"
-                                    value={formData.preferredClientInfoId}
+                                    id="preferredClientId"
+                                    name="preferredClientId"
+                                    value={formData.preferredClientId}
                                     onChange={handleInputChange}
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 >
                                     <option value="">No preferred client</option>
-                                    {clientInfos.map(clientInfo => (
-                                        <option key={clientInfo.id} value={clientInfo.id}>
-                                            {clientInfo.title}
+                                    {clients.map(client => (
+                                        <option key={client.id} value={client.id}>
+                                            {client.title}
                                         </option>
                                     ))}
                                 </select>

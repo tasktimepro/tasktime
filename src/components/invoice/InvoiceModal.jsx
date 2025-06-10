@@ -14,10 +14,10 @@ const InvoiceModal = ({
     projects,
     selectedProject,
     handleProjectSelection,
-    clientInfos,
-    selectedClientInfo,
-    handleClientInfoSelection,
-    onNavigateToClientInfo,
+    clients,
+    selectedClient,
+    handleClientSelection,
+    onNavigateToClients,
     invoiceTasks,
     setShowAddTaskForm,
     showAddTaskForm,
@@ -110,7 +110,7 @@ const InvoiceModal = ({
             setActiveSection('projectClient');
             return;
         }
-        if (!selectedClientInfo) {
+        if (!selectedClient) {
             setActiveSection('projectClient');
             return;
         }
@@ -243,14 +243,14 @@ const InvoiceModal = ({
                                     </h4>
                                     <button
                                         type="button"
-                                        onClick={onNavigateToClientInfo}
+                                        onClick={onNavigateToClients}
                                         className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                                     >
                                         + New Client Info
                                     </button>
                                 </div>
 
-                                {clientInfos.length === 0 ? (
+                                {clients.length === 0 ? (
                                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                                         <p className="text-sm text-yellow-800">
                                             No client information found. Create one to include client details in the invoice.
@@ -259,23 +259,23 @@ const InvoiceModal = ({
                                 ) : (
                                     <div className="space-y-2">
                                         <select
-                                            value={selectedClientInfo?.id || ''}
-                                            onChange={(e) => handleClientInfoSelection(e.target.value)}
+                                            value={selectedClient?.id || ''}
+                                            onChange={(e) => handleClientSelection(e.target.value)}
                                             className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
                                             required
                                         >
                                             {/* Make this placeholder not disabled to allow clearing the selection if needed */}
                                             <option value="">Select client info</option>
-                                            {clientInfos.map(clientInfo => (
-                                                <option key={clientInfo.id} value={clientInfo.id}>
-                                                    {clientInfo.title.trim()}
+                                            {clients.map(client => (
+                                                <option key={client.id} value={client.id}>
+                                                    {client.title.trim()}
                                                 </option>
                                             ))}
                                         </select>
-                                        {selectedClientInfo && (
+                                        {selectedClient && (
                                             <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
                                                 <p className="text-sm text-blue-800">
-                                                    <strong>{selectedClientInfo.title}</strong> will be included as "Invoice To" in the invoice.
+                                                    <strong>{selectedClient.title}</strong> will be included as "Invoice To" in the invoice.
                                                 </p>
                                             </div>
                                         )}
