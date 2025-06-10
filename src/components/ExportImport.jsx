@@ -241,13 +241,13 @@ function ExportImport({
                     <div className="p-4 bg-blue-50 rounded-lg">
                         <h4 className="font-medium text-blue-700 mb-2">Current Data</h4>
                         <div className="text-sm text-blue-700 space-y-1">
+                            <p>Clients: <span className="font-medium">{clients.length}</span></p>
                             <p>Projects: <span className="font-medium">{projects.length}</span></p>
+                            <p>Invoices: <span className="font-medium">{invoices.length}</span></p>
                             <p>Tasks: <span className="font-medium">{tasks.length}</span></p>
                             <p>Time Entries: <span className="font-medium">{timeEntries.length}</span></p>
-                            <p>Invoices: <span className="font-medium">{invoices.length}</span></p>
+                            <p>Businesses: <span className="font-medium">{businessInfos.length}</span></p>
                             <p>Payment Methods: <span className="font-medium">{paymentMethods.length}</span></p>
-                            <p>Business Info: <span className="font-medium">{businessInfos.length}</span></p>
-                            <p>Clients: <span className="font-medium">{clients.length}</span></p>
                             <p>Invoice Templates: <span className="font-medium">{invoiceTemplates.length}</span></p>
                             <p>Total Time: <span className="font-medium">{calculateTotalTimeAcrossAllProjects()}</span></p>
                         </div>

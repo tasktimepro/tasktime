@@ -12,6 +12,7 @@ import * as InvoiceHandler from './invoice/InvoiceHandler';
  */
 const InvoiceGenerator = ({ 
     project, 
+    client, // Add client prop for pre-selection
     projects, 
     setProjects, 
     tasks,
@@ -38,10 +39,11 @@ const InvoiceGenerator = ({
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
-    const [selectedClient, setSelectedClient] = useState(null);
+    const [selectedClient, setSelectedClient] = useState(client); // Initialize with client prop if provided
     const [selectedProject, setSelectedProject] = useState(project); // Initialize with current project
     const [selectedTemplate, setSelectedTemplate] = useState(null); // Selected invoice template
-    const [isProjectContextFixed, setIsProjectContextFixed] = useState(!!project); // Track if opened from project context
+    const [isProjectContextFixed, setIsProjectContextFixed] = useState(!!project && !client); // Track if opened from project context (but not client context)
+    const [isClientContextFixed, setIsClientContextFixed] = useState(!!client); // Track if opened from client context
     const [projectManuallyChanged, setProjectManuallyChanged] = useState(false); // Track manual project changes
     const { showSuccess, showError, showWarning } = useToast();
     const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
@@ -55,7 +57,7 @@ const InvoiceGenerator = ({
             return []; // Return empty array if no project is available
         }
         return invoices.filter(invoice => 
-            (currentProject.invoiceIds || []).includes(invoice.id)
+            invoice && invoice.id && (currentProject?.invoiceIds || []).includes(invoice.id)
         );
     }, [invoices, selectedProject, project]);
 
@@ -189,7 +191,7 @@ const InvoiceGenerator = ({
 
         // If user has already made a selection and it still exists in clients, keep it
         if (selectedClient !== null && !editingInvoice) {
-            const stillExists = clients.some(ci => ci.id === selectedClient.id);
+            const stillExists = clients.some(ci => ci && ci.id === selectedClient?.id);
             if (stillExists) {
                 return; // Preserve user selection
             }
@@ -198,16 +200,22 @@ const InvoiceGenerator = ({
 
         // If editing an invoice, use its client info ID
         if (editingInvoice && editingInvoice.clientId) {
-            const client = clients.find(ci => ci.id === editingInvoice.clientId);
-            if (client) {
-                setSelectedClient(client);
+            const clientFromInvoice = clients.find(ci => ci && ci.id === editingInvoice?.clientId);
+            if (clientFromInvoice) {
+                setSelectedClient(clientFromInvoice);
                 return;
             }
+        }
+
+        // If a client prop is provided (from ClientDashboard), use it
+        if (client && !editingInvoice) {
+            setSelectedClient(client);
+            return;
         }
         
         // Check for project's preferred client info first (only if project not manually changed)
         if (!projectManuallyChanged && selectedProject?.preferredClientId) {
-            const preferredClient = clients.find(ci => ci.id === selectedProject.preferredClientId);
+            const preferredClient = clients.find(ci => ci && ci.id === selectedProject?.preferredClientId);
             if (preferredClient) {
                 setSelectedClient(preferredClient);
                 return;
@@ -218,8 +226,8 @@ const InvoiceGenerator = ({
         if (!projectManuallyChanged && projectInvoices.length > 0) {
             for (let i = projectInvoices.length - 1; i >= 0; i--) {
                 const invoice = projectInvoices[i];
-                if (invoice.clientId) {
-                    const client = clients.find(ci => ci.id === invoice.clientId);
+                if (invoice?.clientId) {
+                    const client = clients.find(ci => ci && ci.id === invoice?.clientId);
                     if (client) {
                         setSelectedClient(client);
                         return;
@@ -229,7 +237,7 @@ const InvoiceGenerator = ({
         }
         
         // Don't auto-select client info - user should manually select
-    }, [editingInvoice, projectInvoices, clients, selectedClient, projectManuallyChanged, selectedProject?.preferredClientId]);
+    }, [editingInvoice, projectInvoices, clients, selectedClient, projectManuallyChanged, selectedProject?.preferredClientId, client]);
 
     /**
      * Initialize selected project based on current project or editing invoice
@@ -470,7 +478,7 @@ const InvoiceGenerator = ({
             }
             
             // Initialize merged subtasks state
-            if (editingInvoice.mergedSubtasks) {
+            if (editingInvoice && editingInvoice.mergedSubtasks) {
                 setMergedSubtasks(editingInvoice.mergedSubtasks);
             }
         } else {
@@ -548,21 +556,18 @@ const InvoiceGenerator = ({
         // Prepare tasks data array
         const tasksData = Object.entries(taskTimeMap).map(([taskId, totalTime]) => {
             const task = tasks.find(t => t.id === taskId);
-            const hours = millisecondsToHours(totalTime);
-            const roundedHours = Math.round(hours * 100) / 100;
-            const editedHours = editableHours[taskId] !== undefined ? editableHours[taskId] : roundedHours;
             return {
                 id: taskId,
                 title: task ? task.title : 'Unknown Task',
-                parentTaskId: task ? task.parentTaskId : null, // Include parent task ID for subtask relationship
-                originalHours: roundedHours,
-                originalTimeMs: totalTime, // Keep the original milliseconds for accurate time display
-                hours: editedHours,
-                isEdited: editedHours !== roundedHours
+                parentTaskId: task ? task.parentTaskId : null,
+                originalHours: Math.round((millisecondsToHours(totalTime)) * 100) / 100,
+                originalTimeMs: totalTime,
+                hours: editableHours[taskId] !== undefined ? editableHours[taskId] : (task ? Math.round((millisecondsToHours(totalTime)) * 100) / 100 : 0),
+                isEdited: editableHours[taskId] !== undefined && editableHours[taskId] !== (task ? Math.round((millisecondsToHours(totalTime)) * 100) / 100 : 0)
             };
         }).filter(task => {
-            // Include tasks with time OR manually marked as billable
-            const taskData = tasks.find(t => t.id === task.id && t.projectId === projectToUse.id);
+            if (!task) return false;
+            const taskData = tasks.find(t => t && t.id === task.id && t.projectId === projectToUse.id);
             return task.originalHours > 0 || (taskData && taskData.billable === true);
         });
 
@@ -697,17 +702,20 @@ const InvoiceGenerator = ({
         
         // Calculate regular project tasks subtotal (only include selected tasks)
         invoiceTasks.forEach(task => {
+            // Skip if task is null or id is missing
+            if (!task || !task.id) return;
+            
             // Only include selected tasks in pricing calculation
             if (!selectedTasksForBilling[task.id]) return;
             
             // Skip subtasks if their parent is merged (they're included in parent calculation)
-            if (task.parentTaskId && mergedSubtasks[task.parentTaskId]) return;
+            if (task.parentTaskId && mergedSubtasks[task?.parentTaskId]) return;
             
-            let taskHours = editableHours[task.id] || task.hours;
+            let taskHours = editableHours[task.id] || task.hours || 0;
             
             // If this task has merged subtasks, include their hours too
-            if (mergedSubtasks[task.id]) {
-                const subtasks = invoiceTasks.filter(subtask => subtask.parentTaskId === task.id);
+            if (task && task.id && mergedSubtasks[task.id]) {
+                const subtasks = invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task.id);
                 const subtaskHours = subtasks.reduce((total, subtask) => {
                     const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
                     return total + hours;
@@ -960,27 +968,27 @@ const InvoiceGenerator = ({
             project: selectedProject,
             projectId: selectedProject?.id || null,
             client: {
-                name: selectedClient.clientName || '',
-                contactPerson: selectedClient.contactPerson || '',
-                email: selectedClient.email || '',
-                address: selectedClient.address || '',
-                city: selectedClient.city || '',
-                state: selectedClient.state || '',
-                zip: selectedClient.zip || '',
-                country: selectedClient.country || ''
+                name: selectedClient?.clientName || '',
+                contactPerson: selectedClient?.contactPerson || '',
+                email: selectedClient?.email || '',
+                address: selectedClient?.address || '',
+                city: selectedClient?.city || '',
+                state: selectedClient?.state || '',
+                zip: selectedClient?.zip || '',
+                country: selectedClient?.country || ''
             },
             tasks: invoiceTasks
-                .filter(task => selectedTasksForBilling[task.id]) // Only include selected tasks
+                .filter(task => task && task.id && selectedTasksForBilling[task.id]) // Only include selected tasks
                 .map(task => ({
                     ...task,
-                    hours: editableHours[task.id] || task.originalHours,
+                    hours: editableHours[task?.id] || task?.originalHours || 0,
                     flatRate: taskFlatRates[task.id] || 0,
                     hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0,
                     useFlatRate: useFlatRate[task.id] || false,
                     quantity: taskQuantities[task.id] || 1, // Include quantity for flat rate tasks
-                    isMerged: mergedSubtasks[task.id] || false, // Track merged status
-                    mergedSubtasks: mergedSubtasks[task.id] ? 
-                        invoiceTasks.filter(subtask => subtask.parentTaskId === task.id) : []
+                    isMerged: (task && task.id && mergedSubtasks[task.id]) || false, // Track merged status
+                    mergedSubtasks: (task && task.id && mergedSubtasks[task.id]) ? 
+                        invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task.id) : []
                 })),
             additionalTasks: additionalTasks.map(task => ({
                 ...task,
@@ -1022,32 +1030,32 @@ const InvoiceGenerator = ({
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
             paymentProcessed: editingInvoice ? editingInvoice.paymentProcessed || false : false,
             htmlContent: createInvoiceHTML({
-                id: editingInvoice ? editingInvoice.id : `INV-${selectedProject.id.slice(-8)}-${Date.now()}`,
+                id: editingInvoice ? editingInvoice.id : `INV-${selectedProject?.id?.slice(-8) || Date.now()}-${Date.now()}`,
                 project: selectedProject,
                 client: {
-                    name: selectedClient.clientName || '',
-                    contactPerson: selectedClient.contactPerson || '',
-                    email: selectedClient.email || '',
-                    address: selectedClient.address || '',
-                    city: selectedClient.city || '',
-                    state: selectedClient.state || '',
-                    zip: selectedClient.zip || '',
-                    country: selectedClient.country || ''
+                    name: selectedClient?.clientName || '',
+                    contactPerson: selectedClient?.contactPerson || '',
+                    email: selectedClient?.email || '',
+                    address: selectedClient?.address || '',
+                    city: selectedClient?.city || '',
+                    state: selectedClient?.state || '',
+                    zip: selectedClient?.zip || '',
+                    country: selectedClient?.country || ''
                 },
                 tasks: invoiceTasks
-                    .filter(task => selectedTasksForBilling[task.id]) // Only include selected tasks
+                    .filter(task => task && selectedTasksForBilling[task?.id]) // Only include selected tasks
                     .map(task => ({
                         ...task,
                         hours: editableHours[task.id] || task.originalHours,
                         hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0,
                         quantity: taskQuantities[task.id] || 1, // Include quantity for flat rate tasks
                         isMerged: mergedSubtasks[task.id] || false, // Track merged status
-                        mergedSubtasks: mergedSubtasks[task.id] ? 
-                            invoiceTasks.filter(subtask => subtask.parentTaskId === task.id) : []
+                        mergedSubtasks: mergedSubtasks[task?.id] ? 
+                            invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task?.id) : []
                     })),
-                additionalTasks: additionalTasks.map(task => ({
+                additionalTasks: additionalTasks.filter(task => task).map(task => ({
                     ...task,
-                    hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
+                    hourlyRate: task?.hourlyRate || selectedProject?.hourlyRate || 0
                 })),
                 taskFlatRates: taskFlatRates,
                 useFlatRate: useFlatRate,
@@ -1325,11 +1333,18 @@ const InvoiceGenerator = ({
                 }
             }
             
-            // When opened from a project context, lock the project selection
-            setIsProjectContextFixed(true);
+            // When opened from a project context (but not client context), lock the project selection
+            // If we have a client prop, we're in client context mode and should allow project selection
+            if (!client) {
+                setIsProjectContextFixed(true);
+                setIsClientContextFixed(false);
+            } else {
+                setIsProjectContextFixed(false); // Ensure project context is not fixed in client context
+                setIsClientContextFixed(true);
+            }
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, currentTimer, isPaused, showError]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, currentTimer, isPaused, showError, client]);
 
     // Keep track of whether we've handled the current editing invoice
     const [handledEditingInvoice, setHandledEditingInvoice] = useState(null);
@@ -1423,6 +1438,7 @@ const InvoiceGenerator = ({
                     handleSaveInvoice={handleSaveInvoice}
                     onNavigateToProjects={onNavigateToProjects}
                     isProjectContextFixed={isProjectContextFixed}
+                    isClientContextFixed={isClientContextFixed}
                     projects={projects}
                     selectedProject={selectedProject}
                     handleProjectSelection={handleProjectSelection}

@@ -28,7 +28,8 @@ const ProjectList = ({
     invoices = [],
     setInvoices,
     clients = [],
-    showCreateForm: initialShowCreateForm = false
+    showCreateForm: initialShowCreateForm = false,
+    preselectedClientId = null
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(initialShowCreateForm);
     const [editingProject, setEditingProject] = useState(null);
@@ -54,8 +55,16 @@ const ProjectList = ({
         // If initialShowCreateForm becomes true, show the form
         if (initialShowCreateForm) {
             setShowCreateForm(true);
+            
+            // If a client is preselected, set it in the form
+            if (preselectedClientId) {
+                setFormData(prev => ({
+                    ...prev,
+                    preferredClientId: preselectedClientId
+                }));
+            }
         }
-    }, [initialShowCreateForm]);
+    }, [initialShowCreateForm, preselectedClientId]);
     
     // Close dropdown when clicking outside or when another dropdown opens
     useEffect(() => {
@@ -640,7 +649,7 @@ const ProjectList = ({
                             <button
                                 type="button"
                                 onClick={cancelForm}
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                             >
                                 Cancel
                             </button>

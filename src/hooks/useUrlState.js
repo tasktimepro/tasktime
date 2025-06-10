@@ -10,9 +10,11 @@ export const useUrlState = () => {
         return {
             view: params.get('view') || 'dashboard',
             projectId: params.get('project') || null,
+            clientId: params.get('client') || null,
             section: params.get('section') || null,
             create: params.get('create') || null,
-            tab: params.get('tab') || null
+            tab: params.get('tab') || null,
+            preselectedClientId: params.get('preselectedClientId') || null
         };
     });
 
@@ -41,9 +43,11 @@ export const useUrlState = () => {
             setUrlParams({
                 view: searchParams.get('view') || 'dashboard',
                 projectId: searchParams.get('project') || null,
+                clientId: searchParams.get('client') || null,
                 section: searchParams.get('section') || null,
                 create: searchParams.get('create') || null,
-                tab: searchParams.get('tab') || null
+                tab: searchParams.get('tab') || null,
+                preselectedClientId: searchParams.get('preselectedClientId') || null
             });
         }
     }, []);
@@ -53,14 +57,14 @@ export const useUrlState = () => {
      * @param {Object} params - Optional parameters to include in URL
      */
     const navigateToProjects = useCallback((params = {}) => {
-        updateUrl({ view: 'projects', project: null, section: null, create: null, tab: null, ...params });
+        updateUrl({ view: 'projects', client: null, project: null, section: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to project dashboard
      */
     const navigateToProject = useCallback((projectId) => {
-        updateUrl({ view: 'projects', project: projectId, section: null, create: null, tab: null });
+        updateUrl({ view: 'projects', client: null, project: projectId, section: null, create: null, tab: null });
     }, [updateUrl]);
 
     /**
@@ -68,7 +72,7 @@ export const useUrlState = () => {
      */
     const navigateToInvoices = useCallback((params = {}) => {
         // Ensure we clear section if not specified
-        const finalParams = { view: 'invoices', project: null, ...params };
+        const finalParams = { view: 'invoices', client: null, project: null, ...params };
         // If no section is specified, set it to the default (invoices)
         if (!('section' in params)) {
             finalParams.section = 'invoices';
@@ -84,14 +88,28 @@ export const useUrlState = () => {
      * Navigate to account view with optional parameters
      */
     const navigateToAccount = useCallback((params = {}) => {
-        updateUrl({ view: 'account', project: null, tab: null, section: 'preferences', ...params });
+        updateUrl({ view: 'account', client: null, project: null, tab: null, section: 'preferences', ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to main dashboard view
      */
     const navigateToDashboard = useCallback((params = {}) => {
-        updateUrl({ view: 'dashboard', project: null, section: null, create: null, tab: null, ...params });
+        updateUrl({ view: 'dashboard', client: null, project: null, section: null, create: null, tab: null, ...params });
+    }, [updateUrl]);
+
+    /**
+     * Navigate to clients view with optional parameters
+     */
+    const navigateToClients = useCallback((params = {}) => {
+        updateUrl({ view: 'clients', client: null, project: null, section: null, create: null, tab: null, ...params });
+    }, [updateUrl]);
+
+    /**
+     * Navigate to client dashboard
+     */
+    const navigateToClient = useCallback((clientId) => {
+        updateUrl({ view: 'clients', client: clientId, project: null, section: null, create: null, tab: null });
     }, [updateUrl]);
 
     /**
@@ -103,9 +121,11 @@ export const useUrlState = () => {
             setUrlParams({
                 view: params.get('view') || 'dashboard',
                 projectId: params.get('project') || null,
+                clientId: params.get('client') || null,
                 section: params.get('section') || null,
                 create: params.get('create') || null,
-                tab: params.get('tab') || null
+                tab: params.get('tab') || null,
+                preselectedClientId: params.get('preselectedClientId') || null
             });
         };
 
@@ -117,6 +137,8 @@ export const useUrlState = () => {
         urlParams,
         navigateToProjects,
         navigateToProject,
+        navigateToClients,
+        navigateToClient,
         navigateToInvoices,
         navigateToAccount,
         navigateToDashboard,

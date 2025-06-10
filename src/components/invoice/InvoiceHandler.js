@@ -229,7 +229,7 @@ export const handleClientSelection = (setSelectedClient, clients) => (clientId) 
     if (clientId === "") {
         setSelectedClient(null);
     } else {
-        const client = clients.find(ci => ci.id === clientId);
+        const client = clients.find(ci => ci && ci.id === clientId);
         if (client) {
             setSelectedClient(client);
         }

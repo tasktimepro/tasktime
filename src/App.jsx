@@ -3,6 +3,8 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { useUrlState } from './hooks/useUrlState';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
+import ClientList from './components/ClientList';
+import ClientDashboard from './components/ClientDashboard';
 import Dashboard from './components/Dashboard';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
@@ -10,7 +12,7 @@ import GlobalTimer from './components/GlobalTimer';
 import OnboardingModal from './components/OnboardingModal';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils';
-import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 
 /**
  * Main App component - Entry point for the Task. Time. Track.
@@ -184,12 +186,15 @@ function App() {
     ]);
 
     // URL-based state management
-    const { urlParams, navigateToProjects, navigateToProject, navigateToInvoices, navigateToAccount, navigateToDashboard, updateUrl } = useUrlState();
+    const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToAccount, navigateToDashboard, updateUrl } = useUrlState();
     
     // Derived state from URL parameters
     const activeView = urlParams.view;
     const selectedProject = urlParams.projectId 
         ? projects.find(p => p.id === urlParams.projectId) 
+        : null;
+    const selectedClient = urlParams.clientId 
+        ? clients.find(c => c.id === urlParams.clientId) 
         : null;
 
     // Handle case where project in URL doesn't exist (e.g., deleted project)
@@ -199,6 +204,14 @@ function App() {
             navigateToProjects();
         }
     }, [urlParams.projectId, urlParams.view, selectedProject, navigateToProjects]);
+
+    // Handle case where client in URL doesn't exist (e.g., deleted client)
+    useEffect(() => {
+        if (urlParams.clientId && urlParams.view === 'clients' && !selectedClient) {
+            console.warn('Client not found, redirecting to clients view');
+            navigateToClients();
+        }
+    }, [urlParams.clientId, urlParams.view, selectedClient, navigateToClients]);
 
     // Show global timer when a timer becomes active or is paused
     useEffect(() => {
@@ -246,7 +259,7 @@ function App() {
     /**
      * Handle navigation to clients creation from invoice generator
      */
-    const handleNavigateToClients = () => {
+    const handleNavigateToClientsFromInvoice = () => {
         navigateToInvoices({ section: 'clients', create: 'client' });
     };
 
@@ -358,6 +371,19 @@ function App() {
                             </li>
                             <li>
                                 <button
+                                    onClick={() => navigateToClients()}
+                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                        activeView === 'clients'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                    }`}
+                                >
+                                    <UserGroupIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Clients
+                                </button>
+                            </li>
+                            <li>
+                                <button
                                     onClick={() => navigateToProjects()}
                                     className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                                         activeView === 'projects'
@@ -442,6 +468,7 @@ function App() {
                         }}
                         clients={clients}
                         showCreateForm={urlParams.create === 'project'}
+                        preselectedClientId={urlParams.preselectedClientId}
                     />
                 )}
 
@@ -466,7 +493,52 @@ function App() {
                         businessInfos={businessInfos}
                         onNavigateToBusinessInfo={handleNavigateToBusinessInfo}
                         clients={clients}
-                        onNavigateToClients={handleNavigateToClients}
+                        onNavigateToClients={handleNavigateToClientsFromInvoice}
+                        onNavigateToProjects={handleNavigateToProjects}
+                        invoices={invoices}
+                        setInvoices={setInvoices}
+                        invoiceTemplates={invoiceTemplates}
+                        setInvoiceTemplates={setInvoiceTemplates}
+                        onNavigateToTemplates={handleNavigateToTemplates}
+                    />
+                )}
+
+                {activeView === 'clients' && !selectedClient && (
+                    <ClientList
+                        clients={clients}
+                        setClients={setClients}
+                        projects={projects}
+                        setProjects={setProjects}
+                        tasks={tasks}
+                        setTasks={setTasks}
+                        timeEntries={timeEntries}
+                        setTimeEntries={setTimeEntries}
+                        invoices={invoices}
+                        setInvoices={setInvoices}
+                        onSelectClient={(client) => {
+                            navigateToClient(client.id);
+                        }}
+                        showCreateForm={urlParams.create === 'client'}
+                    />
+                )}
+
+                {activeView === 'clients' && selectedClient && (
+                    <ClientDashboard
+                        client={selectedClient}
+                        projects={projects}
+                        setProjects={setProjects}
+                        tasks={tasks}
+                        setTasks={setTasks}
+                        timeEntries={timeEntries}
+                        currentTimer={currentTimer}
+                        isPaused={isPaused}
+                        onBackToClients={() => navigateToClients()}
+                        paymentMethods={paymentMethods}
+                        onNavigateToPaymentMethods={handleNavigateToPaymentMethods}
+                        businessInfos={businessInfos}
+                        onNavigateToBusinessInfo={handleNavigateToBusinessInfo}
+                        clients={clients}
+                        onNavigateToClients={handleNavigateToClientsFromInvoice}
                         onNavigateToProjects={handleNavigateToProjects}
                         invoices={invoices}
                         setInvoices={setInvoices}
@@ -492,11 +564,11 @@ function App() {
                         businessInfos={businessInfos}
                         setBusinessInfos={setBusinessInfos}
                         clients={clients}
-                        setClients={setClients}
                         invoiceTemplates={invoiceTemplates}
                         setInvoiceTemplates={setInvoiceTemplates}
                         updateUrl={updateUrl}
                         navigateToProjects={handleNavigateToProjects}
+                        navigateToClients={navigateToClients}
                     />
                 )}
 

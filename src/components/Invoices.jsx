@@ -1,10 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
-import { CreditCardIcon, BuildingOfficeIcon, UserGroupIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { CreditCardIcon, BuildingOfficeIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import { useUrlState } from '../hooks/useUrlState';
 import { useToast } from '../hooks/useToast';
 import PaymentMethods from './PaymentMethods';
 import BusinessInfo from './BusinessInfo';
-import Clients from './Clients';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import InvoiceTemplates from './InvoiceTemplates';
@@ -27,12 +26,12 @@ const Invoices = ({
     businessInfos,
     setBusinessInfos,
     clients,
-    setClients,
     invoiceTemplates,
     setInvoiceTemplates,
-    navigateToProjects
-}) => {
-    const { urlParams, updateUrl } = useUrlState();
+    updateUrl,
+    navigateToProjects,
+    navigateToClients    }) => {
+    const { urlParams } = useUrlState();
     const { showError } = useToast();
     
     // State for the invoice modal
@@ -87,12 +86,6 @@ const Invoices = ({
             name: 'Your Business Info',
             icon: BuildingOfficeIcon,
             description: 'Manage business information for invoices'
-        },
-        {
-            id: 'clients',
-            name: 'Clients',
-            icon: UserGroupIcon,
-            description: 'Manage client information for invoices'
         }
     ], []);
     
@@ -178,14 +171,6 @@ const Invoices = ({
                         autoOpenCreate={urlParams.create === 'business-info'}
                     />
                 );
-            case 'clients':
-                return (
-                    <Clients 
-                        clients={clients} 
-                        setClients={setClients}
-                        autoOpenCreate={urlParams.create === 'client'}
-                    />
-                );
             default:
                 return null;
         }
@@ -263,7 +248,7 @@ const Invoices = ({
                     clients={clients}
                     onNavigateToClients={() => {
                         setShowInvoiceModal(false);
-                        updateUrl({ section: 'clients', create: 'client' });
+                        navigateToClients({ create: 'client' });
                     }}
                     onNavigateToProjects={() => {
                         setShowInvoiceModal(false);

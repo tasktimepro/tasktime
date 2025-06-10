@@ -11,6 +11,7 @@ const InvoiceModal = ({
     handleSaveInvoice,
     onNavigateToProjects,
     isProjectContextFixed,
+    isClientContextFixed,
     projects,
     selectedProject,
     handleProjectSelection,
@@ -92,7 +93,7 @@ const InvoiceModal = ({
             // From Project Dashboard - default to Tasks & Time
             return 'tasksTime';
         } else {
-            // From Invoices view (standalone) - default to Project & Client Details
+            // From Invoices view (standalone) - default to Client & Project Details
             return 'projectClient';
         }
     };
@@ -156,7 +157,7 @@ const InvoiceModal = ({
             footer={footer}
         >
             <form id="invoice-form" onSubmit={handleSave} className="space-y-5">
-                {/* Project & Client Details */}
+                {/* Client & Project Details */}
                 <div className="border border-gray-200 rounded-lg">
                     <button
                         type="button"
@@ -164,7 +165,7 @@ const InvoiceModal = ({
                         className={`w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeSection === 'projectClient' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-gray-900">Project & Client Details</h4>
+                            <h4 className="text-sm font-medium text-gray-900">Client & Project Details</h4>
                             <svg
                                 className={`w-5 h-5 text-gray-500 transform transition-transform ${activeSection === 'projectClient' ? 'rotate-180' : ''}`}
                                 fill="none"
@@ -177,13 +178,64 @@ const InvoiceModal = ({
                     </button>
                     {activeSection === 'projectClient' && (
                         <div className="p-4 space-y-4">
+                            {/* Client Info Selection */}
+                            <div className="mb-6">
+                                <div className="flex justify-between items-center mb-1">
+                                    <h4 className="text-sm font-medium text-gray-900">
+                                        Client <span className="text-red-500">*</span>
+                                    </h4>
+                                    {onNavigateToClients && !isClientContextFixed && !editingInvoice && (
+                                        <button
+                                            type="button"
+                                            onClick={onNavigateToClients}
+                                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                        >
+                                            + New Client Info
+                                        </button>
+                                    )}
+                                </div>
+
+                                {clients.length === 0 ? (
+                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        <p className="text-sm text-yellow-800">
+                                            No client information found. Create one to include client details in the invoice.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <select
+                                            value={selectedClient?.id || ''}
+                                            onChange={(e) => handleClientSelection(e.target.value)}
+                                            className={`block w-full border ${(isClientContextFixed || editingInvoice) ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
+                                            required
+                                            disabled={isClientContextFixed || editingInvoice}
+                                        >
+                                            {/* Make this placeholder not disabled to allow clearing the selection if needed */}
+                                            <option value="">Select client info</option>
+                                            {clients.map(client => (
+                                                <option key={client.id} value={client.id}>
+                                                    {client.title.trim()}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {selectedClient && (
+                                            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
+                                                <p className="text-sm text-blue-800">
+                                                    <strong>{selectedClient?.title || 'Selected client'}</strong> will be included as "Invoice To" in the invoice.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Project selection */}
                             <div className="mb-6">
                                 <div className="flex justify-between items-center mb-1">
                                     <h4 className="text-sm font-medium text-gray-900">
                                         Project <span className="text-red-500">*</span>
                                     </h4>
-                                    {onNavigateToProjects && !isProjectContextFixed && !editingInvoice && (
+                                    {onNavigateToProjects && !(isProjectContextFixed && !isClientContextFixed) && !editingInvoice && (
                                         <button
                                             type="button"
                                             onClick={onNavigateToProjects}
@@ -205,9 +257,9 @@ const InvoiceModal = ({
                                         <select
                                             value={selectedProject?.id || ''}
                                             onChange={(e) => handleProjectSelection(e.target.value)}
-                                            className={`block w-full border ${(isProjectContextFixed || editingInvoice) ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
+                                            className={`block w-full border ${(isProjectContextFixed && !isClientContextFixed) || editingInvoice ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
                                             required
-                                            disabled={isProjectContextFixed || editingInvoice}
+                                            disabled={(isProjectContextFixed && !isClientContextFixed) || editingInvoice}
                                         >
                                             <option value="" disabled>Select project</option>
                                             {projects.map(proj => (
@@ -229,54 +281,6 @@ const InvoiceModal = ({
                                                         ) : null}
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Client Info Selection */}
-                            <div className="mb-6">
-                                <div className="flex justify-between items-center mb-1">
-                                    <h4 className="text-sm font-medium text-gray-900">
-                                        Client <span className="text-red-500">*</span>
-                                    </h4>
-                                    <button
-                                        type="button"
-                                        onClick={onNavigateToClients}
-                                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                                    >
-                                        + New Client Info
-                                    </button>
-                                </div>
-
-                                {clients.length === 0 ? (
-                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800">
-                                            No client information found. Create one to include client details in the invoice.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        <select
-                                            value={selectedClient?.id || ''}
-                                            onChange={(e) => handleClientSelection(e.target.value)}
-                                            className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
-                                            required
-                                        >
-                                            {/* Make this placeholder not disabled to allow clearing the selection if needed */}
-                                            <option value="">Select client info</option>
-                                            {clients.map(client => (
-                                                <option key={client.id} value={client.id}>
-                                                    {client.title.trim()}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {selectedClient && (
-                                            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
-                                                <p className="text-sm text-blue-800">
-                                                    <strong>{selectedClient.title}</strong> will be included as "Invoice To" in the invoice.
-                                                </p>
                                             </div>
                                         )}
                                     </div>
@@ -1024,7 +1028,7 @@ const InvoiceModal = ({
                                 {businessInfos.length === 0 ? (
                                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                                         <p className="text-sm text-yellow-800">
-                                            No business information found. Create one to include your business details in the invoice.
+                                            No businesses found. Create one to include your business details in the invoice.
                                         </p>
                                     </div>
                                 ) : (
