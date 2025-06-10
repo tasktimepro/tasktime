@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
 import GlobalTimer from './components/GlobalTimer';
+import OnboardingModal from './components/OnboardingModal';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils';
 import { ClockIcon } from '@heroicons/react/24/outline';
@@ -27,6 +28,10 @@ function App() {
     const [invoices, setInvoices] = useLocalStorage('invoices', []);
     const [invoiceTemplates, setInvoiceTemplates] = useLocalStorage('invoiceTemplates', []);
     const [preferences, setPreferences] = useLocalStorage('preferences', {});
+    
+    // Onboarding state
+    const [hasCompletedOnboarding, setHasCompletedOnboarding] = useLocalStorage('hasCompletedOnboarding', false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
     
     // Unified timer state (all timer-related data in one localStorage key)
     const [timerState, setTimerState] = useLocalStorage('timer', {
@@ -139,6 +144,34 @@ function App() {
 
     console.log('📊 Loaded projects:', projects.length);
 
+    // Detect first-time users and show onboarding
+    useEffect(() => {
+        // Check if user is new (no projects, tasks, invoices, etc.)
+        const hasAnyData = projects.length > 0 || 
+                          tasks.length > 0 || 
+                          timeEntries.length > 0 || 
+                          invoices.length > 0 || 
+                          paymentMethods.length > 0 || 
+                          businessInfos.length > 0 || 
+                          clientInfos.length > 0 ||
+                          invoiceTemplates.length > 0;
+
+        // Show onboarding if user hasn't completed it and has no data
+        if (!hasCompletedOnboarding && !hasAnyData) {
+            setShowOnboarding(true);
+        }
+    }, [
+        hasCompletedOnboarding, 
+        projects.length, 
+        tasks.length, 
+        timeEntries.length, 
+        invoices.length,
+        paymentMethods.length,
+        businessInfos.length,
+        clientInfos.length,
+        invoiceTemplates.length
+    ]);
+
     // URL-based state management
     const { urlParams, navigateToProjects, navigateToProject, navigateToInvoices, navigateToAccount, navigateToDashboard, updateUrl } = useUrlState();
     
@@ -162,6 +195,28 @@ function App() {
             setShowGlobalTimer(true);
         }
     }, [currentTimer]);
+
+    /**
+     * Handle onboarding completion
+     */
+    const handleOnboardingComplete = () => {
+        setHasCompletedOnboarding(true);
+        setShowOnboarding(false);
+    };
+
+    /**
+     * Handle project creation from onboarding
+     */
+    const handleOnboardingCreateProject = (projectData) => {
+        setProjects(prev => [...prev, projectData]);
+    };
+
+    /**
+     * Handle task creation from onboarding  
+     */
+    const handleOnboardingCreateTask = (taskData) => {
+        setTasks(prev => [...prev, taskData]);
+    };
 
     /**
      * Handle navigation to payment methods creation from invoice generator
@@ -244,6 +299,13 @@ function App() {
             elapsedTime: 0
         });
     };
+
+    // Check if onboarding is required
+    useEffect(() => {
+        if (!hasCompletedOnboarding) {
+            setShowOnboarding(true);
+        }
+    }, [hasCompletedOnboarding]);
 
     return (
         <ToastProvider>
@@ -465,6 +527,14 @@ function App() {
                         setCurrentTimer={setCurrentTimer}
                     />
                 )}
+
+                {/* Onboarding Modal */}
+                <OnboardingModal
+                    isOpen={showOnboarding}
+                    onComplete={handleOnboardingComplete}
+                    onCreateProject={handleOnboardingCreateProject}
+                    onCreateTask={handleOnboardingCreateTask}
+                />
             </main>
         </div>
         </ToastProvider>
