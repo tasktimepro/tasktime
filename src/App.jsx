@@ -146,7 +146,7 @@ function App() {
 
     // Detect first-time users and show onboarding
     useEffect(() => {
-        // Check if user is new (no projects, tasks, invoices, etc.)
+        // Check if user has any data OR if localStorage keys exist (indicating they've used the app before)
         const hasAnyData = projects.length > 0 || 
                           tasks.length > 0 || 
                           timeEntries.length > 0 || 
@@ -156,8 +156,19 @@ function App() {
                           clientInfos.length > 0 ||
                           invoiceTemplates.length > 0;
 
-        // Show onboarding if user hasn't completed it and has no data
-        if (!hasCompletedOnboarding && !hasAnyData) {
+        // Check if localStorage keys exist (even if empty) - indicates the user has used the app before
+        const hasUsedAppBefore = localStorage.getItem('projects') !== null ||
+                                localStorage.getItem('tasks') !== null ||
+                                localStorage.getItem('timeEntries') !== null ||
+                                localStorage.getItem('invoices') !== null ||
+                                localStorage.getItem('paymentMethods') !== null ||
+                                localStorage.getItem('businessInfos') !== null ||
+                                localStorage.getItem('clientInfos') !== null ||
+                                localStorage.getItem('invoiceTemplates') !== null ||
+                                localStorage.getItem('preferences') !== null;
+
+        // Show onboarding only if user hasn't completed it AND has no data AND hasn't used the app before
+        if (!hasCompletedOnboarding && !hasAnyData && !hasUsedAppBefore) {
             setShowOnboarding(true);
         }
     }, [
