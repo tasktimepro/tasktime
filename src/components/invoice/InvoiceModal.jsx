@@ -199,15 +199,6 @@ const InvoiceModal = ({
                                         <p className="text-sm text-yellow-800">
                                             No projects found. Create a project to continue with invoice generation.
                                         </p>
-                                        {onNavigateToProjects && !isProjectContextFixed && !editingInvoice && (
-                                            <button
-                                                type="button"
-                                                onClick={onNavigateToProjects}
-                                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
-                                            >
-                                                Create Project
-                                            </button>
-                                        )}
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
@@ -264,13 +255,6 @@ const InvoiceModal = ({
                                         <p className="text-sm text-yellow-800">
                                             No client information found. Create one to include client details in the invoice.
                                         </p>
-                                        <button
-                                            type="button"
-                                            onClick={onNavigateToClientInfo}
-                                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
-                                        >
-                                            Create Client Info
-                                        </button>
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
@@ -814,7 +798,7 @@ const InvoiceModal = ({
                                         return (
                                             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
                                                 <p className="text-sm text-yellow-800">
-                                                    Please add a task to continue...
+                                                    Please add a task to continue.
                                                 </p>
                                             </div>
                                         );
@@ -822,7 +806,7 @@ const InvoiceModal = ({
                                         return (
                                             <div className="mt-2 bg-orange-50 border border-orange-200 rounded-md p-3">
                                                 <p className="text-sm text-orange-800">
-                                                    Please select or create at least one task to bill...
+                                                    Please select or create at least one task to bill.
                                                 </p>
                                             </div>
                                         );
@@ -1042,13 +1026,6 @@ const InvoiceModal = ({
                                         <p className="text-sm text-yellow-800">
                                             No business information found. Create one to include your business details in the invoice.
                                         </p>
-                                        <button
-                                            type="button"
-                                            onClick={onNavigateToBusinessInfo}
-                                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
-                                        >
-                                            Create Business Info
-                                        </button>
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
@@ -1105,13 +1082,6 @@ const InvoiceModal = ({
                                         <p className="text-sm text-yellow-800">
                                             No payment methods found. Create one to include payment details in your invoice.
                                         </p>
-                                        <button
-                                            type="button"
-                                            onClick={onNavigateToPaymentMethods}
-                                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
-                                        >
-                                            Create Payment Method
-                                        </button>
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
@@ -1192,13 +1162,6 @@ const InvoiceModal = ({
                                         <p className="text-sm text-yellow-800">
                                             No invoice templates found. Create a template to continue with invoice generation.
                                         </p>
-                                        <button
-                                            type="button"
-                                            onClick={onNavigateToTemplates}
-                                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200"
-                                        >
-                                            Create Template
-                                        </button>
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
