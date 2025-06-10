@@ -192,52 +192,49 @@ const Invoices = ({
     };
 
     return (
-        <div className="flex h-full">
-            {/* Side Navigation */}
-            <div className="w-64 bg-white shadow-sm border-r border-gray-200 pb-4">
-                <div className="px-6 py-6">
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
                     <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
                     <p className="mt-1 text-sm text-gray-600">Manage invoices and related settings</p>
-                    
-                    {/* New Invoice Button */}
-                    <button
-                        onClick={handleCreateNewInvoice}
-                        className="mt-4 w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    >
-                        <DocumentTextIcon className="h-5 w-5 mr-2" />
-                        New Invoice
-                    </button>
                 </div>
                 
-                <nav className="px-3">
-                    <ul className="space-y-1">
-                        {sideNavItems.map((item) => {
-                            const Icon = item.icon;
-                            return (
-                                <li key={item.id}>
-                                    <button
-                                        onClick={() => handleSectionChange(item.id)}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                                            activeTab === item.id
-                                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                                : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                                        }`}
-                                    >
-                                        <Icon className="h-5 w-5 mr-3 flex-shrink-0" />
-                                        <div className="text-left">
-                                            <div className="font-medium">{item.name}</div>
-                                            <div className="text-xs text-gray-500 mt-0.5">{item.description}</div>
-                                        </div>
-                                    </button>
-                                </li>
-                            );
-                        })}
-                    </ul>
+                {/* New Invoice Button */}
+                <button
+                    onClick={handleCreateNewInvoice}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" />
+                    New Invoice
+                </button>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="border-b border-gray-200">
+                <nav className="-mb-px flex space-x-8">
+                    {sideNavItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                            <button
+                                key={item.id}
+                                onClick={() => handleSectionChange(item.id)}
+                                className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                                    activeTab === item.id
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                <Icon className="h-4 w-4 mr-2" />
+                                {item.name}
+                            </button>
+                        );
+                    })}
                 </nav>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 pl-8 py-6">
+            {/* Content */}
+            <div>
                 {renderContent()}
             </div>
             

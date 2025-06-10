@@ -10,7 +10,7 @@ import GlobalTimer from './components/GlobalTimer';
 import OnboardingModal from './components/OnboardingModal';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils';
-import { ClockIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 /**
  * Main App component - Entry point for the Task. Time. Track.
@@ -320,102 +320,88 @@ function App() {
 
     return (
         <ToastProvider>
-            <div className="min-h-screen bg-gray-50">
-                {/* Header */}
-            <header className="bg-white shadow-sm border-b border-gray-200">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center py-4">
+            <div className="min-h-screen bg-gray-50 flex">
+                {/* Sidebar Navigation */}
+                <aside className="w-64 bg-white shadow-sm border-r border-gray-200 flex flex-col h-screen sidebar">
+                    {/* Sidebar Header */}
+                    <div className="p-6 flex-shrink-0">
                         <div 
-                            className="flex items-center space-x-2 cursor-pointer hover:text-blue-600 transition-colors group"
+                            className="flex items-center space-x-3 cursor-pointer hover:text-blue-600 transition-colors group"
                             onClick={() => navigateToDashboard()}
                         >
                             <div className="relative">
-                                {/* <img
-                                    src="/tasktime-icon.png"
-                                    alt="TaskTime Icon"
-                                    className="h-8 w-8 group-hover:opacity-90 transition-opacity"
-                                /> */}
                                 <ClockIcon className="h-8 w-8 text-blue-600" />
                             </div>
                             <div>
                                 <h1 className="text-lg font-bold text-gray-900 leading-none">
                                     Task<span className="text-blue-600">Time</span>
                                 </h1>
-                                <p className="text-xs text-gray-500 leading-none mt-1">Your freelance flow simplified</p>
                             </div>
-                        </div>
-                        
-                        {/* Global Timer Display */}
-                        {showGlobalTimer && currentTimer && (
-                            <div className="flex-1 flex justify-center">
-                                <GlobalTimer
-                                    currentTimer={currentTimer}
-                                    setCurrentTimer={setCurrentTimer}
-                                    tasks={tasks}
-                                    projects={projects}
-                                    setTimeEntries={setTimeEntries}
-                                    isPaused={isPaused}
-                                    setIsPaused={setIsPaused}
-                                    pausedElapsedTime={pausedElapsedTime}
-                                    setPausedElapsedTime={setPausedElapsedTime}
-                                    navigateToProject={navigateToProject}
-                                    setTasks={setTasks}
-                                    onClose={() => {
-                                        setShowGlobalTimer(false);
-                                        setIsPaused(false);
-                                    }}
-                                />
-                            </div>
-                        )}
-                        
-                        <div className="flex space-x-4">
-                            <button
-                                onClick={() => navigateToDashboard()}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                    activeView === 'dashboard'
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                Dashboard
-                            </button>
-                            <button
-                                onClick={() => navigateToProjects()}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                    activeView === 'projects'
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                Projects
-                            </button>
-                            <button
-                                onClick={() => navigateToInvoices()}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                    activeView === 'invoices'
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                Invoices
-                            </button>
-                            <button
-                                onClick={() => navigateToAccount()}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                    activeView === 'account'
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                Account
-                            </button>
                         </div>
                     </div>
-                </div>
-            </header>
 
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 content-area">
+                    {/* Navigation Items */}
+                    <nav className="flex-1 px-4 py-6 overflow-y-auto">
+                        <ul className="space-y-2">
+                            <li>
+                                <button
+                                    onClick={() => navigateToDashboard()}
+                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                        activeView === 'dashboard'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                    }`}
+                                >
+                                    <ChartBarIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Dashboard
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => navigateToProjects()}
+                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                        activeView === 'projects'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                    }`}
+                                >
+                                    <ClipboardDocumentCheckIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Projects
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => navigateToInvoices()}
+                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                        activeView === 'invoices'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                    }`}
+                                >
+                                    <DocumentTextIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Invoices
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => navigateToAccount()}
+                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                        activeView === 'account'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                    }`}
+                                >
+                                    <UserCircleIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Account
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+                </aside>
+
+                {/* Main Content */}
+                <main className="flex-1 overflow-auto main-content relative">
+                    <div className={`pl-8 pr-6 pt-8 pb-8 ${showGlobalTimer && currentTimer ? 'pt-24' : ''}`}>{/* Inner content with balanced padding, extra top padding when timer is active */}
                 {activeView === 'dashboard' && (
                     <Dashboard
                         projects={projects}
@@ -546,8 +532,34 @@ function App() {
                     onCreateProject={handleOnboardingCreateProject}
                     onCreateTask={handleOnboardingCreateTask}
                 />
-            </main>
-        </div>
+                    </div>
+                    
+                    {/* Global Timer Display - Fixed at top */}
+                    {showGlobalTimer && currentTimer && (
+                        <div className="fixed top-4 left-64 right-4 z-50 flex justify-center global-timer-mobile">
+                            <div className="bg-white shadow-lg rounded-lg w-auto max-w-2xl">
+                                <GlobalTimer
+                                    currentTimer={currentTimer}
+                                    setCurrentTimer={setCurrentTimer}
+                                    tasks={tasks}
+                                    projects={projects}
+                                    setTimeEntries={setTimeEntries}
+                                    isPaused={isPaused}
+                                    setIsPaused={setIsPaused}
+                                    pausedElapsedTime={pausedElapsedTime}
+                                    setPausedElapsedTime={setPausedElapsedTime}
+                                    navigateToProject={navigateToProject}
+                                    setTasks={setTasks}
+                                    onClose={() => {
+                                        setShowGlobalTimer(false);
+                                        setIsPaused(false);
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </main>
+            </div>
         </ToastProvider>
     );
 }

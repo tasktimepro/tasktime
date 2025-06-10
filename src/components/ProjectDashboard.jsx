@@ -82,7 +82,8 @@ const ProjectDashboard = ({
                 <div className="flex items-center space-x-4">
                     <button
                         onClick={onBackToProjects}
-                        className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
+                        className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                        title="Back to Projects"
                     >
                         <ArrowLeftIcon className="h-5 w-5" />
                     </button>

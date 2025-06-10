@@ -45,10 +45,7 @@
 }
 
 /* Fix for preventing layout shifts when scrollbar appears/disappears */
-html {
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
-}
+/* Overflow scrolling now handled within main content area */
 
 /* When modals are open, prevent background scrolling */
 html.modal-open {
