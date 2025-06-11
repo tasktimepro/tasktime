@@ -534,32 +534,34 @@ const PaymentMethods = ({
                             )}
                         </div>
 
-                        {/* Default Checkbox */}
-                        <div className="flex items-center space-x-2">
-                            <CustomCheckbox
-                                id="isDefault"
-                                checked={formData.isDefault}
-                                onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
-                                label="Set as default payment method"
-                                labelClassName="text-sm font-medium text-gray-700"
-                            />
-                        </div>
+                        <div className="flex justify-between items-center">
+                            {/* Default Checkbox */}
+                            <div className="flex items-center space-x-2">
+                                <CustomCheckbox
+                                    id="isDefault"
+                                    checked={formData.isDefault}
+                                    onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
+                                    label="Set as default payment method"
+                                    labelClassName="text-sm font-medium text-gray-700"
+                                />
+                            </div>
 
-                        <div className="flex justify-end space-x-3">
-                            <button
-                                type="button"
-                                onClick={cancelForm}
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                Cancel
-                            </button>
+                            <div className="flex space-x-3">
+                                <button
+                                    type="button"
+                                    onClick={cancelForm}
+                                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    Cancel
+                                </button>
 
-                            <button
-                                type="submit"
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                {editingPaymentMethod ? 'Update' : 'Create'} Payment Method
-                            </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    {editingPaymentMethod ? 'Update' : 'Create'} Payment Method
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>

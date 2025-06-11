@@ -139,6 +139,10 @@ const BusinessInfo = ({
             return;
         }
 
+        if (!formData.businessName.trim()) {
+            return;
+        }
+
         // Validate email if provided
         if (formData.email && !validateEmail(formData.email)) {
             showSuccess('Please enter a valid email format', 'error');
@@ -211,6 +215,10 @@ const BusinessInfo = ({
         e.preventDefault();
 
         if (!formData.title.trim()) {
+            return;
+        }
+
+        if (!formData.businessName.trim()) {
             return;
         }
 
@@ -425,7 +433,7 @@ const BusinessInfo = ({
 
                             <div>
                                 <label htmlFor="businessName" className="block text-sm font-medium text-gray-700">
-                                    Business/Name
+                                    Business/Name <span className="text-red-500">*</span>
                                 </label>
 
                                 <input
@@ -434,6 +442,7 @@ const BusinessInfo = ({
                                     name="businessName"
                                     value={formData.businessName}
                                     onChange={handleInputChange}
+                                    required
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                     placeholder="Business name or personal name"
                                 />
@@ -518,7 +527,7 @@ const BusinessInfo = ({
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label htmlFor="registrationNumber" className="block text-sm font-medium text-gray-700">
-                                        Reg. Number <span className="text-gray-400 font-normal">(optional)</span>
+                                        Reg. Number
                                     </label>
 
                                     <input
@@ -534,7 +543,7 @@ const BusinessInfo = ({
 
                                 <div>
                                     <label htmlFor="vat" className="block text-sm font-medium text-gray-700">
-                                        VAT <span className="text-gray-400 font-normal">(optional)</span>
+                                        VAT
                                     </label>
 
                                     <input
@@ -550,7 +559,7 @@ const BusinessInfo = ({
 
                                 <div>
                                     <label htmlFor="taxNumber" className="block text-sm font-medium text-gray-700">
-                                        Tax Number <span className="text-gray-400 font-normal">(optional)</span>
+                                        Tax Number
                                     </label>
 
                                     <input
@@ -568,7 +577,7 @@ const BusinessInfo = ({
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                                        Email <span className="text-gray-400 font-normal">(optional)</span>
+                                        Email
                                     </label>
 
                                     <input
@@ -584,7 +593,7 @@ const BusinessInfo = ({
 
                                 <div>
                                     <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                                        Phone <span className="text-gray-400 font-normal">(optional)</span>
+                                        Phone
                                     </label>
 
                                     <input
@@ -710,32 +719,34 @@ const BusinessInfo = ({
                             </div>
                         </div>
 
-                        {/* Default Checkbox */}
-                        <div className="flex items-center space-x-2">
-                            <CustomCheckbox
-                                id="isDefault"
-                                checked={formData.isDefault}
-                                onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
-                                label="Set as default business info"
-                                labelClassName="text-sm font-medium text-gray-700"
-                            />
-                        </div>
+                        <div className="flex justify-between items-center">
+                            {/* Default Checkbox */}
+                            <div className="flex items-center space-x-2">
+                                <CustomCheckbox
+                                    id="isDefault"
+                                    checked={formData.isDefault}
+                                    onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
+                                    label="Set as default business info"
+                                    labelClassName="text-sm font-medium text-gray-700"
+                                />
+                            </div>
 
-                        <div className="flex justify-end space-x-3">
-                            <button
-                                type="button"
-                                onClick={cancelForm}
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                Cancel
-                            </button>
+                            <div className="flex space-x-3">
+                                <button
+                                    type="button"
+                                    onClick={cancelForm}
+                                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    Cancel
+                                </button>
 
-                            <button
-                                type="submit"
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                {editingBusinessInfo ? 'Update' : 'Create'} Business Info
-                            </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    {editingBusinessInfo ? 'Update' : 'Create'} Business Info
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import './App.css';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useUrlState } from './hooks/useUrlState';
 import ProjectList from './components/ProjectList';
@@ -426,8 +427,8 @@ function App() {
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 overflow-auto main-content relative">
-                    <div className={`pl-8 pr-6 pt-8 pb-8 ${showGlobalTimer && currentTimer ? 'pt-24' : ''}`}>{/* Inner content with balanced padding, extra top padding when timer is active */}
+                <main className="flex-1 main-content relative">
+                    <div className={`pl-8 pr-6 pt-8 pb-8 ${showGlobalTimer && currentTimer ? 'pt-20' : ''}`}>{/* Inner content with balanced padding, extra top padding when timer is active */}
                 {activeView === 'dashboard' && (
                     <Dashboard
                         projects={projects}
@@ -541,6 +542,7 @@ function App() {
                         clients={clients}
                         onNavigateToClients={handleNavigateToClientsFromInvoice}
                         onNavigateToProjects={handleNavigateToProjects}
+                        navigateToProject={navigateToProject}
                         invoices={invoices}
                         setInvoices={setInvoices}
                         invoiceTemplates={invoiceTemplates}

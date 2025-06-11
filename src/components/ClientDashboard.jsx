@@ -26,6 +26,7 @@ const ClientDashboard = ({
     clients,
     onNavigateToClients,
     onNavigateToProjects,
+    navigateToProject,
     invoices,
     setInvoices,
     invoiceTemplates,
@@ -271,7 +272,7 @@ const ClientDashboard = ({
                                     <div
                                         key={project.id}
                                         className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                                        onClick={() => window.open(`?view=projects&project=${project.id}`, '_blank')}
+                                        onClick={() => navigateToProject(project.id)}
                                     >
                                         <h3 className="font-medium text-gray-900 truncate">{project.title}</h3>
                                         {project.hourlyRate && (

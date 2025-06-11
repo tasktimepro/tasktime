@@ -329,15 +329,6 @@ const InvoiceTemplates = ({
                                     placeholder="Describe when to use this template..."
                                 />
                             </div>
-
-                            <div className="flex items-center">
-                                <CustomCheckbox
-                                    checked={formData.isDefault}
-                                    onChange={() => setFormData(prev => ({ ...prev, isDefault: !prev.isDefault }))}
-                                    label="Set as default template"
-                                    labelClassName="block text-sm text-gray-900"
-                                />
-                            </div>
                         </div>
 
                         {/* Invoice Number Configuration */}
@@ -519,23 +510,35 @@ const InvoiceTemplates = ({
                         </div>
 
                         {/* Submit Buttons */}
-                        <div className="flex justify-end space-x-3">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowCreateForm(false);
-                                    setEditingTemplate(null);
-                                }}
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                {editingTemplate ? 'Update Template' : 'Create Template'}
-                            </button>
+                        <div className="flex justify-between items-center">
+                            {/* Default Checkbox */}
+                            <div className="flex items-center">
+                                <CustomCheckbox
+                                    checked={formData.isDefault}
+                                    onChange={() => setFormData(prev => ({ ...prev, isDefault: !prev.isDefault }))}
+                                    label="Set as default template"
+                                    labelClassName="block text-sm text-gray-900"
+                                />
+                            </div>
+
+                            <div className="flex space-x-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowCreateForm(false);
+                                        setEditingTemplate(null);
+                                    }}
+                                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    {editingTemplate ? 'Update Template' : 'Create Template'}
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>

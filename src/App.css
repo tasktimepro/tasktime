@@ -8,9 +8,14 @@
 
 /* Apply consistent padding to prevent layout shifts from scrollbar */
 body {
-  padding-right: calc(var(--scrollbar-width) - (100vw - 100%));
   overflow: hidden;
   background-color: var(--app-background);
+}
+
+/* Main content area should have max height and handle its own scrolling */
+.main-content {
+  max-height: 100vh;
+  overflow-y: auto;
 }
 
 /* For components that have their own scrolling areas */
