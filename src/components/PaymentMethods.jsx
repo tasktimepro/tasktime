@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, CreditCardIcon } from '@heroicons/react/24/outline';
-import { generateId } from '../utils/idUtils';
 import { useToast } from '../hooks/useToast';
-import CustomCheckbox from './CustomCheckbox';
 
 // Event name for dropdown coordination
 const DROPDOWN_TOGGLE_EVENT = 'payment-dropdown-toggle';
@@ -13,31 +11,20 @@ const DROPDOWN_TOGGLE_EVENT = 'payment-dropdown-toggle';
 const PaymentMethods = ({ 
     paymentMethods, 
     setPaymentMethods,
-    autoOpenCreate = false
+    autoOpenCreate = false,
+    // Modal functions
+    openPaymentMethodModal = null,
+    editPaymentMethodModal = null
 }) => {
-    const [showCreateForm, setShowCreateForm] = useState(autoOpenCreate);
-    const [editingPaymentMethod, setEditingPaymentMethod] = useState(null);
     const [showDropdown, setShowDropdown] = useState({}); // Track dropdown states by payment method ID
     const { showSuccess } = useToast();
 
-    // Auto-open create form when autoOpenCreate prop changes
+    // Auto-open create modal when autoOpenCreate prop changes
     useEffect(() => {
-        if (autoOpenCreate && !showCreateForm && !editingPaymentMethod) {
-            setShowCreateForm(true);
+        if (autoOpenCreate && openPaymentMethodModal) {
+            openPaymentMethodModal();
         }
-    }, [autoOpenCreate, showCreateForm, editingPaymentMethod]);
-
-    const [formData, setFormData] = useState({
-        title: '',
-        fullName: '',
-        bank: '',
-        iban: '',
-        swift: '',
-        bankAddress: '',
-        paypal: '',
-        custom: [],
-        isDefault: false
-    });
+    }, [autoOpenCreate, openPaymentMethodModal]);
 
     // Close dropdown when clicking outside or when another dropdown opens
     useEffect(() => {
@@ -69,272 +56,17 @@ const PaymentMethods = ({
     }, []);
 
     /**
-     * Handle form input changes
-     */
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
-
-    /**
-     * Handle custom field changes
-     */
-    const handleCustomFieldChange = (index, field, value) => {
-        setFormData(prev => ({
-            ...prev,
-            custom: prev.custom.map((item, i) => 
-                i === index ? { ...item, [field]: value } : item
-            )
-        }));
-    };
-
-    /**
-     * Add a new custom field
-     */
-    const addCustomField = () => {
-        setFormData(prev => ({
-            ...prev,
-            custom: [...prev.custom, { label: '', value: '' }]
-        }));
-    };
-
-    /**
-     * Remove a custom field
-     */
-    const removeCustomField = (index) => {
-        setFormData(prev => ({
-            ...prev,
-            custom: prev.custom.filter((_, i) => i !== index)
-        }));
-    };
-
-    /**
-     * Validate IBAN format (basic validation)
-     */
-    const validateIBAN = (iban) => {
-        if (!iban) return true; // IBAN is optional
-        // Basic IBAN validation - check length and country code
-        const ibanRegex = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4}[0-9]{7}([A-Z0-9]?){0,16}$/;
-        return ibanRegex.test(iban.replace(/\s/g, ''));
-    };
-
-    /**
-     * Validate SWIFT/BIC format (basic validation)
-     */
-    const validateSWIFT = (swift) => {
-        if (!swift) return true; // SWIFT is optional
-        // Basic SWIFT validation - 8 or 11 characters
-        const swiftRegex = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
-        return swiftRegex.test(swift);
-    };
-
-    /**
-     * Create a new payment method
-     */
-    const handleCreatePaymentMethod = (e) => {
-        e.preventDefault();
-
-        if (!formData.title.trim()) {
-            return;
-        }
-
-        // Validate IBAN and SWIFT if provided
-        if (formData.iban && !validateIBAN(formData.iban)) {
-            showSuccess('Please enter a valid IBAN format', 'error');
-            return;
-        }
-
-        if (formData.swift && !validateSWIFT(formData.swift)) {
-            showSuccess('Please enter a valid SWIFT/BIC format', 'error');
-            return;
-        }
-
-        const newPaymentMethod = {
-            id: generateId(),
-            title: formData.title.trim(),
-            fullName: formData.fullName.trim(),
-            bank: formData.bank.trim(),
-            iban: formData.iban.trim(),
-            swift: formData.swift.trim(),
-            bankAddress: formData.bankAddress.trim(),
-            paypal: formData.paypal.trim(),
-            custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
-            isDefault: formData.isDefault,
-            createdAt: Date.now()
-        };
-
-        let updatedPaymentMethods = [...paymentMethods, newPaymentMethod];
-
-        // If this payment method is set as default, remove default from others
-        if (formData.isDefault) {
-            updatedPaymentMethods = updatedPaymentMethods.map(method => ({
-                ...method,
-                isDefault: method.id === newPaymentMethod.id
-            }));
-        }
-
-        setPaymentMethods(updatedPaymentMethods);
-
-        setFormData({
-            title: '',
-            fullName: '',
-            bank: '',
-            iban: '',
-            swift: '',
-            bankAddress: '',
-            paypal: '',
-            custom: [],
-            isDefault: false
-        });
-
-        setShowCreateForm(false);
-
-        showSuccess('Payment method created successfully');
-    };
-
-    /**
-     * Update an existing payment method
-     */
-    const handleUpdatePaymentMethod = (e) => {
-        e.preventDefault();
-
-        if (!formData.title.trim()) {
-            return;
-        }
-
-        // Validate IBAN and SWIFT if provided
-        if (formData.iban && !validateIBAN(formData.iban)) {
-            showSuccess('Please enter a valid IBAN format', 'error');
-            return;
-        }
-
-        if (formData.swift && !validateSWIFT(formData.swift)) {
-            showSuccess('Please enter a valid SWIFT/BIC format', 'error');
-            return;
-        }
-
-        const updatedPaymentMethods = paymentMethods.map(method =>
-            method.id === editingPaymentMethod.id
-                ? {
-                    ...method,
-                    title: formData.title.trim(),
-                    fullName: formData.fullName.trim(),
-                    bank: formData.bank.trim(),
-                    iban: formData.iban.trim(),
-                    swift: formData.swift.trim(),
-                    bankAddress: formData.bankAddress.trim(),
-                    paypal: formData.paypal.trim(),
-                    custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
-                    isDefault: formData.isDefault
-                }
-                : method
-        );
-
-        // If this payment method is set as default, remove default from others
-        let finalUpdatedPaymentMethods = updatedPaymentMethods;
-        if (formData.isDefault) {
-            finalUpdatedPaymentMethods = updatedPaymentMethods.map(method => ({
-                ...method,
-                isDefault: method.id === editingPaymentMethod.id
-            }));
-        }
-
-        setPaymentMethods(finalUpdatedPaymentMethods);
-
-        setEditingPaymentMethod(null);
-
-        setFormData({
-            title: '',
-            fullName: '',
-            bank: '',
-            iban: '',
-            swift: '',
-            bankAddress: '',
-            paypal: '',
-            custom: [],
-            isDefault: false
-        });
-
-        showSuccess('Payment method updated successfully');
-    };
-
-    /**
      * Delete a payment method
      */
     const handleDeletePaymentMethod = (paymentMethodId) => {
         if (window.confirm('Are you sure you want to delete this payment method?')) {
             setPaymentMethods(paymentMethods.filter(method => method.id !== paymentMethodId));
-            
-            // Close the edit form if the deleted item was being edited
-            if (editingPaymentMethod && editingPaymentMethod.id === paymentMethodId) {
-                setEditingPaymentMethod(null);
-                
-                // Reset form data
-                setFormData({
-                    title: '',
-                    fullName: '',
-                    bank: '',
-                    iban: '',
-                    swift: '',
-                    bankAddress: '',
-                    paypal: '',
-                    custom: [],
-                    isDefault: false
-                });
-            }
-
             showSuccess('Payment method deleted successfully');
         }
     };
 
-    /**
-     * Start editing a payment method
-     */
-    const startEditing = (paymentMethod) => {
-        setEditingPaymentMethod(paymentMethod);
-
-        setFormData({
-            title: paymentMethod.title || paymentMethod.name, // Handle legacy data
-            fullName: paymentMethod.fullName || '',
-            bank: paymentMethod.bank,
-            iban: paymentMethod.iban,
-            swift: paymentMethod.swift,
-            bankAddress: paymentMethod.bankAddress,
-            paypal: paymentMethod.paypal,
-            custom: [...paymentMethod.custom],
-            isDefault: paymentMethod.isDefault || false
-        });
-
-        setShowCreateForm(false);
-    };
-
-    /**
-     * Cancel form actions
-     */
-    const cancelForm = () => {
-        setShowCreateForm(false);
-
-        setEditingPaymentMethod(null);
-
-        setFormData({
-            title: '',
-            fullName: '',
-            bank: '',
-            iban: '',
-            swift: '',
-            bankAddress: '',
-            paypal: '',
-            custom: [],
-            isDefault: false
-        });
-    };
-
     return (
-        <div className={`${(showCreateForm || editingPaymentMethod) ? 'space-y-8' : 'space-y-6'}`}>
+        <div className="space-y-6">
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
@@ -345,227 +77,13 @@ const PaymentMethods = ({
                 </div>
 
                 <button
-                    onClick={() => setShowCreateForm(true)}
+                    onClick={() => openPaymentMethodModal && openPaymentMethodModal()}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     <PlusIcon className="h-4 w-4 mr-2" />
                     New Payment Method
                 </button>
             </div>
-
-            {/* Create/Edit Form */}
-            {(showCreateForm || editingPaymentMethod) && (
-                <div className="bg-white shadow rounded-lg p-6 max-w-3xl mx-auto">
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">
-                        {editingPaymentMethod ? 'Edit Payment Method' : 'New Payment Method'}
-                    </h4>
-
-                    <form onSubmit={editingPaymentMethod ? handleUpdatePaymentMethod : handleCreatePaymentMethod} className="space-y-8">
-                        {/* Standard Fields */}
-                        <div className="space-y-4">
-                            <div>
-                                <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                                    Payment Method Title <span className="text-red-500">*</span>
-                                </label>
-
-                                <input
-                                    type="text"
-                                    id="title"
-                                    name="title"
-                                    value={formData.title}
-                                    onChange={handleInputChange}
-                                    required
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="Enter title for this payment method"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-                                    Full Name
-                                </label>
-
-                                <input
-                                    type="text"
-                                    id="fullName"
-                                    name="fullName"
-                                    value={formData.fullName}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="Full name of the person sending the invoice"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="bank" className="block text-sm font-medium text-gray-700">
-                                    Bank Name
-                                </label>
-
-                                <input
-                                    type="text"
-                                    id="bank"
-                                    name="bank"
-                                    value={formData.bank}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="Bank name"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="iban" className="block text-sm font-medium text-gray-700">
-                                        IBAN
-                                    </label>
-
-                                    <input
-                                        type="text"
-                                        id="iban"
-                                        name="iban"
-                                        value={formData.iban}
-                                        onChange={handleInputChange}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                        placeholder="GB29 NWBK 6016 1331 9268 19"
-                                        style={{ textTransform: 'uppercase' }}
-                                    />
-                                    <p className="mt-1 text-xs text-gray-500">International Bank Account Number</p>
-                                </div>
-
-                                <div>
-                                    <label htmlFor="swift" className="block text-sm font-medium text-gray-700">
-                                        SWIFT/BIC
-                                    </label>
-
-                                    <input
-                                        type="text"
-                                        id="swift"
-                                        name="swift"
-                                        value={formData.swift}
-                                        onChange={handleInputChange}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                        placeholder="NWBKGB2L"
-                                        style={{ textTransform: 'uppercase' }}
-                                    />
-                                    <p className="mt-1 text-xs text-gray-500">Bank Identifier Code</p>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label htmlFor="bankAddress" className="block text-sm font-medium text-gray-700">
-                                    Bank Address
-                                </label>
-
-                                <textarea
-                                    id="bankAddress"
-                                    name="bankAddress"
-                                    value={formData.bankAddress}
-                                    onChange={handleInputChange}
-                                    rows={3}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="123 Bank Street, City, Country"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="paypal" className="block text-sm font-medium text-gray-700">
-                                    PayPal Email
-                                </label>
-
-                                <input
-                                    type="email"
-                                    id="paypal"
-                                    name="paypal"
-                                    value={formData.paypal}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="paypal@example.com"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Custom Fields */}
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <h5 className="text-sm font-medium text-gray-900">Custom Fields</h5>
-                                <button
-                                    type="button"
-                                    onClick={addCustomField}
-                                    className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                    <PlusIcon className="h-3 w-3 mr-1" />
-                                    Add Field
-                                </button>
-                            </div>
-
-                            {formData.custom.map((field, index) => (
-                                <div key={index} className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <input
-                                            type="text"
-                                            value={field.label}
-                                            onChange={(e) => handleCustomFieldChange(index, 'label', e.target.value)}
-                                            className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                            placeholder="Field label (e.g., UPI ID)"
-                                        />
-                                    </div>
-                                    <div className="flex space-x-2">
-                                        <input
-                                            type="text"
-                                            value={field.value}
-                                            onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
-                                            className="flex-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                            placeholder="Field value"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => removeCustomField(index)}
-                                            className="inline-flex items-center p-1.5 border border-gray-300 rounded text-gray-700 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                                        >
-                                            <TrashIcon className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {formData.custom.length === 0 && (
-                                <p className="text-sm text-gray-500 italic">
-                                    No custom fields added. Click "Add Field" to add custom payment details.
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                            {/* Default Checkbox */}
-                            <div className="flex items-center space-x-2">
-                                <CustomCheckbox
-                                    id="isDefault"
-                                    checked={formData.isDefault}
-                                    onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
-                                    label="Set as default payment method"
-                                    labelClassName="text-sm font-medium text-gray-700"
-                                />
-                            </div>
-
-                            <div className="flex space-x-3">
-                                <button
-                                    type="button"
-                                    onClick={cancelForm}
-                                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                    Cancel
-                                </button>
-
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                    {editingPaymentMethod ? 'Update' : 'Create'} Payment Method
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            )}
 
             {/* Payment Methods List */}
             {paymentMethods.length === 0 ? (
@@ -576,7 +94,7 @@ const PaymentMethods = ({
 
                     <div className="mt-6">
                         <button
-                            onClick={() => setShowCreateForm(true)}
+                            onClick={() => openPaymentMethodModal && openPaymentMethodModal()}
                             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                             <PlusIcon className="h-4 w-4 mr-2" />
@@ -653,7 +171,7 @@ const PaymentMethods = ({
                                                 <div className="py-1">
                                                     <button
                                                         onClick={() => {
-                                                            startEditing(method);
+                                                            editPaymentMethodModal && editPaymentMethodModal(method);
                                                             setShowDropdown({});
                                                         }}
                                                         className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"

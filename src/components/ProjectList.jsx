@@ -2,12 +2,10 @@ import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
-import { generateId } from '../utils/idUtils';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { getTaskIdsToDelete } from '../utils/taskUtils';
-import CustomCheckbox from './CustomCheckbox';
 
 // Event name for dropdown coordination
 const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
@@ -28,42 +26,16 @@ const ProjectList = ({
     invoices = [],
     setInvoices,
     clients = [],
-    showCreateForm: initialShowCreateForm = false,
-    preselectedClientId = null
+    openProjectModal,
+    editProjectModal
 }) => {
-    const [showCreateForm, setShowCreateForm] = useState(initialShowCreateForm);
-    const [editingProject, setEditingProject] = useState(null);
     const [showDropdown, setShowDropdown] = useState({}); // Track dropdown states by project ID
     const [showArchivedProjects, setShowArchivedProjects] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState(null);
-    const [selectedClientRate, setSelectedClientRate] = useState(null);
     const { showSuccess } = useToast();
 
-    const [formData, setFormData] = useState({
-        title: '',
-        hourlyRate: '', // Keep as empty string for proper placeholder behavior
-        flatRate: false,
-        preferredClientId: '',
-        overrideRate: false,
-        isPersonal: false
-    });
-
-    // Update showCreateForm when the prop changes
-    useEffect(() => {
-        // If initialShowCreateForm becomes true, show the form
-        if (initialShowCreateForm) {
-            setShowCreateForm(true);
-            
-            // If a client is preselected, set it in the form
-            if (preselectedClientId) {
-                setFormData(prev => ({
-                    ...prev,
-                    preferredClientId: preselectedClientId
-                }));
-            }
-        }
-    }, [initialShowCreateForm, preselectedClientId]);
+    // Update showCreateForm when the prop changes - Removed since using modal manager
     
     // Close dropdown when clicking outside or when another dropdown opens
     useEffect(() => {
@@ -93,140 +65,6 @@ const ProjectList = ({
             document.removeEventListener('click', handleClickOutside);
         };
     }, []);
-
-    /**
-     * Handle form input changes
-     */
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-
-        // If client selection changes, update the client rate
-        if (name === 'preferredClientId' && !formData.isPersonal) {
-            if (value) {
-                const selectedClient = clients.find(c => c.id === value);
-                setSelectedClientRate(selectedClient);
-
-                // If not overriding rate and client has a rate, set it
-                if (!formData.overrideRate && selectedClient) {
-                    setFormData(prev => ({
-                        ...prev,
-                        hourlyRate: selectedClient.hourlyRate ? selectedClient.hourlyRate.toString() : '',
-                        flatRate: selectedClient.flatRate || false
-                    }));
-                }
-            } else {
-                setSelectedClientRate(null);
-                if (!formData.overrideRate) {
-                    setFormData(prev => ({
-                        ...prev,
-                        hourlyRate: '',
-                        flatRate: false
-                    }));
-                }
-            }
-        }
-    };
-
-    /**
-     * Handle override rate checkbox
-     */
-    const handleOverrideRateChange = (checked) => {
-        setFormData(prev => ({
-            ...prev,
-            overrideRate: checked,
-            // If disabling override and we have a selected client, use client's rate
-            ...((!checked && selectedClientRate) ? {
-                hourlyRate: selectedClientRate.hourlyRate ? selectedClientRate.hourlyRate.toString() : '',
-                flatRate: selectedClientRate.flatRate || false
-            } : {})
-        }));
-    };
-
-    /**
-     * Create a new project
-     */
-    const handleCreateProject = (e) => {
-        e.preventDefault();
-
-        if (!formData.title) {
-            return; // Title is required
-        }
-
-        if (!formData.isPersonal && !formData.preferredClientId) {
-            return; // Client is mandatory for non-personal projects
-        }
-        
-        // If not flat rate and not personal, hourly rate is required (either from client or override)
-        if (!formData.isPersonal && !formData.flatRate && !formData.hourlyRate) {
-            return; // Hourly rate is required when not using flat rate for billable projects
-        }
-
-        const newProject = {
-            id: generateId(),
-            title: formData.title,
-            hourlyRate: formData.hourlyRate !== '' ? parseFloat(formData.hourlyRate) : null,
-            flatRate: formData.flatRate || false,
-            preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
-            isPersonal: formData.isPersonal || false,
-            createdAt: Date.now(),
-            lastBilledAt: null,
-            archived: false
-        };
-
-        setProjects([...projects, newProject]);
-
-        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false });
-        setSelectedClientRate(null);
-
-        setShowCreateForm(false);
-    };
-
-    /**
-     * Update an existing project
-     */
-    const handleUpdateProject = (e) => {
-        e.preventDefault();
-
-        if (!formData.title) {
-            return; // Title is required
-        }
-
-        if (!formData.isPersonal && !formData.preferredClientId) {
-            return; // Client is mandatory for non-personal projects
-        }
-        
-        // If not flat rate and not personal, hourly rate is required (either from client or override)
-        if (!formData.isPersonal && !formData.flatRate && !formData.hourlyRate) {
-            return; // Hourly rate is required when not using flat rate for billable projects
-        }
-
-        const updatedProjects = projects.map(project =>
-            project.id === editingProject.id
-                ? {
-                    ...project,
-                    title: formData.title,
-                    hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-                    flatRate: formData.flatRate || false,
-                    preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
-                    isPersonal: formData.isPersonal || false
-                }
-                : project
-        );
-
-        setProjects(updatedProjects);
-
-        setEditingProject(null);
-
-        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false });
-        setSelectedClientRate(null);
-
-        showSuccess('Project updated successfully!');
-    };
 
     /**
      * Check if a project has associated invoices
@@ -299,20 +137,7 @@ const ProjectList = ({
         const deletedTaskCount = allTaskIdsToDelete.size;
         const deletedTimeEntriesCount = timeEntries.length - updatedTimeEntries.length;
         
-        // Close the edit form if the deleted project was being edited
-        if (editingProject && editingProject.id === projectId) {
-            setEditingProject(null);
-            
-            // Reset form data
-            setFormData({ 
-                title: '', 
-                hourlyRate: '', 
-                flatRate: false,
-                preferredClientId: '',
-                overrideRate: false
-            });
-            setSelectedClientRate(null);
-        }
+        // Close the edit form if the deleted project was being edited - Removed since using modal manager
 
         // Show appropriate success message
         const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
@@ -321,44 +146,6 @@ const ProjectList = ({
     };
 
     /**
-     * Start editing a project
-     */
-    const startEditing = (project) => {
-        setEditingProject(project);
-
-        // Find the client for this project
-        const projectClient = project.preferredClientId ? clients.find(c => c.id === project.preferredClientId) : null;
-        setSelectedClientRate(projectClient);
-
-        // Determine if the project is overriding client rates
-        const isOverriding = projectClient && (
-            (project.hourlyRate !== projectClient.hourlyRate) || 
-            (project.flatRate !== projectClient.flatRate)
-        );
-
-        setFormData({
-            title: project.title,
-            hourlyRate: project.hourlyRate ? project.hourlyRate.toString() : '',
-            flatRate: project.flatRate || false,
-            preferredClientId: project.preferredClientId || '',
-            overrideRate: isOverriding,
-            isPersonal: project.isPersonal || false
-        });
-
-        setShowCreateForm(false);
-    };
-
-    /**
-     * Cancel form actions
-     */
-    const cancelForm = () => {
-        setShowCreateForm(false);
-
-        setEditingProject(null);
-
-        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false });
-        setSelectedClientRate(null);
-    };    /**
      * Archive a project
      */
     const handleArchiveProject = (projectId) => {
@@ -526,7 +313,7 @@ const ProjectList = ({
                 </h2>
 
                 <button
-                    onClick={() => setShowCreateForm(true)}
+                    onClick={() => openProjectModal()}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     <PlusIcon className="h-4 w-4 mr-2" />
@@ -534,174 +321,7 @@ const ProjectList = ({
                 </button>
             </div>
 
-            {/* Create/Edit Form */}
-            {(showCreateForm || editingProject) && (
-                <div className="bg-white shadow rounded-lg p-6 max-w-3xl mx-auto">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                        {editingProject ? 'Edit Project' : 'Create New Project'}
-                    </h3>
 
-                    <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-5">
-                        <div>
-                            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                                Project Title <span className="text-red-500">*</span>
-                            </label>
-
-                            <input
-                                type="text"
-                                id="title"
-                                name="title"
-                                value={formData.title}
-                                onChange={handleInputChange}
-                                required
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                placeholder="Enter project title"
-                            />
-                        </div>
-
-                        {/* Personal Project Toggle */}
-                        <div className="flex items-start space-x-3">
-                            <div className="flex items-center h-5">
-                                <CustomCheckbox
-                                    id="isPersonal"
-                                    checked={formData.isPersonal}
-                                    onChange={(checked) => setFormData(prev => ({
-                                        ...prev,
-                                        isPersonal: checked,
-                                        // Clear client selection when marking as personal
-                                        preferredClientId: checked ? '' : prev.preferredClientId,
-                                        // Reset override rate when toggling
-                                        overrideRate: false,
-                                        hourlyRate: checked ? prev.hourlyRate : (selectedClientRate && !prev.overrideRate ? selectedClientRate.hourlyRate?.toString() || '' : prev.hourlyRate),
-                                        flatRate: checked ? prev.flatRate : (selectedClientRate && !prev.overrideRate ? selectedClientRate.flatRate || false : prev.flatRate)
-                                    }))}
-                                />
-                            </div>
-                            <div className="text-sm">
-                                <label htmlFor="isPersonal" className="font-medium text-gray-700 cursor-pointer">
-                                    Personal project (Not billable)
-                                </label>
-                                <p className="text-gray-500">
-                                    Check this for personal projects without clients or invoices.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Client Selection - Only show for non-personal projects */}
-                        {!formData.isPersonal && (
-                            <div>
-                                <label htmlFor="preferredClientId" className="block text-sm font-medium text-gray-700">
-                                    Client <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    id="preferredClientId"
-                                    name="preferredClientId"
-                                    value={formData.preferredClientId}
-                                    onChange={handleInputChange}
-                                    required
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                >
-                                    <option value="">Select a client</option>
-                                    {clients.filter(c => !c.archived).map(client => (
-                                        <option key={client.id} value={client.id}>
-                                            {client.title}
-                                        </option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-gray-500 mt-2">
-                                    Every project must be associated with a client.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Rate Information from Client */}
-                        {selectedClientRate && !formData.overrideRate && !formData.isPersonal && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <h4 className="text-sm font-medium text-blue-900 mb-2">Rate from Client</h4>
-                                {selectedClientRate.flatRate ? (
-                                    <p className="text-sm text-blue-700">
-                                        This client uses flat rate pricing (non-hourly basis)
-                                    </p>
-                                ) : selectedClientRate.hourlyRate ? (
-                                    <p className="text-sm text-blue-700">
-                                        Hourly Rate: {selectedClientRate.hourlyRate}/hour
-                                    </p>
-                                ) : (
-                                    <p className="text-sm text-blue-700">
-                                        No default rate set for this client
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Override Rate Checkbox */}
-                        {selectedClientRate && (
-                            <div className="flex items-center space-x-3">
-                                <CustomCheckbox
-                                    checked={formData.overrideRate}
-                                    onChange={handleOverrideRateChange}
-                                    label="Override client rate for this project"
-                                    labelClassName="text-sm font-medium text-gray-700"
-                                    id="overrideRate"
-                                />
-                            </div>
-                        )}
-
-                        {/* Rate Override Section */}
-                        {formData.overrideRate && (
-                            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                <h4 className="text-sm font-medium text-gray-900 mb-3">Project Rate Override</h4>
-                                
-                                <div className="flex items-center space-x-3 mb-4">
-                                    <CustomCheckbox
-                                        checked={formData.flatRate}
-                                        onChange={() => setFormData(prev => ({ ...prev, flatRate: !prev.flatRate }))}
-                                        label="Flat rate project (non-hourly basis)"
-                                        labelClassName="text-sm font-medium text-gray-700"
-                                        id="flatRate"
-                                    />
-                                </div>
-
-                                <div className={formData.flatRate ? "hidden" : ""}>
-                                    <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
-                                        Hourly Rate {!formData.flatRate && <span className="text-red-500">*</span>}
-                                    </label>
-
-                                    <input
-                                        type="number"
-                                        id="hourlyRate"
-                                        name="hourlyRate"
-                                        value={formData.hourlyRate}
-                                        onChange={handleInputChange}
-                                        min="0"
-                                        step="0.01"
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                        placeholder="0.00"
-                                        required={!formData.flatRate && formData.overrideRate}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex justify-end space-x-3">
-                            <button
-                                type="button"
-                                onClick={cancelForm}
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                            >
-                                Cancel
-                            </button>
-
-                            <button
-                                type="submit"
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                {editingProject ? 'Update' : 'Create'} Project
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
 
             {/* Projects Grid */}
             {projects.filter(p => !p.archived).length === 0 && projects.filter(p => p.archived).length === 0 ? (
@@ -716,7 +336,7 @@ const ProjectList = ({
 
                     <div className="mt-6">
                         <button
-                            onClick={() => setShowCreateForm(true)}
+                            onClick={() => openProjectModal()}
                             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                             <PlusIcon className="h-4 w-4 mr-2" />
@@ -765,7 +385,7 @@ const ProjectList = ({
                                                 <div className="py-1">
                                                     <button
                                                         onClick={() => {
-                                                            startEditing(project);
+                                                            editProjectModal(project);
                                                             setShowDropdown({});
                                                         }}
                                                         className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"
@@ -860,7 +480,7 @@ const ProjectList = ({
                             </button>
 
                             {showArchivedProjects && (
-                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 opacity-75 scrollable-container">
+                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 scrollable-container">
                                     {projects.filter(p => p.archived).map((project) => (
                                         <div
                                             key={project.id}

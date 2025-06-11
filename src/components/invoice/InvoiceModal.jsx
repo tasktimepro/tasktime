@@ -1251,9 +1251,6 @@ const InvoiceModal = ({
                                             <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
                                                 <div className="text-sm text-blue-800">
                                                     <strong>{selectedTemplate.name}</strong><br />
-                                                    {selectedTemplate.description && (
-                                                        <>Description: {selectedTemplate.description}<br /></>
-                                                    )}
                                                     Invoice Format: {selectedTemplate.invoiceNumberFormat}<br />
                                                     Due Date: {(() => {
                                                         switch (selectedTemplate.dueDateType) {

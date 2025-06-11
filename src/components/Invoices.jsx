@@ -30,7 +30,15 @@ const Invoices = ({
     setInvoiceTemplates,
     updateUrl,
     navigateToProjects,
-    navigateToClients    }) => {
+    navigateToClients,
+    // Modal functions
+    openTemplateModal,
+    editTemplateModal,
+    openPaymentMethodModal,
+    editPaymentMethodModal,
+    openBusinessModal,
+    editBusinessModal
+}) => {
     const { urlParams } = useUrlState();
     const { showError } = useToast();
     
@@ -199,6 +207,8 @@ const Invoices = ({
                         invoiceTemplates={invoiceTemplates} 
                         setInvoiceTemplates={setInvoiceTemplates}
                         autoOpenCreate={urlParams.create === 'template'}
+                        openTemplateModal={openTemplateModal}
+                        editTemplateModal={editTemplateModal}
                     />
                 )}
                 
@@ -207,6 +217,8 @@ const Invoices = ({
                         paymentMethods={paymentMethods} 
                         setPaymentMethods={setPaymentMethods}
                         autoOpenCreate={urlParams.create === 'payment-method'}
+                        openPaymentMethodModal={openPaymentMethodModal}
+                        editPaymentMethodModal={editPaymentMethodModal}
                     />
                 )}
                 
@@ -215,6 +227,8 @@ const Invoices = ({
                         businessInfos={businessInfos} 
                         setBusinessInfos={setBusinessInfos}
                         autoOpenCreate={urlParams.create === 'business-info'}
+                        openBusinessModal={openBusinessModal}
+                        editBusinessModal={editBusinessModal}
                     />
                 )}
             </div>

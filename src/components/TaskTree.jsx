@@ -279,7 +279,7 @@ const TaskTree = ({
                             </button>
 
                             {showArchivedTasks && (
-                                <div className="space-y-2 opacity-75 scrollable-container-fixed">
+                                <div className="space-y-2 scrollable-container-fixed">
                                     {archivedTasks.map((task) => (
                                         <TaskItem
                                             key={task.id}

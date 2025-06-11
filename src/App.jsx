@@ -10,7 +10,8 @@ import Dashboard from './components/Dashboard';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
 import GlobalTimer from './components/GlobalTimer';
-import OnboardingModal from './components/OnboardingModal';
+// import OnboardingModal from './components/OnboardingModal'; // DISABLED
+import ModalManager from './components/modals/ModalManager';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils';
 import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/24/outline';
@@ -32,9 +33,64 @@ function App() {
     const [invoiceTemplates, setInvoiceTemplates] = useLocalStorage('invoiceTemplates', []);
     const [preferences, setPreferences] = useLocalStorage('preferences', {});
     
-    // Onboarding state
-    const [hasCompletedOnboarding, setHasCompletedOnboarding] = useLocalStorage('hasCompletedOnboarding', false);
-    const [showOnboarding, setShowOnboarding] = useState(false);
+    // Onboarding state - DISABLED
+    // const [hasCompletedOnboarding, setHasCompletedOnboarding] = useLocalStorage('hasCompletedOnboarding', false);
+    // const [showOnboarding, setShowOnboarding] = useState(false);
+    
+    // Modal state for form modals
+    const [activeModal, setActiveModal] = useState(null);
+    const [editingItem, setEditingItem] = useState(null);
+
+    // Modal utility functions
+    const openClientModal = (client = null) => {
+        setActiveModal('client');
+        setEditingItem(client);
+    };
+
+    const editClientModal = (client) => {
+        setActiveModal('client');
+        setEditingItem(client);
+    };
+
+    const openProjectModal = (project = null) => {
+        setActiveModal('project');
+        setEditingItem(project);
+    };
+
+    const editProjectModal = (project) => {
+        setActiveModal('project');
+        setEditingItem(project);
+    };
+
+    const openTemplateModal = (template = null) => {
+        setActiveModal('template');
+        setEditingItem(template);
+    };
+
+    const editTemplateModal = (template) => {
+        setActiveModal('template');
+        setEditingItem(template);
+    };
+
+    const openPaymentMethodModal = (paymentMethod = null) => {
+        setActiveModal('payment-method');
+        setEditingItem(paymentMethod);
+    };
+
+    const editPaymentMethodModal = (paymentMethod) => {
+        setActiveModal('payment-method');
+        setEditingItem(paymentMethod);
+    };
+
+    const openBusinessModal = (businessInfo = null) => {
+        setActiveModal('business');
+        setEditingItem(businessInfo);
+    };
+
+    const editBusinessModal = (businessInfo) => {
+        setActiveModal('business');
+        setEditingItem(businessInfo);
+    };
     
     // Unified timer state (all timer-related data in one localStorage key)
     const [timerState, setTimerState] = useLocalStorage('timer', {
@@ -147,7 +203,8 @@ function App() {
 
     console.log('📊 Loaded projects:', projects.length);
 
-    // Detect first-time users and show onboarding
+    // Detect first-time users and show onboarding - DISABLED
+    /*
     useEffect(() => {
         // Check if user has any data OR if localStorage keys exist (indicating they've used the app before)
         const hasAnyData = projects.length > 0 || 
@@ -185,6 +242,7 @@ function App() {
         clients.length,
         invoiceTemplates.length
     ]);
+    */
 
     // URL-based state management
     const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToAccount, navigateToDashboard, updateUrl } = useUrlState();
@@ -221,27 +279,21 @@ function App() {
         }
     }, [currentTimer]);
 
-    /**
-     * Handle onboarding completion
-     */
+    // Handle onboarding completion - DISABLED
+    /*
     const handleOnboardingComplete = () => {
         setHasCompletedOnboarding(true);
         setShowOnboarding(false);
     };
 
-    /**
-     * Handle project creation from onboarding
-     */
     const handleOnboardingCreateProject = (projectData) => {
         setProjects(prev => [...prev, projectData]);
     };
 
-    /**
-     * Handle task creation from onboarding  
-     */
     const handleOnboardingCreateTask = (taskData) => {
         setTasks(prev => [...prev, taskData]);
     };
+    */
 
     /**
      * Handle navigation to payment methods creation from invoice generator
@@ -325,12 +377,12 @@ function App() {
         });
     };
 
-    // Check if onboarding is required
-    useEffect(() => {
-        if (!hasCompletedOnboarding) {
-            setShowOnboarding(true);
-        }
-    }, [hasCompletedOnboarding]);
+    // Check if onboarding is required - DISABLED
+    // useEffect(() => {
+    //     if (!hasCompletedOnboarding) {
+    //         setShowOnboarding(true);
+    //     }
+    // }, [hasCompletedOnboarding]);
 
     return (
         <ToastProvider>
@@ -469,8 +521,8 @@ function App() {
                             navigateToProject(project.id);
                         }}
                         clients={clients}
-                        showCreateForm={urlParams.create === 'project'}
-                        preselectedClientId={urlParams.preselectedClientId}
+                        openProjectModal={openProjectModal}
+                        editProjectModal={editProjectModal}
                     />
                 )}
 
@@ -520,7 +572,8 @@ function App() {
                         onSelectClient={(client) => {
                             navigateToClient(client.id);
                         }}
-                        showCreateForm={urlParams.create === 'client'}
+                        openClientModal={openClientModal}
+                        editClientModal={editClientModal}
                     />
                 )}
 
@@ -572,6 +625,12 @@ function App() {
                         updateUrl={updateUrl}
                         navigateToProjects={handleNavigateToProjects}
                         navigateToClients={navigateToClients}
+                        openTemplateModal={openTemplateModal}
+                        editTemplateModal={editTemplateModal}
+                        openPaymentMethodModal={openPaymentMethodModal}
+                        editPaymentMethodModal={editPaymentMethodModal}
+                        openBusinessModal={openBusinessModal}
+                        editBusinessModal={editBusinessModal}
                     />
                 )}
 
@@ -600,12 +659,38 @@ function App() {
                     />
                 )}
 
-                {/* Onboarding Modal */}
+                {/* Onboarding Modal - DISABLED */}
+                {/*
                 <OnboardingModal
                     isOpen={showOnboarding}
                     onComplete={handleOnboardingComplete}
                     onCreateProject={handleOnboardingCreateProject}
                     onCreateTask={handleOnboardingCreateTask}
+                />
+                */}
+
+                {/* Modal Manager for Form Modals */}
+                <ModalManager
+                    activeModal={activeModal}
+                    setActiveModal={setActiveModal}
+                    editingItem={editingItem}
+                    setEditingItem={setEditingItem}
+                    clients={clients}
+                    setClients={setClients}
+                    projects={projects}
+                    setProjects={setProjects}
+                    tasks={tasks}
+                    setTasks={setTasks}
+                    timeEntries={timeEntries}
+                    setTimeEntries={setTimeEntries}
+                    invoices={invoices}
+                    setInvoices={setInvoices}
+                    invoiceTemplates={invoiceTemplates}
+                    setInvoiceTemplates={setInvoiceTemplates}
+                    paymentMethods={paymentMethods}
+                    setPaymentMethods={setPaymentMethods}
+                    businessInfos={businessInfos}
+                    setBusinessInfos={setBusinessInfos}
                 />
                     </div>
                     
