@@ -382,166 +382,168 @@ const InvoicesList = ({
                                     </div>
                                 </div>
 
-                                {/* Invoice details */}
-                                <div className="ml-9">
-                                    <p className="text-sm text-gray-500">
-                                        {invoice.date}
-                                        {invoice.totalHours > 0 && (
-                                            <>
-                                                <span className="mx-1">•</span>
-                                                {invoice.totalHours.toFixed(2)} hours
-                                            </>
+                                {/* Invoice details with action buttons on the same row */}
+                                <div className="flex items-end justify-between ml-9">
+                                    <div className="flex-1">
+                                        <p className="text-sm text-gray-500">
+                                            {invoice.date}
+                                            {invoice.totalHours > 0 && (
+                                                <>
+                                                    <span className="mx-1">•</span>
+                                                    {invoice.totalHours.toFixed(2)} hours
+                                                </>
+                                            )}
+                                            <span className="mx-1">•</span>
+                                            {getCurrencySymbol(invoice.currency || getPreferredCurrency())}{invoice.totalAmount.toFixed(2)}
+                                        </p>
+                                        {invoice.dueDate && (
+                                            <p className={`text-sm mt-1 ${
+                                                isInvoiceOverdue(invoice) 
+                                                    ? 'text-red-600 font-medium' 
+                                                    : 'text-gray-500'
+                                            }`}>
+                                                Due: {invoice.dueDate}
+                                            </p>
                                         )}
-                                        <span className="mx-1">•</span>
-                                        {getCurrencySymbol(invoice.currency || getPreferredCurrency())}{invoice.totalAmount.toFixed(2)}
-                                    </p>
-                                    {invoice.dueDate && (
-                                        <p className={`text-sm mt-1 ${
-                                            isInvoiceOverdue(invoice) 
-                                                ? 'text-red-600 font-medium' 
-                                                : 'text-gray-500'
-                                        }`}>
-                                            Due: {invoice.dueDate}
-                                        </p>
-                                    )}
-                                    <div className="text-xs text-gray-400 mt-1">
-                                        <p>
-                                            Project: <span className="font-medium text-gray-600">
-                                                {invoice.project?.title || 'Unknown Project'}
-                                            </span>
-                                        </p>
-                                        <p>
-                                            Client: <span className="font-medium text-gray-600">
-                                                {(() => {
-                                                    // Try to get client name from clientId first
-                                                    if (invoice.clientId) {
-                                                        const client = clients.find(ci => ci.id === invoice.clientId);
-                                                        if (client) {
-                                                            return client.clientName;
+                                        <div className="text-xs text-gray-400 mt-1">
+                                            <p>
+                                                Client: <span className="font-medium text-gray-600">
+                                                    {(() => {
+                                                        // Try to get client name from clientId first
+                                                        if (invoice.clientId) {
+                                                            const client = clients.find(ci => ci.id === invoice.clientId);
+                                                            if (client) {
+                                                                return client.clientName;
+                                                            }
                                                         }
-                                                    }
-                                                    // Fallback to stored client or manual entry
-                                                    return invoice.client?.name || 'Unknown';
-                                                })()}
-                                            </span>
-                                        </p>
-                                        {(invoice.template || (invoice.templateId && invoiceTemplates.length > 0)) && (() => {
-                                            // First try to use stored template object
-                                            let template = invoice.template;
-                                            let isDeleted = false;
-                                            
-                                            // If no stored template, try to find by ID (backward compatibility)
-                                            if (!template && invoice.templateId) {
-                                                template = invoiceTemplates.find(t => t.id === invoice.templateId);
-                                            }
-                                            
-                                            // If we have a stored template but can't find it by ID anymore, it's deleted
-                                            if (invoice.template && invoice.templateId && !invoiceTemplates.find(t => t.id === invoice.templateId)) {
-                                                isDeleted = true;
-                                            }
-                                            
-                                            return template ? (
-                                                <p>
-                                                    Template: <span className="font-medium text-gray-600">{template.name}</span>
-                                                    {isDeleted && (
-                                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                            deleted
-                                                        </span>
-                                                    )}
-                                                </p>
-                                            ) : null;
-                                        })()}
-                                        {(invoice.businessInfo || invoice.businessInfoId) && (() => {
-                                            // First try to use stored business info object
-                                            let businessInfo = invoice.businessInfo;
-                                            let isDeleted = false;
-                                            
-                                            // If no stored business info, try to find by ID (backward compatibility)
-                                            if (!businessInfo && invoice.businessInfoId) {
-                                                businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
-                                            }
-                                            
-                                            // If we have a stored business info but can't find it by ID anymore, it's deleted
-                                            if (invoice.businessInfo && invoice.businessInfoId && !businessInfos.find(bi => bi.id === invoice.businessInfoId)) {
-                                                isDeleted = true;
-                                            }
-                                            
-                                            return businessInfo ? (
-                                                <p>
-                                                    Business: <span className="font-medium text-gray-600">{businessInfo.title}</span>
-                                                    {isDeleted && (
-                                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                            deleted
-                                                        </span>
-                                                    )}
-                                                </p>
-                                            ) : null;
-                                        })()}
-                                        {(invoice.paymentMethod || invoice.paymentMethodId) && (() => {
-                                            // Check if we have a stored payment method object first
-                                            let paymentMethod = invoice.paymentMethod;
-                                            let isDeleted = false;
-                                            
-                                            if (!paymentMethod && invoice.paymentMethodId) {
-                                                // Fall back to finding by ID in current payment methods
-                                                paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                                            } else if (paymentMethod && invoice.paymentMethodId) {
-                                                // Check if the stored payment method still exists in current collection
-                                                const currentPaymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                                                if (!currentPaymentMethod) {
+                                                        // Fallback to stored client or manual entry
+                                                        return invoice.client?.name || 'Unknown';
+                                                    })()}
+                                                </span>
+                                            </p>
+                                            <p>
+                                                Project: <span className="font-medium text-gray-600">
+                                                    {invoice.project?.title || 'Unknown Project'}
+                                                </span>
+                                            </p>
+                                            {(invoice.template || (invoice.templateId && invoiceTemplates.length > 0)) && (() => {
+                                                // First try to use stored template object
+                                                let template = invoice.template;
+                                                let isDeleted = false;
+                                                
+                                                // If no stored template, try to find by ID (backward compatibility)
+                                                if (!template && invoice.templateId) {
+                                                    template = invoiceTemplates.find(t => t.id === invoice.templateId);
+                                                }
+                                                
+                                                // If we have a stored template but can't find it by ID anymore, it's deleted
+                                                if (invoice.template && invoice.templateId && !invoiceTemplates.find(t => t.id === invoice.templateId)) {
                                                     isDeleted = true;
                                                 }
-                                            }
-                                            
-                                            return paymentMethod ? (
-                                                <p>
-                                                    Payment Method: <span className="font-medium text-gray-600">{paymentMethod.title}</span>
-                                                    {isDeleted && (
-                                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                            deleted
-                                                        </span>
-                                                    )}
-                                                </p>
-                                            ) : null;
-                                        })()}
+                                                
+                                                return template ? (
+                                                    <p>
+                                                        Template: <span className="font-medium text-gray-600">{template.name}</span>
+                                                        {isDeleted && (
+                                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                                deleted
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                ) : null;
+                                            })()}
+                                            {(invoice.businessInfo || invoice.businessInfoId) && (() => {
+                                                // First try to use stored business info object
+                                                let businessInfo = invoice.businessInfo;
+                                                let isDeleted = false;
+                                                
+                                                // If no stored business info, try to find by ID (backward compatibility)
+                                                if (!businessInfo && invoice.businessInfoId) {
+                                                    businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                                                }
+                                                
+                                                // If we have a stored business info but can't find it by ID anymore, it's deleted
+                                                if (invoice.businessInfo && invoice.businessInfoId && !businessInfos.find(bi => bi.id === invoice.businessInfoId)) {
+                                                    isDeleted = true;
+                                                }
+                                                
+                                                return businessInfo ? (
+                                                    <p>
+                                                        Business: <span className="font-medium text-gray-600">{businessInfo.title}</span>
+                                                        {isDeleted && (
+                                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                                deleted
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                ) : null;
+                                            })()}
+                                            {(invoice.paymentMethod || invoice.paymentMethodId) && (() => {
+                                                // Check if we have a stored payment method object first
+                                                let paymentMethod = invoice.paymentMethod;
+                                                let isDeleted = false;
+                                                
+                                                if (!paymentMethod && invoice.paymentMethodId) {
+                                                    // Fall back to finding by ID in current payment methods
+                                                    paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                                                } else if (paymentMethod && invoice.paymentMethodId) {
+                                                    // Check if the stored payment method still exists in current collection
+                                                    const currentPaymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                                                    if (!currentPaymentMethod) {
+                                                        isDeleted = true;
+                                                    }
+                                                }
+                                                
+                                                return paymentMethod ? (
+                                                    <p>
+                                                        Payment Method: <span className="font-medium text-gray-600">{paymentMethod.title}</span>
+                                                        {isDeleted && (
+                                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                                deleted
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                ) : null;
+                                            })()}
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Action buttons - bottom right */}
-                                <div className="flex justify-end items-center space-x-2">
-                                    {!invoice.paymentProcessed && (
+                                    {/* Action buttons - right side */}
+                                    <div className="flex justify-end items-center space-x-2">
+                                        {!invoice.paymentProcessed && (
+                                            <button
+                                                onClick={() => handlePaymentProcessedToggle(invoice)}
+                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                            >
+                                                <CheckIcon className="h-3 w-3 mr-1" />
+                                                Mark as Paid
+                                            </button>
+                                        )}
+
                                         <button
-                                            onClick={() => handlePaymentProcessedToggle(invoice)}
-                                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                            onClick={() => handleEdit(invoice)}
+                                            className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
+                                            title="Edit Invoice"
                                         >
-                                            <CheckIcon className="h-3 w-3 mr-1" />
-                                            Mark as Paid
+                                            <PencilIcon className="h-5 w-5" />
                                         </button>
-                                    )}
-
-                                    <button
-                                        onClick={() => handleEdit(invoice)}
-                                        className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
-                                        title="Edit Invoice"
-                                    >
-                                        <PencilIcon className="h-5 w-5" />
-                                    </button>
-                                    
-                                    <button
-                                        onClick={() => handlePreview(invoice)}
-                                        className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50"
-                                        title="Preview Invoice"
-                                    >
-                                        <EyeIcon className="h-5 w-5" />
-                                    </button>
-                                    
-                                    <button
-                                        onClick={() => handleDownload(invoice)}
-                                        className="p-2 text-gray-400 hover:text-purple-600 rounded-md hover:bg-purple-50"
-                                        title="Download as PDF"
-                                    >
-                                        <ArrowDownTrayIcon className="h-5 w-5" />
-                                    </button>
+                                        
+                                        <button
+                                            onClick={() => handlePreview(invoice)}
+                                            className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50"
+                                            title="Preview Invoice"
+                                        >
+                                            <EyeIcon className="h-5 w-5" />
+                                        </button>
+                                        
+                                        <button
+                                            onClick={() => handleDownload(invoice)}
+                                            className="p-2 text-gray-400 hover:text-purple-600 rounded-md hover:bg-purple-50"
+                                            title="Download as PDF"
+                                        >
+                                            <ArrowDownTrayIcon className="h-5 w-5" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -624,7 +626,7 @@ const InvoicesList = ({
                                     <p>{selectedInvoice.project?.title || 'Unknown Project'}</p>
                                     {selectedInvoice.project?.hourlyRate && (
                                         <p>
-                                            Rate: {getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}${selectedInvoice.project.hourlyRate}/${selectedInvoice.currency || getPreferredCurrency()} per hour
+                                            Rate: {getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}{selectedInvoice.project.hourlyRate}/{selectedInvoice.currency || getPreferredCurrency()} per hour
                                         </p>
                                     )}
                                 </div>
@@ -657,7 +659,7 @@ const InvoicesList = ({
 
     if (projectInvoices.length === 0) {
         return (
-            <div className="text-center py-8">
+            <div className="text-center py-12">
                 <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices yet</h3>
                 <p className="mt-1 text-sm text-gray-500">
@@ -666,7 +668,7 @@ const InvoicesList = ({
                 {!hideNewInvoiceButton && (
                     <button
                         onClick={() => onEditInvoice && onEditInvoice(null)}
-                        className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                     >
                         <DocumentTextIcon className="h-5 w-5 mr-2" />
                         New Invoice

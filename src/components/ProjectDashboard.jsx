@@ -135,22 +135,20 @@ const ProjectDashboard = ({
                 </div>
 
                 <div className="p-6">
-                    <div className="scrollable-container-fixed">
-                        <TaskTree
-                            project={project}
-                            tasks={tasks}
-                            setTasks={setTasks}
-                            timeEntries={timeEntries}
-                            setTimeEntries={setTimeEntries}
-                            currentTimer={currentTimer}
-                            setCurrentTimer={setCurrentTimer}
-                            isPaused={isPaused}
-                            setIsPaused={setIsPaused}
-                            pausedElapsedTime={pausedElapsedTime}
-                            setPausedElapsedTime={setPausedElapsedTime}
-                            isGlobalTimer={true}
-                        />
-                    </div>
+                    <TaskTree
+                        project={project}
+                        tasks={tasks}
+                        setTasks={setTasks}
+                        timeEntries={timeEntries}
+                        setTimeEntries={setTimeEntries}
+                        currentTimer={currentTimer}
+                        setCurrentTimer={setCurrentTimer}
+                        isPaused={isPaused}
+                        setIsPaused={setIsPaused}
+                        pausedElapsedTime={pausedElapsedTime}
+                        setPausedElapsedTime={setPausedElapsedTime}
+                        isGlobalTimer={true}
+                    />
                 </div>
             </div>
 
@@ -190,18 +188,16 @@ const ProjectDashboard = ({
                     </div>
 
                     <div className="p-6">
-                        <div className="scrollable-container">
-                            <InvoicesList
-                                projectInvoices={projectInvoices}
-                                onEditInvoice={handleEditInvoice}
-                                paymentMethods={paymentMethods}
-                                businessInfos={businessInfos}
-                                clients={clients}
-                                hideNewInvoiceButton={true}
-                                setInvoices={setInvoices}
-                                invoiceTemplates={invoiceTemplates}
-                            />
-                        </div>
+                        <InvoicesList
+                            projectInvoices={projectInvoices}
+                            onEditInvoice={handleEditInvoice}
+                            paymentMethods={paymentMethods}
+                            businessInfos={businessInfos}
+                            clients={clients}
+                            hideNewInvoiceButton={true}
+                            setInvoices={setInvoices}
+                            invoiceTemplates={invoiceTemplates}
+                        />
                     </div>
                 </div>
             )}

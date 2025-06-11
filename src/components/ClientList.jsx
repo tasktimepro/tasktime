@@ -403,7 +403,7 @@ const ClientList = ({
                             </button>
 
                             {showArchivedClients && (
-                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 scrollable-container">
+                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                                     {clients.filter(c => c.archived).map((client) => (
                                         <div
                                             key={client.id}

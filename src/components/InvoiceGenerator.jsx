@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DocumentTextIcon, TrashIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
-import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
+import { getCurrencySymbol, getPreferredCurrency, getProjectCurrency } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
 import InvoiceModal from './invoice/InvoiceModal';
 import * as InvoiceHandler from './invoice/InvoiceHandler';
@@ -1072,6 +1072,7 @@ const InvoiceGenerator = ({
             businessInfoId: selectedBusinessInfo?.id || null, // Keep for backward compatibility
             businessInfo: selectedBusinessInfo ? { ...selectedBusinessInfo } : null,
             clientId: selectedClient?.id || null,
+            currency: selectedClient?.defaultCurrency || getPreferredCurrency(),
             templateId: selectedTemplate?.id || null, // Keep for backward compatibility
             template: selectedTemplate ? { ...selectedTemplate } : null,
             invoiceNumber: invoiceNumber,
@@ -1480,7 +1481,7 @@ const InvoiceGenerator = ({
                         {currentProjectForCalculation ? 'Generate Invoice' : 'Create Invoice'}
                         {currentProjectForCalculation && unbilledHours > 0 && currentProjectForCalculation.hourlyRate && (
                             <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full">
-                                {getCurrencySymbol(currentProjectForCalculation.currency)}{unbilledAmount.toFixed(2)}
+                                {getCurrencySymbol(getProjectCurrency(currentProjectForCalculation, clients))}{unbilledAmount.toFixed(2)}
                             </span>
                         )}
                         {currentProjectForCalculation && unbilledHours > 0 && !currentProjectForCalculation.hourlyRate && (

@@ -177,8 +177,15 @@ const ProjectList = ({
         // Get tasks for this project
         const projectTasks = tasks.filter(task => task.projectId === project.id);
         
+        // Get explicitly billable tasks (tasks with billable === true)
+        const billableTasks = projectTasks.filter(task => task.billable === true);
+        const billableTaskIds = billableTasks.map(task => task.id);
+        
         // Get time entries for this project's tasks with task-level billing filtering
         const unbilledEntries = timeEntries.filter(entry => {
+            // Only include entries for tasks that are explicitly marked as billable
+            if (!billableTaskIds.includes(entry.taskId)) return false;
+            
             // Find the task for this entry
             const task = projectTasks.find(t => t.id === entry.taskId);
             if (!task) return false;
@@ -217,8 +224,15 @@ const ProjectList = ({
         // Get tasks for this project
         const projectTasks = tasks.filter(task => task.projectId === project.id);
         
+        // Get explicitly billable tasks (tasks with billable === true)
+        const billableTasks = projectTasks.filter(task => task.billable === true);
+        const billableTaskIds = billableTasks.map(task => task.id);
+        
         // Get time entries for this project's tasks with task-level billing filtering
         const unbilledEntries = timeEntries.filter(entry => {
+            // Only include entries for tasks that are explicitly marked as billable
+            if (!billableTaskIds.includes(entry.taskId)) return false;
+            
             // Find the task for this entry
             const task = projectTasks.find(t => t.id === entry.taskId);
             if (!task) return false;
@@ -480,7 +494,7 @@ const ProjectList = ({
                             </button>
 
                             {showArchivedProjects && (
-                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 scrollable-container">
+                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                                     {projects.filter(p => p.archived).map((project) => (
                                         <div
                                             key={project.id}

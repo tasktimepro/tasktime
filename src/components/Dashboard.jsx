@@ -156,18 +156,34 @@ const Dashboard = ({
             return total + (entry.end - entry.start);
         }, 0);
 
-        // Calculate billable time earnings by finding the task and project for each entry
-        const        billableEarningsByCurrency = {};
+        // Calculate billable time earnings using task-by-task rounding for consistency
+        const billableEarningsByCurrency = {};
+        
+        // Group entries by task first, then calculate earnings with proper rounding
+        const taskTimeMap = {};
         entriesInRange.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
-            if (!task) return;
+            if (!task || task.billable !== true) return; // Only include explicitly billable tasks
             
             const project = projects.find(p => p.id === task.projectId);
             if (!project || !project.hourlyRate) return;
 
-            const currency = getProjectCurrency(project, clients);
-            const hoursWorked = millisecondsToHours(entry.end - entry.start);
-            const amount = hoursWorked * project.hourlyRate;
+            const taskKey = `${task.id}-${project.id}`;
+            if (!taskTimeMap[taskKey]) {
+                taskTimeMap[taskKey] = {
+                    totalTime: 0,
+                    project: project,
+                    currency: getProjectCurrency(project, clients)
+                };
+            }
+            taskTimeMap[taskKey].totalTime += (entry.end - entry.start);
+        });
+        
+        // Calculate earnings with task-by-task rounding
+        Object.values(taskTimeMap).forEach(({ totalTime, project, currency }) => {
+            const taskHours = millisecondsToHours(totalTime);
+            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+            const amount = roundedTaskHours * project.hourlyRate;
 
             if (!billableEarningsByCurrency[currency]) {
                 billableEarningsByCurrency[currency] = 0;
@@ -405,7 +421,7 @@ const Dashboard = ({
                 projectActivity[task.projectId] = { 
                     totalTime: 0, 
                     lastActivity: 0,
-                    pendingTime: 0
+                    taskPendingTime: {}
                 };
             }
             projectActivity[task.projectId].totalTime += (entry.end - entry.start);
@@ -414,10 +430,16 @@ const Dashboard = ({
                 entry.end
             );
             
-            // Calculate pending billable time (entries after last billing)
+            // Calculate pending billable time with task-by-task rounding (consistent with invoice calculation)
             const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
-            if (entry.start > taskLastBilledAt) {
-                projectActivity[task.projectId].pendingTime += (entry.end - entry.start);
+            if (entry.start > taskLastBilledAt && task.billable === true) {
+                if (!projectActivity[task.projectId].taskPendingTime) {
+                    projectActivity[task.projectId].taskPendingTime = {};
+                }
+                if (!projectActivity[task.projectId].taskPendingTime[task.id]) {
+                    projectActivity[task.projectId].taskPendingTime[task.id] = 0;
+                }
+                projectActivity[task.projectId].taskPendingTime[task.id] += (entry.end - entry.start);
             }
         });
 
@@ -425,8 +447,18 @@ const Dashboard = ({
             .filter(project => !project.archived) // Only exclude archived projects
             .map(project => {
                 // Use project activity if it exists, otherwise use defaults
-                const activity = projectActivity[project.id] || { totalTime: 0, lastActivity: 0, pendingTime: 0 };
-                const pendingTimeHours = millisecondsToHours(activity.pendingTime);
+                const activity = projectActivity[project.id] || { totalTime: 0, lastActivity: 0, taskPendingTime: {} };
+                
+                // Calculate pending hours using task-by-task rounding (consistent with invoice calculation)
+                let pendingTimeHours = 0;
+                if (activity.taskPendingTime) {
+                    pendingTimeHours = Object.values(activity.taskPendingTime).reduce((total, taskTime) => {
+                        const taskHours = millisecondsToHours(taskTime);
+                        const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+                        return total + roundedTaskHours;
+                    }, 0);
+                }
+                
                 // For recent projects, always use original currency and rate - no conversion
                 const pendingAmount = project.hourlyRate ? pendingTimeHours * project.hourlyRate : 0;
 

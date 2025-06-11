@@ -22,14 +22,5 @@ body {
 .scrollable-container {
   scrollbar-gutter: stable;
   overflow-y: auto;
-  max-height: 100%;
-  padding: 8px; /* Padding to prevent content touching scrollbar and to show shadows */
-}
-
-/* For fixed-height scrollable components */
-.scrollable-container-fixed {
-  scrollbar-gutter: stable;
-  overflow-y: auto;
-  max-height: 70vh; /* Limit height to prevent taking up the entire screen */
-  padding: 8px; /* Padding to prevent content touching scrollbar and to show shadows */
+  max-height: 70vh;
 }

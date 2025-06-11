@@ -236,7 +236,7 @@ const TaskTree = ({
                 <>
                     {/* Active Tasks */}
                     {parentTasks.length > 0 && (
-                        <div className="space-y-4 scrollable-container">
+                        <div className="space-y-4">
                             {parentTasks.map((task) => (
                                 <TaskItem
                                     key={task.id}
@@ -279,7 +279,7 @@ const TaskTree = ({
                             </button>
 
                             {showArchivedTasks && (
-                                <div className="space-y-2 scrollable-container-fixed">
+                                <div className="space-y-2 scrollable-container">
                                     {archivedTasks.map((task) => (
                                         <TaskItem
                                             key={task.id}

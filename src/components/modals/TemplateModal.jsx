@@ -228,7 +228,7 @@ const TemplateModal = ({
 
     // Modal footer with action buttons
     const modalFooter = (
-        <div className="flex justify-between items-center">
+        <div className="flex items-center space-x-4 justify-end">
             {/* Default Checkbox */}
             <div className="flex items-center">
                 <CustomCheckbox
@@ -266,7 +266,7 @@ const TemplateModal = ({
             size="3xl"
             footer={modalFooter}
         >
-            <form id="template-form" onSubmit={handleSubmit} className="space-y-8">
+            <form id="template-form" onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Information */}
                 <div className="space-y-4">
                     <div>
@@ -286,7 +286,7 @@ const TemplateModal = ({
 
                 {/* Invoice Number Configuration */}
                 <div className="border-t pt-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Invoice Number Configuration</h3>
+                    <h3 className="text-sm font-medium text-gray-900 mb-4">Invoice Number Configuration</h3>
                     
                     <div className="space-y-4">
                         <div>
@@ -384,7 +384,7 @@ const TemplateModal = ({
 
                 {/* Due Date Configuration */}
                 <div className="border-t pt-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Due Date Configuration</h3>
+                    <h3 className="text-sm font-medium text-gray-900 mb-4">Due Date Configuration</h3>
                     
                     <div className="space-y-4">
                         <div>

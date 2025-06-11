@@ -1,9 +1,9 @@
-import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
-import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils';
+import { getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils';
 import { millisecondsToHours, formatDuration } from '../utils/dateUtils';
 
 /**
@@ -35,6 +35,11 @@ const ClientDashboard = ({
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
+
+    // Get client's currency
+    const clientCurrency = useMemo(() => {
+        return client.defaultCurrency || getPreferredCurrency();
+    }, [client.defaultCurrency]);
 
     // Get projects for this client
     const clientProjects = useMemo(() => {
@@ -88,15 +93,28 @@ const ClientDashboard = ({
                     if (!task || !projectTaskIds.includes(entry.taskId)) return false;
                     
                     const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
-                    return entry.start > taskLastBilledAt && task.billable !== false;
+                    return entry.start > taskLastBilledAt && task.billable === true;
                 });
 
-                const projectUnbilledTime = unbilledEntries.reduce((total, entry) => {
-                    return total + (entry.end - entry.start);
+                // Group unbilled entries by task and calculate with proper rounding
+                const taskTimeMap = {};
+                unbilledEntries.forEach(entry => {
+                    if (!taskTimeMap[entry.taskId]) {
+                        taskTimeMap[entry.taskId] = 0;
+                    }
+                    taskTimeMap[entry.taskId] += (entry.end - entry.start);
+                });
+
+                // Calculate total rounded hours and revenue (matching invoice calculation)
+                const projectUnbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+                    const taskHours = millisecondsToHours(taskTime);
+                    const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+                    return total + roundedTaskHours;
                 }, 0);
 
+                const projectUnbilledTime = projectUnbilledHours * 60 * 60 * 1000; // Convert back to milliseconds for consistency
                 unbilledTime += projectUnbilledTime;
-                potentialRevenue += millisecondsToHours(projectUnbilledTime) * project.hourlyRate;
+                potentialRevenue += projectUnbilledHours * project.hourlyRate;
             }
         });
 
@@ -109,6 +127,112 @@ const ClientDashboard = ({
             invoiceCount: clientInvoices.length
         };
     }, [clientTimeEntries, clientInvoices, clientProjects, clientTasks]);
+
+    /**
+     * Calculate unbilled amount for a project (requires hourly rate)
+     */
+    const calculateUnbilledAmount = (project) => {
+        // If it's a flat rate project or no hourly rate is set, return 0 for the amount
+        if (project.flatRate || !project.hourlyRate) return 0;
+        
+        // Get tasks for this project
+        const projectTasks = clientTasks.filter(task => task.projectId === project.id);
+        
+        // Get explicitly billable tasks (tasks with billable === true)
+        const billableTasks = projectTasks.filter(task => task.billable === true);
+        const billableTaskIds = billableTasks.map(task => task.id);
+        
+        // Get time entries for this project's tasks with task-level billing filtering
+        const unbilledEntries = clientTimeEntries.filter(entry => {
+            // Only include entries for tasks that are explicitly marked as billable
+            if (!billableTaskIds.includes(entry.taskId)) return false;
+            
+            // Find the task for this entry
+            const task = projectTasks.find(t => t.id === entry.taskId);
+            if (!task) return false;
+            if (!entry.end || entry.end <= entry.start) return false;
+            
+            // Use task-specific lastBilledAt, or task creation date if never billed
+            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            
+            // Only include entries created after this task's last billing date
+            return entry.start > taskLastBilledAt;
+        });
+
+        // Group unbilled entries by task and round each task's hours (same logic as invoice)
+        const taskTimeMap = {};
+        unbilledEntries.forEach(entry => {
+            if (!taskTimeMap[entry.taskId]) {
+                taskTimeMap[entry.taskId] = 0;
+            }
+            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+        });
+
+        // Calculate total rounded hours (matching invoice calculation)
+        const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+            const taskHours = millisecondsToHours(taskTime);
+            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+            return total + roundedTaskHours;
+        }, 0);
+
+        return unbilledHours * project.hourlyRate;
+    };
+
+    /**
+     * Calculate unbilled hours for a project (without rate requirement)
+     */
+    const calculateUnbilledHours = (project) => {
+        // Get tasks for this project
+        const projectTasks = clientTasks.filter(task => task.projectId === project.id);
+        
+        // Get explicitly billable tasks (tasks with billable === true)
+        const billableTasks = projectTasks.filter(task => task.billable === true);
+        const billableTaskIds = billableTasks.map(task => task.id);
+        
+        // Get time entries for this project's tasks with task-level billing filtering
+        const unbilledEntries = clientTimeEntries.filter(entry => {
+            // Only include entries for tasks that are explicitly marked as billable
+            if (!billableTaskIds.includes(entry.taskId)) return false;
+            
+            // Find the task for this entry
+            const task = projectTasks.find(t => t.id === entry.taskId);
+            if (!task) return false;
+            if (!entry.end || entry.end <= entry.start) return false;
+            
+            // Use task-specific lastBilledAt, or task creation date if never billed
+            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            
+            // Only include entries created after this task's last billing date
+            return entry.start > taskLastBilledAt;
+        });
+
+        // Group unbilled entries by task and round each task's hours (same logic as invoice)
+        const taskTimeMap = {};
+        unbilledEntries.forEach(entry => {
+            if (!taskTimeMap[entry.taskId]) {
+                taskTimeMap[entry.taskId] = 0;
+            }
+            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+        });
+
+        // Calculate total rounded hours (matching invoice calculation)
+        const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+            const taskHours = millisecondsToHours(taskTime);
+            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+            return total + roundedTaskHours;
+        }, 0);
+
+        return unbilledHours;
+    };
+
+    /**
+     * Handle generating invoice for a project
+     */
+    const handleGenerateInvoice = (e) => {
+        e.stopPropagation();
+        // Navigate to projects for invoice generation
+        onNavigateToProjects();
+    };
 
     /**
      * Handle editing an invoice
@@ -149,14 +273,32 @@ const ClientDashboard = ({
                     </div>
                 </div>
 
-                {/* New Project Button */}
-                <button
-                    onClick={handleCreateProject}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    New Project
-                </button>
+                {/* Create Invoice Button */}
+                <InvoiceGenerator
+                    client={client}
+                    projects={projects}
+                    setProjects={setProjects}
+                    tasks={clientTasks}
+                    setTasks={setTasks}
+                    timeEntries={clientTimeEntries}
+                    currentTimer={currentTimer}
+                    isPaused={isPaused}
+                    editingInvoice={editingInvoice}
+                    onInvoiceSaved={() => setEditingInvoice(null)}
+                    paymentMethods={paymentMethods}
+                    onNavigateToPaymentMethods={onNavigateToPaymentMethods}
+                    businessInfos={businessInfos}
+                    onNavigateToBusinessInfo={onNavigateToBusinessInfo}
+                    clients={clients}
+                    onNavigateToClients={onNavigateToClients}
+                    onNavigateToProjects={onNavigateToProjects}
+                    invoices={invoices}
+                    setInvoices={setInvoices}
+                    invoiceTemplates={invoiceTemplates}
+                    setInvoiceTemplates={setInvoiceTemplates}
+                    onNavigateToTemplates={onNavigateToTemplates}
+                    showButton={true}
+                />
             </div>
 
             {/* Client Metrics */}
@@ -166,7 +308,7 @@ const ClientDashboard = ({
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
                                 <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
-                                    <span className="text-blue-600 font-semibold text-sm">P</span>
+                                    <ClipboardDocumentCheckIcon className="h-5 w-5 text-blue-600" />
                                 </div>
                             </div>
                             <div className="ml-5 w-0 flex-1">
@@ -184,7 +326,7 @@ const ClientDashboard = ({
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
                                 <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
-                                    <span className="text-green-600 font-semibold text-sm">T</span>
+                                    <ClockIcon className="h-5 w-5 text-green-600" />
                                 </div>
                             </div>
                             <div className="ml-5 w-0 flex-1">
@@ -202,14 +344,14 @@ const ClientDashboard = ({
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
                                 <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
-                                    <span className="text-purple-600 font-semibold text-sm">$</span>
+                                    <BanknotesIcon className="h-5 w-5 text-purple-600" />
                                 </div>
                             </div>
                             <div className="ml-5 w-0 flex-1">
                                 <dl>
                                     <dt className="text-sm font-medium text-gray-500 truncate">Revenue</dt>
                                     <dd className="text-lg font-medium text-gray-900">
-                                        ${clientMetrics.totalRevenue.toFixed(2)}
+                                        {getCurrencySymbol(clientCurrency)}{clientMetrics.totalRevenue.toFixed(2)}
                                     </dd>
                                 </dl>
                             </div>
@@ -222,14 +364,14 @@ const ClientDashboard = ({
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
                                 <div className="w-8 h-8 bg-amber-100 rounded-md flex items-center justify-center">
-                                    <span className="text-amber-600 font-semibold text-sm">U</span>
+                                    <CurrencyDollarIcon className="h-5 w-5 text-amber-600" />
                                 </div>
                             </div>
                             <div className="ml-5 w-0 flex-1">
                                 <dl>
                                     <dt className="text-sm font-medium text-gray-500 truncate">Unbilled</dt>
                                     <dd className="text-lg font-medium text-gray-900">
-                                        ${clientMetrics.potentialRevenue.toFixed(2)}
+                                        {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
                                     </dd>
                                 </dl>
                             </div>
@@ -241,13 +383,23 @@ const ClientDashboard = ({
             {/* Projects Section */}
             <div className="bg-white shadow rounded-lg">
                 <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-lg font-medium text-gray-900">
-                        Projects ({clientProjects.length})
-                    </h2>
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-medium text-gray-900">
+                            Projects ({clientProjects.length})
+                        </h2>
+                        <button
+                            onClick={handleCreateProject}
+                            className="inline-flex items-center px-3 py-1.5 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                            <PlusIcon className="h-4 w-4 mr-1" />
+                            New Project
+                        </button>
+                    </div>
                 </div>
                 <div className="p-6">
                     {clientProjects.length === 0 ? (
                         <div className="text-center py-8">
+                            <ClipboardDocumentCheckIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                             <p className="text-gray-500 mb-4">No projects for this client yet.</p>
                             <button
                                 onClick={handleCreateProject}
@@ -271,7 +423,7 @@ const ClientDashboard = ({
                                 return (
                                     <div
                                         key={project.id}
-                                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer relative"
                                         onClick={() => navigateToProject(project.id)}
                                     >
                                         <h3 className="font-medium text-gray-900 truncate">{project.title}</h3>
@@ -285,6 +437,30 @@ const ClientDashboard = ({
                                             <p>{projectTasks.filter(t => !t.completed && !t.archived).length} active tasks</p>
                                             <p>{formatDuration(totalTime)} total time</p>
                                         </div>
+
+                                        {/* Billable Amount Tag or Clock Icon for missing rate */}
+                                        {calculateUnbilledAmount(project) > 0 ? (
+                                            <div className="absolute bottom-4 right-4">
+                                                <button
+                                                    onClick={(e) => handleGenerateInvoice(e)}
+                                                    className="inline-flex items-center px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-full hover:bg-green-700 transition-colors"
+                                                    title="Click to generate invoice"
+                                                >
+                                                    {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                                </button>
+                                            </div>
+                                        ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
+                                            <div className="absolute bottom-4 right-4">
+                                                <button
+                                                    onClick={(e) => handleGenerateInvoice(e)}
+                                                    className="inline-flex items-center px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded-full hover:bg-blue-700 transition-colors"
+                                                    title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
+                                                >
+                                                    <ClockIcon className="h-3 w-3 mr-1" />
+                                                    {calculateUnbilledHours(project).toFixed(2)}h
+                                                </button>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 );
                             })}
@@ -319,28 +495,28 @@ const ClientDashboard = ({
                             onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                             clients={clients}
                             onNavigateToClients={onNavigateToClients}
+                            onNavigateToProjects={onNavigateToProjects}
                             invoices={invoices}
                             setInvoices={setInvoices}
                             invoiceTemplates={invoiceTemplates}
                             setInvoiceTemplates={setInvoiceTemplates}
                             onNavigateToTemplates={onNavigateToTemplates}
+                            showButton={true}
                         />
                     </div>
                 </div>
 
                 <div className="p-6">
-                    <div className="scrollable-container">
-                        <InvoicesList
-                            projectInvoices={clientInvoices}
-                            onEditInvoice={handleEditInvoice}
-                            paymentMethods={paymentMethods}
-                            businessInfos={businessInfos}
-                            clients={clients}
-                            hideNewInvoiceButton={true}
-                            setInvoices={setInvoices}
-                            invoiceTemplates={invoiceTemplates}
-                        />
-                    </div>
+                    <InvoicesList
+                        projectInvoices={clientInvoices}
+                        onEditInvoice={handleEditInvoice}
+                        paymentMethods={paymentMethods}
+                        businessInfos={businessInfos}
+                        clients={clients}
+                        hideNewInvoiceButton={true}
+                        setInvoices={setInvoices}
+                        invoiceTemplates={invoiceTemplates}
+                    />
                 </div>
             </div>
 

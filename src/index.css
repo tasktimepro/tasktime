@@ -67,8 +67,4 @@ main, .content-area {
   :root {
     --scrollbar-width: 6px; /* Thinner on mobile */
   }
-  
-  .scrollable-container-fixed {
-    max-height: 60vh; /* Adjust height on smaller screens */
-  }
 }
