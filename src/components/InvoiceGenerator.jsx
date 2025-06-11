@@ -46,6 +46,7 @@ const InvoiceGenerator = ({
     const [isProjectContextFixed, setIsProjectContextFixed] = useState(!!project && !client); // Track if opened from project context (but not client context)
     const [isClientContextFixed, setIsClientContextFixed] = useState(!!client); // Track if opened from client context
     const [projectManuallyChanged, setProjectManuallyChanged] = useState(false); // Track manual project changes
+    const [handledEditingInvoice, setHandledEditingInvoice] = useState(null); // Track handled editing invoice ID
     const { showSuccess, showError, showWarning } = useToast();
     const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
     const taskInputRef = useRef(null); // Ref for task description input field
@@ -65,8 +66,12 @@ const InvoiceGenerator = ({
     // Auto-open the form when showButton is false (modal mode)
     useEffect(() => {
         if (!showButton) { // Modal mode (auto-open is possible)
-            // Only auto-open once when first rendered
-            if (!didAutoOpenModalRef.current) {
+            // Don't auto-open if:
+            // 1. We've already auto-opened
+            // 2. We're in client context
+            // 3. We're editing an invoice
+            // 4. We're handling an editing invoice (crucial addition)
+            if (!didAutoOpenModalRef.current && !client && !editingInvoice && !handledEditingInvoice) {
                 setShowInvoiceForm(true);
                 didAutoOpenModalRef.current = true;
             }
@@ -75,7 +80,7 @@ const InvoiceGenerator = ({
             // so it can auto-open next time if props change to modal mode.
             didAutoOpenModalRef.current = false;
         }
-    }, [showButton]); // Only depend on showButton to prevent re-opening after closing
+    }, [showButton, client, editingInvoice, handledEditingInvoice]); // Added handledEditingInvoice dependency
 
     /**
      * Initialize payment method based on previous invoices or editing invoice
@@ -1403,9 +1408,6 @@ const InvoiceGenerator = ({
         setShowInvoiceForm(true);
     }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, currentTimer, isPaused, showError, client]);
 
-    // Keep track of whether we've handled the current editing invoice
-    const [handledEditingInvoice, setHandledEditingInvoice] = useState(null);
-    
     // Auto-open form when editing an invoice
     useEffect(() => {
         // Only open if we have a new editing invoice and the modal isn't already shown
@@ -1419,11 +1421,12 @@ const InvoiceGenerator = ({
     }, [editingInvoice, openInvoiceForm, showInvoiceForm, handledEditingInvoice]);
 
     // Calculate unbilled time - initially using the current project (will update when a project is selected)
-    const currentProjectForCalculation = selectedProject || project;
+    // Don't calculate unbilled time in client context or when editing an invoice
+    const currentProjectForCalculation = (!client && !editingInvoice) ? (selectedProject || project) : null;
     let unbilledHours = 0;
     let unbilledAmount = 0;
 
-    // Only calculate unbilled time if we have a project context
+    // Only calculate unbilled time if we have a project context and not in client dashboard
     if (currentProjectForCalculation) {
         // Get all tasks for this project
         const projectTasks = tasks.filter(task => task.projectId === currentProjectForCalculation.id);
