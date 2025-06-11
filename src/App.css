@@ -9,27 +9,8 @@
 /* Apply consistent padding to prevent layout shifts from scrollbar */
 body {
   padding-right: calc(var(--scrollbar-width) - (100vw - 100%));
-  overflow-x: hidden;
+  overflow: hidden;
   background-color: var(--app-background);
-}
-
-/* Sidebar specific styles */
-.sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  z-index: 40;
-}
-
-/* Main content area adjustments for sidebar layout */
-.main-content {
-  scrollbar-gutter: stable;
-  overflow-y: auto;
-  height: 100vh;
-  background-color: #f9fafb; /* gray-50 */
 }
 
 /* For components that have their own scrolling areas */
@@ -46,37 +27,4 @@ body {
   overflow-y: auto;
   max-height: 70vh; /* Limit height to prevent taking up the entire screen */
   padding-right: 4px;
-}
-
-/* Mobile responsiveness for sidebar */
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease-in-out;
-  }
-  
-  .sidebar.open {
-    transform: translateX(0);
-  }
-  
-  .main-content {
-    margin-left: 0;
-  }
-  
-  /* Adjust global timer position for mobile */
-  .global-timer-mobile {
-    left: 1rem !important;
-    right: 1rem !important;
-    max-width: none !important;
-  }
-}
-
-/* Smooth transitions for interactive elements */
-.sidebar button {
-  transition: all 0.2s ease-in-out;
-}
-
-.sidebar button:hover {
-  transform: translateX(2px);
 }

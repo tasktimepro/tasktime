@@ -53,7 +53,7 @@ html.modal-open {
 }
 
 /* Apply scrollbar gutter to body and main content sections */
-body, main, .content-area {
+main, .content-area {
   scrollbar-gutter: stable;
 }
 

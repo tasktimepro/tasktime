@@ -151,15 +151,36 @@ const TaskItem = ({
     const isRelatedToActiveTimer = isTimerActive || subtaskTimerActive;
     const shouldDimTask = anyTimerActive && !isPaused && !isRelatedToActiveTimer && !isArchived;
 
-    // Check if task has billable time since lastBilledAt (makes it non-toggleable)
-    const hasBillableTime = useMemo(() => {
+    // Check if task has significant billable time since lastBilledAt (for auto-setting as billable)
+    const hasSignificantBillableTime = useMemo(() => {
         const taskBillableEntries = taskTimeEntries.filter(entry => {
             if (!entry.end || entry.end <= entry.start) return false;
             const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
             return entry.start > taskLastBilledAt;
         });
-        return taskBillableEntries.length > 0;
+        
+        // Calculate total time from billable entries
+        const totalBillableTime = taskBillableEntries.reduce((total, entry) => {
+            return total + (entry.end - entry.start);
+        }, 0);
+        
+        // Only consider significant if 30 seconds or more (30,000 milliseconds)
+        return totalBillableTime >= 30000;
     }, [taskTimeEntries, task.lastBilledAt, task.createdAt]);
+
+    // Auto-set task as billable if it has significant billable time (and hasn't been explicitly set by user)
+    useEffect(() => {
+        // Only auto-set billable status if:
+        // 1. Task has significant billable time, AND
+        // 2. The billable status hasn't been explicitly set by the user
+        if (hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
+            const now = Date.now();
+            const updatedTasks = tasks.map(t =>
+                t.id === task.id ? { ...t, billable: true, lastActive: now } : t
+            );
+            setTasks(updatedTasks);
+        }
+    }, [hasSignificantBillableTime, task.billable, task.billableSetByUser, task.id, tasks, setTasks]);
 
     /**
      * Toggle task completion status
@@ -517,32 +538,25 @@ const TaskItem = ({
                                         <ClockIcon className="h-5 w-5 group-hover:text-yellow-700" />
                                     </button>
 
-                                    {/* Billable Toggle Button */}
+                                    {/* Billable Toggle Button - Always show this button */}
                                     {onToggleBillable && (
                                         <button
-                                            onClick={hasBillableTime ? undefined : onToggleBillable}
+                                            onClick={() => onToggleBillable(task.id)}
                                             className={`p-1 rounded-md transition-colors group ${
-                                                hasBillableTime
-                                                    ? 'text-blue-600 bg-blue-100 cursor-not-allowed'
-                                                    : task.billable
-                                                        ? 'text-blue-600 bg-blue-100 hover:bg-blue-200'
-                                                        : 'text-gray-400 hover:bg-blue-100'
+                                                task.billable
+                                                    ? 'text-blue-600 bg-blue-100 hover:bg-blue-200'
+                                                    : 'text-gray-400 hover:bg-blue-100'
                                             }`}
                                             title={
-                                                hasBillableTime
-                                                    ? 'Task has billable time and cannot be manually toggled'
-                                                    : task.billable
-                                                        ? 'Mark as not billable'
-                                                        : 'Mark as billable'
+                                                task.billable
+                                                    ? 'Mark as not billable'
+                                                    : 'Mark as billable'
                                             }
-                                            disabled={hasBillableTime}
                                         >
                                             <CurrencyDollarIcon className={`h-5 w-5 ${
-                                                hasBillableTime
-                                                    ? 'group-hover:text-blue-600'
-                                                    : task.billable
-                                                        ? 'group-hover:text-blue-700'
-                                                        : 'group-hover:text-blue-600'
+                                                task.billable
+                                                    ? 'group-hover:text-blue-700'
+                                                    : 'group-hover:text-blue-600'
                                             }`} />
                                         </button>
                                     )}
@@ -627,7 +641,7 @@ const TaskItem = ({
                                 pausedElapsedTime={pausedElapsedTime}
                                 setPausedElapsedTime={setPausedElapsedTime}
                                 isGlobalTimer={isGlobalTimer}
-                                onToggleBillable={() => onToggleBillable && onToggleBillable(subtask.id)}
+                                onToggleBillable={onToggleBillable}
                                 onDelete={() => {
                                     if (window.confirm('Are you sure you want to delete this subtask?')) {
                                         const result = deleteTaskWithCleanup(
@@ -793,15 +807,36 @@ const SubtaskItem = ({
     // 3. Don't dim if the task is archived
     const shouldDimTask = anyTimerActive && !isPaused && !isTimerActive && !isArchived;
 
-    // Check if subtask has billable time since lastBilledAt (makes it non-toggleable)
-    const hasBillableTime = useMemo(() => {
+    // Check if subtask has significant billable time since lastBilledAt (for auto-setting as billable)
+    const hasSignificantBillableTime = useMemo(() => {
         const taskBillableEntries = taskTimeEntries.filter(entry => {
             if (!entry.end || entry.end <= entry.start) return false;
             const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
             return entry.start > taskLastBilledAt;
         });
-        return taskBillableEntries.length > 0;
+        
+        // Calculate total time from billable entries
+        const totalBillableTime = taskBillableEntries.reduce((total, entry) => {
+            return total + (entry.end - entry.start);
+        }, 0);
+        
+        // Only consider significant if 30 seconds or more (30,000 milliseconds)
+        return totalBillableTime >= 30000;
     }, [taskTimeEntries, task.lastBilledAt, task.createdAt]);
+
+    // Auto-set subtask as billable if it has significant billable time (and hasn't been explicitly set by user)
+    useEffect(() => {
+        // Only auto-set billable status if:
+        // 1. Task has significant billable time, AND
+        // 2. The billable status hasn't been explicitly set by the user
+        if (hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
+            const now = Date.now();
+            const updatedTasks = tasks.map(t =>
+                t.id === task.id ? { ...t, billable: true, lastActive: now } : t
+            );
+            setTasks(updatedTasks);
+        }
+    }, [hasSignificantBillableTime, task.billable, task.billableSetByUser, task.id, tasks, setTasks]);
 
     /**
      * Toggle subtask completion status
@@ -1059,32 +1094,25 @@ const SubtaskItem = ({
                                 <ClockIcon className="h-5 w-5 group-hover:text-yellow-700" />
                             </button>
 
-                            {/* Billable Toggle Button */}
+                            {/* Billable Toggle Button - Always show this button */}
                             {onToggleBillable && (
                                 <button
-                                    onClick={hasBillableTime ? undefined : onToggleBillable}
+                                    onClick={() => onToggleBillable(task.id)}
                                     className={`p-1 rounded-md transition-colors group ${
-                                        hasBillableTime
-                                            ? 'text-blue-600 bg-blue-100 cursor-not-allowed'
-                                            : task.billable
-                                                ? 'text-blue-600 bg-blue-100 hover:bg-blue-200'
-                                                : 'text-gray-400 hover:bg-blue-100'
+                                        task.billable
+                                            ? 'text-blue-600 bg-blue-100 hover:bg-blue-200'
+                                            : 'text-gray-400 hover:bg-blue-100'
                                     }`}
                                     title={
-                                        hasBillableTime
-                                            ? 'Task has billable time and cannot be manually toggled'
-                                            : task.billable
-                                                ? 'Mark as not billable'
-                                                : 'Mark as billable'
+                                        task.billable
+                                            ? 'Mark as not billable'
+                                            : 'Mark as billable'
                                     }
-                                    disabled={hasBillableTime}
                                 >
                                     <CurrencyDollarIcon className={`h-5 w-5 ${
-                                        hasBillableTime
-                                            ? 'group-hover:text-blue-600'
-                                            : task.billable
-                                                ? 'group-hover:text-blue-700'
-                                                : 'group-hover:text-blue-600'
+                                        task.billable
+                                            ? 'group-hover:text-blue-700'
+                                            : 'group-hover:text-blue-600'
                                     }`} />
                                 </button>
                             )}

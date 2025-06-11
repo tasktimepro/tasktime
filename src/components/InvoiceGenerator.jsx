@@ -583,6 +583,7 @@ const InvoiceGenerator = ({
         });
         
         // Get manually marked billable tasks (tasks with billable: true)
+        // IMPORTANT: Explicitly check for billable === true to exclude tasks marked as non-billable
         const manuallyBillableTasks = projectTasks.filter(task => task.billable === true);
         
         // If no billable entries and no manually billable tasks, return null
@@ -617,12 +618,15 @@ const InvoiceGenerator = ({
                 originalHours: Math.round((millisecondsToHours(totalTime)) * 100) / 100,
                 originalTimeMs: totalTime,
                 hours: editableHours[taskId] !== undefined ? editableHours[taskId] : (task ? Math.round((millisecondsToHours(totalTime)) * 100) / 100 : 0),
-                isEdited: editableHours[taskId] !== undefined && editableHours[taskId] !== (task ? Math.round((millisecondsToHours(totalTime)) * 100) / 100 : 0)
+                isEdited: editableHours[taskId] !== undefined && editableHours[taskId] !== (task ? Math.round((millisecondsToHours(totalTime)) * 100) / 100 : 0),
+                billable: task ? task.billable === true : false // Explicitly capture the billable status
             };
         }).filter(task => {
             if (!task) return false;
             const taskData = tasks.find(t => t && t.id === task.id && t.projectId === projectToUse.id);
-            return task.originalHours > 0 || (taskData && taskData.billable === true);
+            // Only include tasks that have billable explicitly set to true
+            // This ensures tasks toggled to non-billable are excluded
+            return taskData && taskData.billable === true;
         });
 
         return tasksData;
@@ -1423,8 +1427,15 @@ const InvoiceGenerator = ({
         // Get all tasks for this project
         const projectTasks = tasks.filter(task => task.projectId === currentProjectForCalculation.id);
         
-        // Filter unbilled entries based on individual task billing dates
+        // Get explicitly billable tasks (tasks with billable === true)
+        const billableTasks = projectTasks.filter(task => task.billable === true);
+        const billableTaskIds = billableTasks.map(task => task.id);
+        
+        // Filter unbilled entries based on individual task billing dates AND billable status
         const unbilledEntries = timeEntries.filter(entry => {
+            // Only include entries for tasks that are explicitly marked as billable
+            if (!billableTaskIds.includes(entry.taskId)) return false;
+            
             // Find the task for this entry
             const task = projectTasks.find(t => t.id === entry.taskId);
             if (!task) return false;

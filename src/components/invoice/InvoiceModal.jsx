@@ -186,7 +186,7 @@ const InvoiceModal = ({
                                     <h4 className="text-sm font-medium text-gray-900">
                                         Client <span className="text-red-500">*</span>
                                     </h4>
-                                    {onNavigateToClients && !isClientContextFixed && !editingInvoice && (
+                                    {onNavigateToClients && !isClientContextFixed && !editingInvoice && !(selectedProject && selectedProject.preferredClientId) && (
                                         <button
                                             type="button"
                                             onClick={onNavigateToClients}
@@ -208,9 +208,9 @@ const InvoiceModal = ({
                                         <select
                                             value={selectedClient?.id || ''}
                                             onChange={(e) => handleClientSelection(e.target.value)}
-                                            className={`block w-full border ${(isClientContextFixed || editingInvoice) ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
+                                            className={`block w-full border ${(isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)) ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
                                             required
-                                            disabled={isClientContextFixed || editingInvoice}
+                                            disabled={isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)}
                                         >
                                             {/* Make this placeholder not disabled to allow clearing the selection if needed */}
                                             <option value="">Select client info</option>
@@ -220,6 +220,13 @@ const InvoiceModal = ({
                                                 </option>
                                             ))}
                                         </select>
+                                        {selectedProject && selectedProject.preferredClientId && (
+                                            <div className="px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                                                <p className="text-sm text-yellow-800">
+                                                    Client cannot be changed because this project is associated with <strong>{clients.find(c => c.id === selectedProject.preferredClientId)?.title || 'a specific client'}</strong>.
+                                                </p>
+                                            </div>
+                                        )}
                                         {selectedClient && (
                                             <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
                                                 <p className="text-sm text-blue-800">
@@ -254,38 +261,83 @@ const InvoiceModal = ({
                                             No projects found. You can create a project or continue without one.
                                         </p>
                                     </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        <select
-                                            value={selectedProject?.id || ''}
-                                            onChange={(e) => handleProjectSelection(e.target.value)}
-                                            className={`block w-full border ${(isProjectContextFixed && !isClientContextFixed) || editingInvoice ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
-                                            disabled={(isProjectContextFixed && !isClientContextFixed) || editingInvoice}
-                                        >
-                                            <option value="">Select project (optional)</option>
-                                            {projects.filter(proj => !proj.isPersonal).map(proj => (
-                                                <option key={proj.id} value={proj.id}>
-                                                    {proj.title}
-                                                </option>
-                                            ))}
-                                        </select>
+                                ) : (() => {
+                                    // Filter projects based on selected client
+                                    const availableProjects = projects.filter(proj => {
+                                        // Only show non-personal projects
+                                        if (proj.isPersonal) return false;
+                                        
+                                        // If a client is selected, only show projects for that client
+                                        if (selectedClient) {
+                                            return proj.preferredClientId === selectedClient.id;
+                                        }
+                                        
+                                        // If no client selected, show all non-personal projects
+                                        return true;
+                                    });
 
-                                        {selectedProject && (
-                                            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
-                                                <div className="text-sm text-blue-800">
+                                    if (availableProjects.length === 0 && selectedClient) {
+                                        return (
+                                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                                <p className="text-sm text-yellow-800">
+                                                    No projects found for <strong>{selectedClient.title}</strong>. You can create a project for this client or continue without one.
+                                                </p>
+                                            </div>
+                                        );
+                                    } else if (availableProjects.length === 0) {
+                                        return (
+                                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                                <p className="text-sm text-yellow-800">
+                                                    No projects available. Select a client first to see their projects, or create a new project.
+                                                </p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className="space-y-2">
+                                            <select
+                                                value={selectedProject?.id || ''}
+                                                onChange={(e) => handleProjectSelection(e.target.value)}
+                                                className={`block w-full border ${(isProjectContextFixed && !isClientContextFixed) || editingInvoice ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
+                                                disabled={(isProjectContextFixed && !isClientContextFixed) || editingInvoice}
+                                            >
+                                                <option value="">Select project (optional)</option>
+                                                {projects.filter(proj => {
+                                                    // Only show non-personal projects
+                                                    if (proj.isPersonal) return false;
+                                                    
+                                                    // If a client is selected, only show projects for that client
+                                                    if (selectedClient) {
+                                                        return proj.preferredClientId === selectedClient.id;
+                                                    }
+                                                    
+                                                    // If no client selected, show all non-personal projects
+                                                    return true;
+                                                }).map(proj => (
+                                                    <option key={proj.id} value={proj.id}>
+                                                        {proj.title}
+                                                    </option>
+                                                ))}
+                                            </select>
+
+                                            {selectedProject && (
+                                                <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
                                                     <div className="text-sm text-blue-800">
-                                                        <strong>{selectedProject.title}</strong><br />
-                                                        {!selectedProject.flatRate && selectedProject.hourlyRate ? (
-                                                            <span>Rate: {getCurrencySymbol(getInvoiceCurrency())}{selectedProject.hourlyRate}/hour</span>
-                                                        ) : !selectedProject.flatRate ? (
-                                                            <span>You can create invoices with custom rates</span>
-                                                        ) : null}
+                                                        <div className="text-sm text-blue-800">
+                                                            <strong>{selectedProject.title}</strong><br />
+                                                            {!selectedProject.flatRate && selectedProject.hourlyRate ? (
+                                                                <span>Rate: {getCurrencySymbol(getInvoiceCurrency())}{selectedProject.hourlyRate}/hour</span>
+                                                            ) : !selectedProject.flatRate ? (
+                                                                <span>You can create invoices with custom rates</span>
+                                                            ) : null}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     )}

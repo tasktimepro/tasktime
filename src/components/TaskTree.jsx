@@ -49,7 +49,8 @@ const TaskTree = ({
             createdAt: now,
             lastActive: now, // Initialize lastActive to creation time
             lastBilledAt: null, // Initialize as never billed
-            billable: false // Initialize as not billable by default
+            billable: false, // Initialize as not billable by default
+            billableSetByUser: false // Track if billable status has been explicitly set by user
         };
 
         // Create a new tasks array with the new task added
@@ -106,14 +107,32 @@ const TaskTree = ({
 
     /**
      * Toggle billable status for a task
+     * This function guarantees that a task can always be toggled
+     * between billable and non-billable states
      */
     const handleToggleBillable = (taskId) => {
         const now = Date.now();
+        
+        // Find the task to get its current billable status
+        const targetTask = tasks.find(task => task.id === taskId);
+        if (!targetTask) return;
+        
+        // Create a definite boolean toggle (force it to be a boolean)
+        const newBillableStatus = targetTask.billable !== true;
+        
+        // Update the task, ensuring billable property is explicitly set
+        // Also mark that this was set by the user to prevent auto-override
         const updatedTasks = tasks.map(task =>
-            task.id === taskId ? { ...task, billable: !task.billable, lastActive: now } : task
+            task.id === taskId ? { 
+                ...task, 
+                billable: newBillableStatus, 
+                billableSetByUser: true, // Mark as explicitly set by user
+                lastActive: now 
+            } : task
         );
+        
         setTasks(updatedTasks);
-        showSuccess('Task billable status updated');
+        showSuccess(`Task marked as ${newBillableStatus ? 'billable' : 'not billable'}`);
     };
 
     /**
@@ -237,7 +256,7 @@ const TaskTree = ({
                                     onCreateSubtask={handleCreateTask}
                                     onArchive={() => handleArchiveTask(task.id)}
                                     onUnarchive={() => handleUnarchiveTask(task.id)}
-                                    onToggleBillable={() => handleToggleBillable(task.id)} // Pass the toggle handler
+                                    onToggleBillable={handleToggleBillable} // Pass the function directly
                                     allTasks={projectTasks}
                                 />
                             ))}
@@ -279,7 +298,7 @@ const TaskTree = ({
                                             onDelete={() => handleDeleteTask(task.id)}
                                             onCreateSubtask={handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
-                                            onToggleBillable={() => handleToggleBillable(task.id)}
+                                            onToggleBillable={handleToggleBillable}
                                             allTasks={projectTasks}
                                         />
                                     ))}

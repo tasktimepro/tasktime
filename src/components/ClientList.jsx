@@ -556,258 +556,261 @@ const ClientList = ({
                         {editingClient ? 'Edit Client' : 'Create New Client'}
                     </h3>
 
-                    <form onSubmit={editingClient ? handleUpdateClient : handleCreateClient} className="space-y-5">
-                        <div>
-                            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                                Client Title <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                id="title"
-                                name="title"
-                                value={formData.title}
-                                onChange={handleInputChange}
-                                required
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                placeholder="Enter client title"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="clientName" className="block text-sm font-medium text-gray-700">
-                                    Client Name/Business Name
-                                </label>
-                                <input
-                                    type="text"
-                                    id="clientName"
-                                    name="clientName"
-                                    value={formData.clientName}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="Company/Organization name"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="contactPerson" className="block text-sm font-medium text-gray-700">
-                                    Contact Person
-                                </label>
-                                <input
-                                    type="text"
-                                    id="contactPerson"
-                                    name="contactPerson"
-                                    value={formData.contactPerson}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="Primary contact person"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                                Address
-                            </label>
-                            <textarea
-                                id="address"
-                                name="address"
-                                value={formData.address}
-                                onChange={handleInputChange}
-                                rows={2}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                placeholder="Street address"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div>
-                                <label htmlFor="city" className="block text-sm font-medium text-gray-700">
-                                    City
-                                </label>
-                                <input
-                                    type="text"
-                                    id="city"
-                                    name="city"
-                                    value={formData.city}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="state" className="block text-sm font-medium text-gray-700">
-                                    State/Province
-                                </label>
-                                <input
-                                    type="text"
-                                    id="state"
-                                    name="state"
-                                    value={formData.state}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="zip" className="block text-sm font-medium text-gray-700">
-                                    ZIP/Postal Code
-                                </label>
-                                <input
-                                    type="text"
-                                    id="zip"
-                                    name="zip"
-                                    value={formData.zip}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-                                    Country
-                                </label>
-                                <input
-                                    type="text"
-                                    id="country"
-                                    name="country"
-                                    value={formData.country}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                                    Email
-                                </label>
-                                <input
-                                    type="email"
-                                    id="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                                    Phone
-                                </label>
-                                <input
-                                    type="tel"
-                                    id="phone"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label htmlFor="registrationNumber" className="block text-sm font-medium text-gray-700">
-                                    Registration Number
-                                </label>
-                                <input
-                                    type="text"
-                                    id="registrationNumber"
-                                    name="registrationNumber"
-                                    value={formData.registrationNumber}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="vat" className="block text-sm font-medium text-gray-700">
-                                    VAT Number
-                                </label>
-                                <input
-                                    type="text"
-                                    id="vat"
-                                    name="vat"
-                                    value={formData.vat}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="taxNumber" className="block text-sm font-medium text-gray-700">
-                                    Tax Number
-                                </label>
-                                <input
-                                    type="text"
-                                    id="taxNumber"
-                                    name="taxNumber"
-                                    value={formData.taxNumber}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Custom Fields */}
+                    <form onSubmit={editingClient ? handleUpdateClient : handleCreateClient} className="space-y-6">
+                        
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-medium text-gray-700">Custom Fields</h4>
-                                <button
-                                    type="button"
-                                    onClick={addCustomField}
-                                    className="text-sm text-blue-600 hover:text-blue-800"
-                                >
-                                    + Add Field
-                                </button>
+                            <div>
+                                <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                                    Client Title <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="title"
+                                    name="title"
+                                    value={formData.title}
+                                    onChange={handleInputChange}
+                                    required
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    placeholder="Enter client title"
+                                />
                             </div>
 
-                            {formData.custom.map((field, index) => (
-                                <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">
-                                            Field Label
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={field.label}
-                                            onChange={(e) => handleCustomFieldChange(index, 'label', e.target.value)}
-                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                            placeholder="Field name"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">
-                                            Field Value
-                                        </label>
-                                        <div className="flex space-x-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="clientName" className="block text-sm font-medium text-gray-700">
+                                        Client Name/Business Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="clientName"
+                                        name="clientName"
+                                        value={formData.clientName}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                        placeholder="Company/Organization name"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="contactPerson" className="block text-sm font-medium text-gray-700">
+                                        Contact Person
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="contactPerson"
+                                        name="contactPerson"
+                                        value={formData.contactPerson}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                        placeholder="Primary contact person"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                                    Address
+                                </label>
+                                <textarea
+                                    id="address"
+                                    name="address"
+                                    value={formData.address}
+                                    onChange={handleInputChange}
+                                    rows={2}
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    placeholder="Street address"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div>
+                                    <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                                        City
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="city"
+                                        name="city"
+                                        value={formData.city}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+                                        State/Province
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="state"
+                                        name="state"
+                                        value={formData.state}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="zip" className="block text-sm font-medium text-gray-700">
+                                        ZIP/Postal Code
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="zip"
+                                        name="zip"
+                                        value={formData.zip}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                                        Country
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="country"
+                                        name="country"
+                                        value={formData.country}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                                        Email
+                                    </label>
+                                    <input
+                                        type="email"
+                                        id="email"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                                        Phone
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        id="phone"
+                                        name="phone"
+                                        value={formData.phone}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label htmlFor="registrationNumber" className="block text-sm font-medium text-gray-700">
+                                        Registration Number
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="registrationNumber"
+                                        name="registrationNumber"
+                                        value={formData.registrationNumber}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="vat" className="block text-sm font-medium text-gray-700">
+                                        VAT Number
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="vat"
+                                        name="vat"
+                                        value={formData.vat}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="taxNumber" className="block text-sm font-medium text-gray-700">
+                                        Tax Number
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="taxNumber"
+                                        name="taxNumber"
+                                        value={formData.taxNumber}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Custom Fields */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-medium text-gray-700">Custom Fields</h4>
+                                    <button
+                                        type="button"
+                                        onClick={addCustomField}
+                                        className="text-sm text-blue-600 hover:text-blue-800"
+                                    >
+                                        + Add Field
+                                    </button>
+                                </div>
+
+                                {formData.custom.map((field, index) => (
+                                    <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">
+                                                Field Label
+                                            </label>
                                             <input
                                                 type="text"
-                                                value={field.value}
-                                                onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
+                                                value={field.label}
+                                                onChange={(e) => handleCustomFieldChange(index, 'label', e.target.value)}
                                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                                placeholder="Field value"
+                                                placeholder="Field name"
                                             />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeCustomField(index)}
-                                                className="mt-1 px-3 py-1.5 text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50"
-                                            >
-                                                Remove
-                                            </button>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">
+                                                Field Value
+                                            </label>
+                                            <div className="flex space-x-2">
+                                                <input
+                                                    type="text"
+                                                    value={field.value}
+                                                    onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                                    placeholder="Field value"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeCustomField(index)}
+                                                    className="mt-1 px-3 py-1.5 text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
 
                         {/* Default Currency */}
                         <div className="space-y-4">
-                            <div className="border-t pt-4">
-                                <label htmlFor="defaultCurrency" className="block text-sm font-medium text-gray-700 mb-2">
+                            <div className="border-t pt-6">
+                                <label htmlFor="defaultCurrency" className="block text-sm font-medium text-gray-900 mb-2">
                                     Default Currency
                                 </label>
                                 <select
@@ -831,7 +834,7 @@ const ClientList = ({
 
                         {/* Pricing & Taxes */}
                         <div className="space-y-4">
-                            <div className="border-t pt-4">
+                            <div className="border-t pt-6">
                                 <h4 className="text-sm font-medium text-gray-900 mb-3">Pricing & Taxes</h4>
                                 
                                 {/* Rate Section */}
@@ -869,20 +872,18 @@ const ClientList = ({
                                 </div>
 
                                 {/* Tax Settings */}
-                                <div className="border-t pt-4">
-                                    <div className="flex items-center space-x-3">
-                                        <CustomCheckbox
-                                            checked={formData.disableTax}
-                                            onChange={(checked) => setFormData(prev => ({ ...prev, disableTax: checked }))}
-                                            label="Disable tax for this client"
-                                            labelClassName="text-sm font-medium text-gray-700"
-                                            id="disableTax"
-                                        />
-                                    </div>
-                                    <p className="mt-2 text-xs text-gray-500">
-                                        When enabled, this client will not have tax applied to their invoices, regardless of business tax settings.
-                                    </p>
+                                <div className="flex items-center space-x-3">
+                                    <CustomCheckbox
+                                        checked={formData.disableTax}
+                                        onChange={(checked) => setFormData(prev => ({ ...prev, disableTax: checked }))}
+                                        label="Disable tax for this client"
+                                        labelClassName="text-sm font-medium text-gray-700"
+                                        id="disableTax"
+                                    />
                                 </div>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    When enabled, this client will not have tax applied to their invoices, regardless of business tax settings.
+                                </p>
                             </div>
                         </div>
 
