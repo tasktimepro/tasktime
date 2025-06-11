@@ -418,7 +418,7 @@ const OnboardingModal = ({
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <span className="text-blue-600">2.</span>
-                                    <span className="text-sm text-gray-700">Set up your business info in Invoices → Your Business Info</span>
+                                    <span className="text-sm text-gray-700">Set up your business info in Invoices → Your Business</span>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <span className="text-blue-600">3.</span>

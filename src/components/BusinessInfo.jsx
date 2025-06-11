@@ -389,7 +389,7 @@ const BusinessInfo = ({
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Your Business Info</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">Your Business</h2>
                     <p className="mt-1 text-sm text-gray-600">
                         Manage sender business information for your invoices
                     </p>
@@ -400,7 +400,7 @@ const BusinessInfo = ({
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     <PlusIcon className="h-4 w-4 mr-2" />
-                    New Business Info
+                    New Business
                 </button>
             </div>
 
@@ -408,7 +408,7 @@ const BusinessInfo = ({
             {(showCreateForm || editingBusinessInfo) && (
                 <div className="bg-white shadow rounded-lg p-6 max-w-3xl mx-auto">
                     <h4 className="text-lg font-medium text-gray-900 mb-4">
-                        {editingBusinessInfo ? 'Edit Business Info' : 'New Business Info'}
+                        {editingBusinessInfo ? 'Edit Business' : 'New Business'}
                     </h4>
 
                     <form onSubmit={editingBusinessInfo ? handleUpdateBusinessInfo : handleCreateBusinessInfo} className="space-y-8">
@@ -416,7 +416,7 @@ const BusinessInfo = ({
                         <div className="space-y-4">
                             <div>
                                 <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                                    Business Info Title <span className="text-red-500">*</span>
+                                    Business Title <span className="text-red-500">*</span>
                                 </label>
 
                                 <input
@@ -744,7 +744,7 @@ const BusinessInfo = ({
                                     type="submit"
                                     className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                 >
-                                    {editingBusinessInfo ? 'Update' : 'Create'} Business Info
+                                    {editingBusinessInfo ? 'Update' : 'Create'} Business
                                 </button>
                             </div>
                         </div>
@@ -752,7 +752,7 @@ const BusinessInfo = ({
                 </div>
             )}
 
-            {/* Business Info List */}
+            {/* Business List */}
             {businessInfos.length === 0 ? (
                 <div className="text-center py-12">
                     <BuildingOfficeIcon className="mx-auto h-12 w-12 text-gray-400" />
@@ -765,7 +765,7 @@ const BusinessInfo = ({
                             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                             <PlusIcon className="h-4 w-4 mr-2" />
-                            New Business Info
+                            New Business
                         </button>
                     </div>
                 </div>

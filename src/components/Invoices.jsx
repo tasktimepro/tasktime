@@ -83,7 +83,7 @@ const Invoices = ({
         },
         {
             id: 'business-info',
-            name: 'Your Business Info',
+            name: 'Your Business',
             icon: BuildingOfficeIcon,
             description: 'Manage business information for invoices'
         }

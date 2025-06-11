@@ -1086,7 +1086,7 @@ const InvoiceModal = ({
                                         onClick={onNavigateToBusinessInfo}
                                         className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                                     >
-                                        + New Business Info
+                                        + New Business
                                     </button>
                                 </div>
 
