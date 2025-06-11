@@ -20,18 +20,19 @@ const ClientDashboard = ({
     isPaused,
     onBackToClients,
     paymentMethods,
-    onNavigateToPaymentMethods,
     businessInfos,
-    onNavigateToBusinessInfo,
     clients,
-    onNavigateToClients,
-    onNavigateToProjects,
     navigateToProject,
     invoices,
     setInvoices,
     invoiceTemplates,
     setInvoiceTemplates,
-    onNavigateToTemplates
+    // Modal functions
+    openClientModal,
+    openProjectModal,
+    openBusinessModal,
+    openPaymentMethodModal,
+    openTemplateModal
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -230,8 +231,8 @@ const ClientDashboard = ({
      */
     const handleGenerateInvoice = (e) => {
         e.stopPropagation();
-        // Navigate to projects for invoice generation
-        onNavigateToProjects();
+        // Open project modal for invoice generation
+        openProjectModal();
     };
 
     /**
@@ -245,8 +246,8 @@ const ClientDashboard = ({
      * Handle creating a new project for this client
      */
     const handleCreateProject = () => {
-        // Navigate to projects with create form and pre-select this client
-        onNavigateToProjects({ create: 'project', preselectedClientId: client.id });
+        // Open project modal with create form and pre-select this client
+        openProjectModal({ create: 'project', preselectedClientId: client.id });
     };
 
     return (
@@ -286,18 +287,19 @@ const ClientDashboard = ({
                     editingInvoice={editingInvoice}
                     onInvoiceSaved={() => setEditingInvoice(null)}
                     paymentMethods={paymentMethods}
-                    onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                     businessInfos={businessInfos}
-                    onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                     clients={clients}
-                    onNavigateToClients={onNavigateToClients}
-                    onNavigateToProjects={onNavigateToProjects}
                     invoices={invoices}
                     setInvoices={setInvoices}
                     invoiceTemplates={invoiceTemplates}
                     setInvoiceTemplates={setInvoiceTemplates}
-                    onNavigateToTemplates={onNavigateToTemplates}
                     showButton={true}
+                    // Modal functions
+                    openClientModal={openClientModal}
+                    openProjectModal={openProjectModal}
+                    openBusinessModal={openBusinessModal}
+                    openPaymentMethodModal={openPaymentMethodModal}
+                    openTemplateModal={openTemplateModal}
                 />
             </div>
 
@@ -307,8 +309,8 @@ const ClientDashboard = ({
                     <div className="p-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
-                                    <ClipboardDocumentCheckIcon className="h-5 w-5 text-blue-600" />
+                                <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+                                    <ClipboardDocumentCheckIcon className="h-5 w-5 text-purple-600" />
                                 </div>
                             </div>
                             <div className="ml-5 w-0 flex-1">
@@ -325,8 +327,8 @@ const ClientDashboard = ({
                     <div className="p-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
-                                    <ClockIcon className="h-5 w-5 text-green-600" />
+                                <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
+                                    <ClockIcon className="h-5 w-5 text-blue-600" />
                                 </div>
                             </div>
                             <div className="ml-5 w-0 flex-1">
@@ -343,8 +345,8 @@ const ClientDashboard = ({
                     <div className="p-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
-                                    <BanknotesIcon className="h-5 w-5 text-purple-600" />
+                                <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
+                                    <BanknotesIcon className="h-5 w-5 text-green-600" />
                                 </div>
                             </div>
                             <div className="ml-5 w-0 flex-1">
@@ -490,18 +492,19 @@ const ClientDashboard = ({
                             editingInvoice={editingInvoice}
                             onInvoiceSaved={() => setEditingInvoice(null)}
                             paymentMethods={paymentMethods}
-                            onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                             businessInfos={businessInfos}
-                            onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                             clients={clients}
-                            onNavigateToClients={onNavigateToClients}
-                            onNavigateToProjects={onNavigateToProjects}
                             invoices={invoices}
                             setInvoices={setInvoices}
                             invoiceTemplates={invoiceTemplates}
                             setInvoiceTemplates={setInvoiceTemplates}
-                            onNavigateToTemplates={onNavigateToTemplates}
                             showButton={true}
+                            // Modal functions
+                            openClientModal={openClientModal}
+                            openProjectModal={openProjectModal}
+                            openBusinessModal={openBusinessModal}
+                            openPaymentMethodModal={openPaymentMethodModal}
+                            openTemplateModal={openTemplateModal}
                         />
                     </div>
                 </div>
@@ -525,18 +528,16 @@ const ClientDashboard = ({
                 <div className="px-6 py-4 border-b border-gray-200">
                     <h2 className="text-lg font-medium text-gray-900">Time Analytics</h2>
                 </div>
-                <div className="p-6">
-                    {clientTimeEntries.length > 0 ? (
-                        <MetricsDisplay
-                            timeEntries={clientTimeEntries}
-                            showTitle={false}
-                        />
-                    ) : (
-                        <div className="text-center py-8">
-                            <p className="text-gray-500">No time entries for this client yet.</p>
-                        </div>
-                    )}
-                </div>
+                {clientTimeEntries.length > 0 ? (
+                    <MetricsDisplay
+                        timeEntries={clientTimeEntries}
+                        showTitle={false}
+                    />
+                ) : (
+                    <div className="text-center py-8">
+                        <p className="text-gray-500">No time entries for this client yet.</p>
+                    </div>
+                )}
             </div>
         </div>
     );

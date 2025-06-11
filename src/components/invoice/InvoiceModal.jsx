@@ -3,14 +3,13 @@ import { formatDurationWithSeconds, hoursToMinutes } from '../../utils/dateUtils
 import { getPreferredCurrency } from '../../utils/currencyUtils';
 import CustomCheckbox from '../CustomCheckbox';
 import Modal from '../Modal';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const InvoiceModal = ({
     showInvoiceForm,
     editingInvoice,
     handleCancel,
     handleSaveInvoice,
-    onNavigateToProjects,
     isProjectContextFixed,
     isClientContextFixed,
     projects,
@@ -19,7 +18,6 @@ const InvoiceModal = ({
     clients,
     selectedClient,
     handleClientSelection,
-    onNavigateToClients,
     invoiceTasks,
     setShowAddTaskForm,
     showAddTaskForm,
@@ -58,10 +56,8 @@ const InvoiceModal = ({
     getCurrencySymbol,
     businessInfos,
     selectedBusinessInfo,
-    onNavigateToBusinessInfo,
     paymentMethods,
     selectedPaymentMethod,
-    onNavigateToPaymentMethods,
     invoiceNote,
     setInvoiceNote,
     editableHours,
@@ -80,11 +76,19 @@ const InvoiceModal = ({
     invoiceTemplates,
     selectedTemplate,
     handleTemplateSelection,
-    onNavigateToTemplates,
     invoiceDateOverride,
     setInvoiceDateOverride,
     useInvoiceDateOverride,
-    setUseInvoiceDateOverride
+    setUseInvoiceDateOverride,
+    // Modal stacking functions
+    openClientModal,
+    openProjectModal,
+    openBusinessModal,
+    openPaymentMethodModal,
+    openTemplateModal,
+    saveFormState,
+    getSavedState,
+    clearSavedState
 }) => {
     // Set default expanded section based on context:
     // - 'projectClient' when opened from Invoices view (standalone mode)
@@ -106,6 +110,40 @@ const InvoiceModal = ({
 
     const [activeSection, setActiveSection] = useState(getDefaultSection());
 
+    // Form state preservation for modal stacking
+    const getAllFormData = useCallback(() => {
+        return {
+            activeSection,
+            // Add other form state as needed
+        };
+    }, [activeSection]);
+
+    // Save form state when opening nested modals
+    const saveCurrentFormState = useCallback(() => {
+        if (saveFormState) {
+            saveFormState(getAllFormData());
+        }
+    }, [saveFormState, getAllFormData]);
+
+    // Auto-save form state periodically
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            saveCurrentFormState();
+        }, 300);
+        return () => clearTimeout(timeoutId);
+    }, [saveCurrentFormState]);
+
+    // Restore form state when modal reopens
+    useEffect(() => {
+        if (getSavedState) {
+            const savedState = getSavedState();
+            if (savedState) {
+                if (savedState.activeSection) setActiveSection(savedState.activeSection);
+                // Restore other form state as needed
+            }
+        }
+    }, [getSavedState]);
+
     const toggleSection = (section) => {
         setActiveSection((prev) => (prev === section ? '' : section));
     };
@@ -126,6 +164,12 @@ const InvoiceModal = ({
             setActiveSection('tasksTime');
             return;
         }
+        
+        // Clear saved state on successful submission
+        if (clearSavedState) {
+            clearSavedState();
+        }
+        
         handleSaveInvoice(e);
     };
 
@@ -186,13 +230,19 @@ const InvoiceModal = ({
                                     <h4 className="text-sm font-medium text-gray-900">
                                         Client <span className="text-red-500">*</span>
                                     </h4>
-                                    {onNavigateToClients && !isClientContextFixed && !editingInvoice && !(selectedProject && selectedProject.preferredClientId) && (
+                                    {openClientModal && !isClientContextFixed && !editingInvoice && !(selectedProject && selectedProject.preferredClientId) && (
                                         <button
                                             type="button"
-                                            onClick={onNavigateToClients}
+                                            onClick={() => {
+                                                if (openClientModal) {
+                                                    // Save current form state before opening nested modal
+                                                    saveCurrentFormState();
+                                                    openClientModal();
+                                                }
+                                            }}
                                             className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                                         >
-                                            + New Client Info
+                                            + New Client
                                         </button>
                                     )}
                                 </div>
@@ -244,10 +294,16 @@ const InvoiceModal = ({
                                     <h4 className="text-sm font-medium text-gray-900">
                                         Project
                                     </h4>
-                                    {onNavigateToProjects && !(isProjectContextFixed && !isClientContextFixed) && !editingInvoice && (
+                                    {openProjectModal && !(isProjectContextFixed && !isClientContextFixed) && !isClientContextFixed && !editingInvoice && (
                                         <button
                                             type="button"
-                                            onClick={onNavigateToProjects}
+                                            onClick={() => {
+                                                if (openProjectModal) {
+                                                    // Save current form state before opening nested modal
+                                                    saveCurrentFormState();
+                                                    openProjectModal();
+                                                }
+                                            }}
                                             className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                                         >
                                             + New Project
@@ -1083,7 +1139,13 @@ const InvoiceModal = ({
                                     </h4>
                                     <button
                                         type="button"
-                                        onClick={onNavigateToBusinessInfo}
+                                        onClick={() => {
+                                            if (openBusinessModal) {
+                                                // Save current form state before opening nested modal
+                                                saveCurrentFormState();
+                                                openBusinessModal();
+                                            }
+                                        }}
                                         className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                                     >
                                         + New Business
@@ -1139,7 +1201,13 @@ const InvoiceModal = ({
                                     </h4>
                                     <button
                                         type="button"
-                                        onClick={onNavigateToPaymentMethods}
+                                        onClick={() => {
+                                            if (openPaymentMethodModal) {
+                                                // Save current form state before opening nested modal
+                                                saveCurrentFormState();
+                                                openPaymentMethodModal();
+                                            }
+                                        }}
                                         className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                                     >
                                         + New Payment Method
@@ -1219,7 +1287,13 @@ const InvoiceModal = ({
                                     </h4>
                                     <button
                                         type="button"
-                                        onClick={onNavigateToTemplates}
+                                        onClick={() => {
+                                            if (openTemplateModal) {
+                                                // Save current form state before opening nested modal
+                                                saveCurrentFormState();
+                                                openTemplateModal();
+                                            }
+                                        }}
                                         className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                                     >
                                         + New Template

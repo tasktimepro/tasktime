@@ -26,17 +26,18 @@ const ProjectDashboard = ({
     setPausedElapsedTime,
     onBackToProjects,
     paymentMethods,
-    onNavigateToPaymentMethods,
     businessInfos,
-    onNavigateToBusinessInfo,
     clients,
-    onNavigateToClients,
-    onNavigateToProjects,
     invoices,
     setInvoices,
     invoiceTemplates,
     setInvoiceTemplates,
-    onNavigateToTemplates
+    // Modal functions
+    openClientModal,
+    openProjectModal,
+    openBusinessModal,
+    openPaymentMethodModal,
+    openTemplateModal
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -111,17 +112,18 @@ const ProjectDashboard = ({
                         currentTimer={currentTimer}
                         isPaused={isPaused}
                         paymentMethods={paymentMethods}
-                        onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                         businessInfos={businessInfos}
-                        onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                         clients={clients}
-                        onNavigateToClients={onNavigateToClients}
-                        onNavigateToProjects={onNavigateToProjects}
                         invoices={invoices}
                         setInvoices={setInvoices}
                         invoiceTemplates={invoiceTemplates}
                         setInvoiceTemplates={setInvoiceTemplates}
-                        onNavigateToTemplates={onNavigateToTemplates}
+                        // Modal functions
+                        openClientModal={openClientModal}
+                        openProjectModal={openProjectModal}
+                        openBusinessModal={openBusinessModal}
+                        openPaymentMethodModal={openPaymentMethodModal}
+                        openTemplateModal={openTemplateModal}
                     />
                 )}
             </div>
@@ -173,16 +175,18 @@ const ProjectDashboard = ({
                                 editingInvoice={editingInvoice}
                                 onInvoiceSaved={() => setEditingInvoice(null)}
                                 paymentMethods={paymentMethods}
-                                onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                                 businessInfos={businessInfos}
-                                onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                                 clients={clients}
-                                onNavigateToClients={onNavigateToClients}
                                 invoices={invoices}
                                 setInvoices={setInvoices}
                                 invoiceTemplates={invoiceTemplates}
                                 setInvoiceTemplates={setInvoiceTemplates}
-                                onNavigateToTemplates={onNavigateToTemplates}
+                                // Modal functions
+                                openClientModal={openClientModal}
+                                openProjectModal={openProjectModal}
+                                openBusinessModal={openBusinessModal}
+                                openPaymentMethodModal={openPaymentMethodModal}
+                                openTemplateModal={openTemplateModal}
                             />
                         </div>
                     </div>

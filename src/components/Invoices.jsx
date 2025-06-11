@@ -37,7 +37,9 @@ const Invoices = ({
     openPaymentMethodModal,
     editPaymentMethodModal,
     openBusinessModal,
-    editBusinessModal
+    editBusinessModal,
+    openClientModal,
+    openProjectModal
 }) => {
     const { urlParams } = useUrlState();
     const { showError } = useToast();
@@ -281,6 +283,12 @@ const Invoices = ({
                         setTimeout(() => {}, 100);
                     }}
                     showButton={false}
+                    // Modal stacking functions
+                    openClientModal={openClientModal}
+                    openProjectModal={openProjectModal}
+                    openBusinessModal={openBusinessModal}
+                    openPaymentMethodModal={openPaymentMethodModal}
+                    openTemplateModal={openTemplateModal}
                 />
             )}
         </div>

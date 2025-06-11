@@ -15,6 +15,10 @@ const ProjectModal = ({
     setProjects,
     editingProject = null,
     clients,
+    openClientModal,
+    saveFormState,
+    getSavedState,
+    clearSavedState
 }) => {
     const [selectedClientRate, setSelectedClientRate] = useState(null);
     const { showSuccess } = useToast();
@@ -50,18 +54,52 @@ const ProjectModal = ({
                 isPersonal: editingProject.isPersonal || false
             });
         } else {
-            // Reset form for creating new project
-            setFormData({
-                title: '',
-                hourlyRate: '',
-                flatRate: false,
-                preferredClientId: '',
-                overrideRate: false,
-                isPersonal: false
-            });
-            setSelectedClientRate(null);
+            // Check if there's saved state from a previous session
+            const savedState = getSavedState && getSavedState();
+            if (savedState && !editingProject) {
+                console.log('Restoring saved project form state:', savedState);
+                setFormData({
+                    title: savedState.title || '',
+                    hourlyRate: savedState.hourlyRate || '',
+                    flatRate: savedState.flatRate || false,
+                    preferredClientId: savedState.preferredClientId || '',
+                    overrideRate: savedState.overrideRate || false,
+                    isPersonal: savedState.isPersonal || false
+                });
+                
+                // Restore client rate if needed
+                if (savedState.preferredClientId && clients.length > 0) {
+                    const savedClient = clients.find(c => c.id === savedState.preferredClientId);
+                    setSelectedClientRate(savedClient || null);
+                }
+            } else {
+                // Reset form for creating new project
+                setFormData({
+                    title: '',
+                    hourlyRate: '',
+                    flatRate: false,
+                    preferredClientId: '',
+                    overrideRate: false,
+                    isPersonal: false
+                });
+                setSelectedClientRate(null);
+            }
         }
-    }, [editingProject, clients]);
+    }, [editingProject, clients, getSavedState]);
+
+    // Save form state whenever it changes (debounced)
+    useEffect(() => {
+        if (saveFormState && !editingProject && isOpen) {
+            const timeoutId = setTimeout(() => {
+                saveFormState({
+                    ...formData,
+                    selectedClientRate: selectedClientRate
+                });
+            }, 500); // Debounce to avoid too frequent saves
+            
+            return () => clearTimeout(timeoutId);
+        }
+    }, [formData, selectedClientRate, saveFormState, editingProject, isOpen]);
 
     /**
      * Handle form input changes
@@ -153,6 +191,11 @@ const ProjectModal = ({
         setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false });
         setSelectedClientRate(null);
 
+        // Clear saved state since project was successfully created
+        if (clearSavedState) {
+            clearSavedState();
+        }
+
         showSuccess('Project created successfully!');
         onClose();
     };
@@ -190,6 +233,11 @@ const ProjectModal = ({
         );
 
         setProjects(updatedProjects);
+
+        // Clear saved state since project was successfully updated  
+        if (clearSavedState) {
+            clearSavedState();
+        }
 
         showSuccess('Project updated successfully!');
         onClose();
@@ -287,9 +335,29 @@ const ProjectModal = ({
                 {/* Client Selection - Only show for non-personal projects */}
                 {!formData.isPersonal && (
                     <div>
-                        <label htmlFor="preferredClientId" className="block text-sm font-medium text-gray-700">
-                            Client <span className="text-red-500">*</span>
-                        </label>
+                        <div className="flex justify-between items-center mb-1">
+                            <label htmlFor="preferredClientId" className="block text-sm font-medium text-gray-700">
+                                Client <span className="text-red-500">*</span>
+                            </label>
+                            {openClientModal && !editingProject && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        // Save current form state before opening nested modal
+                                        if (saveFormState) {
+                                            saveFormState({
+                                                ...formData,
+                                                selectedClientRate: selectedClientRate
+                                            });
+                                        }
+                                        openClientModal();
+                                    }}
+                                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                    + New Client
+                                </button>
+                            )}
+                        </div>
                         <select
                             id="preferredClientId"
                             name="preferredClientId"
@@ -390,7 +458,11 @@ ProjectModal.propTypes = {
     projects: PropTypes.array.isRequired,
     setProjects: PropTypes.func.isRequired,
     clients: PropTypes.array.isRequired,
-    editingProject: PropTypes.object
+    editingProject: PropTypes.object,
+    openClientModal: PropTypes.func,
+    saveFormState: PropTypes.func,
+    getSavedState: PropTypes.func,
+    clearSavedState: PropTypes.func
 };
 
 export default ProjectModal;

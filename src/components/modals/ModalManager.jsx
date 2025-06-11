@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ClientModal from './ClientModal';
 import ProjectModal from './ProjectModal';
 import TemplateModal from './TemplateModal';
 import PaymentMethodModal from './PaymentMethodModal';
 import BusinessModal from './BusinessModal';
+import InvoiceModal from '../invoice/InvoiceModal';
 
 /**
  * ModalManager - Central manager for all form modals
@@ -36,10 +37,63 @@ const ModalManager = ({
     businessInfos,
     setBusinessInfos
 }) => {
+    // Modal stack to preserve states when opening nested modals
+    const [modalStack, setModalStack] = useState([]);
+    
+    // Store form states for each modal type
+    const [modalFormStates, setModalFormStates] = useState({});
+
+    // Function to save current modal's form state
+    const saveCurrentModalState = (modalType, formData) => {
+        setModalFormStates(prev => ({
+            ...prev,
+            [modalType]: {
+                ...formData,
+                timestamp: Date.now() // To track freshness
+            }
+        }));
+    };
+
+    // Function to get saved form state for a modal
+    const getSavedModalState = (modalType) => {
+        return modalFormStates[modalType] || null;
+    };
+
+    // Function to clear saved state when modal is successfully submitted
+    const clearModalState = (modalType) => {
+        setModalFormStates(prev => {
+            const newState = { ...prev };
+            delete newState[modalType];
+            return newState;
+        });
+    };
 
     const closeModal = () => {
-        setActiveModal(null);
-        setEditingItem(null);
+        if (modalStack.length > 0) {
+            // If there's a modal in the stack, restore it
+            const previousModal = modalStack[modalStack.length - 1];
+            console.log('Restoring previous modal:', previousModal.modal, 'with item:', previousModal.item);
+            setActiveModal(previousModal.modal);
+            setEditingItem(previousModal.item);
+            setModalStack(prev => prev.slice(0, -1)); // Remove the last item from stack
+        } else {
+            // No previous modal, close everything
+            console.log('Closing all modals');
+            setActiveModal(null);
+            setEditingItem(null);
+        }
+    };
+
+    // Function to open a new modal while preserving the current one
+    const openNestedModal = (modalType, item = null) => {
+        if (activeModal) {
+            // Push current modal state to stack
+            console.log('Pushing to stack:', activeModal, 'with item:', editingItem);
+            setModalStack(prev => [...prev, { modal: activeModal, item: editingItem }]);
+        }
+        console.log('Opening nested modal:', modalType, 'with item:', item);
+        setActiveModal(modalType);
+        setEditingItem(item);
     };
 
     return (
@@ -64,6 +118,10 @@ const ModalManager = ({
                     setProjects={setProjects}
                     editingProject={editingItem}
                     clients={clients}
+                    openClientModal={() => openNestedModal('client')}
+                    saveFormState={(formData) => saveCurrentModalState('project', formData)}
+                    getSavedState={() => getSavedModalState('project')}
+                    clearSavedState={() => clearModalState('project')}
                 />
             )}
 

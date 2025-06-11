@@ -296,34 +296,6 @@ function App() {
     */
 
     /**
-     * Handle navigation to payment methods creation from invoice generator
-     */
-    const handleNavigateToPaymentMethods = () => {
-        navigateToInvoices({ section: 'payment-methods', create: 'payment-method' });
-    };
-
-    /**
-     * Handle navigation to business info creation from invoice generator
-     */
-    const handleNavigateToBusinessInfo = () => {
-        navigateToInvoices({ section: 'business-info', create: 'business-info' });
-    };
-
-    /**
-     * Handle navigation to clients creation from invoice generator
-     */
-    const handleNavigateToClientsFromInvoice = () => {
-        navigateToInvoices({ section: 'clients', create: 'client' });
-    };
-
-    /**
-     * Handle navigation to invoice templates from invoice generator
-     */
-    const handleNavigateToTemplates = () => {
-        navigateToInvoices({ section: 'templates', create: 'template' });
-    };
-
-    /**
      * Handle navigation to projects view with project creation
      */
     const handleNavigateToProjects = () => {
@@ -543,17 +515,18 @@ function App() {
                         setPausedElapsedTime={setPausedElapsedTime}
                         onBackToProjects={() => navigateToProjects()}
                         paymentMethods={paymentMethods}
-                        onNavigateToPaymentMethods={handleNavigateToPaymentMethods}
                         businessInfos={businessInfos}
-                        onNavigateToBusinessInfo={handleNavigateToBusinessInfo}
                         clients={clients}
-                        onNavigateToClients={handleNavigateToClientsFromInvoice}
-                        onNavigateToProjects={handleNavigateToProjects}
                         invoices={invoices}
                         setInvoices={setInvoices}
                         invoiceTemplates={invoiceTemplates}
                         setInvoiceTemplates={setInvoiceTemplates}
-                        onNavigateToTemplates={handleNavigateToTemplates}
+                        // Modal functions
+                        openClientModal={openClientModal}
+                        openProjectModal={openProjectModal}
+                        openBusinessModal={openBusinessModal}
+                        openPaymentMethodModal={openPaymentMethodModal}
+                        openTemplateModal={openTemplateModal}
                     />
                 )}
 
@@ -589,18 +562,19 @@ function App() {
                         isPaused={isPaused}
                         onBackToClients={() => navigateToClients()}
                         paymentMethods={paymentMethods}
-                        onNavigateToPaymentMethods={handleNavigateToPaymentMethods}
                         businessInfos={businessInfos}
-                        onNavigateToBusinessInfo={handleNavigateToBusinessInfo}
                         clients={clients}
-                        onNavigateToClients={handleNavigateToClientsFromInvoice}
-                        onNavigateToProjects={handleNavigateToProjects}
                         navigateToProject={navigateToProject}
                         invoices={invoices}
                         setInvoices={setInvoices}
                         invoiceTemplates={invoiceTemplates}
                         setInvoiceTemplates={setInvoiceTemplates}
-                        onNavigateToTemplates={handleNavigateToTemplates}
+                        // Modal functions
+                        openClientModal={openClientModal}
+                        openProjectModal={openProjectModal}
+                        openBusinessModal={openBusinessModal}
+                        openPaymentMethodModal={openPaymentMethodModal}
+                        openTemplateModal={openTemplateModal}
                     />
                 )}
 
@@ -625,6 +599,8 @@ function App() {
                         updateUrl={updateUrl}
                         navigateToProjects={handleNavigateToProjects}
                         navigateToClients={navigateToClients}
+                        openClientModal={openClientModal}
+                        openProjectModal={openProjectModal}
                         openTemplateModal={openTemplateModal}
                         editTemplateModal={editTemplateModal}
                         openPaymentMethodModal={openPaymentMethodModal}

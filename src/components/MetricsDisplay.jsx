@@ -8,6 +8,7 @@ import {
     millisecondsToHours
 } from '../utils/dateUtils';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
+import { ClockIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 
 /**
  * MetricsDisplay component - Shows time and earnings metrics for different periods
@@ -87,37 +88,66 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
     const yearMetrics = calculateMetrics(yearRange.start, yearRange.end);
 
     const metrics = [
-        { label: 'Today', ...todayMetrics },
-        { label: 'This Week', ...weekMetrics },
-        { label: 'This Month', ...monthMetrics },
-        { label: 'Last Month', ...lastMonthMetrics },
-        { label: 'This Year', ...yearMetrics }
+        { 
+            label: 'Today',
+            ...todayMetrics 
+        },
+        { 
+            label: 'This Week',
+            ...weekMetrics 
+        },
+        { 
+            label: 'This Month',
+            ...monthMetrics 
+        },
+        { 
+            label: 'Last Month',
+            ...lastMonthMetrics 
+        },
+        { 
+            label: 'This Year',
+            ...yearMetrics 
+        }
     ];
 
     return (
-        <div className="bg-white shadow rounded-lg p-6">
-            {showTitle && <h2 className="text-lg font-medium text-gray-900 mb-6">Project Metrics</h2>}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                {metrics.map((metric) => (
-                    <div key={metric.label} className="text-center">
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                            {metric.label}
-                        </dt>
-
-                        <dd className="mt-1">
-                            <div className="text-lg font-semibold text-gray-900">
-                                {formatDuration(metric.time)}
-                            </div>
-
-                            {project && project.hourlyRate && (
-                                <div className="text-sm text-gray-600">
-                                    {`${getCurrencySymbol(displayCurrency)}${metric.earnings.toFixed(2)}`}
+        <div className="bg-white shadow rounded-lg">
+            {showTitle && (
+                <div className="px-6 py-4 border-b border-gray-200">
+                    <h2 className="text-lg font-medium text-gray-900">Project Metrics</h2>
+                </div>
+            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 p-6">
+                {metrics.map((metric) => {
+                    return (
+                        <div key={metric.label} className="bg-white overflow-hidden shadow rounded-lg">
+                            <div className="p-5">
+                                <div className="flex flex-col">
+                                    <dt className="text-sm font-medium text-gray-500 truncate mb-3">
+                                        {metric.label}
+                                    </dt>
+                                    
+                                    <dd className="flex items-center">
+                                        <ClockIcon className="h-4 w-4 text-blue-600 mr-2 flex-shrink-0" />
+                                        <span className="text-lg font-medium text-gray-900">
+                                            {formatDuration(metric.time)}
+                                        </span>
+                                    </dd>
+                                    
+                                    {project && project.hourlyRate && (
+                                        <dd className="flex items-center mt-1">
+                                            <CurrencyDollarIcon className="h-4 w-4 text-yellow-600 mr-2 flex-shrink-0" />
+                                            <span className="font-medium text-gray-900">
+                                                {`${getCurrencySymbol(displayCurrency)}${metric.earnings.toFixed(2)}`}
+                                            </span>
+                                        </dd>
+                                    )}
                                 </div>
-                            )}
-                        </dd>
-                    </div>
-                ))}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

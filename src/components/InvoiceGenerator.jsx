@@ -23,18 +23,19 @@ const InvoiceGenerator = ({
     editingInvoice,
     onInvoiceSaved,
     paymentMethods = [],
-    onNavigateToPaymentMethods,
     businessInfos = [],
-    onNavigateToBusinessInfo,
     clients = [],
-    onNavigateToClients,
-    onNavigateToProjects,
     invoices = [],
     setInvoices,
     invoiceTemplates = [],
     setInvoiceTemplates,
-    onNavigateToTemplates,
-    showButton = true
+    showButton = true,
+    // Modal stacking functions
+    openClientModal,
+    openProjectModal,
+    openBusinessModal,
+    openPaymentMethodModal,
+    openTemplateModal
 }) => {
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -458,7 +459,6 @@ const InvoiceGenerator = ({
     
     // Invoice note state
     const [invoiceNote, setInvoiceNote] = useState('');
-    const [invoiceNoteCollapsed, setInvoiceNoteCollapsed] = useState(true);
     
     // Invoice date override state
     const [invoiceDateOverride, setInvoiceDateOverride] = useState('');
@@ -1500,7 +1500,6 @@ const InvoiceGenerator = ({
                     editingInvoice={editingInvoice}
                     handleCancel={handleCancel}
                     handleSaveInvoice={handleSaveInvoice}
-                    onNavigateToProjects={onNavigateToProjects}
                     isProjectContextFixed={isProjectContextFixed}
                     isClientContextFixed={isClientContextFixed}
                     projects={projects}
@@ -1509,7 +1508,6 @@ const InvoiceGenerator = ({
                     clients={clients}
                     selectedClient={selectedClient}
                     handleClientSelection={handleClientSelection}
-                    onNavigateToClients={onNavigateToClients}
                     invoiceTasks={invoiceTasks}
                     setShowAddTaskForm={setShowAddTaskForm}
                     showAddTaskForm={showAddTaskForm}
@@ -1548,14 +1546,10 @@ const InvoiceGenerator = ({
                     getCurrencySymbol={getCurrencySymbol}
                     businessInfos={businessInfos}
                     selectedBusinessInfo={selectedBusinessInfo}
-                    onNavigateToBusinessInfo={onNavigateToBusinessInfo}
                     paymentMethods={paymentMethods}
                     selectedPaymentMethod={selectedPaymentMethod}
-                    onNavigateToPaymentMethods={onNavigateToPaymentMethods}
                     invoiceNote={invoiceNote}
                     setInvoiceNote={setInvoiceNote}
-                    invoiceNoteCollapsed={invoiceNoteCollapsed}
-                    setInvoiceNoteCollapsed={setInvoiceNoteCollapsed}
                     editableHours={editableHours}
                     taskFlatRates={taskFlatRates}
                     useFlatRate={useFlatRate}
@@ -1572,11 +1566,16 @@ const InvoiceGenerator = ({
                     invoiceTemplates={invoiceTemplates}
                     selectedTemplate={selectedTemplate}
                     handleTemplateSelection={handleTemplateSelection}
-                    onNavigateToTemplates={onNavigateToTemplates}
                     invoiceDateOverride={invoiceDateOverride}
                     setInvoiceDateOverride={setInvoiceDateOverride}
                     useInvoiceDateOverride={useInvoiceDateOverride}
                     setUseInvoiceDateOverride={setUseInvoiceDateOverride}
+                    // Modal stacking functions
+                    openClientModal={openClientModal}
+                    openProjectModal={openProjectModal}
+                    openBusinessModal={openBusinessModal}
+                    openPaymentMethodModal={openPaymentMethodModal}
+                    openTemplateModal={openTemplateModal}
                 />
             )}
         </div>
