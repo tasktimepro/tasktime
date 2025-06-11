@@ -53,7 +53,9 @@ const ClientList = ({
         phone: '',
         custom: [],
         disableTax: false,
-        defaultCurrency: getPreferredCurrency()
+        defaultCurrency: getPreferredCurrency(),
+        hourlyRate: '',
+        flatRate: false
     });
 
     // Update showCreateForm when the prop changes
@@ -143,7 +145,11 @@ const ClientList = ({
         e.preventDefault();
 
         if (!formData.title) {
-            return; // Only title is required
+            return; // Title is required
+        }
+
+        if (!formData.flatRate && (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0)) {
+            return; // Hourly rate is required when not using flat rate
         }
 
         const newClient = {
@@ -164,6 +170,8 @@ const ClientList = ({
             custom: formData.custom,
             disableTax: formData.disableTax,
             defaultCurrency: formData.defaultCurrency,
+            hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+            flatRate: formData.flatRate || false,
             createdAt: Date.now(),
             archived: false
         };
@@ -186,7 +194,9 @@ const ClientList = ({
             phone: '',
             custom: [],
             disableTax: false,
-            defaultCurrency: getPreferredCurrency()
+            defaultCurrency: getPreferredCurrency(),
+            hourlyRate: '',
+            flatRate: false
         });
 
         setShowCreateForm(false);
@@ -200,7 +210,11 @@ const ClientList = ({
         e.preventDefault();
 
         if (!formData.title) {
-            return; // Only title is required
+            return; // Title is required
+        }
+
+        if (!formData.flatRate && (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0)) {
+            return; // Hourly rate is required when not using flat rate
         }
 
         const updatedClients = clients.map(client =>
@@ -223,6 +237,8 @@ const ClientList = ({
                     custom: formData.custom,
                     disableTax: formData.disableTax,
                     defaultCurrency: formData.defaultCurrency,
+                    hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+                    flatRate: formData.flatRate || false,
                     updatedAt: Date.now()
                 }
                 : client
@@ -248,7 +264,9 @@ const ClientList = ({
             phone: '',
             custom: [],
             disableTax: false,
-            defaultCurrency: getPreferredCurrency()
+            defaultCurrency: getPreferredCurrency(),
+            hourlyRate: '',
+            flatRate: false
         });
 
         showSuccess('Client updated successfully!');
@@ -342,7 +360,9 @@ const ClientList = ({
                 phone: '',
                 custom: [],
                 disableTax: false,
-                defaultCurrency: getPreferredCurrency()
+                defaultCurrency: getPreferredCurrency(),
+                hourlyRate: '',
+                flatRate: false
             });
         }
 
@@ -402,7 +422,9 @@ const ClientList = ({
             phone: client.phone || '',
             custom: client.custom || [],
             disableTax: client.disableTax || false,
-            defaultCurrency: client.defaultCurrency || getPreferredCurrency()
+            defaultCurrency: client.defaultCurrency || getPreferredCurrency(),
+            hourlyRate: client.hourlyRate ? client.hourlyRate.toString() : '',
+            flatRate: client.flatRate || false
         });
 
         setShowCreateForm(false);
@@ -432,7 +454,9 @@ const ClientList = ({
             phone: '',
             custom: [],
             disableTax: false,
-            defaultCurrency: getPreferredCurrency()
+            defaultCurrency: getPreferredCurrency(),
+            hourlyRate: '',
+            flatRate: false
         });
     };
 
@@ -535,7 +559,7 @@ const ClientList = ({
                     <form onSubmit={editingClient ? handleUpdateClient : handleCreateClient} className="space-y-5">
                         <div>
                             <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                                Client Title *
+                                Client Title <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="text"
@@ -552,7 +576,7 @@ const ClientList = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="clientName" className="block text-sm font-medium text-gray-700">
-                                    Client Name
+                                    Client Name/Business Name
                                 </label>
                                 <input
                                     type="text"
@@ -805,23 +829,60 @@ const ClientList = ({
                             </div>
                         </div>
 
-                        {/* Tax Settings */}
+                        {/* Pricing & Taxes */}
                         <div className="space-y-4">
                             <div className="border-t pt-4">
-                                <h4 className="text-sm font-medium text-gray-900 mb-3">Tax Settings</h4>
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">Pricing & Taxes</h4>
                                 
-                                <div className="flex items-center space-x-3">
-                                    <CustomCheckbox
-                                        checked={formData.disableTax}
-                                        onChange={(checked) => setFormData(prev => ({ ...prev, disableTax: checked }))}
-                                        label="Disable tax for this client"
-                                        labelClassName="text-sm font-medium text-gray-700"
-                                        id="disableTax"
-                                    />
+                                {/* Rate Section */}
+                                <div className="space-y-4 mb-4">
+                                    <div className="flex items-center space-x-3 mb-4">
+                                        <CustomCheckbox
+                                            checked={formData.flatRate}
+                                            onChange={() => setFormData(prev => ({ ...prev, flatRate: !prev.flatRate }))}
+                                            label="Flat rate client (non-hourly basis)"
+                                            labelClassName="text-sm font-medium text-gray-700"
+                                            id="flatRate"
+                                        />
+                                    </div>
+
+                                    <div className={formData.flatRate ? "hidden" : ""}>
+                                        <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
+                                            Hourly Rate <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            id="hourlyRate"
+                                            name="hourlyRate"
+                                            value={formData.hourlyRate}
+                                            onChange={handleInputChange}
+                                            min="0"
+                                            step="0.01"
+                                            required={!formData.flatRate}
+                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                            placeholder="0.00"
+                                        />
+                                        <p className="mt-2 text-xs text-gray-500">
+                                            Default hourly rate for projects with this client. Can be overridden per project.
+                                        </p>
+                                    </div>
                                 </div>
-                                <p className="mt-2 text-xs text-gray-500">
-                                    When enabled, this client will not have tax applied to their invoices, regardless of business tax settings.
-                                </p>
+
+                                {/* Tax Settings */}
+                                <div className="border-t pt-4">
+                                    <div className="flex items-center space-x-3">
+                                        <CustomCheckbox
+                                            checked={formData.disableTax}
+                                            onChange={(checked) => setFormData(prev => ({ ...prev, disableTax: checked }))}
+                                            label="Disable tax for this client"
+                                            labelClassName="text-sm font-medium text-gray-700"
+                                            id="disableTax"
+                                        />
+                                    </div>
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        When enabled, this client will not have tax applied to their invoices, regardless of business tax settings.
+                                    </p>
+                                </div>
                             </div>
                         </div>
 

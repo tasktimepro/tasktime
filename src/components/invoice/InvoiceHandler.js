@@ -106,7 +106,7 @@ export const handleToggleNewTaskFlatRate = (setNewTaskUseFlatRate) => () => {
 };
 
 // Handle adding additional custom task
-export const handleAddAdditionalTask = (setAdditionalTasks, setUseFlatRate, newTaskTitle, newTaskHours, newTaskUseFlatRate, newTaskHourlyRate, selectedProject, newTaskQuantity, setNewTaskTitle, setNewTaskHours, setNewTaskHourlyRate, setNewTaskUseFlatRate, setNewTaskQuantity, setShowAddTaskForm, showError, focusTaskInput) => () => {
+export const handleAddAdditionalTask = (setAdditionalTasks, setUseFlatRate, newTaskTitle, newTaskHours, newTaskUseFlatRate, newTaskHourlyRate, selectedProject, selectedClient, newTaskQuantity, setNewTaskTitle, setNewTaskHours, setNewTaskHourlyRate, setNewTaskUseFlatRate, setNewTaskQuantity, setShowAddTaskForm, showError, focusTaskInput) => () => {
     if (!newTaskTitle.trim()) {
         showError('Task description is required');
         if (focusTaskInput) {
@@ -121,7 +121,7 @@ export const handleAddAdditionalTask = (setAdditionalTasks, setUseFlatRate, newT
         title: newTaskTitle.trim(),
         hours: newTaskUseFlatRate ? 0 : roundedValue,
         flatRate: newTaskUseFlatRate ? roundedValue : 0,
-        hourlyRate: newTaskUseFlatRate ? 0 : (newTaskHourlyRate !== '' ? parseFloat(newTaskHourlyRate) : (selectedProject?.hourlyRate !== undefined && selectedProject?.hourlyRate !== null ? selectedProject.hourlyRate : 0)),
+        hourlyRate: newTaskUseFlatRate ? 0 : (newTaskHourlyRate !== '' ? parseFloat(newTaskHourlyRate) : (selectedProject?.hourlyRate !== undefined && selectedProject?.hourlyRate !== null ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== undefined && selectedClient?.hourlyRate !== null ? selectedClient.hourlyRate : 0))),
         quantity: newTaskUseFlatRate ? newTaskQuantity : 1,
         isCustom: true,
         useFlatRate: newTaskUseFlatRate
@@ -354,26 +354,89 @@ export const handleProjectSelection = (
                 }
             }
             
-            // Handle business info and payment method selection from last invoice
+            // Handle business info, payment method, and template selection with client-first priority
+            let selectedClientForHistory = null;
+            let clientBusinessInfoSet = false;
+            let clientPaymentMethodSet = false;
+            let clientTemplateSet = false;
+            
+            // Get the selected client for prioritizing client-based history
+            if (selectedProj.preferredClientId) {
+                selectedClientForHistory = clients.find(ci => ci.id === selectedProj.preferredClientId);
+            } else if (projectInvoicesForSelection.length > 0) {
+                const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
+                if (lastInvoice.clientId) {
+                    selectedClientForHistory = clients.find(ci => ci.id === lastInvoice.clientId);
+                }
+            }
+            
+            // PRIORITY 1: Look for last used business info for this client across all invoices
+            if (selectedClientForHistory) {
+                const clientInvoices = invoices
+                    .filter(invoice => invoice.clientId === selectedClientForHistory.id)
+                    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
+                
+                for (const invoice of clientInvoices) {
+                    if (invoice.businessInfoId) {
+                        const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                        if (businessInfo) {
+                            setSelectedBusinessInfo(businessInfo);
+                            clientBusinessInfoSet = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // PRIORITY 1: Look for last used payment method for this client across all invoices
+                for (const invoice of clientInvoices) {
+                    if (invoice.paymentMethodId) {
+                        const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                        if (paymentMethod) {
+                            setSelectedPaymentMethod(paymentMethod);
+                            clientPaymentMethodSet = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // PRIORITY 1: Look for last used template for this client across all invoices
+                if (setSelectedTemplate && invoiceTemplates) {
+                    for (const invoice of clientInvoices) {
+                        if (invoice.templateId) {
+                            const template = invoiceTemplates.find(t => t.id === invoice.templateId);
+                            if (template) {
+                                setSelectedTemplate(template);
+                                clientTemplateSet = true;
+                                console.log(`Pre-selected template "${template.name}" based on last invoice for client ${selectedClientForHistory.title}`);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // PRIORITY 2: Fall back to project-specific invoice history (only if no client-based history found)
             if (projectInvoicesForSelection.length > 0) {
                 const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
                 
-                if (lastInvoice.businessInfoId) {
+                // Only set business info if not already set from client history
+                if (!clientBusinessInfoSet && lastInvoice.businessInfoId) {
                     const businessInfo = businessInfos.find(bi => bi.id === lastInvoice.businessInfoId);
                     if (businessInfo) {
                         setSelectedBusinessInfo(businessInfo);
                     }
                 }
                 
-                if (lastInvoice.paymentMethodId) {
+                // Only set payment method if not already set from client history
+                if (!clientPaymentMethodSet && lastInvoice.paymentMethodId) {
                     const paymentMethod = paymentMethods.find(pm => pm.id === lastInvoice.paymentMethodId);
                     if (paymentMethod) {
                         setSelectedPaymentMethod(paymentMethod);
                     }
                 }
                 
-                // Set the previously used template for this project if available
-                if (lastInvoice.templateId && setSelectedTemplate && invoiceTemplates) {
+                // Only set template if not already set from client history
+                if (!clientTemplateSet && lastInvoice.templateId && setSelectedTemplate && invoiceTemplates) {
                     const template = invoiceTemplates.find(t => t.id === lastInvoice.templateId);
                     if (template) {
                         setSelectedTemplate(template);

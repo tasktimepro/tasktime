@@ -99,28 +99,31 @@ const ProjectDashboard = ({
                     </div>
                 </div>
 
-                <InvoiceGenerator
-                    project={project}
-                    projects={projects}
-                    setProjects={setProjects}
-                    tasks={projectTasks}
-                    setTasks={setTasks}
-                    timeEntries={projectTimeEntries}
-                    currentTimer={currentTimer}
-                    isPaused={isPaused}
-                    paymentMethods={paymentMethods}
-                    onNavigateToPaymentMethods={onNavigateToPaymentMethods}
-                    businessInfos={businessInfos}
-                    onNavigateToBusinessInfo={onNavigateToBusinessInfo}
-                    clients={clients}
-                    onNavigateToClients={onNavigateToClients}
-                    onNavigateToProjects={onNavigateToProjects}
-                    invoices={invoices}
-                    setInvoices={setInvoices}
-                    invoiceTemplates={invoiceTemplates}
-                    setInvoiceTemplates={setInvoiceTemplates}
-                    onNavigateToTemplates={onNavigateToTemplates}
-                />
+                {/* Invoice Generator - Only show for non-personal projects */}
+                {!project.isPersonal && (
+                    <InvoiceGenerator
+                        project={project}
+                        projects={projects}
+                        setProjects={setProjects}
+                        tasks={projectTasks}
+                        setTasks={setTasks}
+                        timeEntries={projectTimeEntries}
+                        currentTimer={currentTimer}
+                        isPaused={isPaused}
+                        paymentMethods={paymentMethods}
+                        onNavigateToPaymentMethods={onNavigateToPaymentMethods}
+                        businessInfos={businessInfos}
+                        onNavigateToBusinessInfo={onNavigateToBusinessInfo}
+                        clients={clients}
+                        onNavigateToClients={onNavigateToClients}
+                        onNavigateToProjects={onNavigateToProjects}
+                        invoices={invoices}
+                        setInvoices={setInvoices}
+                        invoiceTemplates={invoiceTemplates}
+                        setInvoiceTemplates={setInvoiceTemplates}
+                        onNavigateToTemplates={onNavigateToTemplates}
+                    />
+                )}
             </div>
 
             {/* Task Tree */}
@@ -151,55 +154,57 @@ const ProjectDashboard = ({
                 </div>
             </div>
 
-            {/* Invoices Section */}
-            <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-medium text-gray-900">
-                            Invoices ({projectInvoices.length})
-                        </h2>
-                        
-                        <InvoiceGenerator
-                            project={project}
-                            projects={projects}
-                            setProjects={setProjects}
-                            tasks={projectTasks}
-                            setTasks={setTasks}
-                            timeEntries={projectTimeEntries}
-                            currentTimer={currentTimer}
-                            isPaused={isPaused}
-                            editingInvoice={editingInvoice}
-                            onInvoiceSaved={() => setEditingInvoice(null)}
-                            paymentMethods={paymentMethods}
-                            onNavigateToPaymentMethods={onNavigateToPaymentMethods}
-                            businessInfos={businessInfos}
-                            onNavigateToBusinessInfo={onNavigateToBusinessInfo}
-                            clients={clients}
-                            onNavigateToClients={onNavigateToClients}
-                            invoices={invoices}
-                            setInvoices={setInvoices}
-                            invoiceTemplates={invoiceTemplates}
-                            setInvoiceTemplates={setInvoiceTemplates}
-                            onNavigateToTemplates={onNavigateToTemplates}
-                        />
+            {/* Invoices Section - Only show for non-personal projects */}
+            {!project.isPersonal && (
+                <div className="bg-white shadow rounded-lg">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-medium text-gray-900">
+                                Invoices ({projectInvoices.length})
+                            </h2>
+                            
+                            <InvoiceGenerator
+                                project={project}
+                                projects={projects}
+                                setProjects={setProjects}
+                                tasks={projectTasks}
+                                setTasks={setTasks}
+                                timeEntries={projectTimeEntries}
+                                currentTimer={currentTimer}
+                                isPaused={isPaused}
+                                editingInvoice={editingInvoice}
+                                onInvoiceSaved={() => setEditingInvoice(null)}
+                                paymentMethods={paymentMethods}
+                                onNavigateToPaymentMethods={onNavigateToPaymentMethods}
+                                businessInfos={businessInfos}
+                                onNavigateToBusinessInfo={onNavigateToBusinessInfo}
+                                clients={clients}
+                                onNavigateToClients={onNavigateToClients}
+                                invoices={invoices}
+                                setInvoices={setInvoices}
+                                invoiceTemplates={invoiceTemplates}
+                                setInvoiceTemplates={setInvoiceTemplates}
+                                onNavigateToTemplates={onNavigateToTemplates}
+                            />
+                        </div>
                     </div>
-                </div>
 
-                <div className="p-6">
-                    <div className="scrollable-container">
-                        <InvoicesList
-                            projectInvoices={projectInvoices}
-                            onEditInvoice={handleEditInvoice}
-                            paymentMethods={paymentMethods}
-                            businessInfos={businessInfos}
-                            clients={clients}
-                            hideNewInvoiceButton={true}
-                            setInvoices={setInvoices}
-                            invoiceTemplates={invoiceTemplates}
-                        />
+                    <div className="p-6">
+                        <div className="scrollable-container">
+                            <InvoicesList
+                                projectInvoices={projectInvoices}
+                                onEditInvoice={handleEditInvoice}
+                                paymentMethods={paymentMethods}
+                                businessInfos={businessInfos}
+                                clients={clients}
+                                hideNewInvoiceButton={true}
+                                setInvoices={setInvoices}
+                                invoiceTemplates={invoiceTemplates}
+                            />
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Metrics Display */}
             <MetricsDisplay

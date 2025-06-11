@@ -78,6 +78,7 @@ const InvoiceGenerator = ({
 
     /**
      * Initialize payment method based on previous invoices or editing invoice
+     * Prioritizes client-based invoice history over project-based history
      */
     const initializePaymentMethod = useCallback(() => {
         // Don't override if project was manually changed (user may have gotten auto-populated values)
@@ -100,7 +101,24 @@ const InvoiceGenerator = ({
             }
         }
         
-        // Look for last used payment method in previous invoices (only if project not manually changed)
+        // PRIORITY 1: Look for last used payment method for this client across all invoices
+        if (!projectManuallyChanged && selectedClient && invoices.length > 0) {
+            const clientInvoices = invoices
+                .filter(invoice => invoice.clientId === selectedClient.id)
+                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
+            
+            for (const invoice of clientInvoices) {
+                if (invoice.paymentMethodId) {
+                    const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
+                    if (paymentMethod) {
+                        setSelectedPaymentMethod(paymentMethod);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // PRIORITY 2: Fall back to project-specific invoice history (only if no client-based history found)
         if (!projectManuallyChanged && projectInvoices.length > 0) {
             for (let i = projectInvoices.length - 1; i >= 0; i--) {
                 const invoice = projectInvoices[i];
@@ -114,7 +132,7 @@ const InvoiceGenerator = ({
             }
         }
         
-        // If no previous payment method, look for default payment method
+        // PRIORITY 3: Use default payment method if no history found
         const defaultPaymentMethod = paymentMethods.find(pm => pm.isDefault);
         if (defaultPaymentMethod) {
             setSelectedPaymentMethod(defaultPaymentMethod);
@@ -122,10 +140,11 @@ const InvoiceGenerator = ({
         }
         
         // No need to reset to null as that's the initial state
-    }, [editingInvoice, projectInvoices, paymentMethods, selectedPaymentMethod, projectManuallyChanged]);
+    }, [editingInvoice, projectInvoices, paymentMethods, selectedPaymentMethod, projectManuallyChanged, selectedClient, invoices]);
 
     /**
      * Initialize business info based on previous invoices or editing invoice
+     * Prioritizes client-based invoice history over project-based history
      */
     const initializeBusinessInfo = useCallback(() => {
         // Don't override if project was manually changed (user may have gotten auto-populated values)
@@ -148,7 +167,24 @@ const InvoiceGenerator = ({
             }
         }
         
-        // Look for last used business info in previous invoices (only if project not manually changed)
+        // PRIORITY 1: Look for last used business info for this client across all invoices
+        if (!projectManuallyChanged && selectedClient && invoices.length > 0) {
+            const clientInvoices = invoices
+                .filter(invoice => invoice.clientId === selectedClient.id)
+                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
+            
+            for (const invoice of clientInvoices) {
+                if (invoice.businessInfoId) {
+                    const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
+                    if (businessInfo) {
+                        setSelectedBusinessInfo(businessInfo);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // PRIORITY 2: Fall back to project-specific invoice history (only if no client-based history found)
         if (!projectManuallyChanged && projectInvoices.length > 0) {
             for (let i = projectInvoices.length - 1; i >= 0; i--) {
                 const invoice = projectInvoices[i];
@@ -162,7 +198,7 @@ const InvoiceGenerator = ({
             }
         }
         
-        // If no previous business info, look for default business info
+        // PRIORITY 3: Use default business info if no history found
         const defaultBusinessInfo = businessInfos.find(bi => bi.isDefault);
         if (defaultBusinessInfo) {
             setSelectedBusinessInfo(defaultBusinessInfo);
@@ -170,10 +206,11 @@ const InvoiceGenerator = ({
         }
         
         // No need to reset to null as that's the initial state
-    }, [editingInvoice, projectInvoices, businessInfos, selectedBusinessInfo, projectManuallyChanged]);
+    }, [editingInvoice, projectInvoices, businessInfos, selectedBusinessInfo, projectManuallyChanged, selectedClient, invoices]);
 
     /**
      * Initialize selected client info based on previous invoices or editing invoice
+     * Prioritizes explicit client prop, then editing invoice, then project preferred client, then project history
      */
     const initializeSelectedClient = useCallback(() => {
         // If no clients available, ensure selection is null
@@ -222,7 +259,7 @@ const InvoiceGenerator = ({
             }
         }
         
-        // Look for last used client info in previous invoices (only if project not manually changed)
+        // Look for last used client info in previous invoices for this project (only if project not manually changed)
         if (!projectManuallyChanged && projectInvoices.length > 0) {
             for (let i = projectInvoices.length - 1; i >= 0; i--) {
                 const invoice = projectInvoices[i];
@@ -274,6 +311,7 @@ const InvoiceGenerator = ({
 
     /**
      * Initialize selected template based on default template or editing invoice
+     * Prioritizes client-based invoice history over project-based history
      */
     const initializeSelectedTemplate = useCallback(() => {
         // Don't override if project was manually changed and user has already made a selection
@@ -299,8 +337,25 @@ const InvoiceGenerator = ({
         
         // If not editing an invoice, we need to select a template
         if (!editingInvoice && invoiceTemplates.length > 0) {
-            // If a project is selected and it has previous invoices, use the last template from that project
-            // This should take precedence over any default template selection
+            // PRIORITY 1: Look for last used template for this client across all invoices
+            if (selectedClient && invoices.length > 0) {
+                const clientInvoices = invoices
+                    .filter(invoice => invoice.clientId === selectedClient.id)
+                    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
+                
+                for (const invoice of clientInvoices) {
+                    if (invoice.templateId) {
+                        const lastTemplate = invoiceTemplates.find(t => t.id === invoice.templateId);
+                        if (lastTemplate) {
+                            setSelectedTemplate(lastTemplate);
+                            console.log(`Pre-selected template "${lastTemplate.name}" based on last invoice for client ${selectedClient.title}`);
+                            return;
+                        }
+                    }
+                }
+            }
+            
+            // PRIORITY 2: Fall back to project-specific template history (only if no client-based history found)
             if (selectedProject?.id && selectedProject.invoiceIds?.length > 0) {
                 const projectInvoices = invoices.filter(invoice => 
                     selectedProject.invoiceIds.includes(invoice.id)
@@ -320,8 +375,7 @@ const InvoiceGenerator = ({
                 }
             }
             
-            // Only use default template if no project-specific template was found
-            // This prevents default template from overriding project-specific selection
+            // PRIORITY 3: Use default template if no history found
             if (selectedTemplate === null) {
                 const defaultTemplate = invoiceTemplates.find(t => t.isDefault);
                 if (defaultTemplate) {
@@ -336,7 +390,7 @@ const InvoiceGenerator = ({
         }
         
         // No need to reset to null as that's the initial state
-    }, [editingInvoice, invoiceTemplates, selectedTemplate, projectManuallyChanged, selectedProject?.id, selectedProject?.invoiceIds, invoices, selectedProject?.title]);
+    }, [editingInvoice, invoiceTemplates, selectedTemplate, projectManuallyChanged, selectedProject?.id, selectedProject?.invoiceIds, invoices, selectedProject?.title, selectedClient]);
 
     // Track when the form gets shown so we can initialize only then
     const [hasInitialized, setHasInitialized] = useState(false);
@@ -606,6 +660,7 @@ const InvoiceGenerator = ({
         newTaskUseFlatRate,
         newTaskHourlyRate,
         selectedProject,
+        selectedClient,
         newTaskQuantity,
         setNewTaskTitle,
         setNewTaskHours,
@@ -731,8 +786,8 @@ const InvoiceGenerator = ({
                 const quantity = taskQuantities[task.id] || 1;
                 projectSubtotal += (taskFlatRates[task.id] || 0) * quantity;
             } else {
-                // Use task-specific hourly rate if available, otherwise fall back to project rate
-                const hourlyRate = taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0;
+                // Use task-specific hourly rate if available, otherwise fall back to project rate, then client rate
+                const hourlyRate = taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0;
                 projectSubtotal += taskHours * hourlyRate;
             }
         });
@@ -744,7 +799,7 @@ const InvoiceGenerator = ({
                 const quantity = task.quantity || 1;
                 additionalTaskAmount += (task.flatRate || 0) * quantity;
             } else {
-                const hourlyRate = task.hourlyRate || selectedProject?.hourlyRate || 0;
+                const hourlyRate = task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0;
                 const taskHours = task.hours || 0;
                 additionalTaskAmount += taskHours * hourlyRate;
                 // Add hours to total for hourly tasks
@@ -904,13 +959,7 @@ const InvoiceGenerator = ({
             return;
         }
 
-        // Project selection is now required
-        if (!selectedProject) {
-            showError('Please select a project');
-            return;
-        }
-
-        // Template selection is now required
+        // Template selection is required
         if (!selectedTemplate) {
             showError('Please select an invoice template');
             return;
@@ -945,7 +994,7 @@ const InvoiceGenerator = ({
             ? editingInvoice.id 
             : selectedProject 
                 ? `INV-${selectedProject.id.slice(-8)}-${Date.now()}` 
-                : `INV-${Date.now()}`;
+                : `INV-${selectedClient?.id?.slice(-8) || 'STANDALONE'}-${Date.now()}`;
 
         // Generate invoice number using template
         const invoiceNumber = editingInvoice 
@@ -985,7 +1034,7 @@ const InvoiceGenerator = ({
                     ...task,
                     hours: editableHours[task?.id] || task?.originalHours || 0,
                     flatRate: taskFlatRates[task.id] || 0,
-                    hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || 0,
+                    hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
                     useFlatRate: useFlatRate[task.id] || false,
                     quantity: taskQuantities[task.id] || 1, // Include quantity for flat rate tasks
                     isMerged: (task && task.id && mergedSubtasks[task.id]) || false, // Track merged status
@@ -994,7 +1043,7 @@ const InvoiceGenerator = ({
                 })),
             additionalTasks: additionalTasks.map(task => ({
                 ...task,
-                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0
+                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
             })),
             taskFlatRates: taskFlatRates,
             useFlatRate: useFlatRate,
@@ -1049,7 +1098,7 @@ const InvoiceGenerator = ({
                     .map(task => ({
                         ...task,
                         hours: editableHours[task.id] || task.originalHours,
-                        hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || 0,
+                        hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
                         quantity: taskQuantities[task.id] || 1, // Include quantity for flat rate tasks
                         isMerged: mergedSubtasks[task.id] || false, // Track merged status
                         mergedSubtasks: mergedSubtasks[task?.id] ? 
@@ -1057,7 +1106,7 @@ const InvoiceGenerator = ({
                     })),
                 additionalTasks: additionalTasks.filter(task => task).map(task => ({
                     ...task,
-                    hourlyRate: task?.hourlyRate || selectedProject?.hourlyRate || 0
+                    hourlyRate: task?.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
                 })),
                 taskFlatRates: taskFlatRates,
                 useFlatRate: useFlatRate,

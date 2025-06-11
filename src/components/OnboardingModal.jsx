@@ -460,6 +460,7 @@ const OnboardingModal = ({
                 currency: projectFormData.currency,
                 flatRate: false,
                 archived: false,
+                isPersonal: false, // Default to non-personal for onboarding
                 createdAt: new Date().toISOString()
             };
             

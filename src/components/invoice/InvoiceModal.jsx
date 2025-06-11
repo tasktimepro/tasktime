@@ -113,10 +113,6 @@ const InvoiceModal = ({
     const handleSave = (e) => {
         e.preventDefault();
         // Validation logic to open the relevant section if required inputs are missing
-        if (!selectedProject) {
-            setActiveSection('projectClient');
-            return;
-        }
         if (!selectedClient) {
             setActiveSection('projectClient');
             return;
@@ -239,7 +235,7 @@ const InvoiceModal = ({
                             <div className="mb-6">
                                 <div className="flex justify-between items-center mb-1">
                                     <h4 className="text-sm font-medium text-gray-900">
-                                        Project <span className="text-red-500">*</span>
+                                        Project
                                     </h4>
                                     {onNavigateToProjects && !(isProjectContextFixed && !isClientContextFixed) && !editingInvoice && (
                                         <button
@@ -255,7 +251,7 @@ const InvoiceModal = ({
                                 {projects.length === 0 ? (
                                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                                         <p className="text-sm text-yellow-800">
-                                            No projects found. Create a project to continue with invoice generation.
+                                            No projects found. You can create a project or continue without one.
                                         </p>
                                     </div>
                                 ) : (
@@ -264,11 +260,10 @@ const InvoiceModal = ({
                                             value={selectedProject?.id || ''}
                                             onChange={(e) => handleProjectSelection(e.target.value)}
                                             className={`block w-full border ${(isProjectContextFixed && !isClientContextFixed) || editingInvoice ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
-                                            required
                                             disabled={(isProjectContextFixed && !isClientContextFixed) || editingInvoice}
                                         >
-                                            <option value="" disabled>Select project</option>
-                                            {projects.map(proj => (
+                                            <option value="">Select project (optional)</option>
+                                            {projects.filter(proj => !proj.isPersonal).map(proj => (
                                                 <option key={proj.id} value={proj.id}>
                                                     {proj.title}
                                                 </option>
@@ -549,7 +544,7 @@ const InvoiceModal = ({
                                                                     type="number"
                                                                     step="0.01"
                                                                     min="0"
-                                                                    value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : '')}
+                                                                    value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                                     onChange={(e) => handleTaskHourlyRateChange(task.id, e.target.value)}
                                                                     className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                     placeholder="0.00"
@@ -653,7 +648,7 @@ const InvoiceModal = ({
                                                                     type="number"
                                                                     step="0.01"
                                                                     min="0"
-                                                                    value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : '')}
+                                                                    value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                                     onChange={(e) => handleAdditionalTaskHourlyRateChange(task.id, e.target.value)}
                                                                     className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
                                                                     placeholder="0.00"
@@ -754,7 +749,7 @@ const InvoiceModal = ({
                                                                 type="number"
                                                                 step="0.01"
                                                                 min="0"
-                                                                value={newTaskHourlyRate !== '' ? newTaskHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : '')}
+                                                                value={newTaskHourlyRate !== '' ? newTaskHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                                 onChange={(e) => setNewTaskHourlyRate(e.target.value)}
                                                                 placeholder="0.00"
                                                                 className="w-20 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
@@ -959,13 +954,13 @@ const InvoiceModal = ({
                                 
                                 {!taxOverride.enabled && selectedClient?.disableTax && (
                                     <div className="text-xs text-orange-600">
-                                        Tax disabled for this client
+                                        Tax is currently disabled for this client
                                     </div>
                                 )}
                                 
-                                {!taxOverride.enabled && (!selectedBusinessInfo || !selectedBusinessInfo.taxEnabled) && (
-                                    <div className="text-xs text-gray-500">
-                                        No tax configured for business
+                                {!taxOverride.enabled && !(!taxOverride.enabled && selectedClient?.disableTax) && (!selectedBusinessInfo || !selectedBusinessInfo.taxEnabled) && (
+                                    <div className="text-xs text-orange-600">
+                                        No tax was configured for business
                                     </div>
                                 )}
                             </div>
