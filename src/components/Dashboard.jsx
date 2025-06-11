@@ -38,6 +38,7 @@ const Dashboard = ({
     setCurrentTimer,
     setTasks,
     navigateToProject,
+    navigateToClient,
     navigateToInvoices,
     setIsPaused,
     setPausedElapsedTime,
@@ -462,12 +463,16 @@ const Dashboard = ({
                 // For recent projects, always use original currency and rate - no conversion
                 const pendingAmount = project.hourlyRate ? pendingTimeHours * project.hourlyRate : 0;
 
+                // Get client information if project has a client
+                const client = project.preferredClientId ? clients.find(c => c.id === project.preferredClientId) : null;
+
                 return {
                     ...project,
                     totalTime: activity.totalTime,
                     lastActivity: activity.lastActivity,
                     pendingHours: pendingTimeHours,
-                    pendingAmount
+                    pendingAmount,
+                    client
                 };
             })
             .sort((a, b) => b.lastActivity - a.lastActivity)
@@ -480,31 +485,49 @@ const Dashboard = ({
         }
 
         return projectsWithActivity;
-    }, [projects, tasks, timeEntries, projectSearchQuery]);
+    }, [projects, tasks, timeEntries, projectSearchQuery, clients]);
 
     /**
-     * Calculate total pending hours across all recent projects
+     * Calculate current month's unbilled total that matches the monthly metrics calculation
+     * This should match the "unbilled" amount shown in "This Month" metrics
      */
-    const pendingHoursTotal = useMemo(() => {
-        return recentProjects.reduce((total, project) => total + project.pendingHours, 0);
-    }, [recentProjects]);
+    const thisMonthUnbilledTotal = useMemo(() => {
+        const billableTotal = Object.values(thisMonthMetrics.billableEarnings).reduce((sum, amount) => sum + amount, 0);
+        return billableTotal;
+    }, [thisMonthMetrics.billableEarnings]);
 
     /**
-     * Calculate total pending bills amount in preferred currency
+     * Calculate billable hours for the current month metrics
      */
-    const pendingBillsTotal = useMemo(() => {
-        return recentProjects.reduce((total, project) => {
-            const amount = project.pendingAmount || 0;
-            const currency = getProjectCurrency(project, clients);
+    const thisMonthBillableHours = useMemo(() => {
+        // Re-calculate the hours from the time entries for this month
+        const entriesInRange = timeEntries.filter(entry => 
+            entry.start >= thisMonthRange.start && entry.end <= thisMonthRange.end
+        );
+
+        // Group by task and calculate billable hours using the same rounding logic
+        const taskTimeMap = {};
+        entriesInRange.forEach(entry => {
+            const task = tasks.find(t => t.id === entry.taskId);
+            if (!task || task.billable !== true) return; // Only include explicitly billable tasks
             
-            // Only convert if currency differs from preferred currency
-            if (currency !== preferredCurrency && needsExchangeRates && exchangeRates) {
-                return total + convertCurrency(amount, currency, preferredCurrency, exchangeRates);
+            const project = projects.find(p => p.id === task.projectId);
+            if (!project || !project.hourlyRate) return;
+
+            const taskKey = `${task.id}-${project.id}`;
+            if (!taskTimeMap[taskKey]) {
+                taskTimeMap[taskKey] = { totalTime: 0 };
             }
-            // Add original amount if currency matches preferred
-            return total + (currency === preferredCurrency ? amount : 0);
+            taskTimeMap[taskKey].totalTime += (entry.end - entry.start);
+        });
+
+        // Calculate total billable hours with task-by-task rounding
+        return Object.values(taskTimeMap).reduce((total, { totalTime }) => {
+            const taskHours = millisecondsToHours(totalTime);
+            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+            return total + roundedTaskHours;
         }, 0);
-    }, [recentProjects, preferredCurrency, needsExchangeRates, exchangeRates, clients]);
+    }, [timeEntries, tasks, projects, thisMonthRange]);
 
     /**
      * Create a time entry for the current timer session
@@ -570,6 +593,15 @@ const Dashboard = ({
             navigateToProject(task.project.id);
         }
     }, [navigateToProject]);
+
+    /**
+     * Handle clicking on client title to navigate to client dashboard
+     */
+    const handleClientTitleClick = useCallback((client) => {
+        if (client?.id && navigateToClient) {
+            navigateToClient(client.id);
+        }
+    }, [navigateToClient]);
 
     /**
      * Render task timer controls
@@ -691,17 +723,31 @@ const Dashboard = ({
             );
         }
         
-        // Add outstanding invoices + billable time as "pending"
-        const pendingTotal = outstandingTotal + billableTotal;
-        if (pendingTotal > 0) {
+        // Add outstanding invoices as "pending"
+        if (outstandingTotal > 0) {
             components.push(
                 <div key="pending" className="flex items-center">
-                    <CurrencyDollarIcon className="h-4 w-4 text-amber-600 mr-1" />
+                    <DocumentTextIcon className="h-4 w-4 text-amber-600 mr-1" />
                     <span className="font-semibold text-amber-900">
-                        {formatCurrency(pendingTotal, preferredCurrency)}
+                        {formatCurrency(outstandingTotal, preferredCurrency)}
                     </span>
                     <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded ml-1">
                         pending
+                    </span>
+                </div>
+            );
+        }
+        
+        // Add unbilled time as "unbilled"
+        if (billableTotal > 0) {
+            components.push(
+                <div key="unbilled" className="flex items-center">
+                    <CurrencyDollarIcon className="h-4 w-4 text-purple-600 mr-1" />
+                    <span className="font-semibold text-purple-900">
+                        {formatCurrency(billableTotal, preferredCurrency)}
+                    </span>
+                    <span className="text-xs bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded ml-1">
+                        unbilled
                     </span>
                 </div>
             );
@@ -892,21 +938,21 @@ const Dashboard = ({
                             </div>
                         )}
 
-                        {/* Pending Bills Notice */}
+                        {/* Pending Bills This Month Notice */}
                         <div className="bg-blue-50 rounded-lg p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-medium text-blue-900">Pending Bills</h3>
+                                    <h3 className="text-sm font-medium text-blue-900">Pending Bills This Month</h3>
                                     <div className="flex items-center mt-2">
                                         <ClockIcon className="h-4 w-4 text-blue-600 mr-2" />
                                         <span className="text-lg font-semibold text-blue-900">
-                                            {pendingHoursTotal.toFixed(1)}h
+                                            {thisMonthBillableHours.toFixed(1)}h
                                         </span>
                                     </div>
                                     <div className="flex items-center mt-1">
                                         <CurrencyDollarIcon className="h-4 w-4 text-blue-600 mr-2" />
                                         <span className="text-sm text-blue-700">
-                                            {formatCurrency(pendingBillsTotal, preferredCurrency)} unbilled
+                                            {formatCurrency(thisMonthUnbilledTotal, preferredCurrency)} unbilled
                                         </span>
                                     </div>
                                 </div>
@@ -957,15 +1003,31 @@ const Dashboard = ({
                                                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                                                 disabled={task.completed || shouldDisable}
                                             />
-                                            <div className="flex-1 min-w-0">
+                                            <div className="flex-1 min-w-0 space-y-1">
                                                 {renderTaskTitle(task, task.completed)}
                                                 <p className={`text-xs truncate ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>
                                                     {task.parentTaskId ? (
                                                         <span>
-                                                            Subtask of: {task.parentTask ? task.parentTask.title : 'Unknown Parent'} • {task.project ? task.project.title : 'Unknown Project'}
+                                                            Subtask of: {task.parentTask ? task.parentTask.title : 'Unknown Parent'} <span className="mx-1">•</span> {task.project ? (
+                                                                <button
+                                                                    onClick={() => handleTaskTitleClick(task)}
+                                                                    className="text-gray-500 hover:text-gray-700 hover:underline cursor-pointer"
+                                                                    title={`Click to open ${task.project.title} project`}
+                                                                >
+                                                                    {task.project.title}
+                                                                </button>
+                                                            ) : 'Unknown Project'}
                                                         </span>
                                                     ) : (
-                                                        task.project ? task.project.title : 'Unknown Project'
+                                                        task.project ? (
+                                                            <button
+                                                                onClick={() => handleTaskTitleClick(task)}
+                                                                className="text-gray-500 hover:text-gray-700 hover:underline cursor-pointer"
+                                                                title={`Click to open ${task.project.title} project`}
+                                                            >
+                                                                {task.project.title}
+                                                            </button>
+                                                        ) : 'Unknown Project'
                                                     )}
                                                 </p>
                                             </div>
@@ -992,10 +1054,18 @@ const Dashboard = ({
                                                                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                                                                 disabled={subtask.completed || shouldDisable}
                                                             />
-                                                            <div className="flex-1 min-w-0">
+                                                            <div className="flex-1 min-w-0 space-y-1">
                                                                 {renderTaskTitle(subtaskWithProject, subtask.completed)}
                                                                 <p className={`text-xs truncate ${subtask.completed ? 'text-gray-400' : 'text-gray-500'}`}>
-                                                                    {task.project ? task.project.title : 'Unknown Project'}
+                                                                    {task.project ? (
+                                                                        <button
+                                                                            onClick={() => handleTaskTitleClick(subtaskWithProject)}
+                                                                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                                                            title={`Click to open ${task.project.title} project`}
+                                                                        >
+                                                                            {task.project.title}
+                                                                        </button>
+                                                                    ) : 'Unknown Project'}
                                                                 </p>
                                                             </div>
                                                             <div className={`text-xs ${subtask.completed ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -1048,26 +1118,35 @@ const Dashboard = ({
                         {recentProjects.length > 0 ? (
                             <div className="divide-y divide-gray-200">
                                 {recentProjects.map((project) => (
-                                    <button
-                                        key={project.id}
-                                        onClick={() => navigateToProject(project.id)}
-                                        className="w-full px-6 py-3 text-left hover:bg-gray-50 transition-colors"
-                                    >
+                                    <div key={project.id} className="px-6 py-3 hover:bg-gray-50 transition-colors">
                                         <div className="flex items-center justify-between">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-gray-900 truncate">
+                                            <div className="flex-1 min-w-0 space-y-1">
+                                                <button
+                                                    onClick={() => navigateToProject(project.id)}
+                                                    className="text-sm font-medium text-gray-900 truncate hover:underline cursor-pointer hover:text-blue-600 text-left block"
+                                                    title={`Click to open ${project.title} project`}
+                                                >
                                                     {project.title}
-                                                </p>
-                                                <div className="flex items-center space-x-4 mt-1">
-                                                    <span className="text-xs text-gray-500">
-                                                        {formatDuration(project.totalTime)} total
-                                                    </span>
-                                                    <span className="text-xs text-gray-500">
-                                                        {project.pendingHours.toFixed(1)}h pending
-                                                    </span>
+                                                </button>
+                                                <div className="text-xs text-gray-500">
+                                                    {project.client ? (
+                                                        <span>
+                                                            <button
+                                                                onClick={() => handleClientTitleClick(project.client)}
+                                                                className="text-gray-500 hover:text-gray-700 hover:underline cursor-pointer"
+                                                                title={`Click to open ${project.client.title} client dashboard`}
+                                                            >
+                                                                {project.client.title}
+                                                            </button>
+                                                            <span> <span className="mx-1">•</span> {project.pendingHours.toFixed(1)}h pending</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span>Personal <span className="mx-1">•</span> {project.pendingHours.toFixed(1)}h pending</span>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="text-right">
+                                                {/* Pending Bills */}
                                                 <div className="text-sm font-medium text-gray-900">
                                                     {project.pendingAmount > 0 ? (
                                                         <>
@@ -1078,11 +1157,11 @@ const Dashboard = ({
                                                     )}
                                                 </div>
                                                 <div className="text-xs text-gray-500">
-                                                    pending
+                                                    bills
                                                 </div>
                                             </div>
                                         </div>
-                                    </button>
+                                    </div>
                                 ))}
                             </div>
                         ) : (

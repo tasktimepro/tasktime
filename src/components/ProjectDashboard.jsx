@@ -1,10 +1,11 @@
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
+import { useState, useMemo } from 'react';
 import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils';
+import { formatDuration, millisecondsToHours } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 
 /**
@@ -76,6 +77,84 @@ const ProjectDashboard = ({
         !task.completed && !task.archived
     ).length;
 
+    // Calculate project metrics
+    const projectMetrics = useMemo(() => {
+        // Total time worked on this project
+        const totalTime = projectTimeEntries.reduce((total, entry) => {
+            return total + (entry.end - entry.start);
+        }, 0);
+
+        // Total revenue from paid invoices only
+        const totalRevenue = projectInvoices.reduce((total, invoice) => {
+            // Only include invoices that have been marked as paid
+            if (invoice.paymentProcessed) {
+                return total + (invoice.totalAmount || invoice.total || 0);
+            }
+            return total;
+        }, 0);
+
+        // Calculate pending amount from unpaid invoices
+        const pendingAmount = projectInvoices.reduce((total, invoice) => {
+            // Only include invoices that have NOT been marked as paid
+            if (!invoice.paymentProcessed) {
+                return total + (invoice.totalAmount || invoice.total || 0);
+            }
+            return total;
+        }, 0);
+
+        // Calculate unbilled potential revenue
+        let potentialRevenue = 0;
+
+        if (project.hourlyRate && !project.flatRate) {
+            // Get explicitly billable tasks (tasks with billable === true)
+            const billableTasks = projectTasks.filter(task => task.billable === true);
+            const billableTaskIds = billableTasks.map(task => task.id);
+            
+            // Get time entries for billable tasks that haven't been billed yet
+            const unbilledEntries = projectTimeEntries.filter(entry => {
+                // Only include entries for tasks that are explicitly marked as billable
+                if (!billableTaskIds.includes(entry.taskId)) return false;
+                
+                // Find the task for this entry
+                const task = projectTasks.find(t => t.id === entry.taskId);
+                if (!task) return false;
+                if (!entry.end || entry.end <= entry.start) return false;
+                
+                // Use task-specific lastBilledAt, or task creation date if never billed
+                const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+                
+                // Only include entries created after this task's last billing date
+                return entry.start > taskLastBilledAt;
+            });
+
+            // Group unbilled entries by task and round each task's hours (same logic as invoice)
+            const taskTimeMap = {};
+            unbilledEntries.forEach(entry => {
+                if (!taskTimeMap[entry.taskId]) {
+                    taskTimeMap[entry.taskId] = 0;
+                }
+                taskTimeMap[entry.taskId] += (entry.end - entry.start);
+            });
+
+            // Calculate total rounded hours (matching invoice calculation)
+            const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+                const taskHours = millisecondsToHours(taskTime);
+                const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
+                return total + roundedTaskHours;
+            }, 0);
+
+            potentialRevenue = unbilledHours * project.hourlyRate;
+        }
+
+        return {
+            totalTime,
+            totalRevenue,
+            pendingAmount,
+            potentialRevenue,
+            activeTaskCount: visibleTasksCount
+        };
+    }, [projectTimeEntries, projectInvoices, project, projectTasks, visibleTasksCount]);
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -127,6 +206,107 @@ const ProjectDashboard = ({
                     />
                 )}
             </div>
+
+            {/* Project Metrics - Only show for non-personal projects */}
+            {!project.isPersonal && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <div className="bg-white overflow-hidden shadow rounded-lg">
+                        <div className="p-5">
+                            <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                    <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
+                                        <DocumentCheckIcon className="h-5 w-5 text-gray-600" />
+                                    </div>
+                                </div>
+                                <div className="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-gray-500 truncate">Tasks</dt>
+                                        <dd className="text-lg font-medium text-gray-900">{projectMetrics.activeTaskCount}</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white overflow-hidden shadow rounded-lg">
+                        <div className="p-5">
+                            <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                    <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
+                                        <ClockIcon className="h-5 w-5 text-blue-600" />
+                                    </div>
+                                </div>
+                                <div className="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-gray-500 truncate">Total Time</dt>
+                                        <dd className="text-lg font-medium text-gray-900">{formatDuration(projectMetrics.totalTime)}</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white overflow-hidden shadow rounded-lg">
+                        <div className="p-5">
+                            <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                    <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
+                                        <BanknotesIcon className="h-5 w-5 text-green-600" />
+                                    </div>
+                                </div>
+                                <div className="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-gray-500 truncate">Paid Revenue</dt>
+                                        <dd className="text-lg font-medium text-gray-900">
+                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.totalRevenue.toFixed(2)}
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white overflow-hidden shadow rounded-lg">
+                        <div className="p-5">
+                            <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                    <div className="w-8 h-8 bg-amber-100 rounded-md flex items-center justify-center">
+                                        <DocumentTextIcon className="h-5 w-5 text-amber-600" />
+                                    </div>
+                                </div>
+                                <div className="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-gray-500 truncate">Pending</dt>
+                                        <dd className="text-lg font-medium text-gray-900">
+                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.pendingAmount.toFixed(2)}
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white overflow-hidden shadow rounded-lg">
+                        <div className="p-5">
+                            <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                    <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+                                        <CurrencyDollarIcon className="h-5 w-5 text-purple-600" />
+                                    </div>
+                                </div>
+                                <div className="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-gray-500 truncate">Unbilled</dt>
+                                        <dd className="text-lg font-medium text-gray-900">
+                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.potentialRevenue.toFixed(2)}
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Task Tree */}
             <div className="bg-white shadow rounded-lg">

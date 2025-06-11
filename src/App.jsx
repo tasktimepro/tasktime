@@ -464,6 +464,7 @@ function App() {
                         setCurrentTimer={setCurrentTimer}
                         setTasks={setTasks}
                         navigateToProject={navigateToProject}
+                        navigateToClient={navigateToClient}
                         navigateToInvoices={navigateToInvoices}
                         isPaused={isPaused}
                         setIsPaused={setIsPaused}

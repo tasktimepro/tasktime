@@ -532,10 +532,10 @@ const TaskItem = ({
 
                                     <button
                                         onClick={() => setShowTimeEditModal(true)}
-                                        className="p-1 text-gray-400 hover:bg-yellow-100 rounded-md transition-colors group"
+                                        className="p-1 text-gray-400 hover:bg-blue-100 rounded-md transition-colors group"
                                         title="Edit Time"
                                     >
-                                        <ClockIcon className="h-5 w-5 group-hover:text-yellow-700" />
+                                        <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
                                     </button>
 
                                     {/* Billable Toggle Button - Always show this button */}
@@ -544,8 +544,8 @@ const TaskItem = ({
                                             onClick={() => onToggleBillable(task.id)}
                                             className={`p-1 rounded-md transition-colors group ${
                                                 task.billable
-                                                    ? 'text-blue-600 bg-blue-100 hover:bg-blue-200'
-                                                    : 'text-gray-400 hover:bg-blue-100'
+                                                    ? 'text-purple-600 bg-purple-100 hover:bg-purple-200'
+                                                    : 'text-gray-400 hover:bg-purple-100'
                                             }`}
                                             title={
                                                 task.billable
@@ -555,8 +555,8 @@ const TaskItem = ({
                                         >
                                             <CurrencyDollarIcon className={`h-5 w-5 ${
                                                 task.billable
-                                                    ? 'group-hover:text-blue-700'
-                                                    : 'group-hover:text-blue-600'
+                                                    ? 'group-hover:text-purple-700'
+                                                    : 'group-hover:text-purple-600'
                                             }`} />
                                         </button>
                                     )}
@@ -1088,10 +1088,10 @@ const SubtaskItem = ({
 
                             <button
                                 onClick={() => setShowTimeEditModal(true)}
-                                className="p-1 text-gray-400 hover:bg-yellow-100 rounded-md transition-colors group"
+                                className="p-1 text-gray-400 hover:bg-blue-100 rounded-md transition-colors group"
                                 title="Edit Time"
                             >
-                                <ClockIcon className="h-5 w-5 group-hover:text-yellow-700" />
+                                <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
                             </button>
 
                             {/* Billable Toggle Button - Always show this button */}
@@ -1100,8 +1100,8 @@ const SubtaskItem = ({
                                     onClick={() => onToggleBillable(task.id)}
                                     className={`p-1 rounded-md transition-colors group ${
                                         task.billable
-                                            ? 'text-blue-600 bg-blue-100 hover:bg-blue-200'
-                                            : 'text-gray-400 hover:bg-blue-100'
+                                            ? 'text-purple-600 bg-purple-100 hover:bg-purple-200'
+                                            : 'text-gray-400 hover:bg-purple-100'
                                     }`}
                                     title={
                                         task.billable
@@ -1111,8 +1111,8 @@ const SubtaskItem = ({
                                 >
                                     <CurrencyDollarIcon className={`h-5 w-5 ${
                                         task.billable
-                                            ? 'group-hover:text-blue-700'
-                                            : 'group-hover:text-blue-600'
+                                            ? 'group-hover:text-purple-700'
+                                            : 'group-hover:text-purple-600'
                                     }`} />
                                 </button>
                             )}

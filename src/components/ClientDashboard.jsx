@@ -74,9 +74,13 @@ const ClientDashboard = ({
             return total + (entry.end - entry.start);
         }, 0);
 
-        // Total revenue from invoices
+        // Total revenue from paid invoices only
         const totalRevenue = clientInvoices.reduce((total, invoice) => {
-            return total + (invoice.total || 0);
+            // Only include invoices that have been marked as paid
+            if (invoice.paymentProcessed) {
+                return total + (invoice.totalAmount || invoice.total || 0);
+            }
+            return total;
         }, 0);
 
         // Unbilled time and potential revenue
@@ -119,11 +123,21 @@ const ClientDashboard = ({
             }
         });
 
+        // Calculate pending amount from unpaid invoices
+        const pendingAmount = clientInvoices.reduce((total, invoice) => {
+            // Only include invoices that have NOT been marked as paid
+            if (!invoice.paymentProcessed) {
+                return total + (invoice.totalAmount || invoice.total || 0);
+            }
+            return total;
+        }, 0);
+
         return {
             totalTime,
             totalRevenue,
             unbilledTime,
             potentialRevenue,
+            pendingAmount,
             projectCount: clientProjects.length,
             invoiceCount: clientInvoices.length
         };
@@ -304,13 +318,13 @@ const ClientDashboard = ({
             </div>
 
             {/* Client Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                     <div className="p-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
-                                    <ClipboardDocumentCheckIcon className="h-5 w-5 text-purple-600" />
+                                <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
+                                    <ClipboardDocumentCheckIcon className="h-5 w-5 text-gray-600" />
                                 </div>
                             </div>
                             <div className="ml-5 w-0 flex-1">
@@ -351,7 +365,7 @@ const ClientDashboard = ({
                             </div>
                             <div className="ml-5 w-0 flex-1">
                                 <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Revenue</dt>
+                                    <dt className="text-sm font-medium text-gray-500 truncate">Paid Revenue</dt>
                                     <dd className="text-lg font-medium text-gray-900">
                                         {getCurrencySymbol(clientCurrency)}{clientMetrics.totalRevenue.toFixed(2)}
                                     </dd>
@@ -366,7 +380,27 @@ const ClientDashboard = ({
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
                                 <div className="w-8 h-8 bg-amber-100 rounded-md flex items-center justify-center">
-                                    <CurrencyDollarIcon className="h-5 w-5 text-amber-600" />
+                                    <DocumentTextIcon className="h-5 w-5 text-amber-600" />
+                                </div>
+                            </div>
+                            <div className="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt className="text-sm font-medium text-gray-500 truncate">Pending</dt>
+                                    <dd className="text-lg font-medium text-gray-900">
+                                        {getCurrencySymbol(clientCurrency)}{clientMetrics.pendingAmount.toFixed(2)}
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                    <div className="p-5">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+                                    <CurrencyDollarIcon className="h-5 w-5 text-purple-600" />
                                 </div>
                             </div>
                             <div className="ml-5 w-0 flex-1">
