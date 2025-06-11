@@ -5,6 +5,7 @@ import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ArchiveBoxIcon
 import { generateId } from '../utils/idUtils';
 import { useToast } from '../hooks/useToast';
 import CustomCheckbox from './CustomCheckbox';
+import { getPreferredCurrency, getCurrencyOptions } from '../utils/currencyUtils';
 
 // Event name for dropdown coordination
 const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
@@ -50,7 +51,9 @@ const ClientList = ({
         taxNumber: '',
         email: '',
         phone: '',
-        custom: []
+        custom: [],
+        disableTax: false,
+        defaultCurrency: getPreferredCurrency()
     });
 
     // Update showCreateForm when the prop changes
@@ -159,6 +162,8 @@ const ClientList = ({
             email: formData.email,
             phone: formData.phone,
             custom: formData.custom,
+            disableTax: formData.disableTax,
+            defaultCurrency: formData.defaultCurrency,
             createdAt: Date.now(),
             archived: false
         };
@@ -179,7 +184,9 @@ const ClientList = ({
             taxNumber: '',
             email: '',
             phone: '',
-            custom: []
+            custom: [],
+            disableTax: false,
+            defaultCurrency: getPreferredCurrency()
         });
 
         setShowCreateForm(false);
@@ -214,6 +221,8 @@ const ClientList = ({
                     email: formData.email,
                     phone: formData.phone,
                     custom: formData.custom,
+                    disableTax: formData.disableTax,
+                    defaultCurrency: formData.defaultCurrency,
                     updatedAt: Date.now()
                 }
                 : client
@@ -237,7 +246,9 @@ const ClientList = ({
             taxNumber: '',
             email: '',
             phone: '',
-            custom: []
+            custom: [],
+            disableTax: false,
+            defaultCurrency: getPreferredCurrency()
         });
 
         showSuccess('Client updated successfully!');
@@ -329,7 +340,9 @@ const ClientList = ({
                 taxNumber: '',
                 email: '',
                 phone: '',
-                custom: []
+                custom: [],
+                disableTax: false,
+                defaultCurrency: getPreferredCurrency()
             });
         }
 
@@ -387,7 +400,9 @@ const ClientList = ({
             taxNumber: client.taxNumber || '',
             email: client.email || '',
             phone: client.phone || '',
-            custom: client.custom || []
+            custom: client.custom || [],
+            disableTax: client.disableTax || false,
+            defaultCurrency: client.defaultCurrency || getPreferredCurrency()
         });
 
         setShowCreateForm(false);
@@ -415,7 +430,9 @@ const ClientList = ({
             taxNumber: '',
             email: '',
             phone: '',
-            custom: []
+            custom: [],
+            disableTax: false,
+            defaultCurrency: getPreferredCurrency()
         });
     };
 
@@ -761,6 +778,51 @@ const ClientList = ({
                                     </div>
                                 </div>
                             ))}
+                        </div>
+
+                        {/* Default Currency */}
+                        <div className="space-y-4">
+                            <div className="border-t pt-4">
+                                <label htmlFor="defaultCurrency" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Default Currency
+                                </label>
+                                <select
+                                    id="defaultCurrency"
+                                    name="defaultCurrency"
+                                    value={formData.defaultCurrency}
+                                    onChange={handleInputChange}
+                                    className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                >
+                                    {getCurrencyOptions().map(option => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    This currency will be used as the default for new projects and invoices for this client.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Tax Settings */}
+                        <div className="space-y-4">
+                            <div className="border-t pt-4">
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">Tax Settings</h4>
+                                
+                                <div className="flex items-center space-x-3">
+                                    <CustomCheckbox
+                                        checked={formData.disableTax}
+                                        onChange={(checked) => setFormData(prev => ({ ...prev, disableTax: checked }))}
+                                        label="Disable tax for this client"
+                                        labelClassName="text-sm font-medium text-gray-700"
+                                        id="disableTax"
+                                    />
+                                </div>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    When enabled, this client will not have tax applied to their invoices, regardless of business tax settings.
+                                </p>
+                            </div>
                         </div>
 
                         <div className="flex justify-end space-x-3">

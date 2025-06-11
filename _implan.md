@@ -207,7 +207,7 @@ tasktime/
         "id": "uuid-v4",
         "title": "Project A",
         "hourlyRate": 50,
-        "currency": "USD",
+        "currency": "EUR",
         "lastBilledAt": 1622505600000
       }
     ],

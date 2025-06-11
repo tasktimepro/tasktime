@@ -92,6 +92,11 @@ const Invoices = ({
     // Get current section from URL or default to first section
     const activeTab = urlParams.section || sideNavItems[0].id;
     
+    // Debug log to track activeTab changes
+    useEffect(() => {
+        console.log('ActiveTab changed to:', activeTab, 'URL section:', urlParams.section);
+    }, [activeTab, urlParams.section]);
+    
     // Set default section if not already set
     useEffect(() => {
         if (!urlParams.section) {
@@ -117,64 +122,6 @@ const Invoices = ({
             return () => clearTimeout(timer);
         }
     }, [autoOpenCreate, updateUrl]);
-
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'invoices':
-                return (
-                    <div>
-                        <div className="mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900">
-                                All Invoices {invoices.length > 0 && (
-                                    <span>
-                                        ({invoices.length})
-                                    </span>
-                                )}
-                            </h2>
-                            <p className="mt-1 text-sm text-gray-600">
-                                View and manage all your invoices from all projects.
-                            </p>
-                        </div>
-                        <InvoicesList
-                            projectInvoices={invoices}
-                            onEditInvoice={handleEditInvoice}
-                            paymentMethods={paymentMethods}
-                            businessInfos={businessInfos}
-                            clients={clients}
-                            setInvoices={setInvoices}
-                            invoiceTemplates={invoiceTemplates}
-                            selectedTab={urlParams.tab} // Pass the tab from URL
-                        />
-                    </div>
-                );
-            case 'templates':
-                return (
-                    <InvoiceTemplates 
-                        invoiceTemplates={invoiceTemplates} 
-                        setInvoiceTemplates={setInvoiceTemplates}
-                        autoOpenCreate={urlParams.create === 'template'}
-                    />
-                );
-            case 'payment-methods':
-                return (
-                    <PaymentMethods 
-                        paymentMethods={paymentMethods} 
-                        setPaymentMethods={setPaymentMethods}
-                        autoOpenCreate={urlParams.create === 'payment-method'}
-                    />
-                );
-            case 'business-info':
-                return (
-                    <BusinessInfo 
-                        businessInfos={businessInfos} 
-                        setBusinessInfos={setBusinessInfos}
-                        autoOpenCreate={urlParams.create === 'business-info'}
-                    />
-                );
-            default:
-                return null;
-        }
-    };
 
     return (
         <div className="space-y-6">
@@ -220,7 +167,56 @@ const Invoices = ({
 
             {/* Content */}
             <div>
-                {renderContent()}
+                {activeTab === 'invoices' && (
+                    <div>
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-bold text-gray-900">
+                                All Invoices {invoices.length > 0 && (
+                                    <span>
+                                        ({invoices.length})
+                                    </span>
+                                )}
+                            </h2>
+                            <p className="mt-1 text-sm text-gray-600">
+                                View and manage all your invoices from all projects.
+                            </p>
+                        </div>
+                        <InvoicesList
+                            projectInvoices={invoices}
+                            onEditInvoice={handleEditInvoice}
+                            paymentMethods={paymentMethods}
+                            businessInfos={businessInfos}
+                            clients={clients}
+                            setInvoices={setInvoices}
+                            invoiceTemplates={invoiceTemplates}
+                            selectedTab={urlParams.tab} // Pass the tab from URL
+                        />
+                    </div>
+                )}
+                
+                {activeTab === 'templates' && (
+                    <InvoiceTemplates 
+                        invoiceTemplates={invoiceTemplates} 
+                        setInvoiceTemplates={setInvoiceTemplates}
+                        autoOpenCreate={urlParams.create === 'template'}
+                    />
+                )}
+                
+                {activeTab === 'payment-methods' && (
+                    <PaymentMethods 
+                        paymentMethods={paymentMethods} 
+                        setPaymentMethods={setPaymentMethods}
+                        autoOpenCreate={urlParams.create === 'payment-method'}
+                    />
+                )}
+                
+                {activeTab === 'business-info' && (
+                    <BusinessInfo 
+                        businessInfos={businessInfos} 
+                        setBusinessInfos={setBusinessInfos}
+                        autoOpenCreate={urlParams.create === 'business-info'}
+                    />
+                )}
             </div>
             
             {/* Invoice Generator Modal - Standalone mode */}

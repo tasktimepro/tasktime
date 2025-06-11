@@ -13,6 +13,7 @@ import {
 import Modal from './Modal';
 import { generateId } from '../utils/idUtils';
 import { useToast } from '../hooks/useToast';
+import { DEFAULT_CURRENCY, getPreferredCurrency, getCurrencyOptions } from '../utils/currencyUtils';
 
 /**
  * OnboardingModal component - Guides new users through the application
@@ -27,7 +28,7 @@ const OnboardingModal = ({
     const [projectFormData, setProjectFormData] = useState({
         title: '',
         hourlyRate: '',
-        currency: 'USD'
+        currency: getPreferredCurrency()
     });
     const [taskFormData, setTaskFormData] = useState({
         title: ''
@@ -39,7 +40,7 @@ const OnboardingModal = ({
     useEffect(() => {
         if (isOpen) {
             setCurrentSlide(0);
-            setProjectFormData({ title: '', hourlyRate: '', currency: 'USD' });
+            setProjectFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency() });
             setTaskFormData({ title: '' });
             setCreatedProjectId(null);
         }
@@ -158,11 +159,11 @@ const OnboardingModal = ({
                                     onChange={(e) => setProjectFormData({ ...projectFormData, currency: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                                 >
-                                    <option value="USD">USD</option>
-                                    <option value="EUR">EUR</option>
-                                    <option value="GBP">GBP</option>
-                                    <option value="CAD">CAD</option>
-                                    <option value="AUD">AUD</option>
+                                    {getCurrencyOptions().map(option => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
                         </div>

@@ -1,5 +1,5 @@
 import html2pdf from 'html2pdf.js';
-import { getCurrencySymbol } from './currencyUtils';
+import { getCurrencySymbol, getPreferredCurrency } from './currencyUtils';
 
 /**
  * Generate and download a PDF from HTML content
@@ -73,7 +73,7 @@ export const createInvoiceHTML = (invoiceData) => {
         taxRate,
         taxLabel,
         taskFlatRates = {},
-        currency = 'USD'
+        currency = getPreferredCurrency()
     } = invoiceData;
     
     // Filter out subtasks that are already merged into parent tasks
@@ -134,7 +134,7 @@ export const createInvoiceHTML = (invoiceData) => {
             ${(() => {
                 // Determine if we have any hourly tasks
                 const allTasks = [...tasks, ...additionalTasks];
-                const invoiceCurrency = project?.currency || currency;
+                const invoiceCurrency = currency;
                 
                 // We'll show the hours and rate columns as long as any task has hours > 0
                 // This includes both hourly rate tasks and flat rate tasks with tracked hours
@@ -332,23 +332,23 @@ export const createInvoiceHTML = (invoiceData) => {
             <div style="text-align: right; margin-bottom: 10px;">
                 <div style="border-top: 1px solid #ddd; padding-top: 8px;">
                     ${subtotal ? `
-                        <p style="margin: 5px 0; font-size: 16px;">Subtotal: <strong>${getCurrencySymbol(project?.currency || currency)}${subtotal.toFixed(2)}</strong></p>
+                        <p style="margin: 5px 0; font-size: 16px;">Subtotal: <strong>${getCurrencySymbol(currency)}${subtotal.toFixed(2)}</strong></p>
                         
                         ${discount && discount > 0 ? `
-                            <p style="margin: 5px 0; font-size: 16px; color: #dc2626;">Discount: <strong>-${getCurrencySymbol(project?.currency || currency)}${discount.toFixed(2)}</strong></p>
+                            <p style="margin: 5px 0; font-size: 16px; color: #dc2626;">Discount: <strong>-${getCurrencySymbol(currency)}${discount.toFixed(2)}</strong></p>
                         ` : ''}
                         
                         ${shipping && shipping > 0 ? `
-                            <p style="margin: 5px 0; font-size: 16px;">Shipping: <strong>${getCurrencySymbol(project?.currency || currency)}${shipping.toFixed(2)}</strong></p>
+                            <p style="margin: 5px 0; font-size: 16px;">Shipping: <strong>${getCurrencySymbol(currency)}${shipping.toFixed(2)}</strong></p>
                         ` : ''}
                         
                         ${tax && tax > 0 ? `
-                            <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(project?.currency || currency)}${tax.toFixed(2)}</strong></p>
+                            <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(currency)}${tax.toFixed(2)}</strong></p>
                         ` : ''}
                         
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333; border-top: 1px solid #ddd; padding-top: 10px;"><strong>Total: ${getCurrencySymbol(project?.currency || currency)}${totalAmount.toFixed(2)}</strong></p>
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333; border-top: 1px solid #ddd; padding-top: 10px;"><strong>Total: ${getCurrencySymbol(currency)}${totalAmount.toFixed(2)}</strong></p>
                     ` : `
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333;"><strong>Total${totalHours && parseFloat(totalHours) > 0 ? ` (${parseFloat(totalHours).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(project?.currency || currency)}${totalAmount.toFixed(2)}</strong></p>
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333;"><strong>Total${totalHours && parseFloat(totalHours) > 0 ? ` (${parseFloat(totalHours).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(currency)}${totalAmount.toFixed(2)}</strong></p>
                     `}
                 </div>
             </div>

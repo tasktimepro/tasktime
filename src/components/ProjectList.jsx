@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
-import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
+import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { getTaskIdsToDelete } from '../utils/taskUtils';
@@ -42,10 +42,6 @@ const ProjectList = ({
     const [formData, setFormData] = useState({
         title: '',
         hourlyRate: '', // Keep as empty string for proper placeholder behavior
-        currency: getPreferredCurrency(),
-        taxEnabled: false,
-        taxLabel: 'VAT',
-        taxRate: 0,
         flatRate: false,
         preferredClientId: ''
     });
@@ -126,10 +122,6 @@ const ProjectList = ({
             id: generateId(),
             title: formData.title,
             hourlyRate: formData.hourlyRate !== '' ? parseFloat(formData.hourlyRate) : null,
-            currency: formData.currency,
-            taxEnabled: formData.taxEnabled,
-            taxLabel: formData.taxLabel,
-            taxRate: parseFloat(formData.taxRate) || 0,
             flatRate: formData.flatRate || false,
             preferredClientId: formData.preferredClientId || null,
             createdAt: Date.now(),
@@ -139,7 +131,7 @@ const ProjectList = ({
 
         setProjects([...projects, newProject]);
 
-        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientId: '' });
+        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '' });
 
         setShowCreateForm(false);
     };
@@ -165,10 +157,6 @@ const ProjectList = ({
                     ...project,
                     title: formData.title,
                     hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-                    currency: formData.currency,
-                    taxEnabled: formData.taxEnabled,
-                    taxLabel: formData.taxLabel,
-                    taxRate: parseFloat(formData.taxRate) || 0,
                     flatRate: formData.flatRate || false,
                     preferredClientId: formData.preferredClientId || null
                 }
@@ -179,7 +167,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientId: '' });
+        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '' });
 
         showSuccess('Project updated successfully!');
     };
@@ -263,10 +251,6 @@ const ProjectList = ({
             setFormData({ 
                 title: '', 
                 hourlyRate: '', 
-                currency: getPreferredCurrency(), 
-                taxEnabled: false, 
-                taxLabel: 'VAT', 
-                taxRate: 0,
                 flatRate: false,
                 preferredClientId: ''
             });
@@ -287,10 +271,6 @@ const ProjectList = ({
         setFormData({
             title: project.title,
             hourlyRate: project.hourlyRate ? project.hourlyRate.toString() : '',
-            currency: project.currency,
-            taxEnabled: project.taxEnabled || false,
-            taxLabel: project.taxLabel || 'VAT',
-            taxRate: project.taxRate || 0,
             flatRate: project.flatRate || false,
             preferredClientId: project.preferredClientId || ''
         });
@@ -306,7 +286,7 @@ const ProjectList = ({
 
         setEditingProject(null);
 
-        setFormData({ title: '', hourlyRate: '', currency: getPreferredCurrency(), taxEnabled: false, taxLabel: 'VAT', taxRate: 0, flatRate: false, preferredClientId: '' });
+        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '' });
     };    /**
      * Archive a project
      */
@@ -518,104 +498,23 @@ const ProjectList = ({
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="currency" className="block text-sm font-medium text-gray-700">
-                                    Currency
-                                </label>
+                        <div className={formData.flatRate ? "hidden" : ""}>
+                            <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
+                                Hourly Rate {!formData.flatRate && <span className="text-red-500">*</span>}
+                            </label>
 
-                                <select
-                                    id="currency"
-                                    name="currency"
-                                    value={formData.currency}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                >
-                                    <option value="USD">USD</option>
-                                    <option value="EUR">EUR</option>
-                                    <option value="GBP">GBP</option>
-                                    <option value="CHF">CHF</option>
-                                    <option value="CAD">CAD</option>
-                                    <option value="AUD">AUD</option>
-                                </select>
-                            </div>
-                            <div className={formData.flatRate ? "hidden" : ""}>
-                                <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
-                                    Hourly Rate {!formData.flatRate && <span className="text-red-500">*</span>}
-                                </label>
-
-                                <input
-                                    type="number"
-                                    id="hourlyRate"
-                                    name="hourlyRate"
-                                    value={formData.hourlyRate}
-                                    onChange={handleInputChange}
-                                    min="0"
-                                    step="0.01"
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                    placeholder="0.00"
-                                    required={!formData.flatRate}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Tax Settings */}
-                        <div className="space-y-4">
-                            <div className="border-t pt-4">
-                                <h4 className="text-sm font-medium text-gray-900 mb-3">Tax Settings</h4>
-                                
-                                <div className="flex items-center space-x-3 mb-4">
-                                    <CustomCheckbox
-                                        checked={formData.taxEnabled}
-                                        onChange={() => setFormData(prev => ({ ...prev, taxEnabled: !prev.taxEnabled }))}
-                                        label="Enable tax for this project"
-                                        labelClassName="text-sm font-medium text-gray-700"
-                                        id="taxEnabled"
-                                    />
-                                </div>
-
-                                {formData.taxEnabled && (
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label htmlFor="taxLabel" className="block text-sm font-medium text-gray-700">
-                                                Tax Label
-                                            </label>
-                                            <select
-                                                id="taxLabel"
-                                                name="taxLabel"
-                                                value={formData.taxLabel}
-                                                onChange={handleInputChange}
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                            >
-                                                <option value="VAT">VAT</option>
-                                                <option value="GST">GST</option>
-                                                <option value="MOMS">MOMS</option>
-                                                <option value="BTW">BTW</option>
-                                                <option value="Tax">Tax</option>
-                                                <option value="Sales Tax">Sales Tax</option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label htmlFor="taxRate" className="block text-sm font-medium text-gray-700">
-                                                Tax Rate (%)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                id="taxRate"
-                                                name="taxRate"
-                                                value={formData.taxRate}
-                                                onChange={handleInputChange}
-                                                min="0"
-                                                max="100"
-                                                step="0.01"
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
-                                                placeholder="0.00"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <input
+                                type="number"
+                                id="hourlyRate"
+                                name="hourlyRate"
+                                value={formData.hourlyRate}
+                                onChange={handleInputChange}
+                                min="0"
+                                step="0.01"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                placeholder="0.00"
+                                required={!formData.flatRate}
+                            />
                         </div>
 
                         {/* Preferred Client Info */}
@@ -764,7 +663,7 @@ const ProjectList = ({
 
                                 {project.hourlyRate && !project.flatRate && (
                                     <p className="mt-2 text-sm text-gray-500">
-                                        {`${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`}
+                                        {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
                                     </p>
                                 )}
 
@@ -780,7 +679,7 @@ const ProjectList = ({
                                             className="inline-flex items-center px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-full hover:bg-green-700 transition-colors"
                                             title="Click to generate invoice"
                                         >
-                                            {getCurrencySymbol(project.currency)}{calculateUnbilledAmount(project).toFixed(2)}
+                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
                                         </button>
                                     </div>
                                 ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
@@ -880,7 +779,7 @@ const ProjectList = ({
 
                                                 {project.hourlyRate && !project.flatRate && (
                                                     <p className="mt-2 text-sm text-gray-500">
-                                                        {`${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`}
+                                                        {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
                                                     </p>
                                                 )}
 
@@ -896,7 +795,7 @@ const ProjectList = ({
                                                             className="inline-flex items-center px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-full hover:bg-green-700 transition-colors"
                                                             title="Click to generate invoice"
                                                         >
-                                                            {getCurrencySymbol(project.currency)}{calculateUnbilledAmount(project).toFixed(2)}
+                                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
                                                         </button>
                                                     </div>
                                                 ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (

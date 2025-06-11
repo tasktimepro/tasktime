@@ -1,5 +1,6 @@
 import { TrashIcon } from '@heroicons/react/24/outline';
 import { formatDurationWithSeconds, hoursToMinutes } from '../../utils/dateUtils';
+import { getPreferredCurrency } from '../../utils/currencyUtils';
 import CustomCheckbox from '../CustomCheckbox';
 import Modal from '../Modal';
 import { useState } from 'react';
@@ -96,6 +97,11 @@ const InvoiceModal = ({
             // From Invoices view (standalone) - default to Client & Project Details
             return 'projectClient';
         }
+    };
+
+    // Helper function to get the currency to use (client currency or user preference)
+    const getInvoiceCurrency = () => {
+        return selectedClient?.defaultCurrency || getPreferredCurrency();
     };
 
     const [activeSection, setActiveSection] = useState(getDefaultSection());
@@ -275,7 +281,7 @@ const InvoiceModal = ({
                                                     <div className="text-sm text-blue-800">
                                                         <strong>{selectedProject.title}</strong><br />
                                                         {!selectedProject.flatRate && selectedProject.hourlyRate ? (
-                                                            <span>Rate: {getCurrencySymbol(selectedProject.currency)}{selectedProject.hourlyRate}/hour</span>
+                                                            <span>Rate: {getCurrencySymbol(getInvoiceCurrency())}{selectedProject.hourlyRate}/hour</span>
                                                         ) : !selectedProject.flatRate ? (
                                                             <span>You can create invoices with custom rates</span>
                                                         ) : null}
@@ -470,7 +476,7 @@ const InvoiceModal = ({
                                                                 />
                                                             </div>
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">Rate ({selectedProject?.currency || "USD"})</div>
+                                                                <div className="text-xs text-gray-500 mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
@@ -615,7 +621,7 @@ const InvoiceModal = ({
                                                                 />
                                                             </div>
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">Rate ({selectedProject?.currency || "USD"})</div>
+                                                                <div className="text-xs text-gray-500 mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
@@ -721,7 +727,7 @@ const InvoiceModal = ({
 
                                                     <div className="text-right">
                                                         <div className="text-xs text-gray-500 mb-1 text-left">
-                                                            {newTaskUseFlatRate ? `Rate (${selectedProject?.currency || "USD"})` : `Hours ${newTaskHours ? `(${hoursToMinutes(parseFloat(newTaskHours) || 0)}min)` : ''}`}
+                                                            {newTaskUseFlatRate ? `Rate (${getInvoiceCurrency()})` : `Hours ${newTaskHours ? `(${hoursToMinutes(parseFloat(newTaskHours) || 0)}min)` : ''}`}
                                                         </div>
                                                         <input
                                                             type="number"
@@ -833,7 +839,7 @@ const InvoiceModal = ({
                             <h4 className="text-sm font-medium text-gray-900">Pricing & Totals</h4>
                             <div className="flex items-center space-x-3">
                                 <span className="text-sm font-medium text-blue-600">
-                                    {selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.total.toFixed(2)}
+                                    {getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.total.toFixed(2)}
                                 </span>
                                 <svg
                                     className={`w-5 h-5 text-gray-500 transform transition-transform ${activeSection === 'pricingTotals' ? 'rotate-180' : ''}`}
@@ -858,7 +864,7 @@ const InvoiceModal = ({
                                         className="w-24 text-sm border border-gray-300 rounded-md px-2 py-1"
                                     >
                                         <option value="percentage">%</option>
-                                        <option value="fixed">{selectedProject ? getCurrencySymbol(selectedProject.currency) : '$'}</option>
+                                        <option value="fixed">{getCurrencySymbol(getInvoiceCurrency())}</option>
                                     </select>
                                     <input
                                         type="number"
@@ -945,9 +951,21 @@ const InvoiceModal = ({
                                     </div>
                                 )}
 
-                                {!taxOverride.enabled && selectedProject?.taxEnabled && (
+                                {!taxOverride.enabled && selectedBusinessInfo?.taxEnabled && (!selectedClient || !selectedClient.disableTax) && (
                                     <div className="text-xs text-gray-500">
-                                        Using project tax: {selectedProject.taxLabel} {selectedProject.taxRate}%
+                                        Using business tax: {selectedBusinessInfo.taxLabel} {selectedBusinessInfo.taxRate}%
+                                    </div>
+                                )}
+                                
+                                {!taxOverride.enabled && selectedClient?.disableTax && (
+                                    <div className="text-xs text-orange-600">
+                                        Tax disabled for this client
+                                    </div>
+                                )}
+                                
+                                {!taxOverride.enabled && (!selectedBusinessInfo || !selectedBusinessInfo.taxEnabled) && (
+                                    <div className="text-xs text-gray-500">
+                                        No tax configured for business
                                     </div>
                                 )}
                             </div>
@@ -956,33 +974,33 @@ const InvoiceModal = ({
                             <div className="border-t pt-3 space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span>Subtotal:</span>
-                                    <span>{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.subtotal.toFixed(2)}</span>
+                                    <span>{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.subtotal.toFixed(2)}</span>
                                 </div>
 
                                 {calculatePricing.discount > 0 && (
                                     <div className="flex justify-between text-sm text-red-600">
-                                        <span>Discount ({discountType === 'percentage' ? `${discountValue}%` : getCurrencySymbol(selectedProject?.currency || 'USD') + discountValue}):</span>
-                                        <span>-{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.discount.toFixed(2)}</span>
+                                        <span>Discount ({discountType === 'percentage' ? `${discountValue}%` : getCurrencySymbol(getInvoiceCurrency()) + discountValue}):</span>
+                                        <span>-{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.discount.toFixed(2)}</span>
                                     </div>
                                 )}
 
                                 {calculatePricing.shipping > 0 && (
                                     <div className="flex justify-between text-sm">
                                         <span>Shipping:</span>
-                                        <span>{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.shipping.toFixed(2)}</span>
+                                        <span>{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.shipping.toFixed(2)}</span>
                                     </div>
                                 )}
 
                                 {calculatePricing.tax > 0 && (
                                     <div className="flex justify-between text-sm">
                                         <span>{calculatePricing.taxLabel} ({calculatePricing.taxRate}%):</span>
-                                        <span>{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.tax.toFixed(2)}</span>
+                                        <span>{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.tax.toFixed(2)}</span>
                                     </div>
                                 )}
 
                                 <div className="flex justify-between text-base font-medium border-t pt-2">
                                     <span>Total:</span>
-                                    <span>{selectedProject ? getCurrencySymbol(selectedProject.currency) : ''}{calculatePricing.total.toFixed(2)}</span>
+                                    <span>{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.total.toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>

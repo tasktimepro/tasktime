@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DocumentTextIcon, TrashIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
-import { getCurrencySymbol } from '../utils/currencyUtils';
+import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
 import InvoiceModal from './invoice/InvoiceModal';
 import * as InvoiceHandler from './invoice/InvoiceHandler';
@@ -774,8 +774,10 @@ const InvoiceGenerator = ({
         if (taxOverride.enabled) {
             taxRate = taxOverride.rate === '' ? 0 : parseFloat(taxOverride.rate) || 0;
             taxLabel = taxOverride.label || 'Tax';
-        } else if (selectedProject && selectedProject.taxEnabled) {
-            taxRate = selectedProject.taxRate || 0;
+        } else if (selectedBusinessInfo && selectedBusinessInfo.taxEnabled && (!selectedClient || !selectedClient.disableTax)) {
+            // Use business tax settings if enabled and client doesn't have tax disabled
+            taxRate = selectedBusinessInfo.taxRate || 0;
+            taxLabel = selectedBusinessInfo.taxLabel || 'VAT';
         }
 
         const tax = (afterShipping * (taxRate / 100));
@@ -793,7 +795,7 @@ const InvoiceGenerator = ({
         };
     }, [selectedProject, invoiceTasks, additionalTasks, editableHours, 
         discountType, discountValue, shippingAmount, taxOverride, 
-        taskFlatRates, useFlatRate, taskHourlyRates, taskQuantities, selectedTasksForBilling, mergedSubtasks]);
+        taskFlatRates, useFlatRate, taskHourlyRates, taskQuantities, selectedTasksForBilling, mergedSubtasks, selectedBusinessInfo, selectedClient]);
 
     /**
      * Generate invoice number using template format
@@ -1077,6 +1079,7 @@ const InvoiceGenerator = ({
                     ? new Date(invoiceDateOverride).toLocaleDateString() 
                     : (editingInvoice ? editingInvoice.date : new Date().toLocaleDateString()),
                 dueDate: dueDate,
+                currency: selectedClient?.defaultCurrency || getPreferredCurrency(),
                 createdAt: editingInvoice ? editingInvoice.createdAt : Date.now()
             })
         };

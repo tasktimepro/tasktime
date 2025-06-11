@@ -434,6 +434,7 @@ function App() {
                         tasks={tasks}
                         timeEntries={timeEntries}
                         invoices={invoices}
+                        clients={clients}
                         currentTimer={currentTimer}
                         setCurrentTimer={setCurrentTimer}
                         setTasks={setTasks}

@@ -1,22 +1,47 @@
 import { useState, useEffect, useCallback } from 'react';
 
-/**
- * Custom hook for URL-based state management
- * Syncs application state with browser URL parameters
- */
-export const useUrlState = () => {
-    const [urlParams, setUrlParams] = useState(() => {
-        const params = new URLSearchParams(window.location.search);
-        return {
-            view: params.get('view') || 'dashboard',
-            projectId: params.get('project') || null,
-            clientId: params.get('client') || null,
-            section: params.get('section') || null,
-            create: params.get('create') || null,
-            tab: params.get('tab') || null,
-            preselectedClientId: params.get('preselectedClientId') || null
-        };
+function getParamsFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        view: params.get('view') || 'dashboard',
+        projectId: params.get('project') || null,
+        clientId: params.get('client') || null,
+        section: params.get('section') || null,
+        create: params.get('create') || null,
+        tab: params.get('tab') || null,
+        preselectedClientId: params.get('preselectedClientId') || null
+    };
+}
+
+// Monkey-patch pushState/replaceState to fire a custom event
+(function() {
+    if (typeof window === 'undefined') return;
+    const origPushState = window.history.pushState;
+    const origReplaceState = window.history.replaceState;
+    window.history.pushState = function(...args) {
+        const ret = origPushState.apply(this, args);
+        window.dispatchEvent(new Event('locationchange'));
+        return ret;
+    };
+    window.history.replaceState = function(...args) {
+        const ret = origReplaceState.apply(this, args);
+        window.dispatchEvent(new Event('locationchange'));
+        return ret;
+    };
+    window.addEventListener('popstate', () => {
+        window.dispatchEvent(new Event('locationchange'));
     });
+})();
+
+export const useUrlState = () => {
+    const [urlParams, setUrlParams] = useState(getParamsFromUrl);
+
+    // Always update state from URL on any navigation
+    useEffect(() => {
+        const handler = () => setUrlParams(getParamsFromUrl());
+        window.addEventListener('locationchange', handler);
+        return () => window.removeEventListener('locationchange', handler);
+    }, []);
 
     /**
      * Update URL parameters without page reload
@@ -37,19 +62,21 @@ export const useUrlState = () => {
         // Update the URL
         const newUrl = `${url.pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
         
-        // Only update if URL actually changed
-        if (newUrl !== window.location.pathname + window.location.search) {
-            window.history.pushState({}, '', newUrl);
-            setUrlParams({
-                view: searchParams.get('view') || 'dashboard',
-                projectId: searchParams.get('project') || null,
-                clientId: searchParams.get('client') || null,
-                section: searchParams.get('section') || null,
-                create: searchParams.get('create') || null,
-                tab: searchParams.get('tab') || null,
-                preselectedClientId: searchParams.get('preselectedClientId') || null
-            });
-        }
+        // Update URL and state
+        window.history.pushState({}, '', newUrl);
+        
+        // Create new state object to force re-render
+        const newState = {
+            view: searchParams.get('view') || 'dashboard',
+            projectId: searchParams.get('project') || null,
+            clientId: searchParams.get('client') || null,
+            section: searchParams.get('section') || null,
+            create: searchParams.get('create') || null,
+            tab: searchParams.get('tab') || null,
+            preselectedClientId: searchParams.get('preselectedClientId') || null
+        };
+        
+        setUrlParams(newState);
     }, []);
 
     /**
@@ -111,27 +138,6 @@ export const useUrlState = () => {
     const navigateToClient = useCallback((clientId) => {
         updateUrl({ view: 'clients', client: clientId, project: null, section: null, create: null, tab: null });
     }, [updateUrl]);
-
-    /**
-     * Handle browser back/forward navigation
-     */
-    useEffect(() => {
-        const handlePopState = () => {
-            const params = new URLSearchParams(window.location.search);
-            setUrlParams({
-                view: params.get('view') || 'dashboard',
-                projectId: params.get('project') || null,
-                clientId: params.get('client') || null,
-                section: params.get('section') || null,
-                create: params.get('create') || null,
-                tab: params.get('tab') || null,
-                preselectedClientId: params.get('preselectedClientId') || null
-            });
-        };
-
-        window.addEventListener('popstate', handlePopState);
-        return () => window.removeEventListener('popstate', handlePopState);
-    }, []);
 
     return {
         urlParams,

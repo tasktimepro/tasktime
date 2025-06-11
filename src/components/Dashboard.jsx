@@ -21,7 +21,7 @@ import {
     formatDurationWithSeconds,
     millisecondsToHours
 } from '../utils/dateUtils';
-import { getPreferredCurrency, formatCurrency, fetchExchangeRates, convertCurrency } from '../utils/currencyUtils';
+import { getPreferredCurrency, formatCurrency, fetchExchangeRates, convertCurrency, getProjectCurrency } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
 import CustomCheckbox from './CustomCheckbox';
 
@@ -33,6 +33,7 @@ const Dashboard = ({
     tasks = [], 
     timeEntries = [], 
     invoices = [],
+    clients = [],
     currentTimer,
     setCurrentTimer,
     setTasks,
@@ -51,7 +52,6 @@ const Dashboard = ({
     const [preferredCurrency, setPreferredCurrency] = useState(getPreferredCurrency());
     const [exchangeRates, setExchangeRates] = useState(null);
     const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
-
 
     // Listen for storage changes to update preferred currency
     useEffect(() => {
@@ -76,12 +76,12 @@ const Dashboard = ({
 
     // Check if we have multiple currencies in projects and invoices
     const needsExchangeRates = useMemo(() => {
-        const projectCurrencies = [...new Set(projects.map(p => p.currency || preferredCurrency || 'USD'))];
-        const invoiceCurrencies = [...new Set(invoices.map(i => i.project?.currency || preferredCurrency || 'USD'))];
+        const projectCurrencies = [...new Set(projects.map(p => getProjectCurrency(p, clients)))];
+        const invoiceCurrencies = [...new Set(invoices.map(i => i.currency || preferredCurrency))];
         const allCurrencies = [...new Set([...projectCurrencies, ...invoiceCurrencies])];
         
         return allCurrencies.length > 1;
-    }, [projects, invoices, preferredCurrency]);
+    }, [projects, invoices, preferredCurrency, clients]);
 
     // Fetch exchange rates only if we have multiple currencies
     useEffect(() => {
@@ -157,7 +157,7 @@ const Dashboard = ({
         }, 0);
 
         // Calculate billable time earnings by finding the task and project for each entry
-        const billableEarningsByCurrency = {};
+        const        billableEarningsByCurrency = {};
         entriesInRange.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
             if (!task) return;
@@ -165,7 +165,7 @@ const Dashboard = ({
             const project = projects.find(p => p.id === task.projectId);
             if (!project || !project.hourlyRate) return;
 
-            const currency = project.currency || preferredCurrency || 'USD';
+            const currency = getProjectCurrency(project, clients);
             const hoursWorked = millisecondsToHours(entry.end - entry.start);
             const amount = hoursWorked * project.hourlyRate;
 
@@ -189,7 +189,7 @@ const Dashboard = ({
 
         invoicesInRange.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
-            const currency = invoice.project?.currency || preferredCurrency || 'USD';
+            const currency = invoice.project ? getProjectCurrency(invoice.project, clients) : preferredCurrency;
             
             if (invoice.paymentProcessed) {
                 // Paid invoice
@@ -212,7 +212,7 @@ const Dashboard = ({
             paidInvoices: convertToCurrency(paidInvoicesByCurrency),
             outstandingInvoices: convertToCurrency(outstandingInvoicesByCurrency)
         };
-    }, [timeEntries, tasks, projects, invoices, convertToCurrency, preferredCurrency]);
+    }, [timeEntries, tasks, projects, invoices, convertToCurrency, preferredCurrency, clients]);
 
     // Calculate date ranges statically (they don't change based on preferences)
     const thisMonthRange = useMemo(() => getThisMonthRange(), []);
@@ -247,7 +247,7 @@ const Dashboard = ({
         const outstandingByCurrency = {};
         outstanding.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
-            const currency = invoice.project?.currency || preferredCurrency || 'USD';
+            const currency = invoice.project ? getProjectCurrency(invoice.project, clients) : preferredCurrency;
             
             if (!outstandingByCurrency[currency]) {
                 outstandingByCurrency[currency] = 0;
@@ -259,7 +259,7 @@ const Dashboard = ({
         const pastDueByCurrency = {};
         pastDue.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
-            const currency = invoice.project?.currency || preferredCurrency || 'USD';
+            const currency = invoice.project ? getProjectCurrency(invoice.project, clients) : preferredCurrency;
             
             if (!pastDueByCurrency[currency]) {
                 pastDueByCurrency[currency] = 0;
@@ -281,7 +281,7 @@ const Dashboard = ({
             pastDue: pastDue.length,
             pastDueTotal
         };
-    }, [invoices, convertToCurrency, preferredCurrency]);
+    }, [invoices, convertToCurrency, preferredCurrency, clients]);
 
     /**
      * Get recent active tasks sorted by their most recent activity (any interaction)
@@ -463,7 +463,7 @@ const Dashboard = ({
     const pendingBillsTotal = useMemo(() => {
         return recentProjects.reduce((total, project) => {
             const amount = project.pendingAmount || 0;
-            const currency = project.currency || 'USD';
+            const currency = getProjectCurrency(project, clients);
             
             // Only convert if currency differs from preferred currency
             if (currency !== preferredCurrency && needsExchangeRates && exchangeRates) {
@@ -472,7 +472,7 @@ const Dashboard = ({
             // Add original amount if currency matches preferred
             return total + (currency === preferredCurrency ? amount : 0);
         }, 0);
-    }, [recentProjects, preferredCurrency, needsExchangeRates, exchangeRates]);
+    }, [recentProjects, preferredCurrency, needsExchangeRates, exchangeRates, clients]);
 
     /**
      * Create a time entry for the current timer session
@@ -1039,10 +1039,10 @@ const Dashboard = ({
                                                 <div className="text-sm font-medium text-gray-900">
                                                     {project.pendingAmount > 0 ? (
                                                         <>
-                                                            {formatCurrency(project.pendingAmount, project.currency)}
+                                                            {formatCurrency(project.pendingAmount, getProjectCurrency(project, clients))}
                                                         </>
                                                     ) : (
-                                                        <span className="text-gray-500">{formatCurrency(0, project.currency)}</span>
+                                                        <span className="text-gray-500">{formatCurrency(0, getProjectCurrency(project, clients))}</span>
                                                     )}
                                                 </div>
                                                 <div className="text-xs text-gray-500">

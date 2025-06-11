@@ -6,13 +6,30 @@
  * Map of currency codes to their symbols
  */
 export const CURRENCY_SYMBOLS = {
-    USD: '$',
     EUR: '€',
+    USD: '$',
     GBP: '£',
     CHF: 'CHF',
     CAD: 'CAD$',
     AUD: 'AUD$'
 };
+
+/**
+ * Map of currency codes to their full names
+ */
+export const CURRENCY_NAMES = {
+    EUR: 'Euro',
+    USD: 'US Dollar',
+    GBP: 'British Pound',
+    CHF: 'Swiss Franc',
+    CAD: 'Canadian Dollar',
+    AUD: 'Australian Dollar'
+};
+
+/**
+ * Default currency 
+ */
+export const DEFAULT_CURRENCY = 'EUR';
 
 /**
  * Get the currency symbol for a given currency code
@@ -37,17 +54,32 @@ export const formatCurrency = (amount, currencyCode, decimals = 2) => {
 
 /**
  * Get the user's preferred currency from localStorage
- * @returns {string} The preferred currency code (default: 'USD')
+ * @returns {string} The preferred currency code (default: 'EUR')
  */
 export const getPreferredCurrency = () => {
     try {
         const preferences = JSON.parse(localStorage.getItem('preferences') || '{}');
         const saved = preferences.currency;
-        return saved && CURRENCY_SYMBOLS[saved] ? saved : 'USD';
+        return saved && CURRENCY_SYMBOLS[saved] ? saved : DEFAULT_CURRENCY;
     } catch (error) {
         console.warn('Error parsing preferences from localStorage:', error);
-        return 'USD';
+        return DEFAULT_CURRENCY;
     }
+};
+
+/**
+ * Get the currency for a project based on its preferred client's default currency
+ * Falls back to the preferred currency if no client is specified or found
+ * @param {Object} project - The project object
+ * @param {Array} clients - Array of client objects
+ * @returns {string} The currency code for the project
+ */
+export const getProjectCurrency = (project, clients) => {
+    if (project.preferredClientId && clients && clients.length > 0) {
+        const client = clients.find(c => c.id === project.preferredClientId);
+        return client?.defaultCurrency || getPreferredCurrency();
+    }
+    return getPreferredCurrency();
 };
 
 /**
@@ -171,8 +203,8 @@ export const convertCurrency = (amount, fromCurrency, toCurrency, exchangeRates)
     }
     
     // Standardize currency codes
-    const fromCurrencyStd = fromCurrency || 'USD';
-    const toCurrencyStd = toCurrency || 'USD';
+    const fromCurrencyStd = fromCurrency || DEFAULT_CURRENCY;
+    const toCurrencyStd = toCurrency || DEFAULT_CURRENCY;
 
     // Check if we have valid exchange rates
     if (!exchangeRates || Object.keys(exchangeRates).length === 0) {
@@ -225,4 +257,16 @@ export const hasAllRequiredRates = (currencies, exchangeRates) => {
         if (currency === 'USD') return true; // USD is base currency
         return exchangeRates[currency] !== undefined;
     });
+};
+
+/**
+ * Generate currency options for select dropdowns
+ * @param {boolean} includeFullName - Whether to include the full currency name
+ * @returns {Array} Array of objects with value and label properties
+ */
+export const getCurrencyOptions = (includeFullName = false) => {
+    return Object.keys(CURRENCY_SYMBOLS).map(currencyCode => ({
+        value: currencyCode,
+        label: includeFullName ? `${currencyCode} - ${CURRENCY_NAMES[currencyCode]}` : currencyCode
+    }));
 };

@@ -41,7 +41,10 @@ const BusinessInfo = ({
         email: '',
         phone: '',
         custom: [],
-        isDefault: false
+        isDefault: false,
+        taxEnabled: false,
+        taxLabel: 'VAT',
+        taxRate: 0
     });
 
     // Close dropdown when clicking outside or when another dropdown opens
@@ -158,6 +161,9 @@ const BusinessInfo = ({
             phone: formData.phone.trim(),
             custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
             isDefault: formData.isDefault,
+            taxEnabled: formData.taxEnabled,
+            taxLabel: formData.taxLabel,
+            taxRate: parseFloat(formData.taxRate) || 0,
             createdAt: Date.now()
         };
 
@@ -187,7 +193,10 @@ const BusinessInfo = ({
             email: '',
             phone: '',
             custom: [],
-            isDefault: false
+            isDefault: false,
+            taxEnabled: false,
+            taxLabel: 'VAT',
+            taxRate: 0
         });
 
         setShowCreateForm(false);
@@ -228,7 +237,10 @@ const BusinessInfo = ({
                     email: formData.email.trim(),
                     phone: formData.phone.trim(),
                     custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
-                    isDefault: formData.isDefault
+                    isDefault: formData.isDefault,
+                    taxEnabled: formData.taxEnabled,
+                    taxLabel: formData.taxLabel,
+                    taxRate: parseFloat(formData.taxRate) || 0
                 }
                 : info
         );
@@ -260,7 +272,10 @@ const BusinessInfo = ({
             email: '',
             phone: '',
             custom: [],
-            isDefault: false
+            isDefault: false,
+            taxEnabled: false,
+            taxLabel: 'VAT',
+            taxRate: 0
         });
 
         showSuccess('Business info updated successfully');
@@ -292,7 +307,10 @@ const BusinessInfo = ({
                     email: '',
                     phone: '',
                     custom: [],
-                    isDefault: false
+                    isDefault: false,
+                    taxEnabled: false,
+                    taxLabel: 'VAT',
+                    taxRate: 0
                 });
             }
 
@@ -320,7 +338,10 @@ const BusinessInfo = ({
             email: businessInfo.email || '',
             phone: businessInfo.phone || '',
             custom: [...(businessInfo.custom || [])],
-            isDefault: businessInfo.isDefault || false
+            isDefault: businessInfo.isDefault || false,
+            taxEnabled: businessInfo.taxEnabled || false,
+            taxLabel: businessInfo.taxLabel || 'VAT',
+            taxRate: businessInfo.taxRate || 0
         });
 
         setShowCreateForm(false);
@@ -348,7 +369,10 @@ const BusinessInfo = ({
             email: '',
             phone: '',
             custom: [],
-            isDefault: false
+            isDefault: false,
+            taxEnabled: false,
+            taxLabel: 'VAT',
+            taxRate: 0
         });
     };
 
@@ -625,6 +649,65 @@ const BusinessInfo = ({
                                     No custom fields added. Click "Add Field" to add custom business details.
                                 </p>
                             )}
+                        </div>
+
+                        {/* Tax Settings */}
+                        <div className="space-y-4">
+                            <div className="border-t pt-4">
+                                <h5 className="text-sm font-medium text-gray-900 mb-3">Tax Settings</h5>
+                                
+                                <div className="flex items-center space-x-3 mb-4">
+                                    <CustomCheckbox
+                                        checked={formData.taxEnabled}
+                                        onChange={(checked) => setFormData(prev => ({ ...prev, taxEnabled: checked }))}
+                                        label="Enable tax for this business"
+                                        labelClassName="text-sm font-medium text-gray-700"
+                                        id="taxEnabled"
+                                    />
+                                </div>
+
+                                {formData.taxEnabled && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="taxLabel" className="block text-sm font-medium text-gray-700">
+                                                Tax Label
+                                            </label>
+                                            <select
+                                                id="taxLabel"
+                                                name="taxLabel"
+                                                value={formData.taxLabel}
+                                                onChange={handleInputChange}
+                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                            >
+                                                <option value="VAT">VAT</option>
+                                                <option value="GST">GST</option>
+                                                <option value="MOMS">MOMS</option>
+                                                <option value="BTW">BTW</option>
+                                                <option value="Tax">Tax</option>
+                                                <option value="Sales Tax">Sales Tax</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="taxRate" className="block text-sm font-medium text-gray-700">
+                                                Tax Rate (%)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="taxRate"
+                                                name="taxRate"
+                                                value={formData.taxRate}
+                                                onChange={handleInputChange}
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Default Checkbox */}

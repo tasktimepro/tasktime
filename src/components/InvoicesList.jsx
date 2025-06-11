@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
-import { getCurrencySymbol } from '../utils/currencyUtils';
+import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
 import { useUrlState } from '../hooks/useUrlState';
 import Pagination from './Pagination';
 import Modal from './Modal';
@@ -139,8 +139,13 @@ const InvoicesList = ({
     // Handle tab change
     const handleTabChange = (tab) => {
         setActiveTab(tab);
-        // Update URL to reflect the selected tab
-        updateUrl({ tab });
+        // Update URL to reflect the selected tab, preserving other parameters
+        const currentParams = new URLSearchParams(window.location.search);
+        const section = currentParams.get('section');
+        updateUrl({ 
+            tab,
+            section: section || 'invoices' // Preserve the current section
+        });
     };
 
     /**
@@ -388,7 +393,7 @@ const InvoicesList = ({
                                             </>
                                         )}
                                         <span className="mx-1">•</span>
-                                        {getCurrencySymbol(invoice.project?.currency || 'USD')}{invoice.totalAmount.toFixed(2)}
+                                        {getCurrencySymbol(invoice.currency || getPreferredCurrency())}{invoice.totalAmount.toFixed(2)}
                                     </p>
                                     {invoice.dueDate && (
                                         <p className={`text-sm mt-1 ${
@@ -619,7 +624,7 @@ const InvoicesList = ({
                                     <p>{selectedInvoice.project?.title || 'Unknown Project'}</p>
                                     {selectedInvoice.project?.hourlyRate && (
                                         <p>
-                                            Rate: {getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}${selectedInvoice.project.hourlyRate}/${selectedInvoice.project?.currency || 'USD'} per hour
+                                            Rate: {getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}${selectedInvoice.project.hourlyRate}/${selectedInvoice.currency || getPreferredCurrency()} per hour
                                         </p>
                                     )}
                                 </div>
@@ -641,7 +646,7 @@ const InvoicesList = ({
                         <div className="border-t pt-2">
                             <div className="flex justify-between text-sm font-medium">
                                 <span>Total: {selectedInvoice.totalHours?.toFixed(2) || 0} hours</span>
-                                <span>{getCurrencySymbol(selectedInvoice.project?.currency || 'USD')}{selectedInvoice.totalAmount?.toFixed(2) || 0}</span>
+                                <span>{getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}{selectedInvoice.totalAmount?.toFixed(2) || 0}</span>
                             </div>
                         </div>
                     </div>

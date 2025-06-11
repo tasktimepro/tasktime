@@ -4,7 +4,7 @@ import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
-import { getCurrencySymbol } from '../utils/currencyUtils';
+import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
 
 /**
@@ -93,7 +93,7 @@ const ProjectDashboard = ({
 
                         {project.hourlyRate && (
                             <p className="text-sm text-gray-500">
-                                {`${getCurrencySymbol(project.currency)}${project.hourlyRate}/${project.currency} per hour`}
+                                {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
                             </p>
                         )}
                     </div>
@@ -205,6 +205,7 @@ const ProjectDashboard = ({
             <MetricsDisplay
                 project={project}
                 timeEntries={projectTimeEntries}
+                clients={clients}
             />
         </div>
     );

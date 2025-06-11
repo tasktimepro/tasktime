@@ -7,12 +7,26 @@ import {
     formatDuration,
     millisecondsToHours
 } from '../utils/dateUtils';
-import { getCurrencySymbol } from '../utils/currencyUtils';
+import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
 
 /**
  * MetricsDisplay component - Shows time and earnings metrics for different periods
  */
-const MetricsDisplay = ({ project, timeEntries }) => {
+const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitle = true }) => {
+    
+    // Helper function to get currency for display
+    const getDisplayCurrency = () => {
+        if (currency) return currency;
+        
+        if (project && project.preferredClientId && clients.length > 0) {
+            const client = clients.find(c => c.id === project.preferredClientId);
+            return client?.defaultCurrency || getPreferredCurrency();
+        }
+        
+        return getPreferredCurrency();
+    };
+
+    const displayCurrency = getDisplayCurrency();
     /**
      * Calculate metrics for a given date range
      */
@@ -82,7 +96,7 @@ const MetricsDisplay = ({ project, timeEntries }) => {
 
     return (
         <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-6">Project Metrics</h2>
+            {showTitle && <h2 className="text-lg font-medium text-gray-900 mb-6">Project Metrics</h2>}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {metrics.map((metric) => (
@@ -98,7 +112,7 @@ const MetricsDisplay = ({ project, timeEntries }) => {
 
                             {project && project.hourlyRate && (
                                 <div className="text-sm text-gray-600">
-                                    {`${getCurrencySymbol(project.currency || 'USD')}${metric.earnings.toFixed(2)}`}
+                                    {`${getCurrencySymbol(displayCurrency)}${metric.earnings.toFixed(2)}`}
                                 </div>
                             )}
                         </dd>
