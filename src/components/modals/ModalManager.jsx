@@ -16,6 +16,8 @@ const ModalManager = ({
     setActiveModal,
     editingItem,
     setEditingItem,
+    modalOptions,
+    setModalOptions,
     
     // Client modal props
     clients,
@@ -81,6 +83,10 @@ const ModalManager = ({
             console.log('Closing all modals');
             setActiveModal(null);
             setEditingItem(null);
+            // Clear modal options when closing
+            if (setModalOptions) {
+                setModalOptions(null);
+            }
         }
     };
 
@@ -118,6 +124,7 @@ const ModalManager = ({
                     setProjects={setProjects}
                     editingProject={editingItem}
                     clients={clients}
+                    modalOptions={modalOptions}
                     openClientModal={() => openNestedModal('client')}
                     saveFormState={(formData) => saveCurrentModalState('project', formData)}
                     getSavedState={() => getSavedModalState('project')}

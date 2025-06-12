@@ -542,16 +542,26 @@ const Dashboard = ({
     }, []);
 
     /**
-     * Mark task as completed
+     * Toggle task completion status
      */
     const handleCompleteTask = useCallback((task) => {
-        // Add to completed in current session to keep it visible
-        setCompletedInCurrentSession(prev => new Set([...prev, task.id]));
-
+        const newCompletedStatus = !task.completed;
         const now = Date.now();
         
-        // If timer is active for this task, stop it before completing
-        if (currentTimer?.taskId === task.id) {
+        // If completing a task, add to completed in current session to keep it visible
+        if (newCompletedStatus) {
+            setCompletedInCurrentSession(prev => new Set([...prev, task.id]));
+        } else {
+            // If unchecking a task, remove it from completed in current session
+            setCompletedInCurrentSession(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(task.id);
+                return newSet;
+            });
+        }
+        
+        // If timer is active for this task and we're completing it, stop the timer
+        if (newCompletedStatus && currentTimer?.taskId === task.id) {
             // Create time entry with proper duration based on pause state
             let timeEntry;
             
@@ -571,8 +581,8 @@ const Dashboard = ({
             setCurrentTimer(null);
             setIsPaused(false);
             setPausedElapsedTime(0);
-        } else {
-            // Create minimal time entry to update last activity
+        } else if (newCompletedStatus) {
+            // Create minimal time entry to update last activity when completing
             const timeEntry = createTimeEntry(task.id, now - 1000, now);
             setTimeEntries(prev => [...prev, timeEntry]);
         }
@@ -580,7 +590,7 @@ const Dashboard = ({
         // Update task completion status and lastActive timestamp
         setTasks(prevTasks => 
             prevTasks.map(t =>
-                t.id === task.id ? { ...t, completed: true, lastActive: now } : t
+                t.id === task.id ? { ...t, completed: newCompletedStatus, lastActive: now } : t
             )
         );
     }, [currentTimer, isPaused, pausedElapsedTime, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTasks, setCompletedInCurrentSession]);
@@ -992,16 +1002,15 @@ const Dashboard = ({
                                     // Determine if this task should be disabled
                                     // If any timer is running (not paused) and it's not for this task, disable the task
                                     const isTimerActive = currentTimer?.taskId === task.id;
-                                    const shouldDisable = currentTimer && !isPaused && !isTimerActive && !task.completed;
+                                    const shouldDisable = currentTimer && !isPaused && !isTimerActive;
                                     
                                     return (
-                                    <div key={task.id} className={`px-6 py-3 hover:bg-gray-50 ${task.completed ? 'opacity-75 bg-gray-50' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
+                                    <div key={task.id} className={`px-6 py-3 hover:bg-gray-50 ${task.completed ? 'bg-gray-50' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
                                         <div className="flex items-center space-x-3">
                                             <CustomCheckbox
                                                 checked={task.completed}
                                                 onChange={() => handleCompleteTask(task)}
-                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                                disabled={task.completed || shouldDisable}
+                                                disabled={shouldDisable}
                                             />
                                             <div className="flex-1 min-w-0 space-y-1">
                                                 {renderTaskTitle(task, task.completed)}
@@ -1043,7 +1052,7 @@ const Dashboard = ({
                                             <div className="ml-8 mt-2">
                                                 {task.subtasks.map(subtask => {
                                                     const isTimerActive = currentTimer?.taskId === subtask.id;
-                                                    const shouldDisable = currentTimer && !isPaused && !isTimerActive && !subtask.completed;
+                                                    const shouldDisable = currentTimer && !isPaused && !isTimerActive;
                                                     const subtaskWithProject = { ...subtask, project: task.project };
                                                     
                                                     return (
@@ -1051,8 +1060,7 @@ const Dashboard = ({
                                                             <CustomCheckbox
                                                                 checked={subtask.completed}
                                                                 onChange={() => handleCompleteTask(subtask)}
-                                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                                                disabled={subtask.completed || shouldDisable}
+                                                                disabled={shouldDisable}
                                                             />
                                                             <div className="flex-1 min-w-0 space-y-1">
                                                                 {renderTaskTitle(subtaskWithProject, subtask.completed)}

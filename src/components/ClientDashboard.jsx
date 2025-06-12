@@ -260,8 +260,8 @@ const ClientDashboard = ({
      * Handle creating a new project for this client
      */
     const handleCreateProject = () => {
-        // Open project modal with create form and pre-select this client
-        openProjectModal({ create: 'project', preselectedClientId: client.id });
+        // Open project modal for creating a new project - client will be pre-selected
+        openProjectModal(null, { preselectedClientId: client.id });
     };
 
     return (

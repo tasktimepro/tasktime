@@ -40,6 +40,7 @@ function App() {
     // Modal state for form modals
     const [activeModal, setActiveModal] = useState(null);
     const [editingItem, setEditingItem] = useState(null);
+    const [modalOptions, setModalOptions] = useState(null);
 
     // Modal utility functions
     const openClientModal = (client = null) => {
@@ -52,9 +53,16 @@ function App() {
         setEditingItem(client);
     };
 
-    const openProjectModal = (project = null) => {
+    const openProjectModal = (project = null, options = null) => {
         setActiveModal('project');
         setEditingItem(project);
+        // Store options for the project modal to use
+        if (options) {
+            // We'll need to pass this to the ModalManager
+            setModalOptions(options);
+        } else {
+            setModalOptions(null);
+        }
     };
 
     const editProjectModal = (project) => {
@@ -652,6 +660,8 @@ function App() {
                     setActiveModal={setActiveModal}
                     editingItem={editingItem}
                     setEditingItem={setEditingItem}
+                    modalOptions={modalOptions}
+                    setModalOptions={setModalOptions}
                     clients={clients}
                     setClients={setClients}
                     projects={projects}

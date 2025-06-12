@@ -91,8 +91,8 @@ const BusinessInfo = ({
             {businessInfos.length === 0 ? (
                 <div className="text-center py-12">
                     <BuildingOfficeIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <h4 className="mt-2 text-sm font-medium text-gray-900">No business info</h4>
-                    <p className="mt-1 text-sm text-gray-500">Get started by creating your first business info.</p>
+                    <h4 className="mt-2 text-sm font-medium text-gray-900">No business yet</h4>
+                    <p className="mt-1 text-sm text-gray-500">Get started by creating your first business.</p>
 
                     <div className="mt-6">
                         <button

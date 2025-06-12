@@ -15,6 +15,7 @@ const ProjectModal = ({
     setProjects,
     editingProject = null,
     clients,
+    modalOptions = null,
     openClientModal,
     saveFormState,
     getSavedState,
@@ -74,18 +75,41 @@ const ProjectModal = ({
                 }
             } else {
                 // Reset form for creating new project
-                setFormData({
+                const initialData = {
                     title: '',
                     hourlyRate: '',
                     flatRate: false,
                     preferredClientId: '',
                     overrideRate: false,
                     isPersonal: false
-                });
-                setSelectedClientRate(null);
+                };
+
+                // If modalOptions contains preselectedClientId, set it and disable personal mode
+                if (modalOptions?.preselectedClientId) {
+                    const preselectedClient = clients.find(c => c.id === modalOptions.preselectedClientId);
+                    if (preselectedClient) {
+                        initialData.preferredClientId = modalOptions.preselectedClientId;
+                        setSelectedClientRate(preselectedClient);
+                        
+                        // Set client's rate if available
+                        if (preselectedClient.hourlyRate) {
+                            initialData.hourlyRate = preselectedClient.hourlyRate.toString();
+                        }
+                        if (preselectedClient.flatRate) {
+                            initialData.flatRate = preselectedClient.flatRate;
+                        }
+                    }
+                }
+
+                setFormData(initialData);
+                
+                // If no preselected client, reset selected client rate
+                if (!modalOptions?.preselectedClientId) {
+                    setSelectedClientRate(null);
+                }
             }
         }
-    }, [editingProject, clients, getSavedState]);
+    }, [editingProject, clients, getSavedState, modalOptions]);
 
     // Save form state whenever it changes (debounced)
     useEffect(() => {
@@ -304,33 +328,35 @@ const ProjectModal = ({
                     />
                 </div>
 
-                {/* Personal Project Toggle */}
-                <div className="flex items-start space-x-3">
-                    <div className="flex items-center h-5">
-                        <CustomCheckbox
-                            id="isPersonal"
-                            checked={formData.isPersonal}
-                            onChange={(checked) => setFormData(prev => ({
-                                ...prev,
-                                isPersonal: checked,
-                                // Clear client selection when marking as personal
-                                preferredClientId: checked ? '' : prev.preferredClientId,
-                                // Reset override rate when toggling
-                                overrideRate: false,
-                                hourlyRate: checked ? prev.hourlyRate : (selectedClientRate && !prev.overrideRate ? selectedClientRate.hourlyRate?.toString() || '' : prev.hourlyRate),
-                                flatRate: checked ? prev.flatRate : (selectedClientRate && !prev.overrideRate ? selectedClientRate.flatRate || false : prev.flatRate)
-                            }))}
-                        />
+                {/* Personal Project Toggle - Hide when client is preselected */}
+                {!modalOptions?.preselectedClientId && (
+                    <div className="flex items-start space-x-3">
+                        <div className="flex items-center h-5">
+                            <CustomCheckbox
+                                id="isPersonal"
+                                checked={formData.isPersonal}
+                                onChange={(checked) => setFormData(prev => ({
+                                    ...prev,
+                                    isPersonal: checked,
+                                    // Clear client selection when marking as personal
+                                    preferredClientId: checked ? '' : prev.preferredClientId,
+                                    // Reset override rate when toggling
+                                    overrideRate: false,
+                                    hourlyRate: checked ? prev.hourlyRate : (selectedClientRate && !prev.overrideRate ? selectedClientRate.hourlyRate?.toString() || '' : prev.hourlyRate),
+                                    flatRate: checked ? prev.flatRate : (selectedClientRate && !prev.overrideRate ? selectedClientRate.flatRate || false : prev.flatRate)
+                                }))}
+                            />
+                        </div>
+                        <div className="text-sm">
+                            <label htmlFor="isPersonal" className="font-medium text-gray-700 cursor-pointer">
+                                Personal project (Not billable)
+                            </label>
+                            <p className="text-gray-500">
+                                Check this for personal projects without clients or invoices.
+                            </p>
+                        </div>
                     </div>
-                    <div className="text-sm">
-                        <label htmlFor="isPersonal" className="font-medium text-gray-700 cursor-pointer">
-                            Personal project (Not billable)
-                        </label>
-                        <p className="text-gray-500">
-                            Check this for personal projects without clients or invoices.
-                        </p>
-                    </div>
-                </div>
+                )}
 
                 {/* Client Selection - Only show for non-personal projects */}
                 {!formData.isPersonal && (
@@ -339,7 +365,7 @@ const ProjectModal = ({
                             <label htmlFor="preferredClientId" className="block text-sm font-medium text-gray-700">
                                 Client <span className="text-red-500">*</span>
                             </label>
-                            {openClientModal && !editingProject && (
+                            {openClientModal && !editingProject && !modalOptions?.preselectedClientId && (
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -364,7 +390,10 @@ const ProjectModal = ({
                             value={formData.preferredClientId}
                             onChange={handleInputChange}
                             required
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                            disabled={!!modalOptions?.preselectedClientId}
+                            className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5 ${
+                                modalOptions?.preselectedClientId ? 'bg-gray-100 cursor-not-allowed' : ''
+                            }`}
                         >
                             <option value="">Select a client</option>
                             {clients.filter(c => !c.archived).map(client => (
@@ -373,9 +402,11 @@ const ProjectModal = ({
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs text-gray-500 mt-2">
-                            Every project must be associated with a client.
-                        </p>
+                        {!modalOptions?.preselectedClientId && (
+                            <p className="text-xs text-gray-500 mt-2">
+                                Every project must be associated with a client.
+                            </p>
+                        )}
                     </div>
                 )}
 
@@ -459,6 +490,7 @@ ProjectModal.propTypes = {
     setProjects: PropTypes.func.isRequired,
     clients: PropTypes.array.isRequired,
     editingProject: PropTypes.object,
+    modalOptions: PropTypes.object,
     openClientModal: PropTypes.func,
     saveFormState: PropTypes.func,
     getSavedState: PropTypes.func,
