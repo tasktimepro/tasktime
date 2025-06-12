@@ -101,8 +101,8 @@ export const handleToggleFlatRate = (setUseFlatRate, setTaskFlatRates, setTaskQu
 };
 
 // Toggle new task between flat rate and hourly pricing
-export const handleToggleNewTaskFlatRate = (setNewTaskUseFlatRate) => () => {
-    setNewTaskUseFlatRate(prev => !prev);
+export const handleToggleNewTaskFlatRate = (setNewTaskUseFlatRate) => (checked) => {
+    setNewTaskUseFlatRate(checked);
 };
 
 // Handle adding additional custom task

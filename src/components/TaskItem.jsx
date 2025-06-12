@@ -185,7 +185,7 @@ const TaskItem = ({
     /**
      * Toggle task completion status
      */
-    const handleToggleComplete = () => {
+    const handleToggleComplete = (checked) => {
         const now = Date.now();
         
         // If timer is active for this task, stop it before completing
@@ -201,7 +201,7 @@ const TaskItem = ({
         }
 
         const updatedTasks = tasks.map(t =>
-            t.id === task.id ? { ...t, completed: !isCompleted, lastActive: now } : t
+            t.id === task.id ? { ...t, completed: checked, lastActive: now } : t
         );
 
         setTasks(updatedTasks);
@@ -841,7 +841,7 @@ const SubtaskItem = ({
     /**
      * Toggle subtask completion status
      */
-    const handleToggleComplete = () => {
+    const handleToggleComplete = (checked) => {
         const now = Date.now();
         
         // If timer is active for this subtask, stop it before completing
@@ -857,7 +857,7 @@ const SubtaskItem = ({
         }
 
         const updatedTasks = tasks.map(t =>
-            t.id === task.id ? { ...t, completed: !isCompleted, lastActive: now } : t
+            t.id === task.id ? { ...t, completed: checked, lastActive: now } : t
         );
 
         setTasks(updatedTasks);

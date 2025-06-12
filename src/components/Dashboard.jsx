@@ -545,6 +545,14 @@ const Dashboard = ({
      * Toggle task completion status
      */
     const handleCompleteTask = useCallback((task) => {
+        // If called directly with a task (for compatibility), toggle its completion status
+        // If called from CustomCheckbox, task will be the checked boolean, so we need to handle this differently
+        if (typeof task === 'boolean') {
+            // This shouldn't happen with the current usage pattern, but handle gracefully
+            console.warn('handleCompleteTask called with boolean - this usage pattern is deprecated');
+            return;
+        }
+        
         const newCompletedStatus = !task.completed;
         const now = Date.now();
         
@@ -1009,7 +1017,7 @@ const Dashboard = ({
                                         <div className="flex items-center space-x-3">
                                             <CustomCheckbox
                                                 checked={task.completed}
-                                                onChange={() => handleCompleteTask(task)}
+                                                onChange={(checked) => handleCompleteTask(task, checked)}
                                                 disabled={shouldDisable}
                                             />
                                             <div className="flex-1 min-w-0 space-y-1">
@@ -1059,7 +1067,7 @@ const Dashboard = ({
                                                         <div key={subtask.id} className={`flex items-center space-x-3 py-2 ${shouldDisable ? 'opacity-50' : ''}`}>
                                                             <CustomCheckbox
                                                                 checked={subtask.completed}
-                                                                onChange={() => handleCompleteTask(subtask)}
+                                                                onChange={(checked) => handleCompleteTask(subtask, checked)}
                                                                 disabled={shouldDisable}
                                                             />
                                                             <div className="flex-1 min-w-0 space-y-1">

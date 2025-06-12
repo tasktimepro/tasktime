@@ -1,5 +1,4 @@
 import { CheckIcon } from '@heroicons/react/24/outline';
-import { useState, useEffect } from 'react';
 
 /**
  * CustomCheckbox component - Modern styled checkbox
@@ -21,40 +20,16 @@ const CustomCheckbox = ({
     labelClassName = "",
     id = null
 }) => {
-    // Track if the click was just handled to prevent double triggers
-    const [clickHandled, setClickHandled] = useState(false);
+    // Click handler
+    const handleClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (disabled) return;
 
-    useEffect(() => {
-        if (clickHandled) {
-            // Reset after a short delay
-            const timer = setTimeout(() => setClickHandled(false), 100);
-            return () => clearTimeout(timer);
-        }
-    }, [clickHandled]);
-
-    // Unified click handler that prevents double triggers and handles
-    // both callback styles (with and without parameters)
-    const handleClick = () => {
-        if (disabled || clickHandled) return;
-
-        setClickHandled(true);
-
-        // Check if the component is using the new or old pattern
-        // This heuristic checks if the function likely expects a parameter
-        const callbackText = onChange.toString();
-        const expectsParameter =
-            callbackText.includes("!prev.") ||
-            callbackText.includes("!checked") ||
-            (callbackText.includes("=>") &&
-                (callbackText.includes("checked") ||
-                    callbackText.includes("isDefault") ||
-                    callbackText.includes("prev")));
-
-        if (expectsParameter) {
-            onChange(!checked);
-        } else {
-            onChange();
-        }
+        // Always pass the new checked state as parameter
+        // This is the standard React pattern and works reliably in production
+        onChange(!checked);
     };
 
     const checkboxElement = (
@@ -97,9 +72,7 @@ const CustomCheckbox = ({
             className={`flex items-center ${disabled ? '' : 'cursor-pointer'} ${className}`}
             onClick={disabled ? undefined : handleClick}
         >
-            <div>
-                {checkboxElement}
-            </div>
+            {checkboxElement}
             <label
                 htmlFor={id}
                 className={`ml-2 ${disabled ? 'text-gray-400' : 'text-gray-700'} ${labelClassName}`}

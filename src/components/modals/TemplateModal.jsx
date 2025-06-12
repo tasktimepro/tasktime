@@ -233,7 +233,7 @@ const TemplateModal = ({
             <div className="flex items-center">
                 <CustomCheckbox
                     checked={formData.isDefault}
-                    onChange={() => setFormData(prev => ({ ...prev, isDefault: !prev.isDefault }))}
+                    onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
                     label="Set as default template"
                     labelClassName="block text-sm text-gray-900"
                 />
@@ -323,7 +323,7 @@ const TemplateModal = ({
                         <div className="flex items-center">
                             <CustomCheckbox
                                 checked={formData.useSequentialNumbers}
-                                onChange={() => setFormData(prev => ({ ...prev, useSequentialNumbers: !prev.useSequentialNumbers }))}
+                                onChange={(checked) => setFormData(prev => ({ ...prev, useSequentialNumbers: checked }))}
                                 label="Use sequential numbering"
                                 labelClassName="block text-sm text-gray-900"
                             />
@@ -370,7 +370,7 @@ const TemplateModal = ({
                             <div className="flex items-center">
                                 <CustomCheckbox
                                     checked={formData.sequentialResetYearly}
-                                    onChange={() => setFormData(prev => ({ ...prev, sequentialResetYearly: !prev.sequentialResetYearly }))}
+                                    onChange={(checked) => setFormData(prev => ({ ...prev, sequentialResetYearly: checked }))}
                                     label="Reset sequential number yearly"
                                     labelClassName="block text-sm text-gray-900"
                                 />

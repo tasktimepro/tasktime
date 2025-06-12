@@ -514,7 +514,7 @@ const InvoiceModal = ({
                                                     {/* Task selection checkbox */}
                                                     <CustomCheckbox
                                                         checked={selectedTasksForBilling[task.id] || false}
-                                                        onChange={() => handleTaskSelectionForBilling(task.id, !selectedTasksForBilling[task.id])}
+                                                        onChange={(checked) => handleTaskSelectionForBilling(task.id, checked)}
                                                     />
                                                     <div className="flex-1 pr-4">
                                                         <p className="text-sm font-medium text-gray-900 overflow-hidden" style={{ 
@@ -544,7 +544,7 @@ const InvoiceModal = ({
                                                         <div className="flex items-center bg-blue-50 px-2 py-2 rounded">
                                                             <CustomCheckbox
                                                                 checked={mergedSubtasks[task.id] || false}
-                                                                onChange={() => handleToggleMergeSubtasks(task.id, !mergedSubtasks[task.id])}
+                                                                onChange={(checked) => handleToggleMergeSubtasks(task.id, checked)}
                                                                 title="Merge subtasks with this parent task"
                                                                 label="Merge subtasks"
                                                                 labelClassName="text-xs text-blue-700 font-medium"
@@ -556,7 +556,7 @@ const InvoiceModal = ({
                                                     <div className="flex items-center">
                                                         <CustomCheckbox
                                                             checked={isUsingFlatRate}
-                                                            onChange={() => handleToggleAdditionalTaskFlatRate(task.id, !isUsingFlatRate)}
+                                                            onChange={(checked) => handleToggleAdditionalTaskFlatRate(task.id, checked)}
                                                             label="Flat rate"
                                                             labelClassName="text-xs text-gray-700"
                                                             id={`flat-rate-${task.id}`}
@@ -701,7 +701,7 @@ const InvoiceModal = ({
                                                     <div className="flex items-center ">
                                                         <CustomCheckbox
                                                             checked={isUsingFlatRate}
-                                                            onChange={() => handleToggleAdditionalTaskFlatRate(task.id, !isUsingFlatRate)}
+                                                            onChange={(checked) => handleToggleAdditionalTaskFlatRate(task.id, checked)}
                                                             label="Flat rate"
                                                             labelClassName="text-xs text-gray-700"
                                                             id={`flat-rate-${task.id}`}
@@ -1014,7 +1014,7 @@ const InvoiceModal = ({
                                 <div className="flex items-center space-x-2 mb-2">
                                     <CustomCheckbox
                                         checked={taxOverride.enabled}
-                                        onChange={() => setTaxOverride(prev => ({ ...prev, enabled: !prev.enabled }))}
+                                        onChange={(checked) => setTaxOverride(prev => ({ ...prev, enabled: checked }))}
                                         label="Override tax settings"
                                         labelClassName="text-sm font-medium text-gray-700"
                                         id="taxOverrideEnabled"
@@ -1369,7 +1369,7 @@ const InvoiceModal = ({
                                 <div className="flex items-center space-x-2 mb-2">
                                     <CustomCheckbox
                                         checked={useInvoiceDateOverride}
-                                        onChange={() => setUseInvoiceDateOverride(!useInvoiceDateOverride)}
+                                        onChange={(checked) => setUseInvoiceDateOverride(checked)}
                                         label="Override invoice date"
                                         labelClassName="text-sm font-medium text-gray-700"
                                     />

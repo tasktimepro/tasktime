@@ -451,7 +451,7 @@ const ProjectModal = ({
                         <div className="flex items-center space-x-3 mb-4">
                             <CustomCheckbox
                                 checked={formData.flatRate}
-                                onChange={() => setFormData(prev => ({ ...prev, flatRate: !prev.flatRate }))}
+                                onChange={(checked) => setFormData(prev => ({ ...prev, flatRate: checked }))}
                                 label="Flat rate project (non-hourly basis)"
                                 labelClassName="text-sm font-medium text-gray-700"
                                 id="flatRate"
