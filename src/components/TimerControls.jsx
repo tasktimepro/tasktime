@@ -51,7 +51,8 @@ function TimerControls({
                     id: generateId(),
                     taskId: currentTimer.taskId,
                     start: currentTimer.startTime,
-                    end: currentTimer.startTime + pausedElapsedTime
+                    end: currentTimer.startTime + pausedElapsedTime,
+                    note: currentTimer.note
                 };
                 setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
                 
@@ -64,7 +65,8 @@ function TimerControls({
                     id: generateId(),
                     taskId: currentTimer.taskId,
                     start: currentTimer.startTime,
-                    end: Date.now()
+                    end: Date.now(),
+                    note: currentTimer.note
                 };
                 setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
             }
@@ -73,7 +75,8 @@ function TimerControls({
         // Start new timer
         setCurrentTimer({
             taskId: task.id,
-            startTime: Date.now()
+            startTime: Date.now(),
+            note: undefined // Initialize with no note
         });
         
         // If we have access to the isPaused state, make sure it's set to false
@@ -143,7 +146,8 @@ function TimerControls({
                 id: generateId(),
                 taskId: task.id,
                 start: currentTimer.startTime,
-                end: now
+                end: now,
+                note: currentTimer.note
             };
 
             setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
@@ -166,7 +170,8 @@ function TimerControls({
                 id: generateId(),
                 taskId: task.id,
                 start: currentTimer.startTime,
-                end: currentTimer.startTime + pausedElapsedTime
+                end: currentTimer.startTime + pausedElapsedTime,
+                note: currentTimer.note
             };
             
             setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
@@ -176,7 +181,8 @@ function TimerControls({
                 id: generateId(),
                 taskId: task.id,
                 start: currentTimer.startTime,
-                end: now
+                end: now,
+                note: currentTimer.note
             };
 
             setTimeEntries(prevEntries => [...prevEntries, timeEntry]);

@@ -460,7 +460,7 @@ function App() {
 
                 {/* Main Content */}
                 <main className="flex-1 main-content relative">
-                    <div className={`pl-8 pr-6 pt-8 pb-8 ${showGlobalTimer && currentTimer ? 'pt-20' : ''}`}>{/* Inner content with balanced padding, extra top padding when timer is active */}
+                    <div className={`pl-8 pr-6 pb-8 ${showGlobalTimer && currentTimer ? 'pt-20' : 'pt-8'}`}>{/* Inner content with balanced padding, extra top padding when timer is active */}
                 {activeView === 'dashboard' && (
                     <Dashboard
                         projects={projects}
@@ -684,13 +684,14 @@ function App() {
                     {/* Global Timer Display - Fixed at top */}
                     {showGlobalTimer && currentTimer && (
                         <div className="fixed top-4 left-64 right-4 z-50 flex justify-center global-timer-mobile">
-                            <div className="bg-white shadow-lg rounded-lg w-auto max-w-2xl">
+                            <div className="bg-white shadow-lg rounded-lg w-auto max-w-2xl shadow-md">
                                 <GlobalTimer
                                     currentTimer={currentTimer}
                                     setCurrentTimer={setCurrentTimer}
                                     tasks={tasks}
                                     projects={projects}
                                     setTimeEntries={setTimeEntries}
+                                    timeEntries={timeEntries}
                                     isPaused={isPaused}
                                     setIsPaused={setIsPaused}
                                     pausedElapsedTime={pausedElapsedTime}

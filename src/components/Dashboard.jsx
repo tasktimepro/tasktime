@@ -532,12 +532,13 @@ const Dashboard = ({
     /**
      * Create a time entry for the current timer session
      */
-    const createTimeEntry = useCallback((taskId, startTime, endTime) => {
+    const createTimeEntry = useCallback((taskId, startTime, endTime, note = undefined) => {
         return {
             id: `dashboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             taskId,
             start: startTime,
-            end: endTime
+            end: endTime,
+            note: note
         };
     }, []);
 
@@ -578,11 +579,12 @@ const Dashboard = ({
                 timeEntry = createTimeEntry(
                     task.id,
                     currentTimer.startTime,
-                    currentTimer.startTime + pausedElapsedTime
+                    currentTimer.startTime + pausedElapsedTime,
+                    currentTimer.note
                 );
             } else {
                 // For active timer, calculate duration from start to now
-                timeEntry = createTimeEntry(task.id, currentTimer.startTime, now);
+                timeEntry = createTimeEntry(task.id, currentTimer.startTime, now, currentTimer.note);
             }
             
             setTimeEntries(prev => [...prev, timeEntry]);

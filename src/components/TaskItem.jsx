@@ -9,7 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import TaskTimer from './TaskTimer.jsx';
 import CustomCheckbox from './CustomCheckbox.jsx';
-import TimeEditModal from './TimeEditModal.jsx';
+import TimeEntriesModal from './TimeEntriesModal.jsx';
 import { formatDurationWithSeconds } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { deleteTaskWithCleanup } from '../utils/taskUtils';
@@ -45,7 +45,7 @@ const TaskItem = ({
     const { showSuccess } = useToast();
     // eslint-disable-next-line no-unused-vars
     const [currentTime, setCurrentTime] = useState(Date.now());
-    const [showTimeEditModal, setShowTimeEditModal] = useState(false);
+    const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
@@ -194,7 +194,8 @@ const TaskItem = ({
                 id: `completion-${Date.now()}`,
                 taskId: task.id,
                 start: currentTimer.startTime,
-                end: now
+                end: now,
+                note: currentTimer.note
             };
             setTimeEntries([...timeEntries, timeEntry]);
             setCurrentTimer(null);
@@ -205,94 +206,6 @@ const TaskItem = ({
         );
 
         setTasks(updatedTasks);
-    };
-
-    /**
-     * Handle editing time for task
-     */
-    const handleTimeEdit = (newTime) => {
-        // For main tasks, only edit the main task's own time (not including subtasks)
-        const currentEditableTime = !task.parentTaskId ? mainTaskTime : totalTimeWithSubtasks;
-        
-        // Calculate the difference between new and old time
-        const timeDifference = newTime - currentEditableTime;
-
-        if (timeDifference !== 0) {
-            const now = Date.now();
-            
-            // Update the task's lastActive property to now
-            setTasks(prevTasks => 
-                prevTasks.map(t =>
-                    t.id === task.id ? { ...t, lastActive: now } : t
-                )
-            );
-            
-            // Get billing cutoff date (same logic as invoice generation)
-            // Use task-specific lastBilledAt, or task creation date if never billed
-            const billingCutoffDate = task.lastBilledAt || task.createdAt || 0;
-            
-            if (timeDifference > 0) {
-                // Adding time - ensure start time is after billing cutoff while preserving duration
-                const proposedStartTime = now - timeDifference;
-                
-                if (proposedStartTime > billingCutoffDate) {
-                    // Normal case - no adjustment needed
-                    const adjustmentEntry = {
-                        id: `adjustment-${now}`,
-                        taskId: task.id,
-                        start: proposedStartTime,
-                        end: now
-                    };
-                    setTimeEntries([...timeEntries, adjustmentEntry]);
-                } else {
-                    // Start time would be before billing cutoff - adjust both start and end to preserve duration
-                    const startTime = billingCutoffDate + 1;
-                    const endTime = startTime + timeDifference;
-                    
-                    const adjustmentEntry = {
-                        id: `adjustment-${now}`,
-                        taskId: task.id,
-                        start: startTime,
-                        end: endTime
-                    };
-                    setTimeEntries([...timeEntries, adjustmentEntry]);
-                }
-            } else {
-                // Reducing time - replace existing entries with a new single entry
-                if (newTime > 0) {
-                    // Remove existing entries for this task and create a new one with the exact time
-                    const otherEntries = timeEntries.filter(entry => entry.taskId !== task.id);
-                    const proposedStartTime = now - newTime;
-                    
-                    if (proposedStartTime > billingCutoffDate) {
-                        // Normal case - no adjustment needed
-                        const newEntry = {
-                            id: `manual-${now}`,
-                            taskId: task.id,
-                            start: proposedStartTime,
-                            end: now
-                        };
-                        setTimeEntries([...otherEntries, newEntry]);
-                    } else {
-                        // Start time would be before billing cutoff - adjust both start and end to preserve duration
-                        const startTime = billingCutoffDate + 1;
-                        const endTime = startTime + newTime;
-                        
-                        const newEntry = {
-                            id: `manual-${now}`,
-                            taskId: task.id,
-                            start: startTime,
-                            end: endTime
-                        };
-                        setTimeEntries([...otherEntries, newEntry]);
-                    }
-                } else {
-                    // Remove all time entries for this task
-                    const otherEntries = timeEntries.filter(entry => entry.taskId !== task.id);
-                    setTimeEntries(otherEntries);
-                }
-            }
-        }
     };
 
     /**
@@ -416,7 +329,7 @@ const TaskItem = ({
                                                     <div className="flex ml-2 items-center space-x-2">
                                                         {mainTaskTime > 0 && (
                                                             <button
-                                                                onClick={() => setShowTimeEditModal(true)}
+                                                                onClick={() => setShowTimeEntriesModal(true)}
                                                                 className="hover:bg-gray-100 rounded-md transition-colors"
                                                                 title="Click to edit main task time (excluding subtasks)"
                                                                 disabled={isCompleted}
@@ -444,7 +357,7 @@ const TaskItem = ({
                                             /* Subtask - show only subtask time */
                                             totalTimeWithSubtasks > 0 && (
                                                 <button
-                                                    onClick={() => setShowTimeEditModal(true)}
+                                                    onClick={() => setShowTimeEntriesModal(true)}
                                                     className="hover:bg-gray-100 px-2 py-1 rounded-md transition-colors"
                                                     title="Click to edit time"
                                                     disabled={isCompleted}
@@ -531,9 +444,9 @@ const TaskItem = ({
                                     />
 
                                     <button
-                                        onClick={() => setShowTimeEditModal(true)}
+                                        onClick={() => setShowTimeEntriesModal(true)}
                                         className="p-1 text-gray-400 hover:bg-blue-100 rounded-md transition-colors group"
-                                        title="Edit Time"
+                                        title="View Time Entries"
                                     >
                                         <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
                                     </button>
@@ -613,13 +526,14 @@ const TaskItem = ({
                 </div>
             </div>
 
-            {/* Time Edit Modal */}
-            <TimeEditModal
-                isOpen={showTimeEditModal}
-                onClose={() => setShowTimeEditModal(false)}
-                currentTime={!task.parentTaskId ? mainTaskTime : totalTimeWithSubtasks}
-                onSave={handleTimeEdit}
-                taskTitle={task.title}
+            {/* Time Entries Modal */}
+            <TimeEntriesModal
+                isOpen={showTimeEntriesModal}
+                onClose={() => setShowTimeEntriesModal(false)}
+                task={task}
+                timeEntries={timeEntries}
+                setTimeEntries={setTimeEntries}
+                allTasks={allTasks}
             />
 
             {/* Subtasks */}
@@ -642,6 +556,7 @@ const TaskItem = ({
                                 setPausedElapsedTime={setPausedElapsedTime}
                                 isGlobalTimer={isGlobalTimer}
                                 onToggleBillable={onToggleBillable}
+                                allTasks={allTasks}
                                 onDelete={() => {
                                     if (window.confirm('Are you sure you want to delete this subtask?')) {
                                         const result = deleteTaskWithCleanup(
@@ -728,13 +643,14 @@ const SubtaskItem = ({
     setPausedElapsedTime = null,
     isGlobalTimer = false,
     onToggleBillable,
-    onDelete
+    onDelete,
+    allTasks
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
     // eslint-disable-next-line no-unused-vars
     const [currentTime, setCurrentTime] = useState(Date.now());
-    const [showTimeEditModal, setShowTimeEditModal] = useState(false);
+    const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
 
     // Update current time every second for active timer display
@@ -845,12 +761,14 @@ const SubtaskItem = ({
         const now = Date.now();
         
         // If timer is active for this subtask, stop it before completing
+        // If timer is active for this subtask, stop it before completing
         if (isTimerActive && currentTimer) {
             const timeEntry = {
                 id: `completion-${Date.now()}`,
                 taskId: task.id,
                 start: currentTimer.startTime,
-                end: now
+                end: now,
+                note: currentTimer.note
             };
             setTimeEntries([...timeEntries, timeEntry]);
             setCurrentTimer(null);
@@ -861,91 +779,6 @@ const SubtaskItem = ({
         );
 
         setTasks(updatedTasks);
-    };
-
-    /**
-     * Handle editing time for subtask
-     */
-    const handleTimeEdit = (newTime) => {
-        // Calculate the difference between new and old time
-        const timeDifference = newTime - totalTime;
-
-        if (timeDifference !== 0) {
-            const now = Date.now();
-            
-            // Update the task's lastActive property to now
-            setTasks(prevTasks => 
-                prevTasks.map(t =>
-                    t.id === task.id ? { ...t, lastActive: now } : t
-                )
-            );
-            
-            // Get billing cutoff date (same logic as invoice generation)
-            // Use task-specific lastBilledAt, or task creation date if never billed
-            const billingCutoffDate = task.lastBilledAt || task.createdAt || 0;
-            
-            if (timeDifference > 0) {
-                // Adding time - ensure start time is after billing cutoff while preserving duration
-                const proposedStartTime = now - timeDifference;
-                
-                if (proposedStartTime > billingCutoffDate) {
-                    // Normal case - no adjustment needed
-                    const adjustmentEntry = {
-                        id: `adjustment-${now}`,
-                        taskId: task.id,
-                        start: proposedStartTime,
-                        end: now
-                    };
-                    setTimeEntries([...timeEntries, adjustmentEntry]);
-                } else {
-                    // Start time would be before billing cutoff - adjust both start and end to preserve duration
-                    const startTime = billingCutoffDate + 1;
-                    const endTime = startTime + timeDifference;
-                    
-                    const adjustmentEntry = {
-                        id: `adjustment-${now}`,
-                        taskId: task.id,
-                        start: startTime,
-                        end: endTime
-                    };
-                    setTimeEntries([...timeEntries, adjustmentEntry]);
-                }
-            } else {
-                // Reducing time - replace existing entries with a new single entry
-                if (newTime > 0) {
-                    // Remove existing entries for this task and create a new one with the exact time
-                    const otherEntries = timeEntries.filter(entry => entry.taskId !== task.id);
-                    const proposedStartTime = now - newTime;
-                    
-                    if (proposedStartTime > billingCutoffDate) {
-                        // Normal case - no adjustment needed
-                        const newEntry = {
-                            id: `manual-${now}`,
-                            taskId: task.id,
-                            start: proposedStartTime,
-                            end: now
-                        };
-                        setTimeEntries([...otherEntries, newEntry]);
-                    } else {
-                        // Start time would be before billing cutoff - adjust both start and end to preserve duration
-                        const startTime = billingCutoffDate + 1;
-                        const endTime = startTime + newTime;
-                        
-                        const newEntry = {
-                            id: `manual-${now}`,
-                            taskId: task.id,
-                            start: startTime,
-                            end: endTime
-                        };
-                        setTimeEntries([...otherEntries, newEntry]);
-                    }
-                } else {
-                    // Remove all time entries for this task
-                    const otherEntries = timeEntries.filter(entry => entry.taskId !== task.id);
-                    setTimeEntries(otherEntries);
-                }
-            }
-        }
     };
 
     /**
@@ -1029,9 +862,9 @@ const SubtaskItem = ({
                             <div className="flex items-center space-x-2 text-xs text-gray-500">
                                 {totalTime > 0 && (
                                     <button
-                                        onClick={() => setShowTimeEditModal(true)}
+                                        onClick={() => setShowTimeEntriesModal(true)}
                                         className="hover:bg-gray-100 px-2 py-1 rounded-md transition-colors"
-                                        title="Click to edit time"
+                                        title="Click to view time entries"
                                         disabled={isCompleted}
                                     >
                                         {formatDurationWithSeconds(totalTime)}
@@ -1087,7 +920,7 @@ const SubtaskItem = ({
                             />
 
                             <button
-                                onClick={() => setShowTimeEditModal(true)}
+                                onClick={() => setShowTimeEntriesModal(true)}
                                 className="p-1 text-gray-400 hover:bg-blue-100 rounded-md transition-colors group"
                                 title="Edit Time"
                             >
@@ -1167,13 +1000,14 @@ const SubtaskItem = ({
                 </div>
             )}
 
-            {/* Time Edit Modal */}
-            <TimeEditModal
-                isOpen={showTimeEditModal}
-                onClose={() => setShowTimeEditModal(false)}
-                currentTime={totalTime}
-                onSave={handleTimeEdit}
-                taskTitle={task.title}
+            {/* Time Entries Modal */}
+            <TimeEntriesModal
+                isOpen={showTimeEntriesModal}
+                onClose={() => setShowTimeEntriesModal(false)}
+                task={task}
+                timeEntries={timeEntries}
+                setTimeEntries={setTimeEntries}
+                allTasks={allTasks}
             />
         </div>
     );
