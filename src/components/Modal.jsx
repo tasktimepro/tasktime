@@ -85,7 +85,7 @@ const Modal = ({
 
   // Always use the scrollable modal layout with header and footer
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 !mt-0">
       <div className={`bg-white rounded-lg w-full mx-auto flex flex-col ${sizeClasses[size]} ${className}`} 
            style={{ maxHeight: 'calc(100vh - 2rem)' }}>
         {/* Fixed Header */}

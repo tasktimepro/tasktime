@@ -105,16 +105,18 @@ function App() {
         startTime: null,
         taskId: null,
         paused: false,
-        elapsedTime: 0
+        elapsedTime: 0,
+        note: undefined
     });
 
     // Derived state for backward compatibility
     const currentTimer = useMemo(() => {
         return timerState.startTime && timerState.taskId ? {
             startTime: timerState.startTime,
-            taskId: timerState.taskId
+            taskId: timerState.taskId,
+            note: timerState.note
         } : null;
-    }, [timerState.startTime, timerState.taskId]);
+    }, [timerState.startTime, timerState.taskId, timerState.note]);
     
     const isPaused = timerState.paused;
     const pausedElapsedTime = timerState.elapsedTime;
@@ -126,13 +128,15 @@ function App() {
                 startTime: null,
                 taskId: null,
                 paused: false,
-                elapsedTime: 0
+                elapsedTime: 0,
+                note: undefined
             });
         } else {
             setTimerState(prev => ({
                 ...prev,
                 startTime: timer.startTime,
-                taskId: timer.taskId
+                taskId: timer.taskId,
+                note: timer.note
             }));
         }
     };

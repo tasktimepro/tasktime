@@ -105,7 +105,8 @@ function TimerControls({
         // Adjust the startTime to make sure the timer continues from the pause point
         setCurrentTimer({
             ...currentTimer,
-            startTime: currentTimer.startTime + pauseDuration
+            startTime: currentTimer.startTime + pauseDuration,
+            note: currentTimer.note
         });
         
         setIsPaused(false);
@@ -159,6 +160,7 @@ function TimerControls({
      * Stop timer completely and remove it
      */
     const stopTimer = () => {
+
         if (!currentTimer || currentTimer.taskId !== task.id) return;
 
         const now = Date.now();

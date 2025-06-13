@@ -24,8 +24,9 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
     const isEntryBilled = useCallback(
         (entry) => {
             if (!task || !entry) return false;
-            const billingCutoffDate = task.lastBilledAt || task.createdAt || 0;
-            return entry.start <= billingCutoffDate;
+            // Only consider entries billed if the task has actually been billed (has lastBilledAt)
+            if (!task.lastBilledAt) return false;
+            return entry.start <= task.lastBilledAt;
         },
         [task]
     );
@@ -233,7 +234,8 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
         }
 
         // Check for billing cutoff date (same logic as task editing)
-        const billingCutoffDate = task.lastBilledAt || task.createdAt || 0;
+        // Allow creating entries before task created time
+        const billingCutoffDate = task.lastBilledAt; // || task.createdAt || 0;
         
         if (startTimestamp <= billingCutoffDate) {
             showError('Cannot add time entries before the last billing date');

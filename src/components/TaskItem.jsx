@@ -761,7 +761,6 @@ const SubtaskItem = ({
         const now = Date.now();
         
         // If timer is active for this subtask, stop it before completing
-        // If timer is active for this subtask, stop it before completing
         if (isTimerActive && currentTimer) {
             const timeEntry = {
                 id: `completion-${Date.now()}`,
