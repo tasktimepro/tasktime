@@ -19,7 +19,8 @@ import {
     getThisYearRange,
     formatDuration,
     formatDurationWithSeconds,
-    millisecondsToHours
+    millisecondsToHours,
+    parseStoredDate
 } from '../utils/dateUtils';
 import { getPreferredCurrency, formatCurrency, fetchExchangeRates, convertCurrency, getProjectCurrency } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
@@ -194,8 +195,10 @@ const Dashboard = ({
 
         // Calculate invoice amounts in the given date range
         const invoicesInRange = invoices.filter(invoice => {
-            // Use invoice date (which includes overrides) for accurate reporting
-            const invoiceDate = invoice.date ? new Date(invoice.date).getTime() : invoice.createdAt;
+            // Use invoice date for accurate reporting, with createdAt as fallback
+            // parseStoredDate handles both ISO format and legacy locale-dependent formats
+            const parsedDate = parseStoredDate(invoice.date, invoice.createdAt);
+            const invoiceDate = parsedDate ? parsedDate.getTime() : null;
             if (!invoiceDate) return false;
             return invoiceDate >= startTime && invoiceDate <= endTime;
         });
@@ -206,7 +209,8 @@ const Dashboard = ({
 
         invoicesInRange.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
-            const currency = invoice.project ? getProjectCurrency(invoice.project, clients) : preferredCurrency;
+            // Invoices store their currency directly - use it, or fall back to preferred currency
+            const currency = invoice.currency || preferredCurrency;
             
             if (invoice.paymentProcessed) {
                 // Paid invoice
@@ -256,7 +260,9 @@ const Dashboard = ({
         const outstanding = invoices.filter(invoice => !invoice.paymentProcessed);
         const pastDue = outstanding.filter(invoice => {
             if (!invoice.dueDate) return false;
-            const dueDate = new Date(invoice.dueDate);
+            // parseStoredDate handles both ISO format and legacy locale-dependent formats
+            const dueDate = parseStoredDate(invoice.dueDate);
+            if (!dueDate) return false;
             return dueDate < new Date();
         });
 
@@ -264,7 +270,8 @@ const Dashboard = ({
         const outstandingByCurrency = {};
         outstanding.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
-            const currency = invoice.project ? getProjectCurrency(invoice.project, clients) : preferredCurrency;
+            // Invoices store their currency directly - use it, or fall back to preferred currency
+            const currency = invoice.currency || preferredCurrency;
             
             if (!outstandingByCurrency[currency]) {
                 outstandingByCurrency[currency] = 0;
@@ -276,7 +283,8 @@ const Dashboard = ({
         const pastDueByCurrency = {};
         pastDue.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
-            const currency = invoice.project ? getProjectCurrency(invoice.project, clients) : preferredCurrency;
+            // Invoices store their currency directly - use it, or fall back to preferred currency
+            const currency = invoice.currency || preferredCurrency;
             
             if (!pastDueByCurrency[currency]) {
                 pastDueByCurrency[currency] = 0;
@@ -298,7 +306,7 @@ const Dashboard = ({
             pastDue: pastDue.length,
             pastDueTotal
         };
-    }, [invoices, convertToCurrency, preferredCurrency, clients]);
+    }, [invoices, convertToCurrency, preferredCurrency]);
 
     /**
      * Get recent active tasks sorted by their most recent activity (any interaction)

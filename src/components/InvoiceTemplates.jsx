@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import { useToast } from '../hooks/useToast';
+import { toDisplayDate } from '../utils/dateUtils';
 
 /**
  * InvoiceTemplates component - Manages invoice templates with customizable formats
@@ -98,7 +99,7 @@ const InvoiceTemplates = ({
                 const days = parseInt(template.dueDateDays) || 0;
                 const daysDate = new Date(today);
                 daysDate.setDate(daysDate.getDate() + days);
-                return `Due date: ${daysDate.toLocaleDateString()} (${days} ${days === 1 ? 'day' : 'days'} from invoice date)`;
+                return `Due date: ${toDisplayDate(daysDate)} (${days} ${days === 1 ? 'day' : 'days'} from invoice date)`;
             }
             
             case 'fixed-weeks': {
@@ -108,14 +109,14 @@ const InvoiceTemplates = ({
                 const weeks = parseInt(template.dueDateWeeks) || 0;
                 const weeksDate = new Date(today);
                 weeksDate.setDate(weeksDate.getDate() + (weeks * 7));
-                return `Due date: ${weeksDate.toLocaleDateString()} (${weeks} ${weeks === 1 ? 'week' : 'weeks'} from invoice date)`;
+                return `Due date: ${toDisplayDate(weeksDate)} (${weeks} ${weeks === 1 ? 'week' : 'weeks'} from invoice date)`;
             }
             
             case 'precise-date': {
                 if (!template.dueDatePrecise) {
                     return 'Due date: Not specified';
                 }
-                return `Due date: ${new Date(template.dueDatePrecise).toLocaleDateString()}`;
+                return `Due date: ${toDisplayDate(template.dueDatePrecise)}`;
             }
             
             case 'none': {
@@ -126,7 +127,7 @@ const InvoiceTemplates = ({
                 // Backward compatibility with old 'fixed' type
                 const defaultDate = new Date(today);
                 defaultDate.setDate(defaultDate.getDate() + (template.dueDateDays || 30));
-                return `Due date: ${defaultDate.toLocaleDateString()} (${template.dueDateDays || 30} days from invoice date)`;
+                return `Due date: ${toDisplayDate(defaultDate)} (${template.dueDateDays || 30} days from invoice date)`;
             }
         }
     }, [staticDate]);
@@ -208,7 +209,7 @@ const InvoiceTemplates = ({
                                                     <p>{calculateDueDatePreview(template)}</p>
                                                 </div>
                                                 <p className="mt-2 text-xs text-gray-400">
-                                                    Created {new Date(template.createdAt).toLocaleDateString()}
+                                                    Created {toDisplayDate(template.createdAt)}
                                                 </p>
                                             </div>
                                         </div>

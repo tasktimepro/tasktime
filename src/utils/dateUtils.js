@@ -150,3 +150,89 @@ export const millisecondsToHours = (milliseconds) => {
 export const hoursToMinutes = (hours) => {
     return Math.round(hours * 60);
 };
+
+/**
+ * Format a date for storage (YYYY-MM-DD format - portable across locales)
+ * Uses LOCAL date to avoid timezone shifting issues
+ * Use this when STORING dates to IndexedDB or state
+ * @param {Date|number|string} date - Date object, timestamp, or date string
+ * @returns {string} Date string (YYYY-MM-DD) or null if invalid
+ */
+export const toStorageDate = (date) => {
+    if (!date) return null;
+    
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return null;
+    
+    // Use LOCAL date components to avoid timezone shifting
+    // e.g., Jan 15 at 10pm PST should store as "2026-01-15", not "2026-01-16" (UTC)
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+};
+
+/**
+ * Format a date for display (locale-aware)
+ * Use this when DISPLAYING dates to users
+ * @param {Date|number|string} date - Date object, timestamp, or ISO date string
+ * @param {object} options - Intl.DateTimeFormat options
+ * @returns {string} Locale-formatted date string
+ */
+export const toDisplayDate = (date, options = {}) => {
+    if (!date) return '';
+    
+    // If it's a YYYY-MM-DD string, parse it as local time to avoid timezone shift
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const [year, month, day] = date.split('-').map(Number);
+        const d = new Date(year, month - 1, day); // Local time
+        return d.toLocaleDateString(undefined, options);
+    }
+    
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return '';
+    
+    return d.toLocaleDateString(undefined, options);
+};
+
+/**
+ * Parse a stored date string back to a Date object
+ * Handles YYYY-MM-DD format as LOCAL time (not UTC) to avoid timezone issues
+ * Also handles legacy locale-dependent formats with fallback
+ * @param {string|number} dateValue - ISO date string, locale string, or timestamp
+ * @param {number} fallbackTimestamp - Fallback timestamp if parsing fails
+ * @returns {Date|null} Parsed Date object or null if invalid
+ */
+export const parseStoredDate = (dateValue, fallbackTimestamp = null) => {
+    if (!dateValue) {
+        return fallbackTimestamp ? new Date(fallbackTimestamp) : null;
+    }
+    
+    // If it's already a timestamp, convert directly
+    if (typeof dateValue === 'number') {
+        return new Date(dateValue);
+    }
+    
+    // If it's a YYYY-MM-DD string, parse as LOCAL time to avoid timezone shift
+    // This prevents "2026-01-15" from becoming Jan 14 in western timezones
+    if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+        const [year, month, day] = dateValue.split('-').map(Number);
+        return new Date(year, month - 1, day); // Local time, not UTC
+    }
+    
+    // Try parsing other string formats
+    const parsed = new Date(dateValue);
+    
+    // If parsing succeeded, return the date
+    if (!isNaN(parsed.getTime())) {
+        return parsed;
+    }
+    
+    // If parsing failed and we have a fallback, use it
+    if (fallbackTimestamp) {
+        return new Date(fallbackTimestamp);
+    }
+    
+    return null;
+};

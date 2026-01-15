@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { useToast } from '../hooks/useToast';
+import { toDisplayDate } from '../utils/dateUtils';
 
 // Event name for dropdown coordination
 const DROPDOWN_TOGGLE_EVENT = 'payment-dropdown-toggle';
@@ -141,7 +142,7 @@ const PaymentMethods = ({
                                                     )}
                                                 </div>
                                                 <p className="mt-2 text-xs text-gray-400">
-                                                    Created {new Date(method.createdAt).toLocaleDateString()}
+                                                    Created {toDisplayDate(method.createdAt)}
                                                 </p>
                                             </div>
                                         </div>

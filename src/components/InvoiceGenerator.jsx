@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DocumentTextIcon, TrashIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
-import { millisecondsToHours } from '../utils/dateUtils';
+import { millisecondsToHours, toStorageDate, toDisplayDate } from '../utils/dateUtils';
 import { getCurrencySymbol, getPreferredCurrency, getProjectCurrency } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
 import InvoiceModal from './invoice/InvoiceModal';
@@ -894,13 +894,14 @@ const InvoiceGenerator = ({
 
     /**
      * Calculate due date using template settings
+     * Returns ISO format (YYYY-MM-DD) for storage portability
      */
     const calculateDueDate = useCallback((template, invoiceDate = new Date()) => {
         if (!template) {
             // Default to 30 days if no template
             const dueDate = new Date(invoiceDate);
             dueDate.setDate(dueDate.getDate() + 30);
-            return dueDate.toLocaleDateString();
+            return toStorageDate(dueDate);
         }
 
         switch (template.dueDateType) {
@@ -910,7 +911,7 @@ const InvoiceGenerator = ({
                 }
                 const dueDate = new Date(invoiceDate);
                 dueDate.setDate(dueDate.getDate() + parseInt(template.dueDateDays));
-                return dueDate.toLocaleDateString();
+                return toStorageDate(dueDate);
             }
             
             case 'fixed-weeks': {
@@ -919,14 +920,14 @@ const InvoiceGenerator = ({
                 }
                 const dueDate = new Date(invoiceDate);
                 dueDate.setDate(dueDate.getDate() + (parseInt(template.dueDateWeeks) * 7));
-                return dueDate.toLocaleDateString();
+                return toStorageDate(dueDate);
             }
             
             case 'precise-date': {
                 if (!template.dueDatePrecise) {
                     return null; // No due date
                 }
-                return new Date(template.dueDatePrecise).toLocaleDateString();
+                return toStorageDate(new Date(template.dueDatePrecise));
             }
             
             case 'none': {
@@ -937,7 +938,7 @@ const InvoiceGenerator = ({
                 // Backward compatibility with old 'fixed' and 'net' types
                 const dueDate = new Date(invoiceDate);
                 dueDate.setDate(dueDate.getDate() + (template.dueDateDays || 30));
-                return dueDate.toLocaleDateString();
+                return toStorageDate(dueDate);
             }
         }
     }, []);
@@ -1081,11 +1082,12 @@ const InvoiceGenerator = ({
             templateId: selectedTemplate?.id || null, // Keep for backward compatibility
             template: selectedTemplate ? { ...selectedTemplate } : null,
             invoiceNumber: invoiceNumber,
+            // Store dates in ISO format (YYYY-MM-DD) for portability
             date: useInvoiceDateOverride && invoiceDateOverride 
-                ? new Date(invoiceDateOverride).toLocaleDateString() 
-                : (editingInvoice ? editingInvoice.date : new Date().toLocaleDateString()),
+                ? toStorageDate(new Date(invoiceDateOverride))
+                : (editingInvoice ? editingInvoice.date : toStorageDate(new Date())),
             dateOverride: useInvoiceDateOverride && invoiceDateOverride 
-                ? new Date(invoiceDateOverride).toLocaleDateString() 
+                ? toStorageDate(new Date(invoiceDateOverride))
                 : null,
             dueDate: dueDate,
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
@@ -1134,10 +1136,11 @@ const InvoiceGenerator = ({
                 paymentMethod: selectedPaymentMethod,
                 businessInfo: selectedBusinessInfo,
                 invoiceNumber: invoiceNumber,
+                // Display dates in locale format for PDF
                 date: useInvoiceDateOverride && invoiceDateOverride 
-                    ? new Date(invoiceDateOverride).toLocaleDateString() 
-                    : (editingInvoice ? editingInvoice.date : new Date().toLocaleDateString()),
-                dueDate: dueDate,
+                    ? toDisplayDate(new Date(invoiceDateOverride))
+                    : (editingInvoice ? toDisplayDate(editingInvoice.date) : toDisplayDate(new Date())),
+                dueDate: dueDate ? toDisplayDate(dueDate) : null,
                 currency: selectedClient?.defaultCurrency || getPreferredCurrency(),
                 createdAt: editingInvoice ? editingInvoice.createdAt : Date.now()
             })

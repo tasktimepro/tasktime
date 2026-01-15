@@ -1,5 +1,5 @@
 import { TrashIcon } from '@heroicons/react/24/outline';
-import { formatDurationWithSeconds, hoursToMinutes } from '../../utils/dateUtils';
+import { formatDurationWithSeconds, hoursToMinutes, toDisplayDate } from '../../utils/dateUtils';
 import { getPreferredCurrency } from '../../utils/currencyUtils';
 import CustomCheckbox from '../CustomCheckbox';
 import Modal from '../Modal';
@@ -1337,7 +1337,7 @@ const InvoiceModal = ({
                                                                 return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} from invoice date`;
                                                             }
                                                             case 'precise-date':
-                                                                return `Precise date: ${selectedTemplate.dueDatePrecise ? new Date(selectedTemplate.dueDatePrecise).toLocaleDateString() : 'Not set'}`;
+                                                                return `Precise date: ${selectedTemplate.dueDatePrecise ? toDisplayDate(selectedTemplate.dueDatePrecise) : 'Not set'}`;
                                                             case 'none':
                                                                 return 'Not shown';
                                                             default:

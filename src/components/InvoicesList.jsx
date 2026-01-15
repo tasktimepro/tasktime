@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
+import { parseStoredDate, toDisplayDate } from '../utils/dateUtils';
 import { useUrlState } from '../hooks/useUrlState';
 import Pagination from './Pagination';
 import Modal from './Modal';
@@ -15,7 +16,10 @@ const isInvoiceOverdue = (invoice) => {
     }
     
     const today = new Date();
-    const dueDate = new Date(invoice.dueDate);
+    // parseStoredDate handles both ISO format and legacy locale-dependent formats
+    const dueDate = parseStoredDate(invoice.dueDate);
+    
+    if (!dueDate) return false;
     
     // Set times to start of day for accurate date comparison
     today.setHours(0, 0, 0, 0);
@@ -386,7 +390,7 @@ const InvoicesList = ({
                                 <div className="flex items-end justify-between ml-9">
                                     <div className="flex-1">
                                         <p className="text-sm text-gray-500">
-                                            {invoice.date}
+                                            {toDisplayDate(invoice.date)}
                                             {invoice.totalHours > 0 && (
                                                 <>
                                                     <span className="mx-1">•</span>
@@ -402,7 +406,7 @@ const InvoicesList = ({
                                                     ? 'text-red-600 font-medium' 
                                                     : 'text-gray-500'
                                             }`}>
-                                                Due: {invoice.dueDate}
+                                                Due: {toDisplayDate(invoice.dueDate)}
                                             </p>
                                         )}
                                         <div className="text-xs text-gray-400 mt-1">
@@ -600,7 +604,7 @@ const InvoicesList = ({
                         <div className="text-center border-b pb-4">
                             <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
                             <p className="text-gray-600">Invoice #{selectedInvoice.invoiceNumber}</p>
-                            <p className="text-gray-600">Date: {selectedInvoice.date}</p>
+                            <p className="text-gray-600">Date: {toDisplayDate(selectedInvoice.date)}</p>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4">

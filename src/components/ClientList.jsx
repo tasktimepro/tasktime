@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useToast } from '../hooks/useToast';
+import { toDisplayDate } from '../utils/dateUtils';
 
 // Event name for dropdown coordination
 const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
@@ -367,7 +368,7 @@ const ClientList = ({
                                         )}
 
                                         <p className="mt-1 text-xs text-gray-400">
-                                            Created {new Date(client.createdAt).toLocaleDateString()}
+                                            Created {toDisplayDate(client.createdAt)}
                                         </p>
 
                                         {/* Show related projects count */}
@@ -477,7 +478,7 @@ const ClientList = ({
                                                 )}
 
                                                 <p className="mt-1 text-xs text-gray-400">
-                                                    Created {new Date(client.createdAt).toLocaleDateString()}
+                                                    Created {toDisplayDate(client.createdAt)}
                                                 </p>
 
                                                 {/* Show related projects count */}

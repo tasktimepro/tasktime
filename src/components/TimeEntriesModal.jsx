@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
-import { formatDurationWithSeconds } from '../utils/dateUtils';
+import { formatDurationWithSeconds, toDisplayDate } from '../utils/dateUtils';
 import { checkTimeOverlap } from '../utils/timeValidationUtils';
 import { generateId } from '../utils/idUtils';
 import { useToast } from '../hooks/useToast';
@@ -131,7 +131,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
     const formatDateTime = (timestamp) => {
         const date = new Date(timestamp);
         return {
-            date: date.toLocaleDateString(),
+            date: toDisplayDate(date),
             time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         };
     };

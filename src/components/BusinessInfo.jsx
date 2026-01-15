@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
 import { useToast } from '../hooks/useToast';
+import { toDisplayDate } from '../utils/dateUtils';
 
 // Event name for dropdown coordination
 const DROPDOWN_TOGGLE_EVENT = 'business-dropdown-toggle';
@@ -149,7 +150,7 @@ const BusinessInfo = ({
                                                     )}
                                                 </div>
                                                 <p className="mt-2 text-xs text-gray-400">
-                                                    Created {new Date(info.createdAt).toLocaleDateString()}
+                                                    Created {toDisplayDate(info.createdAt)}
                                                 </p>
                                             </div>
                                         </div>

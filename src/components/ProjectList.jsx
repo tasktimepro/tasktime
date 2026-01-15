@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils';
-import { millisecondsToHours } from '../utils/dateUtils';
+import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { getTaskIdsToDelete } from '../utils/taskUtils';
 
@@ -441,7 +441,7 @@ const ProjectList = ({
                                 )}
 
                                 <p className="mt-1 text-xs text-gray-400">
-                                    Created {new Date(project.createdAt).toLocaleDateString()}
+                                    Created {toDisplayDate(project.createdAt)}
                                     {project.isPersonal && (
                                         <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                                             Personal
@@ -562,7 +562,7 @@ const ProjectList = ({
                                                 )}
 
                                                 <p className="mt-1 text-xs text-gray-400">
-                                                    Created {new Date(project.createdAt).toLocaleDateString()}
+                                                    Created {toDisplayDate(project.createdAt)}
                                                     {project.isPersonal && (
                                                         <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                                                             Personal
