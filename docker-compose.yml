@@ -1,0 +1,9 @@
+services:
+  app:
+    build: .
+    container_name: tasktime
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3101:3101"

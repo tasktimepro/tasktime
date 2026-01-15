@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { generateId } from '../../utils/idUtils';
+import { generateSlugId } from '../../utils/idUtils';
 import { useToast } from '../../hooks/useToast';
 import CustomCheckbox from '../CustomCheckbox';
 import { getPreferredCurrency, getCurrencyOptions } from '../../utils/currencyUtils';
@@ -149,7 +149,7 @@ const ClientModal = ({
         }
 
         const newClient = {
-            id: generateId(),
+            id: generateSlugId(formData.title),
             title: formData.title,
             clientName: formData.clientName,
             contactPerson: formData.contactPerson,

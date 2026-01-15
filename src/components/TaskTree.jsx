@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import TaskItem from './TaskItem';
 import { generateId } from '../utils/idUtils';
@@ -312,4 +312,4 @@ const TaskTree = ({
     );
 };
 
-export default TaskTree;
+export default React.memo(TaskTree);

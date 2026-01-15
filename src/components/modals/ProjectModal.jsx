@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import Modal from '../Modal';
-import { generateId } from '../../utils/idUtils';
+import { generateSlugId } from '../../utils/idUtils';
 import { useToast } from '../../hooks/useToast';
 import CustomCheckbox from '../CustomCheckbox';
 
@@ -55,56 +55,56 @@ const ProjectModal = ({
                 isPersonal: editingProject.isPersonal || false
             });
         } else {
-            // Check if there's saved state from a previous session
-            const savedState = getSavedState && getSavedState();
-            if (savedState && !editingProject) {
-                console.log('Restoring saved project form state:', savedState);
-                setFormData({
-                    title: savedState.title || '',
-                    hourlyRate: savedState.hourlyRate || '',
-                    flatRate: savedState.flatRate || false,
-                    preferredClientId: savedState.preferredClientId || '',
-                    overrideRate: savedState.overrideRate || false,
-                    isPersonal: savedState.isPersonal || false
-                });
-                
-                // Restore client rate if needed
-                if (savedState.preferredClientId && clients.length > 0) {
-                    const savedClient = clients.find(c => c.id === savedState.preferredClientId);
-                    setSelectedClientRate(savedClient || null);
+            // If modalOptions contains preselectedClientId, it takes priority
+            if (modalOptions?.preselectedClientId) {
+                const preselectedClient = clients.find(c => c.id === modalOptions.preselectedClientId);
+                if (preselectedClient) {
+                    // Only set initial values if client isn't already selected (avoid resetting user input)
+                    setFormData(prev => {
+                        if (prev.preferredClientId === modalOptions.preselectedClientId) {
+                            // Already initialized with this client, don't reset
+                            return prev;
+                        }
+                        // First time initialization with preselected client
+                        return {
+                            title: '',
+                            hourlyRate: preselectedClient.hourlyRate ? preselectedClient.hourlyRate.toString() : '',
+                            flatRate: preselectedClient.flatRate || false,
+                            preferredClientId: modalOptions.preselectedClientId,
+                            overrideRate: false,
+                            isPersonal: false
+                        };
+                    });
+                    setSelectedClientRate(preselectedClient);
                 }
             } else {
-                // Reset form for creating new project
-                const initialData = {
-                    title: '',
-                    hourlyRate: '',
-                    flatRate: false,
-                    preferredClientId: '',
-                    overrideRate: false,
-                    isPersonal: false
-                };
-
-                // If modalOptions contains preselectedClientId, set it and disable personal mode
-                if (modalOptions?.preselectedClientId) {
-                    const preselectedClient = clients.find(c => c.id === modalOptions.preselectedClientId);
-                    if (preselectedClient) {
-                        initialData.preferredClientId = modalOptions.preselectedClientId;
-                        setSelectedClientRate(preselectedClient);
-                        
-                        // Set client's rate if available
-                        if (preselectedClient.hourlyRate) {
-                            initialData.hourlyRate = preselectedClient.hourlyRate.toString();
-                        }
-                        if (preselectedClient.flatRate) {
-                            initialData.flatRate = preselectedClient.flatRate;
-                        }
+                // Check if there's saved state from a previous session (only when no preselected client)
+                const savedState = getSavedState && getSavedState();
+                if (savedState) {
+                    setFormData({
+                        title: savedState.title || '',
+                        hourlyRate: savedState.hourlyRate || '',
+                        flatRate: savedState.flatRate || false,
+                        preferredClientId: savedState.preferredClientId || '',
+                        overrideRate: savedState.overrideRate || false,
+                        isPersonal: savedState.isPersonal || false
+                    });
+                    
+                    // Restore client rate if needed
+                    if (savedState.preferredClientId && clients.length > 0) {
+                        const savedClient = clients.find(c => c.id === savedState.preferredClientId);
+                        setSelectedClientRate(savedClient || null);
                     }
-                }
-
-                setFormData(initialData);
-                
-                // If no preselected client, reset selected client rate
-                if (!modalOptions?.preselectedClientId) {
+                } else {
+                    // No saved state and no preselected client - reset form
+                    setFormData({
+                        title: '',
+                        hourlyRate: '',
+                        flatRate: false,
+                        preferredClientId: '',
+                        overrideRate: false,
+                        isPersonal: false
+                    });
                     setSelectedClientRate(null);
                 }
             }
@@ -198,7 +198,7 @@ const ProjectModal = ({
         }
 
         const newProject = {
-            id: generateId(),
+            id: generateSlugId(formData.title),
             title: formData.title,
             hourlyRate: formData.hourlyRate !== '' ? parseFloat(formData.hourlyRate) : null,
             flatRate: formData.flatRate || false,

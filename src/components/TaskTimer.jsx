@@ -12,6 +12,7 @@ const TaskTimer = ({
     task,
     timeEntries,
     setTimeEntries,
+    tasks = [], // All tasks for overlap validation
     currentTimer,
     setCurrentTimer,
     isPaused = false,
@@ -78,6 +79,7 @@ const TaskTimer = ({
                 task={task}
                 timeEntries={timeEntries}
                 setTimeEntries={setTimeEntries}
+                tasks={tasks}
                 currentTimer={currentTimer}
                 setCurrentTimer={setCurrentTimer}
                 isPaused={isPaused}

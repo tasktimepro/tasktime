@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     PencilIcon, 
     TrashIcon,
@@ -381,6 +381,7 @@ const TaskItem = ({
                                     task={task}
                                     timeEntries={timeEntries}
                                     setTimeEntries={setTimeEntries}
+                                    tasks={allTasks || tasks}
                                     currentTimer={currentTimer}
                                     setCurrentTimer={setCurrentTimer}
                                     isPaused={isPaused}
@@ -432,6 +433,7 @@ const TaskItem = ({
                                         task={task}
                                         timeEntries={timeEntries}
                                         setTimeEntries={setTimeEntries}
+                                        tasks={allTasks || tasks}
                                         currentTimer={currentTimer}
                                         setCurrentTimer={setCurrentTimer}
                                         isPaused={isPaused}
@@ -884,6 +886,7 @@ const SubtaskItem = ({
                             task={task}
                             timeEntries={timeEntries}
                             setTimeEntries={setTimeEntries}
+                            tasks={allTasks || tasks}
                             currentTimer={currentTimer}
                             setCurrentTimer={setCurrentTimer}
                             isPaused={isPaused}
@@ -907,6 +910,7 @@ const SubtaskItem = ({
                                 task={task}
                                 timeEntries={timeEntries}
                                 setTimeEntries={setTimeEntries}
+                                tasks={allTasks || tasks}
                                 currentTimer={currentTimer}
                                 setCurrentTimer={setCurrentTimer}
                                 isPaused={isPaused}
@@ -1012,4 +1016,4 @@ const SubtaskItem = ({
     );
 };
 
-export default TaskItem;
+export default React.memo(TaskItem);

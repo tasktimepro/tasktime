@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { formatActiveTimer, formatDurationWithSeconds } from '../utils/dateUtils';
 import { checkTimerStartOverlap } from '../utils/timeValidationUtils';
@@ -208,7 +208,9 @@ const GlobalTimer = ({
                     {/* Control buttons - using TaskTimer component */}
                     <TaskTimer
                         task={currentTask}
+                        timeEntries={timeEntries}
                         setTimeEntries={setTimeEntries}
+                        tasks={tasks}
                         currentTimer={currentTimer}
                         setCurrentTimer={setCurrentTimer}
                         isGlobalTimer={true}
@@ -293,4 +295,4 @@ const GlobalTimer = ({
     );
 };
 
-export default GlobalTimer;
+export default React.memo(GlobalTimer);

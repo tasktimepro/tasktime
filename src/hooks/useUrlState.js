@@ -1,11 +1,53 @@
 import { useState, useEffect, useCallback } from 'react';
 
+/**
+ * Parse URL path and search params into state object
+ * Supports paths like: /, /projects, /projects/abc123, /clients, /clients/xyz789, /invoices, /account
+ */
 function getParamsFromUrl() {
+    const pathname = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
+    
+    // Parse the pathname to extract view and IDs
+    const pathParts = pathname.split('/').filter(Boolean); // Remove empty strings
+    
+    let view = 'dashboard';
+    let projectId = null;
+    let clientId = null;
+    
+    if (pathParts.length === 0 || pathname === '/') {
+        view = 'dashboard';
+    } else {
+        const firstPart = pathParts[0];
+        
+        switch (firstPart) {
+            case 'projects':
+                view = 'projects';
+                if (pathParts[1]) {
+                    projectId = pathParts[1];
+                }
+                break;
+            case 'clients':
+                view = 'clients';
+                if (pathParts[1]) {
+                    clientId = pathParts[1];
+                }
+                break;
+            case 'invoices':
+                view = 'invoices';
+                break;
+            case 'account':
+                view = 'account';
+                break;
+            default:
+                view = 'dashboard';
+        }
+    }
+    
     return {
-        view: params.get('view') || 'dashboard',
-        projectId: params.get('project') || null,
-        clientId: params.get('client') || null,
+        view,
+        projectId,
+        clientId,
         section: params.get('section') || null,
         create: params.get('create') || null,
         tab: params.get('tab') || null,
@@ -44,40 +86,89 @@ export const useUrlState = () => {
     }, []);
 
     /**
-     * Update URL parameters without page reload
+     * Build URL from path and optional query params
      */
-    const updateUrl = useCallback((newParams) => {
-        const url = new URL(window.location);
-        const searchParams = new URLSearchParams(url.search);
-
-        // Update or remove parameters
-        Object.entries(newParams).forEach(([key, value]) => {
-            if (value === null || value === undefined || value === '') {
-                searchParams.delete(key);
-            } else {
+    const buildUrl = useCallback((path, queryParams = {}) => {
+        const searchParams = new URLSearchParams();
+        
+        Object.entries(queryParams).forEach(([key, value]) => {
+            if (value !== null && value !== undefined && value !== '') {
                 searchParams.set(key, value);
             }
         });
+        
+        const queryString = searchParams.toString();
+        return queryString ? `${path}?${queryString}` : path;
+    }, []);
 
-        // Update the URL
-        const newUrl = `${url.pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    /**
+     * Update URL and state - now uses path-based routing
+     * Merges with current state when partial params are provided
+     */
+    const updateUrl = useCallback((newParams) => {
+        // Get current state to merge with
+        const currentState = getParamsFromUrl();
+        
+        // Merge new params with current state
+        // If view is not provided, keep current view
+        const mergedParams = {
+            view: currentState.view,
+            project: currentState.projectId,
+            client: currentState.clientId,
+            section: currentState.section,
+            create: currentState.create,
+            tab: currentState.tab,
+            preselectedClientId: currentState.preselectedClientId,
+            ...newParams
+        };
+        
+        // Build the new path based on view and IDs
+        let path = '/';
+        const queryParams = {};
+        
+        const view = mergedParams.view || 'dashboard';
+        
+        switch (view) {
+            case 'projects':
+                if (mergedParams.project) {
+                    path = `/projects/${mergedParams.project}`;
+                } else {
+                    path = '/projects';
+                }
+                break;
+            case 'clients':
+                if (mergedParams.client) {
+                    path = `/clients/${mergedParams.client}`;
+                } else {
+                    path = '/clients';
+                }
+                break;
+            case 'invoices':
+                path = '/invoices';
+                break;
+            case 'account':
+                path = '/account';
+                break;
+            default:
+                path = '/';
+        }
+        
+        // Add optional query params (section, create, tab, preselectedClientId)
+        // Only add if truthy (not null/undefined/empty)
+        if (mergedParams.section) queryParams.section = mergedParams.section;
+        if (mergedParams.create) queryParams.create = mergedParams.create;
+        if (mergedParams.tab) queryParams.tab = mergedParams.tab;
+        if (mergedParams.preselectedClientId) queryParams.preselectedClientId = mergedParams.preselectedClientId;
+        
+        const newUrl = buildUrl(path, queryParams);
         
         // Update URL and state
         window.history.pushState({}, '', newUrl);
         
         // Create new state object to force re-render
-        const newState = {
-            view: searchParams.get('view') || 'dashboard',
-            projectId: searchParams.get('project') || null,
-            clientId: searchParams.get('client') || null,
-            section: searchParams.get('section') || null,
-            create: searchParams.get('create') || null,
-            tab: searchParams.get('tab') || null,
-            preselectedClientId: searchParams.get('preselectedClientId') || null
-        };
-        
+        const newState = getParamsFromUrl();
         setUrlParams(newState);
-    }, []);
+    }, [buildUrl]);
 
     /**
      * Navigate to projects view

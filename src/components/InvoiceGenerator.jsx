@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DocumentTextIcon, TrashIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours } from '../utils/dateUtils';
@@ -1585,4 +1585,4 @@ const InvoiceGenerator = ({
     );
 };
 
-export default InvoiceGenerator;
+export default React.memo(InvoiceGenerator);

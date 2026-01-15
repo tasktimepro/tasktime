@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
     ChartBarIcon, 
     ClockIcon, 
@@ -639,6 +639,7 @@ const Dashboard = ({
                 task={task}
                 timeEntries={timeEntries}
                 setTimeEntries={setTimeEntries}
+                tasks={tasks}
                 currentTimer={currentTimer}
                 setCurrentTimer={setCurrentTimer}
                 isGlobalTimer={true}
@@ -651,7 +652,7 @@ const Dashboard = ({
                 setTasks={setTasks}
             />
         );
-    }, [currentTimer, isPaused, pausedElapsedTime, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTimeEntries, timeEntries, setTasks]);
+    }, [currentTimer, isPaused, pausedElapsedTime, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTimeEntries, timeEntries, setTasks, tasks]);
 
     /**
      * Render task title with navigation
@@ -1197,4 +1198,4 @@ const Dashboard = ({
     );
 };
 
-export default Dashboard;
+export default React.memo(Dashboard);

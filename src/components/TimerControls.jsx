@@ -1,11 +1,16 @@
+import React from 'react';
 import { PlayIcon, PauseIcon, StopIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../utils/idUtils';
+import { checkTimeOverlap } from '../utils/timeValidationUtils';
+import { useToast } from '../hooks/useToast';
 
 /**
  * TimerControls component - Handles task timer functionality
  * @param {Object} props - Component props
  * @param {Object} props.task - Task object
+ * @param {Array} props.timeEntries - All time entries for validation
  * @param {Function} props.setTimeEntries - Function to update time entries
+ * @param {Array} props.tasks - All tasks for overlap validation
  * @param {Object} props.currentTimer - Current active timer
  * @param {Function} props.setCurrentTimer - Function to update current timer
  * @param {string} props.size - Size variant ('sm' or normal)
@@ -17,7 +22,9 @@ import { generateId } from '../utils/idUtils';
  */
 function TimerControls({
     task,
+    timeEntries = [],
     setTimeEntries,
+    tasks = [],
     currentTimer,
     setCurrentTimer,
     size = 'normal',
@@ -30,7 +37,49 @@ function TimerControls({
     onComplete = null,
     setTasks = null
 }) {
+    const { showError } = useToast();
     const isTimerActive = currentTimer && currentTimer.taskId === task.id;
+
+    /**
+     * Validate and create a time entry with overlap checking
+     * @param {string} taskId - Task ID for the entry
+     * @param {number} startTime - Start timestamp
+     * @param {number} endTime - End timestamp
+     * @param {string} note - Optional note
+     * @returns {boolean} - Whether the entry was created successfully
+     */
+    const createValidatedTimeEntry = (taskId, startTime, endTime, note) => {
+        // Find the task to get its project ID
+        const entryTask = tasks.find(t => t.id === taskId) || task;
+        const projectId = entryTask?.projectId;
+
+        // Only validate if we have tasks data for proper overlap checking
+        if (tasks.length > 0 && projectId) {
+            const overlapCheck = checkTimeOverlap(
+                startTime,
+                endTime,
+                projectId,
+                timeEntries,
+                tasks
+            );
+
+            if (!overlapCheck.isValid) {
+                showError(overlapCheck.error);
+                return false;
+            }
+        }
+
+        // Create the time entry
+        const timeEntry = {
+            id: generateId(),
+            taskId: taskId,
+            start: startTime,
+            end: endTime,
+            note: note
+        };
+        setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+        return true;
+    };
 
     /**
      * Start timer for current task
@@ -47,28 +96,26 @@ function TimerControls({
             // Check if the existing timer is paused (for a different task)
             if (isPaused && setIsPaused && setPausedElapsedTime) {
                 // For paused timer of different task, create time entry with paused time
-                const timeEntry = {
-                    id: generateId(),
-                    taskId: currentTimer.taskId,
-                    start: currentTimer.startTime,
-                    end: currentTimer.startTime + pausedElapsedTime,
-                    note: currentTimer.note
-                };
-                setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+                const created = createValidatedTimeEntry(
+                    currentTimer.taskId,
+                    currentTimer.startTime,
+                    currentTimer.startTime + pausedElapsedTime,
+                    currentTimer.note
+                );
+                if (!created) return; // Don't start new timer if validation failed
                 
                 // Reset paused state
                 setIsPaused(false);
                 setPausedElapsedTime(0);
             } else {
                 // For running timer, create time entry with current time
-                const timeEntry = {
-                    id: generateId(),
-                    taskId: currentTimer.taskId,
-                    start: currentTimer.startTime,
-                    end: Date.now(),
-                    note: currentTimer.note
-                };
-                setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+                const created = createValidatedTimeEntry(
+                    currentTimer.taskId,
+                    currentTimer.startTime,
+                    Date.now(),
+                    currentTimer.note
+                );
+                if (!created) return; // Don't start new timer if validation failed
             }
         }
 
@@ -141,18 +188,17 @@ function TimerControls({
                 )
             );
         } else {
-            // Legacy behavior - create entry and stop timer
+            // Legacy behavior - create entry and stop timer with validation
             // This branch should only run if called from a component that doesn't support pausing
-            const timeEntry = {
-                id: generateId(),
-                taskId: task.id,
-                start: currentTimer.startTime,
-                end: now,
-                note: currentTimer.note
-            };
-
-            setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
-            setCurrentTimer(null);
+            const created = createValidatedTimeEntry(
+                task.id,
+                currentTimer.startTime,
+                now,
+                currentTimer.note
+            );
+            if (created) {
+                setCurrentTimer(null);
+            }
         }
     };
 
@@ -165,30 +211,28 @@ function TimerControls({
 
         const now = Date.now();
         
-        // Create the appropriate time entry based on the timer's state
+        // Create the appropriate time entry based on the timer's state with validation
+        let created = false;
         if (isPaused) {
             // For paused timer, use the paused elapsed time
-            const timeEntry = {
-                id: generateId(),
-                taskId: task.id,
-                start: currentTimer.startTime,
-                end: currentTimer.startTime + pausedElapsedTime,
-                note: currentTimer.note
-            };
-            
-            setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+            created = createValidatedTimeEntry(
+                task.id,
+                currentTimer.startTime,
+                currentTimer.startTime + pausedElapsedTime,
+                currentTimer.note
+            );
         } else {
             // For active timer, calculate duration from start to now
-            const timeEntry = {
-                id: generateId(),
-                taskId: task.id,
-                start: currentTimer.startTime,
-                end: now,
-                note: currentTimer.note
-            };
-
-            setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
+            created = createValidatedTimeEntry(
+                task.id,
+                currentTimer.startTime,
+                now,
+                currentTimer.note
+            );
         }
+        
+        // Only proceed with cleanup if entry was created successfully
+        if (!created) return;
         
         // Update the task's lastActive property to keep it at the top of recent tasks
         if (setTasks) {
@@ -274,4 +318,4 @@ function TimerControls({
     );
 }
 
-export default TimerControls;
+export default React.memo(TimerControls);
