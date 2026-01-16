@@ -1,5 +1,6 @@
 import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
@@ -162,17 +163,17 @@ const ProjectDashboard = ({
                 <div className="flex items-center space-x-4">
                     <button
                         onClick={onBackToProjects}
-                        className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                        className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
                         title="Back to Projects"
                     >
                         <ArrowLeftIcon className="h-5 w-5" />
                     </button>
 
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
+                        <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
 
                         {project.hourlyRate && (
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground">
                                 {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
                             </p>
                         )}
@@ -210,113 +211,103 @@ const ProjectDashboard = ({
             {/* Project Metrics - Only show for non-personal projects */}
             {!project.isPersonal && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="p-5">
+                    <Card>
+                        <CardContent className="pt-5">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
-                                        <DocumentCheckIcon className="h-5 w-5 text-gray-600" />
-                                    </div>
+                                    <DocumentCheckIcon className="h-5 w-5 text-muted-foreground" />
                                 </div>
-                                <div className="ml-5 w-0 flex-1">
+                                <div className="ml-4 w-0 flex-1">
                                     <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">Tasks</dt>
-                                        <dd className="text-lg font-medium text-gray-900">{projectMetrics.activeTaskCount}</dd>
+                                        <dt className="text-sm font-medium text-muted-foreground truncate">Tasks</dt>
+                                        <dd className="text-lg font-semibold text-foreground">{projectMetrics.activeTaskCount}</dd>
                                     </dl>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="p-5">
+                    <Card>
+                        <CardContent className="pt-5">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
-                                        <ClockIcon className="h-5 w-5 text-blue-600" />
-                                    </div>
+                                    <ClockIcon className="h-5 w-5 text-muted-foreground" />
                                 </div>
-                                <div className="ml-5 w-0 flex-1">
+                                <div className="ml-4 w-0 flex-1">
                                     <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">Total Time</dt>
-                                        <dd className="text-lg font-medium text-gray-900">{formatDuration(projectMetrics.totalTime)}</dd>
+                                        <dt className="text-sm font-medium text-muted-foreground truncate">Total Time</dt>
+                                        <dd className="text-lg font-semibold text-foreground">{formatDuration(projectMetrics.totalTime)}</dd>
                                     </dl>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="p-5">
+                    <Card>
+                        <CardContent className="pt-5">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
-                                        <BanknotesIcon className="h-5 w-5 text-green-600" />
-                                    </div>
+                                    <BanknotesIcon className="h-5 w-5 text-muted-foreground" />
                                 </div>
-                                <div className="ml-5 w-0 flex-1">
+                                <div className="ml-4 w-0 flex-1">
                                     <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">Paid Revenue</dt>
-                                        <dd className="text-lg font-medium text-gray-900">
+                                        <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
+                                        <dd className="text-lg font-semibold text-foreground">
                                             {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.totalRevenue.toFixed(2)}
                                         </dd>
                                     </dl>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="p-5">
+                    <Card>
+                        <CardContent className="pt-5">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <div className="w-8 h-8 bg-amber-100 rounded-md flex items-center justify-center">
-                                        <DocumentTextIcon className="h-5 w-5 text-amber-600" />
-                                    </div>
+                                    <DocumentTextIcon className="h-5 w-5 text-muted-foreground" />
                                 </div>
-                                <div className="ml-5 w-0 flex-1">
+                                <div className="ml-4 w-0 flex-1">
                                     <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">Pending</dt>
-                                        <dd className="text-lg font-medium text-gray-900">
+                                        <dt className="text-sm font-medium text-muted-foreground truncate">Pending</dt>
+                                        <dd className="text-lg font-semibold text-foreground">
                                             {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.pendingAmount.toFixed(2)}
                                         </dd>
                                     </dl>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="p-5">
+                    <Card>
+                        <CardContent className="pt-5">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
-                                        <CurrencyDollarIcon className="h-5 w-5 text-purple-600" />
-                                    </div>
+                                    <CurrencyDollarIcon className="h-5 w-5 text-muted-foreground" />
                                 </div>
-                                <div className="ml-5 w-0 flex-1">
+                                <div className="ml-4 w-0 flex-1">
                                     <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">Unbilled</dt>
-                                        <dd className="text-lg font-medium text-gray-900">
+                                        <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
+                                        <dd className="text-lg font-semibold text-foreground">
                                             {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.potentialRevenue.toFixed(2)}
                                         </dd>
                                     </dl>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
                 </div>
             )}
 
             {/* Task Tree */}
-            <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-lg font-medium text-gray-900">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">
                         Tasks ({visibleTasksCount})
-                    </h2>
-                </div>
+                    </CardTitle>
+                </CardHeader>
 
-                <div className="p-6">
+                <CardContent>
                     <TaskTree
                         project={project}
                         tasks={tasks}
@@ -331,17 +322,17 @@ const ProjectDashboard = ({
                         setPausedElapsedTime={setPausedElapsedTime}
                         isGlobalTimer={true}
                     />
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Invoices Section - Only show for non-personal projects */}
             {!project.isPersonal && (
-                <div className="bg-white shadow rounded-lg">
-                    <div className="px-6 py-4 border-b border-gray-200">
+                <Card>
+                    <CardHeader>
                         <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-medium text-gray-900">
+                            <CardTitle className="text-lg">
                                 Invoices ({projectInvoices.length})
-                            </h2>
+                            </CardTitle>
                             
                             <InvoiceGenerator
                                 project={project}
@@ -369,9 +360,9 @@ const ProjectDashboard = ({
                                 openTemplateModal={openTemplateModal}
                             />
                         </div>
-                    </div>
+                    </CardHeader>
 
-                    <div className="p-6">
+                    <CardContent>
                         <InvoicesList
                             projectInvoices={projectInvoices}
                             onEditInvoice={handleEditInvoice}
@@ -382,8 +373,8 @@ const ProjectDashboard = ({
                             setInvoices={setInvoices}
                             invoiceTemplates={invoiceTemplates}
                         />
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             )}
 
             {/* Metrics Display */}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import './App.css';
 import { useIndexedDB, useIndexedDBLoading } from './hooks/useIndexedDB';
 import { useUrlState } from './hooks/useUrlState';
@@ -14,7 +14,7 @@ import ModalManager from './components/modals/ModalManager';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils';
-import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { TIMER_UPDATE_INTERVAL_MS, TIMER_HEARTBEAT_INTERVAL_MS } from './constants/app';
 
 /** Original browser tab title */
@@ -35,6 +35,27 @@ function App() {
     const [invoices, setInvoices, invoicesStatus] = useIndexedDB('invoices', []);
     const [invoiceTemplates, setInvoiceTemplates, invoiceTemplatesStatus] = useIndexedDB('invoiceTemplates', []);
     const [preferences, setPreferences, preferencesStatus] = useIndexedDB('preferences', {});
+    
+    // Dark mode state - persisted in preferences
+    const [darkMode, setDarkMode] = useState(() => {
+        // Check if user has a saved preference, otherwise use system preference
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('tasktime-dark-mode');
+            if (saved !== null) return saved === 'true';
+            return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        return false;
+    });
+    
+    // Apply dark mode class to document
+    useEffect(() => {
+        if (darkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        localStorage.setItem('tasktime-dark-mode', String(darkMode));
+    }, [darkMode]);
     
     // Unified timer state (all timer-related data in one IndexedDB key)
     const [timerState, setTimerState, timerStatus] = useIndexedDB('timer', {
@@ -204,6 +225,7 @@ function App() {
         const interval = setInterval(heartbeat, TIMER_HEARTBEAT_INTERVAL_MS);
 
         return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentTimer?.taskId, isPaused]);
 
     // State for showing/hiding global timer
@@ -272,6 +294,7 @@ function App() {
         return () => {
             clearInterval(interval);
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentTimer?.taskId, currentTimer?.startTime, isPaused, pausedElapsedTime, currentTaskName]);
 
     // URL-based state management
@@ -375,13 +398,13 @@ function App() {
     if (isLoading) {
 
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center">
                     <ClockIcon className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-pulse" />
-                    <h1 className="text-xl font-semibold text-gray-900">
+                    <h1 className="text-xl font-semibold text-foreground">
                         Task<span className="text-blue-600">Time</span>
                     </h1>
-                    <p className="text-gray-500 mt-2">Loading your data...</p>
+                    <p className="text-muted-foreground mt-2">Loading your data...</p>
                 </div>
             </div>
         );
@@ -389,21 +412,21 @@ function App() {
 
     return (
         <ToastProvider>
-            <div className="min-h-screen bg-gray-50 flex">
+            <div className="min-h-screen bg-background flex">
                 {/* Sidebar Navigation */}
-                <aside className="w-64 bg-white shadow-sm border-r border-gray-200 flex flex-col h-screen sidebar">
+                <aside className="w-64 bg-card shadow-sm border-r border-border flex flex-col h-screen sidebar">
                     {/* Sidebar Header */}
                     <div className="p-6 flex-shrink-0">
                         <div 
-                            className="flex items-center space-x-3 cursor-pointer hover:text-blue-600 transition-colors group"
+                            className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity group"
                             onClick={() => navigateToDashboard()}
                         >
                             <div className="relative">
-                                <ClockIcon className="h-8 w-8 text-blue-600" />
+                                <ClockIcon className="h-6 w-6 text-foreground" />
                             </div>
                             <div>
-                                <h1 className="text-lg font-bold text-gray-900 leading-none">
-                                    Task<span className="text-blue-600">Time</span>
+                                <h1 className="text-lg font-bold text-foreground leading-none">
+                                    TaskTime
                                 </h1>
                             </div>
                         </div>
@@ -417,8 +440,8 @@ function App() {
                                     onClick={() => navigateToDashboard()}
                                     className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                                         activeView === 'dashboard'
-                                            ? 'bg-blue-100 text-blue-700'
-                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                     }`}
                                 >
                                     <ChartBarIcon className="h-5 w-5 mr-3 flex-shrink-0" />
@@ -430,8 +453,8 @@ function App() {
                                     onClick={() => navigateToClients()}
                                     className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                                         activeView === 'clients'
-                                            ? 'bg-blue-100 text-blue-700'
-                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                     }`}
                                 >
                                     <UserGroupIcon className="h-5 w-5 mr-3 flex-shrink-0" />
@@ -443,8 +466,8 @@ function App() {
                                     onClick={() => navigateToProjects()}
                                     className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                                         activeView === 'projects'
-                                            ? 'bg-blue-100 text-blue-700'
-                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                     }`}
                                 >
                                     <ClipboardDocumentCheckIcon className="h-5 w-5 mr-3 flex-shrink-0" />
@@ -456,8 +479,8 @@ function App() {
                                     onClick={() => navigateToInvoices()}
                                     className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                                         activeView === 'invoices'
-                                            ? 'bg-blue-100 text-blue-700'
-                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                     }`}
                                 >
                                     <DocumentTextIcon className="h-5 w-5 mr-3 flex-shrink-0" />
@@ -469,8 +492,8 @@ function App() {
                                     onClick={() => navigateToAccount()}
                                     className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                                         activeView === 'account'
-                                            ? 'bg-blue-100 text-blue-700'
-                                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                     }`}
                                 >
                                     <UserCircleIcon className="h-5 w-5 mr-3 flex-shrink-0" />
@@ -479,6 +502,22 @@ function App() {
                             </li>
                         </ul>
                     </nav>
+                    
+                    {/* Theme Toggle */}
+                    <div className="px-4 py-4 border-t border-border">
+                        <button
+                            onClick={() => setDarkMode(!darkMode)}
+                            className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                        >
+                            {darkMode ? (
+                                <SunIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                            ) : (
+                                <MoonIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                            )}
+                            {darkMode ? 'Light Mode' : 'Dark Mode'}
+                        </button>
+                    </div>
                 </aside>
 
                 {/* Main Content */}
@@ -712,7 +751,7 @@ function App() {
                     {/* Global Timer Display - Fixed at top */}
                     {showGlobalTimer && currentTimer && (
                         <div className="fixed top-4 left-64 right-4 z-50 flex justify-center global-timer-mobile">
-                            <div className="bg-white shadow-lg rounded-lg w-auto max-w-2xl shadow-md">
+                            <div className="bg-card shadow-lg rounded-lg w-auto max-w-2xl shadow-md">
                                 <GlobalTimer
                                     currentTimer={currentTimer}
                                     setCurrentTimer={setCurrentTimer}

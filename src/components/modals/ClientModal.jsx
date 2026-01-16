@@ -456,7 +456,7 @@ const ClientModal = ({
                     {/* Custom Fields */}
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                            <h5 className="text-sm font-medium text-gray-900">Custom Fields</h5>
+                            <h5 className="text-sm font-medium text-foreground">Custom Fields</h5>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -491,7 +491,7 @@ const ClientModal = ({
                                         variant="outline"
                                         size="icon"
                                         onClick={() => removeCustomField(index)}
-                                        className="hover:bg-red-50 hover:text-red-600 hover:border-red-300"
+                                        className="hover:bg-accent hover:text-red-600 dark:hover:text-red-400 hover:border-red-300"
                                     >
                                         <TrashIcon className="h-4 w-4" />
                                     </Button>
@@ -500,7 +500,7 @@ const ClientModal = ({
                         ))}
 
                         {formData.custom.length === 0 && (
-                            <p className="text-sm text-gray-500 italic">
+                            <p className="text-sm text-muted-foreground italic">
                                 No custom fields added. Click "Add Field" to add custom client details.
                             </p>
                         )}
@@ -535,7 +535,7 @@ const ClientModal = ({
                 {/* Pricing & Taxes */}
                 <div className="space-y-4">
                     <div className="border-t pt-6">
-                        <h4 className="text-sm font-medium text-gray-900 mb-3">Pricing & Taxes</h4>
+                        <h4 className="text-sm font-medium text-foreground mb-3">Pricing & Taxes</h4>
 
                         {/* Rate Section */}
                         <div className="space-y-4 mb-4">

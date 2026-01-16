@@ -69,8 +69,8 @@ const TaskTimer = ({
             {showTimeDisplay && isTimerActive && (
                 <span className={`text-xs font-mono ${
                     isPaused 
-                        ? 'text-yellow-700 bg-yellow-100' 
-                        : 'text-red-700 bg-red-100'
+                        ? 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900' 
+                        : 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900'
                 } px-2 py-1 rounded-md min-w-[32px] inline-block text-center`}>
                     {isPaused ? pausedTime : currentTime}
                 </span>

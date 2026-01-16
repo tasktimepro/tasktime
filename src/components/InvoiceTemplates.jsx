@@ -1,7 +1,17 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import React, { useMemo, useEffect } from 'react';
+import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { toDisplayDate } from '../utils/dateUtils';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 /**
  * InvoiceTemplates component - Manages invoice templates with customizable formats
@@ -14,7 +24,6 @@ const InvoiceTemplates = ({
     openTemplateModal = null,
     editTemplateModal = null
 }) => {
-    const [showDropdown, setShowDropdown] = useState({});
     const { showSuccess } = useToast();
 
     // Auto-open create modal when autoOpenCreate prop changes
@@ -23,34 +32,6 @@ const InvoiceTemplates = ({
             openTemplateModal();
         }
     }, [autoOpenCreate, openTemplateModal]);
-
-    // Add event listener for dropdown close behavior
-    const DROPDOWN_TOGGLE_EVENT = 'closeOtherDropdowns';
-
-    useEffect(() => {
-        const handleCloseDropdowns = (event) => {
-            const { templateId, open } = event.detail;
-            
-            if (open) {
-                // Close all dropdowns except the one being opened
-                setShowDropdown({ [templateId]: true });
-            }
-        };
-
-        const handleClickOutside = (event) => {
-            if (!event.target.closest('.dropdown-container')) {
-                setShowDropdown({});
-            }
-        };
-
-        document.addEventListener(DROPDOWN_TOGGLE_EVENT, handleCloseDropdowns);
-        document.addEventListener('click', handleClickOutside);
-
-        return () => {
-            document.removeEventListener(DROPDOWN_TOGGLE_EVENT, handleCloseDropdowns);
-            document.removeEventListener('click', handleClickOutside);
-        };
-    }, []);
 
     // Handle delete
     const handleDelete = (templateId) => {
@@ -146,69 +127,65 @@ const InvoiceTemplates = ({
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">
+                    <h2 className="text-2xl font-bold text-foreground">
                         Invoice Templates
                     </h2>
-                    <p className="mt-1 text-sm text-gray-600">
+                    <p className="mt-1 text-sm text-muted-foreground">
                         Create and manage invoice templates with custom numbering and due date settings.
                     </p>
                 </div>
-                <button
+                <Button
                     onClick={() => openTemplateModal && openTemplateModal()}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    leadingIcon={PlusIcon}
                 >
-                    <PlusIcon className="h-5 w-5 mr-2" />
                     New Template
-                </button>
+                </Button>
             </div>
 
             {/* Templates List */}
             {sortedTemplates.length === 0 ? (
                 <div className="text-center py-12">
-                    <DocumentDuplicateIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No templates</h3>
-                    <p className="mt-1 text-sm text-gray-500">Get started by creating your first invoice template.</p>
+                    <DocumentDuplicateIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-2 text-sm font-medium text-foreground">No templates</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">Get started by creating your first invoice template.</p>
                     <div className="mt-6">
-                        <button
+                        <Button
                             onClick={() => openTemplateModal && openTemplateModal()}
-                            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            leadingIcon={PlusIcon}
                         >
-                            <PlusIcon className="h-5 w-5 mr-2" />
                             New Template
-                        </button>
+                        </Button>
                     </div>
                 </div>
             ) : (
                 <div className="space-y-4">
                     {sortedTemplates.map((template) => (
-                        <div
+                        <Card
                             key={template.id}
-                            className="bg-white shadow rounded-lg hover:shadow-md transition-shadow"
+                            className="hover:shadow-md transition-shadow"
                         >
-                            <div className="p-5">
+                            <CardContent className="pt-5">
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1">
                                         <div className="flex items-center space-x-3">
-                                            <DocumentDuplicateIcon className="h-6 w-6 text-gray-400" />
+                                            <DocumentDuplicateIcon className="h-6 w-6 text-muted-foreground" />
                                             <div>
                                                 <div className="flex items-center">
-                                                    <h4 className="text-lg font-medium text-gray-900">
+                                                    <h4 className="text-lg font-medium text-foreground">
                                                         {template.name}
                                                     </h4>
                                                     {template.isDefault && (
-                                                        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                            Default
-                                                        </span>
+                                                        <Badge variant="secondary" className="ml-2">Default</Badge>
                                                     )}
                                                 </div>
-                                                <div className="mt-1 text-sm text-gray-500 space-y-1">
+                                                <div className="mt-1 text-sm text-muted-foreground space-y-1">
                                                     <p>Invoice Number: {generatePreviewInvoiceNumber(template)}</p>
                                                     {template.useSequentialNumbers && (
                                                         <p>Next Sequential: #{template.currentSequentialNumber.toString().padStart(template.sequentialNumberDigits || 4, '0')}</p>
                                                     )}
                                                     <p>{calculateDueDatePreview(template)}</p>
                                                 </div>
-                                                <p className="mt-2 text-xs text-gray-400">
+                                                <p className="mt-2 text-xs text-muted-foreground">
                                                     Created {toDisplayDate(template.createdAt)}
                                                 </p>
                                             </div>
@@ -216,54 +193,35 @@ const InvoiceTemplates = ({
                                     </div>
 
                                     {/* Three-dot dropdown menu for Edit and Delete */}
-                                    <div className="relative dropdown-container">
-                                        <button
-                                            onClick={() => {
-                                                const newState = !showDropdown[template.id];
-                                                setShowDropdown(newState ? { [template.id]: true } : {});
-
-                                                // Dispatch a custom event to close other dropdowns
-                                                const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
-                                                    detail: { templateId: template.id, open: newState }
-                                                });
-                                                document.dispatchEvent(event);
-                                            }}
-                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
-                                            title="More actions"
-                                        >
-                                            <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
-                                        </button>
-
-                                        {showDropdown[template.id] && (
-                                            <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                                                <div className="py-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            editTemplateModal && editTemplateModal(template);
-                                                            setShowDropdown({});
-                                                        }}
-                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"
-                                                    >
-                                                        <PencilIcon className="h-4 w-4" />
-                                                        <span>Edit</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            handleDelete(template.id);
-                                                            setShowDropdown({});
-                                                        }}
-                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
-                                                    >
-                                                        <TrashIcon className="h-4 w-4" />
-                                                        <span>Delete</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                                title="More actions"
+                                            >
+                                                <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                onClick={() => editTemplateModal && editTemplateModal(template)}
+                                                className="cursor-pointer hover:bg-accent focus:bg-accent hover:text-yellow-600 dark:hover:text-yellow-400 focus:text-yellow-600 dark:focus:text-yellow-400"
+                                            >
+                                                <PencilIcon className="h-4 w-4" />
+                                                <span>Edit</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => handleDelete(template.id)}
+                                                className="cursor-pointer hover:bg-accent focus:bg-accent hover:text-red-600 dark:hover:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                                            >
+                                                <TrashIcon className="h-4 w-4" />
+                                                <span>Delete</span>
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
-                            </div>
-                        </div>
+                            </CardContent>
+                        </Card>
                     ))}
                 </div>
             )}

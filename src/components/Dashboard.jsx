@@ -12,6 +12,7 @@ import {
     CurrencyDollarIcon,
     CalendarDaysIcon
 } from '@heroicons/react/24/outline';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskTimer from './TaskTimer.jsx';
 import { 
     getThisMonthRange, 
@@ -697,12 +698,12 @@ const Dashboard = ({
      */
     const renderTaskTitle = useCallback((task, isCompleted) => {
         const baseClasses = `text-sm font-medium truncate text-left transition-colors ${
-            isCompleted ? 'line-through text-gray-500' : 'text-gray-900'
+            isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
         }`;
 
         const title = task.parentTaskId ? (
             <span>
-                <span className="text-gray-400 text-xs">↳ </span>
+                <span className="text-muted-foreground text-xs">↳ </span>
                 {task.title}
                 {!task.parentTask && <span className="text-red-500 text-xs"> [Parent missing]</span>}
             </span>
@@ -715,7 +716,7 @@ const Dashboard = ({
                 <button
                     onClick={() => handleTaskTitleClick(task)}
                     className={`${baseClasses} hover:underline cursor-pointer ${
-                        isCompleted ? 'hover:text-gray-600' : 'hover:text-blue-600'
+                        isCompleted ? 'hover:text-muted-foreground' : 'hover:text-blue-600 dark:hover:text-blue-400'
                     }`}
                     title={`Click to open ${task.project.title} project`}
                 >
@@ -729,7 +730,7 @@ const Dashboard = ({
     const renderEarningsByCurrency = useCallback((metrics, colorScheme = 'blue') => {
         // Show loading indicator if we need exchange rates and they're still loading
         if (needsExchangeRates && exchangeRatesLoading) {
-            return <span className="text-gray-500 text-sm italic">Loading rates...</span>;
+            return <span className="text-muted-foreground text-sm italic">Loading rates...</span>;
         }
         
         const billableTotal = Object.values(metrics.billableEarnings).reduce((sum, amount) => sum + amount, 0);
@@ -738,7 +739,7 @@ const Dashboard = ({
         
         // If no earnings at all, show zero
         if (billableTotal === 0 && paidTotal === 0 && outstandingTotal === 0) {
-            return <span className="text-gray-500">{formatCurrency(0, preferredCurrency)}</span>;
+            return <span className="text-muted-foreground">{formatCurrency(0, preferredCurrency)}</span>;
         }
 
         const components = [];
@@ -746,22 +747,22 @@ const Dashboard = ({
         // Color mappings for different schemes
         const colorClasses = {
             blue: {
-                icon: 'text-blue-600',
-                text: 'text-blue-900',
-                bg: 'bg-blue-100',
-                badge: 'text-blue-800'
+                icon: 'text-muted-foreground',
+                text: 'text-foreground',
+                bg: 'bg-muted',
+                badge: 'text-muted-foreground'
             },
             gray: {
-                icon: 'text-gray-600',
-                text: 'text-gray-900',
-                bg: 'bg-gray-100',
-                badge: 'text-gray-800'
+                icon: 'text-muted-foreground',
+                text: 'text-foreground',
+                bg: 'bg-muted',
+                badge: 'text-muted-foreground'
             },
             green: {
-                icon: 'text-green-600',
-                text: 'text-green-900',
-                bg: 'bg-green-100',
-                badge: 'text-green-800'
+                icon: 'text-muted-foreground',
+                text: 'text-foreground',
+                bg: 'bg-muted',
+                badge: 'text-muted-foreground'
             }
         };
         
@@ -786,11 +787,11 @@ const Dashboard = ({
         if (outstandingTotal > 0) {
             components.push(
                 <div key="pending" className="flex items-center">
-                    <DocumentTextIcon className="h-4 w-4 text-amber-600 mr-1" />
-                    <span className="font-semibold text-amber-900">
+                    <DocumentTextIcon className="h-4 w-4 text-muted-foreground mr-1" />
+                    <span className="font-semibold text-foreground">
                         {formatCurrency(outstandingTotal, preferredCurrency)}
                     </span>
-                    <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded ml-1">
+                    <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
                         pending
                     </span>
                 </div>
@@ -801,11 +802,11 @@ const Dashboard = ({
         if (billableTotal > 0) {
             components.push(
                 <div key="unbilled" className="flex items-center">
-                    <CurrencyDollarIcon className="h-4 w-4 text-purple-600 mr-1" />
-                    <span className="font-semibold text-purple-900">
+                    <CurrencyDollarIcon className="h-4 w-4 text-muted-foreground mr-1" />
+                    <span className="font-semibold text-foreground">
                         {formatCurrency(billableTotal, preferredCurrency)}
                     </span>
-                    <span className="text-xs bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded ml-1">
+                    <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
                         unbilled
                     </span>
                 </div>
@@ -822,83 +823,83 @@ const Dashboard = ({
     return (
         <div className="space-y-6">
             {/* Metrics Section - Full Width */}
-            <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <div className="flex items-center">
-                        <ChartBarIcon className="h-5 w-5 text-blue-600 mr-2" />
-                        <h2 className="text-lg font-medium text-gray-900">Reports Overview</h2>
-                    </div>
-                </div>
-                <div className="p-6">
+            <Card>
+                <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center text-lg">
+                        <ChartBarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                        Reports Overview
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* This Month */}
-                        <div className="bg-blue-50 rounded-lg p-4">
+                        <div className="bg-muted/40 rounded-lg p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-medium text-blue-900">This Month</h3>
+                                    <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">This Month</h3>
                                     <div className="mt-2">
                                         <div className="flex items-center">
-                                            <div className="text-lg font-semibold text-blue-900">
+                                            <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
                                                 {renderEarningsByCurrency(thisMonthMetrics, 'blue')}
                                             </div>
                                         </div>
                                         <div className="flex items-center mt-1">
-                                            <ClockIcon className="h-4 w-4 text-blue-600 mr-1" />
-                                            <span className="text-sm text-blue-700">
+                                            <ClockIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-1" />
+                                            <span className="text-sm text-blue-700 dark:text-blue-300">
                                                 {formatDuration(thisMonthMetrics.time)}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
-                                <CalendarDaysIcon className="h-8 w-8 text-blue-600" />
+                                <CalendarDaysIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                             </div>
                         </div>
 
                         {/* Last Month */}
-                        <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="bg-muted/40 rounded-lg p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-medium text-gray-900">Last Month</h3>
+                                    <h3 className="text-sm font-medium text-foreground">Last Month</h3>
                                     <div className="mt-2">
                                         <div className="flex items-center">
-                                            <BanknotesIcon className="h-4 w-4 text-gray-600 mr-1" />
-                                            <div className="text-lg font-semibold text-gray-900">
+                                            <BanknotesIcon className="h-4 w-4 text-muted-foreground mr-1" />
+                                            <div className="text-lg font-semibold text-foreground">
                                                 {renderEarningsByCurrency(lastMonthMetrics, 'gray')}
                                             </div>
                                         </div>
                                         <div className="flex items-center mt-1">
-                                            <ClockIcon className="h-4 w-4 text-gray-600 mr-1" />
-                                            <span className="text-sm text-gray-700">
+                                            <ClockIcon className="h-4 w-4 text-muted-foreground mr-1" />
+                                            <span className="text-sm text-foreground">
                                                 {formatDuration(lastMonthMetrics.time)}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
-                                <CalendarDaysIcon className="h-8 w-8 text-gray-600" />
+                                <CalendarDaysIcon className="h-8 w-8 text-muted-foreground" />
                             </div>
                         </div>
 
                         {/* This Year */}
-                        <div className="bg-green-50 rounded-lg p-4">
+                        <div className="bg-muted/40 rounded-lg p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-medium text-green-900">This Year</h3>
+                                    <h3 className="text-sm font-medium text-green-900 dark:text-green-100">This Year</h3>
                                     <div className="mt-2">
                                         <div className="flex items-center">
-                                            {/* <BanknotesIcon className="h-4 w-4 text-green-600 mr-1" /> */}
-                                            <div className="text-lg font-semibold text-green-900">
+                                            {/* <BanknotesIcon className="h-4 w-4 text-green-600 dark:text-green-400 mr-1" /> */}
+                                            <div className="text-lg font-semibold text-green-900 dark:text-green-100">
                                                 {renderEarningsByCurrency(thisYearMetrics, 'green')}
                                             </div>
                                         </div>
                                         <div className="flex items-center mt-1">
-                                            <ClockIcon className="h-4 w-4 text-green-600 mr-1" />
-                                            <span className="text-sm text-green-700">
+                                            <ClockIcon className="h-4 w-4 text-green-600 dark:text-green-400 mr-1" />
+                                            <span className="text-sm text-green-700 dark:text-green-300">
                                                 {formatDuration(thisYearMetrics.time)}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
-                                <CalendarDaysIcon className="h-8 w-8 text-green-600" />
+                                <CalendarDaysIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
                             </div>
                         </div>
                     </div>
@@ -909,43 +910,43 @@ const Dashboard = ({
                         {invoiceMetrics.outstanding > 0 ? (
                             <button
                                 onClick={() => navigateToInvoices({ section: 'invoices', tab: 'outstanding' })}
-                                className="bg-amber-50 rounded-lg p-4 text-left hover:bg-amber-100 transition-colors border border-amber-200"
+                                className="bg-muted/40 rounded-lg p-4 text-left hover:bg-accent transition-colors border border-border"
                             >
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-sm font-medium text-amber-900">Outstanding Invoices</h3>
+                                        <h3 className="text-sm font-medium text-amber-900 dark:text-amber-100">Outstanding Invoices</h3>
                                         <div className="flex items-center mt-2">
-                                            <DocumentTextIcon className="h-4 w-4 text-amber-600 mr-2" />
-                                            <span className="text-lg font-semibold text-amber-900">
+                                            <DocumentTextIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-2" />
+                                            <span className="text-lg font-semibold text-amber-900 dark:text-amber-100">
                                                 {invoiceMetrics.outstanding} invoices
                                             </span>
                                         </div>
                                         <div className="flex items-center mt-1">
-                                            <CurrencyDollarIcon className="h-4 w-4 text-amber-600 mr-2" />
-                                            <span className="text-sm text-amber-700">
+                                            <CurrencyDollarIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-2" />
+                                            <span className="text-sm text-amber-700 dark:text-amber-300">
                                                 {formatCurrency(invoiceMetrics.outstandingTotal, preferredCurrency)} total
                                             </span>
                                         </div>
                                     </div>
-                                    <DocumentTextIcon className="h-8 w-8 text-amber-600" />
+                                    <DocumentTextIcon className="h-8 w-8 text-amber-600 dark:text-amber-400" />
                                 </div>
                             </button>
                         ) : (
-                            <div className="bg-green-50 rounded-lg p-4">
+                            <div className="bg-muted/40 rounded-lg p-4">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-sm font-medium text-green-900">Outstanding Invoices</h3>
+                                        <h3 className="text-sm font-medium text-green-900 dark:text-green-100">Outstanding Invoices</h3>
                                         <div className="flex items-center mt-2">
-                                            <CheckIcon className="h-4 w-4 text-green-600 mr-2" />
-                                            <span className="text-lg font-semibold text-green-900">
+                                            <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400 mr-2" />
+                                            <span className="text-lg font-semibold text-green-900 dark:text-green-100">
                                                 No outstanding invoices
                                             </span>
                                         </div>
-                                        <div className="text-sm text-green-700 mt-1">
+                                        <div className="text-sm text-green-700 dark:text-green-300 mt-1">
                                             No outstanding payments
                                         </div>
                                     </div>
-                                    <DocumentTextIcon className="h-8 w-8 text-green-600" />
+                                    <DocumentTextIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
                                 </div>
                             </div>
                         )}
@@ -954,97 +955,97 @@ const Dashboard = ({
                         {invoiceMetrics.pastDue > 0 ? (
                             <button
                                 onClick={() => navigateToInvoices({ section: 'invoices', tab: 'overdue' })}
-                                className="bg-red-50 rounded-lg p-4 text-left hover:bg-red-100 transition-colors border border-red-200"
+                                className="bg-muted/40 rounded-lg p-4 text-left hover:bg-accent transition-colors border border-border"
                             >
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-sm font-medium text-red-900 flex items-center">
+                                        <h3 className="text-sm font-medium text-red-900 dark:text-red-100 flex items-center">
                                             Past Due Invoices
                                         </h3>
                                         <div className="flex items-center mt-2">
-                                            <DocumentTextIcon className="h-4 w-4 text-red-600 mr-2" />
-                                            <span className="text-lg font-semibold text-red-900">
+                                            <DocumentTextIcon className="h-4 w-4 text-red-600 dark:text-red-400 mr-2" />
+                                            <span className="text-lg font-semibold text-red-900 dark:text-red-100">
                                                 {invoiceMetrics.pastDue} invoices
                                             </span>
                                         </div>
                                         <div className="flex items-center mt-1">
-                                            <CurrencyDollarIcon className="h-4 w-4 text-red-600 mr-2" />
-                                            <span className="text-sm text-red-700">
+                                            <CurrencyDollarIcon className="h-4 w-4 text-red-600 dark:text-red-400 mr-2" />
+                                            <span className="text-sm text-red-700 dark:text-red-300">
                                                 {formatCurrency(invoiceMetrics.pastDueTotal, preferredCurrency)} overdue
                                             </span>
                                         </div>
                                     </div>
-                                    <ExclamationTriangleIcon className="h-8 w-8 text-red-600" />
+                                    <ExclamationTriangleIcon className="h-8 w-8 text-red-600 dark:text-red-400" />
                                 </div>
                             </button>
                         ) : (
-                            <div className="bg-green-50 rounded-lg p-4">
+                            <div className="bg-muted/40 rounded-lg p-4">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-sm font-medium text-green-900">No Past Due Invoices</h3>
+                                        <h3 className="text-sm font-medium text-green-900 dark:text-green-100">No Past Due Invoices</h3>
                                         <div className="flex items-center mt-2">
-                                            <CheckIcon className="h-4 w-4 text-green-600 mr-2" />
-                                            <span className="text-lg font-semibold text-green-900">
+                                            <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400 mr-2" />
+                                            <span className="text-lg font-semibold text-green-900 dark:text-green-100">
                                                 All invoices are up-to-date
                                             </span>
                                         </div>
-                                        <div className="text-sm text-green-700 mt-1">
+                                        <div className="text-sm text-green-700 dark:text-green-300 mt-1">
                                             Great job staying on top of payments!
                                         </div>
                                     </div>
-                                    <DocumentTextIcon className="h-8 w-8 text-green-600" />
+                                    <DocumentTextIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
                                 </div>
                             </div>
                         )}
 
                         {/* Pending Bills This Month Notice */}
-                        <div className="bg-blue-50 rounded-lg p-4">
+                        <div className="bg-muted/40 rounded-lg p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-medium text-blue-900">Pending Bills This Month</h3>
+                                    <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">Pending Bills This Month</h3>
                                     <div className="flex items-center mt-2">
-                                        <ClockIcon className="h-4 w-4 text-blue-600 mr-2" />
-                                        <span className="text-lg font-semibold text-blue-900">
+                                        <ClockIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-2" />
+                                        <span className="text-lg font-semibold text-blue-900 dark:text-blue-100">
                                             {thisMonthBillableHours.toFixed(1)}h
                                         </span>
                                     </div>
                                     <div className="flex items-center mt-1">
-                                        <CurrencyDollarIcon className="h-4 w-4 text-blue-600 mr-2" />
-                                        <span className="text-sm text-blue-700">
+                                        <CurrencyDollarIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-2" />
+                                        <span className="text-sm text-blue-700 dark:text-blue-300">
                                             {formatCurrency(thisMonthUnbilledTotal, preferredCurrency)} unbilled
                                         </span>
                                     </div>
                                 </div>
-                                <ClockIcon className="h-8 w-8 text-blue-600" />
+                                <ClockIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Recent Tasks and Projects Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Recent Tasks Section */}
-                <div className="bg-white shadow rounded-lg">
-                    <div className="px-6 py-4 border-b border-gray-200">
+                <Card>
+                    <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <DocumentCheckIcon className="h-5 w-5 text-blue-600 mr-2" />
-                                <h2 className="text-lg font-medium text-gray-900">Recent Tasks</h2>
-                            </div>
+                            <CardTitle className="flex items-center text-lg">
+                                <DocumentCheckIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                                Recent Tasks
+                            </CardTitle>
                             <div className="relative">
-                                <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                                <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
                                 <input
                                     type="text"
                                     placeholder="Search tasks"
                                     value={taskSearchQuery}
                                     onChange={(e) => setTaskSearchQuery(e.target.value)}
-                                    className="pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="pl-9 pr-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                                 />
                             </div>
                         </div>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
+                    </CardHeader>
+                    <CardContent className="pt-0 max-h-96 overflow-y-auto">
                         {recentTasks.length > 0 ? (
                             <div className="divide-y divide-gray-200">
                                 {recentTasks.map((task) => {
@@ -1054,7 +1055,7 @@ const Dashboard = ({
                                     const shouldDisable = currentTimer && !isPaused && !isTimerActive;
                                     
                                     return (
-                                    <div key={task.id} className={`px-6 py-3 hover:bg-gray-50 ${task.completed ? 'bg-gray-50' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
+                                    <div key={task.id} className={`px-6 py-3 hover:bg-muted ${task.completed ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
                                         <div className="flex items-center space-x-3">
                                             <CustomCheckbox
                                                 checked={task.completed}
@@ -1063,13 +1064,13 @@ const Dashboard = ({
                                             />
                                             <div className="flex-1 min-w-0 space-y-1">
                                                 {renderTaskTitle(task, task.completed)}
-                                                <p className={`text-xs truncate ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                <p className={`text-xs truncate ${task.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                     {task.parentTaskId ? (
                                                         <span>
                                                             Subtask of: {task.parentTask ? task.parentTask.title : 'Unknown Parent'} <span className="mx-1">•</span> {task.project ? (
                                                                 <button
                                                                     onClick={() => handleTaskTitleClick(task)}
-                                                                    className="text-gray-500 hover:text-gray-700 hover:underline cursor-pointer"
+                                                                    className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
                                                                     title={`Click to open ${task.project.title} project`}
                                                                 >
                                                                     {task.project.title}
@@ -1080,7 +1081,7 @@ const Dashboard = ({
                                                         task.project ? (
                                                             <button
                                                                 onClick={() => handleTaskTitleClick(task)}
-                                                                className="text-gray-500 hover:text-gray-700 hover:underline cursor-pointer"
+                                                                className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
                                                                 title={`Click to open ${task.project.title} project`}
                                                             >
                                                                 {task.project.title}
@@ -1089,7 +1090,7 @@ const Dashboard = ({
                                                     )}
                                                 </p>
                                             </div>
-                                            <div className={`text-xs ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>
+                                            <div className={`text-xs ${task.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                 {formatDurationWithSeconds(task.recentTime)}
                                             </div>
                                             <div className="flex space-x-1">
@@ -1113,11 +1114,11 @@ const Dashboard = ({
                                                             />
                                                             <div className="flex-1 min-w-0 space-y-1">
                                                                 {renderTaskTitle(subtaskWithProject, subtask.completed)}
-                                                                <p className={`text-xs truncate ${subtask.completed ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                                <p className={`text-xs truncate ${subtask.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                                     {task.project ? (
                                                                         <button
                                                                             onClick={() => handleTaskTitleClick(subtaskWithProject)}
-                                                                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                                                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline cursor-pointer"
                                                                             title={`Click to open ${task.project.title} project`}
                                                                         >
                                                                             {task.project.title}
@@ -1125,7 +1126,7 @@ const Dashboard = ({
                                                                     ) : 'Unknown Project'}
                                                                 </p>
                                                             </div>
-                                                            <div className={`text-xs ${subtask.completed ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                            <div className={`text-xs ${subtask.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                                 {formatDurationWithSeconds(subtask.recentTime)}
                                                             </div>
                                                             <div className="flex space-x-1">
@@ -1141,56 +1142,56 @@ const Dashboard = ({
                                 })}
                             </div>
                         ) : (
-                            <div className="px-6 py-8 text-center text-gray-500">
-                                <DocumentCheckIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                            <div className="px-6 py-8 text-center text-muted-foreground">
+                                <DocumentCheckIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                                 <p className="text-sm">
                                     {taskSearchQuery ? 'No tasks found matching your search' : 'No recent tasks found'}
                                 </p>
                             </div>
                         )}
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Recent Projects Section */}
-                <div className="bg-white shadow rounded-lg">
-                    <div className="px-6 py-4 border-b border-gray-200">
+                <Card>
+                    <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <ClipboardDocumentCheckIcon className="h-5 w-5 text-blue-600 mr-2" />
-                                <h2 className="text-lg font-medium text-gray-900">Recent Projects</h2>
-                            </div>
+                            <CardTitle className="flex items-center text-lg">
+                                <ClipboardDocumentCheckIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                                Recent Projects
+                            </CardTitle>
                             <div className="relative">
-                                <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                                <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
                                 <input
                                     type="text"
                                     placeholder="Search projects"
                                     value={projectSearchQuery}
                                     onChange={(e) => setProjectSearchQuery(e.target.value)}
-                                    className="pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="pl-9 pr-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                                 />
                             </div>
                         </div>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
+                    </CardHeader>
+                    <CardContent className="pt-0 max-h-96 overflow-y-auto">
                         {recentProjects.length > 0 ? (
                             <div className="divide-y divide-gray-200">
                                 {recentProjects.map((project) => (
-                                    <div key={project.id} className="px-6 py-3 hover:bg-gray-50 transition-colors">
+                                    <div key={project.id} className="px-6 py-3 hover:bg-muted transition-colors">
                                         <div className="flex items-center justify-between">
                                             <div className="flex-1 min-w-0 space-y-1">
                                                 <button
                                                     onClick={() => navigateToProject(project.id)}
-                                                    className="text-sm font-medium text-gray-900 truncate hover:underline cursor-pointer hover:text-blue-600 text-left block"
+                                                    className="text-sm font-medium text-foreground truncate hover:underline cursor-pointer hover:text-blue-600 dark:text-blue-400 text-left block"
                                                     title={`Click to open ${project.title} project`}
                                                 >
                                                     {project.title}
                                                 </button>
-                                                <div className="text-xs text-gray-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     {project.client ? (
                                                         <span>
                                                             <button
                                                                 onClick={() => handleClientTitleClick(project.client)}
-                                                                className="text-gray-500 hover:text-gray-700 hover:underline cursor-pointer"
+                                                                className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
                                                                 title={`Click to open ${project.client.title} client dashboard`}
                                                             >
                                                                 {project.client.title}
@@ -1204,16 +1205,16 @@ const Dashboard = ({
                                             </div>
                                             <div className="text-right">
                                                 {/* Pending Bills */}
-                                                <div className="text-sm font-medium text-gray-900">
+                                                <div className="text-sm font-medium text-foreground">
                                                     {project.pendingAmount > 0 ? (
                                                         <>
                                                             {formatCurrency(project.pendingAmount, getProjectCurrency(project, clients))}
                                                         </>
                                                     ) : (
-                                                        <span className="text-gray-500">{formatCurrency(0, getProjectCurrency(project, clients))}</span>
+                                                        <span className="text-muted-foreground">{formatCurrency(0, getProjectCurrency(project, clients))}</span>
                                                     )}
                                                 </div>
-                                                <div className="text-xs text-gray-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     bills
                                                 </div>
                                             </div>
@@ -1222,15 +1223,15 @@ const Dashboard = ({
                                 ))}
                             </div>
                         ) : (
-                            <div className="px-6 py-8 text-center text-gray-500">
-                                <ClipboardDocumentCheckIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                            <div className="px-6 py-8 text-center text-muted-foreground">
+                                <ClipboardDocumentCheckIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                                 <p className="text-sm">
                                     {projectSearchQuery ? 'No projects found matching your search' : 'No recent projects found'}
                                 </p>
                             </div>
                         )}
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );

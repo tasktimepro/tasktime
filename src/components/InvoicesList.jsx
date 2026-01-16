@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
 import { parseStoredDate, toDisplayDate } from '../utils/dateUtils';
@@ -303,12 +305,12 @@ const InvoicesList = ({
     // Render empty state for a tab
     const renderEmptyState = (tabType) => (
         <div className="text-center py-8">
-            <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-sm font-medium text-gray-900">
+            <DocumentTextIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-sm font-medium text-foreground">
                 {tabType === 'outstanding' ? 'No outstanding invoices' : 
                  tabType === 'overdue' ? 'No overdue invoices' : 'No paid invoices'}
             </h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-muted-foreground">
                 {tabType === 'outstanding' 
                     ? 'All your invoices have been paid.'
                     : tabType === 'overdue'
@@ -353,32 +355,32 @@ const InvoicesList = ({
                     {currentInvoices.map((invoice) => (
                         <div key={invoice.id} className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
                             invoice.paymentProcessed 
-                                ? 'border-green-300 bg-white' 
-                                : 'border-gray-200 bg-white'
+                                ? 'border-green-300 dark:border-green-700 bg-background' 
+                                : 'border-border bg-background'
                         }`}>
                             <div className="flex flex-col space-y-4">
                                 {/* Header row with invoice number and status tag */}
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
-                                        <DocumentTextIcon className="h-6 w-6 text-gray-400" />
-                                        <h3 className="text-sm font-medium text-gray-900">
+                                        <DocumentTextIcon className="h-6 w-6 text-muted-foreground" />
+                                        <h3 className="text-sm font-medium text-foreground">
                                             {invoice.invoiceNumber}
                                         </h3>
                                     </div>
                                     <div>
                                         {invoice.paymentProcessed ? (
-                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <Badge variant="success">
                                                 <CheckIcon className="h-3 w-3 mr-1" />
                                                 Paid
-                                            </span>
+                                            </Badge>
                                         ) : isInvoiceOverdue(invoice) ? (
-                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <Badge variant="error">
                                                 Overdue
-                                            </span>
+                                            </Badge>
                                         ) : (
-                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                            <Badge variant="warning">
                                                 Outstanding
-                                            </span>
+                                            </Badge>
                                         )}
                                     </div>
                                 </div>
@@ -386,7 +388,7 @@ const InvoicesList = ({
                                 {/* Invoice details with action buttons on the same row */}
                                 <div className="flex items-end justify-between ml-9">
                                     <div className="flex-1">
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             {toDisplayDate(invoice.date)}
                                             {invoice.totalHours > 0 && (
                                                 <>
@@ -401,14 +403,14 @@ const InvoicesList = ({
                                             <p className={`text-sm mt-1 ${
                                                 isInvoiceOverdue(invoice) 
                                                     ? 'text-red-600 font-medium' 
-                                                    : 'text-gray-500'
+                                                    : 'text-muted-foreground'
                                             }`}>
                                                 Due: {toDisplayDate(invoice.dueDate)}
                                             </p>
                                         )}
-                                        <div className="text-xs text-gray-400 mt-1">
+                                        <div className="text-xs text-muted-foreground mt-1">
                                             <p>
-                                                Client: <span className="font-medium text-gray-600">
+                                                Client: <span className="font-medium text-muted-foreground">
                                                     {(() => {
                                                         // Try to get client name from clientId first
                                                         if (invoice.clientId) {
@@ -423,7 +425,7 @@ const InvoicesList = ({
                                                 </span>
                                             </p>
                                             <p>
-                                                Project: <span className="font-medium text-gray-600">
+                                                Project: <span className="font-medium text-muted-foreground">
                                                     {invoice.project?.title || 'Unknown Project'}
                                                 </span>
                                             </p>
@@ -444,7 +446,7 @@ const InvoicesList = ({
                                                 
                                                 return template ? (
                                                     <p>
-                                                        Template: <span className="font-medium text-gray-600">{template.name}</span>
+                                                        Template: <span className="font-medium text-muted-foreground">{template.name}</span>
                                                         {isDeleted && (
                                                             <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                                                 deleted
@@ -470,7 +472,7 @@ const InvoicesList = ({
                                                 
                                                 return businessInfo ? (
                                                     <p>
-                                                        Business: <span className="font-medium text-gray-600">{businessInfo.title}</span>
+                                                        Business: <span className="font-medium text-muted-foreground">{businessInfo.title}</span>
                                                         {isDeleted && (
                                                             <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                                                 deleted
@@ -497,7 +499,7 @@ const InvoicesList = ({
                                                 
                                                 return paymentMethod ? (
                                                     <p>
-                                                        Payment Method: <span className="font-medium text-gray-600">{paymentMethod.title}</span>
+                                                        Payment Method: <span className="font-medium text-muted-foreground">{paymentMethod.title}</span>
                                                         {isDeleted && (
                                                             <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                                                 deleted
@@ -514,7 +516,7 @@ const InvoicesList = ({
                                         {!invoice.paymentProcessed && (
                                             <button
                                                 onClick={() => handlePaymentProcessedToggle(invoice)}
-                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                                             >
                                                 <CheckIcon className="h-3 w-3 mr-1" />
                                                 Mark as Paid
@@ -523,7 +525,7 @@ const InvoicesList = ({
 
                                         <button
                                             onClick={() => handleEdit(invoice)}
-                                            className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
+                                            className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
                                             title="Edit Invoice"
                                         >
                                             <PencilIcon className="h-5 w-5" />
@@ -531,7 +533,7 @@ const InvoicesList = ({
                                         
                                         <button
                                             onClick={() => handlePreview(invoice)}
-                                            className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50"
+                                            className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
                                             title="Preview Invoice"
                                         >
                                             <EyeIcon className="h-5 w-5" />
@@ -539,7 +541,7 @@ const InvoicesList = ({
                                         
                                         <button
                                             onClick={() => handleDownload(invoice)}
-                                            className="p-2 text-gray-400 hover:text-purple-600 rounded-md hover:bg-purple-50"
+                                            className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
                                             title="Download as PDF"
                                         >
                                             <ArrowDownTrayIcon className="h-5 w-5" />
@@ -572,14 +574,14 @@ const InvoicesList = ({
             <div className="flex justify-end space-x-4">
                 <button
                     onClick={() => handleDownload(selectedInvoice)}
-                    className="px-4 py-2 bg-purple-600 text-sm font-medium text-white rounded-md hover:bg-purple-700 flex items-center space-x-2"
+                    className="px-4 py-2 bg-primary text-sm font-medium text-primary-foreground rounded-md hover:bg-primary/90 flex items-center space-x-2"
                 >
                     <ArrowDownTrayIcon className="h-5 w-5" />
                     <span>Download PDF</span>
                 </button>
                 <button
                     onClick={() => setShowPreview(false)}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400"
+                    className="px-4 py-2 bg-muted text-foreground text-sm font-medium rounded-md hover:bg-muted"
                 >
                     Close
                 </button>
@@ -599,15 +601,15 @@ const InvoicesList = ({
                 ) : (
                     <div className="space-y-4">
                         <div className="text-center border-b pb-4">
-                            <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
-                            <p className="text-gray-600">Invoice #{selectedInvoice.invoiceNumber}</p>
-                            <p className="text-gray-600">Date: {toDisplayDate(selectedInvoice.date)}</p>
+                            <h1 className="text-2xl font-bold text-foreground">INVOICE</h1>
+                            <p className="text-muted-foreground">Invoice #{selectedInvoice.invoiceNumber}</p>
+                            <p className="text-muted-foreground">Date: {toDisplayDate(selectedInvoice.date)}</p>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <h3 className="text-sm font-medium text-gray-900 mb-2">Invoice To:</h3>
-                                <div className="text-sm text-gray-600">
+                                <h3 className="text-sm font-medium text-foreground mb-2">Invoice To:</h3>
+                                <div className="text-sm text-muted-foreground">
                                     <p>{selectedInvoice.client?.name}</p>
                                     {selectedInvoice.client?.email && (
                                         <p>{selectedInvoice.client.email}</p>
@@ -622,8 +624,8 @@ const InvoicesList = ({
                             </div>
                             
                             <div>
-                                <h3 className="text-sm font-medium text-gray-900 mb-2">Project:</h3>
-                                <div className="text-sm text-gray-600">
+                                <h3 className="text-sm font-medium text-foreground mb-2">Project:</h3>
+                                <div className="text-sm text-muted-foreground">
                                     <p>{selectedInvoice.project?.title || 'Unknown Project'}</p>
                                     {selectedInvoice.project?.hourlyRate && (
                                         <p>
@@ -635,14 +637,14 @@ const InvoicesList = ({
                         </div>
 
                         <div>
-                            <h3 className="text-sm font-medium text-gray-900 mb-2">Tasks:</h3>
+                            <h3 className="text-sm font-medium text-foreground mb-2">Tasks:</h3>
                             <div className="space-y-1">
                                 {selectedInvoice.tasks?.map((task, index) => (
-                                    <div key={index} className="flex justify-between text-sm py-1 border-b border-gray-200">
+                                    <div key={index} className="flex justify-between text-sm py-1 border-b border-border">
                                         <span>{task.title}</span>
                                         <span>{task.hours?.toFixed(2) || 0} hours</span>
                                     </div>
-                                )) || <p className="text-gray-500">No tasks found</p>}
+                                )) || <p className="text-muted-foreground">No tasks found</p>}
                             </div>
                         </div>
 
@@ -674,41 +676,31 @@ const InvoicesList = ({
     return (
         <div className="space-y-6">
             {/* Tabs */}
-            <div className="flex border-b border-gray-200">
-                {/* Overdue tab - only show when there are overdue invoices */}
-                {overdueInvoices.length > 0 && (
-                    <button
-                        className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                            activeTab === 'overdue'
-                                ? 'border-red-500 text-red-700'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                        onClick={() => handleTabChange('overdue')}
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
+                <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+                    {/* Overdue tab - only show when there are overdue invoices */}
+                    {overdueInvoices.length > 0 && (
+                        <TabsTrigger
+                            value="overdue"
+                            className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-red-500 dark:data-[state=active]:border-red-400 data-[state=active]:text-red-700 dark:data-[state=active]:text-red-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                        >
+                            Overdue ({overdueInvoices.length})
+                        </TabsTrigger>
+                    )}
+                    <TabsTrigger
+                        value="outstanding"
+                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-yellow-500 dark:data-[state=active]:border-yellow-400 data-[state=active]:text-yellow-700 dark:data-[state=active]:text-yellow-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                     >
-                        Overdue ({overdueInvoices.length})
-                    </button>
-                )}
-                <button
-                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                        activeTab === 'outstanding'
-                            ? 'border-yellow-500 text-yellow-700'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                    onClick={() => handleTabChange('outstanding')}
-                >
-                    Outstanding ({outstandingInvoices.length})
-                </button>
-                <button
-                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                        activeTab === 'paid'
-                            ? 'border-green-500 text-green-700'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                    onClick={() => handleTabChange('paid')}
-                >
-                    Paid ({paidInvoices.length})
-                </button>
-            </div>
+                        Outstanding ({outstandingInvoices.length})
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="paid"
+                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-green-500 dark:data-[state=active]:border-green-400 data-[state=active]:text-green-700 dark:data-[state=active]:text-green-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                    >
+                        Paid ({paidInvoices.length})
+                    </TabsTrigger>
+                </TabsList>
+            </Tabs>
 
             {/* Tab Content */}
             {renderInvoiceList()}

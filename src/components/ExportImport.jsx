@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils';
 import Modal from './Modal';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
 
 /**
  * ExportImport component for backing up and restoring application data
@@ -180,68 +184,67 @@ function ExportImport({
     // Import modal footer buttons
     const importModalFooter = (
         <div className="flex justify-end gap-3">
-            <button
+            <Button
+                variant="secondary"
                 onClick={() => {
                     setShowImportModal(false);
                     setImportData('');
                     setImportError('');
                 }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
             >
                 Cancel
-            </button>
+            </Button>
             
-            <button
+            <Button
                 onClick={handleImport}
                 disabled={!importData.trim()}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
                 Import Data
-            </button>
+            </Button>
         </div>
     );
 
     return (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-            
-            <div className="space-y-4">
-                {/* Export Section */}
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+        <Card>
+            <CardContent className="pt-6">
+                <div className="space-y-4">
+                    {/* Export Section */}
+                    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                     <div>
-                        <h4 className="font-medium text-gray-900">Export Data</h4>
-                        <p className="text-sm text-gray-600">Download all your data including projects, tasks, invoices, settings, and more as JSON</p>
+                        <h4 className="font-medium text-foreground">Export Data</h4>
+                        <p className="text-sm text-muted-foreground">Download all your data including projects, tasks, invoices, settings, and more as JSON</p>
                     </div>
                     
-                    <button
+                    <Button
+                        variant="outline"
                         onClick={handleExport}
-                        className="flex items-center gap-2 px-4 py-2 border border-yellow-600 text-yellow-600 bg-transparent rounded-lg hover:bg-yellow-50 transition-colors"
+                        leadingIcon={ArrowDownTrayIcon}
                     >
-                        <ArrowDownTrayIcon className="w-4 h-4" />
                         Export
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Import Section */}
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                     <div>
-                        <h4 className="font-medium text-gray-900">Import Data</h4>
-                        <p className="text-sm text-gray-600">Restore all data including projects, tasks, invoices, settings, and more from JSON backup</p>
+                        <h4 className="font-medium text-foreground">Import Data</h4>
+                        <p className="text-sm text-muted-foreground">Restore all data including projects, tasks, invoices, settings, and more from JSON backup</p>
                     </div>
                     
-                    <button
+                    <Button
+                        variant="outline"
                         onClick={() => setShowImportModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 bg-transparent rounded-lg hover:bg-blue-50 transition-colors"
+                        leadingIcon={ArrowUpTrayIcon}
                     >
-                        <ArrowUpTrayIcon className="w-4 h-4" />
                         Import
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Data Summary */}
                 {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clients.length > 0 || invoiceTemplates.length > 0) && (
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                        <h4 className="font-medium text-blue-700 mb-2">Current Data</h4>
-                        <div className="text-sm text-blue-700 space-y-1">
+                    <div className="p-4 bg-muted rounded-lg">
+                        <h4 className="font-medium text-foreground mb-2">Current Data</h4>
+                        <div className="text-sm text-muted-foreground space-y-1">
                             <p>Clients: <span className="font-medium">{clients.length}</span></p>
                             <p>Projects: <span className="font-medium">{projects.length}</span></p>
                             <p>Invoices: <span className="font-medium">{invoices.length}</span></p>
@@ -270,61 +273,60 @@ function ExportImport({
             >
                 <div className="space-y-4">
                     {/* File Upload */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Upload JSON File
-                        </label>
+                    <div className="space-y-2">
+                        <Label htmlFor="file-upload">Upload JSON File</Label>
                         <input
+                            id="file-upload"
                             type="file"
                             accept=".json"
                             onChange={handleFileUpload}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         />
                     </div>
 
                     {/* Manual Input */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Or paste JSON data
-                        </label>
-                        <textarea
+                    <div className="space-y-2">
+                        <Label htmlFor="json-data">Or paste JSON data</Label>
+                        <Textarea
+                            id="json-data"
                             value={importData}
                             onChange={(e) => setImportData(e.target.value)}
                             placeholder="Paste JSON data here..."
-                            className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                            className="h-40 font-mono text-sm"
                         />
                     </div>
 
                     {/* Error Display */}
                     {importError && (
-                        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
-                            <p className="text-sm text-red-700">{importError}</p>
+                        <div className="flex items-center gap-2 p-3 bg-muted border border-border rounded-lg">
+                            <ExclamationTriangleIcon className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                            <p className="text-sm text-foreground">{importError}</p>
                         </div>
                     )}
 
                     {/* Active Timer Warning */}
                     {currentTimer && (
-                        <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-red-700">
+                        <div className="flex items-start gap-2 p-3 bg-muted border border-border rounded-lg">
+                            <ExclamationTriangleIcon className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            <div className="text-sm text-foreground">
                                 <p className="font-medium">Active Timer Detected!</p>
-                                <p>You have an active timer running. Importing data will <strong>stop and discard</strong> any unsaved timer progress. Please stop your timer first to save the time entry, or proceed knowing the current timer session will be lost.</p>
+                                <p className="text-muted-foreground">You have an active timer running. Importing data will <strong>stop and discard</strong> any unsaved timer progress. Please stop your timer first to save the time entry, or proceed knowing the current timer session will be lost.</p>
                             </div>
                         </div>
                     )}
 
                     {/* Warning */}
-                    <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                        <div className="text-sm text-yellow-700">
+                    <div className="flex items-start gap-2 p-3 bg-muted border border-border rounded-lg">
+                        <ExclamationTriangleIcon className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-foreground">
                             <p className="font-medium">Warning:</p>
-                            <p>Importing will replace all current data including projects, tasks, invoices, payment methods, business info, clients, templates, and preferences. Make sure to export your current data first if you want to keep it.</p>
+                            <p className="text-muted-foreground">Importing will replace all current data including projects, tasks, invoices, payment methods, business info, clients, templates, and preferences. Make sure to export your current data first if you want to keep it.</p>
                         </div>
                     </div>
                 </div>
             </Modal>
-        </div>
+            </CardContent>
+        </Card>
     );
 }
 

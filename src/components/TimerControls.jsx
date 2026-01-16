@@ -1,5 +1,6 @@
 import React from 'react';
 import { PlayIcon, PauseIcon, StopIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
 import { generateId } from '../utils/idUtils';
 import { checkTimeOverlap } from '../utils/timeValidationUtils';
 import { useToast } from '../hooks/useToast';
@@ -268,50 +269,86 @@ function TimerControls({
         <div className="flex items-center space-x-1">
             {!isTimerActive ? (
                 // Start button - shown when no timer active for this task
-                <button
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={startTimer}
-                    className="p-1 text-green-600 hover:bg-green-100 rounded-md transition-colors group"
+                    className="h-8 w-8 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-100 dark:hover:bg-green-900"
                     title="Start Timer"
                 >
-                    <PlayIcon className={`${iconSize} group-hover:text-green-700`} />
-                </button>
+                    <PlayIcon className={iconSize} />
+                </Button>
             ) : isPaused ? (
                 // For paused state, show resume and stop buttons
                 <div className="flex space-x-1">
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={resumeTimer}
-                        className="p-1 text-green-600 hover:bg-green-100 rounded-md transition-colors group"
+                        className="h-8 w-8 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-100 dark:hover:bg-green-900"
                         title="Resume Timer"
                     >
-                        <PlayIcon className={`${iconSize} group-hover:text-green-700`} />
-                    </button>
-                    {isGlobalTimer && <button
-                        onClick={stopTimer}
-                            className="flex items-center space-x-1 p-1 text-red-600 hover:bg-red-100 rounded-md transition-colors group"
-                        title="Save & Stop Timer"
-                    >
-                        <StopIcon className={`${iconSize} group-hover:text-red-700`} />
-                    </button>}
+                        <PlayIcon className={iconSize} />
+                    </Button>
+                    {isGlobalTimer && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={stopTimer}
+                            className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900"
+                            title="Save & Stop Timer"
+                        >
+                            <StopIcon className={iconSize} />
+                        </Button>
+                    )}
                 </div>
             ) : (
                 // For active (running) state, show pause and stop buttons
                 <div className="flex space-x-1">
-                    <button
-                        onClick={pauseTimer}
-                        className={`flex items-center space-x-1 p-1 ${isGlobalTimer ? 'text-yellow-600 hover:bg-yellow-100' : 'text-yellow-600 hover:bg-yellow-100'} rounded-md transition-colors group`}
-                        title="Pause Timer"
-                    >
-                        <PauseIcon className={`${iconSize} group-hover:text-yellow-700`} />
-                        {!isGlobalTimer && <span className="text-xs font-medium group-hover:text-yellow-700">Pause</span>}
-                    </button>
-                    <button
-                        onClick={stopTimer}
-                        className={`${isGlobalTimer ? 'p-1' : 'flex items-center space-x-1 p-1'} text-red-600 hover:bg-red-100 rounded-md transition-colors group`}
-                        title="Save & Stop Timer"
-                    >
-                        <StopIcon className={`${iconSize} group-hover:text-red-700`} />
-                        {!isGlobalTimer && <span className="text-xs font-medium group-hover:text-red-700">Stop</span>}
-                    </button>
+                    {isGlobalTimer ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={pauseTimer}
+                            className="h-8 w-8 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900"
+                            title="Pause Timer"
+                        >
+                            <PauseIcon className={iconSize} />
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={pauseTimer}
+                            className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900"
+                            title="Pause Timer"
+                            leadingIcon={PauseIcon}
+                        >
+                            Pause
+                        </Button>
+                    )}
+                    {isGlobalTimer ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={stopTimer}
+                            className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900"
+                            title="Save & Stop Timer"
+                        >
+                            <StopIcon className={iconSize} />
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={stopTimer}
+                            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900"
+                            title="Save & Stop Timer"
+                            leadingIcon={StopIcon}
+                        >
+                            Stop
+                        </Button>
+                    )}
                 </div>
             )}
         </div>

@@ -1,16 +1,22 @@
 import PropTypes from 'prop-types';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
+import { MoreHorizontal } from 'lucide-react';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils';
 import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { getTaskIdsToDelete } from '../utils/taskUtils';
-
-// Event name for dropdown coordination
-const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
 
 /**
  * ProjectList component - Displays and manages the list of projects
@@ -31,42 +37,12 @@ const ProjectList = ({
     openProjectModal,
     editProjectModal
 }) => {
-    const [showDropdown, setShowDropdown] = useState({}); // Track dropdown states by project ID
     const [showArchivedProjects, setShowArchivedProjects] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState(null);
     const { showSuccess } = useToast();
 
     // Update showCreateForm when the prop changes - Removed since using modal manager
-    
-    // Close dropdown when clicking outside or when another dropdown opens
-    useEffect(() => {
-        const handleDropdownToggle = (event) => {
-            const { taskId, open } = event.detail;
-            if (!open) {
-                // Close all dropdowns when any dropdown is closed
-                setShowDropdown({});
-            } else {
-                // Close other dropdowns when a new one opens
-                setShowDropdown({ [taskId]: true });
-            }
-        };
-
-        const handleClickOutside = (event) => {
-            // Close dropdowns when clicking outside
-            if (!event.target.closest('.dropdown-container')) {
-                setShowDropdown({});
-            }
-        };
-
-        document.addEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
-        document.addEventListener('click', handleClickOutside);
-        
-        return () => {
-            document.removeEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
-            document.removeEventListener('click', handleClickOutside);
-        };
-    }, []);
 
     /**
      * Check if a project has associated invoices
@@ -320,7 +296,7 @@ const ProjectList = ({
         <div className="space-y-8">
             {/* Header */}
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-2xl font-bold text-foreground">
                     Projects {projects.filter(p => !p.archived).length > 0 && (
                         <span>
                             ({projects.filter(p => !p.archived).length})
@@ -351,86 +327,67 @@ const ProjectList = ({
                     {projects.filter(p => !p.archived).length > 0 && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {projects.filter(p => !p.archived).map((project) => (
-                        <div
+                        <Card
                             key={project.id}
-                            className="bg-white shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
+                            className="hover:shadow-md transition-shadow cursor-pointer relative"
                             onClick={() => onSelectProject(project)}
                         >
-                            <div className="p-5">
+                            <CardContent className="pt-5">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-lg font-medium text-gray-900 truncate">
+                                    <h3 className="text-lg font-medium text-foreground truncate">
                                         {project.title}
                                     </h3>
 
                                     {/* Three-dot dropdown menu for Edit and Delete */}
-                                    <div className="relative dropdown-container" onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                            onClick={() => {
-                                                const newState = !showDropdown[project.id];
-                                                setShowDropdown(newState ? { [project.id]: true } : {});
-
-                                                // Dispatch a custom event to close other dropdowns
-                                                const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
-                                                    detail: { taskId: project.id, open: newState }
-                                                });
-                                                document.dispatchEvent(event);
-                                            }}
-                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
-                                            title="More actions"
-                                        >
-                                            <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
-                                        </button>
-
-                                        {showDropdown[project.id] && (
-                                            <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                                                <div className="py-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            editProjectModal(project);
-                                                            setShowDropdown({});
-                                                        }}
-                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"
-                                                    >
-                                                        <PencilIcon className="h-4 w-4" />
-                                                        <span>Edit</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            handleArchiveProject(project.id);
-                                                            setShowDropdown({});
-                                                        }}
-                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors space-x-2"
-                                                    >
-                                                        <ArchiveBoxIcon className="h-4 w-4" />
-                                                        <span>Archive</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setProjectToDelete(project); // Set the project to be deleted
-                                                            setShowDeleteModal(true); // Show the delete confirmation modal
-                                                            setShowDropdown({});
-                                                        }}
-                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
-                                                    >
-                                                        <TrashIcon className="h-4 w-4" />
-                                                        <span>Delete</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                                title="More actions"
+                                            >
+                                                <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                            <DropdownMenuItem
+                                                onClick={() => editProjectModal(project)}
+                                                className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
+                                            >
+                                                <PencilIcon className="h-4 w-4" />
+                                                <span>Edit</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => handleArchiveProject(project.id)}
+                                                className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                            >
+                                                <ArchiveBoxIcon className="h-4 w-4" />
+                                                <span>Archive</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    setProjectToDelete(project);
+                                                    setShowDeleteModal(true);
+                                                }}
+                                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                            >
+                                                <TrashIcon className="h-4 w-4" />
+                                                <span>Delete</span>
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
 
                                 {project.hourlyRate && !project.flatRate && (
-                                    <p className="mt-2 text-sm text-gray-500">
+                                    <p className="mt-2 text-sm text-muted-foreground">
                                         {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
                                     </p>
                                 )}
 
-                                <p className="mt-1 text-xs text-gray-400">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                     Created {toDisplayDate(project.createdAt)}
                                     {project.isPersonal && (
-                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground">
                                             Personal
                                         </span>
                                     )}
@@ -441,7 +398,7 @@ const ProjectList = ({
                                     <div className="absolute bottom-4 right-4">
                                         <button
                                             onClick={(e) => handleGenerateInvoice(e, project)}
-                                            className="inline-flex items-center px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-full hover:bg-green-700 transition-colors"
+                                            className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
                                             title="Click to generate invoice"
                                         >
                                             {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
@@ -451,7 +408,7 @@ const ProjectList = ({
                                     <div className="absolute bottom-4 right-4">
                                         <button
                                             onClick={(e) => handleGenerateInvoice(e, project)}
-                                            className="inline-flex items-center px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded-full hover:bg-blue-700 transition-colors"
+                                            className="inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground text-xs font-medium rounded-full hover:bg-secondary/80 transition-colors"
                                             title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
                                         >
                                             <ClockIcon className="h-3 w-3 mr-1" />
@@ -459,8 +416,8 @@ const ProjectList = ({
                                         </button>
                                     </div>
                                 ) : null}
-                            </div>
-                        </div>
+                            </CardContent>
+                        </Card>
                     ))}
                 </div>
                     )}
@@ -470,7 +427,7 @@ const ProjectList = ({
                         <div className="border-t pt-6">
                             <button
                                 onClick={() => setShowArchivedProjects(!showArchivedProjects)}
-                                className="flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 mb-4"
+                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4"
                             >
                                 {showArchivedProjects ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />
@@ -483,75 +440,57 @@ const ProjectList = ({
                             {showArchivedProjects && (
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                                     {projects.filter(p => p.archived).map((project) => (
-                                        <div
+                                        <Card
                                             key={project.id}
-                                            className="bg-white shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
+                                            className="hover:shadow-md transition-shadow cursor-pointer relative"
                                             onClick={() => onSelectProject(project)}
                                         >
-                                            <div className="p-5">
+                                            <CardContent className="pt-5">
                                                 <div className="flex items-center justify-between">
-                                                    <h3 className="text-lg font-medium text-gray-900 truncate">
+                                                    <h3 className="text-lg font-medium text-foreground truncate">
                                                         {project.title}
                                                     </h3>
 
                                                     {/* Three-dot dropdown menu for Unarchive and Delete */}
-                                                    <div className="relative dropdown-container" onClick={(e) => e.stopPropagation()}>
-                                                        <button
-                                                            onClick={() => {
-                                                                const newState = !showDropdown[project.id];
-                                                                setShowDropdown(newState ? { [project.id]: true } : {});
-
-                                                                // Dispatch a custom event to close other dropdowns
-                                                                const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
-                                                                    detail: { taskId: project.id, open: newState }
-                                                                });
-                                                                document.dispatchEvent(event);
-                                                            }}
-                                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
-                                                            title="More actions"
-                                                        >
-                                                            <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
-                                                        </button>
-
-                                                        {showDropdown[project.id] && (
-                                                            <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                                                                <div className="py-1">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            handleUnarchiveProject(project.id);
-                                                                            setShowDropdown({});
-                                                                        }}
-                                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors space-x-2"
-                                                                    >
-                                                                        <ArchiveBoxIcon className="h-4 w-4" />
-                                                                        <span>Unarchive</span>
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            handleDeleteProject(project.id);
-                                                                            setShowDropdown({});
-                                                                        }}
-                                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
-                                                                    >
-                                                                        <TrashIcon className="h-4 w-4" />
-                                                                        <span>Delete</span>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                                                title="More actions"
+                                                            >
+                                                                <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleUnarchiveProject(project.id)}
+                                                                className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                                            >
+                                                                <ArchiveBoxIcon className="h-4 w-4" />
+                                                                <span>Unarchive</span>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleDeleteProject(project.id)}
+                                                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                                            >
+                                                                <TrashIcon className="h-4 w-4" />
+                                                                <span>Delete</span>
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </div>
 
                                                 {project.hourlyRate && !project.flatRate && (
-                                                    <p className="mt-2 text-sm text-gray-500">
+                                                    <p className="mt-2 text-sm text-muted-foreground">
                                                         {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
                                                     </p>
                                                 )}
 
-                                                <p className="mt-1 text-xs text-gray-400">
+                                                <p className="mt-1 text-xs text-muted-foreground">
                                                     Created {toDisplayDate(project.createdAt)}
                                                     {project.isPersonal && (
-                                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground">
                                                             Personal
                                                         </span>
                                                     )}
@@ -562,7 +501,7 @@ const ProjectList = ({
                                                     <div className="absolute bottom-4 right-4">
                                                         <button
                                                             onClick={(e) => handleGenerateInvoice(e, project)}
-                                                            className="inline-flex items-center px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-full hover:bg-green-700 transition-colors"
+                                                            className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
                                                             title="Click to generate invoice"
                                                         >
                                                             {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
@@ -572,7 +511,7 @@ const ProjectList = ({
                                                     <div className="absolute bottom-4 right-4">
                                                         <button
                                                             onClick={(e) => handleGenerateInvoice(e, project)}
-                                                            className="inline-flex items-center px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded-full hover:bg-blue-700 transition-colors"
+                                                            className="inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground text-xs font-medium rounded-full hover:bg-secondary/80 transition-colors"
                                                             title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
                                                         >
                                                             <ClockIcon className="h-3 w-3 mr-1" />
@@ -580,8 +519,8 @@ const ProjectList = ({
                                                         </button>
                                                     </div>
                                                 ) : null}
-                                            </div>
-                                        </div>
+                                            </CardContent>
+                                        </Card>
                                     ))}
                                 </div>
                             )}
@@ -605,7 +544,7 @@ const ProjectList = ({
                                 <div className="flex justify-end space-x-3">
                                     <button
                                         onClick={handleCancelDelete}
-                                        className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                                        className="px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                                     >
                                         Cancel
                                     </button>
@@ -614,14 +553,14 @@ const ProjectList = ({
                                 <div className="flex justify-end space-x-3">
                                     <button
                                         onClick={handleCancelDelete}
-                                        className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        className="px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                                     >
                                         Cancel
                                     </button>
 
                                     <button
                                         onClick={confirmDeleteProject}
-                                        className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                        className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-destructive-foreground bg-destructive hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                                     >
                                         Delete Project
                                     </button>
@@ -631,32 +570,32 @@ const ProjectList = ({
                     >
                         {hasInvoices ? (
                             <>
-                                <p className="text-sm text-gray-700 mb-4">
+                                <p className="text-sm text-foreground mb-4">
                                     The project "<span className="font-semibold">{projectToDelete.title}</span>" has invoices attached to it.
                                 </p>
 
-                                <p className="text-sm text-gray-700 mb-6">
+                                <p className="text-sm text-foreground mb-6">
                                     <strong>Recommended:</strong> Archive this project to preserve the invoices for record-keeping purposes.
                                 </p>
 
                                 <div className="flex flex-col space-y-3">
                                     <button
                                         onClick={handleArchiveFromModal}
-                                        className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                                     >
                                         Archive Project (Recommended)
                                     </button>
 
                                     <button
                                         onClick={handleForceDelete}
-                                        className="w-full px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                        className="w-full px-4 py-2 border border-red-300 dark:border-red-700 rounded-md shadow-sm text-sm font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                                     >
                                         Force Delete Project & All Invoices
                                     </button>
                                 </div>
                             </>
                         ) : (
-                            <p className="text-sm text-gray-700">
+                            <p className="text-sm text-foreground">
                                 Are you sure you want to delete the project "<span className="font-semibold">{projectToDelete.title}</span>"? This action cannot be undone.
                             </p>
                         )}

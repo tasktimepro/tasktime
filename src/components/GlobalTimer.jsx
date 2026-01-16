@@ -168,13 +168,12 @@ const GlobalTimer = ({
         return null;
     }
 
-    // Determine styles based on timer state
-    // const bgColor = isPaused ? 'bg-yellow-50' : 'bg-red-50';
-    const borderColor = isPaused ? 'border-yellow-200' : 'border-red-200';
-    const dotColor = isPaused ? 'bg-yellow-500' : 'bg-red-500';
+    // Determine styles based on timer state - using semantic colors with dark mode support
+    const borderColor = isPaused ? 'border-yellow-300 dark:border-yellow-700' : 'border-red-300 dark:border-red-700';
+    const dotColor = isPaused ? 'bg-yellow-500 dark:bg-yellow-400' : 'bg-red-500 dark:bg-red-400';
     const dotAnimation = isPaused ? '' : 'animate-pulse';
-    const textColor = isPaused ? 'text-yellow-900' : 'text-red-900';
-    const timeColor = isPaused ? 'text-yellow-700 bg-yellow-100' : 'text-red-700 bg-red-100';
+    const textColor = isPaused ? 'text-yellow-900 dark:text-yellow-100' : 'text-red-900 dark:text-red-100';
+    const timeColor = isPaused ? 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900' : 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900';
 
     return (
         <div className={`border ${borderColor} rounded-lg px-4 py-2 ${isExpanded ? 'space-y-3' : ''}`}>
@@ -230,7 +229,7 @@ const GlobalTimer = ({
                     {/* Options toggle button */}
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className={`p-1 ${textColor} hover:bg-gray-100 rounded-md transition-colors`}
+                        className={`p-1 ${textColor} hover:bg-muted rounded-md transition-colors`}
                         title={isExpanded ? "Hide options" : "Show timer options"}
                     >
                         {isExpanded ? (
@@ -244,11 +243,11 @@ const GlobalTimer = ({
 
             {/* Expanded options */}
             {isExpanded && (
-                <div className="border-t border-gray-200 pt-3 space-y-3">
+                <div className="border-t border-border pt-3 space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {/* Start Time Input */}
                         <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                            <label className="block text-xs font-medium text-foreground mb-1">
                                 Start Time
                             </label>
                             <input
@@ -256,13 +255,13 @@ const GlobalTimer = ({
                                 step="1"
                                 value={startTimeInput}
                                 onChange={(e) => setStartTimeInput(e.target.value)}
-                                className="w-full text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
+                                className="w-full text-sm border border-border rounded-md focus:ring-ring focus:border-ring px-2.5 py-1.5 bg-background text-foreground"
                             />
                         </div>
 
                         {/* Note Input */}
                         <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                            <label className="block text-xs font-medium text-foreground mb-1">
                                 Note
                             </label>
                             <input
@@ -270,7 +269,7 @@ const GlobalTimer = ({
                                 value={noteInput}
                                 onChange={(e) => setNoteInput(e.target.value)}
                                 placeholder="What are you working on..."
-                                className="w-full text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
+                                className="w-full text-sm border border-border rounded-md focus:ring-ring focus:border-ring px-2.5 py-1.5 bg-background text-foreground placeholder:text-muted-foreground"
                             />
                         </div>
                     </div>
@@ -279,13 +278,13 @@ const GlobalTimer = ({
                     <div className="flex justify-end space-x-2">
                         <button
                             onClick={() => setIsExpanded(false)}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            className="px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-muted rounded-md transition-colors"
                         >
                             Cancel
                         </button>
                         <button
                             onClick={handleSubmitChanges}
-                            className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+                            className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors"
                         >
                             Update Timer
                         </button>

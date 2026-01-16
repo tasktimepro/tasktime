@@ -9,6 +9,7 @@ import {
 } from '../utils/dateUtils';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
 import { ClockIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 /**
  * MetricsDisplay component - Shows time and earnings metrics for different periods
@@ -111,45 +112,47 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
     ];
 
     return (
-        <div className="bg-white shadow rounded-lg">
+        <Card>
             {showTitle && (
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-lg font-medium text-gray-900">Project Metrics</h2>
-                </div>
+                <CardHeader className="pb-0">
+                    <CardTitle>Project Metrics</CardTitle>
+                </CardHeader>
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 p-6">
-                {metrics.map((metric) => {
-                    return (
-                        <div key={metric.label} className="bg-white overflow-hidden shadow rounded-lg">
-                            <div className="p-5">
-                                <div className="flex flex-col">
-                                    <dt className="text-sm font-medium text-gray-500 truncate mb-3">
-                                        {metric.label}
-                                    </dt>
-                                    
-                                    <dd className="flex items-center">
-                                        <ClockIcon className="h-4 w-4 text-blue-600 mr-2 flex-shrink-0" />
-                                        <span className="text-lg font-medium text-gray-900">
-                                            {formatDuration(metric.time)}
-                                        </span>
-                                    </dd>
-                                    
-                                    {project && project.hourlyRate && (
-                                        <dd className="flex items-center mt-1">
-                                            <CurrencyDollarIcon className="h-4 w-4 text-yellow-600 mr-2 flex-shrink-0" />
-                                            <span className="font-medium text-gray-900">
-                                                {`${getCurrencySymbol(displayCurrency)}${metric.earnings.toFixed(2)}`}
+            <CardContent className={showTitle ? "pt-6" : "pt-6"}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                    {metrics.map((metric) => {
+                        return (
+                            <Card key={metric.label}>
+                                <CardContent className="pt-5">
+                                    <div className="flex flex-col">
+                                        <dt className="text-sm font-medium text-muted-foreground truncate mb-3">
+                                            {metric.label}
+                                        </dt>
+                                        
+                                        <dd className="flex items-center">
+                                            <ClockIcon className="h-4 w-4 text-blue-600 mr-2 flex-shrink-0" />
+                                            <span className="text-lg font-medium">
+                                                {formatDuration(metric.time)}
                                             </span>
                                         </dd>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
+                                        
+                                        {project && project.hourlyRate && (
+                                            <dd className="flex items-center mt-1">
+                                                <CurrencyDollarIcon className="h-4 w-4 text-yellow-600 mr-2 flex-shrink-0" />
+                                                <span className="font-medium">
+                                                    {`${getCurrencySymbol(displayCurrency)}${metric.earnings.toFixed(2)}`}
+                                                </span>
+                                            </dd>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                </div>
+            </CardContent>
+        </Card>
     );
 };
 

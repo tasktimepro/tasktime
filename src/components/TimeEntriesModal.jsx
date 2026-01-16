@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { formatDurationWithSeconds, toDisplayDate, getTodayString, getCurrentTimeString, timestampToDateString, timestampToTimeString } from '../utils/dateUtils';
 import { checkTimeOverlap } from '../utils/timeValidationUtils';
 import { generateId } from '../utils/idUtils';
@@ -288,74 +293,80 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
         const isEditing = editingEntry?.id === entry.id;
 
         return (
-            <div key={entry.id} className={`border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow ${isBilled ? 'bg-gray-50 opacity-75' : ''}`}>
+            <div key={entry.id} className={`border border-border rounded-lg p-3 hover:shadow-md transition-shadow ${isBilled ? 'bg-muted opacity-75' : ''}`}>
                 {isEditing ? (
                     // Edit form
-                    <div className="border border-yellow-200 rounded-lg p-3 bg-yellow-50">
-                        <h4 className="text-sm font-medium text-yellow-900 mb-3">Edit Time Entry</h4>
+                    <div className="border border-border rounded-lg p-3 bg-muted">
+                        <h4 className="text-sm font-medium text-foreground mb-3">Edit Time Entry</h4>
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-medium text-yellow-700 mb-1">Start Date</label>
-                                <input
+                            <div className="space-y-1.5">
+                                <Label htmlFor={`edit-start-date-${entry.id}`} className="text-xs">Start Date</Label>
+                                <Input
+                                    id={`edit-start-date-${entry.id}`}
                                     type="date"
                                     value={editForm.startDate}
                                     onChange={(e) => setEditForm(prev => ({ ...prev, startDate: e.target.value }))}
-                                    className="w-full text-sm border border-yellow-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 px-2.5 py-1.5"
+                                    className="text-sm"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-yellow-700 mb-1">Start Time</label>
-                                <input
+                            <div className="space-y-1.5">
+                                <Label htmlFor={`edit-start-time-${entry.id}`} className="text-xs">Start Time</Label>
+                                <Input
+                                    id={`edit-start-time-${entry.id}`}
                                     type="time"
                                     step="1"
                                     value={editForm.startTime}
                                     onChange={(e) => setEditForm(prev => ({ ...prev, startTime: e.target.value }))}
-                                    className="w-full text-sm border border-yellow-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 px-2.5 py-1.5"
+                                    className="text-sm"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-yellow-700 mb-1">End Date</label>
-                                <input
+                            <div className="space-y-1.5">
+                                <Label htmlFor={`edit-end-date-${entry.id}`} className="text-xs">End Date</Label>
+                                <Input
+                                    id={`edit-end-date-${entry.id}`}
                                     type="date"
                                     value={editForm.endDate}
                                     onChange={(e) => setEditForm(prev => ({ ...prev, endDate: e.target.value }))}
-                                    className="w-full text-sm border border-yellow-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 px-2.5 py-1.5"
+                                    className="text-sm"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-yellow-700 mb-1">End Time</label>
-                                <input
+                            <div className="space-y-1.5">
+                                <Label htmlFor={`edit-end-time-${entry.id}`} className="text-xs">End Time</Label>
+                                <Input
+                                    id={`edit-end-time-${entry.id}`}
                                     type="time"
                                     step="1"
                                     value={editForm.endTime}
                                     onChange={(e) => setEditForm(prev => ({ ...prev, endTime: e.target.value }))}
-                                    className="w-full text-sm border border-yellow-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 px-2.5 py-1.5"
+                                    className="text-sm"
                                 />
                             </div>
                         </div>
-                        <div className="mt-3">
-                            <label className="block text-xs font-medium text-yellow-700 mb-1">Note (optional)</label>
-                            <textarea
+                        <div className="mt-3 space-y-1.5">
+                            <Label htmlFor={`edit-note-${entry.id}`} className="text-xs">Note (optional)</Label>
+                            <Textarea
+                                id={`edit-note-${entry.id}`}
                                 value={editForm.note}
                                 onChange={(e) => setEditForm(prev => ({ ...prev, note: e.target.value }))}
                                 placeholder="What was done during this time..."
                                 rows={2}
-                                className="w-full text-sm border border-yellow-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 px-2.5 py-1.5"
+                                className="text-sm"
                             />
                         </div>
                         <div className="mt-3 flex justify-end space-x-2">
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={handleCancelEdit}
-                                className="px-3 py-1.5 text-xs font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-md transition-colors"
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                size="sm"
                                 onClick={handleSaveEdit}
-                                className="px-3 py-1.5 text-xs font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-md transition-colors"
                             >
                                 Save Changes
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 ) : (
@@ -364,44 +375,46 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
                         <div className="flex-1">
                             <div className="flex items-center space-x-4 text-sm">
                                 <div className="flex items-center space-x-2">
-                                    <span className="text-gray-500">{startDate}</span>
-                                    <span className="font-mono text-gray-700">{startTime}</span>
-                                    <span className="text-gray-400">→</span>
-                                    {startDate !== endDate && <span className="text-gray-500">{endDate}</span>}
-                                    <span className="font-mono text-gray-700">{endTime}</span>
+                                    <span className="text-muted-foreground">{startDate}</span>
+                                    <span className="font-mono text-foreground">{startTime}</span>
+                                    <span className="text-muted-foreground">→</span>
+                                    {startDate !== endDate && <span className="text-muted-foreground">{endDate}</span>}
+                                    <span className="font-mono text-foreground">{endTime}</span>
                                 </div>
-                                <div className="text-blue-600 font-medium">
+                                <div className="text-foreground font-medium">
                                     {formatDurationWithSeconds(duration)}
                                 </div>
                             </div>
                             {entry.note && (
-                                <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded border-l-4 border-blue-200">
+                                <div className="mt-2 text-sm text-muted-foreground bg-muted p-2 rounded border-l-4 border-border">
                                     {entry.note}
                                 </div>
                             )}
                         </div>
                         <div className="flex items-center space-x-2 ml-4">
                             {isBilled && (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                    Billed
-                                </span>
+                                <Badge variant="secondary">Billed</Badge>
                             )}
                             {!isBilled && (
                                 <>
-                                    <button
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => handleEditEntry(entry)}
-                                        className="p-1 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded transition-colors"
+                                        className="h-7 w-7 text-muted-foreground hover:text-yellow-600 hover:bg-yellow-50"
                                         title="Edit entry"
                                     >
                                         <PencilIcon className="h-4 w-4" />
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => handleDeleteEntry(entry.id)}
-                                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                        className="h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50"
                                         title="Delete entry"
                                     >
                                         <TrashIcon className="h-4 w-4" />
-                                    </button>
+                                    </Button>
                                 </>
                             )}
                         </div>
@@ -413,15 +426,12 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
 
     const footer = (
         <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-600">
-                Total Time: <span className="font-medium text-gray-900">{formatDurationWithSeconds(totalTime)}</span>
+            <div className="text-sm text-muted-foreground">
+                Total Time: <span className="font-medium text-foreground">{formatDurationWithSeconds(totalTime)}</span>
             </div>
-            <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-            >
+            <Button variant="secondary" onClick={onClose}>
                 Close
-            </button>
+            </Button>
         </div>
     );
 
@@ -436,85 +446,90 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
             <div className="space-y-4">
                 {/* Add New Entry Button */}
                 <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-gray-900">
+                    <h3 className="text-sm font-medium text-foreground">
                         {taskTimeEntries.length} {taskTimeEntries.length === 1 ? 'Entry' : 'Entries'}
                     </h3>
-                    <button
+                    <Button
                         onClick={() => setShowAddForm(true)}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        leadingIcon={PlusIcon}
                     >
-                        <PlusIcon className="h-4 w-4 mr-2" />
                         Add Entry
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Add New Entry Form */}
                 {showAddForm && (
-                    <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
-                        <h4 className="text-sm font-medium text-blue-900 mb-3">Add New Time Entry</h4>
+                    <div className="border border-border rounded-lg p-4 bg-muted">
+                        <h4 className="text-sm font-medium text-foreground mb-3">Add New Time Entry</h4>
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-medium text-blue-700 mb-1">Start Date</label>
-                                <input
+                            <div className="space-y-1.5">
+                                <Label htmlFor="add-start-date" className="text-xs">Start Date</Label>
+                                <Input
+                                    id="add-start-date"
                                     type="date"
                                     value={addForm.startDate}
                                     onChange={(e) => setAddForm(prev => ({ ...prev, startDate: e.target.value }))}
-                                    className="w-full text-sm border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
+                                    className="text-sm"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-blue-700 mb-1">Start Time</label>
-                                <input
+                            <div className="space-y-1.5">
+                                <Label htmlFor="add-start-time" className="text-xs">Start Time</Label>
+                                <Input
+                                    id="add-start-time"
                                     type="time"
                                     step="1"
                                     value={addForm.startTime}
                                     onChange={(e) => setAddForm(prev => ({ ...prev, startTime: e.target.value }))}
-                                    className="w-full text-sm border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
+                                    className="text-sm"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-blue-700 mb-1">End Date</label>
-                                <input
+                            <div className="space-y-1.5">
+                                <Label htmlFor="add-end-date" className="text-xs">End Date</Label>
+                                <Input
+                                    id="add-end-date"
                                     type="date"
                                     value={addForm.endDate}
                                     onChange={(e) => setAddForm(prev => ({ ...prev, endDate: e.target.value }))}
-                                    className="w-full text-sm border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
+                                    className="text-sm"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-blue-700 mb-1">End Time</label>
-                                <input
+                            <div className="space-y-1.5">
+                                <Label htmlFor="add-end-time" className="text-xs">End Time</Label>
+                                <Input
+                                    id="add-end-time"
                                     type="time"
                                     step="1"
                                     value={addForm.endTime}
                                     onChange={(e) => setAddForm(prev => ({ ...prev, endTime: e.target.value }))}
-                                    className="w-full text-sm border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
+                                    className="text-sm"
                                 />
                             </div>
                         </div>
-                        <div className="mt-3">
-                            <label className="block text-xs font-medium text-blue-700 mb-1">Note (optional)</label>
-                            <textarea
+                        <div className="mt-3 space-y-1.5">
+                            <Label htmlFor="add-note" className="text-xs">Note (optional)</Label>
+                            <Textarea
+                                id="add-note"
                                 value={addForm.note}
                                 onChange={(e) => setAddForm(prev => ({ ...prev, note: e.target.value }))}
                                 placeholder="What was done during this time..."
                                 rows={2}
-                                className="w-full text-sm border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
+                                className="text-sm"
                             />
                         </div>
                         <div className="mt-3 flex justify-end space-x-2">
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={handleCancelAdd}
-                                className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-colors"
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                size="sm"
                                 onClick={handleAddEntry}
-                                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
                             >
                                 Add Entry
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 )}
@@ -522,17 +537,17 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
                 {/* Time Entries List */}
                 <div className="space-y-4 max-h-96 overflow-y-auto">
                     {taskTimeEntries.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
-                            <ClockIcon className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                        <div className="text-center py-8 text-muted-foreground">
+                            <ClockIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                             <p className="text-sm">No time entries found for this task</p>
-                            <p className="text-xs text-gray-400 mt-1">Click "Add Entry" to get started</p>
+                            <p className="text-xs text-muted-foreground mt-1">Click "Add Entry" to get started</p>
                         </div>
                     ) : (
                         <>
                             {/* Unbilled Time Entries */}
                             {unbilledEntries.length > 0 && (
                                 <div className="space-y-2">
-                                    <h4 className="text-sm font-medium text-gray-900 mb-2">
+                                    <h4 className="text-sm font-medium text-foreground mb-2">
                                         Current Time Entries ({unbilledEntries.length})
                                     </h4>
                                     {unbilledEntries.map((entry) => renderTimeEntry(entry, false))}
@@ -541,10 +556,10 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
 
                             {/* Billed Time Entries - Collapsible Section */}
                             {billedEntries.length > 0 && (
-                                <div className="border-t border-gray-200 pt-4">
+                                <div className="border-t border-border pt-4">
                                     <button
                                         onClick={() => setShowBilledEntries(!showBilledEntries)}
-                                        className="flex items-center justify-between w-full text-left text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                                        className="flex items-center justify-between w-full text-left text-sm font-medium text-foreground hover:text-foreground transition-colors"
                                     >
                                         <span>Billed Time Entries ({billedEntries.length})</span>
                                         {showBilledEntries ? (
@@ -556,7 +571,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
                                     
                                     {showBilledEntries && (
                                         <div className="mt-1 space-y-2">
-                                            <p className="text-xs text-gray-500 mb-3">
+                                            <p className="text-xs text-muted-foreground mb-3">
                                                 These entries have been billed and cannot be modified
                                             </p>
                                             {billedEntries.map((entry) => renderTimeEntry(entry, true))}

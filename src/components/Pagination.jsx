@@ -1,4 +1,5 @@
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
 
 /**
  * Reusable pagination component for various list views
@@ -53,92 +54,79 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   };
 
   return (
-    <nav className="flex items-center justify-between border-t border-gray-200 px-4 sm:px-0 mt-6">
+    <nav className="flex items-center justify-between border-t border-border px-4 sm:px-0 mt-6">
       <div className="hidden md:-mt-px md:flex">
         {/* Previous Page Button */}
-        <button
+        <Button
+          variant="ghost"
           onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`inline-flex items-center border-t-2 px-4 pt-4 text-sm font-medium ${
-            currentPage === 1
-              ? 'cursor-not-allowed border-transparent text-gray-300'
-              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-          }`}
+          className="border-t-2 border-transparent rounded-none px-4 pt-4 hover:border-border"
+          leadingIcon={ChevronLeftIcon}
         >
-          <ChevronLeftIcon className="mr-3 h-5 w-5" aria-hidden="true" />
           Previous
-        </button>
+        </Button>
         
         {/* Page Numbers */}
         {getPageNumbers().map((page, index) => (
           page === '...' ? (
             <span
               key={`ellipsis-${index}`}
-              className="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-gray-500"
+              className="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-muted-foreground"
             >
               ...
             </span>
           ) : (
-            <button
+            <Button
               key={page}
+              variant="ghost"
               onClick={() => onPageChange(page)}
-              className={`inline-flex items-center border-t-2 px-4 pt-4 text-sm font-medium ${
+              className={`border-t-2 rounded-none px-4 pt-4 ${
                 currentPage === page
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
               }`}
             >
               {page}
-            </button>
+            </Button>
           )
         ))}
         
         {/* Next Page Button */}
-        <button
+        <Button
+          variant="ghost"
           onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`inline-flex items-center border-t-2 px-4 pt-4 text-sm font-medium ${
-            currentPage === totalPages
-              ? 'cursor-not-allowed border-transparent text-gray-300'
-              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-          }`}
+          className="border-t-2 border-transparent rounded-none px-4 pt-4 hover:border-border"
+          trailingIcon={ChevronRightIcon}
         >
           Next
-          <ChevronRightIcon className="ml-3 h-5 w-5" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
       
       {/* Mobile version */}
       <div className="flex items-center justify-between w-full md:hidden">
-        <button
+        <Button
+          variant="outline"
           onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`flex items-center justify-center rounded-md border px-3 py-2 text-sm font-medium ${
-            currentPage === 1
-              ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300'
-              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-          }`}
+          leadingIcon={ChevronLeftIcon}
         >
-          <ChevronLeftIcon className="h-5 w-5" aria-hidden="true" />
-          <span className="ml-2">Previous</span>
-        </button>
+          Previous
+        </Button>
         
-        <div className="text-sm text-gray-700">
+        <div className="text-sm text-foreground">
           Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
         </div>
         
-        <button
+        <Button
+          variant="outline"
           onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`flex items-center justify-center rounded-md border px-3 py-2 text-sm font-medium ${
-            currentPage === totalPages
-              ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300'
-              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-          }`}
+          trailingIcon={ChevronRightIcon}
         >
-          <span className="mr-2">Next</span>
-          <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
-        </button>
+          Next
+        </Button>
       </div>
     </nav>
   );

@@ -8,24 +8,24 @@ const ErrorFallback = ({ error, resetError }) => {
     return (
         <div className="min-h-[200px] flex items-center justify-center p-6">
             <div className="text-center max-w-md">
-                <div className="mx-auto w-12 h-12 flex items-center justify-center rounded-full bg-red-100 mb-4">
-                    <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+                <div className="mx-auto w-12 h-12 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900 mb-4">
+                    <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
                 
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                <h2 className="text-lg font-semibold text-foreground mb-2">
                     Something went wrong
                 </h2>
                 
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-muted-foreground mb-4">
                     An unexpected error occurred. You can try refreshing the component or reloading the page.
                 </p>
                 
                 {process.env.NODE_ENV === 'development' && error && (
-                    <details className="text-left mb-4 p-3 bg-gray-100 rounded-md">
-                        <summary className="text-xs font-medium text-gray-700 cursor-pointer">
+                    <details className="text-left mb-4 p-3 bg-muted rounded-md">
+                        <summary className="text-xs font-medium text-foreground cursor-pointer">
                             Error Details (Dev Only)
                         </summary>
-                        <pre className="mt-2 text-xs text-red-600 overflow-auto max-h-32">
+                        <pre className="mt-2 text-xs text-red-600 dark:text-red-400 overflow-auto max-h-32">
                             {error.message}
                             {error.stack && `\n\n${error.stack}`}
                         </pre>
@@ -35,7 +35,7 @@ const ErrorFallback = ({ error, resetError }) => {
                 <div className="flex justify-center space-x-3">
                     <button
                         onClick={resetError}
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors"
                     >
                         <ArrowPathIcon className="h-4 w-4 mr-2" />
                         Try Again
@@ -43,7 +43,7 @@ const ErrorFallback = ({ error, resetError }) => {
                     
                     <button
                         onClick={() => window.location.reload()}
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary hover:bg-secondary/80 rounded-md transition-colors"
                     >
                         Reload Page
                     </button>

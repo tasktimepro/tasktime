@@ -182,8 +182,8 @@ const TaskTree = ({
         <div className="space-y-4">
             {/* Create Task Form */}
             {showCreateForm && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">
+                <div className="bg-muted border border-border rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-foreground mb-3">
                         Create New Task
                     </h3>
 
@@ -267,7 +267,7 @@ const TaskTree = ({
                         <div className="mt-8 border-t pt-6">
                             <button
                                 onClick={() => setShowArchivedTasks(!showArchivedTasks)}
-                                className="flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 mb-4"
+                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4"
                             >
                                 {showArchivedTasks ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />

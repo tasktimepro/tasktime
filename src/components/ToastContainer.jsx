@@ -44,7 +44,7 @@ export const ToastProvider = ({ children }) => {
     return (
         <ToastContext.Provider value={{ addToast, removeToast, showSuccess, showError, showInfo, showWarning }}>
             {children}
-            <Toaster position="bottom-right" richColors closeButton />
+            <Toaster position="bottom-right" />
         </ToastContext.Provider>
     );
 };

@@ -4,6 +4,11 @@ import { getPreferredCurrency } from '../../utils/currencyUtils';
 import CustomCheckbox from '../CustomCheckbox';
 import Modal from '../Modal';
 import { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Notice } from '@/components/ui/notice';
 
 const InvoiceModal = ({
     showInvoiceForm,
@@ -176,21 +181,20 @@ const InvoiceModal = ({
     // Footer content with action buttons
     const footer = (
         <div className="flex justify-end space-x-3">
-            <button
+            <Button
                 type="button"
+                variant="secondary"
                 onClick={handleCancel}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
             >
                 Cancel
-            </button>
+            </Button>
 
-            <button
+            <Button
                 type="submit"
                 form="invoice-form"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
             >
                 {editingInvoice ? 'Update Invoice' : 'Generate New Invoice'}
-            </button>
+            </Button>
         </div>
     );
 
@@ -204,16 +208,16 @@ const InvoiceModal = ({
         >
             <form id="invoice-form" onSubmit={handleSave} className="space-y-5">
                 {/* Client & Project Details */}
-                <div className="border border-gray-200 rounded-lg">
+                <div className="border border-border rounded-lg">
                     <button
                         type="button"
                         onClick={() => toggleSection('projectClient')}
-                        className={`w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeSection === 'projectClient' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'projectClient' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-gray-900">Client & Project Details</h4>
+                            <h4 className="text-sm font-medium text-foreground">Client & Project Details</h4>
                             <svg
-                                className={`w-5 h-5 text-gray-500 transform transition-transform ${activeSection === 'projectClient' ? 'rotate-180' : ''}`}
+                                className={`w-5 h-5 text-muted-foreground transform transition-transform ${activeSection === 'projectClient' ? 'rotate-180' : ''}`}
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -227,7 +231,7 @@ const InvoiceModal = ({
                             {/* Client Info Selection */}
                             <div className="mb-6">
                                 <div className="flex justify-between items-center mb-1">
-                                    <h4 className="text-sm font-medium text-gray-900">
+                                    <h4 className="text-sm font-medium text-foreground">
                                         Client <span className="text-red-500">*</span>
                                     </h4>
                                     {openClientModal && !isClientContextFixed && !editingInvoice && !(selectedProject && selectedProject.preferredClientId) && (
@@ -240,7 +244,7 @@ const InvoiceModal = ({
                                                     openClientModal();
                                                 }
                                             }}
-                                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                            className="text-sm text-blue-600 hover:text-foreground font-medium"
                                         >
                                             + New Client
                                         </button>
@@ -248,17 +252,17 @@ const InvoiceModal = ({
                                 </div>
 
                                 {clients.length === 0 ? (
-                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800">
-                                            No client information found. Create one to include client details in the invoice.
-                                        </p>
-                                    </div>
+                                    <Notice
+                                        title="No client information found"
+                                        description="Create one to include client details in the invoice."
+                                        showIcon={false}
+                                    />
                                 ) : (
                                     <div className="space-y-2">
                                         <select
                                             value={selectedClient?.id || ''}
                                             onChange={(e) => handleClientSelection(e.target.value)}
-                                            className={`block w-full border ${(isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)) ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
+                                            className={`block w-full border ${(isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)) ? 'bg-muted' : 'bg-background'} border-border rounded-md shadow-sm focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2`}
                                             required
                                             disabled={isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)}
                                         >
@@ -271,18 +275,16 @@ const InvoiceModal = ({
                                             ))}
                                         </select>
                                         {selectedProject && selectedProject.preferredClientId && (
-                                            <div className="px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                                                <p className="text-sm text-yellow-800">
-                                                    Client cannot be changed because this project is associated with <strong>{clients.find(c => c.id === selectedProject.preferredClientId)?.title || 'a specific client'}</strong>.
-                                                </p>
-                                            </div>
+                                            <Notice
+                                                title={`Client cannot be changed because this project is associated with ${clients.find(c => c.id === selectedProject.preferredClientId)?.title || 'a specific client'}.`}
+                                                className="py-2 px-3"
+                                            />
                                         )}
                                         {selectedClient && (
-                                            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
-                                                <p className="text-sm text-blue-800">
-                                                    <strong>{selectedClient?.title || 'Selected client'}</strong> will be included as "Invoice To" in the invoice.
-                                                </p>
-                                            </div>
+                                            <Notice
+                                                title={`${selectedClient?.title || 'Selected client'} will be included as "Invoice To" in the invoice.`}
+                                                className="py-2 px-3"
+                                            />
                                         )}
                                     </div>
                                 )}
@@ -291,7 +293,7 @@ const InvoiceModal = ({
                             {/* Project selection */}
                             <div className="mb-6">
                                 <div className="flex justify-between items-center mb-1">
-                                    <h4 className="text-sm font-medium text-gray-900">
+                                    <h4 className="text-sm font-medium text-foreground">
                                         Project
                                     </h4>
                                     {openProjectModal && !(isProjectContextFixed && !isClientContextFixed) && !isClientContextFixed && !editingInvoice && (
@@ -304,7 +306,7 @@ const InvoiceModal = ({
                                                     openProjectModal();
                                                 }
                                             }}
-                                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                            className="text-sm text-blue-600 hover:text-foreground font-medium"
                                         >
                                             + New Project
                                         </button>
@@ -312,11 +314,11 @@ const InvoiceModal = ({
                                 </div>
 
                                 {projects.length === 0 ? (
-                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800">
-                                            No projects found. You can create a project or continue without one.
-                                        </p>
-                                    </div>
+                                    <Notice
+                                        title="No projects found"
+                                        description="You can create a project or continue without one."
+                                        showIcon={false}
+                                    />
                                 ) : (() => {
                                     // Filter projects based on selected client
                                     const availableProjects = projects.filter(proj => {
@@ -334,19 +336,19 @@ const InvoiceModal = ({
 
                                     if (availableProjects.length === 0 && selectedClient) {
                                         return (
-                                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                                <p className="text-sm text-yellow-800">
-                                                    No projects found for <strong>{selectedClient.title}</strong>. You can create a project for this client or continue without one.
-                                                </p>
-                                            </div>
+                                            <Notice
+                                                title={`No projects found for ${selectedClient.title}`}
+                                                description="You can create a project for this client or continue without one."
+                                                showIcon={false}
+                                            />
                                         );
                                     } else if (availableProjects.length === 0) {
                                         return (
-                                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                                <p className="text-sm text-yellow-800">
-                                                    No projects available. Select a client first to see their projects, or create a new project.
-                                                </p>
-                                            </div>
+                                            <Notice
+                                                title="No projects available"
+                                                description="Select a client first to see their projects, or create a new project."
+                                                showIcon={false}
+                                            />
                                         );
                                     }
 
@@ -355,7 +357,7 @@ const InvoiceModal = ({
                                             <select
                                                 value={selectedProject?.id || ''}
                                                 onChange={(e) => handleProjectSelection(e.target.value)}
-                                                className={`block w-full border ${(isProjectContextFixed && !isClientContextFixed) || editingInvoice ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2`}
+                                                className={`block w-full border ${(isProjectContextFixed && !isClientContextFixed) || editingInvoice ? 'bg-muted' : 'bg-background'} border-border rounded-md shadow-sm focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2`}
                                                 disabled={(isProjectContextFixed && !isClientContextFixed) || editingInvoice}
                                             >
                                                 <option value="">Select project (optional)</option>
@@ -378,18 +380,11 @@ const InvoiceModal = ({
                                             </select>
 
                                             {selectedProject && (
-                                                <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
-                                                    <div className="text-sm text-blue-800">
-                                                        <div className="text-sm text-blue-800">
-                                                            <strong>{selectedProject.title}</strong><br />
-                                                            {!selectedProject.flatRate && selectedProject.hourlyRate ? (
-                                                                <span>Rate: {getCurrencySymbol(getInvoiceCurrency())}{selectedProject.hourlyRate}/hour</span>
-                                                            ) : !selectedProject.flatRate ? (
-                                                                <span>You can create invoices with custom rates</span>
-                                                            ) : null}
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                <Notice
+                                                    title={selectedProject.title}
+                                                    description={!selectedProject.flatRate && selectedProject.hourlyRate ? `Rate: ${getCurrencySymbol(getInvoiceCurrency())}${selectedProject.hourlyRate}/hour` : (!selectedProject.flatRate ? 'You can create invoices with custom rates' : undefined)}
+                                                    className="py-2 px-3"
+                                                />
                                             )}
                                         </div>
                                     );
@@ -400,31 +395,31 @@ const InvoiceModal = ({
                 </div>
 
                 {/* Tasks & Time */}
-                <div className="border border-gray-200 rounded-lg">
+                <div className="border border-border rounded-lg">
                     <button
                         type="button"
                         onClick={() => toggleSection('tasksTime')}
-                        className={`w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeSection === 'tasksTime' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'tasksTime' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
-                                <h4 className="text-sm font-medium text-gray-900">Tasks & Time</h4>
+                                <h4 className="text-sm font-medium text-foreground">Tasks & Time</h4>
                                 <div className="relative group flex">
                                     <div
-                                        className="text-gray-400 hover:text-gray-600 cursor-help focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+                                        className="text-muted-foreground hover:text-muted-foreground cursor-help focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
                                         tabIndex="0"
                                     >
                                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                         </svg>
                                     </div>
-                                    <div className="absolute left-0 top-6 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10">
+                                    <div className="absolute left-0 top-6 w-64 p-2 bg-popover text-popover-foreground border border-border text-xs rounded shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10">
                                         ✓ Select or create the tasks you want to bill. Unchecked tasks will remain unbilled and appear in future invoices.
                                     </div>
                                 </div>
                             </div>
                             <svg
-                                className={`w-5 h-5 text-gray-500 transform transition-transform ${activeSection === 'tasksTime' ? 'rotate-180' : ''}`}
+                                className={`w-5 h-5 text-muted-foreground transform transition-transform ${activeSection === 'tasksTime' ? 'rotate-180' : ''}`}
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -449,17 +444,17 @@ const InvoiceModal = ({
                                                     });
                                                     setSelectedTasksForBilling(allSelected);
                                                 }}
-                                                className="text-xs text-blue-600 hover:text-blue-800"
+                                                className="text-xs text-blue-600 hover:text-foreground"
                                             >
                                                 Select All
                                             </button>
-                                            <span className="text-xs text-gray-400">|</span>
+                                            <span className="text-xs text-muted-foreground">|</span>
                                             <button
                                                 type="button"
                                                 onClick={() => {
                                                     setSelectedTasksForBilling({});
                                                 }}
-                                                className="text-xs text-gray-600 hover:text-gray-800"
+                                                className="text-xs text-muted-foreground hover:text-foreground"
                                             >
                                                 Deselect All
                                             </button>
@@ -477,7 +472,7 @@ const InvoiceModal = ({
                                             }
                                         }, 50);
                                     }}
-                                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                    className="text-sm text-blue-600 hover:text-foreground font-medium"
                                 >
                                     + Add Task
                                 </button>
@@ -509,7 +504,7 @@ const InvoiceModal = ({
                                         }
 
                                         return (
-                                            <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                                            <div key={task.id} className="flex items-center justify-between p-3 bg-muted rounded border">
                                                 <div className="flex items-center space-x-3 flex-1">
                                                     {/* Task selection checkbox */}
                                                     <CustomCheckbox
@@ -517,19 +512,19 @@ const InvoiceModal = ({
                                                         onChange={(checked) => handleTaskSelectionForBilling(task.id, checked)}
                                                     />
                                                     <div className="flex-1 pr-4">
-                                                        <p className="text-sm font-medium text-gray-900 overflow-hidden" style={{ 
+                                                        <p className="text-sm font-medium text-foreground overflow-hidden" style={{ 
                                                             display: '-webkit-box', 
                                                             WebkitLineClamp: 2, 
                                                             WebkitBoxOrient: 'vertical' 
                                                         }}>
                                                             {task.title}
                                                             {isSubtask && (
-                                                                <span className="ml-2 text-xs text-gray-500">
+                                                                <span className="ml-2 text-xs text-muted-foreground">
                                                                     (subtask)
                                                                 </span>
                                                             )}
                                                         </p>
-                                                        <p className="text-xs text-gray-500">
+                                                        <p className="text-xs text-muted-foreground">
                                                             Original: {formatDurationWithSeconds(originalTimeMs)}
                                                             {task.isEdited && (
                                                                 <span className="text-blue-600 ml-2">(Modified)</span>
@@ -541,7 +536,7 @@ const InvoiceModal = ({
                                                 <div className="flex items-center space-x-4">
                                                     {/* Merge subtasks checkbox - only show for parent tasks with subtasks */}
                                                     {hasSubtasksInInvoice && (
-                                                        <div className="flex items-center bg-blue-50 px-2 py-2 rounded">
+                                                        <div className="flex items-center bg-muted px-2 py-2 rounded">
                                                             <CustomCheckbox
                                                                 checked={mergedSubtasks[task.id] || false}
                                                                 onChange={(checked) => handleToggleMergeSubtasks(task.id, checked)}
@@ -558,7 +553,7 @@ const InvoiceModal = ({
                                                             checked={isUsingFlatRate}
                                                             onChange={(checked) => handleToggleAdditionalTaskFlatRate(task.id, checked)}
                                                             label="Flat rate"
-                                                            labelClassName="text-xs text-gray-700"
+                                                            labelClassName="text-xs text-foreground"
                                                             id={`flat-rate-${task.id}`}
                                                         />
                                                     </div>
@@ -567,26 +562,26 @@ const InvoiceModal = ({
                                                         // Flat rate input with quantity
                                                         <div className="flex items-center space-x-2">
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">Quantity</div>
+                                                                <div className="text-xs text-muted-foreground mb-1 text-left">Quantity</div>
                                                                 <input
                                                                     type="number"
                                                                     step="1"
                                                                     min="1"
                                                                     value={taskQuantities[task.id] || 1}
                                                                     onChange={(e) => handleQuantityChange(task.id, e.target.value)}
-                                                                    className="w-16 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                    className="w-16 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
                                                                     placeholder="1"
                                                                 />
                                                             </div>
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
+                                                                <div className="text-xs text-muted-foreground mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
                                                                     min="0"
                                                                     value={currentFlatRate}
                                                                     onChange={(e) => handleFlatRateChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
                                                                     placeholder="0.00"
                                                                 />
                                                             </div>
@@ -595,7 +590,7 @@ const InvoiceModal = ({
                                                         // Hours input with custom hourly rate
                                                         <div className="flex items-center space-x-2">
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">
+                                                                <div className="text-xs text-muted-foreground mb-1 text-left">
                                                                     Hours {(() => {
                                                                         // Ensure currentHours is numeric for calculations
                                                                         const numericCurrentHours = parseFloat(currentHours) || 0;
@@ -642,19 +637,19 @@ const InvoiceModal = ({
                                                                         return numericCurrentHours.toFixed(2);
                                                                     })()}
                                                                     onChange={(e) => handleHoursChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
                                                                     title={mergedSubtasks[task.id] ? "This shows the combined hours of parent and subtasks. Editing changes the parent task hours." : ""}
                                                                 />
                                                             </div>
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">Hourly rate</div>
+                                                                <div className="text-xs text-muted-foreground mb-1 text-left">Hourly rate</div>
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
                                                                     min="0"
                                                                     value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                                     onChange={(e) => handleTaskHourlyRateChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
                                                                     placeholder="0.00"
                                                                 />
                                                             </div>
@@ -674,24 +669,24 @@ const InvoiceModal = ({
                                         const isUsingFlatRate = task.useFlatRate || useFlatRate[task.id] || false;
 
                                         return (
-                                            <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                                            <div key={task.id} className="flex items-center justify-between p-3 bg-muted rounded border">
                                                 <div className="flex items-center space-x-3 flex-1">
                                                     {/* Task remove button */}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRemoveAdditionalTask(task.id)}
-                                                        className="text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded"
+                                                        className="text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
                                                         title="Remove task"
                                                     >
                                                         <TrashIcon className="w-5 h-5" />
                                                     </button>
                                                     <div className="flex-1 pr-4">
-                                                        <p className="text-sm font-medium text-gray-900 overflow-hidden" style={{ 
+                                                        <p className="text-sm font-medium text-foreground overflow-hidden" style={{ 
                                                             display: '-webkit-box', 
                                                             WebkitLineClamp: 2, 
                                                             WebkitBoxOrient: 'vertical' 
                                                         }}>{task.title}</p>
-                                                        <p className="text-xs text-gray-500">
+                                                        <p className="text-xs text-muted-foreground">
                                                             Custom task
                                                         </p>
                                                     </div>
@@ -703,7 +698,7 @@ const InvoiceModal = ({
                                                             checked={isUsingFlatRate}
                                                             onChange={(checked) => handleToggleAdditionalTaskFlatRate(task.id, checked)}
                                                             label="Flat rate"
-                                                            labelClassName="text-xs text-gray-700"
+                                                            labelClassName="text-xs text-foreground"
                                                             id={`flat-rate-${task.id}`}
                                                         />
                                                     </div>
@@ -712,26 +707,26 @@ const InvoiceModal = ({
                                                         // Flat rate input with quantity
                                                         <div className="flex items-center space-x-2">
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">Quantity</div>
+                                                                <div className="text-xs text-muted-foreground mb-1 text-left">Quantity</div>
                                                                 <input
                                                                     type="number"
                                                                     step="1"
                                                                     min="1"
                                                                     value={task.quantity || 1}
                                                                     onChange={(e) => handleAdditionalTaskQuantityChange(task.id, e.target.value)}
-                                                                    className="w-16 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                    className="w-16 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
                                                                     placeholder="1"
                                                                 />
                                                             </div>
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
+                                                                <div className="text-xs text-muted-foreground mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
                                                                     min="0"
                                                                     value={currentFlatRate}
                                                                     onChange={(e) => handleAdditionalTaskFlatRateChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
                                                                     placeholder="0.00"
                                                                 />
                                                             </div>
@@ -740,25 +735,25 @@ const InvoiceModal = ({
                                                         // Hours input with custom hourly rate
                                                         <div className="flex items-center space-x-2">
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">Hours ({currentMinutes}min)</div>
+                                                                <div className="text-xs text-muted-foreground mb-1 text-left">Hours ({currentMinutes}min)</div>
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
                                                                     min="0"
                                                                     value={task.hours}
                                                                     onChange={(e) => handleAdditionalTaskHoursChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
                                                                 />
                                                             </div>
                                                             <div className="text-right">
-                                                                <div className="text-xs text-gray-500 mb-1 text-left">Hourly rate</div>
+                                                                <div className="text-xs text-muted-foreground mb-1 text-left">Hourly rate</div>
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
                                                                     min="0"
                                                                     value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                                     onChange={(e) => handleAdditionalTaskHourlyRateChange(task.id, e.target.value)}
-                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-gray-300 rounded-md"
+                                                                    className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
                                                                     placeholder="0.00"
                                                                 />
                                                             </div>
@@ -772,16 +767,15 @@ const InvoiceModal = ({
 
                                 {/* Add Task Form */}
                                 {showAddTaskForm && (
-                                    <div className="mt-2 mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                    <div className="mt-2 mb-2 p-3 bg-muted border border-border rounded-md">
                                         <div className="space-y-3">
                                             <div>
-                                                <input
+                                                <Input
                                                     ref={taskInputRef}
                                                     type="text"
                                                     value={newTaskTitle}
                                                     onChange={(e) => setNewTaskTitle(e.target.value)}
                                                     placeholder="Task description"
-                                                    className="w-full text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
                                                     required
                                                     onKeyDown={(e) => {
                                                         if (e.key === 'Enter') {
@@ -801,21 +795,21 @@ const InvoiceModal = ({
                                                             checked={newTaskUseFlatRate}
                                                             onChange={handleToggleNewTaskFlatRate}
                                                             label="Flat rate"
-                                                            labelClassName="text-xs text-gray-700"
+                                                            labelClassName="text-xs text-foreground"
                                                             id="new-task-flat-rate"
                                                         />
                                                     </div>
 
                                                     {newTaskUseFlatRate && (
                                                         <div className="text-right">
-                                                            <div className="text-xs text-gray-500 mb-1 text-left">Quantity</div>
-                                                            <input
+                                                            <div className="text-xs text-muted-foreground mb-1 text-left">Quantity</div>
+                                                            <Input
                                                                 type="number"
                                                                 step="1"
                                                                 min="1"
                                                                 value={newTaskQuantity}
                                                                 onChange={(e) => setNewTaskQuantity(e.target.value)}
-                                                                className="w-16 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                                className="w-16 h-9"
                                                                 placeholder="1"
                                                                 onKeyDown={(e) => {
                                                                     if (e.key === 'Enter') {
@@ -829,17 +823,17 @@ const InvoiceModal = ({
                                                     )}
 
                                                     <div className="text-right">
-                                                        <div className="text-xs text-gray-500 mb-1 text-left">
+                                                        <div className="text-xs text-muted-foreground mb-1 text-left">
                                                             {newTaskUseFlatRate ? `Rate (${getInvoiceCurrency()})` : `Hours ${newTaskHours ? `(${hoursToMinutes(parseFloat(newTaskHours) || 0)}min)` : ''}`}
                                                         </div>
-                                                        <input
+                                                        <Input
                                                             type="number"
                                                             step="0.01"
                                                             min="0"
                                                             value={newTaskHours}
                                                             onChange={(e) => setNewTaskHours(e.target.value)}
                                                             placeholder={newTaskUseFlatRate ? "0.00" : "Hours"}
-                                                            className="w-24 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                            className="w-24 h-9"
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter') {
                                                                     e.preventDefault();
@@ -852,15 +846,15 @@ const InvoiceModal = ({
 
                                                     {!newTaskUseFlatRate && (
                                                         <div className="text-right">
-                                                            <div className="text-xs text-gray-500 mb-1 text-left">Hourly rate</div>
-                                                            <input
+                                                            <div className="text-xs text-muted-foreground mb-1 text-left">Hourly rate</div>
+                                                            <Input
                                                                 type="number"
                                                                 step="0.01"
                                                                 min="0"
                                                                 value={newTaskHourlyRate !== '' ? newTaskHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                                 onChange={(e) => setNewTaskHourlyRate(e.target.value)}
                                                                 placeholder="0.00"
-                                                                className="w-20 text-sm border border-gray-300 rounded-md px-2.5 py-1.5"
+                                                                className="w-20 h-9"
                                                                 onKeyDown={(e) => {
                                                                     if (e.key === 'Enter') {
                                                                         e.preventDefault();
@@ -875,8 +869,9 @@ const InvoiceModal = ({
 
                                                 {/* Buttons */}
                                                 <div className="flex space-x-2">
-                                                    <button
+                                                    <Button
                                                         type="button"
+                                                        variant="secondary"
                                                         onClick={() => {
                                                             setShowAddTaskForm(false);
                                                             setNewTaskTitle('');
@@ -884,18 +879,16 @@ const InvoiceModal = ({
                                                             setNewTaskHourlyRate('');
                                                             setNewTaskUseFlatRate(selectedProject?.flatRate || false);
                                                         }}
-                                                        className="h-[36px] px-3 bg-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-400"
                                                     >
                                                         Cancel
-                                                    </button>
+                                                    </Button>
 
-                                                    <button
+                                                    <Button
                                                         type="button"
                                                         onClick={handleAddAdditionalTask}
-                                                        className="h-[36px] px-3 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
                                                     >
                                                         Add Task
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </div>
                                         </div>
@@ -909,8 +902,8 @@ const InvoiceModal = ({
 
                                     if (totalAvailableTasks === 0) {
                                         return (
-                                            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                                                <p className="text-sm text-yellow-800">
+                                            <div className="bg-muted border border-border rounded-md p-3">
+                                                <p className="text-sm text-foreground">
                                                     Please add a task to continue.
                                                 </p>
                                             </div>
@@ -932,20 +925,20 @@ const InvoiceModal = ({
                 </div>
 
                 {/* Pricing & Totals */}
-                <div className="border border-gray-200 rounded-lg">
+                <div className="border border-border rounded-lg">
                     <button
                         type="button"
                         onClick={() => toggleSection('pricingTotals')}
-                        className={`w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeSection === 'pricingTotals' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'pricingTotals' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-gray-900">Pricing & Totals</h4>
+                            <h4 className="text-sm font-medium text-foreground">Pricing & Totals</h4>
                             <div className="flex items-center space-x-3">
                                 <span className="text-sm font-medium text-blue-600">
                                     {getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.total.toFixed(2)}
                                 </span>
                                 <svg
-                                    className={`w-5 h-5 text-gray-500 transform transition-transform ${activeSection === 'pricingTotals' ? 'rotate-180' : ''}`}
+                                    className={`w-5 h-5 text-muted-foreground transform transition-transform ${activeSection === 'pricingTotals' ? 'rotate-180' : ''}`}
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -959,12 +952,12 @@ const InvoiceModal = ({
                         <div className="p-4 space-y-4">
                             {/* Discount Settings */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Discount</label>
+                                <label className="block text-sm font-medium text-foreground mb-2">Discount</label>
                                 <div className="flex space-x-2">
                                     <select
                                         value={discountType}
                                         onChange={(e) => setDiscountType(e.target.value)}
-                                        className="w-24 text-sm border border-gray-300 rounded-md px-2 py-1"
+                                        className="w-24 text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
                                     >
                                         <option value="percentage">%</option>
                                         <option value="fixed">{getCurrencySymbol(getInvoiceCurrency())}</option>
@@ -982,7 +975,7 @@ const InvoiceModal = ({
                                                 setDiscountValue(parseFloat(newValue) || 0);
                                             }
                                         }}
-                                        className="flex-1 text-sm border border-gray-300 rounded-md px-2 py-1"
+                                        className="flex-1 text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
                                         placeholder={discountType === 'percentage' ? '0.00' : '0.00'}
                                     />
                                 </div>
@@ -990,7 +983,7 @@ const InvoiceModal = ({
 
                             {/* Shipping */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Shipping</label>
+                                <label className="block text-sm font-medium text-foreground mb-2">Shipping</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -1004,7 +997,7 @@ const InvoiceModal = ({
                                             setShippingAmount(parseFloat(newValue) || 0);
                                         }
                                     }}
-                                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
+                                    className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
                                     placeholder="0.00"
                                 />
                             </div>
@@ -1015,8 +1008,25 @@ const InvoiceModal = ({
                                     <CustomCheckbox
                                         checked={taxOverride.enabled}
                                         onChange={(checked) => setTaxOverride(prev => ({ ...prev, enabled: checked }))}
-                                        label="Override tax settings"
-                                        labelClassName="text-sm font-medium text-gray-700"
+                                        label={
+                                            <>
+                                                Override tax settings
+                                                {!taxOverride.enabled && (
+                                                    <span className="text-muted-foreground font-normal ml-1">
+                                                        {selectedBusinessInfo?.taxEnabled && (!selectedClient || !selectedClient.disableTax) && (
+                                                            <>({selectedBusinessInfo.taxLabel} {selectedBusinessInfo.taxRate}%)</>
+                                                        )}
+                                                        {selectedClient?.disableTax && (
+                                                            <>(tax disabled for this client)</>
+                                                        )}
+                                                        {!selectedClient?.disableTax && (!selectedBusinessInfo || !selectedBusinessInfo.taxEnabled) && (
+                                                            <>(no tax configured)</>
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </>
+                                        }
+                                        labelClassName="text-sm font-medium text-foreground"
                                         id="taxOverrideEnabled"
                                     />
                                 </div>
@@ -1028,7 +1038,7 @@ const InvoiceModal = ({
                                                 type="text"
                                                 value={taxOverride.label}
                                                 onChange={(e) => setTaxOverride(prev => ({ ...prev, label: e.target.value }))}
-                                                className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
+                                                className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
                                                 placeholder="Tax label"
                                             />
                                         </div>
@@ -1047,28 +1057,10 @@ const InvoiceModal = ({
                                                         setTaxOverride(prev => ({ ...prev, rate: parseFloat(newValue) || 0 }));
                                                     }
                                                 }}
-                                                className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
+                                                className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
                                                 placeholder="Rate %"
                                             />
                                         </div>
-                                    </div>
-                                )}
-
-                                {!taxOverride.enabled && selectedBusinessInfo?.taxEnabled && (!selectedClient || !selectedClient.disableTax) && (
-                                    <div className="text-xs text-gray-500">
-                                        Using business tax: {selectedBusinessInfo.taxLabel} {selectedBusinessInfo.taxRate}%
-                                    </div>
-                                )}
-                                
-                                {!taxOverride.enabled && selectedClient?.disableTax && (
-                                    <div className="text-xs text-orange-600">
-                                        Tax is currently disabled for this client
-                                    </div>
-                                )}
-                                
-                                {!taxOverride.enabled && !(!taxOverride.enabled && selectedClient?.disableTax) && (!selectedBusinessInfo || !selectedBusinessInfo.taxEnabled) && (
-                                    <div className="text-xs text-orange-600">
-                                        No tax was configured for business
                                     </div>
                                 )}
                             </div>
@@ -1111,16 +1103,16 @@ const InvoiceModal = ({
                 </div>
 
                 {/* Business & Payment */}
-                <div className="border border-gray-200 rounded-lg">
+                <div className="border border-border rounded-lg">
                     <button
                         type="button"
                         onClick={() => toggleSection('businessPayment')}
-                        className={`w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeSection === 'businessPayment' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'businessPayment' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-gray-900">Business & Payment</h4>
+                            <h4 className="text-sm font-medium text-foreground">Business & Payment</h4>
                             <svg
-                                className={`w-5 h-5 text-gray-500 transform transition-transform ${activeSection === 'businessPayment' ? 'rotate-180' : ''}`}
+                                className={`w-5 h-5 text-muted-foreground transform transition-transform ${activeSection === 'businessPayment' ? 'rotate-180' : ''}`}
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -1134,7 +1126,7 @@ const InvoiceModal = ({
                             {/* Business information */}
                             <div className="mb-6">
                                 <div className="flex justify-between items-center mb-1">
-                                    <h4 className="text-sm font-medium text-gray-900">
+                                    <h4 className="text-sm font-medium text-foreground">
                                         Business
                                     </h4>
                                     <button
@@ -1146,18 +1138,18 @@ const InvoiceModal = ({
                                                 openBusinessModal();
                                             }
                                         }}
-                                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                        className="text-sm text-blue-600 hover:text-foreground font-medium"
                                     >
                                         + New Business
                                     </button>
                                 </div>
 
                                 {businessInfos.length === 0 ? (
-                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800">
-                                            No businesses found. Create one to include your business details in the invoice.
-                                        </p>
-                                    </div>
+                                    <Notice
+                                        title="No businesses found"
+                                        description="Create one to include your business details in the invoice."
+                                        showIcon={false}
+                                    />
                                 ) : (
                                     <div className="space-y-2">
                                         <select
@@ -1172,7 +1164,7 @@ const InvoiceModal = ({
                                                     }
                                                 }
                                             }}
-                                            className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
+                                            className="block w-full border border-border rounded-md shadow-sm bg-background text-foreground focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2"
                                         >
                                             <option value="">Select business info (optional)</option>
                                             {businessInfos.map(info => (
@@ -1183,11 +1175,10 @@ const InvoiceModal = ({
                                         </select>
 
                                         {selectedBusinessInfo && (
-                                            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
-                                                <p className="text-sm text-blue-800">
-                                                    <strong>{selectedBusinessInfo.title}</strong> will be included as "Invoice From" in the invoice.
-                                                </p>
-                                            </div>
+                                            <Notice
+                                                title={`${selectedBusinessInfo.title} will be included as "Invoice From" in the invoice.`}
+                                                className="py-2 px-3"
+                                            />
                                         )}
                                     </div>
                                 )}
@@ -1196,7 +1187,7 @@ const InvoiceModal = ({
                             {/* Payment method */}
                             <div className="mb-6">
                                 <div className="flex justify-between items-center mb-1">
-                                    <h4 className="text-sm font-medium text-gray-900">
+                                    <h4 className="text-sm font-medium text-foreground">
                                         Payment Method
                                     </h4>
                                     <button
@@ -1208,18 +1199,18 @@ const InvoiceModal = ({
                                                 openPaymentMethodModal();
                                             }
                                         }}
-                                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                        className="text-sm text-blue-600 hover:text-foreground font-medium"
                                     >
                                         + New Payment Method
                                     </button>
                                 </div>
 
                                 {paymentMethods.length === 0 ? (
-                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800">
-                                            No payment methods found. Create one to include payment details in your invoice.
-                                        </p>
-                                    </div>
+                                    <Notice
+                                        title="No payment methods found"
+                                        description="Create one to include payment details in your invoice."
+                                        showIcon={false}
+                                    />
                                 ) : (
                                     <div className="space-y-2">
                                         <select
@@ -1234,7 +1225,7 @@ const InvoiceModal = ({
                                                     }
                                                 }
                                             }}
-                                            className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
+                                            className="block w-full border border-border rounded-md shadow-sm bg-background text-foreground focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2"
                                         >
                                             <option value="">Select payment method (optional)</option>
                                             {paymentMethods.map(method => (
@@ -1245,11 +1236,10 @@ const InvoiceModal = ({
                                         </select>
 
                                         {selectedPaymentMethod && (
-                                            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
-                                                <p className="text-sm text-blue-800">
-                                                    <strong>{selectedPaymentMethod.title}</strong> will be included as "Payment Details" in the invoice.
-                                                </p>
-                                            </div>
+                                            <Notice
+                                                title={`${selectedPaymentMethod.title} will be included as "Payment Details" in the invoice.`}
+                                                className="py-2 px-3"
+                                            />
                                         )}
                                     </div>
                                 )}
@@ -1259,16 +1249,16 @@ const InvoiceModal = ({
                 </div>
 
                 {/* Invoice Settings */}
-                <div className="border border-gray-200 rounded-lg">
+                <div className="border border-border rounded-lg">
                     <button
                         type="button"
                         onClick={() => toggleSection('invoiceSettings')}
-                        className={`w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeSection === 'invoiceSettings' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'invoiceSettings' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-gray-900">Invoice Settings</h4>
+                            <h4 className="text-sm font-medium text-foreground">Invoice Settings</h4>
                             <svg
-                                className={`w-5 h-5 text-gray-500 transform transition-transform ${activeSection === 'invoiceSettings' ? 'rotate-180' : ''}`}
+                                className={`w-5 h-5 text-muted-foreground transform transition-transform ${activeSection === 'invoiceSettings' ? 'rotate-180' : ''}`}
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -1282,7 +1272,7 @@ const InvoiceModal = ({
                             {/* Template selection */}
                             <div className="mb-6">
                                 <div className="flex justify-between items-center mb-1">
-                                    <h4 className="text-sm font-medium text-gray-900">
+                                    <h4 className="text-sm font-medium text-foreground">
                                         Invoice Template <span className="text-red-500">*</span>
                                     </h4>
                                     <button
@@ -1294,24 +1284,24 @@ const InvoiceModal = ({
                                                 openTemplateModal();
                                             }
                                         }}
-                                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                        className="text-sm text-blue-600 hover:text-foreground font-medium"
                                     >
                                         + New Template
                                     </button>
                                 </div>
 
                                 {invoiceTemplates.length === 0 ? (
-                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <p className="text-sm text-yellow-800">
-                                            No invoice templates found. Create a template to continue with invoice generation.
-                                        </p>
-                                    </div>
+                                    <Notice
+                                        title="No invoice templates found"
+                                        description="Create a template to continue with invoice generation."
+                                        showIcon={false}
+                                    />
                                 ) : (
                                     <div className="space-y-2">
                                         <select
                                             value={selectedTemplate?.id || ''}
                                             onChange={(e) => handleTemplateSelection(e.target.value)}
-                                            className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
+                                            className="block w-full border border-border rounded-md shadow-sm bg-background text-foreground focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2"
                                             required
                                         >
                                             <option value="">Select template</option>
@@ -1322,9 +1312,11 @@ const InvoiceModal = ({
                                             ))}
                                         </select>
                                         {selectedTemplate && (
-                                            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
-                                                <div className="text-sm text-blue-800">
-                                                    <strong>{selectedTemplate.name}</strong><br />
+                                            <Notice
+                                                title={selectedTemplate.name}
+                                                className="py-2 px-3"
+                                            >
+                                                <div className="text-sm">
                                                     Invoice Format: {selectedTemplate.invoiceNumberFormat}<br />
                                                     Due Date: {(() => {
                                                         switch (selectedTemplate.dueDateType) {
@@ -1346,22 +1338,22 @@ const InvoiceModal = ({
                                                         }
                                                     })()}
                                                 </div>
-                                            </div>
+                                            </Notice>
                                         )}
                                     </div>
                                 )}
                             </div>
 
                             {/* Invoice notes */}
-                            <div className="mt-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Invoice Note</label>
-                                <textarea
+                            <div className="mt-2 space-y-2">
+                                <Label htmlFor="invoice-note">Invoice Note</Label>
+                                <Textarea
+                                    id="invoice-note"
                                     value={invoiceNote}
                                     onChange={(e) => setInvoiceNote(e.target.value)}
-                                    className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
                                     rows="3"
                                     placeholder="Add any additional notes for the invoice here..."
-                                ></textarea>
+                                />
                             </div>
 
                             {/* Invoice Date Override */}
@@ -1371,7 +1363,7 @@ const InvoiceModal = ({
                                         checked={useInvoiceDateOverride}
                                         onChange={(checked) => setUseInvoiceDateOverride(checked)}
                                         label="Override invoice date"
-                                        labelClassName="text-sm font-medium text-gray-700"
+                                        labelClassName="text-sm font-medium text-foreground"
                                     />
                                 </div>
 
@@ -1382,10 +1374,10 @@ const InvoiceModal = ({
                                             value={invoiceDateOverride}
                                             onChange={(e) => setInvoiceDateOverride(e.target.value)}
                                             max={getTodayString()}
-                                            className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
+                                            className="block w-full border border-border rounded-md shadow-sm bg-background text-foreground focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2"
                                             required={useInvoiceDateOverride}
                                         />
-                                        <p className="mt-1 text-xs text-gray-500">
+                                        <p className="mt-1 text-xs text-muted-foreground">
                                             When enabled, this date will be used instead of today's date for the invoice. Future dates are not allowed.
                                         </p>
                                     </div>

@@ -1,14 +1,19 @@
 import PropTypes from 'prop-types';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PlusIcon, PencilIcon, TrashIcon, EllipsisHorizontalIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { toDisplayDate } from '../utils/dateUtils';
-
-// Event name for dropdown coordination
-const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -28,7 +33,6 @@ const ClientList = ({
     openClientModal,
     editClientModal
 }) => {
-    const [showDropdown, setShowDropdown] = useState({}); // Track dropdown states by client ID
     const [showArchivedClients, setShowArchivedClients] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [clientToDelete, setClientToDelete] = useState(null);
@@ -37,35 +41,6 @@ const ClientList = ({
     const { showSuccess } = useToast();
 
     // Form data removed - using modal manager now
-    
-    // Add event listener for dropdown close behavior
-    useEffect(() => {
-        const handleDropdownToggle = (event) => {
-            const { taskId, open } = event.detail;
-            if (!open) {
-                // Close all dropdowns when any dropdown is closed
-                setShowDropdown({});
-            } else {
-                // Close other dropdowns when a new one opens
-                setShowDropdown({ [taskId]: true });
-            }
-        };
-
-        const handleClickOutside = (event) => {
-            // Close dropdowns when clicking outside
-            if (!event.target.closest('.dropdown-container')) {
-                setShowDropdown({});
-            }
-        };
-
-        document.addEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
-        document.addEventListener('click', handleClickOutside);
-        
-        return () => {
-            document.removeEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
-            document.removeEventListener('click', handleClickOutside);
-        };
-    }, []);
 
     /**
      * Get related projects for a client
@@ -242,7 +217,7 @@ const ClientList = ({
         <div className="space-y-8">
             {/* Header */}
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-2xl font-bold text-foreground">
                     Clients {clients.filter(c => !c.archived).length > 0 && (
                         <span>
                             ({clients.filter(c => !c.archived).length})
@@ -273,88 +248,67 @@ const ClientList = ({
                     {clients.filter(c => !c.archived).length > 0 && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {clients.filter(c => !c.archived).map((client) => (
-                                <div
+                                <Card
                                     key={client.id}
-                                    className="bg-white shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
+                                    className="hover:shadow-md transition-shadow cursor-pointer relative"
                                     onClick={() => onSelectClient(client)}
                                 >
-                                    <div className="p-5">
+                                    <CardContent className="pt-5">
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-lg font-medium text-gray-900 truncate">
+                                            <h3 className="text-lg font-medium text-foreground truncate">
                                                 {client.title}
                                             </h3>
 
                                             {/* Three-dot dropdown menu for Edit and Delete */}
-                                            <div className="relative dropdown-container" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                    onClick={() => {
-                                                        const newState = !showDropdown[client.id];
-                                                        setShowDropdown(newState ? { [client.id]: true } : {});
-
-                                                        // Dispatch a custom event to close other dropdowns
-                                                        const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
-                                                            detail: { taskId: client.id, open: newState }
-                                                        });
-                                                        document.dispatchEvent(event);
-                                                    }}
-                                                    className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
-                                                    title="More actions"
-                                                >
-                                                    <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
-                                                </button>
-
-                                                {showDropdown[client.id] && (
-                                                    <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                                                        <div className="py-1">
-                                                            <button
-                                                                onClick={() => {
-                                                                    editClientModal(client);
-                                                                    setShowDropdown({});
-                                                                }}
-                                                                className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"
-                                                            >
-                                                                <PencilIcon className="h-4 w-4" />
-                                                                <span>Edit</span>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    handleArchiveClient(client.id);
-                                                                    setShowDropdown({});
-                                                                }}
-                                                                className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors space-x-2"
-                                                            >
-                                                                <ArchiveBoxIcon className="h-4 w-4" />
-                                                                <span>Archive</span>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    handleDeleteClient(client.id);
-                                                                    setShowDropdown({});
-                                                                }}
-                                                                className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
-                                                            >
-                                                                <TrashIcon className="h-4 w-4" />
-                                                                <span>Delete</span>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                                        title="More actions"
+                                                    >
+                                                        <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                    <DropdownMenuItem
+                                                        onClick={() => editClientModal(client)}
+                                                        className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
+                                                    >
+                                                        <PencilIcon className="h-4 w-4" />
+                                                        <span>Edit</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleArchiveClient(client.id)}
+                                                        className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                                    >
+                                                        <ArchiveBoxIcon className="h-4 w-4" />
+                                                        <span>Archive</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleDeleteClient(client.id)}
+                                                        className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                                    >
+                                                        <TrashIcon className="h-4 w-4" />
+                                                        <span>Delete</span>
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </div>
 
                                         {client.clientName && (
-                                            <p className="mt-2 text-sm text-gray-600">
+                                            <p className="mt-2 text-sm text-muted-foreground">
                                                 {client.clientName}
                                             </p>
                                         )}
 
                                         {client.contactPerson && (
-                                            <p className="mt-1 text-sm text-gray-500">
+                                            <p className="mt-1 text-sm text-muted-foreground">
                                                 Contact: {client.contactPerson}
                                             </p>
                                         )}
 
-                                        <p className="mt-1 text-xs text-gray-400">
+                                        <p className="mt-1 text-xs text-muted-foreground">
                                             Created {toDisplayDate(client.createdAt)}
                                         </p>
 
@@ -362,15 +316,15 @@ const ClientList = ({
                                         {(() => {
                                             const relatedProjectsCount = getRelatedProjects(client.id).length;
                                             return relatedProjectsCount > 0 && (
-                                                <div className="mt-3 pt-3 border-t border-gray-100">
-                                                    <div className="text-xs text-gray-500">
+                                                <div className="mt-3 pt-3 border-t border-border">
+                                                    <div className="text-xs text-muted-foreground">
                                                         {relatedProjectsCount} project{relatedProjectsCount !== 1 ? 's' : ''}
                                                     </div>
                                                 </div>
                                             );
                                         })()}
-                                    </div>
-                                </div>
+                                    </CardContent>
+                                </Card>
                             ))}
                         </div>
                     )}
@@ -380,7 +334,7 @@ const ClientList = ({
                         <div className="border-t pt-6">
                             <button
                                 onClick={() => setShowArchivedClients(!showArchivedClients)}
-                                className="flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 mb-4"
+                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4"
                             >
                                 {showArchivedClients ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />
@@ -393,78 +347,60 @@ const ClientList = ({
                             {showArchivedClients && (
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                                     {clients.filter(c => c.archived).map((client) => (
-                                        <div
+                                        <Card
                                             key={client.id}
-                                            className="bg-white shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
+                                            className="hover:shadow-md transition-shadow cursor-pointer relative"
                                             onClick={() => onSelectClient(client)}
                                         >
-                                            <div className="p-5">
+                                            <CardContent className="pt-5">
                                                 <div className="flex items-center justify-between">
-                                                    <h3 className="text-lg font-medium text-gray-900 truncate">
+                                                    <h3 className="text-lg font-medium text-foreground truncate">
                                                         {client.title}
                                                     </h3>
 
                                                     {/* Three-dot dropdown menu for Unarchive and Delete */}
-                                                    <div className="relative dropdown-container" onClick={(e) => e.stopPropagation()}>
-                                                        <button
-                                                            onClick={() => {
-                                                                const newState = !showDropdown[client.id];
-                                                                setShowDropdown(newState ? { [client.id]: true } : {});
-
-                                                                // Dispatch a custom event to close other dropdowns
-                                                                const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
-                                                                    detail: { taskId: client.id, open: newState }
-                                                                });
-                                                                document.dispatchEvent(event);
-                                                            }}
-                                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors group"
-                                                            title="More actions"
-                                                        >
-                                                            <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
-                                                        </button>
-
-                                                        {showDropdown[client.id] && (
-                                                            <div className="absolute right-0 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                                                                <div className="py-1">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            handleUnarchiveClient(client.id);
-                                                                            setShowDropdown({});
-                                                                        }}
-                                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors space-x-2"
-                                                                    >
-                                                                        <ArchiveBoxIcon className="h-4 w-4" />
-                                                                        <span>Unarchive</span>
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            handleDeleteClient(client.id);
-                                                                            setShowDropdown({});
-                                                                        }}
-                                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
-                                                                    >
-                                                                        <TrashIcon className="h-4 w-4" />
-                                                                        <span>Delete</span>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                                                title="More actions"
+                                                            >
+                                                                <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleUnarchiveClient(client.id)}
+                                                                className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                                            >
+                                                                <ArchiveBoxIcon className="h-4 w-4" />
+                                                                <span>Unarchive</span>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleDeleteClient(client.id)}
+                                                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                                            >
+                                                                <TrashIcon className="h-4 w-4" />
+                                                                <span>Delete</span>
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </div>
 
                                                 {client.clientName && (
-                                                    <p className="mt-2 text-sm text-gray-600">
+                                                    <p className="mt-2 text-sm text-muted-foreground">
                                                         {client.clientName}
                                                     </p>
                                                 )}
 
                                                 {client.contactPerson && (
-                                                    <p className="mt-1 text-sm text-gray-500">
+                                                    <p className="mt-1 text-sm text-muted-foreground">
                                                         Contact: {client.contactPerson}
                                                     </p>
                                                 )}
 
-                                                <p className="mt-1 text-xs text-gray-400">
+                                                <p className="mt-1 text-xs text-muted-foreground">
                                                     Created {toDisplayDate(client.createdAt)}
                                                 </p>
 
@@ -472,15 +408,15 @@ const ClientList = ({
                                                 {(() => {
                                                     const relatedProjectsCount = getRelatedProjects(client.id).length;
                                                     return relatedProjectsCount > 0 && (
-                                                        <div className="mt-3 pt-3 border-t border-gray-100">
-                                                            <div className="text-xs text-gray-500">
+                                                        <div className="mt-3 pt-3 border-t border-border">
+                                                            <div className="text-xs text-muted-foreground">
                                                                 {relatedProjectsCount} project{relatedProjectsCount !== 1 ? 's' : ''}
                                                             </div>
                                                         </div>
                                                     );
                                                 })()}
-                                            </div>
-                                        </div>
+                                            </CardContent>
+                                        </Card>
                                     ))}
                                 </div>
                             )}
@@ -500,7 +436,7 @@ const ClientList = ({
                         <div className="flex justify-end">
                             <button
                                 onClick={handleCancelDelete}
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                                className="px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                             >
                                 Cancel
                             </button>
@@ -508,10 +444,10 @@ const ClientList = ({
                     }
                 >
                     <div>
-                        <p className="text-sm text-gray-700 mb-4">
+                        <p className="text-sm text-foreground mb-4">
                             The client "<span className="font-semibold">{clientToDelete.title}</span>" has {relatedProjects.length} related project(s):
                         </p>
-                        <ul className="text-sm text-gray-600 mb-4 list-disc list-inside">
+                        <ul className="text-sm text-muted-foreground mb-4 list-disc list-inside">
                             {relatedProjects.slice(0, 5).map(project => (
                                 <li key={project.id}>{project.title}</li>
                             ))}
@@ -520,7 +456,7 @@ const ClientList = ({
                             )}
                         </ul>
                         
-                        <p className="text-sm text-gray-700 mb-6">
+                        <p className="text-sm text-foreground mb-6">
                             <strong>Recommended:</strong> Archive this client to preserve project relationships for record-keeping purposes.
                         </p>
 
@@ -532,21 +468,21 @@ const ClientList = ({
                                     setClientToDelete(null);
                                     setRelatedProjects([]);
                                 }}
-                                className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                             >
                                 Archive Client (Recommended)
                             </button>
 
                             <button
                                 onClick={confirmDeleteClient}
-                                className="w-full px-4 py-2 border border-yellow-300 rounded-md shadow-sm text-sm font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                                className="w-full px-4 py-2 border border-yellow-300 dark:border-yellow-700 rounded-md shadow-sm text-sm font-medium text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-950 hover:bg-yellow-100 dark:hover:bg-yellow-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                             >
                                 Delete & Remove Client Reference
                             </button>
 
                             <button
                                 onClick={handleForceDelete}
-                                className="w-full px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                className="w-full px-4 py-2 border border-red-300 dark:border-red-700 rounded-md shadow-sm text-sm font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                             >
                                 Delete Client & All Projects
                             </button>
@@ -566,7 +502,7 @@ const ClientList = ({
                         <div className="flex justify-end">
                             <button
                                 onClick={handleCancelDelete}
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                                className="px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                             >
                                 Cancel
                             </button>
@@ -574,10 +510,10 @@ const ClientList = ({
                     }
                 >
                     <div>
-                        <p className="text-sm text-gray-700 mb-4">
+                        <p className="text-sm text-foreground mb-4">
                             The client "<span className="font-semibold">{clientToDelete.title}</span>" has {relatedProjects.length} related project(s):
                         </p>
-                        <ul className="text-sm text-gray-600 mb-4 list-disc list-inside">
+                        <ul className="text-sm text-muted-foreground mb-4 list-disc list-inside">
                             {relatedProjects.slice(0, 5).map(project => (
                                 <li key={project.id}>{project.title}</li>
                             ))}
@@ -586,21 +522,21 @@ const ClientList = ({
                             )}
                         </ul>
                         
-                        <p className="text-sm text-gray-700 mb-6">
+                        <p className="text-sm text-foreground mb-6">
                             Would you like to archive the related projects as well?
                         </p>
 
                         <div className="flex flex-col space-y-3">
                             <button
                                 onClick={handleArchiveWithProjects}
-                                className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                             >
                                 Archive Client & Projects
                             </button>
 
                             <button
                                 onClick={handleArchiveFromModal}
-                                className="w-full px-4 py-2 border border-blue-300 rounded-md shadow-sm text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                className="w-full px-4 py-2 border border-blue-300 dark:border-blue-700 rounded-md shadow-sm text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                             >
                                 Archive Client Only
                             </button>

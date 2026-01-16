@@ -373,7 +373,7 @@ const PaymentMethodModal = ({
                                     variant="outline"
                                     size="icon"
                                     onClick={() => removeCustomField(index)}
-                                    className="hover:bg-red-50 hover:text-red-600 hover:border-red-300"
+                                    className="hover:bg-accent hover:text-red-600 dark:hover:text-red-400 hover:border-red-300"
                                 >
                                     <TrashIcon className="h-4 w-4" />
                                 </Button>

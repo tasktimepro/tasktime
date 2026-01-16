@@ -1479,17 +1479,17 @@ const InvoiceGenerator = ({
                 <div className="flex items-center space-x-3">
                     <button
                         onClick={openInvoiceForm}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                     >
                         <DocumentTextIcon className="h-5 w-5 mr-2" />
                         {currentProjectForCalculation ? 'Generate Invoice' : 'Create Invoice'}
                         {currentProjectForCalculation && unbilledHours > 0 && currentProjectForCalculation.hourlyRate && (
-                            <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full">
+                            <span className="ml-2 px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full">
                                 {getCurrencySymbol(getProjectCurrency(currentProjectForCalculation, clients))}{unbilledAmount.toFixed(2)}
                             </span>
                         )}
                         {currentProjectForCalculation && unbilledHours > 0 && !currentProjectForCalculation.hourlyRate && (
-                            <span className="ml-2 px-2 py-1 bg-green-500 text-xs rounded-full flex items-center">
+                            <span className="ml-2 px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full flex items-center">
                                 <ClockIcon className="h-3 w-3 mr-1" />
                                 {unbilledHours.toFixed(2)}h
                             </span>

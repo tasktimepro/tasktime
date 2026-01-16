@@ -1,5 +1,7 @@
 import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
@@ -271,19 +273,19 @@ const ClientDashboard = ({
                 <div className="flex items-center space-x-4">
                     <button
                         onClick={onBackToClients}
-                        className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                        className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-accent transition-colors"
                         title="Back to Clients"
                     >
                         <ArrowLeftIcon className="h-5 w-5" />
                     </button>
 
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{client.title}</h1>
+                        <h1 className="text-2xl font-bold text-foreground">{client.title}</h1>
                         {client.clientName && (
-                            <p className="text-sm text-gray-500">{client.clientName}</p>
+                            <p className="text-sm text-muted-foreground">{client.clientName}</p>
                         )}
                         {client.contactPerson && (
-                            <p className="text-sm text-gray-500">Contact: {client.contactPerson}</p>
+                            <p className="text-sm text-muted-foreground">Contact: {client.contactPerson}</p>
                         )}
                     </div>
                 </div>
@@ -319,131 +321,120 @@ const ClientDashboard = ({
 
             {/* Client Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
+                <Card>
+                    <CardContent className="pt-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
-                                    <ClipboardDocumentCheckIcon className="h-5 w-5 text-gray-600" />
-                                </div>
+                                <ClipboardDocumentCheckIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
-                            <div className="ml-5 w-0 flex-1">
+                            <div className="ml-4 w-0 flex-1">
                                 <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Projects</dt>
-                                    <dd className="text-lg font-medium text-gray-900">{clientMetrics.projectCount}</dd>
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Projects</dt>
+                                    <dd className="text-lg font-semibold text-foreground">{clientMetrics.projectCount}</dd>
                                 </dl>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
+                <Card>
+                    <CardContent className="pt-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
-                                    <ClockIcon className="h-5 w-5 text-blue-600" />
-                                </div>
+                                <ClockIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
-                            <div className="ml-5 w-0 flex-1">
+                            <div className="ml-4 w-0 flex-1">
                                 <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Total Time</dt>
-                                    <dd className="text-lg font-medium text-gray-900">{formatDuration(clientMetrics.totalTime)}</dd>
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Total Time</dt>
+                                    <dd className="text-lg font-semibold text-foreground">{formatDuration(clientMetrics.totalTime)}</dd>
                                 </dl>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
+                <Card>
+                    <CardContent className="pt-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
-                                    <BanknotesIcon className="h-5 w-5 text-green-600" />
-                                </div>
+                                <BanknotesIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
-                            <div className="ml-5 w-0 flex-1">
+                            <div className="ml-4 w-0 flex-1">
                                 <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Paid Revenue</dt>
-                                    <dd className="text-lg font-medium text-gray-900">
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
+                                    <dd className="text-lg font-semibold text-foreground">
                                         {getCurrencySymbol(clientCurrency)}{clientMetrics.totalRevenue.toFixed(2)}
                                     </dd>
                                 </dl>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
+                <Card>
+                    <CardContent className="pt-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-amber-100 rounded-md flex items-center justify-center">
-                                    <DocumentTextIcon className="h-5 w-5 text-amber-600" />
-                                </div>
+                                <DocumentTextIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
-                            <div className="ml-5 w-0 flex-1">
+                            <div className="ml-4 w-0 flex-1">
                                 <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Pending</dt>
-                                    <dd className="text-lg font-medium text-gray-900">
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Pending</dt>
+                                    <dd className="text-lg font-semibold text-foreground">
                                         {getCurrencySymbol(clientCurrency)}{clientMetrics.pendingAmount.toFixed(2)}
                                     </dd>
                                 </dl>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
+                <Card>
+                    <CardContent className="pt-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
-                                    <CurrencyDollarIcon className="h-5 w-5 text-purple-600" />
-                                </div>
+                                <CurrencyDollarIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
-                            <div className="ml-5 w-0 flex-1">
+                            <div className="ml-4 w-0 flex-1">
                                 <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Unbilled</dt>
-                                    <dd className="text-lg font-medium text-gray-900">
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
+                                    <dd className="text-lg font-semibold text-foreground">
                                         {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
                                     </dd>
                                 </dl>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Projects Section */}
-            <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4 border-b border-gray-200">
+            <Card>
+                <CardHeader>
                     <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-medium text-gray-900">
+                        <CardTitle className="text-lg">
                             Projects ({clientProjects.length})
-                        </h2>
-                        <button
+                        </CardTitle>
+                        <Button
                             onClick={handleCreateProject}
-                            className="inline-flex items-center px-3 py-1.5 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            variant="outline"
+                            leadingIcon={PlusIcon}
                         >
-                            <PlusIcon className="h-4 w-4 mr-1" />
                             New Project
-                        </button>
+                        </Button>
                     </div>
-                </div>
-                <div className="p-6">
+                </CardHeader>
+                <CardContent>
                     {clientProjects.length === 0 ? (
                         <div className="text-center py-8">
-                            <ClipboardDocumentCheckIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-500 mb-4">No projects for this client yet.</p>
-                            <button
+                            <ClipboardDocumentCheckIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <p className="text-muted-foreground mb-4">No projects for this client yet.</p>
+                            <Button
                                 onClick={handleCreateProject}
-                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                leadingIcon={PlusIcon}
                             >
-                                <PlusIcon className="h-4 w-4 mr-2" />
                                 Create First Project
-                            </button>
+                            </Button>
                         </div>
                     ) : (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -459,17 +450,17 @@ const ClientDashboard = ({
                                 return (
                                     <div
                                         key={project.id}
-                                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer relative"
+                                        className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer relative"
                                         onClick={() => navigateToProject(project.id)}
                                     >
-                                        <h3 className="font-medium text-gray-900 truncate">{project.title}</h3>
+                                        <h3 className="font-medium text-foreground truncate">{project.title}</h3>
                                         {project.hourlyRate && (
-                                            <p className="text-sm text-gray-500 mt-1">
+                                            <p className="text-sm text-muted-foreground mt-1">
                                                 {getCurrencySymbol(getProjectCurrency(project, clients))}
                                                 {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
                                             </p>
                                         )}
-                                        <div className="mt-2 text-sm text-gray-600">
+                                        <div className="mt-2 text-sm text-muted-foreground">
                                             <p>{projectTasks.filter(t => !t.completed && !t.archived).length} active tasks</p>
                                             <p>{formatDuration(totalTime)} total time</p>
                                         </div>
@@ -479,7 +470,7 @@ const ClientDashboard = ({
                                             <div className="absolute bottom-4 right-4">
                                                 <button
                                                     onClick={(e) => handleGenerateInvoice(e)}
-                                                    className="inline-flex items-center px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-full hover:bg-green-700 transition-colors"
+                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
                                                     title="Click to generate invoice"
                                                 >
                                                     {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
@@ -489,7 +480,7 @@ const ClientDashboard = ({
                                             <div className="absolute bottom-4 right-4">
                                                 <button
                                                     onClick={(e) => handleGenerateInvoice(e)}
-                                                    className="inline-flex items-center px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded-full hover:bg-blue-700 transition-colors"
+                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
                                                     title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
                                                 >
                                                     <ClockIcon className="h-3 w-3 mr-1" />
@@ -502,16 +493,16 @@ const ClientDashboard = ({
                             })}
                         </div>
                     )}
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Invoices Section */}
-            <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4 border-b border-gray-200">
+            <Card>
+                <CardHeader>
                     <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-medium text-gray-900">
+                        <CardTitle className="text-lg">
                             Invoices ({clientInvoices.length})
-                        </h2>
+                        </CardTitle>
                         
                         {/* Generate Invoice with Client Pre-selected */}
                         <InvoiceGenerator
@@ -541,9 +532,9 @@ const ClientDashboard = ({
                             openTemplateModal={openTemplateModal}
                         />
                     </div>
-                </div>
+                </CardHeader>
 
-                <div className="p-6">
+                <CardContent>
                     <InvoicesList
                         projectInvoices={clientInvoices}
                         onEditInvoice={handleEditInvoice}
@@ -554,25 +545,27 @@ const ClientDashboard = ({
                         setInvoices={setInvoices}
                         invoiceTemplates={invoiceTemplates}
                     />
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Client Time Metrics */}
-            <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-lg font-medium text-gray-900">Time Analytics</h2>
-                </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">Time Analytics</CardTitle>
+                </CardHeader>
                 {clientTimeEntries.length > 0 ? (
                     <MetricsDisplay
                         timeEntries={clientTimeEntries}
                         showTitle={false}
                     />
                 ) : (
-                    <div className="text-center py-8">
-                        <p className="text-gray-500">No time entries for this client yet.</p>
-                    </div>
+                    <CardContent>
+                        <div className="text-center py-8">
+                            <p className="text-muted-foreground">No time entries for this client yet.</p>
+                        </div>
+                    </CardContent>
                 )}
-            </div>
+            </Card>
         </div>
     );
 };

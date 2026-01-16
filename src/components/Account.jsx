@@ -4,6 +4,12 @@ import { useUrlState } from '../hooks/useUrlState';
 import ExportImport from './ExportImport';
 import Preferences from './Preferences';
 import Modal from './Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Notice } from '@/components/ui/notice';
 import { useToast } from '../hooks/useToast';
 
 /**
@@ -128,8 +134,8 @@ const Account = ({
                 return (
                     <div>
                         <div className="mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900">Backup & Restore</h2>
-                            <p className="mt-1 text-sm text-gray-600">
+                            <h2 className="text-2xl font-bold text-foreground">Backup & Restore</h2>
+                            <p className="mt-1 text-sm text-muted-foreground">
                                 Export your data for backup purposes or import data from a previous backup.
                             </p>
                         </div>
@@ -152,103 +158,81 @@ const Account = ({
                 return (
                     <div>
                         <div className="mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900">Your Data</h2>
-                            <p className="mt-1 text-sm text-gray-600">
+                            <h2 className="text-2xl font-bold text-foreground">Your Data</h2>
+                            <p className="mt-1 text-sm text-muted-foreground">
                                 Manage your account data and permanently delete information.
                             </p>
                         </div>
                         
                         <div className="space-y-6">
                             {/* Delete All Account Data */}
-                            <div className="bg-white shadow rounded-lg p-6">
-                                <h3 className="text-lg font-medium text-gray-900 mb-4">Delete All Account Data</h3>
-                                <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-                                    <div className="flex">
-                                        <div className="flex-shrink-0">
-                                            <TrashIcon className="h-5 w-5 text-red-400" />
-                                        </div>
-                                        <div className="ml-3">
-                                            <h3 className="text-sm font-medium text-red-800">
-                                                Danger Zone
-                                            </h3>
-                                            <div className="mt-2 text-sm text-red-700">
-                                                <p>
-                                                    This action will permanently delete all your data including projects, tasks, 
-                                                    time entries, invoices, invoice configurations, and settings. This action cannot be undone.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <button
-                                    onClick={() => setShowDeleteModal(true)}
-                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                                >
-                                    <TrashIcon className="h-4 w-4 mr-2" />
-                                    Delete All Account Data
-                                </button>
-                            </div>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Delete All Account Data</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <Notice
+                                        title="Danger Zone"
+                                        description="This action will permanently delete all your data including projects, tasks, time entries, invoices, invoice configurations, and settings. This action cannot be undone."
+                                        icon={TrashIcon}
+                                        className="mb-4"
+                                    />
+                                    
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => setShowDeleteModal(true)}
+                                        leadingIcon={TrashIcon}
+                                    >
+                                        Delete All Account Data
+                                    </Button>
+                                </CardContent>
+                            </Card>
 
                             {/* Temporary Delete All Projects & Related Data - Uncommented for demonstration */}
-                            <div className="bg-white shadow rounded-lg p-6">
-                                <h3 className="text-lg font-medium text-gray-900 mb-4">Delete All Projects & Related Data</h3>
-                                <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-                                    <div className="flex">
-                                        <div className="flex-shrink-0">
-                                            <TrashIcon className="h-5 w-5 text-red-400" />
-                                        </div>
-                                        <div className="ml-3">
-                                            <h3 className="text-sm font-medium text-red-800">
-                                                Temporary Feature
-                                            </h3>
-                                            <div className="mt-2 text-sm text-red-700">
-                                                <p>
-                                                    This will delete all projects, tasks, time entries, and invoices. Business info, clients, templates, and payment methods will remain intact.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <button
-                                    onClick={() => _setShowDeleteProjectsModal(true)}
-                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                                >
-                                    <TrashIcon className="h-4 w-4 mr-2" />
-                                    Delete All Projects & Related Data
-                                </button>
-                            </div>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Delete All Projects & Related Data</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <Notice
+                                        title="Temporary Feature"
+                                        description="This will delete all projects, tasks, time entries, and invoices. Business info, clients, templates, and payment methods will remain intact."
+                                        icon={TrashIcon}
+                                        className="mb-4"
+                                    />
+                                    
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => _setShowDeleteProjectsModal(true)}
+                                        leadingIcon={TrashIcon}
+                                    >
+                                        Delete All Projects & Related Data
+                                    </Button>
+                                </CardContent>
+                            </Card>
 
                             {/* Temporary Delete All Invoices - Uncommented for demonstration */}
-                            <div className="bg-white shadow rounded-lg p-6">
-                                <h3 className="text-lg font-medium text-gray-900 mb-4">Delete All Invoices</h3>
-                                <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-                                    <div className="flex">
-                                        <div className="flex-shrink-0">
-                                            <TrashIcon className="h-5 w-5 text-red-400" />
-                                        </div>
-                                        <div className="ml-3">
-                                            <h3 className="text-sm font-medium text-red-800">
-                                                Temporary Feature
-                                            </h3>
-                                            <div className="mt-2 text-sm text-red-700">
-                                                <p>
-                                                    This will delete all invoices from your account. Projects and other data will remain intact.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <button
-                                    onClick={() => _setShowDeleteInvoicesModal(true)}
-                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                                >
-                                    <TrashIcon className="h-4 w-4 mr-2" />
-                                    Delete All Invoices
-                                </button>
-                            </div>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Delete All Invoices</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <Notice
+                                        title="Temporary Feature"
+                                        description="This will delete all invoices from your account. Projects and other data will remain intact."
+                                        icon={TrashIcon}
+                                        className="mb-4"
+                                    />
+                                    
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => _setShowDeleteInvoicesModal(true)}
+                                        leadingIcon={TrashIcon}
+                                    >
+                                        Delete All Invoices
+                                    </Button>
+                                </CardContent>
+                            </Card>
                         </div>
                     </div>
                 );
@@ -261,32 +245,28 @@ const Account = ({
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-gray-900">Account</h1>
-                <p className="mt-1 text-sm text-gray-600">Manage your account settings</p>
+                <h1 className="text-2xl font-bold text-foreground">Account</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Manage your account settings</p>
             </div>
 
             {/* Navigation Tabs */}
-            <div className="border-b border-gray-200">
-                <nav className="-mb-px flex space-x-8">
+            <Tabs value={activeTab} onValueChange={handleSectionChange}>
+                <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
                     {sideNavItems.map((item) => {
                         const Icon = item.icon;
                         return (
-                            <button
+                            <TabsTrigger
                                 key={item.id}
-                                onClick={() => handleSectionChange(item.id)}
-                                className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
-                                    activeTab === item.id
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
+                                value={item.id}
+                                className="flex items-center py-2 px-1 mr-8 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm whitespace-nowrap transition-colors data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                             >
                                 <Icon className="h-4 w-4 mr-2" />
                                 {item.name}
-                            </button>
+                            </TabsTrigger>
                         );
                     })}
-                </nav>
-            </div>
+                </TabsList>
+            </Tabs>
 
             {/* Content */}
             <div>
@@ -304,62 +284,52 @@ const Account = ({
                 size="md"
                 footer={
                     <div className="flex justify-end space-x-3">
-                        <button
+                        <Button
+                            variant="secondary"
                             onClick={() => {
                                 setShowDeleteModal(false);
                                 setDeleteConfirmationText('');
                             }}
-                            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="destructive"
                             onClick={handleDeleteAllData}
                             disabled={deleteConfirmationText !== 'Delete'}
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
                         >
                             Delete All Data
-                        </button>
+                        </Button>
                     </div>
                 }
             >
                 <div className="space-y-4">
-                    <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                        <div className="flex">
-                            <div className="flex-shrink-0">
-                                <TrashIcon className="h-5 w-5 text-red-400" />
-                            </div>
-                            <div className="ml-3">
-                                <h3 className="text-sm font-medium text-red-800">
-                                    This action cannot be undone
-                                </h3>
-                                <div className="mt-2 text-sm text-red-700">
-                                    <p>
-                                        This will permanently delete all your data including:
-                                    </p>
-                                    <ul className="list-disc list-inside mt-2 space-y-1">
-                                        <li>All projects ({projects.length})</li>
-                                        <li>All tasks ({tasks.length})</li>
-                                        <li>All time entries</li>
-                                        <li>All invoices ({invoices.length})</li>
-                                        <li>All invoice configurations</li>
-                                        <li>All settings</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <Notice
+                        title="This action cannot be undone"
+                        icon={TrashIcon}
+                    >
+                        <p>
+                            This will permanently delete all your data including:
+                        </p>
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                            <li>All projects ({projects.length})</li>
+                            <li>All tasks ({tasks.length})</li>
+                            <li>All time entries</li>
+                            <li>All invoices ({invoices.length})</li>
+                            <li>All invoice configurations</li>
+                            <li>All settings</li>
+                        </ul>
+                    </Notice>
 
-                    <div>
-                        <label htmlFor="confirmDelete" className="block text-sm font-medium text-gray-700 mb-2">
+                    <div className="space-y-2">
+                        <Label htmlFor="confirmDelete">
                             Type <strong>"Delete"</strong> to confirm:
-                        </label>
-                        <input
+                        </Label>
+                        <Input
                             id="confirmDelete"
                             type="text"
                             value={deleteConfirmationText}
                             onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                            className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm px-3 py-2"
                             placeholder="Type 'Delete' here"
                         />
                     </div>
@@ -374,32 +344,33 @@ const Account = ({
                 size="md"
                 footer={
                     <div className="flex justify-end space-x-3">
-                        <button
+                        <Button
+                            variant="secondary"
                             onClick={() => _setShowDeleteProjectsModal(false)}
-                            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="destructive"
                             onClick={_handleDeleteAllProjects}
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                         >
                             Delete All Projects & Related Data
-                        </button>
+                        </Button>
                     </div>
                 }
             >
                 <div className="space-y-4">
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-muted-foreground">
                         Are you sure you want to delete all projects, tasks, time entries, and invoices? This action cannot be undone.
                     </p>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                        <p className="text-sm text-yellow-800">
-                            <strong>What will be deleted:</strong> All projects ({projects.length}), all tasks ({tasks.length}), all time entries ({timeEntries.length}), and all invoices ({invoices.length}).
+                    <Notice title="What will be deleted" showIcon={false}>
+                        <p>
+                            All projects ({projects.length}), all tasks ({tasks.length}), all time entries ({timeEntries.length}), and all invoices ({invoices.length}).
                         </p>
-                        <p className="text-sm text-yellow-800 mt-1">                                            <strong>What will remain:</strong> Business info, clients, invoice templates, and payment methods.
+                        <p className="mt-1 text-muted-foreground">
+                            <strong>What will remain:</strong> Business info, clients, invoice templates, and payment methods.
                         </p>
-                    </div>
+                    </Notice>
                 </div>
             </Modal>
 
@@ -411,23 +382,23 @@ const Account = ({
                 size="md"
                 footer={
                     <div className="flex justify-end space-x-3">
-                        <button
+                        <Button
+                            variant="secondary"
                             onClick={() => _setShowDeleteInvoicesModal(false)}
-                            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="destructive"
                             onClick={_handleDeleteAllInvoices}
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                         >
                             Delete All Invoices
-                        </button>
+                        </Button>
                     </div>
                 }
             >
                 <div className="space-y-4">
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-foreground">
                         Are you sure you want to delete all {invoices.length} invoices? This action cannot be undone.
                     </p>
                 </div>

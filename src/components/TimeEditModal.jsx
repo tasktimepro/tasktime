@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 /**
  * TimeEditModal component - Modal for editing task time
@@ -56,26 +59,17 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
     // Footer with action buttons
     const footer = (
         <div className="flex justify-end space-x-3">
-            <button
-                onClick={handleReset}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-            >
+            <Button variant="secondary" onClick={handleReset}>
                 Reset
-            </button>
+            </Button>
 
-            <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-            >
+            <Button variant="secondary" onClick={onClose}>
                 Cancel
-            </button>
+            </Button>
 
-            <button
-                onClick={handleSave}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
-            >
+            <Button onClick={handleSave}>
                 Save
-            </button>
+            </Button>
         </div>
     );
 
@@ -89,12 +83,10 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
         >
             <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Hours
-                        </label>
-
-                        <input
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-hours">Hours</Label>
+                        <Input
+                            id="edit-hours"
                             type="number"
                             min="0"
                             value={editHours === '' ? '' : editHours}
@@ -106,16 +98,13 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                                     setEditHours(Math.max(0, parseInt(newValue) || 0));
                                 }
                             }}
-                            className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                         />
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Minutes
-                        </label>
-
-                        <input
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-minutes">Minutes</Label>
+                        <Input
+                            id="edit-minutes"
                             type="number"
                             min="0"
                             max="59"
@@ -128,16 +117,13 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                                     setEditMinutes(Math.max(0, Math.min(59, parseInt(newValue) || 0)));
                                 }
                             }}
-                            className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                         />
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Seconds
-                        </label>
-
-                        <input
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-seconds">Seconds</Label>
+                        <Input
+                            id="edit-seconds"
                             type="number"
                             min="0"
                             max="59"
@@ -150,7 +136,6 @@ const TimeEditModal = ({ isOpen, onClose, currentTime, onSave, taskTitle }) => {
                                     setEditSeconds(Math.max(0, Math.min(59, parseInt(newValue) || 0)));
                                 }
                             }}
-                            className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
                         />
                     </div>
                 </div>

@@ -1,12 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
     PencilIcon, 
     TrashIcon,
     ArchiveBoxIcon,
     ClockIcon,
-    EllipsisHorizontalIcon,
     CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
+import { MoreHorizontal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import TaskTimer from './TaskTimer.jsx';
 import CustomCheckbox from './CustomCheckbox.jsx';
 import TimeEntriesModal from './TimeEntriesModal.jsx';
@@ -14,9 +22,6 @@ import { formatDurationWithSeconds } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { deleteTaskWithCleanup } from '../utils/taskUtils';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app';
-
-// Create a custom event for dropdown management
-const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
 
 /**
  * TaskItem component - Displays individual task with timer controls and subtasks
@@ -47,32 +52,6 @@ const TaskItem = ({
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
-    const [showDropdown, setShowDropdown] = useState(false);
-
-    // Close dropdown when clicking outside or when another dropdown opens
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (showDropdown && !event.target.closest('.dropdown-container')) {
-                setShowDropdown(false);
-            }
-        };
-        
-        // Handle when another dropdown is opened
-        const handleDropdownToggle = (event) => {
-            // If this is not our dropdown being toggled (different task ID) and it's being opened, close this one
-            if (event.detail.taskId !== task.id && event.detail.open) {
-                setShowDropdown(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        document.addEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
-        
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            document.removeEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
-        };
-    }, [showDropdown, task.id]);
 
     // Get subtasks for this task
     const subtasks = allTasks.filter(t => t.parentTaskId === task.id);
@@ -247,7 +226,7 @@ const TaskItem = ({
     // const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
 
     return (
-        <div className={`border border-gray-200 rounded-lg hover:shadow-md transition-shadow ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
+        <div className={`border border-border rounded-lg hover:shadow-md transition-shadow ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
             {/* Main Task */}
             <div className={`p-4 transition-colors ${
                 // If we have subtasks or can create them, only round the top corners
@@ -255,8 +234,8 @@ const TaskItem = ({
                 (subtasks.length > 0 || (!task.completed && onCreateSubtask)) ? 'rounded-t-lg' : 'rounded-lg'
             } ${
                 (subtaskTimerActive && !isPaused) && !isArchived
-                ? 'bg-gray-100 opacity-50 pointer-events-none' 
-                : 'hover:bg-gray-50'
+                ? 'bg-muted/30 opacity-50 pointer-events-none' 
+                : 'hover:bg-muted/40'
             }`}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -272,40 +251,38 @@ const TaskItem = ({
                         <div className="flex-1 min-w-0">
                             {isEditing ? (
                                 <form onSubmit={handleUpdateTitle} className="flex items-center space-x-2">
-                                    <input
+                                    <Input
                                         type="text"
                                         value={editTitle}
                                         onChange={(e) => setEditTitle(e.target.value)}
-                                        className="flex-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
+                                        className="flex-1 text-sm"
                                         autoFocus
                                         disabled={isCompleted}
                                     />
 
-                                    <button
-                                        type="submit"
-                                        className="px-3 py-2 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                    >
+                                    <Button type="submit" size="sm">
                                         Save
-                                    </button>
+                                    </Button>
 
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={cancelEdit}
-                                        className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                     >
                                         Cancel
-                                    </button>
+                                    </Button>
                                 </form>
                             ) : (
                                 <div className="flex items-center space-x-3">
                                     <h3 className={`text-sm font-medium truncate ${
-                                        isCompleted ? 'line-through text-gray-500' : 'text-gray-900'
+                                        isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
                                     }`}>
                                         {task.title}
                                     </h3>
 
                                     {/* Time Display */}
-                                    <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                                         {!task.parentTaskId ? (
                                             /* Main task - show both main task time and total time */
                                             <>
@@ -314,11 +291,11 @@ const TaskItem = ({
                                                         {mainTaskTime > 0 && (
                                                             <button
                                                                 onClick={() => setShowTimeEntriesModal(true)}
-                                                                className="hover:bg-gray-100 rounded-md transition-colors"
+                                                                className="hover:bg-muted rounded-md transition-colors"
                                                                 title="Click to edit main task time (excluding subtasks)"
                                                                 disabled={isCompleted}
                                                             >
-                                                                <span className="text-gray-500">
+                                                                <span className="text-muted-foreground">
                                                                     {formatDurationWithSeconds(mainTaskTime)}
                                                                 </span>
                                                             </button>
@@ -342,7 +319,7 @@ const TaskItem = ({
                                             totalTimeWithSubtasks > 0 && (
                                                 <button
                                                     onClick={() => setShowTimeEntriesModal(true)}
-                                                    className="hover:bg-gray-100 px-2 py-1 rounded-md transition-colors"
+                                                    className="hover:bg-muted px-2 py-1 rounded-md transition-colors"
                                                     title="Click to edit time"
                                                     disabled={isCompleted}
                                                 >
@@ -380,32 +357,38 @@ const TaskItem = ({
                                 /* Show unarchive and delete buttons for archived tasks in flex layout */
                                 <div className="flex items-center space-x-2">
                                     {onUnarchive && (
-                                        <button
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={onUnarchive}
-                                            className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded-md"
+                                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-950 hover:bg-accent dark:hover:bg-blue-900"
                                             title="Unarchive Task"
                                         >
                                             Unarchive
-                                        </button>
+                                        </Button>
                                     )}
-                                    <button
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={onDelete}
-                                        className="text-xs text-red-600 hover:text-red-800 bg-red-50 px-2 py-1 rounded-md"
+                                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900"
                                         title="Delete Task"
                                     >
                                         Delete
-                                    </button>
+                                    </Button>
                                 </div>
                             ) : isCompleted ? (
                                 /* Only show archive button when completed */
                                 !task.parentTaskId && onArchive && (
-                                    <button
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={onArchive}
-                                        className="p-1 text-yellow-600 hover:bg-yellow-100 rounded-md transition-colors group"
+                                        className="h-8 w-8 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900"
                                         title="Archive Task"
                                     >
-                                        <ArchiveBoxIcon className="h-5 w-5 group-hover:text-yellow-700" />
-                                    </button>
+                                        <ArchiveBoxIcon className="h-5 w-5" />
+                                    </Button>
                                 )
                             ) : anyTimerActive && !isPaused && !isTimerActive ? (
                                 /* When any timer is actively running (not paused) and it's not this task's timer, hide all action buttons */
@@ -429,22 +412,26 @@ const TaskItem = ({
                                         setTasks={setTasks}
                                     />
 
-                                    <button
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => setShowTimeEntriesModal(true)}
-                                        className="p-1 text-gray-400 hover:bg-blue-100 rounded-md transition-colors group"
+                                        className="h-8 w-8 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-muted/40"
                                         title="View Time Entries"
                                     >
-                                        <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
-                                    </button>
+                                        <ClockIcon className="h-5 w-5" />
+                                    </Button>
 
                                     {/* Billable Toggle Button - Always show this button */}
                                     {onToggleBillable && (
-                                        <button
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
                                             onClick={() => onToggleBillable(task.id)}
-                                            className={`p-1 rounded-md transition-colors group ${
+                                            className={`h-8 w-8 ${
                                                 task.billable
-                                                    ? 'text-purple-600 bg-purple-100 hover:bg-purple-200'
-                                                    : 'text-gray-400 hover:bg-purple-100'
+                                                    ? 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 hover:text-purple-700 dark:hover:text-purple-300'
+                                                    : 'text-muted-foreground hover:bg-accent hover:text-purple-600 dark:hover:text-purple-400'
                                             }`}
                                             title={
                                                 task.billable
@@ -452,59 +439,39 @@ const TaskItem = ({
                                                     : 'Mark as billable'
                                             }
                                         >
-                                            <CurrencyDollarIcon className={`h-5 w-5 ${
-                                                task.billable
-                                                    ? 'group-hover:text-purple-700'
-                                                    : 'group-hover:text-purple-600'
-                                            }`} />
-                                        </button>
+                                            <CurrencyDollarIcon className="h-5 w-5" />
+                                        </Button>
                                     )}
 
                                     {/* Three-dot dropdown menu for Edit and Delete */}
-                                    <div className="relative dropdown-container">
-                                        <button
-                                            onClick={() => {
-                                                setShowDropdown(!showDropdown);
-
-                                                // Dispatch a custom event to close other dropdowns
-                                                const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
-                                                    detail: { taskId: task.id, open: !showDropdown }
-                                                });
-                                                document.dispatchEvent(event);
-                                            }}
-                                            className="p-1 text-gray-400 hover:bg-gray-100 rounded-md transition-colors group"
-                                            title="More actions"
-                                        >
-                                            <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
-                                        </button>
-
-                                        {showDropdown && (
-                                            <div className="absolute right-0 top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                                                <div className="py-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            setIsEditing(true);
-                                                            setShowDropdown(false);
-                                                        }}
-                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"
-                                                    >
-                                                        <PencilIcon className="h-4 w-4" />
-                                                        <span>Edit</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            onDelete();
-                                                            setShowDropdown(false);
-                                                        }}
-                                                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
-                                                    >
-                                                        <TrashIcon className="h-4 w-4" />
-                                                        <span>Delete</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-muted-foreground hover:bg-muted/40"
+                                                title="More actions"
+                                            >
+                                                <MoreHorizontal className="h-5 w-5" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                onClick={() => setIsEditing(true)}
+                                                className="flex items-center space-x-2 hover:bg-accent hover:text-yellow-600 dark:hover:text-yellow-400"
+                                            >
+                                                <PencilIcon className="h-4 w-4" />
+                                                <span>Edit</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={onDelete}
+                                                className="flex items-center space-x-2 hover:bg-accent hover:text-red-600 dark:hover:text-red-400"
+                                            >
+                                                <TrashIcon className="h-4 w-4" />
+                                                <span>Delete</span>
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </>
                             )}
                         </div>
@@ -524,7 +491,7 @@ const TaskItem = ({
 
             {/* Subtasks */}
             {!isArchived && (subtasks.length > 0 || (!task.completed && onCreateSubtask)) && (
-                <div className="border-t border-gray-100 bg-gray-50 rounded-b-lg">
+                <div className="border-t border-border bg-muted/40 rounded-b-lg">
                     <div className="pl-8 pr-4 py-2 space-y-2">
                         {subtasks.map((subtask) => (
                             <SubtaskItem
@@ -567,27 +534,25 @@ const TaskItem = ({
                             showCreateSubtaskForm ? (
                                 <form onSubmit={handleCreateSubtask} className="space-y-3">
                                     <div className="flex space-x-3">
-                                        <input
+                                        <Input
                                             type="text"
                                             value={newSubtaskTitle}
                                             onChange={(e) => setNewSubtaskTitle(e.target.value)}
                                             placeholder="Enter subtask title"
-                                            className="flex-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                            className="flex-1 text-sm"
                                             autoFocus
                                         />
-                                        <button
-                                            type="submit"
-                                            className="px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                        >
+                                        <Button type="submit" size="sm">
                                             Add
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
                                             type="button"
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={cancelCreateSubtask}
-                                            className="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                         >
                                             Cancel
-                                        </button>
+                                        </Button>
                                     </div>
                                 </form>
                             ) : (
@@ -598,7 +563,7 @@ const TaskItem = ({
                                 }`}>
                                     <button
                                         onClick={() => setShowCreateSubtaskForm(true)}
-                                        className="w-full text-left py-2 px-3 text-sm text-gray-500 rounded-md transition-colors border border-dashed border-gray-300 hover:bg-gray-100"
+                                        className="w-full text-left py-2 px-3 text-sm text-muted-foreground rounded-md transition-colors border border-dashed border-border hover:bg-muted/40"
                                     >
                                         + Add subtask
                                     </button>
@@ -635,32 +600,6 @@ const SubtaskItem = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
-    const [showDropdown, setShowDropdown] = useState(false);
-
-    // Close dropdown when clicking outside or when another dropdown opens
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (showDropdown && !event.target.closest('.dropdown-container')) {
-                setShowDropdown(false);
-            }
-        };
-        
-        // Handle when another dropdown is opened
-        const handleDropdownToggle = (event) => {
-            // If this is not our dropdown being toggled (different task ID) and it's being opened, close this one
-            if (event.detail.taskId !== task.id && event.detail.open) {
-                setShowDropdown(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        document.addEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
-        
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            document.removeEventListener(DROPDOWN_TOGGLE_EVENT, handleDropdownToggle);
-        };
-    }, [showDropdown, task.id]);
 
     // Get time entries for this subtask
     const taskTimeEntries = timeEntries.filter(entry => entry.taskId === task.id);
@@ -780,7 +719,7 @@ const SubtaskItem = ({
     // const activeTimerDisplay = isTimerActive ? formatActiveTimer(currentTimer.startTime) : null;
 
     return (
-        <div className={`flex items-center justify-between py-2 rounded-md hover:bg-gray-50 transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-gray-50' : ''}`}>
+        <div className={`flex items-center justify-between py-2 rounded-md hover:bg-muted transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
             <div className="flex items-center space-x-3 flex-1 min-w-0">
                 {/* Completion Checkbox */}
                 <div className="flex-shrink-0">
@@ -794,44 +733,42 @@ const SubtaskItem = ({
                 <div className="flex-1 min-w-0">
                     {isEditing ? (
                         <form onSubmit={handleUpdateTitle} className="flex items-center space-x-2">
-                            <input
+                            <Input
                                 type="text"
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
-                                className="flex-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2.5 py-1.5"
+                                className="flex-1 text-sm"
                                 autoFocus
                                 disabled={isCompleted}
                             />
 
-                            <button
-                                type="submit"
-                                className="px-3 py-2 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
+                            <Button type="submit" size="sm">
                                 Save
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
                                 type="button"
+                                variant="secondary"
+                                size="sm"
                                 onClick={cancelEdit}
-                                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                             >
                                 Cancel
-                            </button>
+                            </Button>
                         </form>
                     ) : (
                         <div className="flex items-center space-x-3">
                             <h4 className={`text-sm truncate ${
-                                isCompleted ? 'line-through text-gray-500' : 'text-gray-700'
+                                isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
                             }`}>
                                 {task.title}
                             </h4>
 
                             {/* Time Display - aligned left next to title */}
-                            <div className="flex items-center space-x-2 text-xs text-gray-500">
+                            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                                 {totalTime > 0 && (
                                     <button
                                         onClick={() => setShowTimeEntriesModal(true)}
-                                        className="hover:bg-gray-100 px-2 py-1 rounded-md transition-colors"
+                                        className="hover:bg-muted px-2 py-1 rounded-md transition-colors"
                                         title="Click to view time entries"
                                         disabled={isCompleted}
                                     >
@@ -889,22 +826,26 @@ const SubtaskItem = ({
                                 setTasks={setTasks}
                             />
 
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => setShowTimeEntriesModal(true)}
-                                className="p-1 text-gray-400 hover:bg-blue-100 rounded-md transition-colors group"
+                                className="h-8 w-8 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-muted/40"
                                 title="Edit Time"
                             >
-                                <ClockIcon className="h-5 w-5 group-hover:text-blue-600" />
-                            </button>
+                                <ClockIcon className="h-5 w-5" />
+                            </Button>
 
                             {/* Billable Toggle Button - Always show this button */}
                             {onToggleBillable && (
-                                <button
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => onToggleBillable(task.id)}
-                                    className={`p-1 rounded-md transition-colors group ${
+                                    className={`h-8 w-8 ${
                                         task.billable
-                                            ? 'text-purple-600 bg-purple-100 hover:bg-purple-200'
-                                            : 'text-gray-400 hover:bg-purple-100'
+                                            ? 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 hover:text-purple-700 dark:hover:text-purple-300'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-purple-600 dark:hover:text-purple-400'
                                     }`}
                                     title={
                                         task.billable
@@ -912,59 +853,39 @@ const SubtaskItem = ({
                                             : 'Mark as billable'
                                     }
                                 >
-                                    <CurrencyDollarIcon className={`h-5 w-5 ${
-                                        task.billable
-                                            ? 'group-hover:text-purple-700'
-                                            : 'group-hover:text-purple-600'
-                                    }`} />
-                                </button>
+                                    <CurrencyDollarIcon className="h-5 w-5" />
+                                </Button>
                             )}
                             
                             {/* Three-dot dropdown menu for Edit and Delete */}
-                            <div className="relative dropdown-container">
-                                <button
-                                    onClick={() => {
-                                        setShowDropdown(!showDropdown);
-
-                                        // Dispatch a custom event to close other dropdowns
-                                        const event = new CustomEvent(DROPDOWN_TOGGLE_EVENT, {
-                                            detail: { taskId: task.id, open: !showDropdown }
-                                        });
-                                        document.dispatchEvent(event);
-                                    }}
-                                    className="p-1 text-gray-400 hover:bg-gray-100 rounded-md transition-colors group"
-                                    title="More actions"
-                                >
-                                    <EllipsisHorizontalIcon className="h-5 w-5 group-hover:text-gray-600" />
-                                </button>
-
-                                {showDropdown && (
-                                    <div className="absolute right-0 top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                                        <div className="py-1">
-                                            <button
-                                                onClick={() => {
-                                                    setIsEditing(true);
-                                                    setShowDropdown(false);
-                                                }}
-                                                className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-600 transition-colors space-x-2"
-                                            >
-                                                <PencilIcon className="h-4 w-4" />
-                                                <span>Edit</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    onDelete();
-                                                    setShowDropdown(false);
-                                                }}
-                                                className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors space-x-2"
-                                            >
-                                                <TrashIcon className="h-4 w-4" />
-                                                <span>Delete</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-muted-foreground hover:bg-muted/40"
+                                        title="More actions"
+                                    >
+                                        <MoreHorizontal className="h-5 w-5" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                        onClick={() => setIsEditing(true)}
+                                        className="flex items-center space-x-2 hover:bg-accent hover:text-yellow-600 dark:hover:text-yellow-400"
+                                    >
+                                        <PencilIcon className="h-4 w-4" />
+                                        <span>Edit</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={onDelete}
+                                        className="flex items-center space-x-2 hover:bg-accent hover:text-red-600 dark:hover:text-red-400"
+                                    >
+                                        <TrashIcon className="h-4 w-4" />
+                                        <span>Delete</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </>
                     )}
                 </div>
