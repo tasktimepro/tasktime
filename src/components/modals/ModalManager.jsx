@@ -74,13 +74,11 @@ const ModalManager = ({
         if (modalStack.length > 0) {
             // If there's a modal in the stack, restore it
             const previousModal = modalStack[modalStack.length - 1];
-            console.log('Restoring previous modal:', previousModal.modal, 'with item:', previousModal.item);
             setActiveModal(previousModal.modal);
             setEditingItem(previousModal.item);
             setModalStack(prev => prev.slice(0, -1)); // Remove the last item from stack
         } else {
             // No previous modal, close everything
-            console.log('Closing all modals');
             setActiveModal(null);
             setEditingItem(null);
             // Clear modal options when closing
@@ -94,10 +92,8 @@ const ModalManager = ({
     const openNestedModal = (modalType, item = null) => {
         if (activeModal) {
             // Push current modal state to stack
-            console.log('Pushing to stack:', activeModal, 'with item:', editingItem);
             setModalStack(prev => [...prev, { modal: activeModal, item: editingItem }]);
         }
-        console.log('Opening nested modal:', modalType, 'with item:', item);
         setActiveModal(modalType);
         setEditingItem(item);
     };

@@ -3,6 +3,10 @@ import Modal from '../Modal';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../../utils/idUtils';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import CustomCheckbox from '../CustomCheckbox';
 
 /**
@@ -192,25 +196,24 @@ const PaymentMethodModal = ({
                     checked={formData.isDefault}
                     onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
                     label="Set as default payment method"
-                    labelClassName="text-sm font-medium text-gray-700"
+                    labelClassName="text-sm font-medium text-foreground"
                 />
             </div>
 
             <div className="flex space-x-3">
-                <button
+                <Button
                     type="button"
+                    variant="outline"
                     onClick={handleCancel}
-                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                     type="submit"
                     form="payment-method-form"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     {editingPaymentMethod ? 'Update' : 'Create'} Payment Method
-                </button>
+                </Button>
             </div>
         </div>
     );
@@ -226,121 +229,107 @@ const PaymentMethodModal = ({
             <form id="payment-method-form" onSubmit={handleSubmit} className="space-y-8">
                 {/* Standard Fields */}
                 <div className="space-y-4">
-                    <div>
-                        <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="title">
                             Payment Method Title <span className="text-red-500">*</span>
-                        </label>
-
-                        <input
+                        </Label>
+                        <Input
                             type="text"
                             id="title"
                             name="title"
                             value={formData.title}
                             onChange={handleInputChange}
                             required
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="Enter title for this payment method"
                         />
                     </div>
 
-                    <div>
-                        <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="fullName">
                             Full Name
-                        </label>
-
-                        <input
+                        </Label>
+                        <Input
                             type="text"
                             id="fullName"
                             name="fullName"
                             value={formData.fullName}
                             onChange={handleInputChange}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="Full name of the person sending the invoice"
                         />
                     </div>
 
-                    <div>
-                        <label htmlFor="bank" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="bank">
                             Bank Name
-                        </label>
-
-                        <input
+                        </Label>
+                        <Input
                             type="text"
                             id="bank"
                             name="bank"
                             value={formData.bank}
                             onChange={handleInputChange}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="Bank name"
                         />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="iban" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="iban">
                                 IBAN
-                            </label>
-
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="iban"
                                 name="iban"
                                 value={formData.iban}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="GB29 NWBK 6016 1331 9268 19"
                                 style={{ textTransform: 'uppercase' }}
                             />
-                            <p className="mt-1 text-xs text-gray-500">International Bank Account Number</p>
+                            <p className="text-xs text-muted-foreground">International Bank Account Number</p>
                         </div>
 
-                        <div>
-                            <label htmlFor="swift" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="swift">
                                 SWIFT/BIC
-                            </label>
-
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="swift"
                                 name="swift"
                                 value={formData.swift}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="NWBKGB2L"
                                 style={{ textTransform: 'uppercase' }}
                             />
-                            <p className="mt-1 text-xs text-gray-500">Bank Identifier Code</p>
+                            <p className="text-xs text-muted-foreground">Bank Identifier Code</p>
                         </div>
                     </div>
 
-                    <div>
-                        <label htmlFor="bankAddress" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="bankAddress">
                             Bank Address
-                        </label>
-
-                        <textarea
+                        </Label>
+                        <Textarea
                             id="bankAddress"
                             name="bankAddress"
                             value={formData.bankAddress}
                             onChange={handleInputChange}
                             rows={3}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="123 Bank Street, City, Country"
                         />
                     </div>
 
-                    <div>
-                        <label htmlFor="paypal" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="paypal">
                             PayPal Email
-                        </label>
-
-                        <input
+                        </Label>
+                        <Input
                             type="email"
                             id="paypal"
                             name="paypal"
                             value={formData.paypal}
                             onChange={handleInputChange}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="paypal@example.com"
                         />
                     </div>
@@ -349,49 +338,51 @@ const PaymentMethodModal = ({
                 {/* Custom Fields */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <h4 className="text-sm font-medium text-gray-900">Custom Fields</h4>
-                        <button
+                        <h4 className="text-sm font-medium text-foreground">Custom Fields</h4>
+                        <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={addCustomField}
-                            className="inline-flex items-center px-3 py-1 border border-blue-300 shadow-sm text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            leadingIcon={PlusIcon}
                         >
-                            <PlusIcon className="h-3 w-3 mr-1" />
                             Add Field
-                        </button>
+                        </Button>
                     </div>
 
                     {formData.custom.map((field, index) => (
                         <div key={index} className="grid grid-cols-2 gap-4">
                             <div>
-                                <input
+                                <Input
                                     type="text"
                                     value={field.label}
                                     onChange={(e) => handleCustomFieldChange(index, 'label', e.target.value)}
-                                    className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                     placeholder="Field label (e.g., Website)"
                                 />
                             </div>
                             <div className="flex space-x-2">
-                                <input
+                                <Input
                                     type="text"
                                     value={field.value}
                                     onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
-                                    className="flex-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    className="flex-1"
                                     placeholder="Field value"
                                 />
-                                <button
+                                <Button
                                     type="button"
+                                    variant="outline"
+                                    size="icon"
                                     onClick={() => removeCustomField(index)}
-                                    className="inline-flex items-center p-1.5 border border-gray-300 rounded text-gray-700 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                    className="hover:bg-red-50 hover:text-red-600 hover:border-red-300"
                                 >
                                     <TrashIcon className="h-4 w-4" />
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     ))}
 
                     {formData.custom.length === 0 && (
-                        <p className="text-sm text-gray-500 italic">
+                        <p className="text-sm text-muted-foreground italic">
                             No custom fields added. Click "Add Field" to add custom payment details.
                         </p>
                     )}

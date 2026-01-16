@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import Modal from '../Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { generateSlugId } from '../../utils/idUtils';
 import { useToast } from '../../hooks/useToast';
 import CustomCheckbox from '../CustomCheckbox';
@@ -280,21 +283,20 @@ const ProjectModal = ({
     // Footer content with action buttons
     const footer = (
         <div className="flex justify-end space-x-3">
-            <button
+            <Button
                 type="button"
+                variant="outline"
                 onClick={handleClose}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
             >
                 Cancel
-            </button>
+            </Button>
 
-            <button
+            <Button
                 type="submit"
                 form="project-form"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
                 {editingProject ? 'Update' : 'Create'} Project
-            </button>
+            </Button>
         </div>
     );
 
@@ -312,18 +314,18 @@ const ProjectModal = ({
                 className="space-y-5"
             >
                 <div>
-                    <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                    <Label htmlFor="title">
                         Project Title <span className="text-red-500">*</span>
-                    </label>
+                    </Label>
 
-                    <input
+                    <Input
                         type="text"
                         id="title"
                         name="title"
                         value={formData.title}
                         onChange={handleInputChange}
                         required
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                        className="mt-1"
                         placeholder="Enter project title"
                     />
                 </div>
@@ -348,10 +350,10 @@ const ProjectModal = ({
                             />
                         </div>
                         <div className="text-sm">
-                            <label htmlFor="isPersonal" className="font-medium text-gray-700 cursor-pointer">
+                            <label htmlFor="isPersonal" className="font-medium text-foreground cursor-pointer">
                                 Personal project (Not billable)
                             </label>
-                            <p className="text-gray-500">
+                            <p className="text-muted-foreground">
                                 Check this for personal projects without clients or invoices.
                             </p>
                         </div>
@@ -362,12 +364,15 @@ const ProjectModal = ({
                 {!formData.isPersonal && (
                     <div>
                         <div className="flex justify-between items-center mb-1">
-                            <label htmlFor="preferredClientId" className="block text-sm font-medium text-gray-700">
+                            <Label htmlFor="preferredClientId">
                                 Client <span className="text-red-500">*</span>
-                            </label>
+                            </Label>
                             {openClientModal && !editingProject && !modalOptions?.preselectedClientId && (
-                                <button
+                                <Button
                                     type="button"
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto p-0"
                                     onClick={() => {
                                         // Save current form state before opening nested modal
                                         if (saveFormState) {
@@ -378,10 +383,9 @@ const ProjectModal = ({
                                         }
                                         openClientModal();
                                     }}
-                                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                                 >
                                     + New Client
-                                </button>
+                                </Button>
                             )}
                         </div>
                         <select
@@ -391,8 +395,8 @@ const ProjectModal = ({
                             onChange={handleInputChange}
                             required
                             disabled={!!modalOptions?.preselectedClientId}
-                            className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5 ${
-                                modalOptions?.preselectedClientId ? 'bg-gray-100 cursor-not-allowed' : ''
+                            className={`flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm ${
+                                modalOptions?.preselectedClientId ? 'bg-muted cursor-not-allowed opacity-50' : ''
                             }`}
                         >
                             <option value="">Select a client</option>
@@ -403,7 +407,7 @@ const ProjectModal = ({
                             ))}
                         </select>
                         {!modalOptions?.preselectedClientId && (
-                            <p className="text-xs text-gray-500 mt-2">
+                            <p className="text-xs text-muted-foreground mt-2">
                                 Every project must be associated with a client.
                             </p>
                         )}
@@ -437,7 +441,7 @@ const ProjectModal = ({
                             checked={formData.overrideRate}
                             onChange={handleOverrideRateChange}
                             label="Override client rate for this project"
-                            labelClassName="text-sm font-medium text-gray-700"
+                            labelClassName="text-sm font-medium text-foreground"
                             id="overrideRate"
                         />
                     </div>
@@ -453,17 +457,17 @@ const ProjectModal = ({
                                 checked={formData.flatRate}
                                 onChange={(checked) => setFormData(prev => ({ ...prev, flatRate: checked }))}
                                 label="Flat rate project (non-hourly basis)"
-                                labelClassName="text-sm font-medium text-gray-700"
+                                labelClassName="text-sm font-medium text-foreground"
                                 id="flatRate"
                             />
                         </div>
 
                         <div className={formData.flatRate ? "hidden" : ""}>
-                            <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
+                            <Label htmlFor="hourlyRate">
                                 Hourly Rate {!formData.flatRate && <span className="text-red-500">*</span>}
-                            </label>
+                            </Label>
 
-                            <input
+                            <Input
                                 type="number"
                                 id="hourlyRate"
                                 name="hourlyRate"
@@ -471,7 +475,7 @@ const ProjectModal = ({
                                 onChange={handleInputChange}
                                 min="0"
                                 step="0.01"
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                className="mt-1"
                                 placeholder="0.00"
                                 required={!formData.flatRate && formData.overrideRate}
                             />

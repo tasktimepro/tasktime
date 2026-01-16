@@ -102,11 +102,6 @@ const Invoices = ({
     // Get current section from URL or default to first section
     const activeTab = urlParams.section || sideNavItems[0].id;
     
-    // Debug log to track activeTab changes
-    useEffect(() => {
-        console.log('ActiveTab changed to:', activeTab, 'URL section:', urlParams.section);
-    }, [activeTab, urlParams.section]);
-    
     // Set default section if not already set
     useEffect(() => {
         if (!urlParams.section) {

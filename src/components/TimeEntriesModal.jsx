@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
-import { formatDurationWithSeconds, toDisplayDate } from '../utils/dateUtils';
+import { formatDurationWithSeconds, toDisplayDate, getTodayString, getCurrentTimeString, timestampToDateString, timestampToTimeString } from '../utils/dateUtils';
 import { checkTimeOverlap } from '../utils/timeValidationUtils';
 import { generateId } from '../utils/idUtils';
 import { useToast } from '../hooks/useToast';
@@ -106,9 +106,8 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
     }, [isOpen]);
 
     const resetForms = () => {
-        const now = new Date();
-        const todayDate = now.toISOString().split('T')[0];
-        const currentTime = now.toTimeString().slice(0, 8);
+        const todayDate = getTodayString();
+        const currentTime = getCurrentTimeString();
         
         setEditForm({
             startDate: '',
@@ -143,14 +142,11 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
             return;
         }
 
-        const startDateTime = new Date(entry.start);
-        const endDateTime = new Date(entry.end);
-        
         setEditForm({
-            startDate: startDateTime.toISOString().split('T')[0],
-            startTime: startDateTime.toTimeString().slice(0, 8),
-            endDate: endDateTime.toISOString().split('T')[0],
-            endTime: endDateTime.toTimeString().slice(0, 8),
+            startDate: timestampToDateString(entry.start),
+            startTime: timestampToTimeString(entry.start),
+            endDate: timestampToDateString(entry.end),
+            endTime: timestampToTimeString(entry.end),
             note: entry.note || ''
         });
         

@@ -1,46 +1,50 @@
-import { useState } from 'react';
-import Toast from './Toast';
+import { toast } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
 import { ToastContext } from '../contexts/ToastContext';
+import { TOAST_DURATION_DEFAULT_MS, TOAST_DURATION_WARNING_MS } from '../constants/app';
 
 /**
  * Toast provider component that manages toasts across the application
+ * Uses shadcn/ui Sonner component under the hood
  */
 export const ToastProvider = ({ children }) => {
-  const [toasts, setToasts] = useState([]);
 
-  // Add a new toast
-  const addToast = (message, type = 'success', duration = 3000) => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type, duration }]);
-    return id;
-  };
+    // Helper methods for different toast types - wraps sonner's toast API
+    const showSuccess = (message, duration = TOAST_DURATION_DEFAULT_MS) => {
+        toast.success(message, { duration });
+    };
 
-  // Remove a toast by ID
-  const removeToast = (id) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  };
+    const showError = (message, duration = TOAST_DURATION_DEFAULT_MS) => {
+        toast.error(message, { duration });
+    };
 
-  // Helper methods for different toast types
-  const showSuccess = (message, duration = 3000) => addToast(message, 'success', duration);
-  const showError = (message, duration = 3000) => addToast(message, 'error', duration);
-  const showInfo = (message, duration = 3000) => addToast(message, 'info', duration);
-  const showWarning = (message, duration = 5000) => addToast(message, 'warning', duration);
+    const showInfo = (message, duration = TOAST_DURATION_DEFAULT_MS) => {
+        toast.info(message, { duration });
+    };
 
-  return (
-    <ToastContext.Provider value={{ addToast, removeToast, showSuccess, showError, showInfo, showWarning }}>
-      {children}
-      <div className="fixed bottom-0 right-0 z-50 w-full max-w-[500px] p-4 flex flex-col-reverse items-end">
-        {toasts.map((toast, index) => (
-          <div key={toast.id} className={index > 0 ? 'mb-4' : ''}>
-            <Toast
-              message={toast.message}
-              type={toast.type}
-              duration={toast.duration}
-              onClose={() => removeToast(toast.id)}
-            />
-          </div>
-        ))}
-      </div>
-    </ToastContext.Provider>
-  );
+    const showWarning = (message, duration = TOAST_DURATION_WARNING_MS) => {
+        toast.warning(message, { duration });
+    };
+
+    // Legacy addToast for backwards compatibility
+    const addToast = (message, type = 'success', duration = TOAST_DURATION_DEFAULT_MS) => {
+        const toastFn = {
+            success: toast.success,
+            error: toast.error,
+            info: toast.info,
+            warning: toast.warning,
+        }[type] || toast;
+        
+        toastFn(message, { duration });
+    };
+
+    // removeToast is no longer needed with sonner (it handles dismissal automatically)
+    const removeToast = () => {};
+
+    return (
+        <ToastContext.Provider value={{ addToast, removeToast, showSuccess, showError, showInfo, showWarning }}>
+            {children}
+            <Toaster position="bottom-right" richColors closeButton />
+        </ToastContext.Provider>
+    );
 };

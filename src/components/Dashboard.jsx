@@ -25,6 +25,7 @@ import {
 import { getPreferredCurrency, formatCurrency, fetchExchangeRates, convertCurrency, getProjectCurrency } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
 import CustomCheckbox from './CustomCheckbox';
+import { THIRTY_DAYS_MS, ONE_HOUR_MS, ONE_MINUTE_MS } from '../constants/app';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -54,6 +55,7 @@ const Dashboard = ({
     const [preferredCurrency, setPreferredCurrency] = useState(getPreferredCurrency());
     const [exchangeRates, setExchangeRates] = useState(null);
     const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
+    const [conversionWarningShown, setConversionWarningShown] = useState(false);
 
     // Listen for storage changes to update preferred currency
     useEffect(() => {
@@ -115,37 +117,45 @@ const Dashboard = ({
             // If there's only one currency and it matches preferred, or no exchange rates needed, return as-is
             const currencies = Object.keys(amountsByCurrency);
             if (currencies.length === 1 && currencies[0] === preferredCurrency) {
-                return amountsByCurrency;
+                return { amounts: amountsByCurrency, hadConversionError: false };
             }
             
             // Check if we actually need to do any conversions
             const hasNonPreferredCurrency = currencies.some(currency => currency !== preferredCurrency);
             if (!hasNonPreferredCurrency) {
-                return amountsByCurrency;
+                return { amounts: amountsByCurrency, hadConversionError: false };
             }
 
             // Only convert if we have exchange rates and actually need them
             if (needsExchangeRates && exchangeRates) {
                 let totalInPreferredCurrency = 0;
+                let hadConversionError = false;
+                
                 Object.entries(amountsByCurrency).forEach(([currency, amount]) => {
                     if (currency === preferredCurrency) {
                         totalInPreferredCurrency += amount;
                     } else {
-                        const convertedAmount = convertCurrency(
+                        const result = convertCurrency(
                             amount,
                             currency,
                             preferredCurrency,
                             exchangeRates
                         );
-                        totalInPreferredCurrency += convertedAmount;
+                        totalInPreferredCurrency += result.amount;
+                        if (!result.success) {
+                            hadConversionError = true;
+                        }
                     }
                 });
-                const result = { [preferredCurrency]: totalInPreferredCurrency };
-                return result;
+                
+                return { 
+                    amounts: { [preferredCurrency]: totalInPreferredCurrency },
+                    hadConversionError 
+                };
             }
             
-            // If we need exchange rates but don't have them, return original amounts
-            return amountsByCurrency;
+            // If we need exchange rates but don't have them, return original amounts with error flag
+            return { amounts: amountsByCurrency, hadConversionError: true };
         };
     }, [preferredCurrency, needsExchangeRates, exchangeRates]);
 
@@ -227,11 +237,17 @@ const Dashboard = ({
             }
         });
 
+        // Track conversion results
+        const billableResult = convertToCurrency(billableEarningsByCurrency);
+        const paidResult = convertToCurrency(paidInvoicesByCurrency);
+        const outstandingResult = convertToCurrency(outstandingInvoicesByCurrency);
+
         return {
             time: totalTime,
-            billableEarnings: convertToCurrency(billableEarningsByCurrency),
-            paidInvoices: convertToCurrency(paidInvoicesByCurrency),
-            outstandingInvoices: convertToCurrency(outstandingInvoicesByCurrency)
+            billableEarnings: billableResult.amounts,
+            paidInvoices: paidResult.amounts,
+            outstandingInvoices: outstandingResult.amounts,
+            hadConversionError: billableResult.hadConversionError || paidResult.hadConversionError || outstandingResult.hadConversionError
         };
     }, [timeEntries, tasks, projects, invoices, convertToCurrency, preferredCurrency, clients]);
 
@@ -252,6 +268,19 @@ const Dashboard = ({
     const thisYearMetrics = useMemo(() => {
         return calculateMetrics(thisYearRange.start, thisYearRange.end);
     }, [thisYearRange, calculateMetrics]);
+
+    // Show warning if any conversion errors occurred (only once per session)
+    useEffect(() => {
+        const hasConversionErrors = 
+            thisMonthMetrics.hadConversionError || 
+            lastMonthMetrics.hadConversionError || 
+            thisYearMetrics.hadConversionError;
+        
+        if (hasConversionErrors && !conversionWarningShown && needsExchangeRates) {
+            showWarning('Some currency conversions could not be completed. Amounts may be approximate.');
+            setConversionWarningShown(true);
+        }
+    }, [thisMonthMetrics, lastMonthMetrics, thisYearMetrics, conversionWarningShown, needsExchangeRates, showWarning]);
 
     /**
      * Calculate outstanding invoices metrics
@@ -293,18 +322,19 @@ const Dashboard = ({
         });
 
         // Convert using the same logic as other metrics
-        const convertedOutstanding = convertToCurrency(outstandingByCurrency);
-        const convertedPastDue = convertToCurrency(pastDueByCurrency);
+        const convertedOutstandingResult = convertToCurrency(outstandingByCurrency);
+        const convertedPastDueResult = convertToCurrency(pastDueByCurrency);
 
         // Sum the converted amounts
-        const outstandingTotal = Object.values(convertedOutstanding).reduce((sum, amount) => sum + amount, 0);
-        const pastDueTotal = Object.values(convertedPastDue).reduce((sum, amount) => sum + amount, 0);
+        const outstandingTotal = Object.values(convertedOutstandingResult.amounts).reduce((sum, amount) => sum + amount, 0);
+        const pastDueTotal = Object.values(convertedPastDueResult.amounts).reduce((sum, amount) => sum + amount, 0);
 
         return {
             outstanding: outstanding.length,
             outstandingTotal,
             pastDue: pastDue.length,
-            pastDueTotal
+            pastDueTotal,
+            hadConversionError: convertedOutstandingResult.hadConversionError || convertedPastDueResult.hadConversionError
         };
     }, [invoices, convertToCurrency, preferredCurrency]);
 
@@ -317,7 +347,7 @@ const Dashboard = ({
             (!task.completed && !task.archived) || completedInCurrentSession.has(task.id)
         );
 
-        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
         const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
 
         // Calculate task activity data
@@ -357,7 +387,7 @@ const Dashboard = ({
             const project = projects.find(p => p.id === task.projectId);
             const totalTime = taskActivity[task.id]?.totalTime || 0;
             const hours = Math.floor(millisecondsToHours(totalTime));
-            const minutes = Math.floor((totalTime % (60 * 60 * 1000)) / (60 * 1000));
+            const minutes = Math.floor((totalTime % ONE_HOUR_MS) / ONE_MINUTE_MS);
 
             // Add parent task information for subtasks
             let parentTask = null;
@@ -417,7 +447,7 @@ const Dashboard = ({
      * Get recent projects with total time and pending billable amount
      */
     const recentProjects = useMemo(() => {
-        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
         const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
         
         // Group by project

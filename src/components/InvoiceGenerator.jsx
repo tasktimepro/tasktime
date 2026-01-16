@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DocumentTextIcon, TrashIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { createInvoiceHTML } from '../utils/pdfUtils';
-import { millisecondsToHours, toStorageDate, toDisplayDate } from '../utils/dateUtils';
+import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils';
 import { getCurrencySymbol, getPreferredCurrency, getProjectCurrency } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
 import InvoiceModal from './invoice/InvoiceModal';
@@ -354,7 +354,6 @@ const InvoiceGenerator = ({
                         const lastTemplate = invoiceTemplates.find(t => t.id === invoice.templateId);
                         if (lastTemplate) {
                             setSelectedTemplate(lastTemplate);
-                            console.log(`Pre-selected template "${lastTemplate.name}" based on last invoice for client ${selectedClient.title}`);
                             return;
                         }
                     }
@@ -374,7 +373,6 @@ const InvoiceGenerator = ({
                         const lastTemplate = invoiceTemplates.find(t => t.id === lastInvoice.templateId);
                         if (lastTemplate) {
                             setSelectedTemplate(lastTemplate);
-                            console.log(`Pre-selected template "${lastTemplate.name}" based on last invoice for project ${selectedProject.title}`);
                             return;
                         }
                     }
@@ -396,7 +394,7 @@ const InvoiceGenerator = ({
         }
         
         // No need to reset to null as that's the initial state
-    }, [editingInvoice, invoiceTemplates, selectedTemplate, projectManuallyChanged, selectedProject?.id, selectedProject?.invoiceIds, invoices, selectedProject?.title, selectedClient]);
+    }, [editingInvoice, invoiceTemplates, selectedTemplate, projectManuallyChanged, selectedProject?.id, selectedProject?.invoiceIds, invoices, selectedClient]);
 
     // Track when the form gets shown so we can initialize only then
     const [hasInitialized, setHasInitialized] = useState(false);
@@ -524,8 +522,8 @@ const InvoiceGenerator = ({
                         setInvoiceDateOverride('');
                         setUseInvoiceDateOverride(false);
                     } else {
-                        // Convert to YYYY-MM-DD format for HTML date input
-                        dateForInput = date.toISOString().split('T')[0];
+                        // Convert to YYYY-MM-DD format for HTML date input using local time
+                        dateForInput = timestampToDateString(date.getTime());
                         setInvoiceDateOverride(dateForInput);
                         setUseInvoiceDateOverride(true);
                     }

@@ -19,6 +19,7 @@ const Account = ({
     clients,
     invoiceTemplates,
     preferences,
+    currentTimer,
     onImport,
     setProjects,
     setTasks,
@@ -142,6 +143,7 @@ const Account = ({
                             clients={clients}
                             invoiceTemplates={invoiceTemplates}
                             preferences={preferences}
+                            currentTimer={currentTimer}
                             onImport={onImport}
                         />
                     </div>

@@ -13,6 +13,7 @@ import TimeEntriesModal from './TimeEntriesModal.jsx';
 import { formatDurationWithSeconds } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { deleteTaskWithCleanup } from '../utils/taskUtils';
+import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app';
 
 // Create a custom event for dropdown management
 const DROPDOWN_TOGGLE_EVENT = 'dropdown-toggle';
@@ -43,27 +44,10 @@ const TaskItem = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
     const { showSuccess } = useToast();
-    // eslint-disable-next-line no-unused-vars
-    const [currentTime, setCurrentTime] = useState(Date.now());
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
-
-    // Update current time every second for active timer display
-    useEffect(() => {
-        let interval;
-
-        if (currentTimer && currentTimer.taskId === task.id) {
-            interval = setInterval(() => {
-                setCurrentTime(Date.now());
-            }, 1000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [currentTimer, task.id]);
 
     // Close dropdown when clicking outside or when another dropdown opens
     useEffect(() => {
@@ -164,8 +148,8 @@ const TaskItem = ({
             return total + (entry.end - entry.start);
         }, 0);
         
-        // Only consider significant if 30 seconds or more (30,000 milliseconds)
-        return totalBillableTime >= 30000;
+        // Only consider significant if at or above the billable threshold
+        return totalBillableTime >= BILLABLE_TIME_THRESHOLD_MS;
     }, [taskTimeEntries, task.lastBilledAt, task.createdAt]);
 
     // Auto-set task as billable if it has significant billable time (and hasn't been explicitly set by user)
@@ -650,25 +634,8 @@ const SubtaskItem = ({
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
-    // eslint-disable-next-line no-unused-vars
-    const [currentTime, setCurrentTime] = useState(Date.now());
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
-
-    // Update current time every second for active timer display
-    useEffect(() => {
-        let interval;
-
-        if (currentTimer && currentTimer.taskId === task.id) {
-            interval = setInterval(() => {
-                setCurrentTime(Date.now());
-            }, 1000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [currentTimer, task.id]);
 
     // Close dropdown when clicking outside or when another dropdown opens
     useEffect(() => {
@@ -738,8 +705,8 @@ const SubtaskItem = ({
             return total + (entry.end - entry.start);
         }, 0);
         
-        // Only consider significant if 30 seconds or more (30,000 milliseconds)
-        return totalBillableTime >= 30000;
+        // Only consider significant if at or above the billable threshold
+        return totalBillableTime >= BILLABLE_TIME_THRESHOLD_MS;
     }, [taskTimeEntries, task.lastBilledAt, task.createdAt]);
 
     // Auto-set subtask as billable if it has significant billable time (and hasn't been explicitly set by user)

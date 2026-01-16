@@ -152,6 +152,42 @@ export const hoursToMinutes = (hours) => {
 };
 
 /**
+ * Get today's date as a YYYY-MM-DD string for form inputs
+ * Uses local time to avoid timezone issues with date inputs
+ * @returns {string} Today's date in YYYY-MM-DD format
+ */
+export const getTodayString = () => {
+    return toStorageDate(new Date());
+};
+
+/**
+ * Get current time as HH:MM:SS string for time inputs
+ * @returns {string} Current time in HH:MM:SS format
+ */
+export const getCurrentTimeString = () => {
+    return new Date().toTimeString().slice(0, 8);
+};
+
+/**
+ * Convert a timestamp to a date string for form inputs (YYYY-MM-DD)
+ * Uses local time to avoid timezone issues
+ * @param {number} timestamp - Unix timestamp in milliseconds
+ * @returns {string} Date in YYYY-MM-DD format
+ */
+export const timestampToDateString = (timestamp) => {
+    return toStorageDate(new Date(timestamp));
+};
+
+/**
+ * Convert a timestamp to a time string for form inputs (HH:MM:SS)
+ * @param {number} timestamp - Unix timestamp in milliseconds
+ * @returns {string} Time in HH:MM:SS format
+ */
+export const timestampToTimeString = (timestamp) => {
+    return new Date(timestamp).toTimeString().slice(0, 8);
+};
+
+/**
  * Format a date for storage (YYYY-MM-DD format - portable across locales)
  * Uses LOCAL date to avoid timezone shifting issues
  * Use this when STORING dates to IndexedDB or state

@@ -3,6 +3,9 @@ import Modal from '../Modal';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { useToast } from '../../hooks/useToast';
 import { toDisplayDate } from '../../utils/dateUtils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import CustomCheckbox from '../CustomCheckbox';
 
 /**
@@ -236,25 +239,24 @@ const TemplateModal = ({
                     checked={formData.isDefault}
                     onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
                     label="Set as default template"
-                    labelClassName="block text-sm text-gray-900"
+                    labelClassName="block text-sm text-foreground"
                 />
             </div>
 
             <div className="flex space-x-3">
-                <button
+                <Button
                     type="button"
+                    variant="outline"
                     onClick={handleCancel}
-                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                     type="submit"
                     form="template-form"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     {editingTemplate ? 'Update Template' : 'Create Template'}
-                </button>
+                </Button>
             </div>
         </div>
     );
@@ -270,15 +272,14 @@ const TemplateModal = ({
             <form id="template-form" onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Information */}
                 <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label>
                             Template Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
+                        </Label>
+                        <Input
                             type="text"
                             value={formData.name}
                             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2"
                             placeholder="e.g., Standard Invoice, Project Invoice"
                             required
                         />
@@ -287,35 +288,34 @@ const TemplateModal = ({
 
                 {/* Invoice Number Configuration */}
                 <div className="border-t pt-6">
-                    <h3 className="text-sm font-medium text-gray-900 mb-4">Invoice Number Configuration</h3>
+                    <h3 className="text-sm font-medium text-foreground mb-4">Invoice Number Configuration</h3>
                     
                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label>
                                 Invoice Number Format <span className="text-red-500">*</span>
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 value={formData.invoiceNumberFormat}
                                 onChange={(e) => setFormData(prev => ({ ...prev, invoiceNumberFormat: e.target.value }))}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2"
                                 placeholder="e.g., INV-{projectId}-{timestamp}"
                                 required
                             />
-                            <p className="mt-1 text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground">
                                 Preview: <strong>{formPreviewInvoiceNumber}</strong>
                             </p>
                         </div>
 
-                        <div className="bg-gray-50 p-4 rounded-md">
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">Available Variables:</h4>
+                        <div className="bg-muted p-4 rounded-md">
+                            <h4 className="text-sm font-medium text-foreground mb-2">Available Variables:</h4>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 {formatVariables.map((variable) => (
                                     <div key={variable.key} className="flex items-center">
-                                        <code className="bg-gray-200 px-1 rounded text-xs font-mono mr-2">
+                                        <code className="bg-background px-1 rounded text-xs font-mono mr-2 border">
                                             {variable.key}
                                         </code>
-                                        <span className="text-gray-600">{variable.description}</span>
+                                        <span className="text-muted-foreground">{variable.description}</span>
                                     </div>
                                 ))}
                             </div>
@@ -326,41 +326,39 @@ const TemplateModal = ({
                                 checked={formData.useSequentialNumbers}
                                 onChange={(checked) => setFormData(prev => ({ ...prev, useSequentialNumbers: checked }))}
                                 label="Use sequential numbering"
-                                labelClassName="block text-sm text-gray-900"
+                                labelClassName="block text-sm text-foreground"
                             />
-                            <span className="ml-2 text-xs text-gray-500">
+                            <span className="ml-2 text-xs text-muted-foreground">
                                 (Enables {'{sequential}'} variable)
                             </span>
                         </div>
 
                         {formData.useSequentialNumbers && (
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">
+                                <div className="space-y-2">
+                                    <Label>
                                         Starting Number
-                                    </label>
-                                    <input
+                                    </Label>
+                                    <Input
                                         type="number"
                                         min="1"
                                         value={formData.sequentialNumberStart}
                                         onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberStart: parseInt(e.target.value) || 1 }))}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2"
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">
+                                <div className="space-y-2">
+                                    <Label>
                                         Number of Digits
-                                    </label>
-                                    <input
+                                    </Label>
+                                    <Input
                                         type="number"
                                         min="1"
                                         max="10"
                                         value={formData.sequentialNumberDigits}
                                         onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberDigits: parseInt(e.target.value) || 4 }))}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2"
                                     />
-                                    <p className="mt-1 text-xs text-gray-500">
+                                    <p className="text-xs text-muted-foreground">
                                         Preview: {(formData.sequentialNumberStart).toString().padStart(formData.sequentialNumberDigits || 4, '0')}
                                     </p>
                                 </div>
@@ -373,9 +371,9 @@ const TemplateModal = ({
                                     checked={formData.sequentialResetYearly}
                                     onChange={(checked) => setFormData(prev => ({ ...prev, sequentialResetYearly: checked }))}
                                     label="Reset sequential number yearly"
-                                    labelClassName="block text-sm text-gray-900"
+                                    labelClassName="block text-sm text-foreground"
                                 />
-                                <span className="ml-2 text-xs text-gray-500">
+                                <span className="ml-2 text-xs text-muted-foreground">
                                     (Restarts at starting number each new year)
                                 </span>
                             </div>
@@ -385,13 +383,13 @@ const TemplateModal = ({
 
                 {/* Due Date Configuration */}
                 <div className="border-t pt-6">
-                    <h3 className="text-sm font-medium text-gray-900 mb-4">Due Date Configuration</h3>
+                    <h3 className="text-sm font-medium text-foreground mb-4">Due Date Configuration</h3>
                     
                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label>
                                 Due Date Type
-                            </label>
+                            </Label>
                             <select
                                 value={formData.dueDateType}
                                 onChange={(e) => setFormData(prev => ({ 
@@ -402,7 +400,7 @@ const TemplateModal = ({
                                     dueDateWeeks: e.target.value === 'fixed-weeks' ? prev.dueDateWeeks || 1 : 0,
                                     dueDatePrecise: e.target.value === 'precise-date' ? prev.dueDatePrecise || '' : ''
                                 }))}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2"
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
                             >
                                 <option value="fixed-days">Fixed days from invoice date</option>
                                 <option value="fixed-weeks">Fixed weeks from invoice date</option>
@@ -413,47 +411,47 @@ const TemplateModal = ({
 
                         {/* Days input - only show for fixed-days type */}
                         {formData.dueDateType === 'fixed-days' && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                            <div className="space-y-2">
+                                <Label>
                                     Days Until Due
-                                </label>
-                                <input
+                                </Label>
+                                <Input
                                     type="number"
                                     min="0"
                                     value={formData.dueDateDays}
                                     onChange={(e) => setFormData(prev => ({ ...prev, dueDateDays: parseInt(e.target.value) || 0 }))}
-                                    className="mt-1 block w-24 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2"
+                                    className="w-24"
                                 />
                             </div>
                         )}
 
                         {/* Weeks input - only show for fixed-weeks type */}
                         {formData.dueDateType === 'fixed-weeks' && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                            <div className="space-y-2">
+                                <Label>
                                     Weeks Until Due
-                                </label>
-                                <input
+                                </Label>
+                                <Input
                                     type="number"
                                     min="1"
                                     value={formData.dueDateWeeks || 1}
                                     onChange={(e) => setFormData(prev => ({ ...prev, dueDateWeeks: parseInt(e.target.value) || 1 }))}
-                                    className="mt-1 block w-24 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2"
+                                    className="w-24"
                                 />
                             </div>
                         )}
 
                         {/* Date picker - only show for precise-date type */}
                         {formData.dueDateType === 'precise-date' && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                            <div className="space-y-2">
+                                <Label>
                                     Due Date
-                                </label>
-                                <input
+                                </Label>
+                                <Input
                                     type="date"
                                     value={formData.dueDatePrecise || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, dueDatePrecise: e.target.value }))}
-                                    className="mt-1 block w-48 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2"
+                                    className="w-48"
                                 />
                             </div>
                         )}

@@ -1,12 +1,14 @@
-import { CheckIcon } from '@heroicons/react/24/outline';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 /**
- * CustomCheckbox component - Modern styled checkbox
+ * CustomCheckbox component - Uses shadcn/ui Checkbox
  * @param {Object} props - Component props
  * @param {boolean} props.checked - Whether checkbox is checked
- * @param {Function} props.onChange - Callback when checkbox state changes
+ * @param {Function} props.onChange - Callback when checkbox state changes (receives new boolean value)
  * @param {boolean} props.disabled - Whether checkbox is disabled
- * @param {string} props.className - Additional CSS classes
+ * @param {string} props.className - Additional CSS classes for the container
  * @param {string} props.label - Optional label text that makes the entire component clickable
  * @param {string} props.labelClassName - Additional CSS classes for the label
  * @param {string} props.id - Optional id for the checkbox (useful for accessibility)
@@ -20,65 +22,47 @@ const CustomCheckbox = ({
     labelClassName = "",
     id = null
 }) => {
-    // Click handler
-    const handleClick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        if (disabled) return;
 
-        // Always pass the new checked state as parameter
-        // This is the standard React pattern and works reliably in production
-        onChange(!checked);
+    const checkboxId = id || (label ? `checkbox-${Math.random().toString(36).substr(2, 9)}` : undefined);
+
+    const handleCheckedChange = (checkedState) => {
+        // Radix returns true/false/'indeterminate', we always pass boolean
+        onChange(checkedState === true);
     };
 
-    const checkboxElement = (
-        <button
-            type="button"
-            onClick={label ? undefined : handleClick} // Only handle click if no label
-            disabled={disabled}
-            id={id}
-            className={`
-                flex items-center justify-center
-                w-5 h-5 
-                border-2 rounded-md
-                transition-all duration-200
-                ${checked
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white border-gray-300 hover:border-blue-400'
-                }
-                ${disabled
-                    ? 'opacity-50'
-                    : 'cursor-pointer'
-                }
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
-                ${label ? '' : className}
-            `}
-        >
-            {checked && (
-                <CheckIcon className="w-3 h-3" strokeWidth={3} />
-            )}
-        </button>
-    );
-
-    // If no label is provided, return just the checkbox (original behavior)
+    // If no label is provided, return just the checkbox
     if (!label) {
-        return checkboxElement;
+        return (
+            <Checkbox
+                id={checkboxId}
+                checked={checked}
+                onCheckedChange={handleCheckedChange}
+                disabled={disabled}
+                className={cn("h-5 w-5", className)}
+            />
+        );
     }
 
-    // If label is provided, wrap in a clickable container
+    // If label is provided, wrap with label for accessibility
     return (
-        <div
-            className={`flex items-center ${disabled ? '' : 'cursor-pointer'} ${className}`}
-            onClick={disabled ? undefined : handleClick}
-        >
-            {checkboxElement}
-            <label
-                htmlFor={id}
-                className={`ml-2 ${disabled ? 'text-gray-400' : 'text-gray-700'} ${labelClassName}`}
+        <div className={cn("flex items-center gap-2", className)}>
+            <Checkbox
+                id={checkboxId}
+                checked={checked}
+                onCheckedChange={handleCheckedChange}
+                disabled={disabled}
+                className="h-5 w-5"
+            />
+            <Label
+                htmlFor={checkboxId}
+                className={cn(
+                    "cursor-pointer select-none",
+                    disabled && "cursor-not-allowed opacity-50",
+                    labelClassName
+                )}
             >
                 {label}
-            </label>
+            </Label>
         </div>
     );
 };

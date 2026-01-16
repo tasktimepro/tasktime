@@ -3,6 +3,9 @@ import Modal from '../Modal';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { generateId } from '../../utils/idUtils';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import CustomCheckbox from '../CustomCheckbox';
 
 /**
@@ -252,25 +255,24 @@ const BusinessModal = ({
                     checked={formData.isDefault}
                     onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
                     label="Set as default business info"
-                    labelClassName="text-sm font-medium text-gray-700"
+                    labelClassName="text-sm font-medium text-foreground"
                 />
             </div>
 
             <div className="flex space-x-3">
-                <button
+                <Button
                     type="button"
+                    variant="outline"
                     onClick={handleCancel}
-                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                     type="submit"
                     form="business-form"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                     {editingBusinessInfo ? 'Update' : 'Create'} Business
-                </button>
+                </Button>
             </div>
         </div>
     );
@@ -286,185 +288,175 @@ const BusinessModal = ({
             <form id="business-form" onSubmit={handleSubmit} className="space-y-8">
                 {/* Standard Fields */}
                 <div className="space-y-4">
-                    <div>
-                        <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="title">
                             Business Title <span className="text-red-500">*</span>
-                        </label>
-                        <input
+                        </Label>
+                        <Input
                             type="text"
                             id="title"
                             name="title"
                             value={formData.title}
                             onChange={handleInputChange}
                             required
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="Enter title for this business info"
                         />
                     </div>
 
-                    <div>
-                        <label htmlFor="businessName" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="businessName">
                             Business/Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
+                        </Label>
+                        <Input
                             type="text"
                             id="businessName"
                             name="businessName"
                             value={formData.businessName}
                             onChange={handleInputChange}
                             required
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="Business name or personal name"
                         />
                     </div>
 
-                    <div>
-                        <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="address">
                             Address
-                        </label>
-                        <input
+                        </Label>
+                        <Input
                             type="text"
                             id="address"
                             name="address"
                             value={formData.address}
                             onChange={handleInputChange}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="Street address"
                         />
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="city">
                                 City
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="city"
                                 name="city"
                                 value={formData.city}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="City"
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label>
                                 State/ZIP
-                            </label>
+                            </Label>
                             <div className="flex space-x-2 w-full">
-                                <input
+                                <Input
                                     type="text"
                                     id="state"
                                     name="state"
                                     value={formData.state}
                                     onChange={handleInputChange}
-                                    className="mt-1 flex-1 min-w-0 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    className="flex-1 min-w-0"
                                     placeholder="State"
                                 />
-                                <input
+                                <Input
                                     type="text"
                                     id="zip"
                                     name="zip"
                                     value={formData.zip}
                                     onChange={handleInputChange}
-                                    className="mt-1 w-20 flex-shrink-0 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    className="w-20 flex-shrink-0"
                                     placeholder="ZIP"
                                 />
                             </div>
                         </div>
 
-                        <div>
-                            <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="country">
                                 Country
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="country"
                                 name="country"
                                 value={formData.country}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="Country"
                             />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label htmlFor="registrationNumber" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="registrationNumber">
                                 Reg. Number
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="registrationNumber"
                                 name="registrationNumber"
                                 value={formData.registrationNumber}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="Company registration"
                             />
                         </div>
 
-                        <div>
-                            <label htmlFor="vat" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="vat">
                                 VAT
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="vat"
                                 name="vat"
                                 value={formData.vat}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="VAT number"
                             />
                         </div>
 
-                        <div>
-                            <label htmlFor="taxNumber" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="taxNumber">
                                 Tax Number
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="taxNumber"
                                 name="taxNumber"
                                 value={formData.taxNumber}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="Tax ID"
                             />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="email">
                                 Email
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="email"
                                 id="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="contact@example.com"
                             />
                         </div>
 
-                        <div>
-                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">
                                 Phone
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="tel"
                                 id="phone"
                                 name="phone"
                                 value={formData.phone}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="+1 (555) 123-4567"
                             />
                         </div>
@@ -474,49 +466,51 @@ const BusinessModal = ({
                 {/* Custom Fields */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <h5 className="text-sm font-medium text-gray-900">Custom Fields</h5>
-                        <button
+                        <h5 className="text-sm font-medium text-foreground">Custom Fields</h5>
+                        <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={addCustomField}
-                            className="inline-flex items-center px-3 py-1 border border-blue-300 shadow-sm text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            leadingIcon={PlusIcon}
                         >
-                            <PlusIcon className="h-3 w-3 mr-1" />
                             Add Field
-                        </button>
+                        </Button>
                     </div>
 
                     {formData.custom.map((field, index) => (
                         <div key={index} className="grid grid-cols-2 gap-4">
                             <div>
-                                <input
+                                <Input
                                     type="text"
                                     value={field.label}
                                     onChange={(e) => handleCustomFieldChange(index, 'label', e.target.value)}
-                                    className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                     placeholder="Field label (e.g., Website)"
                                 />
                             </div>
                             <div className="flex space-x-2">
-                                <input
+                                <Input
                                     type="text"
                                     value={field.value}
                                     onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
-                                    className="flex-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    className="flex-1"
                                     placeholder="Field value"
                                 />
-                                <button
+                                <Button
                                     type="button"
+                                    variant="outline"
+                                    size="icon"
                                     onClick={() => removeCustomField(index)}
-                                    className="inline-flex items-center p-1.5 border border-gray-300 rounded text-gray-700 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                    className="hover:bg-red-50 hover:text-red-600 hover:border-red-300"
                                 >
                                     <TrashIcon className="h-4 w-4" />
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     ))}
 
                     {formData.custom.length === 0 && (
-                        <p className="text-sm text-gray-500 italic">
+                        <p className="text-sm text-muted-foreground italic">
                             No custom fields added. Click "Add Field" to add custom business details.
                         </p>
                     )}
@@ -525,30 +519,30 @@ const BusinessModal = ({
                 {/* Tax Settings */}
                 <div className="space-y-4">
                     <div className="border-t pt-4">
-                        <h5 className="text-sm font-medium text-gray-900 mb-3">Tax Settings</h5>
+                        <h5 className="text-sm font-medium text-foreground mb-3">Tax Settings</h5>
                         
                         <div className="flex items-center space-x-3 mb-4">
                             <CustomCheckbox
                                 checked={formData.taxEnabled}
                                 onChange={(checked) => setFormData(prev => ({ ...prev, taxEnabled: checked }))}
                                 label="Enable tax for this business"
-                                labelClassName="text-sm font-medium text-gray-700"
+                                labelClassName="text-sm font-medium text-foreground"
                                 id="taxEnabled"
                             />
                         </div>
 
                         {formData.taxEnabled && (
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="taxLabel" className="block text-sm font-medium text-gray-700">
+                                <div className="space-y-2">
+                                    <Label htmlFor="taxLabel">
                                         Tax Label
-                                    </label>
+                                    </Label>
                                     <select
                                         id="taxLabel"
                                         name="taxLabel"
                                         value={formData.taxLabel}
                                         onChange={handleInputChange}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
                                     >
                                         <option value="VAT">VAT</option>
                                         <option value="GST">GST</option>
@@ -559,11 +553,11 @@ const BusinessModal = ({
                                     </select>
                                 </div>
 
-                                <div>
-                                    <label htmlFor="taxRate" className="block text-sm font-medium text-gray-700">
+                                <div className="space-y-2">
+                                    <Label htmlFor="taxRate">
                                         Tax Rate (%)
-                                    </label>
-                                    <input
+                                    </Label>
+                                    <Input
                                         type="number"
                                         id="taxRate"
                                         name="taxRate"
@@ -572,7 +566,6 @@ const BusinessModal = ({
                                         min="0"
                                         max="100"
                                         step="0.01"
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                         placeholder="0.00"
                                     />
                                 </div>

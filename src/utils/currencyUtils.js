@@ -1,6 +1,4 @@
-/**
- * Currency utilities for handling different currency symbols
- */
+import { EXCHANGE_RATE_CACHE_MS, ONE_HOUR_MS } from '../constants/app';
 
 /**
  * Map of currency codes to their symbols
@@ -120,17 +118,14 @@ const getCachedExchangeRates = () => {
     try {
         const cacheData = JSON.parse(localStorage.getItem('exchangeRatesCache') || 'null');
         if (!cacheData || !cacheData.rates) {
-            console.log('No cached exchange rates found');
             return null;
         }
         
-        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
-        if (cacheData.timestamp && cacheData.timestamp > twentyFourHoursAgo) {
-            console.log('Using cached exchange rates, cache age:', Math.round((Date.now() - cacheData.timestamp) / (60 * 60 * 1000)), 'hours');
+        const cacheExpiryTime = Date.now() - EXCHANGE_RATE_CACHE_MS;
+        if (cacheData.timestamp && cacheData.timestamp > cacheExpiryTime) {
             return cacheData.rates;
         }
         
-        console.log('Cached exchange rates expired, last updated:', new Date(cacheData.timestamp).toLocaleString());
         return null;
     } catch (error) {
         console.warn('Error reading cached exchange rates:', error);
@@ -146,14 +141,12 @@ export const fetchExchangeRates = async () => {
     // First try to get cached rates
     const cachedRates = getCachedExchangeRates();
     if (cachedRates) {
-        console.log('Using cached exchange rates');
         return cachedRates;
     }
 
     // If no valid cache, fetch from API
     const API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
     try {
-        console.log('Fetching fresh exchange rates from API');
         const response = await fetch(API_URL);
         if (!response.ok) {
             throw new Error(`API request failed: ${response.status}`);
@@ -188,18 +181,17 @@ export const fetchExchangeRates = async () => {
  * @param {string} fromCurrency - The currency code of the original amount
  * @param {string} toCurrency - The currency code to convert to
  * @param {Object} exchangeRates - A map of currency codes to their exchange rates relative to USD
- * @returns {number} The converted amount
+ * @returns {{success: boolean, amount: number, error?: string}} Result object with conversion status
  */
 export const convertCurrency = (amount, fromCurrency, toCurrency, exchangeRates) => {
     // Handle invalid input
     if (amount === undefined || amount === null || isNaN(amount)) {
-        console.warn('Invalid amount for currency conversion:', amount);
-        return 0;
+        return { success: false, amount: 0, error: 'Invalid amount' };
     }
 
     // If converting to the same currency, return original amount
     if (fromCurrency === toCurrency) {
-        return amount;
+        return { success: true, amount };
     }
     
     // Standardize currency codes
@@ -208,27 +200,36 @@ export const convertCurrency = (amount, fromCurrency, toCurrency, exchangeRates)
 
     // Check if we have valid exchange rates
     if (!exchangeRates || Object.keys(exchangeRates).length === 0) {
-        console.warn('No exchange rates available for currency conversion');
-        return amount; // Return original amount if no rates available
+        return { 
+            success: false, 
+            amount, 
+            error: 'No exchange rates available - showing unconverted amount' 
+        };
     }
 
     // Handle USD as base currency
     if (fromCurrencyStd === 'USD') {
         const toRate = exchangeRates[toCurrencyStd];
         if (!toRate) {
-            console.warn(`Missing exchange rate for ${toCurrencyStd}`);
-            return amount;
+            return { 
+                success: false, 
+                amount, 
+                error: `Missing exchange rate for ${toCurrencyStd}` 
+            };
         }
-        return amount * toRate;
+        return { success: true, amount: amount * toRate };
     }
     
     if (toCurrencyStd === 'USD') {
         const fromRate = exchangeRates[fromCurrencyStd];
         if (!fromRate) {
-            console.warn(`Missing exchange rate for ${fromCurrencyStd}`);
-            return amount;
+            return { 
+                success: false, 
+                amount, 
+                error: `Missing exchange rate for ${fromCurrencyStd}` 
+            };
         }
-        return amount / fromRate;
+        return { success: true, amount: amount / fromRate };
     }
     
     // For non-USD to non-USD conversion, go through USD
@@ -236,12 +237,15 @@ export const convertCurrency = (amount, fromCurrency, toCurrency, exchangeRates)
     const toRate = exchangeRates[toCurrencyStd];
     
     if (!fromRate || !toRate) {
-        console.warn(`Missing exchange rate data for ${fromCurrencyStd} to ${toCurrencyStd} conversion`);
-        return amount;
+        return { 
+            success: false, 
+            amount, 
+            error: `Missing exchange rate for ${fromCurrencyStd} to ${toCurrencyStd} conversion` 
+        };
     }
     
     const amountInUSD = amount / fromRate;
-    return amountInUSD * toRate;
+    return { success: true, amount: amountInUSD * toRate };
 };
 
 /**

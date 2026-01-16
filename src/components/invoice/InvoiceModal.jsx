@@ -1,5 +1,5 @@
 import { TrashIcon } from '@heroicons/react/24/outline';
-import { formatDurationWithSeconds, hoursToMinutes, toDisplayDate } from '../../utils/dateUtils';
+import { formatDurationWithSeconds, hoursToMinutes, toDisplayDate, getTodayString } from '../../utils/dateUtils';
 import { getPreferredCurrency } from '../../utils/currencyUtils';
 import CustomCheckbox from '../CustomCheckbox';
 import Modal from '../Modal';
@@ -1381,7 +1381,7 @@ const InvoiceModal = ({
                                             type="date"
                                             value={invoiceDateOverride}
                                             onChange={(e) => setInvoiceDateOverride(e.target.value)}
-                                            max={new Date().toISOString().split('T')[0]}
+                                            max={getTodayString()}
                                             className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-2"
                                             required={useInvoiceDateOverride}
                                         />

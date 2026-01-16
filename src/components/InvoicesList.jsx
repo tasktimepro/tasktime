@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
 import { parseStoredDate, toDisplayDate } from '../utils/dateUtils';
@@ -157,12 +159,9 @@ const InvoicesList = ({
      */
     const handleDownload = async (invoice) => {
         try {
-            console.log('Downloading invoice:', invoice);
-            
             // Check if htmlContent exists, if not, recreate it
             let htmlContent = invoice.htmlContent;
             if (!htmlContent) {
-                console.log('No htmlContent found, recreating...');
                 
                 // Use stored objects first, fall back to finding by ID
                 let paymentMethod = invoice.paymentMethod;
@@ -214,10 +213,8 @@ const InvoicesList = ({
             }
             
             const filename = `invoice-${invoice.invoiceNumber}.pdf`;
-            console.log('Generating PDF with filename:', filename);
             
             await generatePDF(htmlContent, filename);
-            console.log('PDF generated successfully');
         } catch (error) {
             console.error('Error downloading invoice:', error);
             alert('Error downloading invoice: ' + error.message);
@@ -663,22 +660,14 @@ const InvoicesList = ({
 
     if (projectInvoices.length === 0) {
         return (
-            <div className="text-center py-12">
-                <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices yet</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                    Get started by generating your first invoice.
-                </p>
-                {!hideNewInvoiceButton && (
-                    <button
-                        onClick={() => onEditInvoice && onEditInvoice(null)}
-                        className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    >
-                        <DocumentTextIcon className="h-5 w-5 mr-2" />
-                        Create First Invoice
-                    </button>
-                )}
-            </div>
+            <EmptyState
+                icon={DocumentTextIcon}
+                title="No invoices yet"
+                description="Get started by generating your first invoice."
+                actionLabel={!hideNewInvoiceButton ? "Create First Invoice" : undefined}
+                actionIcon={!hideNewInvoiceButton ? DocumentTextIcon : undefined}
+                onAction={!hideNewInvoiceButton ? () => onEditInvoice && onEditInvoice(null) : undefined}
+            />
         );
     }
 

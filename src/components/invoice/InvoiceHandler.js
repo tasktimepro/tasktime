@@ -407,7 +407,6 @@ export const handleProjectSelection = (
                             if (template) {
                                 setSelectedTemplate(template);
                                 clientTemplateSet = true;
-                                console.log(`Pre-selected template "${template.name}" based on last invoice for client ${selectedClientForHistory.title}`);
                                 break;
                             }
                         }
@@ -440,7 +439,6 @@ export const handleProjectSelection = (
                     const template = invoiceTemplates.find(t => t.id === lastInvoice.templateId);
                     if (template) {
                         setSelectedTemplate(template);
-                        console.log(`Pre-selected template "${template.name}" based on previous invoice for project ${selectedProj.title}`);
                     }
                 }
             }

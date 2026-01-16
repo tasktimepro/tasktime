@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import './App.css';
 import { useIndexedDB, useIndexedDBLoading } from './hooks/useIndexedDB';
 import { useUrlState } from './hooks/useUrlState';
@@ -15,6 +15,10 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils';
 import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { TIMER_UPDATE_INTERVAL_MS, TIMER_HEARTBEAT_INTERVAL_MS } from './constants/app';
+
+/** Original browser tab title */
+const ORIGINAL_TITLE = "TaskTime - Track your time by the task. Invoice without the mess.";
 
 /**
  * Main App component - Entry point for the Task. Time. Track.
@@ -38,7 +42,8 @@ function App() {
         taskId: null,
         paused: false,
         elapsedTime: 0,
-        note: undefined
+        note: undefined,
+        lastActive: null  // Heartbeat timestamp for crash recovery
     });
 
     // Track overall loading state
@@ -151,14 +156,16 @@ function App() {
                 taskId: null,
                 paused: false,
                 elapsedTime: 0,
-                note: undefined
+                note: undefined,
+                lastActive: null
             });
         } else {
             setTimerState(prev => ({
                 ...prev,
                 startTime: timer.startTime,
                 taskId: timer.taskId,
-                note: timer.note
+                note: timer.note,
+                lastActive: Date.now()  // Set initial heartbeat when timer starts
             }));
         }
     };
@@ -177,63 +184,95 @@ function App() {
         }));
     };
 
+    // Timer heartbeat - periodically save timer state for crash recovery
+    // This updates a lastActive timestamp every 30 seconds while timer is running
+    useEffect(() => {
+        // Only run heartbeat when timer is active and not paused
+        if (!currentTimer || isPaused) return;
+
+        const heartbeat = () => {
+            setTimerState(prev => ({
+                ...prev,
+                lastActive: Date.now()
+            }));
+        };
+
+        // Save immediately when timer starts
+        heartbeat();
+
+        // Then save every 30 seconds
+        const interval = setInterval(heartbeat, TIMER_HEARTBEAT_INTERVAL_MS);
+
+        return () => clearInterval(interval);
+    }, [currentTimer?.taskId, isPaused]);
+
     // State for showing/hiding global timer
     const [showGlobalTimer, setShowGlobalTimer] = useState(false);
 
+    // Refs to track latest values for browser tab title (avoids stale closures)
+    const timerStateRef = useRef({ currentTimer, isPaused, pausedElapsedTime });
+    const tasksRef = useRef(tasks);
+    
+    // Keep refs updated with latest values
+    useEffect(() => {
+        timerStateRef.current = { currentTimer, isPaused, pausedElapsedTime };
+    }, [currentTimer, isPaused, pausedElapsedTime]);
+    
+    useEffect(() => {
+        tasksRef.current = tasks;
+    }, [tasks]);
+
+    // Find current task name (memoized to avoid recalculating on every render)
+    const currentTaskName = useMemo(() => {
+        if (!currentTimer?.taskId) return null;
+        const task = tasks.find(t => t.id === currentTimer.taskId);
+        return task?.title || null;
+    }, [currentTimer?.taskId, tasks]);
+
     // Update browser tab title with live timer
     useEffect(() => {
-        const originalTitle = "TaskTime - Track your time by the task. Invoice without the mess.";
-        
-        if (currentTimer && !isPaused) {
-            // Only update title if we have the task data available
-            const currentTask = tasks.find(task => task.id === currentTimer.taskId);
-            if (!currentTask) {
-                // Task data not loaded yet, don't update title
-                return;
-            }
-            
-            // Update title every second when timer is running
-            const updateTitle = () => {
-                const now = Date.now();
-                const elapsed = now - currentTimer.startTime;
-                const formattedTime = formatDurationWithSeconds(elapsed);
-                const taskName = currentTask.title;
-                
-                document.title = `▶ ${formattedTime} - ${taskName} | TaskTime`;
-            };
-            
-            // Update immediately
-            updateTitle();
-            
-            // Then update every second
-            const interval = setInterval(updateTitle, 1000);
-            
-            return () => clearInterval(interval);
-        } else if (currentTimer && isPaused) {
-            // Only update title if we have the task data available
-            const currentTask = tasks.find(task => task.id === currentTimer.taskId);
-            if (!currentTask) {
-                // Task data not loaded yet, don't update title
-                return;
-            }
-            
-            // Show paused state in title
-            const pausedTime = formatDurationWithSeconds(pausedElapsedTime);
-            const taskName = currentTask.title;
-            
-            document.title = `⏸ ${pausedTime} - ${taskName} | TaskTime`;
-        } else {
-            // Reset to original title when no timer is active
-            document.title = originalTitle;
+        // No timer active - reset to original title
+        if (!currentTimer) {
+            document.title = ORIGINAL_TITLE;
+            return;
         }
         
-        // Cleanup function to reset title
-        return () => {
-            if (!currentTimer) {
-                document.title = originalTitle;
-            }
+        // Task not found yet (still loading) - don't update title
+        if (!currentTaskName) {
+            return;
+        }
+        
+        // Timer is paused - show static paused state
+        if (isPaused) {
+            const pausedTime = formatDurationWithSeconds(pausedElapsedTime);
+            document.title = `⏸ ${pausedTime} - ${currentTaskName} | TaskTime`;
+            return;
+        }
+        
+        // Timer is running - update title every second
+        const updateTitle = () => {
+            // Use ref to get latest timer state to avoid stale closure
+            const { currentTimer: timer } = timerStateRef.current;
+            if (!timer) return;
+            
+            const elapsed = Date.now() - timer.startTime;
+            const formattedTime = formatDurationWithSeconds(elapsed);
+            // Use latest task name from ref in case it changed
+            const taskName = tasksRef.current.find(t => t.id === timer.taskId)?.title || currentTaskName;
+            
+            document.title = `▶ ${formattedTime} - ${taskName} | TaskTime`;
         };
-    }, [currentTimer, isPaused, pausedElapsedTime, tasks]);
+        
+        // Update immediately
+        updateTitle();
+        
+        // Then update every second
+        const interval = setInterval(updateTitle, TIMER_UPDATE_INTERVAL_MS);
+        
+        return () => {
+            clearInterval(interval);
+        };
+    }, [currentTimer?.taskId, currentTimer?.startTime, isPaused, pausedElapsedTime, currentTaskName]);
 
     // URL-based state management
     const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToAccount, navigateToDashboard, updateUrl } = useUrlState();
@@ -627,6 +666,7 @@ function App() {
                         clients={clients}
                         invoiceTemplates={invoiceTemplates}
                         preferences={preferences}
+                        currentTimer={currentTimer}
                         onImport={handleImport}
                         setProjects={setProjects}
                         setTasks={setTasks}

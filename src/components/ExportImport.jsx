@@ -22,6 +22,7 @@ function ExportImport({
     clients = [],
     invoiceTemplates = [],
     preferences = {},
+    currentTimer = null,
     onImport 
 }) {
     const [showImportModal, setShowImportModal] = useState(false);
@@ -299,6 +300,17 @@ function ExportImport({
                         <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                             <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
                             <p className="text-sm text-red-700">{importError}</p>
+                        </div>
+                    )}
+
+                    {/* Active Timer Warning */}
+                    {currentTimer && (
+                        <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                            <div className="text-sm text-red-700">
+                                <p className="font-medium">Active Timer Detected!</p>
+                                <p>You have an active timer running. Importing data will <strong>stop and discard</strong> any unsaved timer progress. Please stop your timer first to save the time entry, or proceed knowing the current timer session will be lost.</p>
+                            </div>
                         </div>
                     )}
 

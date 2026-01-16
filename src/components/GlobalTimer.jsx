@@ -4,6 +4,7 @@ import { formatActiveTimer, formatDurationWithSeconds } from '../utils/dateUtils
 import { checkTimerStartOverlap } from '../utils/timeValidationUtils';
 import TaskTimer from './TaskTimer.jsx';
 import { useToast } from '../hooks/useToast';
+import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
 
 /**
  * GlobalTimer component - Shows active timer in the header
@@ -143,7 +144,7 @@ const GlobalTimer = ({
         updateTimer();
 
         // Then update every second
-        const interval = setInterval(updateTimer, 1000);
+        const interval = setInterval(updateTimer, TIMER_UPDATE_INTERVAL_MS);
 
         return () => clearInterval(interval);
     }, [currentTimer, isPaused]);

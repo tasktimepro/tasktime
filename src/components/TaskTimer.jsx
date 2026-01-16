@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { formatActiveTimer } from '../utils/dateUtils';
 import TimerControls from './TimerControls.jsx';
+import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
 
 /**
  * TaskTimer component - Shows task timer and timer controls
@@ -49,7 +50,7 @@ const TaskTimer = ({
         updateTimer();
 
         // Then update every second
-        const interval = setInterval(updateTimer, 1000);
+        const interval = setInterval(updateTimer, TIMER_UPDATE_INTERVAL_MS);
 
         return () => clearInterval(interval);
     }, [currentTimer, isPaused, task.id]);

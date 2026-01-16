@@ -25,15 +25,11 @@ export const generatePDF = (htmlContent, filename = 'invoice.pdf', options = {})
 
             const finalOptions = { ...defaultOptions, ...options };
 
-            console.log('Generating PDF with options:', finalOptions);
-            console.log('HTML content length:', htmlContent.length);
-
             html2pdf()
                 .set(finalOptions)
                 .from(htmlContent)
                 .save()
                 .then(() => {
-                    console.log('PDF generated successfully');
                     resolve();
                 })
                 .catch((error) => {

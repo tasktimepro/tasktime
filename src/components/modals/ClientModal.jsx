@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { generateSlugId } from '../../utils/idUtils';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import CustomCheckbox from '../CustomCheckbox';
 import { getPreferredCurrency, getCurrencyOptions } from '../../utils/currencyUtils';
 import Modal from '../Modal';
@@ -229,21 +232,20 @@ const ClientModal = ({
 
     const footer = (
         <div className="flex justify-end space-x-3">
-            <button
+            <Button
                 type="button"
+                variant="outline"
                 onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
                 Cancel
-            </button>
+            </Button>
 
-            <button
+            <Button
                 type="submit"
                 form="client-form"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
                 {editingClient ? 'Update' : 'Create'} Client
-            </button>
+            </Button>
         </div>
     );
 
@@ -261,202 +263,191 @@ const ClientModal = ({
                 className="space-y-6">
 
                 <div className="space-y-4">
-                    <div>
-                        <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="title">
                             Client Title <span className="text-red-500">*</span>
-                        </label>
-                        <input
+                        </Label>
+                        <Input
                             type="text"
                             id="title"
                             name="title"
                             value={formData.title}
                             onChange={handleInputChange}
                             required
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="Enter title for this client"
                         />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="clientName" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="clientName">
                                 Business/Name <span className="text-red-500">*</span>
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="clientName"
                                 name="clientName"
                                 value={formData.clientName}
                                 onChange={handleInputChange}
                                 required
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="Business name or personal name"
                             />
                         </div>
 
-                        <div>
-                            <label htmlFor="contactPerson" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="contactPerson">
                                 Contact Person
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="contactPerson"
                                 name="contactPerson"
                                 value={formData.contactPerson}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="Primary contact person"
                             />
                         </div>
                     </div>
 
-                    <div>
-                        <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                    <div className="space-y-2">
+                        <Label htmlFor="address">
                             Address
-                        </label>
-                        <input
+                        </Label>
+                        <Input
                             type="text"
                             id="address"
                             name="address"
                             value={formData.address}
                             onChange={handleInputChange}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                             placeholder="Street address"
                         />
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="city">
                                 City
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="city"
                                 name="city"
                                 value={formData.city}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="City"
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label>
                                 State/ZIP
-                            </label>
+                            </Label>
                             <div className="flex space-x-2 w-full">
-                                <input
+                                <Input
                                     type="text"
                                     id="state"
                                     name="state"
                                     value={formData.state}
                                     onChange={handleInputChange}
-                                    className="mt-1 flex-1 min-w-0 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    className="flex-1 min-w-0"
                                     placeholder="State"
                                 />
-                                <input
+                                <Input
                                     type="text"
                                     id="zip"
                                     name="zip"
                                     value={formData.zip}
                                     onChange={handleInputChange}
-                                    className="mt-1 w-20 flex-shrink-0 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                    className="w-20 flex-shrink-0"
                                     placeholder="ZIP"
                                 />
                             </div>
                         </div>
 
-                        <div>
-                            <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="country">
                                 Country
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="country"
                                 name="country"
                                 value={formData.country}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="Country"
                             />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="email">
                                 Email
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="email"
                                 id="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="contact@example.com"
                             />
                         </div>
 
-                        <div>
-                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">
                                 Phone
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="tel"
                                 id="phone"
                                 name="phone"
                                 value={formData.phone}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="+1 (555) 123-4567"
                             />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label htmlFor="registrationNumber" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="registrationNumber">
                                 Reg. Number
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="registrationNumber"
                                 name="registrationNumber"
                                 value={formData.registrationNumber}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="Company registration"
                             />
                         </div>
 
-                        <div>
-                            <label htmlFor="vat" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="vat">
                                 VAT
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="vat"
                                 name="vat"
                                 value={formData.vat}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="VAT number"
                             />
                         </div>
 
-                        <div>
-                            <label htmlFor="taxNumber" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <Label htmlFor="taxNumber">
                                 Tax Number
-                            </label>
-                            <input
+                            </Label>
+                            <Input
                                 type="text"
                                 id="taxNumber"
                                 name="taxNumber"
                                 value={formData.taxNumber}
                                 onChange={handleInputChange}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                 placeholder="Tax ID"
                             />
                         </div>
@@ -466,42 +457,44 @@ const ClientModal = ({
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
                             <h5 className="text-sm font-medium text-gray-900">Custom Fields</h5>
-                            <button
+                            <Button
                                 type="button"
+                                variant="outline"
+                                size="sm"
                                 onClick={addCustomField}
-                                className="inline-flex items-center px-3 py-1 border border-blue-300 shadow-sm text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                leadingIcon={PlusIcon}
                             >
-                                <PlusIcon className="h-3 w-3 mr-1" />
                                 Add Field
-                            </button>
+                            </Button>
                         </div>
 
                         {formData.custom.map((field, index) => (
                             <div key={index} className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <input
+                                    <Input
                                         type="text"
                                         value={field.label}
                                         onChange={(e) => handleCustomFieldChange(index, 'label', e.target.value)}
-                                        className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                         placeholder="Field label (e.g., Website)"
                                     />
                                 </div>
                                 <div className="flex space-x-2">
-                                    <input
+                                    <Input
                                         type="text"
                                         value={field.value}
                                         onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
-                                        className="flex-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                                        className="flex-1"
                                         placeholder="Field value"
                                     />
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="outline"
+                                        size="icon"
                                         onClick={() => removeCustomField(index)}
-                                        className="inline-flex items-center p-1.5 border border-gray-300 rounded text-gray-700 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                        className="hover:bg-red-50 hover:text-red-600 hover:border-red-300"
                                     >
                                         <TrashIcon className="h-4 w-4" />
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         ))}
@@ -517,15 +510,15 @@ const ClientModal = ({
                 {/* Default Currency */}
                 <div className="space-y-4">
                     <div className="border-t pt-6">
-                        <label htmlFor="defaultCurrency" className="block text-sm font-medium text-gray-900 mb-2">
+                        <Label htmlFor="defaultCurrency" className="mb-2">
                             Default Currency
-                        </label>
+                        </Label>
                         <select
                             id="defaultCurrency"
                             name="defaultCurrency"
                             value={formData.defaultCurrency}
                             onChange={handleInputChange}
-                            className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
                         >
                             {getCurrencyOptions().map(option => (
                                 <option key={option.value} value={option.value}>
@@ -533,7 +526,7 @@ const ClientModal = ({
                                 </option>
                             ))}
                         </select>
-                        <p className="mt-2 text-xs text-gray-500">
+                        <p className="mt-2 text-xs text-muted-foreground">
                             This currency will be used as the default for new projects and invoices for this client.
                         </p>
                     </div>
@@ -551,16 +544,16 @@ const ClientModal = ({
                                     checked={formData.flatRate}
                                     onChange={(checked) => setFormData(prev => ({ ...prev, flatRate: checked }))}
                                     label="Flat rate client (non-hourly basis)"
-                                    labelClassName="text-sm font-medium text-gray-700"
+                                    labelClassName="text-sm font-medium text-foreground"
                                     id="flatRate"
                                 />
                             </div>
 
-                            <div className={formData.flatRate ? "hidden" : ""}>
-                                <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700">
+                            <div className={formData.flatRate ? "hidden" : "space-y-2"}>
+                                <Label htmlFor="hourlyRate">
                                     Hourly Rate <span className="text-red-500">*</span>
-                                </label>
-                                <input
+                                </Label>
+                                <Input
                                     type="number"
                                     id="hourlyRate"
                                     name="hourlyRate"
@@ -569,10 +562,9 @@ const ClientModal = ({
                                     min="0"
                                     step="0.01"
                                     required={!formData.flatRate}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-2.5 py-1.5"
                                     placeholder="0.00"
                                 />
-                                <p className="mt-2 text-xs text-gray-500">
+                                <p className="text-xs text-muted-foreground">
                                     Default hourly rate for projects with this client. Can be overridden per project.
                                 </p>
                             </div>
@@ -584,11 +576,11 @@ const ClientModal = ({
                                 checked={formData.disableTax}
                                 onChange={(checked) => setFormData(prev => ({ ...prev, disableTax: checked }))}
                                 label="Disable tax for this client"
-                                labelClassName="text-sm font-medium text-gray-700"
+                                labelClassName="text-sm font-medium text-foreground"
                                 id="disableTax"
                             />
                         </div>
-                        <p className="mt-2 text-xs text-gray-500">
+                        <p className="mt-2 text-xs text-muted-foreground">
                             When enabled, this client will not have tax applied to their invoices, regardless of business tax settings.
                         </p>
                     </div>

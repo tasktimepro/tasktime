@@ -1,7 +1,7 @@
 # Agent Instructions for TaskTime
 
 > **Purpose:** Guidelines and context for AI agents working on this codebase  
-> **Last Updated:** January 15, 2026
+> **Last Updated:** January 16, 2026
 
 ---
 
@@ -163,7 +163,7 @@ docker compose run --rm app npm run <script>
 
 ## 📊 Current State (January 2026)
 
-### Recently Completed
+### ✅ Phase 1: Stabilization COMPLETE
 - [x] Comprehensive project documentation (`docs/project_overview.md`)
 - [x] Identified issues and improvements
 - [x] **IndexedDB migration** (replaced localStorage)
@@ -180,17 +180,31 @@ docker compose run --rm app npm run <script>
 - [x] **Time entry overlap validation** - Centralized in `TimerControls.jsx`
   - `createValidatedTimeEntry()` function validates before creating entries
   - Shows toast error if overlap detected
+- [x] **Constants file** - Created `src/constants/app.js`
+  - Centralized magic numbers (time, billing, UI constants)
+  - Updated all components to use constants
+- [x] **Debug code cleanup** - Removed all console.log statements
+  - Cleaned 7 files: pdfUtils.js, currencyUtils.js, ModalManager.jsx, InvoicesList.jsx, Invoices.jsx, InvoiceGenerator.jsx, InvoiceHandler.js
+- [x] **Fixed bugs**
+  - Export/Import timer warning: Users now warned when importing with active timer
+  - Removed unused `currentTime` state from TaskItem.jsx (dead code cleanup)
+  - Currency conversion error handling with user warnings
+  - Browser tab title race condition (using refs)
+  - Consistent date handling utilities added
+- [x] **Timer heartbeat auto-save** - Crash recovery improvement
+  - Added `lastActive` timestamp to timer state
+  - Periodic save every 30 seconds while timer is running
+  - Added `TIMER_HEARTBEAT_INTERVAL_MS` constant
 
-### Planned Next
-- [ ] Constants file for magic numbers
-- [ ] Component splitting (InvoiceGenerator is 1589 lines)
-- [ ] Timer state recovery (auto-save during active timer)
+### 🔄 Phase 2: UI Migration (NEXT)
+- [ ] shadcn/ui migration (see `docs/todo/shadcn-migration.md`)
+- [ ] Component restructuring during migration
+- [ ] Split large components as needed
 
-### Future (Post-Stabilization)
-- [ ] Edge service integration (see `docs/client_edge_license_flow.md`)
-- [ ] Google OAuth + Drive backup
-- [ ] Multi-device sync
-- [ ] TypeScript migration
+### Future Phases
+- [ ] Testing infrastructure (Jest + React Testing Library)
+- [ ] TypeScript migration (gradual)
+- [ ] Cloud features (Google OAuth, Drive backup, multi-device sync)
 
 ---
 
