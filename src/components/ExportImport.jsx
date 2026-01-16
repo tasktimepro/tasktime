@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';

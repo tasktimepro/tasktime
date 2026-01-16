@@ -1,4 +1,4 @@
-import { TrashIcon } from '@heroicons/react/24/outline';
+import { TrashIcon } from '@/components/ui/icons';
 import { formatDurationWithSeconds, hoursToMinutes, toDisplayDate, getTodayString } from '../../utils/dateUtils';
 import { getPreferredCurrency } from '../../utils/currencyUtils';
 import CustomCheckbox from '../CustomCheckbox';
@@ -910,11 +910,10 @@ const InvoiceModal = ({
                                         );
                                     } else if (selectedTasksCount === 0 && additionalTasks.length === 0) {
                                         return (
-                                            <div className="mt-2 bg-orange-50 border border-orange-200 rounded-md p-3">
-                                                <p className="text-sm text-orange-800">
-                                                    Please select or create at least one task to bill.
-                                                </p>
-                                            </div>
+                                            <Notice
+                                                title="Please select or create at least one task to bill."
+                                                className="mt-2"
+                                            />
                                         );
                                     }
                                     return null;
@@ -1148,7 +1147,6 @@ const InvoiceModal = ({
                                     <Notice
                                         title="No businesses found"
                                         description="Create one to include your business details in the invoice."
-                                        showIcon={false}
                                     />
                                 ) : (
                                     <div className="space-y-2">
@@ -1209,7 +1207,6 @@ const InvoiceModal = ({
                                     <Notice
                                         title="No payment methods found"
                                         description="Create one to include payment details in your invoice."
-                                        showIcon={false}
                                     />
                                 ) : (
                                     <div className="space-y-2">

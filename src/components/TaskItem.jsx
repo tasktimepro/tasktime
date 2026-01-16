@@ -5,7 +5,7 @@ import {
     ArchiveBoxIcon,
     ClockIcon,
     CurrencyDollarIcon
-} from '@heroicons/react/24/outline';
+} from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -416,7 +416,7 @@ const TaskItem = ({
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => setShowTimeEntriesModal(true)}
-                                        className="h-8 w-8 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-muted/40"
+                                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
                                         title="View Time Entries"
                                     >
                                         <ClockIcon className="h-5 w-5" />
@@ -430,9 +430,9 @@ const TaskItem = ({
                                             onClick={() => onToggleBillable(task.id)}
                                             className={`h-8 w-8 ${
                                                 task.billable
-                                                    ? 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 hover:text-purple-700 dark:hover:text-purple-300'
-                                                    : 'text-muted-foreground hover:bg-accent hover:text-purple-600 dark:hover:text-purple-400'
-                                            }`}
+                                                    ? 'text-foreground bg-muted'
+                                                    : 'text-muted-foreground'
+                                            } hover:text-foreground hover:bg-accent`}
                                             title={
                                                 task.billable
                                                     ? 'Mark as not billable'
@@ -449,7 +449,7 @@ const TaskItem = ({
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-muted-foreground hover:bg-muted/40"
+                                                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
                                                 title="More actions"
                                             >
                                                 <MoreHorizontal className="h-5 w-5" />
@@ -830,7 +830,7 @@ const SubtaskItem = ({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setShowTimeEntriesModal(true)}
-                                className="h-8 w-8 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-muted/40"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
                                 title="Edit Time"
                             >
                                 <ClockIcon className="h-5 w-5" />
@@ -844,9 +844,9 @@ const SubtaskItem = ({
                                     onClick={() => onToggleBillable(task.id)}
                                     className={`h-8 w-8 ${
                                         task.billable
-                                            ? 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 hover:text-purple-700 dark:hover:text-purple-300'
-                                            : 'text-muted-foreground hover:bg-accent hover:text-purple-600 dark:hover:text-purple-400'
-                                    }`}
+                                            ? 'text-foreground bg-muted'
+                                            : 'text-muted-foreground'
+                                    } hover:text-foreground hover:bg-accent`}
                                     title={
                                         task.billable
                                             ? 'Mark as not billable'
@@ -863,7 +863,7 @@ const SubtaskItem = ({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-muted-foreground hover:bg-muted/40"
+                                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
                                         title="More actions"
                                     >
                                         <MoreHorizontal className="h-5 w-5" />

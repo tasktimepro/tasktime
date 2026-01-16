@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { DocumentTextIcon, TrashIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, TrashIcon, ClockIcon } from '@/components/ui/icons';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils';
 import { getCurrencySymbol, getPreferredCurrency, getProjectCurrency } from '../utils/currencyUtils';

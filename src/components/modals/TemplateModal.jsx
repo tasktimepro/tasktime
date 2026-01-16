@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../Modal';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { PlusIcon } from '@/components/ui/icons';
 import { useToast } from '../../hooks/useToast';
 import { toDisplayDate } from '../../utils/dateUtils';
 import { Button } from '@/components/ui/button';

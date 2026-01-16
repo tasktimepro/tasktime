@@ -44,9 +44,6 @@
   background: transparent;
 }
 
-/* Fix for preventing layout shifts when scrollbar appears/disappears */
-/* Overflow scrolling now handled within main content area */
-
 /* HTML tag should have overflow hidden */
 html {
   overflow: hidden;

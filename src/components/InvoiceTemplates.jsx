@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { toDisplayDate } from '../utils/dateUtils';

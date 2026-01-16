@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronUpIcon } from '@/components/ui/icons';
 import { formatActiveTimer, formatDurationWithSeconds } from '../utils/dateUtils';
 import { checkTimerStartOverlap } from '../utils/timeValidationUtils';
 import TaskTimer from './TaskTimer.jsx';

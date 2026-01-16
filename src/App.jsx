@@ -14,7 +14,7 @@ import ModalManager from './components/modals/ModalManager';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils';
-import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon } from '@/components/ui/icons';
 import { TIMER_UPDATE_INTERVAL_MS, TIMER_HEARTBEAT_INTERVAL_MS } from './constants/app';
 
 /** Original browser tab title */
@@ -487,24 +487,11 @@ function App() {
                                     Invoices
                                 </button>
                             </li>
-                            <li>
-                                <button
-                                    onClick={() => navigateToAccount()}
-                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                                        activeView === 'account'
-                                            ? 'bg-accent text-accent-foreground font-semibold'
-                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                                    }`}
-                                >
-                                    <UserCircleIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                                    Account
-                                </button>
-                            </li>
                         </ul>
                     </nav>
                     
                     {/* Theme Toggle */}
-                    <div className="px-4 py-4 border-t border-border">
+                    <div className="px-4 py-4 border-t border-border space-y-2">
                         <button
                             onClick={() => setDarkMode(!darkMode)}
                             className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -516,6 +503,17 @@ function App() {
                                 <MoonIcon className="h-5 w-5 mr-3 flex-shrink-0" />
                             )}
                             {darkMode ? 'Light Mode' : 'Dark Mode'}
+                        </button>
+                        <button
+                            onClick={() => navigateToAccount()}
+                            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                activeView === 'account'
+                                    ? 'bg-accent text-accent-foreground font-semibold'
+                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            }`}
+                        >
+                            <UserCircleIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                            Account
                         </button>
                     </div>
                 </aside>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../Modal';
-import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon } from '@/components/ui/icons';
 import { generateId } from '../../utils/idUtils';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '@/components/ui/button';

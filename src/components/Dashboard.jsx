@@ -11,8 +11,9 @@ import {
     ClipboardDocumentCheckIcon,
     CurrencyDollarIcon,
     CalendarDaysIcon
-} from '@heroicons/react/24/outline';
+} from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import TaskTimer from './TaskTimer.jsx';
 import { 
     getThisMonthRange, 
@@ -1035,19 +1036,19 @@ const Dashboard = ({
                             </CardTitle>
                             <div className="relative">
                                 <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Search tasks"
                                     value={taskSearchQuery}
                                     onChange={(e) => setTaskSearchQuery(e.target.value)}
-                                    className="pl-9 pr-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
+                                    className="pl-9"
                                 />
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent className="pt-0 max-h-96 overflow-y-auto">
                         {recentTasks.length > 0 ? (
-                            <div className="divide-y divide-gray-200">
+                            <div className="divide-y divide-border">
                                 {recentTasks.map((task) => {
                                     // Determine if this task should be disabled
                                     // If any timer is running (not paused) and it's not for this task, disable the task
@@ -1055,7 +1056,7 @@ const Dashboard = ({
                                     const shouldDisable = currentTimer && !isPaused && !isTimerActive;
                                     
                                     return (
-                                    <div key={task.id} className={`px-6 py-3 hover:bg-muted ${task.completed ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
+                                    <div key={task.id} className={`px-3 py-3 hover:bg-muted ${task.completed ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
                                         <div className="flex items-center space-x-3">
                                             <CustomCheckbox
                                                 checked={task.completed}
@@ -1162,21 +1163,21 @@ const Dashboard = ({
                             </CardTitle>
                             <div className="relative">
                                 <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Search projects"
                                     value={projectSearchQuery}
                                     onChange={(e) => setProjectSearchQuery(e.target.value)}
-                                    className="pl-9 pr-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
+                                    className="pl-9"
                                 />
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent className="pt-0 max-h-96 overflow-y-auto">
                         {recentProjects.length > 0 ? (
-                            <div className="divide-y divide-gray-200">
+                            <div className="divide-y divide-border">
                                 {recentProjects.map((project) => (
-                                    <div key={project.id} className="px-6 py-3 hover:bg-muted transition-colors">
+                                    <div key={project.id} className="px-3 py-3 hover:bg-muted transition-colors">
                                         <div className="flex items-center justify-between">
                                             <div className="flex-1 min-w-0 space-y-1">
                                                 <button

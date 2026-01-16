@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from '@/components/ui/icons';
 import TaskItem from './TaskItem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

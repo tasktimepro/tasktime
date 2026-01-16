@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownTrayIcon, CogIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, CogIcon, TrashIcon } from '@/components/ui/icons';
 import { useUrlState } from '../hooks/useUrlState';
 import ExportImport from './ExportImport';
 import Preferences from './Preferences';

@@ -1,6 +1,6 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { InformationCircleIcon } from "@heroicons/react/24/outline"
+import { InformationCircleIcon } from "@/components/ui/icons"
 
 /**
  * Notice component for displaying informational messages, warnings, or tips

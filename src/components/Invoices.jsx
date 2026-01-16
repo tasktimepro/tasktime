@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { CreditCardIcon, BuildingOfficeIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { CreditCardIcon, BuildingOfficeIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
 import { useUrlState } from '../hooks/useUrlState';
 import { useToast } from '../hooks/useToast';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';

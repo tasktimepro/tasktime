@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, ArrowPathIcon } from '@/components/ui/icons';
 
 /**
  * Error Fallback component - Displayed when an error occurs

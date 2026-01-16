@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ChevronDownIcon, ChevronRightIcon } from '@/components/ui/icons';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -371,7 +371,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
                     </div>
                 ) : (
                     // Display mode
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-center justify-between">
                         <div className="flex-1">
                             <div className="flex items-center space-x-4 text-sm">
                                 <div className="flex items-center space-x-2">

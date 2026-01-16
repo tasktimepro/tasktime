@@ -8,7 +8,7 @@ import {
     millisecondsToHours
 } from '../utils/dateUtils';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
-import { ClockIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, CurrencyDollarIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 /**
