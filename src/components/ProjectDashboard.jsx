@@ -1,4 +1,5 @@
 import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon } from '@/components/ui/icons';
+import { Button } from '@/components/ui/button';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskTree from './TaskTree';
@@ -161,13 +162,17 @@ const ProjectDashboard = ({
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                    <button
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={onBackToProjects}
-                        className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
+                        className="text-muted-foreground hover:text-foreground"
                         title="Back to Projects"
+                        aria-label="Back to Projects"
                     >
                         <ArrowLeftIcon className="h-5 w-5" />
-                    </button>
+                    </Button>
 
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>

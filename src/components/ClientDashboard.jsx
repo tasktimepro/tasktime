@@ -271,13 +271,17 @@ const ClientDashboard = ({
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                    <button
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={onBackToClients}
-                        className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-accent transition-colors"
+                        className="text-muted-foreground hover:text-foreground"
                         title="Back to Clients"
+                        aria-label="Back to Clients"
                     >
                         <ArrowLeftIcon className="h-5 w-5" />
-                    </button>
+                    </Button>
 
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">{client.title}</h1>
@@ -549,23 +553,23 @@ const ClientDashboard = ({
             </Card>
 
             {/* Client Time Metrics */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg">Time Analytics</CardTitle>
-                </CardHeader>
-                {clientTimeEntries.length > 0 ? (
-                    <MetricsDisplay
-                        timeEntries={clientTimeEntries}
-                        showTitle={false}
-                    />
-                ) : (
+            {clientTimeEntries.length > 0 ? (
+                <MetricsDisplay
+                    title="Time Analytics"
+                    timeEntries={clientTimeEntries}
+                />
+            ) : (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Time Analytics</CardTitle>
+                    </CardHeader>
                     <CardContent>
                         <div className="text-center py-8">
                             <p className="text-muted-foreground">No time entries for this client yet.</p>
                         </div>
                     </CardContent>
-                )}
-            </Card>
+                </Card>
+            )}
         </div>
     );
 };

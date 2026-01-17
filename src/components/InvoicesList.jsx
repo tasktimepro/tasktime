@@ -353,35 +353,39 @@ const InvoicesList = ({
         return (
             <>
                 <div className="space-y-4">
-                    {currentInvoices.map((invoice) => (
-                        <Card key={invoice.id} className="hover:shadow-md transition-shadow">
-                            <CardContent className="p-4">
-                                <div className="flex flex-col space-y-4">
-                                {/* Header row with invoice number and status tag */}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
-                                        <DocumentTextIcon className="h-6 w-6 text-muted-foreground" />
-                                        <h3 className="text-sm font-medium text-foreground">
-                                            {invoice.invoiceNumber}
-                                        </h3>
+                    {currentInvoices.map((invoice) => {
+                        const invoiceCurrency = invoice.currency || getPreferredCurrency();
+                        const invoiceTotal = `${getCurrencySymbol(invoiceCurrency)}${(invoice.totalAmount || 0).toFixed(2)}`;
+
+                        return (
+                            <Card key={invoice.id} className="hover:shadow-md transition-shadow">
+                                <CardContent className="p-4">
+                                    <div className="flex flex-col space-y-4">
+                                    {/* Header row with invoice number and status tag */}
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-3">
+                                            <DocumentTextIcon className="h-6 w-6 text-muted-foreground" />
+                                            <h3 className="text-sm font-medium text-foreground">
+                                                {invoice.invoiceNumber}
+                                            </h3>
+                                        </div>
+                                        <div>
+                                            {invoice.paymentProcessed ? (
+                                                <Badge variant="success">
+                                                    <CheckIcon className="h-3 w-3 mr-1" />
+                                                    Paid • {invoiceTotal}
+                                                </Badge>
+                                            ) : isInvoiceOverdue(invoice) ? (
+                                                <Badge variant="error">
+                                                    Overdue • {invoiceTotal}
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="warning">
+                                                    Outstanding • {invoiceTotal}
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div>
-                                        {invoice.paymentProcessed ? (
-                                            <Badge variant="success">
-                                                <CheckIcon className="h-3 w-3 mr-1" />
-                                                Paid
-                                            </Badge>
-                                        ) : isInvoiceOverdue(invoice) ? (
-                                            <Badge variant="error">
-                                                Overdue
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="warning">
-                                                Outstanding
-                                            </Badge>
-                                        )}
-                                    </div>
-                                </div>
 
                                 {/* Invoice details with action buttons on the same row */}
                                 <div className="flex items-end justify-between ml-9">
@@ -551,8 +555,9 @@ const InvoicesList = ({
                                 </div>
                                 </div>
                             </CardContent>
-                        </Card>
-                    ))}
+                            </Card>
+                        );
+                    })}
                 </div>
 
                 {/* Pagination */}
@@ -683,20 +688,23 @@ const InvoicesList = ({
                     {overdueInvoices.length > 0 && (
                         <TabsTrigger
                             value="overdue"
-                            className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-red-500 dark:data-[state=active]:border-red-400 data-[state=active]:text-red-700 dark:data-[state=active]:text-red-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                            className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-red-700 dark:data-[state=active]:text-red-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                         >
                             Overdue ({overdueInvoices.length})
                         </TabsTrigger>
                     )}
                     <TabsTrigger
                         value="outstanding"
-                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-yellow-500 dark:data-[state=active]:border-yellow-400 data-[state=active]:text-yellow-700 dark:data-[state=active]:text-yellow-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                        className={`px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border ${outstandingInvoices.length > 0
+                            ? 'data-[state=active]:text-yellow-700 dark:data-[state=active]:text-yellow-300'
+                            : 'data-[state=active]:text-foreground'
+                        }`}
                     >
                         Outstanding ({outstandingInvoices.length})
                     </TabsTrigger>
                     <TabsTrigger
                         value="paid"
-                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-border data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                     >
                         Paid ({paidInvoices.length})
                     </TabsTrigger>

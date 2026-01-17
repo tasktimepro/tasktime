@@ -425,7 +425,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
     };
 
     const footer = (
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-3">
             <div className="text-sm text-muted-foreground">
                 Total Time: <span className="font-medium text-foreground">{formatDurationWithSeconds(totalTime)}</span>
             </div>

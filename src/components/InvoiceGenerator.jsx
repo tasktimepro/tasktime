@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { DocumentTextIcon, TrashIcon, ClockIcon } from '@/components/ui/icons';
 import { createInvoiceHTML } from '../utils/pdfUtils';
 import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils';
-import { getCurrencySymbol, getPreferredCurrency, getProjectCurrency } from '../utils/currencyUtils';
+import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
 import { useToast } from '../hooks/useToast';
 import InvoiceModal from './invoice/InvoiceModal';
+import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
 import * as InvoiceHandler from './invoice/InvoiceHandler';
+import useInvoicePricing from './invoice/hooks/useInvoicePricing';
+import { calculateDueDate, generateInvoiceNumber } from './invoice/utils/invoiceDateUtils';
+import { buildInvoiceTaskData } from './invoice/InvoiceCalculations';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -560,79 +563,13 @@ const InvoiceGenerator = ({
      * Prepare invoice data
      */
     const prepareInvoiceData = useCallback((projectForData = null) => {
-        // Use provided project or default to selected project
-        const projectToUse = projectForData || selectedProject;
-        if (!projectToUse) return null;
-        
-        // Get all tasks that belong to this project
-        const projectTasks = tasks.filter(task => task.projectId === projectToUse.id);
-        const projectTaskIds = projectTasks.map(task => task.id);
-        
-        // Filter billable entries based on individual task billing dates
-        const billableEntries = timeEntries.filter(entry => {
-            // Double check that this entry belongs to a task in the current project
-            if (!projectTaskIds.includes(entry.taskId)) return false;
-            if (!entry.end || entry.end <= entry.start) return false;
-            
-            // Find the task for this entry
-            const task = projectTasks.find(t => t.id === entry.taskId);
-            if (!task || task.projectId !== projectToUse.id) return false;
-            
-            // Use task-specific lastBilledAt, or task creation date if never billed
-            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
-            
-            // Only include entries created after this task's last billing date
-            return entry.start > taskLastBilledAt;
+        return buildInvoiceTaskData({
+            projectForData,
+            selectedProject,
+            tasks,
+            timeEntries,
+            editableHours
         });
-        
-        // Get manually marked billable tasks (tasks with billable: true)
-        // IMPORTANT: Explicitly check for billable === true to exclude tasks marked as non-billable
-        const manuallyBillableTasks = projectTasks.filter(task => task.billable === true);
-        
-        // If no billable entries and no manually billable tasks, return null
-        if (billableEntries.length === 0 && manuallyBillableTasks.length === 0) {
-            return null;
-        }
-
-        // Group entries by task
-        const taskTimeMap = {};
-
-        billableEntries.forEach(entry => {
-            if (!taskTimeMap[entry.taskId]) {
-                taskTimeMap[entry.taskId] = 0;
-            }
-            taskTimeMap[entry.taskId] += (entry.end - entry.start);
-        });
-
-        // Add manually billable tasks to the map (even if they have no time)
-        manuallyBillableTasks.forEach(task => {
-            if (!taskTimeMap[task.id]) {
-                taskTimeMap[task.id] = 0; // 0 time for manually marked tasks
-            }
-        });
-
-        // Prepare tasks data array
-        const tasksData = Object.entries(taskTimeMap).map(([taskId, totalTime]) => {
-            const task = tasks.find(t => t.id === taskId);
-            return {
-                id: taskId,
-                title: task ? task.title : 'Unknown Task',
-                parentTaskId: task ? task.parentTaskId : null,
-                originalHours: Math.round((millisecondsToHours(totalTime)) * 100) / 100,
-                originalTimeMs: totalTime,
-                hours: editableHours[taskId] !== undefined ? editableHours[taskId] : (task ? Math.round((millisecondsToHours(totalTime)) * 100) / 100 : 0),
-                isEdited: editableHours[taskId] !== undefined && editableHours[taskId] !== (task ? Math.round((millisecondsToHours(totalTime)) * 100) / 100 : 0),
-                billable: task ? task.billable === true : false // Explicitly capture the billable status
-            };
-        }).filter(task => {
-            if (!task) return false;
-            const taskData = tasks.find(t => t && t.id === task.id && t.projectId === projectToUse.id);
-            // Only include tasks that have billable explicitly set to true
-            // This ensures tasks toggled to non-billable are excluded
-            return taskData && taskData.billable === true;
-        });
-
-        return tasksData;
     }, [selectedProject, timeEntries, tasks, editableHours]);
 
     // Handler assignments (replace function definitions)
@@ -743,203 +680,24 @@ const InvoiceGenerator = ({
      * Calculate pricing breakdown: Subtotal → Discount → Shipping → Tax → Total
      * Supports both hourly rate (from project) and flat rate (per task) pricing
      */
-    const calculatePricing = useMemo(() => {
-        if (invoiceTasks.length === 0 && additionalTasks.length === 0) {
-            return {
-                subtotal: 0,
-                discount: 0,
-                shipping: 0,
-                tax: 0,
-                total: 0,
-                totalHours: 0,
-                taxRate: 0,
-                taxLabel: 'VAT'
-            };
-        }
-
-        // Calculate project subtotal by adding up task amounts
-        let projectSubtotal = 0;
-        let additionalTaskAmount = 0;
-        let totalHours = 0;
-        
-        // Calculate regular project tasks subtotal (only include selected tasks)
-        invoiceTasks.forEach(task => {
-            // Skip if task is null or id is missing
-            if (!task || !task.id) return;
-            
-            // Only include selected tasks in pricing calculation
-            if (!selectedTasksForBilling[task.id]) return;
-            
-            // Skip subtasks if their parent is merged (they're included in parent calculation)
-            if (task.parentTaskId && mergedSubtasks[task?.parentTaskId]) return;
-            
-            let taskHours = editableHours[task.id] || task.hours || 0;
-            
-            // If this task has merged subtasks, include their hours too
-            if (task && task.id && mergedSubtasks[task.id]) {
-                const subtasks = invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task.id);
-                const subtaskHours = subtasks.reduce((total, subtask) => {
-                    const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
-                    return total + hours;
-                }, 0);
-                taskHours += subtaskHours;
-            }
-            
-            // Always add task hours to total hours, even for flat rate tasks
-            totalHours += taskHours;
-            
-            if (useFlatRate[task.id]) {
-                // Use flat rate for this task with quantity
-                const quantity = taskQuantities[task.id] || 1;
-                projectSubtotal += (taskFlatRates[task.id] || 0) * quantity;
-            } else {
-                // Use task-specific hourly rate if available, otherwise fall back to project rate, then client rate
-                const hourlyRate = taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0;
-                projectSubtotal += taskHours * hourlyRate;
-            }
-        });
-        
-        // Calculate additional tasks subtotal
-        additionalTasks.forEach(task => {
-            if (task.useFlatRate) {
-                // Use flat rate with quantity
-                const quantity = task.quantity || 1;
-                additionalTaskAmount += (task.flatRate || 0) * quantity;
-            } else {
-                const hourlyRate = task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0;
-                const taskHours = task.hours || 0;
-                additionalTaskAmount += taskHours * hourlyRate;
-                // Add hours to total for hourly tasks
-                totalHours += taskHours;
-            }
-        });
-        
-        const subtotal = projectSubtotal + additionalTaskAmount;
-
-        // Calculate discount
-        const discountVal = discountValue === '' ? 0 : discountValue;
-        const discount = discountType === 'percentage' 
-            ? (subtotal * (discountVal / 100))
-            : discountVal;
-
-        // Subtotal after discount
-        const afterDiscount = subtotal - discount;
-
-        // Add shipping
-        const shipping = shippingAmount === '' ? 0 : parseFloat(shippingAmount) || 0;
-        const afterShipping = afterDiscount + shipping;
-
-        // Calculate tax
-        let taxRate = 0;
-        let taxLabel = 'VAT';
-        
-        if (taxOverride.enabled) {
-            taxRate = taxOverride.rate === '' ? 0 : parseFloat(taxOverride.rate) || 0;
-            taxLabel = taxOverride.label || 'Tax';
-        } else if (selectedBusinessInfo && selectedBusinessInfo.taxEnabled && (!selectedClient || !selectedClient.disableTax)) {
-            // Use business tax settings if enabled and client doesn't have tax disabled
-            taxRate = selectedBusinessInfo.taxRate || 0;
-            taxLabel = selectedBusinessInfo.taxLabel || 'VAT';
-        }
-
-        const tax = (afterShipping * (taxRate / 100));
-        const total = afterShipping + tax;
-
-        return {
-            subtotal: Math.round(subtotal * 100) / 100,
-            discount: Math.round(discount * 100) / 100,
-            shipping: Math.round(shipping * 100) / 100,
-            tax: Math.round(tax * 100) / 100,
-            total: Math.round(total * 100) / 100,
-            totalHours: Math.round(totalHours * 100) / 100,
-            taxRate,
-            taxLabel
-        };
-    }, [selectedProject, invoiceTasks, additionalTasks, editableHours, 
-        discountType, discountValue, shippingAmount, taxOverride, 
-        taskFlatRates, useFlatRate, taskHourlyRates, taskQuantities, selectedTasksForBilling, mergedSubtasks, selectedBusinessInfo, selectedClient]);
-
-    /**
-     * Generate invoice number using template format
-     */
-    const generateInvoiceNumber = useCallback((template, project) => {
-        if (!template) {
-            // Fallback to original logic if no template
-            return project 
-                ? `INV-${project.id.slice(-8)}-${Date.now()}` 
-                : `INV-${Date.now()}`;
-        }
-
-        const now = new Date();
-        const variables = {
-            '{projectId}': project ? project.id.slice(-8) : 'NOPROJECT',
-            '{timestamp}': Date.now().toString(),
-            '{date}': now.toISOString().slice(0, 10).replace(/-/g, ''),
-            '{year}': now.getFullYear().toString(),
-            '{month}': (now.getMonth() + 1).toString().padStart(2, '0'),
-            '{day}': now.getDate().toString().padStart(2, '0'),
-            '{sequential}': template.useSequentialNumbers ? 
-                template.currentSequentialNumber.toString().padStart(4, '0') : '0001'
-        };
-
-        let format = template.invoiceNumberFormat;
-        Object.entries(variables).forEach(([key, value]) => {
-            format = format.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
-        });
-
-        return format;
-    }, []);
-
-    /**
-     * Calculate due date using template settings
-     * Returns ISO format (YYYY-MM-DD) for storage portability
-     */
-    const calculateDueDate = useCallback((template, invoiceDate = new Date()) => {
-        if (!template) {
-            // Default to 30 days if no template
-            const dueDate = new Date(invoiceDate);
-            dueDate.setDate(dueDate.getDate() + 30);
-            return toStorageDate(dueDate);
-        }
-
-        switch (template.dueDateType) {
-            case 'fixed-days': {
-                if (!template.dueDateDays || template.dueDateDays === 0) {
-                    return null; // No due date
-                }
-                const dueDate = new Date(invoiceDate);
-                dueDate.setDate(dueDate.getDate() + parseInt(template.dueDateDays));
-                return toStorageDate(dueDate);
-            }
-            
-            case 'fixed-weeks': {
-                if (!template.dueDateWeeks || template.dueDateWeeks === 0) {
-                    return null; // No due date
-                }
-                const dueDate = new Date(invoiceDate);
-                dueDate.setDate(dueDate.getDate() + (parseInt(template.dueDateWeeks) * 7));
-                return toStorageDate(dueDate);
-            }
-            
-            case 'precise-date': {
-                if (!template.dueDatePrecise) {
-                    return null; // No due date
-                }
-                return toStorageDate(new Date(template.dueDatePrecise));
-            }
-            
-            case 'none': {
-                return null; // No due date to be shown
-            }
-            
-            default: {
-                // Backward compatibility with old 'fixed' and 'net' types
-                const dueDate = new Date(invoiceDate);
-                dueDate.setDate(dueDate.getDate() + (template.dueDateDays || 30));
-                return toStorageDate(dueDate);
-            }
-        }
-    }, []);
+    const calculatePricing = useInvoicePricing({
+        invoiceTasks,
+        additionalTasks,
+        editableHours,
+        discountType,
+        discountValue,
+        shippingAmount,
+        taxOverride,
+        taskFlatRates,
+        useFlatRate,
+        taskHourlyRates,
+        taskQuantities,
+        selectedTasksForBilling,
+        mergedSubtasks,
+        selectedBusinessInfo,
+        selectedClient,
+        selectedProject
+    });
 
     /**
      * Update template sequential number
@@ -1476,26 +1234,13 @@ const InvoiceGenerator = ({
     return (
         <div className="space-y-4">
             {showButton && (
-                <div className="flex items-center space-x-3">
-                    <button
-                        onClick={openInvoiceForm}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring cursor-pointer"
-                    >
-                        <DocumentTextIcon className="h-5 w-5 mr-2" />
-                        {currentProjectForCalculation ? 'Generate Invoice' : 'Create Invoice'}
-                        {currentProjectForCalculation && unbilledHours > 0 && currentProjectForCalculation.hourlyRate && (
-                            <span className="ml-2 px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full">
-                                {getCurrencySymbol(getProjectCurrency(currentProjectForCalculation, clients))}{unbilledAmount.toFixed(2)}
-                            </span>
-                        )}
-                        {currentProjectForCalculation && unbilledHours > 0 && !currentProjectForCalculation.hourlyRate && (
-                            <span className="ml-2 px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full flex items-center">
-                                <ClockIcon className="h-3 w-3 mr-1" />
-                                {unbilledHours.toFixed(2)}h
-                            </span>
-                        )}
-                    </button>
-                </div>
+                <InvoiceGeneratorButton
+                    onClick={openInvoiceForm}
+                    currentProject={currentProjectForCalculation}
+                    unbilledHours={unbilledHours}
+                    unbilledAmount={unbilledAmount}
+                    clients={clients}
+                />
             )}
             {/* Invoice Generation Modal */}
             {showInvoiceForm && (

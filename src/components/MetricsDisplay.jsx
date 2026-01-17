@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 /**
  * MetricsDisplay component - Shows time and earnings metrics for different periods
  */
-const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitle = true }) => {
+const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitle = true, title = "Project Metrics" }) => {
     
     // Helper function to get currency for display
     const getDisplayCurrency = () => {
@@ -115,7 +115,7 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
         <Card>
             {showTitle && (
                 <CardHeader className="pb-0">
-                    <CardTitle>Project Metrics</CardTitle>
+                    <CardTitle>{title}</CardTitle>
                 </CardHeader>
             )}
             
@@ -131,7 +131,7 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
                                         </dt>
                                         
                                         <dd className="flex items-center">
-                                            <ClockIcon className="h-4 w-4 text-blue-600 mr-2 flex-shrink-0" />
+                                            <ClockIcon className="h-4 w-4 text-muted-foreground mr-2 flex-shrink-0" />
                                             <span className="text-lg font-medium">
                                                 {formatDuration(metric.time)}
                                             </span>
@@ -139,7 +139,7 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
                                         
                                         {project && project.hourlyRate && (
                                             <dd className="flex items-center mt-1">
-                                                <CurrencyDollarIcon className="h-4 w-4 text-yellow-600 mr-2 flex-shrink-0" />
+                                                <CurrencyDollarIcon className="h-4 w-4 text-muted-foreground mr-2 flex-shrink-0" />
                                                 <span className="font-medium">
                                                     {`${getCurrencySymbol(displayCurrency)}${metric.earnings.toFixed(2)}`}
                                                 </span>

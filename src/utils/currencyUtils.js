@@ -30,12 +30,23 @@ export const CURRENCY_NAMES = {
 export const DEFAULT_CURRENCY = 'EUR';
 
 /**
+ * Normalize a currency code to uppercase and trim whitespace
+ * @param {string} currencyCode
+ * @returns {string}
+ */
+export const normalizeCurrencyCode = (currencyCode) => {
+    if (!currencyCode) return DEFAULT_CURRENCY;
+    return String(currencyCode).trim().toUpperCase();
+};
+
+/**
  * Get the currency symbol for a given currency code
  * @param {string} currencyCode - The currency code (e.g., 'USD', 'EUR')
  * @returns {string} The currency symbol
  */
 export const getCurrencySymbol = (currencyCode) => {
-    return CURRENCY_SYMBOLS[currencyCode] || '$';
+    const normalized = normalizeCurrencyCode(currencyCode);
+    return CURRENCY_SYMBOLS[normalized] || '$';
 };
 
 /**
@@ -57,7 +68,7 @@ export const formatCurrency = (amount, currencyCode, decimals = 2) => {
 export const getPreferredCurrency = () => {
     try {
         const preferences = JSON.parse(localStorage.getItem('preferences') || '{}');
-        const saved = preferences.currency;
+        const saved = normalizeCurrencyCode(preferences.currency);
         return saved && CURRENCY_SYMBOLS[saved] ? saved : DEFAULT_CURRENCY;
     } catch (error) {
         console.warn('Error parsing preferences from localStorage:', error);
@@ -75,7 +86,10 @@ export const getPreferredCurrency = () => {
 export const getProjectCurrency = (project, clients) => {
     if (project.preferredClientId && clients && clients.length > 0) {
         const client = clients.find(c => c.id === project.preferredClientId);
-        return client?.defaultCurrency || getPreferredCurrency();
+        const clientCurrency = normalizeCurrencyCode(client?.defaultCurrency);
+        return clientCurrency && CURRENCY_SYMBOLS[clientCurrency]
+            ? clientCurrency
+            : getPreferredCurrency();
     }
     return getPreferredCurrency();
 };
@@ -87,7 +101,7 @@ export const getProjectCurrency = (project, clients) => {
 export const setPreferredCurrency = (currencyCode) => {
     try {
         const preferences = JSON.parse(localStorage.getItem('preferences') || '{}');
-        preferences.currency = currencyCode;
+        preferences.currency = normalizeCurrencyCode(currencyCode);
         localStorage.setItem('preferences', JSON.stringify(preferences));
     } catch (error) {
         console.warn('Error saving preferences to localStorage:', error);
@@ -141,7 +155,7 @@ export const fetchExchangeRates = async () => {
     // First try to get cached rates
     const cachedRates = getCachedExchangeRates();
     if (cachedRates) {
-        return cachedRates;
+        return { rates: cachedRates, error: null };
     }
 
     // If no valid cache, fetch from API
@@ -156,7 +170,7 @@ export const fetchExchangeRates = async () => {
         // Cache the rates for future use
         cacheExchangeRates(data.rates);
         
-        return data.rates;
+        return { rates: data.rates, error: null };
     } catch (error) {
         console.error('Error fetching exchange rates:', error);
         
@@ -165,13 +179,13 @@ export const fetchExchangeRates = async () => {
             const fallbackCache = JSON.parse(localStorage.getItem('exchangeRatesCache') || 'null');
             if (fallbackCache && fallbackCache.rates) {
                 console.warn('Using expired cached rates as fallback');
-                return fallbackCache.rates;
+                return { rates: fallbackCache.rates, error: 'Using cached exchange rates (may be outdated).' };
             }
         } catch {
             console.warn('No fallback rates available');
         }
         
-        return null;
+        return { rates: null, error: 'Unable to load exchange rates.' };
     }
 };
 
@@ -195,8 +209,8 @@ export const convertCurrency = (amount, fromCurrency, toCurrency, exchangeRates)
     }
     
     // Standardize currency codes
-    const fromCurrencyStd = fromCurrency || DEFAULT_CURRENCY;
-    const toCurrencyStd = toCurrency || DEFAULT_CURRENCY;
+    const fromCurrencyStd = normalizeCurrencyCode(fromCurrency);
+    const toCurrencyStd = normalizeCurrencyCode(toCurrency);
 
     // Check if we have valid exchange rates
     if (!exchangeRates || Object.keys(exchangeRates).length === 0) {

@@ -7,6 +7,7 @@ export {
     AlertCircle as ExclamationCircleIcon,
     AlertTriangle as ExclamationTriangleIcon,
     Archive as ArchiveBoxIcon,
+    ArchiveRestore as ArchiveRestoreIcon,
     ArrowLeft as ArrowLeftIcon,
     BarChart3 as ChartBarIcon,
     Banknote as BanknotesIcon,

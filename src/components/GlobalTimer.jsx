@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDownIcon, ChevronUpIcon } from '@/components/ui/icons';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { TimePicker } from '@/components/ui/time-picker';
 import { formatActiveTimer, formatDurationWithSeconds } from '../utils/dateUtils';
 import { checkTimerStartOverlap } from '../utils/timeValidationUtils';
 import TaskTimer from './TaskTimer.jsx';
@@ -176,11 +180,11 @@ const GlobalTimer = ({
     const timeColor = isPaused ? 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900' : 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900';
 
     return (
-        <div className={`border ${borderColor} rounded-lg px-4 py-2 ${isExpanded ? 'space-y-3' : ''}`}>
+        <div className={`border ${borderColor} rounded-lg px-4 py-2 ${isExpanded ? 'space-y-3 w-[26rem] max-w-full' : ''}`}>
             {/* Main timer row */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-center space-x-3">
                 {/* Timer info */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3">
                     <div className={`w-3 h-3 ${dotColor} rounded-full ${dotAnimation}`}></div>
                     {currentProject ? (
                         <button
@@ -204,7 +208,7 @@ const GlobalTimer = ({
                 </div>
 
                 {/* Control buttons and options toggle */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3">
                     {/* Control buttons - using TaskTimer component */}
                     <TaskTimer
                         task={currentTask}
@@ -243,51 +247,54 @@ const GlobalTimer = ({
 
             {/* Expanded options */}
             {isExpanded && (
-                <div className="border-t border-border pt-3 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="border-t border-border pt-3 pb-2 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-[120px_minmax(0,1fr)] gap-3">
                         {/* Start Time Input */}
                         <div>
-                            <label className="block text-xs font-medium text-foreground mb-1">
+                            <Label className="text-xs text-foreground" htmlFor="global-timer-start-time">
                                 Start Time
-                            </label>
-                            <input
-                                type="time"
-                                step="1"
+                            </Label>
+                            <TimePicker
+                                id="global-timer-start-time"
                                 value={startTimeInput}
                                 onChange={(e) => setStartTimeInput(e.target.value)}
-                                className="w-full text-sm border border-border rounded-md focus:ring-ring focus:border-ring px-2.5 py-1.5 bg-background text-foreground"
+                                className="mt-1 h-8 text-sm"
                             />
                         </div>
 
                         {/* Note Input */}
                         <div>
-                            <label className="block text-xs font-medium text-foreground mb-1">
+                            <Label className="text-xs text-foreground" htmlFor="global-timer-note">
                                 Note
-                            </label>
-                            <input
+                            </Label>
+                            <Input
+                                id="global-timer-note"
                                 type="text"
                                 value={noteInput}
                                 onChange={(e) => setNoteInput(e.target.value)}
                                 placeholder="What are you working on..."
-                                className="w-full text-sm border border-border rounded-md focus:ring-ring focus:border-ring px-2.5 py-1.5 bg-background text-foreground placeholder:text-muted-foreground"
+                                className="mt-1 h-8 text-sm"
                             />
                         </div>
                     </div>
 
                     {/* Action buttons */}
                     <div className="flex justify-end space-x-2">
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setIsExpanded(false)}
-                            className="px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-muted rounded-md transition-colors"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
                             onClick={handleSubmitChanges}
-                            className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors"
                         >
                             Update Timer
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}

@@ -402,9 +402,9 @@ function App() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center">
-                    <ClockIcon className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+                    <ClockIcon className="h-12 w-12 text-foreground mx-auto mb-4 animate-pulse" />
                     <h1 className="text-xl font-semibold text-foreground">
-                        Task<span className="text-blue-600">Time</span>
+                        Task<span>Time</span>
                     </h1>
                     <p className="text-muted-foreground mt-2">Loading your data...</p>
                 </div>
@@ -414,9 +414,11 @@ function App() {
 
     return (
         <ToastProvider>
-            <div className="min-h-screen bg-background flex">
+            <div className="min-h-screen bg-background">
+                <div className="mx-auto w-full max-w-[100rem] px-6">
+                <div className="flex gap-6">
                 {/* Sidebar Navigation */}
-                <aside className="w-64 bg-card shadow-sm border-r border-border flex flex-col h-screen sidebar">
+                <aside className="w-64 bg-card shadow-sm border border-border rounded-xl flex flex-col h-[calc(100vh-3rem)] sidebar my-6">
                     {/* Sidebar Header */}
                     <div className="p-6 flex-shrink-0">
                         <div 
@@ -522,7 +524,7 @@ function App() {
 
                 {/* Main Content */}
                 <main className="flex-1 main-content relative">
-                    <div className={`pl-8 pr-6 pb-8 ${showGlobalTimer && currentTimer ? 'pt-20' : 'pt-8'}`}>{/* Inner content with balanced padding, extra top padding when timer is active */}
+                    <div className={`pr-4 pb-6 ${showGlobalTimer && currentTimer ? 'pt-20' : 'pt-6'}`}>{/* Inner content with balanced padding, extra top padding when timer is active */}
                 {activeView === 'dashboard' && (
                     <ErrorBoundary>
                     <Dashboard
@@ -750,7 +752,7 @@ function App() {
                     
                     {/* Global Timer Display - Fixed at top */}
                     {showGlobalTimer && currentTimer && (
-                        <div className="fixed top-4 left-64 right-4 z-50 flex justify-center global-timer-mobile">
+                        <div className="fixed top-4 left-[calc(1.5rem+16rem+1.5rem)] right-6 z-50 flex justify-center global-timer-mobile">
                             <div className="bg-card shadow-lg rounded-lg w-auto max-w-2xl shadow-md">
                                 <GlobalTimer
                                     currentTimer={currentTimer}
@@ -774,6 +776,8 @@ function App() {
                         </div>
                     )}
                 </main>
+            </div>
+            </div>
             </div>
             
             {/* PWA Components */}
