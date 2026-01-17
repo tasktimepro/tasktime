@@ -163,45 +163,7 @@ docker compose run --rm app npm run <script>
 
 ## 📊 Current State (January 2026)
 
-### ✅ Phase 1: Stabilization COMPLETE
-- [x] Comprehensive project documentation (`docs/project_overview.md`)
-- [x] Identified issues and improvements
-- [x] **IndexedDB migration** (replaced localStorage)
-  - Installed `idb` package
-  - Created `useIndexedDB` hook with loading state
-  - Updated `App.jsx` with loading screen
-  - Deleted `useLocalStorage` hook
-  - Removed dead code (onboarding, console.logs)
-- [x] **Performance optimization** - Added `React.memo` to heavy components
-  - Dashboard, InvoiceGenerator, TaskItem, TaskTree, GlobalTimer, TimerControls
-- [x] **Error Boundaries** - Created `ErrorBoundary.jsx`
-  - Wrapped all main views in App.jsx
-  - User-friendly error fallback with retry option
-- [x] **Time entry overlap validation** - Centralized in `TimerControls.jsx`
-  - `createValidatedTimeEntry()` function validates before creating entries
-  - Shows toast error if overlap detected
-- [x] **Constants file** - Created `src/constants/app.js`
-  - Centralized magic numbers (time, billing, UI constants)
-  - Updated all components to use constants
-- [x] **Debug code cleanup** - Removed all console.log statements
-  - Cleaned 7 files: pdfUtils.js, currencyUtils.js, ModalManager.jsx, InvoicesList.jsx, Invoices.jsx, InvoiceGenerator.jsx, InvoiceHandler.js
-- [x] **Fixed bugs**
-  - Export/Import timer warning: Users now warned when importing with active timer
-  - Removed unused `currentTime` state from TaskItem.jsx (dead code cleanup)
-  - Currency conversion error handling with user warnings
-  - Browser tab title race condition (using refs)
-  - Consistent date handling utilities added
-- [x] **Timer heartbeat auto-save** - Crash recovery improvement
-  - Added `lastActive` timestamp to timer state
-  - Periodic save every 30 seconds while timer is running
-  - Added `TIMER_HEARTBEAT_INTERVAL_MS` constant
-
-### 🔄 Phase 2: UI Migration (NEXT)
-- [ ] shadcn/ui migration (see `docs/todo/shadcn-migration.md`)
-- [ ] Component restructuring during migration
-- [ ] Split large components as needed
-
-### Future Phases
+### Next Phases
 - [ ] Testing infrastructure (Jest + React Testing Library)
 - [ ] TypeScript migration (gradual)
 - [ ] Cloud features (Google OAuth, Drive backup, multi-device sync)
@@ -224,8 +186,6 @@ docker compose run --rm app npm run <script>
 1. **Read `docs/project_overview.md` first** — It has the full architecture
 2. **Check this file for rules** — Especially the "no legacy code" rule
 3. **App.jsx is the state hub** — All data flows from there
-4. **Large components exist** — InvoiceGenerator.jsx (1589 lines), Dashboard.jsx (1201 lines)
-5. **Test in browser** — localStorage → IndexedDB won't auto-migrate, clear data if needed
 
 ---
 
