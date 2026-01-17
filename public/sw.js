@@ -1,0 +1,75 @@
+const CACHE_NAME = 'tasktime-cache-v1';
+const APP_SHELL = [
+    '/',
+    '/index.html',
+    '/manifest.json',
+    '/tasktime-icon.png',
+    '/icons/icon-192x192.png',
+    '/icons/icon-512x512.png'
+];
+
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then((cache) => cache.addAll(APP_SHELL))
+            .then(() => self.skipWaiting())
+    );
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys()
+            .then((keys) => Promise.all(
+                keys.map((key) => (key === CACHE_NAME ? null : caches.delete(key)))
+            ))
+            .then(() => self.clients.claim())
+    );
+});
+
+self.addEventListener('fetch', (event) => {
+    const { request } = event;
+
+    if (request.method !== 'GET') {
+        return;
+    }
+
+    // Navigation requests: network-first, fallback to cache
+    if (request.mode === 'navigate') {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', responseClone));
+                    return response;
+                })
+                .catch(() => caches.match('/index.html'))
+        );
+        return;
+    }
+
+    // Static assets: cache-first with background refresh
+    event.respondWith(
+        caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) {
+                event.waitUntil(
+                    fetch(request)
+                        .then((response) => {
+                            if (response && response.status === 200) {
+                                caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+                            }
+                        })
+                        .catch(() => undefined)
+                );
+                return cachedResponse;
+            }
+
+            return fetch(request).then((response) => {
+                if (response && response.status === 200) {
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+                }
+                return response;
+            });
+        })
+    );
+});

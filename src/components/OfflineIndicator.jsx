@@ -5,7 +5,7 @@ import { WifiOffIcon } from '@/components/ui/icons';
  * Displays a notification when the user goes offline
  * Automatically appears/disappears based on network status
  */
-const OfflineIndicator = () => {
+const OfflineIndicator = ({ className = '' }) => {
 
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     
@@ -27,9 +27,11 @@ const OfflineIndicator = () => {
     if (!isOffline) return null;
     
     return (
-        <div className="fixed bottom-4 left-4 bg-yellow-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50">
-            <WifiOffIcon className="h-5 w-5" />
-            <span>You&apos;re offline — changes saved locally</span>
+        <div
+            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md bg-yellow-50 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 ${className}`}
+        >
+            <WifiOffIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+            <span>You&apos;re offline</span>
         </div>
     );
 };

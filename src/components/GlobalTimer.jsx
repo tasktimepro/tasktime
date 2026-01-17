@@ -41,8 +41,7 @@ const GlobalTimer = ({
     timeEntries = [] // Add timeEntries prop for validation
 }) => {
     const { showSuccess, showError } = useToast();
-    const [currentTime, setCurrentTime] = useState('');
-    const [pausedTime, setPausedTime] = useState('');
+    const [displayTime, setDisplayTime] = useState('');
     const [isExpanded, setIsExpanded] = useState(false);
     const [startTimeInput, setStartTimeInput] = useState('');
     const [noteInput, setNoteInput] = useState('');
@@ -130,18 +129,18 @@ const GlobalTimer = ({
         }
     };
 
-    // Update timer display every second
+    // Update timer display every second (only when not paused)
     useEffect(() => {
         if (!currentTimer) return;
         
-        // Don't return early for isPaused, we still want the initial update
+        // When paused, don't update - just keep the frozen display time
+        if (isPaused) return;
 
         const updateTimer = () => {
-            if (isPaused) return; // Only skip subsequent updates when paused
             // Calculate elapsed time in ms for active timer
             const elapsedMs = Date.now() - currentTimer.startTime;
             const formattedTime = formatActiveTimer(elapsedMs);
-            setCurrentTime(formattedTime);
+            setDisplayTime(formattedTime);
         };
 
         // Update immediately
@@ -153,20 +152,14 @@ const GlobalTimer = ({
         return () => clearInterval(interval);
     }, [currentTimer, isPaused]);
 
-    // Initialize paused time display when component mounts and timer is already paused
+    // Initialize display time when component mounts with a paused timer
+    // or when pausedElapsedTime changes while paused
     useEffect(() => {
         if (isPaused && pausedElapsedTime > 0) {
             const formattedPausedTime = formatDurationWithSeconds(pausedElapsedTime);
-            setPausedTime(formattedPausedTime);
+            setDisplayTime(formattedPausedTime);
         }
     }, [isPaused, pausedElapsedTime]);
-
-    // When paused, save the current time display (for transitions from running to paused)
-    useEffect(() => {
-        if (isPaused && currentTime) {
-            setPausedTime(currentTime);
-        }
-    }, [isPaused, currentTime]);
 
     if (!currentTimer || !currentTask) {
         return null;
@@ -203,7 +196,7 @@ const GlobalTimer = ({
                         </span>
                     )}
                     <span className={`text-sm font-mono ${timeColor} px-2 py-1 rounded-md min-w-[32px] inline-block text-center`}>
-                        {isPaused ? pausedTime : currentTime}
+                        {displayTime}
                     </span>
                 </div>
 
@@ -231,9 +224,11 @@ const GlobalTimer = ({
                     />
                     
                     {/* Options toggle button */}
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className={`p-1 ${textColor} hover:bg-muted rounded-md transition-colors`}
+                        className={`h-8 w-8 ${textColor} hover:bg-accent transition-colors`}
                         title={isExpanded ? "Hide options" : "Show timer options"}
                     >
                         {isExpanded ? (
@@ -241,7 +236,7 @@ const GlobalTimer = ({
                         ) : (
                             <ChevronDownIcon className="h-4 w-4" />
                         )}
-                    </button>
+                    </Button>
                 </div>
             </div>
 

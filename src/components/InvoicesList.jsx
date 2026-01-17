@@ -268,13 +268,13 @@ const InvoicesList = ({
             paymentProcessed: !invoice.paymentProcessed
         };
 
-        // Find the invoice in the list and update it
-        const updatedInvoices = projectInvoices.map(inv => 
-            inv.id === invoice.id ? updatedInvoice : inv
+        // Use functional update to properly update just this one invoice in the full invoices array
+        // This is critical because projectInvoices is a filtered subset, not the full array
+        setInvoices(prevInvoices => 
+            prevInvoices.map(inv => 
+                inv.id === invoice.id ? updatedInvoice : inv
+            )
         );
-
-        // Update the invoices state
-        setInvoices(updatedInvoices);
 
         // If marking as paid and we're on outstanding or overdue tab, and it's the last item on the page,
         // go to previous page if available

@@ -7,12 +7,35 @@ import { openDB } from 'idb';
 const DB_NAME = 'tasktime-db';
 const DB_VERSION = 1;
 const STORE_NAME = 'app-data';
+const BROADCAST_CHANNEL_NAME = 'tasktime-sync';
 
 /**
  * Singleton database instance promise
  * Ensures we only open one connection
  */
 let dbPromise = null;
+
+/**
+ * Singleton BroadcastChannel for cross-tab communication
+ * Used to sync state changes across browser tabs
+ */
+let broadcastChannel = null;
+
+/**
+ * Get or create the BroadcastChannel
+ * @returns {BroadcastChannel|null} BroadcastChannel instance or null if not supported
+ */
+const getBroadcastChannel = () => {
+    if (typeof BroadcastChannel === 'undefined') {
+        return null; // Not supported in this browser
+    }
+    
+    if (!broadcastChannel) {
+        broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+    }
+    
+    return broadcastChannel;
+};
 
 /**
  * Get or create the database connection
@@ -58,6 +81,9 @@ export const useIndexedDB = (key, defaultValue) => {
     // Track the latest value to avoid stale closures in save
     const latestValue = useRef(value);
     latestValue.current = value;
+    
+    // Track if the update came from another tab to prevent echo
+    const isExternalUpdate = useRef(false);
 
     /**
      * Load initial value from IndexedDB
@@ -90,6 +116,34 @@ export const useIndexedDB = (key, defaultValue) => {
 
         loadValue();
     }, [key]);
+    
+    /**
+     * Listen for cross-tab updates via BroadcastChannel
+     */
+    useEffect(() => {
+        const channel = getBroadcastChannel();
+        if (!channel) return;
+        
+        const handleMessage = (event) => {
+            // Only process messages for this key
+            if (event.data?.key !== key) return;
+            
+            // Mark as external update to prevent broadcasting back
+            isExternalUpdate.current = true;
+            setValue(event.data.value);
+            
+            // Reset the flag after a microtask
+            Promise.resolve().then(() => {
+                isExternalUpdate.current = false;
+            });
+        };
+        
+        channel.addEventListener('message', handleMessage);
+        
+        return () => {
+            channel.removeEventListener('message', handleMessage);
+        };
+    }, [key]);
 
     /**
      * Save value to IndexedDB whenever it changes
@@ -108,6 +162,14 @@ export const useIndexedDB = (key, defaultValue) => {
 
                 const db = await getDB();
                 await db.put(STORE_NAME, value, key);
+                
+                // Broadcast the change to other tabs (only if this wasn't an external update)
+                if (!isExternalUpdate.current) {
+                    const channel = getBroadcastChannel();
+                    if (channel) {
+                        channel.postMessage({ key, value });
+                    }
+                }
 
             } catch (err) {
 

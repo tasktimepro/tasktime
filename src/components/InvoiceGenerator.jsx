@@ -767,11 +767,12 @@ const InvoiceGenerator = ({
             ? editingInvoice.invoiceNumber 
             : generateInvoiceNumber(selectedTemplate, selectedProject);
 
-        // Calculate due date using template - use override date if available
-        const invoiceDate = editingInvoice 
-            ? new Date(editingInvoice.date) 
-            : useInvoiceDateOverride && invoiceDateOverride 
-                ? new Date(invoiceDateOverride) 
+        // Calculate due date using template - use override date if available (for both new and editing)
+        // Priority: 1. Date override (if enabled), 2. Original date (if editing), 3. Today's date (for new)
+        const invoiceDate = useInvoiceDateOverride && invoiceDateOverride
+            ? new Date(invoiceDateOverride)
+            : editingInvoice 
+                ? new Date(editingInvoice.date) 
                 : new Date();
         const dueDate = calculateDueDate(selectedTemplate, invoiceDate);
 
@@ -866,11 +867,19 @@ const InvoiceGenerator = ({
                     .map(task => ({
                         ...task,
                         hours: editableHours[task.id] || task.originalHours,
-                        hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                        flatRate: taskFlatRates[task.id] || 0,
+                        hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                        useFlatRate: useFlatRate[task.id] || false,
                         quantity: taskQuantities[task.id] || 1, // Include quantity for flat rate tasks
                         isMerged: mergedSubtasks[task.id] || false, // Track merged status
                         mergedSubtasks: mergedSubtasks[task?.id] ? 
-                            invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task?.id) : []
+                            invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task?.id).map(subtask => ({
+                                ...subtask,
+                                hours: editableHours[subtask.id] || subtask.originalHours,
+                                flatRate: taskFlatRates[subtask.id] || 0,
+                                hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                                useFlatRate: useFlatRate[subtask.id] || false
+                            })) : []
                     })),
                 additionalTasks: additionalTasks.filter(task => task).map(task => ({
                     ...task,

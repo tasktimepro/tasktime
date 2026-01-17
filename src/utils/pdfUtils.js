@@ -181,20 +181,46 @@ export const createInvoiceHTML = (invoiceData) => {
                                 parseFloat(taskFlatRates[task.id]) || 0 : 
                                 (parseFloat(task.flatRate) || 0);
                         } else {
-                            // For hourly tasks, always multiply hours by rate
-                            const hourlyRate = parseFloat(task.hourlyRate) || parseFloat(project?.hourlyRate) || 0;
-                            taskAmount = displayHours * hourlyRate;
+                            // For hourly tasks, calculate parent's amount
+                            const parentHours = parseFloat(task.hours) || 0;
+                            const parentHourlyRate = parseFloat(task.hourlyRate) || parseFloat(project?.hourlyRate) || 0;
+                            taskAmount = parentHours * parentHourlyRate;
+                            
+                            // For merged subtasks, calculate each subtask's amount with its own rate
+                            if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
+                                task.mergedSubtasks.forEach(subtask => {
+                                    const subtaskHours = parseFloat(subtask.hours) || 0;
+                                    const subtaskHourlyRate = parseFloat(subtask.hourlyRate) || parseFloat(project?.hourlyRate) || 0;
+                                    taskAmount += subtaskHours * subtaskHourlyRate;
+                                });
+                            }
                         }
                         
                         // Show hours if we have tracked time, even for flat rate tasks
                         const hours = showHoursAndRate ? displayHours.toFixed(2) : '—';
-                        const rate = showHoursAndRate ? getCurrencySymbol(invoiceCurrency) + (parseFloat(task.hourlyRate) || parseFloat(project?.hourlyRate) || 0).toFixed(2) : '—';
+                        // For merged tasks with different rates, show "Mixed" instead of a single rate
+                        let rateDisplay;
+                        if (!showHoursAndRate) {
+                            rateDisplay = '—';
+                        } else if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
+                            // Check if all rates are the same
+                            const parentRate = parseFloat(task.hourlyRate) || parseFloat(project?.hourlyRate) || 0;
+                            const allRatesSame = task.mergedSubtasks.every(subtask => {
+                                const subtaskRate = parseFloat(subtask.hourlyRate) || parseFloat(project?.hourlyRate) || 0;
+                                return subtaskRate === parentRate;
+                            });
+                            rateDisplay = allRatesSame 
+                                ? getCurrencySymbol(invoiceCurrency) + parentRate.toFixed(2)
+                                : 'Mixed';
+                        } else {
+                            rateDisplay = getCurrencySymbol(invoiceCurrency) + (parseFloat(task.hourlyRate) || parseFloat(project?.hourlyRate) || 0).toFixed(2);
+                        }
                         
                         return `
                         <tr>
                             <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
                             <td style="padding: 8px; text-align: right; ${borderStyle}">${hours}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${rate}</td>
+                            <td style="padding: 8px; text-align: right; ${borderStyle}">${rateDisplay}</td>
                             <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
@@ -277,9 +303,19 @@ export const createInvoiceHTML = (invoiceData) => {
                                 parseFloat(taskFlatRates[task.id]) || 0 : 
                                 (parseFloat(task.flatRate) || 0);
                         } else {
-                            // For hourly tasks, multiply hours by rate
-                            const hourlyRate = parseFloat(task.hourlyRate) || parseFloat(project?.hourlyRate) || 0;
-                            taskAmount = displayHours * hourlyRate;
+                            // For hourly tasks, calculate parent's amount
+                            const parentHours = parseFloat(task.hours) || 0;
+                            const parentHourlyRate = parseFloat(task.hourlyRate) || parseFloat(project?.hourlyRate) || 0;
+                            taskAmount = parentHours * parentHourlyRate;
+                            
+                            // For merged subtasks, calculate each subtask's amount with its own rate
+                            if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
+                                task.mergedSubtasks.forEach(subtask => {
+                                    const subtaskHours = parseFloat(subtask.hours) || 0;
+                                    const subtaskHourlyRate = parseFloat(subtask.hourlyRate) || parseFloat(project?.hourlyRate) || 0;
+                                    taskAmount += subtaskHours * subtaskHourlyRate;
+                                });
+                            }
                         }
                         
                         // Always show hours when they exist, even for flat rate tasks

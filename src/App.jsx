@@ -519,6 +519,7 @@ function App() {
                             <UserCircleIcon className="h-5 w-5 mr-3 flex-shrink-0" />
                             Account
                         </button>
+                        <OfflineIndicator className="mt-2" />
                     </div>
                 </aside>
 
@@ -781,7 +782,6 @@ function App() {
             </div>
             
             {/* PWA Components */}
-            <OfflineIndicator />
             <InstallPrompt />
         </ToastProvider>
     );

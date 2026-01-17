@@ -82,13 +82,14 @@ const useTaskState = ({
         if (!setTasks) return;
 
         if (hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
-            const now = Date.now();
-            const updatedTasks = tasks.map(t =>
-                t.id === task.id ? { ...t, billable: true, lastActive: now } : t
+            // Use functional update to avoid race conditions with other task updates
+            setTasks(prevTasks => 
+                prevTasks.map(t =>
+                    t.id === task.id ? { ...t, billable: true, lastActive: Date.now() } : t
+                )
             );
-            setTasks(updatedTasks);
         }
-    }, [hasSignificantBillableTime, task.billable, task.billableSetByUser, task.id, tasks, setTasks]);
+    }, [hasSignificantBillableTime, task.billable, task.billableSetByUser, task.id, setTasks]);
 
     return {
         taskTimeEntries,

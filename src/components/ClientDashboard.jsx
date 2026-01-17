@@ -507,34 +507,6 @@ const ClientDashboard = ({
                         <CardTitle className="text-lg">
                             Invoices ({clientInvoices.length})
                         </CardTitle>
-                        
-                        {/* Generate Invoice with Client Pre-selected */}
-                        <InvoiceGenerator
-                            client={client} // Pass client instead of project
-                            projects={projects}
-                            setProjects={setProjects}
-                            tasks={clientTasks}
-                            setTasks={setTasks}
-                            timeEntries={clientTimeEntries}
-                            currentTimer={currentTimer}
-                            isPaused={isPaused}
-                            editingInvoice={editingInvoice}
-                            onInvoiceSaved={() => setEditingInvoice(null)}
-                            paymentMethods={paymentMethods}
-                            businessInfos={businessInfos}
-                            clients={clients}
-                            invoices={invoices}
-                            setInvoices={setInvoices}
-                            invoiceTemplates={invoiceTemplates}
-                            setInvoiceTemplates={setInvoiceTemplates}
-                            showButton={true}
-                            // Modal functions
-                            openClientModal={openClientModal}
-                            openProjectModal={openProjectModal}
-                            openBusinessModal={openBusinessModal}
-                            openPaymentMethodModal={openPaymentMethodModal}
-                            openTemplateModal={openTemplateModal}
-                        />
                     </div>
                 </CardHeader>
 
