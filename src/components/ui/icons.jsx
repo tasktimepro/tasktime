@@ -41,6 +41,7 @@ export {
     Upload as ArrowUpTrayIcon,
     User as UserCircleIcon,
     Users as UserGroupIcon,
+    WifiOff as WifiOffIcon,
     X as XMarkIcon,
     Download as ArrowDownTrayIcon,
 } from "lucide-react";

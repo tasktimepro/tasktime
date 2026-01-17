@@ -75,3 +75,14 @@ export const TOAST_DURATION_WARNING_MS = 5000;
 
 /** Maximum items per page in paginated lists */
 export const MAX_PAGINATION_ITEMS = 20;
+
+// =============================================================================
+// PWA CONSTANTS
+// =============================================================================
+
+/** 
+ * Delay before showing the PWA install prompt.
+ * We wait to ensure user has had time to explore the app.
+ * Default: 60 seconds
+ */
+export const INSTALL_PROMPT_DELAY_MS = 60 * ONE_SECOND_MS;

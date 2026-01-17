@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
@@ -353,12 +354,9 @@ const InvoicesList = ({
             <>
                 <div className="space-y-4">
                     {currentInvoices.map((invoice) => (
-                        <div key={invoice.id} className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
-                            invoice.paymentProcessed 
-                                ? 'border-green-300 dark:border-green-700 bg-background' 
-                                : 'border-border bg-background'
-                        }`}>
-                            <div className="flex flex-col space-y-4">
+                        <Card key={invoice.id} className="hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                                <div className="flex flex-col space-y-4">
                                 {/* Header row with invoice number and status tag */}
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
@@ -514,42 +512,46 @@ const InvoicesList = ({
                                     {/* Action buttons - right side */}
                                     <div className="flex justify-end items-center space-x-2">
                                         {!invoice.paymentProcessed && (
-                                            <button
+                                            <Button
                                                 onClick={() => handlePaymentProcessedToggle(invoice)}
-                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                                size="sm"
+                                                leadingIcon={CheckIcon}
                                             >
-                                                <CheckIcon className="h-3 w-3 mr-1" />
                                                 Mark as Paid
-                                            </button>
+                                            </Button>
                                         )}
 
-                                        <button
+                                        <Button
                                             onClick={() => handleEdit(invoice)}
-                                            className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
+                                            variant="ghost"
+                                            size="icon"
                                             title="Edit Invoice"
                                         >
                                             <PencilIcon className="h-5 w-5" />
-                                        </button>
+                                        </Button>
                                         
-                                        <button
+                                        <Button
                                             onClick={() => handlePreview(invoice)}
-                                            className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
+                                            variant="ghost"
+                                            size="icon"
                                             title="Preview Invoice"
                                         >
                                             <EyeIcon className="h-5 w-5" />
-                                        </button>
+                                        </Button>
                                         
-                                        <button
+                                        <Button
                                             onClick={() => handleDownload(invoice)}
-                                            className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
+                                            variant="ghost"
+                                            size="icon"
                                             title="Download as PDF"
                                         >
                                             <ArrowDownTrayIcon className="h-5 w-5" />
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     ))}
                 </div>
 
@@ -572,19 +574,18 @@ const InvoicesList = ({
         // Footer with action buttons for the invoice preview modal
         const previewModalFooter = (
             <div className="flex justify-end space-x-4">
-                <button
+                <Button
                     onClick={() => handleDownload(selectedInvoice)}
-                    className="px-4 py-2 bg-primary text-sm font-medium text-primary-foreground rounded-md hover:bg-primary/90 flex items-center space-x-2"
+                    leadingIcon={ArrowDownTrayIcon}
                 >
-                    <ArrowDownTrayIcon className="h-5 w-5" />
-                    <span>Download PDF</span>
-                </button>
-                <button
+                    Download PDF
+                </Button>
+                <Button
                     onClick={() => setShowPreview(false)}
-                    className="px-4 py-2 bg-muted text-foreground text-sm font-medium rounded-md hover:bg-muted"
+                    variant="secondary"
                 >
                     Close
-                </button>
+                </Button>
             </div>
         );
 
@@ -695,7 +696,7 @@ const InvoicesList = ({
                     </TabsTrigger>
                     <TabsTrigger
                         value="paid"
-                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-green-500 dark:data-[state=active]:border-green-400 data-[state=active]:text-green-700 dark:data-[state=active]:text-green-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-border data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                     >
                         Paid ({paidInvoices.length})
                     </TabsTrigger>

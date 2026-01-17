@@ -3,6 +3,7 @@ import { useToast } from '../hooks/useToast';
 import { DEFAULT_CURRENCY, getCurrencyOptions } from '../utils/currencyUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
  * Preferences component - Manages user preferences including preferred currency
@@ -18,8 +19,7 @@ const Preferences = ({ preferences = {}, setPreferences }) => {
     }, [preferences]);
 
     // Save preferred currency to preferences state
-    const handleCurrencyChange = (e) => {
-        const newCurrency = e.target.value;
+    const handleCurrencyChange = (newCurrency) => {
         setPreferredCurrency(newCurrency);
         
         // Update preferences state
@@ -56,18 +56,21 @@ const Preferences = ({ preferences = {}, setPreferences }) => {
                         <Label htmlFor="preferredCurrency">
                             Preferred Currency
                         </Label>
-                        <select
-                            id="preferredCurrency"
+                        <Select
                             value={preferredCurrency}
-                            onChange={handleCurrencyChange}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            onValueChange={handleCurrencyChange}
                         >
-                            {getCurrencyOptions(true).map(option => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectTrigger id="preferredCurrency">
+                                <SelectValue placeholder="Select a currency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {getCurrencyOptions(true).map(option => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         <p className="text-sm text-muted-foreground">
                             This currency will be used as the default for new projects and in dashboard metrics.
                         </p>

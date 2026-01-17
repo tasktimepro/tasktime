@@ -341,13 +341,16 @@ const ProjectList = ({
                                     {/* Three-dot dropdown menu for Edit and Delete */}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button
+                                            <Button
                                                 onClick={(e) => e.stopPropagation()}
-                                                className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-muted-foreground hover:bg-muted rounded-full"
                                                 title="More actions"
+                                                aria-label="More actions"
                                             >
-                                                <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
-                                            </button>
+                                                <MoreHorizontal className="h-5 w-5" />
+                                            </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                             <DropdownMenuItem

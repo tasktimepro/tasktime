@@ -6,6 +6,7 @@ import { useToast } from '../../hooks/useToast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
 
 /**
@@ -537,20 +538,22 @@ const BusinessModal = ({
                                     <Label htmlFor="taxLabel">
                                         Tax Label
                                     </Label>
-                                    <select
-                                        id="taxLabel"
-                                        name="taxLabel"
+                                    <Select
                                         value={formData.taxLabel}
-                                        onChange={handleInputChange}
-                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
+                                        onValueChange={(value) => handleInputChange({ target: { name: 'taxLabel', value } })}
                                     >
-                                        <option value="VAT">VAT</option>
-                                        <option value="GST">GST</option>
-                                        <option value="MOMS">MOMS</option>
-                                        <option value="BTW">BTW</option>
-                                        <option value="Tax">Tax</option>
-                                        <option value="Sales Tax">Sales Tax</option>
-                                    </select>
+                                        <SelectTrigger id="taxLabel">
+                                            <SelectValue placeholder="Select tax label" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="VAT">VAT</SelectItem>
+                                            <SelectItem value="GST">GST</SelectItem>
+                                            <SelectItem value="MOMS">MOMS</SelectItem>
+                                            <SelectItem value="BTW">BTW</SelectItem>
+                                            <SelectItem value="Tax">Tax</SelectItem>
+                                            <SelectItem value="Sales Tax">Sales Tax</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 <div className="space-y-2">

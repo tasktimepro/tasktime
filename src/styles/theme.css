@@ -1,21 +1,79 @@
-/* Theme variables for TaskTime app */
+/* Theme variables for TaskTime app - shadcn/ui compatible */
 
+/* Tailwind v4 theme extension - use 'inline' to extend rather than replace default theme */
+@theme inline {
+  /* Border radius */
+  --radius: 0.5rem;
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  
+  /* Custom colors using CSS variables for shadcn/ui */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+  
+  /* Toast animations */
+  --animate-toast-enter: toast-enter 0.3s ease-out forwards;
+  --animate-toast-exit: toast-exit 0.3s ease-in forwards;
+  
+  @keyframes toast-enter {
+    0% {
+      transform: translateY(1rem);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes toast-exit {
+    0% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(1rem);
+      opacity: 0;
+    }
+  }
+}
+
+/* App-specific colors for scrollbar and legacy components */
 :root {
-  /* 
-   * Main app colors - adjust these to match your app's color scheme 
-   * These will be referenced by the scrollbar variables
-   */
-  --app-primary: #2563eb;         /* Blue 600 - matches primary blue in your app */
-  --app-primary-light: #60a5fa;   /* Blue 400 - lighter shade */
-  --app-primary-lighter: #93c5fd; /* Blue 300 - even lighter shade for subtle elements */
-  --app-background: #f9fafb;      /* Gray 50 - matches your app's background */
-  --app-surface: #f3f4f6;         /* Gray 100 - for UI elements */
+  --app-primary: #2563eb;
+  --app-primary-light: #60a5fa;
+  --app-primary-lighter: #93c5fd;
+  --app-background: #f9fafb;
+  --app-surface: #f3f4f6;
   
   /* Scrollbar specific variables */
-  --scrollbar-track-color: rgba(243, 244, 246, 0.8);  /* Semi-transparent surface color */
-  --scrollbar-thumb-color: rgba(135, 135, 135, 0.6);   /* Semi-transparent primary light */
-  --scrollbar-thumb-hover-color: rgba(37, 99, 235, 0.8); /* More opaque primary on hover */
-  --scrollbar-width: 8px;         /* Width of the scrollbar - slim but visible */
+  --scrollbar-track-color: rgba(243, 244, 246, 0.8);
+  --scrollbar-thumb-color: rgba(135, 135, 135, 0.6);
+  --scrollbar-thumb-hover-color: rgba(37, 99, 235, 0.8);
+  --scrollbar-width: 8px;
   
   /* Border radius for UI elements */
   --border-radius-sm: 3px;
@@ -23,19 +81,9 @@
   --border-radius-lg: 8px;
 }
 
-/* Dark mode support - uncomment and customize if needed */
-/*
-@media (prefers-color-scheme: dark) {
-  :root {
-    --app-primary: #3b82f6;       /* Blue 500 - brighter blue for dark mode *\/
-    --app-primary-light: #93c5fd; /* Blue 300 - lighter for dark mode *\/
-    --app-primary-lighter: #bfdbfe; /* Blue 200 - even lighter for dark mode *\/
-    --app-background: #111827;    /* Gray 900 - dark background *\/
-    --app-surface: #1f2937;       /* Gray 800 - slightly lighter surface *\/
-    
-    --scrollbar-track-color: rgba(31, 41, 55, 0.8);  /* Semi-transparent dark surface *\/
-    --scrollbar-thumb-color: rgba(96, 165, 250, 0.5); /* Semi-transparent primary light *\/
-    --scrollbar-thumb-hover-color: rgba(147, 197, 253, 0.8); /* Brighter on hover *\/
-  }
+/* Dark mode scrollbar */
+.dark {
+  --scrollbar-track-color: rgba(31, 41, 55, 0.8);
+  --scrollbar-thumb-color: rgba(96, 165, 250, 0.5);
+  --scrollbar-thumb-hover-color: rgba(147, 197, 253, 0.8);
 }
-*/

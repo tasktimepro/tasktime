@@ -6,6 +6,7 @@ import { toDisplayDate } from '../../utils/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
 
 /**
@@ -390,23 +391,27 @@ const TemplateModal = ({
                             <Label>
                                 Due Date Type
                             </Label>
-                            <select
+                            <Select
                                 value={formData.dueDateType}
-                                onChange={(e) => setFormData(prev => ({ 
+                                onValueChange={(value) => setFormData(prev => ({ 
                                     ...prev, 
-                                    dueDateType: e.target.value,
+                                    dueDateType: value,
                                     // Reset related fields when type changes
-                                    dueDateDays: e.target.value === 'fixed-days' ? prev.dueDateDays : 0,
-                                    dueDateWeeks: e.target.value === 'fixed-weeks' ? prev.dueDateWeeks || 1 : 0,
-                                    dueDatePrecise: e.target.value === 'precise-date' ? prev.dueDatePrecise || '' : ''
+                                    dueDateDays: value === 'fixed-days' ? prev.dueDateDays : 0,
+                                    dueDateWeeks: value === 'fixed-weeks' ? prev.dueDateWeeks || 1 : 0,
+                                    dueDatePrecise: value === 'precise-date' ? prev.dueDatePrecise || '' : ''
                                 }))}
-                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
                             >
-                                <option value="fixed-days">Fixed days from invoice date</option>
-                                <option value="fixed-weeks">Fixed weeks from invoice date</option>
-                                <option value="precise-date">Precise date</option>
-                                <option value="none">Don't show due date</option>
-                            </select>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select due date type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="fixed-days">Fixed days from invoice date</SelectItem>
+                                    <SelectItem value="fixed-weeks">Fixed weeks from invoice date</SelectItem>
+                                    <SelectItem value="precise-date">Precise date</SelectItem>
+                                    <SelectItem value="none">Don't show due date</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         {/* Days input - only show for fixed-days type */}

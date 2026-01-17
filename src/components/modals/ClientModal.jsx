@@ -5,6 +5,7 @@ import { useToast } from '../../hooks/useToast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
 import { getPreferredCurrency, getCurrencyOptions } from '../../utils/currencyUtils';
 import Modal from '../Modal';
@@ -513,19 +514,21 @@ const ClientModal = ({
                         <Label htmlFor="defaultCurrency" className="mb-2">
                             Default Currency
                         </Label>
-                        <select
-                            id="defaultCurrency"
-                            name="defaultCurrency"
+                        <Select
                             value={formData.defaultCurrency}
-                            onChange={handleInputChange}
-                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
+                            onValueChange={(value) => handleInputChange({ target: { name: 'defaultCurrency', value } })}
                         >
-                            {getCurrencyOptions().map(option => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectTrigger id="defaultCurrency">
+                                <SelectValue placeholder="Select a currency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {getCurrencyOptions().map(option => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         <p className="mt-2 text-xs text-muted-foreground">
                             This currency will be used as the default for new projects and invoices for this client.
                         </p>

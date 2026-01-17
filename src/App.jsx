@@ -12,6 +12,8 @@ import Invoices from './components/Invoices';
 import GlobalTimer from './components/GlobalTimer';
 import ModalManager from './components/modals/ModalManager';
 import ErrorBoundary from './components/ErrorBoundary';
+import OfflineIndicator from './components/OfflineIndicator';
+import InstallPrompt from './components/InstallPrompt';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils';
 import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon } from '@/components/ui/icons';
@@ -438,7 +440,7 @@ function App() {
                             <li>
                                 <button
                                     onClick={() => navigateToDashboard()}
-                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                         activeView === 'dashboard'
                                             ? 'bg-accent text-accent-foreground font-semibold'
                                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -451,7 +453,7 @@ function App() {
                             <li>
                                 <button
                                     onClick={() => navigateToClients()}
-                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                         activeView === 'clients'
                                             ? 'bg-accent text-accent-foreground font-semibold'
                                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -464,7 +466,7 @@ function App() {
                             <li>
                                 <button
                                     onClick={() => navigateToProjects()}
-                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                         activeView === 'projects'
                                             ? 'bg-accent text-accent-foreground font-semibold'
                                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -477,7 +479,7 @@ function App() {
                             <li>
                                 <button
                                     onClick={() => navigateToInvoices()}
-                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                         activeView === 'invoices'
                                             ? 'bg-accent text-accent-foreground font-semibold'
                                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -494,7 +496,7 @@ function App() {
                     <div className="px-4 py-4 border-t border-border space-y-2">
                         <button
                             onClick={() => setDarkMode(!darkMode)}
-                            className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                             title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
                         >
                             {darkMode ? (
@@ -506,7 +508,7 @@ function App() {
                         </button>
                         <button
                             onClick={() => navigateToAccount()}
-                            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                 activeView === 'account'
                                     ? 'bg-accent text-accent-foreground font-semibold'
                                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -773,6 +775,10 @@ function App() {
                     )}
                 </main>
             </div>
+            
+            {/* PWA Components */}
+            <OfflineIndicator />
+            <InstallPrompt />
         </ToastProvider>
     );
 }

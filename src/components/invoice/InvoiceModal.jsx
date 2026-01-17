@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Notice } from '@/components/ui/notice';
 
@@ -235,8 +236,11 @@ const InvoiceModal = ({
                                         Client <span className="text-red-500">*</span>
                                     </h4>
                                     {openClientModal && !isClientContextFixed && !editingInvoice && !(selectedProject && selectedProject.preferredClientId) && (
-                                        <button
+                                        <Button
                                             type="button"
+                                            variant="link"
+                                            size="sm"
+                                            className="h-auto p-0"
                                             onClick={() => {
                                                 if (openClientModal) {
                                                     // Save current form state before opening nested modal
@@ -244,10 +248,9 @@ const InvoiceModal = ({
                                                     openClientModal();
                                                 }
                                             }}
-                                            className="text-sm text-blue-600 hover:text-foreground font-medium"
                                         >
                                             + New Client
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
 
@@ -259,21 +262,25 @@ const InvoiceModal = ({
                                     />
                                 ) : (
                                     <div className="space-y-2">
-                                        <select
-                                            value={selectedClient?.id || ''}
-                                            onChange={(e) => handleClientSelection(e.target.value)}
-                                            className={`block w-full border ${(isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)) ? 'bg-muted' : 'bg-background'} border-border rounded-md shadow-sm focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2`}
-                                            required
+                                        <Select
+                                            value={selectedClient?.id || "__none__"}
+                                            onValueChange={(value) => handleClientSelection(value === "__none__" ? "" : value)}
                                             disabled={isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)}
                                         >
-                                            {/* Make this placeholder not disabled to allow clearing the selection if needed */}
-                                            <option value="">Select client info</option>
-                                            {clients.map(client => (
-                                                <option key={client.id} value={client.id}>
-                                                    {client.title.trim()}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            <SelectTrigger
+                                                className={(isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)) ? 'bg-muted' : 'bg-background'}
+                                            >
+                                                <SelectValue placeholder="Select client info" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">Select client info</SelectItem>
+                                                {clients.map(client => (
+                                                    <SelectItem key={client.id} value={client.id}>
+                                                        {client.title.trim()}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                         {selectedProject && selectedProject.preferredClientId && (
                                             <Notice
                                                 title={`Client cannot be changed because this project is associated with ${clients.find(c => c.id === selectedProject.preferredClientId)?.title || 'a specific client'}.`}
@@ -297,8 +304,11 @@ const InvoiceModal = ({
                                         Project
                                     </h4>
                                     {openProjectModal && !(isProjectContextFixed && !isClientContextFixed) && !isClientContextFixed && !editingInvoice && (
-                                        <button
+                                        <Button
                                             type="button"
+                                            variant="link"
+                                            size="sm"
+                                            className="h-auto p-0"
                                             onClick={() => {
                                                 if (openProjectModal) {
                                                     // Save current form state before opening nested modal
@@ -306,10 +316,9 @@ const InvoiceModal = ({
                                                     openProjectModal();
                                                 }
                                             }}
-                                            className="text-sm text-blue-600 hover:text-foreground font-medium"
                                         >
                                             + New Project
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
 
@@ -354,30 +363,36 @@ const InvoiceModal = ({
 
                                     return (
                                         <div className="space-y-2">
-                                            <select
-                                                value={selectedProject?.id || ''}
-                                                onChange={(e) => handleProjectSelection(e.target.value)}
-                                                className={`block w-full border ${(isProjectContextFixed && !isClientContextFixed) || editingInvoice ? 'bg-muted' : 'bg-background'} border-border rounded-md shadow-sm focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2`}
+                                            <Select
+                                                value={selectedProject?.id || "__none__"}
+                                                onValueChange={(value) => handleProjectSelection(value === "__none__" ? "" : value)}
                                                 disabled={(isProjectContextFixed && !isClientContextFixed) || editingInvoice}
                                             >
-                                                <option value="">Select project (optional)</option>
-                                                {projects.filter(proj => {
-                                                    // Only show non-personal projects
-                                                    if (proj.isPersonal) return false;
-                                                    
-                                                    // If a client is selected, only show projects for that client
-                                                    if (selectedClient) {
-                                                        return proj.preferredClientId === selectedClient.id;
-                                                    }
-                                                    
-                                                    // If no client selected, show all non-personal projects
-                                                    return true;
-                                                }).map(proj => (
-                                                    <option key={proj.id} value={proj.id}>
-                                                        {proj.title}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                                <SelectTrigger
+                                                    className={((isProjectContextFixed && !isClientContextFixed) || editingInvoice) ? 'bg-muted' : 'bg-background'}
+                                                >
+                                                    <SelectValue placeholder="Select project (optional)" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="__none__">Select project (optional)</SelectItem>
+                                                    {projects.filter(proj => {
+                                                        // Only show non-personal projects
+                                                        if (proj.isPersonal) return false;
+                                                        
+                                                        // If a client is selected, only show projects for that client
+                                                        if (selectedClient) {
+                                                            return proj.preferredClientId === selectedClient.id;
+                                                        }
+                                                        
+                                                        // If no client selected, show all non-personal projects
+                                                        return true;
+                                                    }).map(proj => (
+                                                        <SelectItem key={proj.id} value={proj.id}>
+                                                            {proj.title}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
 
                                             {selectedProject && (
                                                 <Notice
@@ -461,8 +476,11 @@ const InvoiceModal = ({
                                         </>
                                     )}
                                 </div>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto p-0"
                                     onClick={() => {
                                         setShowAddTaskForm(true);
                                         // Use setTimeout to ensure the form is rendered before focusing
@@ -472,10 +490,9 @@ const InvoiceModal = ({
                                             }
                                         }, 50);
                                     }}
-                                    className="text-sm text-blue-600 hover:text-foreground font-medium"
                                 >
                                     + Add Task
-                                </button>
+                                </Button>
                             </div>
                             
                             {/* Tasks with Editable Hours */}
@@ -672,14 +689,17 @@ const InvoiceModal = ({
                                             <div key={task.id} className="flex items-center justify-between p-3 bg-muted rounded border">
                                                 <div className="flex items-center space-x-3 flex-1">
                                                     {/* Task remove button */}
-                                                    <button
+                                                    <Button
                                                         type="button"
+                                                        variant="ghost"
+                                                        size="icon"
                                                         onClick={() => handleRemoveAdditionalTask(task.id)}
-                                                        className="text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
+                                                        className="text-red-600 hover:text-red-800"
                                                         title="Remove task"
+                                                        aria-label="Remove task"
                                                     >
                                                         <TrashIcon className="w-5 h-5" />
-                                                    </button>
+                                                    </Button>
                                                     <div className="flex-1 pr-4">
                                                         <p className="text-sm font-medium text-foreground overflow-hidden" style={{ 
                                                             display: '-webkit-box', 
@@ -953,14 +973,18 @@ const InvoiceModal = ({
                             <div>
                                 <label className="block text-sm font-medium text-foreground mb-2">Discount</label>
                                 <div className="flex space-x-2">
-                                    <select
+                                    <Select
                                         value={discountType}
-                                        onChange={(e) => setDiscountType(e.target.value)}
-                                        className="w-24 text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
+                                        onValueChange={setDiscountType}
                                     >
-                                        <option value="percentage">%</option>
-                                        <option value="fixed">{getCurrencySymbol(getInvoiceCurrency())}</option>
-                                    </select>
+                                        <SelectTrigger className="w-24">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="percentage">%</SelectItem>
+                                            <SelectItem value="fixed">{getCurrencySymbol(getInvoiceCurrency())}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -1128,8 +1152,11 @@ const InvoiceModal = ({
                                     <h4 className="text-sm font-medium text-foreground">
                                         Business
                                     </h4>
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="link"
+                                        size="sm"
+                                        className="h-auto p-0"
                                         onClick={() => {
                                             if (openBusinessModal) {
                                                 // Save current form state before opening nested modal
@@ -1137,10 +1164,9 @@ const InvoiceModal = ({
                                                 openBusinessModal();
                                             }
                                         }}
-                                        className="text-sm text-blue-600 hover:text-foreground font-medium"
                                     >
                                         + New Business
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 {businessInfos.length === 0 ? (
@@ -1150,27 +1176,31 @@ const InvoiceModal = ({
                                     />
                                 ) : (
                                     <div className="space-y-2">
-                                        <select
-                                            value={selectedBusinessInfo?.id || ''}
-                                            onChange={(e) => {
-                                                if (e.target.value === "") {
+                                        <Select
+                                            value={selectedBusinessInfo?.id || "__none__"}
+                                            onValueChange={(value) => {
+                                                if (value === "__none__") {
                                                     setSelectedBusinessInfo(null);
                                                 } else {
-                                                    const businessInfo = businessInfos.find(bi => bi.id === e.target.value);
+                                                    const businessInfo = businessInfos.find(bi => bi.id === value);
                                                     if (businessInfo) {
                                                         setSelectedBusinessInfo(businessInfo);
                                                     }
                                                 }
                                             }}
-                                            className="block w-full border border-border rounded-md shadow-sm bg-background text-foreground focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2"
                                         >
-                                            <option value="">Select business info (optional)</option>
-                                            {businessInfos.map(info => (
-                                                <option key={info.id} value={info.id}>
-                                                    {info.title}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select business info (optional)" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">Select business info (optional)</SelectItem>
+                                                {businessInfos.map(info => (
+                                                    <SelectItem key={info.id} value={info.id}>
+                                                        {info.title}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
 
                                         {selectedBusinessInfo && (
                                             <Notice
@@ -1188,8 +1218,11 @@ const InvoiceModal = ({
                                     <h4 className="text-sm font-medium text-foreground">
                                         Payment Method
                                     </h4>
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="link"
+                                        size="sm"
+                                        className="h-auto p-0"
                                         onClick={() => {
                                             if (openPaymentMethodModal) {
                                                 // Save current form state before opening nested modal
@@ -1197,10 +1230,9 @@ const InvoiceModal = ({
                                                 openPaymentMethodModal();
                                             }
                                         }}
-                                        className="text-sm text-blue-600 hover:text-foreground font-medium"
                                     >
                                         + New Payment Method
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 {paymentMethods.length === 0 ? (
@@ -1210,27 +1242,31 @@ const InvoiceModal = ({
                                     />
                                 ) : (
                                     <div className="space-y-2">
-                                        <select
-                                            value={selectedPaymentMethod?.id || ''}
-                                            onChange={(e) => {
-                                                if (e.target.value === "") {
+                                        <Select
+                                            value={selectedPaymentMethod?.id || "__none__"}
+                                            onValueChange={(value) => {
+                                                if (value === "__none__") {
                                                     setSelectedPaymentMethod(null);
                                                 } else {
-                                                    const paymentMethod = paymentMethods.find(pm => pm.id === e.target.value);
+                                                    const paymentMethod = paymentMethods.find(pm => pm.id === value);
                                                     if (paymentMethod) {
                                                         setSelectedPaymentMethod(paymentMethod);
                                                     }
                                                 }
                                             }}
-                                            className="block w-full border border-border rounded-md shadow-sm bg-background text-foreground focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2"
                                         >
-                                            <option value="">Select payment method (optional)</option>
-                                            {paymentMethods.map(method => (
-                                                <option key={method.id} value={method.id}>
-                                                    {method.title}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select payment method (optional)" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">Select payment method (optional)</SelectItem>
+                                                {paymentMethods.map(method => (
+                                                    <SelectItem key={method.id} value={method.id}>
+                                                        {method.title}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
 
                                         {selectedPaymentMethod && (
                                             <Notice
@@ -1272,8 +1308,11 @@ const InvoiceModal = ({
                                     <h4 className="text-sm font-medium text-foreground">
                                         Invoice Template <span className="text-red-500">*</span>
                                     </h4>
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="link"
+                                        size="sm"
+                                        className="h-auto p-0"
                                         onClick={() => {
                                             if (openTemplateModal) {
                                                 // Save current form state before opening nested modal
@@ -1281,10 +1320,9 @@ const InvoiceModal = ({
                                                 openTemplateModal();
                                             }
                                         }}
-                                        className="text-sm text-blue-600 hover:text-foreground font-medium"
                                     >
                                         + New Template
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 {invoiceTemplates.length === 0 ? (
@@ -1295,19 +1333,22 @@ const InvoiceModal = ({
                                     />
                                 ) : (
                                     <div className="space-y-2">
-                                        <select
-                                            value={selectedTemplate?.id || ''}
-                                            onChange={(e) => handleTemplateSelection(e.target.value)}
-                                            className="block w-full border border-border rounded-md shadow-sm bg-background text-foreground focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2"
-                                            required
+                                        <Select
+                                            value={selectedTemplate?.id || "__none__"}
+                                            onValueChange={(value) => handleTemplateSelection(value === "__none__" ? "" : value)}
                                         >
-                                            <option value="">Select template</option>
-                                            {invoiceTemplates.map(template => (
-                                                <option key={template.id} value={template.id}>
-                                                    {template.name} {template.isDefault ? '(Default)' : ''}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select template" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">Select template</SelectItem>
+                                                {invoiceTemplates.map(template => (
+                                                    <SelectItem key={template.id} value={template.id}>
+                                                        {template.name} {template.isDefault ? '(Default)' : ''}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                         {selectedTemplate && (
                                             <Notice
                                                 title={selectedTemplate.name}

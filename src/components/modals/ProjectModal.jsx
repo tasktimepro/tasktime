@@ -4,6 +4,7 @@ import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { generateSlugId } from '../../utils/idUtils';
 import { useToast } from '../../hooks/useToast';
 import CustomCheckbox from '../CustomCheckbox';
@@ -388,24 +389,27 @@ const ProjectModal = ({
                                 </Button>
                             )}
                         </div>
-                        <select
-                            id="preferredClientId"
-                            name="preferredClientId"
+                        <Select
                             value={formData.preferredClientId}
-                            onChange={handleInputChange}
-                            required
+                            onValueChange={(value) => {
+                                handleInputChange({ target: { name: 'preferredClientId', value } });
+                            }}
                             disabled={!!modalOptions?.preselectedClientId}
-                            className={`flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm ${
-                                modalOptions?.preselectedClientId ? 'bg-muted cursor-not-allowed opacity-50' : ''
-                            }`}
                         >
-                            <option value="">Select a client</option>
-                            {clients.filter(c => !c.archived).map(client => (
-                                <option key={client.id} value={client.id}>
-                                    {client.title}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectTrigger
+                                id="preferredClientId"
+                                className={modalOptions?.preselectedClientId ? 'bg-muted opacity-50' : ''}
+                            >
+                                <SelectValue placeholder="Select a client" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {clients.filter(c => !c.archived).map(client => (
+                                    <SelectItem key={client.id} value={client.id}>
+                                        {client.title}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         {!modalOptions?.preselectedClientId && (
                             <p className="text-xs text-muted-foreground mt-2">
                                 Every project must be associated with a client.

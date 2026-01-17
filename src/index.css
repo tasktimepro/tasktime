@@ -1,10 +1,12 @@
 @import './styles/theme.css';
-/* Tailwind CSS directives */
-/* stylelint-disable */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-/* stylelint-enable */
+@import "tailwindcss";
+
+/* Configure dark mode to use the .dark class instead of media query */
+@variant dark (&:where(.dark, .dark *));
+
+/* Tell Tailwind where to look for classes */
+@source "../index.html";
+@source "./**/*.{js,jsx}";
 
 /* Custom scrollbar styling */
 
