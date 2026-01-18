@@ -6,9 +6,9 @@ import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
-import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils';
-import { formatDuration, millisecondsToHours } from '../utils/dateUtils';
-import { useToast } from '../hooks/useToast';
+import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
+import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
+import { useToast } from '../hooks/useToast.ts';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project

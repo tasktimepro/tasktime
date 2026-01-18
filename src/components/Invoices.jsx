@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { CreditCardIcon, BuildingOfficeIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
-import { useUrlState } from '../hooks/useUrlState';
-import { useToast } from '../hooks/useToast';
+import { useUrlState } from '../hooks/useUrlState.ts';
+import { useToast } from '../hooks/useToast.ts';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaymentMethods from './PaymentMethods';
 import BusinessInfo from './BusinessInfo';

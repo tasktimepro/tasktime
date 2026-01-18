@@ -9,7 +9,7 @@ import {
     ExclamationTriangleIcon
 } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCurrency } from '../../utils/currencyUtils';
+import { formatCurrency } from '../../utils/currencyUtils.ts';
 
 /**
  * MetricsCards component - Reports overview and invoice metrics.

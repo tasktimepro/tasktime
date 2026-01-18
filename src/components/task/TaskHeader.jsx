@@ -1,4 +1,4 @@
-import CustomCheckbox from '../CustomCheckbox.jsx';
+import CustomCheckbox from '../CustomCheckbox';
 import TaskEditForm from './TaskEditForm';
 import TaskTimeDisplay from './TaskTimeDisplay';
 

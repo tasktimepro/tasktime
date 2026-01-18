@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../Modal';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
-import { generateId } from '../../utils/idUtils';
-import { useToast } from '../../hooks/useToast';
+import { generateId } from '../../utils/idUtils.ts';
+import { useToast } from '../../hooks/useToast.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

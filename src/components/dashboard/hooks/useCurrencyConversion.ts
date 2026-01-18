@@ -2,6 +2,31 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { convertCurrency, fetchExchangeRates, getPreferredCurrency, getProjectCurrency, hasAllRequiredRates } from '../../../utils/currencyUtils';
 import { useToast } from '../../../hooks/useToast';
 
+type ProjectItem = {
+    id: string;
+    preferredClientId?: string | null;
+};
+
+type InvoiceItem = {
+    currency?: string;
+};
+
+type ClientItem = {
+    id: string;
+    defaultCurrency?: string | null;
+};
+
+type CurrencyConversionParams = {
+    projects: ProjectItem[];
+    invoices: InvoiceItem[];
+    clients: ClientItem[];
+};
+
+type ConversionResult = {
+    amounts: Record<string, number>;
+    hadConversionError: boolean;
+};
+
 /**
  * useCurrencyConversion hook - manages currency preferences and exchange rates.
  * @param {Object} params
@@ -10,13 +35,13 @@ import { useToast } from '../../../hooks/useToast';
  * @param {Array} params.clients
  * @returns {Object}
  */
-const useCurrencyConversion = ({ projects, invoices, clients }) => {
+const useCurrencyConversion = ({ projects, invoices, clients }: CurrencyConversionParams) => {
     const { showWarning } = useToast();
     const [preferredCurrency, setPreferredCurrency] = useState(getPreferredCurrency());
-    const [exchangeRates, setExchangeRates] = useState(null);
+    const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
     const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
-    const [exchangeRatesError, setExchangeRatesError] = useState(null);
-    const lastRatesFetchKeyRef = useRef(null);
+    const [exchangeRatesError, setExchangeRatesError] = useState<string | null>(null);
+    const lastRatesFetchKeyRef = useRef<string | null>(null);
 
     // Listen for storage changes to update preferred currency
     useEffect(() => {
@@ -41,9 +66,9 @@ const useCurrencyConversion = ({ projects, invoices, clients }) => {
 
     // Track currencies in use across projects and invoices
     const currenciesInUse = useMemo(() => {
-        const projectCurrencies = [...new Set(projects.map(p => getProjectCurrency(p, clients)))];
-        const invoiceCurrencies = [...new Set(invoices.map(i => i.currency || preferredCurrency))];
-        return [...new Set([...projectCurrencies, ...invoiceCurrencies])];
+        const projectCurrencies = Array.from(new Set(projects.map(p => getProjectCurrency(p, clients))));
+        const invoiceCurrencies = Array.from(new Set(invoices.map(i => i.currency || preferredCurrency)));
+        return Array.from(new Set([...projectCurrencies, ...invoiceCurrencies]));
     }, [projects, invoices, preferredCurrency, clients]);
 
     const sortedCurrenciesInUse = useMemo(() => {
@@ -56,7 +81,7 @@ const useCurrencyConversion = ({ projects, invoices, clients }) => {
     }, [currenciesInUse, preferredCurrency]);
 
     const missingExchangeRates = useMemo(() => {
-        if (!needsExchangeRates || !exchangeRates) return [];
+        if (!needsExchangeRates || !exchangeRates) return [] as string[];
         return currenciesInUse.filter(currency => currency !== 'USD' && !exchangeRates[currency]);
     }, [needsExchangeRates, exchangeRates, currenciesInUse]);
 
@@ -97,7 +122,7 @@ const useCurrencyConversion = ({ projects, invoices, clients }) => {
 
     // Memoize the currency conversion function to prevent unnecessary recalculations
     const convertToCurrency = useMemo(() => {
-        return (amountsByCurrency) => {
+        return (amountsByCurrency: Record<string, number>): ConversionResult => {
             // If there's only one currency and it matches preferred, or no exchange rates needed, return as-is
             const currencies = Object.keys(amountsByCurrency);
             if (currencies.length === 1 && currencies[0] === preferredCurrency) {

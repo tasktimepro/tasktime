@@ -1,5 +1,40 @@
 import { millisecondsToHours } from '../../utils/dateUtils';
 
+type TaskItem = {
+    id: string;
+    projectId: string;
+    title?: string;
+    parentTaskId?: string | null;
+    lastBilledAt?: number;
+    createdAt?: number;
+    billable?: boolean;
+};
+
+type TimeEntry = {
+    taskId: string;
+    start: number;
+    end?: number;
+};
+
+type BuildInvoiceTaskParams = {
+    projectForData: TaskItem | null;
+    selectedProject: TaskItem | null;
+    tasks: TaskItem[];
+    timeEntries: TimeEntry[];
+    editableHours: Record<string, number>;
+};
+
+type InvoiceTaskData = {
+    id: string;
+    title: string;
+    parentTaskId: string | null | undefined;
+    originalHours: number;
+    originalTimeMs: number;
+    hours: number;
+    isEdited: boolean;
+    billable: boolean;
+};
+
 /**
  * Build invoice task data for a project.
  * @param {Object} params
@@ -16,7 +51,7 @@ export const buildInvoiceTaskData = ({
     tasks,
     timeEntries,
     editableHours
-}) => {
+}: BuildInvoiceTaskParams): InvoiceTaskData[] | null => {
     // Use provided project or default to selected project
     const projectToUse = projectForData || selectedProject;
     if (!projectToUse) return null;
@@ -52,13 +87,13 @@ export const buildInvoiceTaskData = ({
     }
 
     // Group entries by task
-    const taskTimeMap = {};
+    const taskTimeMap: Record<string, number> = {};
 
     billableEntries.forEach(entry => {
         if (!taskTimeMap[entry.taskId]) {
             taskTimeMap[entry.taskId] = 0;
         }
-        taskTimeMap[entry.taskId] += (entry.end - entry.start);
+        taskTimeMap[entry.taskId] += ((entry.end as number) - entry.start);
     });
 
     // Add manually billable tasks to the map (even if they have no time)
@@ -73,7 +108,7 @@ export const buildInvoiceTaskData = ({
         const task = tasks.find(t => t.id === taskId);
         return {
             id: taskId,
-            title: task ? task.title : 'Unknown Task',
+            title: task ? task.title || 'Unknown Task' : 'Unknown Task',
             parentTaskId: task ? task.parentTaskId : null,
             originalHours: Math.round((millisecondsToHours(totalTime)) * 100) / 100,
             originalTimeMs: totalTime,

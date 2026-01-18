@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils.ts';
 import { Button } from '@/components/ui/button';
 
 /**

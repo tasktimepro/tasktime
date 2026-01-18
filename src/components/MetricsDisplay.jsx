@@ -6,8 +6,8 @@ import {
     getThisYearRange,
     formatDuration,
     millisecondsToHours
-} from '../utils/dateUtils';
-import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
+} from '../utils/dateUtils.ts';
+import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { ClockIcon, CurrencyDollarIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 

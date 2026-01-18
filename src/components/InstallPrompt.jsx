@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowDownTrayIcon, XMarkIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
-import { INSTALL_PROMPT_DELAY_MS } from '@/constants/app';
+import { INSTALL_PROMPT_DELAY_MS } from '@/constants/app.ts';
 
 /**
  * Shows an install prompt for PWA installation

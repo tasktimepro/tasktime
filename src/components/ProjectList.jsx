@@ -13,10 +13,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
-import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils';
-import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils';
-import { useToast } from '../hooks/useToast';
-import { getTaskIdsToDelete } from '../utils/taskUtils';
+import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
+import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
+import { useToast } from '../hooks/useToast.ts';
+import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 
 /**
  * ProjectList component - Displays and manages the list of projects

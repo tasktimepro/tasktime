@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
-import { formatDuration, millisecondsToHours } from '../utils/dateUtils';
+import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';

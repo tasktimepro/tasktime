@@ -1,5 +1,5 @@
-import { toDisplayDate, getTodayString } from '../../utils/dateUtils';
-import { getPreferredCurrency } from '../../utils/currencyUtils';
+import { toDisplayDate, getTodayString } from '../../utils/dateUtils.ts';
+import { getPreferredCurrency } from '../../utils/currencyUtils.ts';
 import CustomCheckbox from '../CustomCheckbox';
 import Modal from '../Modal';
 import { useState, useEffect, useCallback } from 'react';

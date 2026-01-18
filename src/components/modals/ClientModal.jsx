@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
-import { generateSlugId } from '../../utils/idUtils';
-import { useToast } from '../../hooks/useToast';
+import { generateSlugId } from '../../utils/idUtils.ts';
+import { useToast } from '../../hooks/useToast.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
-import { getPreferredCurrency, getCurrencyOptions } from '../../utils/currencyUtils';
+import { getPreferredCurrency, getCurrencyOptions } from '../../utils/currencyUtils.ts';
 import Modal from '../Modal';
 
 /**

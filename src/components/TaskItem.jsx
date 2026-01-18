@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import TaskHeader from './task/TaskHeader';
 import TaskActions from './task/TaskActions';
 import SubtaskSection from './task/SubtaskSection';
-import TimeEntriesModal from './TimeEntriesModal.jsx';
+import TimeEntriesModal from './TimeEntriesModal';
 import { useToast } from '../hooks/useToast';
 import useTaskState from './task/hooks/useTaskState';
 

@@ -1,7 +1,7 @@
 # TaskTime Makefile
 # Shorthand commands for common Docker operations
 
-.PHONY: help dev stop build install lint clean logs shell
+.PHONY: help dev stop build install lint clean logs shell test test-run test-coverage
 
 # Default target - show help
 help:
@@ -17,6 +17,9 @@ help:
 	@echo "  make logs     - View container logs"
 	@echo "  make shell    - Open shell in container"
 	@echo "  make clean    - Remove containers and rebuild"
+	@echo "  make test     - Run vitest in watch mode"
+	@echo "  make test-run - Run vitest once"
+	@echo "  make test-coverage - Run vitest with coverage"
 	@echo ""
 
 # Start development server
@@ -48,6 +51,16 @@ add:
 # Run linter
 lint:
 	docker compose run --rm app npm run lint
+
+# Run tests
+test:
+	docker compose run --rm app npm test
+
+test-run:
+	docker compose run --rm app npm run test:run
+
+test-coverage:
+	docker compose run --rm app npm run test:coverage
 
 # View logs
 logs:

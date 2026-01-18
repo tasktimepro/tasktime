@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
-import { ToastContext } from '../contexts/ToastContext';
-import { TOAST_DURATION_DEFAULT_MS, TOAST_DURATION_WARNING_MS } from '../constants/app';
+import { ToastContext } from '../contexts/ToastContext.ts';
+import { TOAST_DURATION_DEFAULT_MS, TOAST_DURATION_WARNING_MS } from '../constants/app.ts';
 
 /**
  * Toast provider component that manages toasts across the application

@@ -2,6 +2,54 @@ import { useCallback, useMemo } from 'react';
 import { getLastMonthRange, getThisMonthRange, getThisYearRange, millisecondsToHours, parseStoredDate } from '../../../utils/dateUtils';
 import { formatCurrency, getProjectCurrency } from '../../../utils/currencyUtils';
 
+type TimeEntry = {
+    taskId: string;
+    start: number;
+    end: number;
+};
+
+type TaskItem = {
+    id: string;
+    projectId: string;
+    billable?: boolean;
+    lastBilledAt?: number;
+};
+
+type ProjectItem = {
+    id: string;
+    hourlyRate?: number;
+    preferredClientId?: string | null;
+};
+
+type ClientItem = {
+    id: string;
+};
+
+type InvoiceItem = {
+    date?: string;
+    createdAt?: number;
+    totalAmount?: number;
+    currency?: string;
+    paymentProcessed?: boolean;
+    dueDate?: string;
+    clientId?: string;
+};
+
+type CurrencyConversionResult = {
+    amounts: Record<string, number>;
+    hadConversionError: boolean;
+};
+
+type UseMetricsParams = {
+    timeEntries: TimeEntry[];
+    tasks: TaskItem[];
+    projects: ProjectItem[];
+    invoices: InvoiceItem[];
+    clients: ClientItem[];
+    preferredCurrency: string;
+    convertToCurrency: (amounts: Record<string, number>) => CurrencyConversionResult;
+};
+
 /**
  * useMetricsCalculation hook - derives dashboard metrics and summaries.
  * @param {Object} params
@@ -15,13 +63,13 @@ const useMetricsCalculation = ({
     clients,
     preferredCurrency,
     convertToCurrency
-}) => {
+}: UseMetricsParams) => {
     /**
      * Calculate metrics for a given date range
      * When preferred currency is updated, this will be recalculated
      * Now includes both billable time earnings AND invoice amounts
      */
-    const calculateMetrics = useCallback((startTime, endTime) => {
+    const calculateMetrics = useCallback((startTime: number, endTime: number) => {
         const entriesInRange = timeEntries.filter(entry =>
             entry.start >= startTime && entry.end <= endTime
         );
@@ -31,10 +79,10 @@ const useMetricsCalculation = ({
         }, 0);
 
         // Calculate unbilled time earnings using task-by-task rounding for consistency
-        const billableEarningsByCurrency = {};
+        const billableEarningsByCurrency: Record<string, number> = {};
 
         // Group entries by task first, then calculate earnings with proper rounding
-        const taskTimeMap = {};
+        const taskTimeMap: Record<string, { totalTime: number; project: ProjectItem; currency: string }> = {};
         entriesInRange.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
             if (!task || task.billable !== true) return; // Only include explicitly billable tasks
@@ -61,7 +109,7 @@ const useMetricsCalculation = ({
         Object.values(taskTimeMap).forEach(({ totalTime, project, currency }) => {
             const taskHours = millisecondsToHours(totalTime);
             const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
-            const amount = roundedTaskHours * project.hourlyRate;
+            const amount = roundedTaskHours * (project.hourlyRate || 0);
 
             if (!billableEarningsByCurrency[currency]) {
                 billableEarningsByCurrency[currency] = 0;
@@ -73,15 +121,15 @@ const useMetricsCalculation = ({
         const invoicesInRange = invoices.filter(invoice => {
             // Use invoice date for accurate reporting, with createdAt as fallback
             // parseStoredDate handles both ISO format and legacy locale-dependent formats
-            const parsedDate = parseStoredDate(invoice.date, invoice.createdAt);
+            const parsedDate = parseStoredDate(invoice.date, invoice.createdAt || null);
             const invoiceDate = parsedDate ? parsedDate.getTime() : null;
             if (!invoiceDate) return false;
             return invoiceDate >= startTime && invoiceDate <= endTime;
         });
 
         // Group paid and outstanding invoices by currency
-        const paidInvoicesByCurrency = {};
-        const outstandingInvoicesByCurrency = {};
+        const paidInvoicesByCurrency: Record<string, number> = {};
+        const outstandingInvoicesByCurrency: Record<string, number> = {};
         invoicesInRange.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
             const currency = invoice.currency || preferredCurrency;
@@ -145,7 +193,7 @@ const useMetricsCalculation = ({
         });
 
         // Group outstanding invoices by currency first
-        const outstandingByCurrency = {};
+        const outstandingByCurrency: Record<string, number> = {};
         outstanding.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
             // Invoices store their currency directly - use it, or fall back to preferred currency
@@ -158,7 +206,7 @@ const useMetricsCalculation = ({
         });
 
         // Group past due invoices by currency first
-        const pastDueByCurrency = {};
+        const pastDueByCurrency: Record<string, number> = {};
         pastDue.forEach(invoice => {
             const amount = invoice.totalAmount || 0;
             // Invoices store their currency directly - use it, or fall back to preferred currency
@@ -229,7 +277,7 @@ const useMetricsCalculation = ({
         );
 
         // Group by task and calculate billable hours using the same rounding logic
-        const taskTimeMap = {};
+        const taskTimeMap: Record<string, { totalTime: number }> = {};
         entriesInRange.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
             if (!task || task.billable !== true) return; // Only include explicitly billable tasks

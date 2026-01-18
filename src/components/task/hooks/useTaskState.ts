@@ -1,6 +1,36 @@
 import { useEffect, useMemo } from 'react';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../../../constants/app';
 
+type TaskItem = {
+    id: string;
+    completed?: boolean;
+    archived?: boolean;
+    billable?: boolean;
+    billableSetByUser?: boolean;
+    lastBilledAt?: number;
+    createdAt?: number;
+};
+
+type TimeEntry = {
+    taskId: string;
+    start: number;
+    end?: number;
+};
+
+type TimerState = {
+    taskId: string;
+} | null;
+
+type UseTaskStateParams = {
+    task: TaskItem;
+    tasks: TaskItem[];
+    timeEntries: TimeEntry[];
+    currentTimer: TimerState;
+    isPaused: boolean;
+    subtasks?: TaskItem[];
+    setTasks?: (updater: (prevTasks: TaskItem[]) => TaskItem[]) => void;
+};
+
 /**
  * useTaskState hook - derives task timing and status state.
  * @param {Object} params
@@ -14,7 +44,7 @@ const useTaskState = ({
     isPaused,
     subtasks = [],
     setTasks
-}) => {
+}: UseTaskStateParams) => {
     const taskTimeEntries = useMemo(() => {
         return timeEntries.filter(entry => entry.taskId === task.id);
     }, [timeEntries, task.id]);
@@ -24,7 +54,7 @@ const useTaskState = ({
     }, [subtasks]);
 
     const subtaskTimeEntries = useMemo(() => {
-        if (subtaskIds.length === 0) return [];
+        if (subtaskIds.length === 0) return [] as TimeEntry[];
         return timeEntries.filter(entry => subtaskIds.includes(entry.taskId));
     }, [timeEntries, subtaskIds]);
 
@@ -61,7 +91,7 @@ const useTaskState = ({
     const isCompleted = task.completed || false;
     const isArchived = task.archived || false;
 
-    const isRelatedToActiveTimer = isTimerActive || subtaskTimerActive;
+    const isRelatedToActiveTimer = !!(isTimerActive || subtaskTimerActive);
     const shouldDimTask = anyTimerActive && !isPaused && !isRelatedToActiveTimer && !isArchived;
 
     const hasSignificantBillableTime = useMemo(() => {
@@ -72,7 +102,7 @@ const useTaskState = ({
         });
 
         const totalBillableTime = taskBillableEntries.reduce((total, entry) => {
-            return total + (entry.end - entry.start);
+            return total + ((entry.end as number) - entry.start);
         }, 0);
 
         return totalBillableTime >= BILLABLE_TIME_THRESHOLD_MS;
@@ -83,7 +113,7 @@ const useTaskState = ({
 
         if (hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
             // Use functional update to avoid race conditions with other task updates
-            setTasks(prevTasks => 
+            setTasks(prevTasks =>
                 prevTasks.map(t =>
                     t.id === task.id ? { ...t, billable: true, lastActive: Date.now() } : t
                 )

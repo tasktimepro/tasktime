@@ -1,9 +1,22 @@
+/* global __APP_VERSION__ */
+
+declare const __APP_VERSION__: string;
+
 /**
  * Application-wide constants
  * 
  * Centralizes magic numbers and configuration values used throughout the app.
  * This improves maintainability and makes values easier to adjust.
  */
+
+// =============================================================================
+// VERSION CONSTANTS
+// =============================================================================
+
+/** Current application version (injected by Vite at build time) */
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined'
+	? __APP_VERSION__
+	: '0.0.0';
 
 // =============================================================================
 // TIME CONSTANTS

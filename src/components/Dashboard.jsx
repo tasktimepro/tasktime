@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import TaskTimer from './TaskTimer.jsx';
+import TaskTimer from './TaskTimer';
 import {
     formatDuration,
     millisecondsToHours

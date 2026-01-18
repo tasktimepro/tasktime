@@ -1,11 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, CreditCardIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
-import { useToast } from '../hooks/useToast';
-import { toDisplayDate } from '../utils/dateUtils';
+import { useToast } from '../hooks/useToast.ts';
+import { toDisplayDate } from '../utils/dateUtils.ts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
+import Modal from './Modal';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,6 +27,7 @@ const PaymentMethods = ({
     editPaymentMethodModal = null
 }) => {
     const { showSuccess } = useToast();
+    const [pendingDeletePaymentMethodId, setPendingDeletePaymentMethodId] = useState(null);
 
     // Auto-open create modal when autoOpenCreate prop changes
     useEffect(() => {
@@ -37,11 +40,29 @@ const PaymentMethods = ({
      * Delete a payment method
      */
     const handleDeletePaymentMethod = (paymentMethodId) => {
-        if (window.confirm('Are you sure you want to delete this payment method?')) {
-            setPaymentMethods(paymentMethods.filter(method => method.id !== paymentMethodId));
-            showSuccess('Payment method deleted successfully');
-        }
+        setPendingDeletePaymentMethodId(paymentMethodId);
     };
+
+    const closeDeletePaymentMethodModal = () => {
+
+        setPendingDeletePaymentMethodId(null);
+    };
+
+    const confirmDeletePaymentMethod = () => {
+
+        if (!pendingDeletePaymentMethodId) {
+
+            return;
+        }
+
+        setPaymentMethods(paymentMethods.filter(method => method.id !== pendingDeletePaymentMethodId));
+        showSuccess('Payment method deleted successfully');
+        setPendingDeletePaymentMethodId(null);
+    };
+
+    const pendingDeletePaymentMethod = pendingDeletePaymentMethodId
+        ? paymentMethods.find((method) => method.id === pendingDeletePaymentMethodId)
+        : null;
 
     return (
         <div className="space-y-6">
@@ -124,12 +145,15 @@ const PaymentMethods = ({
                                     {/* Three-dot dropdown menu for Edit and Delete */}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button
-                                                className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-muted-foreground hover:bg-muted rounded-full transition-colors group"
                                                 title="More actions"
+                                                aria-label="More actions"
                                             >
                                                 <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
-                                            </button>
+                                            </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem
@@ -154,6 +178,36 @@ const PaymentMethods = ({
                     ))}
                 </div>
             )}
+
+            <Modal
+                isOpen={Boolean(pendingDeletePaymentMethodId)}
+                onClose={closeDeletePaymentMethodModal}
+                title="Delete payment method?"
+                description="This will permanently remove the payment method."
+                footer={(
+                    <div className="flex justify-end space-x-3">
+                        <Button
+                            variant="outline"
+                            onClick={closeDeletePaymentMethodModal}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDeletePaymentMethod}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                )}
+            >
+                <Notice
+                    title={pendingDeletePaymentMethod
+                        ? `Deleting "${pendingDeletePaymentMethod.title || pendingDeletePaymentMethod.name}" cannot be undone.`
+                        : 'Deleting this payment method cannot be undone.'}
+                    variant="destructive"
+                />
+            </Modal>
         </div>
     );
 };

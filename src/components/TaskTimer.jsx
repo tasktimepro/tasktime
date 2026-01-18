@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { formatActiveTimer } from '../utils/dateUtils';
-import TimerControls from './TimerControls.jsx';
+import TimerControls from './TimerControls';
 import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
 
 /**

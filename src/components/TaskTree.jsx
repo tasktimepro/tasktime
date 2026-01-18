@@ -4,9 +4,11 @@ import TaskItem from './TaskItem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
-import { generateId } from '../utils/idUtils';
-import { useToast } from '../hooks/useToast';
-import { deleteTaskWithCleanup } from '../utils/taskUtils';
+import { Notice } from '@/components/ui/notice';
+import Modal from './Modal';
+import { generateId } from '../utils/idUtils.ts';
+import { useToast } from '../hooks/useToast.ts';
+import { deleteTaskWithCleanup } from '../utils/taskUtils.ts';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -28,6 +30,7 @@ const TaskTree = ({
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [showArchivedTasks, setShowArchivedTasks] = useState(false);
+    const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState(null);
     const { showSuccess } = useToast();
 
     // Get tasks for this project
@@ -38,6 +41,10 @@ const TaskTree = ({
 
     // Get archived parent tasks
     const archivedTasks = projectTasks.filter(task => !task.parentTaskId && task.archived);
+
+    const pendingDeleteTask = pendingDeleteTaskId
+        ? tasks.find(task => task.id === pendingDeleteTaskId)
+        : null;
 
     /**
      * Create a new task
@@ -142,24 +149,38 @@ const TaskTree = ({
      * Delete a task and its subtasks
      */
     const handleDeleteTask = (taskId) => {
-        if (window.confirm('Are you sure you want to delete this task? All subtasks and time entries will be lost.')) {
-            const result = deleteTaskWithCleanup(
-                taskId,
-                tasks,
-                timeEntries,
-                currentTimer,
-                setTasks,
-                setTimeEntries,
-                setCurrentTimer
-            );
+        setPendingDeleteTaskId(taskId);
+    };
 
-            // Show appropriate success message
-            const message = result.isMainTask && result.deletedCount > 1
-                ? `Task "${result.taskTitle}" and ${result.deletedCount - 1} subtask(s) deleted successfully`
-                : `Task "${result.taskTitle}" deleted successfully`;
-            
-            showSuccess(message);
+    const closeDeleteTaskModal = () => {
+
+        setPendingDeleteTaskId(null);
+    };
+
+    const confirmDeleteTask = () => {
+
+        if (!pendingDeleteTaskId) {
+
+            return;
         }
+
+        const result = deleteTaskWithCleanup(
+            pendingDeleteTaskId,
+            tasks,
+            timeEntries,
+            currentTimer,
+            setTasks,
+            setTimeEntries,
+            setCurrentTimer
+        );
+
+        // Show appropriate success message
+        const message = result.isMainTask && result.deletedCount > 1
+            ? `Task "${result.taskTitle}" and ${result.deletedCount - 1} subtask(s) deleted successfully`
+            : `Task "${result.taskTitle}" deleted successfully`;
+        
+        showSuccess(message);
+        setPendingDeleteTaskId(null);
     };
 
     /**
@@ -307,6 +328,36 @@ const TaskTree = ({
                     )}
                 </>
             )}
+
+            <Modal
+                isOpen={Boolean(pendingDeleteTaskId)}
+                onClose={closeDeleteTaskModal}
+                title="Delete task?"
+                description="This will permanently remove the task and any related time entries."
+                footer={(
+                    <div className="flex justify-end space-x-3">
+                        <Button
+                            variant="outline"
+                            onClick={closeDeleteTaskModal}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDeleteTask}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                )}
+            >
+                <Notice
+                    title={pendingDeleteTask
+                        ? `Deleting "${pendingDeleteTask.title}" cannot be undone.`
+                        : 'Deleting this task cannot be undone.'}
+                    variant="destructive"
+                />
+            </Modal>
         </div>
     );
 };

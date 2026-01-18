@@ -1,6 +1,6 @@
 import SubtaskItem from './SubtaskItem';
 import SubtaskCreateForm from './SubtaskCreateForm';
-import { deleteTaskWithCleanup } from '../../../utils/taskUtils';
+import { deleteTaskWithCleanup } from '../../../utils/taskUtils.ts';
 
 /**
  * SubtaskSection component - Renders subtasks list and create form.

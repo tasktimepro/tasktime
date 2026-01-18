@@ -2,6 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import { readFileSync } from 'fs'
+
+const packageJson = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url))
+)
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -33,6 +38,9 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
   },
   server: {
     port: 5173,

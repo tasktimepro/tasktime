@@ -1,7 +1,7 @@
 import { ClipboardDocumentCheckIcon, MagnifyingGlassIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { formatCurrency, getProjectCurrency } from '../../utils/currencyUtils';
+import { formatCurrency, getProjectCurrency } from '../../utils/currencyUtils.ts';
 
 /**
  * ProjectsOverview component - Recent projects list with search.

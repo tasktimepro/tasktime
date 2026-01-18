@@ -1,5 +1,60 @@
 import { useMemo } from 'react';
 
+type TaskItem = {
+    id: string;
+    parentTaskId?: string | null;
+    hours?: number;
+    hourlyRate?: number;
+};
+
+type AdditionalTask = {
+    hours?: number;
+    hourlyRate?: number;
+    flatRate?: number;
+    quantity?: number;
+    useFlatRate?: boolean;
+};
+
+type BusinessInfo = {
+    taxEnabled?: boolean;
+    taxRate?: number;
+    taxLabel?: string;
+};
+
+type ClientInfo = {
+    hourlyRate?: number;
+    disableTax?: boolean;
+};
+
+type ProjectInfo = {
+    hourlyRate?: number;
+};
+
+type TaxOverride = {
+    enabled: boolean;
+    rate: string | number;
+    label?: string;
+};
+
+type InvoicePricingParams = {
+    invoiceTasks: TaskItem[];
+    additionalTasks: AdditionalTask[];
+    editableHours: Record<string, number>;
+    discountType: 'percentage' | 'fixed';
+    discountValue: number | string;
+    shippingAmount: number | string;
+    taxOverride: TaxOverride;
+    taskFlatRates: Record<string, number>;
+    useFlatRate: Record<string, boolean>;
+    taskHourlyRates: Record<string, number>;
+    taskQuantities: Record<string, number>;
+    selectedTasksForBilling: Record<string, boolean>;
+    mergedSubtasks: Record<string, boolean>;
+    selectedBusinessInfo?: BusinessInfo | null;
+    selectedClient?: ClientInfo | null;
+    selectedProject?: ProjectInfo | null;
+};
+
 /**
  * useInvoicePricing - Calculates pricing breakdown for invoice.
  */
@@ -20,7 +75,7 @@ const useInvoicePricing = ({
     selectedBusinessInfo,
     selectedClient,
     selectedProject
-}) => {
+}: InvoicePricingParams) => {
 
     const pricing = useMemo(() => {
         if (invoiceTasks.length === 0 && additionalTasks.length === 0) {
@@ -58,7 +113,7 @@ const useInvoicePricing = ({
             if (task && task.id && mergedSubtasks[task.id]) {
                 const subtasks = invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task.id);
                 const subtaskHours = subtasks.reduce((total, subtask) => {
-                    const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
+                    const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours || 0;
                     return total + hours;
                 }, 0);
                 taskHours += subtaskHours;
@@ -76,18 +131,18 @@ const useInvoicePricing = ({
                 const parentHours = editableHours[task.id] || task.hours || 0;
                 const parentHourlyRate = taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0;
                 let taskAmount = parentHours * parentHourlyRate;
-                
+
                 // If this task has merged subtasks, calculate each subtask's amount with its own rate
                 if (task && task.id && mergedSubtasks[task.id]) {
                     const subtasks = invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task.id);
                     subtasks.forEach(subtask => {
-                        const subtaskHours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
+                        const subtaskHours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours || 0;
                         // Use subtask's own hourly rate if set, otherwise fall back
                         const subtaskHourlyRate = taskHourlyRates[subtask.id] || subtask.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0;
                         taskAmount += subtaskHours * subtaskHourlyRate;
                     });
                 }
-                
+
                 projectSubtotal += taskAmount;
             }
         });
@@ -112,14 +167,14 @@ const useInvoicePricing = ({
         // Calculate discount
         const discountVal = discountValue === '' ? 0 : discountValue;
         const discount = discountType === 'percentage'
-            ? (subtotal * (discountVal / 100))
-            : discountVal;
+            ? (subtotal * (Number(discountVal) / 100))
+            : Number(discountVal);
 
         // Subtotal after discount
         const afterDiscount = subtotal - discount;
 
         // Add shipping
-        const shipping = shippingAmount === '' ? 0 : parseFloat(shippingAmount) || 0;
+        const shipping = shippingAmount === '' ? 0 : parseFloat(String(shippingAmount)) || 0;
         const afterShipping = afterDiscount + shipping;
 
         // Calculate tax
@@ -127,7 +182,7 @@ const useInvoicePricing = ({
         let taxLabel = 'VAT';
 
         if (taxOverride.enabled) {
-            taxRate = taxOverride.rate === '' ? 0 : parseFloat(taxOverride.rate) || 0;
+            taxRate = taxOverride.rate === '' ? 0 : parseFloat(String(taxOverride.rate)) || 0;
             taxLabel = taxOverride.label || 'Tax';
         } else if (selectedBusinessInfo && selectedBusinessInfo.taxEnabled && (!selectedClient || !selectedClient.disableTax)) {
             // Use business tax settings if enabled and client doesn't have tax disabled

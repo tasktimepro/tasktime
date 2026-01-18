@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { TimePicker } from '@/components/ui/time-picker';
 import { formatActiveTimer, formatDurationWithSeconds } from '../utils/dateUtils';
 import { checkTimerStartOverlap } from '../utils/timeValidationUtils';
-import TaskTimer from './TaskTimer.jsx';
+import TaskTimer from './TaskTimer';
 import { useToast } from '../hooks/useToast';
 import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
 

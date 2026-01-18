@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
-import { getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils';
-import { millisecondsToHours, formatDuration } from '../utils/dateUtils';
+import { getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { millisecondsToHours, formatDuration } from '../utils/dateUtils.ts';
 
 /**
  * ClientDashboard component - Main dashboard view for a selected client

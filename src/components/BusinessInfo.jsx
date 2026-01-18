@@ -1,11 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, BuildingOfficeIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
-import { useToast } from '../hooks/useToast';
-import { toDisplayDate } from '../utils/dateUtils';
+import { useToast } from '../hooks/useToast.ts';
+import { toDisplayDate } from '../utils/dateUtils.ts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
+import Modal from './Modal';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,6 +27,7 @@ const BusinessInfo = ({
     editBusinessModal = null
 }) => {
     const { showSuccess } = useToast();
+    const [pendingDeleteBusinessId, setPendingDeleteBusinessId] = useState(null);
 
     // Auto-open create modal when autoOpenCreate prop changes
     useEffect(() => {
@@ -37,11 +40,29 @@ const BusinessInfo = ({
      * Delete a business info
      */
     const handleDeleteBusinessInfo = (businessInfoId) => {
-        if (window.confirm('Are you sure you want to delete this business info?')) {
-            setBusinessInfos(businessInfos.filter(info => info.id !== businessInfoId));
-            showSuccess('Business info deleted successfully');
-        }
+        setPendingDeleteBusinessId(businessInfoId);
     };
+
+    const closeDeleteBusinessModal = () => {
+
+        setPendingDeleteBusinessId(null);
+    };
+
+    const confirmDeleteBusiness = () => {
+
+        if (!pendingDeleteBusinessId) {
+
+            return;
+        }
+
+        setBusinessInfos(businessInfos.filter(info => info.id !== pendingDeleteBusinessId));
+        showSuccess('Business info deleted successfully');
+        setPendingDeleteBusinessId(null);
+    };
+
+    const pendingDeleteBusiness = pendingDeleteBusinessId
+        ? businessInfos.find((info) => info.id === pendingDeleteBusinessId)
+        : null;
 
     return (
         <div className="space-y-6">
@@ -132,12 +153,15 @@ const BusinessInfo = ({
                                     {/* Three-dot dropdown menu for Edit and Delete */}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button
-                                                className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-muted-foreground hover:bg-muted rounded-full transition-colors group"
                                                 title="More actions"
+                                                aria-label="More actions"
                                             >
                                                 <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
-                                            </button>
+                                            </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem
@@ -162,6 +186,36 @@ const BusinessInfo = ({
                     ))}
                 </div>
             )}
+
+            <Modal
+                isOpen={Boolean(pendingDeleteBusinessId)}
+                onClose={closeDeleteBusinessModal}
+                title="Delete business?"
+                description="This will permanently remove the business entry."
+                footer={(
+                    <div className="flex justify-end space-x-3">
+                        <Button
+                            variant="outline"
+                            onClick={closeDeleteBusinessModal}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDeleteBusiness}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                )}
+            >
+                <Notice
+                    title={pendingDeleteBusiness
+                        ? `Deleting "${pendingDeleteBusiness.title || pendingDeleteBusiness.name}" cannot be undone.`
+                        : 'Deleting this business cannot be undone.'}
+                    variant="destructive"
+                />
+            </Modal>
         </div>
     );
 };

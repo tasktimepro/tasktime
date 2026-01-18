@@ -2,6 +2,20 @@
  * Task utility functions for handling task operations
  */
 
+type Task = {
+    id: string;
+    title?: string;
+    parentTaskId?: string | null;
+};
+
+type TimeEntry = {
+    taskId: string;
+};
+
+type TimerState = {
+    taskId: string;
+} | null;
+
 /**
  * Get all task IDs that should be deleted when a main task is deleted
  * This includes the main task and all its direct subtasks
@@ -9,7 +23,7 @@
  * @param {Array} allTasks - Array of all tasks
  * @returns {Array} Array of task IDs to delete
  */
-export const getTaskIdsToDelete = (taskId, allTasks) => {
+export const getTaskIdsToDelete = (taskId: string, allTasks: Task[]): string[] => {
     // Find all direct subtasks of this task
     const subtaskIds = allTasks
         .filter(task => task.parentTaskId === taskId)
@@ -35,23 +49,23 @@ export const getTaskIdsToDelete = (taskId, allTasks) => {
  * @returns {Object} Object containing the deleted task title and count of deleted items
  */
 export const deleteTaskWithCleanup = (
-    taskId, 
-    allTasks, 
-    timeEntries, 
-    currentTimer,
-    setTasks, 
-    setTimeEntries, 
-    setCurrentTimer
-) => {
+    taskId: string,
+    allTasks: Task[],
+    timeEntries: TimeEntry[],
+    currentTimer: TimerState,
+    setTasks: (tasks: Task[]) => void,
+    setTimeEntries: (entries: TimeEntry[]) => void,
+    setCurrentTimer: (timer: TimerState) => void
+): { taskTitle: string; deletedCount: number; isMainTask: boolean } => {
     // Find the task to get its title for feedback
     const taskToDelete = allTasks.find(t => t.id === taskId);
-    const taskTitle = taskToDelete ? taskToDelete.title : 'Task';
-    
+    const taskTitle = taskToDelete ? taskToDelete.title || 'Task' : 'Task';
+
     // Check if this is a main task (no parentTaskId) or a subtask
-    const isMainTask = taskToDelete && !taskToDelete.parentTaskId;
-    
-    let taskIdsToDelete;
-    
+    const isMainTask = !!(taskToDelete && !taskToDelete.parentTaskId);
+
+    let taskIdsToDelete: string[];
+
     if (isMainTask) {
         // For main tasks, get all subtasks too
         taskIdsToDelete = getTaskIdsToDelete(taskId, allTasks);
@@ -86,7 +100,7 @@ export const deleteTaskWithCleanup = (
  * @param {Array} allTasks - Array of all tasks
  * @returns {boolean} True if the task has subtasks
  */
-export const hasSubtasks = (taskId, allTasks) => {
+export const hasSubtasks = (taskId: string, allTasks: Task[]): boolean => {
     return allTasks.some(task => task.parentTaskId === taskId);
 };
 
@@ -96,6 +110,6 @@ export const hasSubtasks = (taskId, allTasks) => {
  * @param {Array} allTasks - Array of all tasks
  * @returns {Array} Array of subtasks
  */
-export const getSubtasks = (taskId, allTasks) => {
+export const getSubtasks = (taskId: string, allTasks: Task[]): Task[] => {
     return allTasks.filter(task => task.parentTaskId === taskId);
 };

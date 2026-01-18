@@ -1,25 +1,47 @@
 import { useState, useEffect, useCallback } from 'react';
 
+type ViewName = 'dashboard' | 'projects' | 'clients' | 'invoices' | 'account';
+
+type UrlParams = {
+    view: ViewName;
+    projectId: string | null;
+    clientId: string | null;
+    section: string | null;
+    create: string | null;
+    tab: string | null;
+    preselectedClientId: string | null;
+};
+
+type UrlUpdateParams = Partial<{
+    view: ViewName;
+    project: string | null;
+    client: string | null;
+    section: string | null;
+    create: string | null;
+    tab: string | null;
+    preselectedClientId: string | null;
+}>;
+
 /**
  * Parse URL path and search params into state object
  * Supports paths like: /, /projects, /projects/abc123, /clients, /clients/xyz789, /invoices, /account
  */
-function getParamsFromUrl() {
+function getParamsFromUrl(): UrlParams {
     const pathname = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
-    
+
     // Parse the pathname to extract view and IDs
     const pathParts = pathname.split('/').filter(Boolean); // Remove empty strings
-    
-    let view = 'dashboard';
-    let projectId = null;
-    let clientId = null;
-    
+
+    let view: ViewName = 'dashboard';
+    let projectId: string | null = null;
+    let clientId: string | null = null;
+
     if (pathParts.length === 0 || pathname === '/') {
         view = 'dashboard';
     } else {
         const firstPart = pathParts[0];
-        
+
         switch (firstPart) {
             case 'projects':
                 view = 'projects';
@@ -43,7 +65,7 @@ function getParamsFromUrl() {
                 view = 'dashboard';
         }
     }
-    
+
     return {
         view,
         projectId,
@@ -56,17 +78,17 @@ function getParamsFromUrl() {
 }
 
 // Monkey-patch pushState/replaceState to fire a custom event
-(function() {
+(function () {
     if (typeof window === 'undefined') return;
-    const origPushState = window.history.pushState;
-    const origReplaceState = window.history.replaceState;
-    window.history.pushState = function(...args) {
-        const ret = origPushState.apply(this, args);
+    const origPushState = window.history.pushState.bind(window.history);
+    const origReplaceState = window.history.replaceState.bind(window.history);
+    window.history.pushState = function (...args) {
+        const ret = origPushState(...args);
         window.dispatchEvent(new Event('locationchange'));
         return ret;
     };
-    window.history.replaceState = function(...args) {
-        const ret = origReplaceState.apply(this, args);
+    window.history.replaceState = function (...args) {
+        const ret = origReplaceState(...args);
         window.dispatchEvent(new Event('locationchange'));
         return ret;
     };
@@ -88,15 +110,15 @@ export const useUrlState = () => {
     /**
      * Build URL from path and optional query params
      */
-    const buildUrl = useCallback((path, queryParams = {}) => {
+    const buildUrl = useCallback((path: string, queryParams: Record<string, string | null | undefined> = {}) => {
         const searchParams = new URLSearchParams();
-        
+
         Object.entries(queryParams).forEach(([key, value]) => {
             if (value !== null && value !== undefined && value !== '') {
                 searchParams.set(key, value);
             }
         });
-        
+
         const queryString = searchParams.toString();
         return queryString ? `${path}?${queryString}` : path;
     }, []);
@@ -105,10 +127,10 @@ export const useUrlState = () => {
      * Update URL and state - now uses path-based routing
      * Merges with current state when partial params are provided
      */
-    const updateUrl = useCallback((newParams) => {
+    const updateUrl = useCallback((newParams: UrlUpdateParams) => {
         // Get current state to merge with
         const currentState = getParamsFromUrl();
-        
+
         // Merge new params with current state
         // If view is not provided, keep current view
         const mergedParams = {
@@ -121,13 +143,13 @@ export const useUrlState = () => {
             preselectedClientId: currentState.preselectedClientId,
             ...newParams
         };
-        
+
         // Build the new path based on view and IDs
         let path = '/';
-        const queryParams = {};
-        
+        const queryParams: Record<string, string> = {};
+
         const view = mergedParams.view || 'dashboard';
-        
+
         switch (view) {
             case 'projects':
                 if (mergedParams.project) {
@@ -152,19 +174,19 @@ export const useUrlState = () => {
             default:
                 path = '/';
         }
-        
+
         // Add optional query params (section, create, tab, preselectedClientId)
         // Only add if truthy (not null/undefined/empty)
         if (mergedParams.section) queryParams.section = mergedParams.section;
         if (mergedParams.create) queryParams.create = mergedParams.create;
         if (mergedParams.tab) queryParams.tab = mergedParams.tab;
         if (mergedParams.preselectedClientId) queryParams.preselectedClientId = mergedParams.preselectedClientId;
-        
+
         const newUrl = buildUrl(path, queryParams);
-        
+
         // Update URL and state
         window.history.pushState({}, '', newUrl);
-        
+
         // Create new state object to force re-render
         const newState = getParamsFromUrl();
         setUrlParams(newState);
@@ -174,23 +196,23 @@ export const useUrlState = () => {
      * Navigate to projects view
      * @param {Object} params - Optional parameters to include in URL
      */
-    const navigateToProjects = useCallback((params = {}) => {
+    const navigateToProjects = useCallback((params: UrlUpdateParams = {}) => {
         updateUrl({ view: 'projects', client: null, project: null, section: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to project dashboard
      */
-    const navigateToProject = useCallback((projectId) => {
+    const navigateToProject = useCallback((projectId: string) => {
         updateUrl({ view: 'projects', client: null, project: projectId, section: null, create: null, tab: null });
     }, [updateUrl]);
 
     /**
      * Navigate to invoices view with optional parameters
      */
-    const navigateToInvoices = useCallback((params = {}) => {
+    const navigateToInvoices = useCallback((params: UrlUpdateParams = {}) => {
         // Ensure we clear section if not specified
-        const finalParams = { view: 'invoices', client: null, project: null, ...params };
+        const finalParams: UrlUpdateParams = { view: 'invoices', client: null, project: null, ...params };
         // If no section is specified, set it to the default (invoices)
         if (!('section' in params)) {
             finalParams.section = 'invoices';
@@ -205,28 +227,28 @@ export const useUrlState = () => {
     /**
      * Navigate to account view with optional parameters
      */
-    const navigateToAccount = useCallback((params = {}) => {
+    const navigateToAccount = useCallback((params: UrlUpdateParams = {}) => {
         updateUrl({ view: 'account', client: null, project: null, tab: null, section: 'preferences', ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to main dashboard view
      */
-    const navigateToDashboard = useCallback((params = {}) => {
+    const navigateToDashboard = useCallback((params: UrlUpdateParams = {}) => {
         updateUrl({ view: 'dashboard', client: null, project: null, section: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to clients view with optional parameters
      */
-    const navigateToClients = useCallback((params = {}) => {
+    const navigateToClients = useCallback((params: UrlUpdateParams = {}) => {
         updateUrl({ view: 'clients', client: null, project: null, section: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to client dashboard
      */
-    const navigateToClient = useCallback((clientId) => {
+    const navigateToClient = useCallback((clientId: string) => {
         updateUrl({ view: 'clients', client: clientId, project: null, section: null, create: null, tab: null });
     }, [updateUrl]);
 

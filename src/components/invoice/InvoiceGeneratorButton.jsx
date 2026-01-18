@@ -1,6 +1,6 @@
 import React from 'react';
 import { DocumentTextIcon, ClockIcon } from '@/components/ui/icons';
-import { getCurrencySymbol, getProjectCurrency } from '../../utils/currencyUtils';
+import { getCurrencySymbol, getProjectCurrency } from '../../utils/currencyUtils.ts';
 
 /**
  * InvoiceGeneratorButton - Renders invoice generation button with badge.

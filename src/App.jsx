@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import './App.css';
-import { useIndexedDB, useIndexedDBLoading } from './hooks/useIndexedDB';
-import { useUrlState } from './hooks/useUrlState';
+import { useIndexedDB, useIndexedDBLoading } from './hooks/useIndexedDB.ts';
+import { useUrlState } from './hooks/useUrlState.ts';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
 import ClientList from './components/ClientList';
@@ -15,9 +15,9 @@ import ErrorBoundary from './components/ErrorBoundary';
 import OfflineIndicator from './components/OfflineIndicator';
 import InstallPrompt from './components/InstallPrompt';
 import { ToastProvider } from './components/ToastContainer';
-import { formatDurationWithSeconds } from './utils/dateUtils';
+import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon } from '@/components/ui/icons';
-import { TIMER_UPDATE_INTERVAL_MS, TIMER_HEARTBEAT_INTERVAL_MS } from './constants/app';
+import { TIMER_UPDATE_INTERVAL_MS, TIMER_HEARTBEAT_INTERVAL_MS, APP_VERSION } from './constants/app.ts';
 
 /** Original browser tab title */
 const ORIGINAL_TITLE = "TaskTime - Track your time by the task. Invoice without the mess.";
@@ -37,6 +37,7 @@ function App() {
     const [invoices, setInvoices, invoicesStatus] = useIndexedDB('invoices', []);
     const [invoiceTemplates, setInvoiceTemplates, invoiceTemplatesStatus] = useIndexedDB('invoiceTemplates', []);
     const [preferences, setPreferences, preferencesStatus] = useIndexedDB('preferences', {});
+    const [storedAppVersion, setStoredAppVersion, storedAppVersionStatus] = useIndexedDB('appVersion', null);
     
     // Dark mode state - persisted in preferences
     const [darkMode, setDarkMode] = useState(() => {
@@ -80,8 +81,23 @@ function App() {
         invoicesStatus,
         invoiceTemplatesStatus,
         preferencesStatus,
-        timerStatus
+        timerStatus,
+        storedAppVersionStatus
     ]);
+
+    // Persist app version for future migration checks
+    useEffect(() => {
+
+        if (storedAppVersionStatus.loading) {
+
+            return;
+        }
+
+        if (storedAppVersion !== APP_VERSION) {
+
+            setStoredAppVersion(APP_VERSION);
+        }
+    }, [storedAppVersion, storedAppVersionStatus.loading, setStoredAppVersion, APP_VERSION]);
     
     // Modal state for form modals
     const [activeModal, setActiveModal] = useState(null);

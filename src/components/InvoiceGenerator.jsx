@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { createInvoiceHTML } from '../utils/pdfUtils';
-import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils';
-import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
-import { useToast } from '../hooks/useToast';
+import { createInvoiceHTML } from '../utils/pdfUtils.ts';
+import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils.ts';
+import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { useToast } from '../hooks/useToast.ts';
 import InvoiceModal from './invoice/InvoiceModal';
 import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
-import * as InvoiceHandler from './invoice/InvoiceHandler';
-import useInvoicePricing from './invoice/hooks/useInvoicePricing';
-import { calculateDueDate, generateInvoiceNumber } from './invoice/utils/invoiceDateUtils';
-import { buildInvoiceTaskData } from './invoice/InvoiceCalculations';
+import * as InvoiceHandler from './invoice/InvoiceHandler.ts';
+import useInvoicePricing from './invoice/hooks/useInvoicePricing.ts';
+import { calculateDueDate, generateInvoiceNumber } from './invoice/utils/invoiceDateUtils.ts';
+import { buildInvoiceTaskData } from './invoice/InvoiceCalculations.ts';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection

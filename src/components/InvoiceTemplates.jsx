@@ -1,11 +1,13 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
-import { useToast } from '../hooks/useToast';
-import { toDisplayDate } from '../utils/dateUtils';
+import { useToast } from '../hooks/useToast.ts';
+import { toDisplayDate } from '../utils/dateUtils.ts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
+import Modal from './Modal';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,6 +27,7 @@ const InvoiceTemplates = ({
     editTemplateModal = null
 }) => {
     const { showSuccess } = useToast();
+    const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
 
     // Auto-open create modal when autoOpenCreate prop changes
     useEffect(() => {
@@ -35,12 +38,31 @@ const InvoiceTemplates = ({
 
     // Handle delete
     const handleDelete = (templateId) => {
-        if (window.confirm('Are you sure you want to delete this template?')) {
-            const updatedTemplates = invoiceTemplates.filter(t => t.id !== templateId);
-            setInvoiceTemplates(updatedTemplates);
-            showSuccess('Template deleted successfully!');
-        }
+
+        setPendingDeleteTemplateId(templateId);
     };
+
+    const closeDeleteTemplateModal = () => {
+
+        setPendingDeleteTemplateId(null);
+    };
+
+    const confirmDeleteTemplate = () => {
+
+        if (!pendingDeleteTemplateId) {
+
+            return;
+        }
+
+        const updatedTemplates = invoiceTemplates.filter(t => t.id !== pendingDeleteTemplateId);
+        setInvoiceTemplates(updatedTemplates);
+        showSuccess('Template deleted successfully!');
+        setPendingDeleteTemplateId(null);
+    };
+
+    const pendingDeleteTemplate = pendingDeleteTemplateId
+        ? invoiceTemplates.find((template) => template.id === pendingDeleteTemplateId)
+        : null;
 
     // Generate a static timestamp for previews that only changes when component mounts
     const staticTimestamp = useMemo(() => Date.now().toString(), []);
@@ -195,12 +217,15 @@ const InvoiceTemplates = ({
                                     {/* Three-dot dropdown menu for Edit and Delete */}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button
-                                                className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-muted-foreground hover:bg-muted rounded-full transition-colors group"
                                                 title="More actions"
+                                                aria-label="More actions"
                                             >
                                                 <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
-                                            </button>
+                                            </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem
@@ -225,6 +250,36 @@ const InvoiceTemplates = ({
                     ))}
                 </div>
             )}
+
+            <Modal
+                isOpen={Boolean(pendingDeleteTemplateId)}
+                onClose={closeDeleteTemplateModal}
+                title="Delete template?"
+                description="This will permanently remove the invoice template."
+                footer={(
+                    <div className="flex justify-end space-x-3">
+                        <Button
+                            variant="outline"
+                            onClick={closeDeleteTemplateModal}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDeleteTemplate}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                )}
+            >
+                <Notice
+                    title={pendingDeleteTemplate
+                        ? `Deleting "${pendingDeleteTemplate.name}" cannot be undone.`
+                        : 'Deleting this template cannot be undone.'}
+                    variant="destructive"
+                />
+            </Modal>
         </div>
     );
 };

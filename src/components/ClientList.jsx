@@ -12,8 +12,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, UserGroupIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
-import { useToast } from '../hooks/useToast';
-import { toDisplayDate } from '../utils/dateUtils';
+import { useToast } from '../hooks/useToast.ts';
+import { toDisplayDate } from '../utils/dateUtils.ts';
 
 /**
  * ClientList component - Displays and manages the list of clients

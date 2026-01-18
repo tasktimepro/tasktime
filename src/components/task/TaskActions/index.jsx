@@ -1,6 +1,6 @@
 import { ArchiveBoxIcon, ArchiveRestoreIcon, ClockIcon, CurrencyDollarIcon, TrashIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
-import TaskTimer from '../../TaskTimer.jsx';
+import TaskTimer from '../../TaskTimer';
 import TaskDropdown from './TaskDropdown';
 
 /**

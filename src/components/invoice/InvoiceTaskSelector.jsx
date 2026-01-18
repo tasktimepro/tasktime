@@ -1,5 +1,5 @@
 import { TrashIcon } from '@/components/ui/icons';
-import { formatDurationWithSeconds, hoursToMinutes } from '../../utils/dateUtils';
+import { formatDurationWithSeconds, hoursToMinutes } from '../../utils/dateUtils.ts';
 import CustomCheckbox from '../CustomCheckbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

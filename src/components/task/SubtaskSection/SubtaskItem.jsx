@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import TimeEntriesModal from '../../TimeEntriesModal.jsx';
+import TimeEntriesModal from '../../TimeEntriesModal';
 import TaskHeader from '../TaskHeader';
 import TaskActions from '../TaskActions';
 import useTaskState from '../hooks/useTaskState';

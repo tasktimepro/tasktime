@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useToast } from '../hooks/useToast';
-import { DEFAULT_CURRENCY, getCurrencyOptions } from '../utils/currencyUtils';
+import { useToast } from '../hooks/useToast.ts';
+import { DEFAULT_CURRENCY, getCurrencyOptions } from '../utils/currencyUtils.ts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

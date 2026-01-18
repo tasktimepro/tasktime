@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownTrayIcon, CogIcon, TrashIcon } from '@/components/ui/icons';
-import { useUrlState } from '../hooks/useUrlState';
+import { useUrlState } from '../hooks/useUrlState.ts';
 import ExportImport from './ExportImport';
 import Preferences from './Preferences';
 import Modal from './Modal';
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
-import { useToast } from '../hooks/useToast';
+import { useToast } from '../hooks/useToast.ts';
 
 /**
  * Account component - Main account management page with side navigation

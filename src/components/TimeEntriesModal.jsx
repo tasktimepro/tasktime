@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDurationWithSeconds, toDisplayDate, getTodayString, getCurrentTimeString, timestampToDateString, timestampToTimeString } from '../utils/dateUtils';
-import { checkTimeOverlap } from '../utils/timeValidationUtils';
-import { generateId } from '../utils/idUtils';
-import { useToast } from '../hooks/useToast';
+import { formatDurationWithSeconds, toDisplayDate, getTodayString, getCurrentTimeString, timestampToDateString, timestampToTimeString } from '../utils/dateUtils.ts';
+import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
+import { generateId } from '../utils/idUtils.ts';
+import { useToast } from '../hooks/useToast.ts';
 
 /**
  * TimeEntriesModal component - Modal for viewing and managing time entries for a task

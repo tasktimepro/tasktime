@@ -1,4 +1,4 @@
-import { formatDurationWithSeconds } from '../../utils/dateUtils';
+import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
 
 /**
  * TaskTimeDisplay component - Renders time display for tasks.

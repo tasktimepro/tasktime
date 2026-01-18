@@ -1,9 +1,26 @@
 import { toStorageDate } from '../../../utils/dateUtils';
 
+type InvoiceTemplate = {
+    invoiceNumberFormat: string;
+    useSequentialNumbers?: boolean;
+    currentSequentialNumber?: number;
+    dueDateType?: 'fixed-days' | 'fixed-weeks' | 'precise-date' | 'none' | string;
+    dueDateDays?: number | string;
+    dueDateWeeks?: number | string;
+    dueDatePrecise?: string;
+};
+
+type ProjectInfo = {
+    id: string;
+};
+
 /**
  * generateInvoiceNumber - Generates an invoice number based on template.
  */
-export const generateInvoiceNumber = (template, project) => {
+export const generateInvoiceNumber = (
+    template: InvoiceTemplate | null | undefined,
+    project?: ProjectInfo | null
+): string => {
 
     if (!template) {
         // Fallback to original logic if no template
@@ -13,7 +30,7 @@ export const generateInvoiceNumber = (template, project) => {
     }
 
     const now = new Date();
-    const variables = {
+    const variables: Record<string, string> = {
         '{projectId}': project ? project.id.slice(-8) : 'NOPROJECT',
         '{timestamp}': Date.now().toString(),
         '{date}': now.toISOString().slice(0, 10).replace(/-/g, ''),
@@ -21,7 +38,7 @@ export const generateInvoiceNumber = (template, project) => {
         '{month}': (now.getMonth() + 1).toString().padStart(2, '0'),
         '{day}': now.getDate().toString().padStart(2, '0'),
         '{sequential}': template.useSequentialNumbers
-            ? template.currentSequentialNumber.toString().padStart(4, '0')
+            ? String(template.currentSequentialNumber || 0).padStart(4, '0')
             : '0001'
     };
 
@@ -37,7 +54,10 @@ export const generateInvoiceNumber = (template, project) => {
  * calculateDueDate - Calculates due date using template settings.
  * Returns ISO format (YYYY-MM-DD) for storage portability.
  */
-export const calculateDueDate = (template, invoiceDate = new Date()) => {
+export const calculateDueDate = (
+    template: InvoiceTemplate | null | undefined,
+    invoiceDate: Date = new Date()
+): string | null => {
 
     if (!template) {
         // Default to 30 days if no template
@@ -52,7 +72,7 @@ export const calculateDueDate = (template, invoiceDate = new Date()) => {
                 return null; // No due date
             }
             const dueDate = new Date(invoiceDate);
-            dueDate.setDate(dueDate.getDate() + parseInt(template.dueDateDays));
+            dueDate.setDate(dueDate.getDate() + parseInt(String(template.dueDateDays)));
             return toStorageDate(dueDate);
         }
 
@@ -61,7 +81,7 @@ export const calculateDueDate = (template, invoiceDate = new Date()) => {
                 return null; // No due date
             }
             const dueDate = new Date(invoiceDate);
-            dueDate.setDate(dueDate.getDate() + (parseInt(template.dueDateWeeks) * 7));
+            dueDate.setDate(dueDate.getDate() + (parseInt(String(template.dueDateWeeks)) * 7));
             return toStorageDate(dueDate);
         }
 
@@ -79,7 +99,7 @@ export const calculateDueDate = (template, invoiceDate = new Date()) => {
         default: {
             // Backward compatibility with old 'fixed' and 'net' types
             const dueDate = new Date(invoiceDate);
-            dueDate.setDate(dueDate.getDate() + (template.dueDateDays || 30));
+            dueDate.setDate(dueDate.getDate() + (Number(template.dueDateDays) || 30));
             return toStorageDate(dueDate);
         }
     }

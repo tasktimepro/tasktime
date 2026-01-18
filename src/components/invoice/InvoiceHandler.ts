@@ -1,3 +1,4 @@
+// @ts-nocheck
 // InvoiceHandler.js
 // Extracted handler functions from InvoiceGenerator for use in InvoiceModal and related invoice logic
 

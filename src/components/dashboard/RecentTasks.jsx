@@ -2,7 +2,7 @@ import { DocumentCheckIcon, MagnifyingGlassIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import CustomCheckbox from '../CustomCheckbox';
-import { formatDurationWithSeconds } from '../../utils/dateUtils';
+import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
 
 /**
  * RecentTasks component - Recent task list with search and controls.

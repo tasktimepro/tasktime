@@ -7,7 +7,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils.ts';
 
 /**
  * Reusable Modal component using shadcn/ui Dialog

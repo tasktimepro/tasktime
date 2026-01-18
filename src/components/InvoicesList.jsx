@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils';
-import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils';
-import { parseStoredDate, toDisplayDate } from '../utils/dateUtils';
-import { useUrlState } from '../hooks/useUrlState';
+import { Notice } from '@/components/ui/notice';
+import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils.ts';
+import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { parseStoredDate, toDisplayDate } from '../utils/dateUtils.ts';
+import { useUrlState } from '../hooks/useUrlState.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 
@@ -49,6 +50,7 @@ const InvoicesList = ({
 }) => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
+    const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
     const { updateUrl } = useUrlState();
     
     // Default to overdue tab if there are overdue invoices, otherwise outstanding
@@ -239,18 +241,31 @@ const InvoicesList = ({
         if (onEditInvoice) {
             // Show warning for paid invoices
             if (invoice.paymentProcessed) {
-                const confirmEdit = window.confirm(
-                    "This invoice is marked as Paid. Editing a paid invoice may cause inconsistencies in your records.\n\nAre you sure you want to continue?"
-                );
-                if (!confirmEdit) {
-                    return; // User cancelled, don't proceed with edit
-                }
+                setPendingPaidEditInvoice(invoice);
+                return;
             }
             
             onEditInvoice(invoice);
         } else {
             alert('Edit functionality requires integration with the parent component.');
         }
+    };
+
+    const closePaidEditWarning = () => {
+
+        setPendingPaidEditInvoice(null);
+    };
+
+    const confirmPaidEdit = () => {
+
+        if (!pendingPaidEditInvoice || !onEditInvoice) {
+
+            setPendingPaidEditInvoice(null);
+            return;
+        }
+
+        onEditInvoice(pendingPaidEditInvoice);
+        setPendingPaidEditInvoice(null);
     };
 
     /**
@@ -716,6 +731,33 @@ const InvoicesList = ({
 
             {/* Invoice Preview Modal */}
             {renderInvoicePreview()}
+
+            <Modal
+                isOpen={Boolean(pendingPaidEditInvoice)}
+                onClose={closePaidEditWarning}
+                title="Edit paid invoice?"
+                description="Editing a paid invoice can create inconsistencies in your records."
+                footer={(
+                    <div className="flex justify-end space-x-3">
+                        <Button
+                            variant="outline"
+                            onClick={closePaidEditWarning}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={confirmPaidEdit}
+                        >
+                            Continue
+                        </Button>
+                    </div>
+                )}
+            >
+                <Notice
+                    title="This invoice is marked as paid. Continue anyway?"
+                    variant="warning"
+                />
+            </Modal>
         </div>
     );
 };

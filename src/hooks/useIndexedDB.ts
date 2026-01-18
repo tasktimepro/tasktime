@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { openDB } from 'idb';
+import type { IDBPDatabase } from 'idb';
 
 /**
  * Database configuration
@@ -13,27 +15,27 @@ const BROADCAST_CHANNEL_NAME = 'tasktime-sync';
  * Singleton database instance promise
  * Ensures we only open one connection
  */
-let dbPromise = null;
+let dbPromise: Promise<IDBPDatabase> | null = null;
 
 /**
  * Singleton BroadcastChannel for cross-tab communication
  * Used to sync state changes across browser tabs
  */
-let broadcastChannel = null;
+let broadcastChannel: BroadcastChannel | null = null;
 
 /**
  * Get or create the BroadcastChannel
  * @returns {BroadcastChannel|null} BroadcastChannel instance or null if not supported
  */
-const getBroadcastChannel = () => {
+const getBroadcastChannel = (): BroadcastChannel | null => {
     if (typeof BroadcastChannel === 'undefined') {
         return null; // Not supported in this browser
     }
-    
+
     if (!broadcastChannel) {
         broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
     }
-    
+
     return broadcastChannel;
 };
 
@@ -69,19 +71,22 @@ const getDB = () => {
  * @param {*} defaultValue - Default value if no stored value exists
  * @returns {Array} [value, setValue, { loading, error }] - Current value, setter, and status
  */
-export const useIndexedDB = (key, defaultValue) => {
+export const useIndexedDB = <T,>(
+    key: string,
+    defaultValue: T
+): [T, Dispatch<SetStateAction<T>>, { loading: boolean; error: unknown }] => {
 
     const [value, setValue] = useState(defaultValue);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    
+    const [error, setError] = useState<unknown>(null);
+
     // Track if this is the initial load to prevent writing default value
     const isInitialLoad = useRef(true);
-    
+
     // Track the latest value to avoid stale closures in save
     const latestValue = useRef(value);
     latestValue.current = value;
-    
+
     // Track if the update came from another tab to prevent echo
     const isExternalUpdate = useRef(false);
 
@@ -95,7 +100,7 @@ export const useIndexedDB = (key, defaultValue) => {
             try {
 
                 const db = await getDB();
-                const storedValue = await db.get(STORE_NAME, key);
+                const storedValue = await db.get(STORE_NAME, key) as T | undefined;
 
                 if (storedValue !== undefined) {
 
@@ -116,32 +121,32 @@ export const useIndexedDB = (key, defaultValue) => {
 
         loadValue();
     }, [key]);
-    
+
     /**
      * Listen for cross-tab updates via BroadcastChannel
      */
     useEffect(() => {
         const channel = getBroadcastChannel();
         if (!channel) return;
-        
-        const handleMessage = (event) => {
+
+        const handleMessage = (event: MessageEvent<{ key: string; value: T }>) => {
             // Only process messages for this key
             if (event.data?.key !== key) return;
-            
+
             // Mark as external update to prevent broadcasting back
             isExternalUpdate.current = true;
             setValue(event.data.value);
-            
+
             // Reset the flag after a microtask
             Promise.resolve().then(() => {
                 isExternalUpdate.current = false;
             });
         };
-        
-        channel.addEventListener('message', handleMessage);
-        
+
+        channel.addEventListener('message', handleMessage as EventListener);
+
         return () => {
-            channel.removeEventListener('message', handleMessage);
+            channel.removeEventListener('message', handleMessage as EventListener);
         };
     }, [key]);
 
@@ -162,7 +167,7 @@ export const useIndexedDB = (key, defaultValue) => {
 
                 const db = await getDB();
                 await db.put(STORE_NAME, value, key);
-                
+
                 // Broadcast the change to other tabs (only if this wasn't an external update)
                 if (!isExternalUpdate.current) {
                     const channel = getBroadcastChannel();
@@ -185,13 +190,13 @@ export const useIndexedDB = (key, defaultValue) => {
      * Wrapped setValue that can accept a function or value
      * Matches the useState API
      */
-    const setStoredValue = useCallback((newValue) => {
+    const setStoredValue = useCallback((newValue: SetStateAction<T>) => {
 
         setValue(prevValue => {
 
             // Support functional updates like setState(prev => prev + 1)
-            const resolvedValue = typeof newValue === 'function' 
-                ? newValue(prevValue) 
+            const resolvedValue = typeof newValue === 'function'
+                ? (newValue as (prev: T) => T)(prevValue)
                 : newValue;
 
             return resolvedValue;
@@ -208,7 +213,7 @@ export const useIndexedDB = (key, defaultValue) => {
  * @param {Array<{loading: boolean}>} states - Array of status objects from useIndexedDB
  * @returns {boolean} True if any state is still loading
  */
-export const useIndexedDBLoading = (states) => {
+export const useIndexedDBLoading = (states: Array<{ loading: boolean }>): boolean => {
 
     return states.some(state => state.loading);
 };
@@ -216,7 +221,7 @@ export const useIndexedDBLoading = (states) => {
 /**
  * Utility to clear all data (useful for testing/reset)
  */
-export const clearAllData = async () => {
+export const clearAllData = async (): Promise<void> => {
 
     const db = await getDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -227,7 +232,7 @@ export const clearAllData = async () => {
 /**
  * Utility to get all keys (useful for debugging)
  */
-export const getAllKeys = async () => {
+export const getAllKeys = async (): Promise<IDBValidKey[]> => {
 
     const db = await getDB();
     return db.getAllKeys(STORE_NAME);

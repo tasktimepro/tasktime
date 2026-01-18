@@ -1,9 +1,9 @@
 import React from 'react';
 import { PlayIcon, PauseIcon, StopIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
-import { generateId } from '../utils/idUtils';
-import { checkTimeOverlap } from '../utils/timeValidationUtils';
-import { useToast } from '../hooks/useToast';
+import { generateId } from '../utils/idUtils.ts';
+import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
+import { useToast } from '../hooks/useToast.ts';
 
 /**
  * TimerControls component - Handles task timer functionality

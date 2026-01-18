@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
  * Generate a unique UUID v4 identifier
  * @returns {string} A unique UUID string
  */
-export const generateId = () => {
+export const generateId = (): string => {
     return uuidv4();
 };
 
@@ -13,7 +13,7 @@ export const generateId = () => {
  * @param {string} text - The text to slugify
  * @returns {string} A URL-friendly slug
  */
-export const slugify = (text) => {
+export const slugify = (text: string): string => {
     return text
         .toLowerCase()
         .trim()
@@ -29,7 +29,7 @@ export const slugify = (text) => {
  * @param {string} name - The name/title to include in the slug
  * @returns {string} A human-readable slug ID
  */
-export const generateSlugId = (name) => {
+export const generateSlugId = (name: string): string => {
     const slug = slugify(name);
     const shortId = uuidv4().split('-')[0]; // First segment of UUID (8 chars)
     return slug ? `${slug}-${shortId}` : shortId;
