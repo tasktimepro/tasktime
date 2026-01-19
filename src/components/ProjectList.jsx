@@ -304,7 +304,10 @@ const ProjectList = ({
                     )}
                 </h2>
 
-                <Button onClick={() => openProjectModal()} leadingIcon={PlusIcon}>
+                <Button 
+                    onClick={() => openProjectModal()} 
+                    leadingIcon={PlusIcon}
+                >
                     New Project
                 </Button>
             </div>

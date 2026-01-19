@@ -1,16 +1,210 @@
 import { useState, useEffect } from 'react';
-import {
-    ChevronLeftIcon,
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ChartBarIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, DocumentTextIcon, RocketLaunchIcon } from '@/components/ui/icons';
+import Modal from './Modal';
+import { useToast } from '../hooks/useToast.ts';
+import { generateId } from '../utils/idUtils.ts';
+import { CURRENCY_NAMES, CURRENCY_SYMBOLS, getPreferredCurrency } from '../utils/currencyUtils.ts';
+
+const CURRENCY_OPTIONS = Object.keys(CURRENCY_NAMES);
+
+/**
+ * OnboardingModal component - Guided setup for first-time users.
+ * @param {Object} props
+ * @param {boolean} props.isOpen
+ * @param {Function} props.onComplete
+ * @param {Function} props.onCreateProject
+ * @param {Function} props.onCreateTask
+ */
+const OnboardingModal = ({
+    isOpen,
+    onComplete,
+    onCreateProject,
+    onCreateTask
+}) => {
+
+    const { showSuccess, showWarning, showError } = useToast();
+
+    const [currentSlide, setCurrentSlide] = useState(0);
+    const [createdProjectId, setCreatedProjectId] = useState(null);
+    const [projectFormData, setProjectFormData] = useState({
+        title: '',
+        hourlyRate: '',
+        currency: getPreferredCurrency()
+    });
+    const [taskFormData, setTaskFormData] = useState({
+        title: ''
+    });
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        setCurrentSlide(0);
+        setCreatedProjectId(null);
+        setProjectFormData({
+            title: '',
+            hourlyRate: '',
+            currency: getPreferredCurrency()
+        });
+        setTaskFormData({
+            title: ''
+        });
+    }, [isOpen]);
+
     /**
-     * OnboardingModal component - removed in cleanup phase.
+     * Handle project form input change.
      */
-    const OnboardingModal = () => {
-        return null;
+    const handleProjectInputChange = (e) => {
+        const { name, value } = e.target;
+
+        setProjectFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
     };
 
-    export default OnboardingModal;
+    /**
+     * Handle project currency selection.
+     */
+    const handleProjectCurrencyChange = (value) => {
+        setProjectFormData(prev => ({
+            ...prev,
+            currency: value
+        }));
+    };
+
+    /**
+     * Handle task form input change.
+     */
+    const handleTaskInputChange = (e) => {
+        const { name, value } = e.target;
+
+        setTaskFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const slides = [
+        {
+            id: 'welcome',
+            title: '👋 Welcome to TaskTime',
+            content: (
+                <div className="space-y-6">
+                    <div className="text-center space-y-4">
+                        <div className="flex justify-center">
+                            <div className="bg-muted p-4 rounded-full">
+                                <RocketLaunchIcon className="h-10 w-10 text-foreground" />
                             </div>
                         </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-foreground mb-2">
+                                Let’s get you set up in minutes
+                            </h3>
+                            <p className="text-muted-foreground">
+                                We’ll create your first project and task so you can start tracking time right away.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="border border-border rounded-lg p-4 space-y-2">
+                            <div className="text-sm font-medium text-foreground">What you’ll do</div>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                                <li>• Create a project</li>
+                                <li>• Add your first task</li>
+                                <li>• Review dashboard insights</li>
+                            </ul>
+                        </div>
+                        <div className="border border-border rounded-lg p-4 space-y-2">
+                            <div className="text-sm font-medium text-foreground">Why it matters</div>
+                            <p className="text-sm text-muted-foreground">
+                                Your setup helps TaskTime auto-fill invoices and keep your data organized.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )
+        },
+        {
+            id: 'project',
+            title: '🗂️ Create Your First Project',
+            content: (
+                <div className="space-y-6">
+                    <div className="space-y-2">
+                        <Label htmlFor="onboarding-project-title">Project name</Label>
+                        <Input
+                            id="onboarding-project-title"
+                            name="title"
+                            value={projectFormData.title}
+                            onChange={handleProjectInputChange}
+                            placeholder="Client website redesign"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="onboarding-project-rate">Hourly rate (optional)</Label>
+                            <Input
+                                id="onboarding-project-rate"
+                                name="hourlyRate"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={projectFormData.hourlyRate}
+                                onChange={handleProjectInputChange}
+                                placeholder="0.00"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="onboarding-project-currency">Currency</Label>
+                            <Select
+                                value={projectFormData.currency}
+                                onValueChange={handleProjectCurrencyChange}
+                            >
+                                <SelectTrigger id="onboarding-project-currency">
+                                    <SelectValue placeholder="Select currency" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {CURRENCY_OPTIONS.map(code => (
+                                        <SelectItem key={code} value={code}>
+                                            {code} — {CURRENCY_NAMES[code]} ({CURRENCY_SYMBOLS[code] || code})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <p className="text-sm text-muted-foreground">
+                        You can adjust project details later in Projects.
+                    </p>
+                </div>
+            )
+        },
+        {
+            id: 'task',
+            title: '✅ Add Your First Task',
+            content: (
+                <div className="space-y-6">
+                    <div className="space-y-2">
+                        <Label htmlFor="onboarding-task-title">Task name</Label>
+                        <Input
+                            id="onboarding-task-title"
+                            name="title"
+                            value={taskFormData.title}
+                            onChange={handleTaskInputChange}
+                            placeholder="Design homepage mockups"
+                        />
+                    </div>
+
+                    <div className="border border-border rounded-lg p-4 text-sm text-muted-foreground">
+                        This task will be linked to the project you just created.
                     </div>
                 </div>
             )
@@ -152,15 +346,16 @@ import {
     const isLastSlide = currentSlide === slides.length - 1;
     const isFirstSlide = currentSlide === 0;
 
+    /**
+     * Handle forward navigation.
+     */
     const handleNext = () => {
         if (currentSlide === 1) {
-            // Create project slide
             if (!projectFormData.title.trim()) {
-                showSuccess('Please enter a project name to continue', 'warning');
+                showWarning('Please enter a project name to continue');
                 return;
             }
             
-            // Create the project
             const newProject = {
                 id: generateId(),
                 title: projectFormData.title,
@@ -168,7 +363,7 @@ import {
                 currency: projectFormData.currency,
                 flatRate: false,
                 archived: false,
-                isPersonal: false, // Default to non-personal for onboarding
+                isPersonal: false,
                 createdAt: new Date().toISOString()
             };
             
@@ -176,18 +371,16 @@ import {
             setCreatedProjectId(newProject.id);
             showSuccess('Project created successfully!');
         } else if (currentSlide === 2) {
-            // Create task slide
             if (!taskFormData.title.trim()) {
-                showSuccess('Please enter a task name to continue', 'warning');
+                showWarning('Please enter a task name to continue');
                 return;
             }
             
             if (!createdProjectId) {
-                showSuccess('Project not found. Please go back and create a project first.', 'error');
+                showError('Project not found. Please go back and create a project first.');
                 return;
             }
             
-            // Create the task
             const newTask = {
                 id: generateId(),
                 title: taskFormData.title,
@@ -209,16 +402,25 @@ import {
         }
     };
 
+    /**
+     * Handle back navigation.
+     */
     const handlePrevious = () => {
         if (!isFirstSlide) {
             setCurrentSlide(prev => prev - 1);
         }
     };
 
+    /**
+     * Handle skipping onboarding.
+     */
     const handleSkip = () => {
         onComplete();
     };
 
+    /**
+     * Determine whether current step can proceed.
+     */
     const canProceed = () => {
         if (currentSlide === 1) {
             return projectFormData.title.trim();
@@ -232,7 +434,6 @@ import {
     const footer = (
         <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-                {/* Progress indicators */}
                 <div className="flex space-x-2">
                     {slides.map((_, index) => (
                         <div
@@ -285,6 +486,10 @@ import {
             </div>
         </div>
     );
+
+    if (!currentSlideData) {
+        return null;
+    }
 
     return (
         <Modal

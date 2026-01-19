@@ -4,6 +4,10 @@ services:
     container_name: tasktime
     volumes:
       - .:/app
-      - /app/node_modules
+      - node_modules:/app/node_modules
     ports:
       - "3101:3101"
+
+volumes:
+  node_modules:
+

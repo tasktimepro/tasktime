@@ -186,6 +186,7 @@ docker compose run --rm app npm run <script>
 1. **Read `docs/project_overview.md` first** — It has the full architecture
 2. **Check this file for rules** — Especially the "no legacy code" rule
 3. **App.jsx is the state hub** — All data flows from there
+4. **Keep tests updated** — Add or adjust tests whenever behavior changes or new workflows are added
 
 ---
 

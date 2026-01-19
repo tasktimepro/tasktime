@@ -202,7 +202,7 @@ const InvoiceModal = ({
                     <button
                         type="button"
                         onClick={() => toggleSection('projectClient')}
-                        className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'projectClient' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'projectClient' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
                             <h4 className="text-sm font-medium text-foreground">Client & Project Details</h4>
@@ -466,7 +466,7 @@ const InvoiceModal = ({
                     <button
                         type="button"
                         onClick={() => toggleSection('businessPayment')}
-                        className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'businessPayment' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'businessPayment' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
                             <h4 className="text-sm font-medium text-foreground">Business & Payment</h4>
@@ -622,7 +622,7 @@ const InvoiceModal = ({
                     <button
                         type="button"
                         onClick={() => toggleSection('invoiceSettings')}
-                        className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'invoiceSettings' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'invoiceSettings' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
                             <h4 className="text-sm font-medium text-foreground">Invoice Settings</h4>

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { CreditCardIcon, BuildingOfficeIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaymentMethods from './PaymentMethods';
 import BusinessInfo from './BusinessInfo';
@@ -139,13 +140,12 @@ const Invoices = ({
                 </div>
                 
                 {/* New Invoice Button */}
-                <button
+                <Button
                     onClick={handleCreateNewInvoice}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                    leadingIcon={DocumentTextIcon}
                 >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" />
                     New Invoice
-                </button>
+                </Button>
             </div>
 
             {/* Navigation Tabs */}

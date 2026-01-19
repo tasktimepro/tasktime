@@ -58,7 +58,7 @@ const InvoiceTaskSelector = ({
             <button
                 type="button"
                 onClick={() => toggleSection('tasksTime')}
-                className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'tasksTime' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'tasksTime' ? 'rounded-t-lg' : 'rounded-lg'}`}
             >
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -103,7 +103,7 @@ const InvoiceTaskSelector = ({
                                             });
                                             setSelectedTasksForBilling(allSelected);
                                         }}
-                                        className="text-xs text-blue-600 hover:text-foreground"
+                                        className="text-xs text-muted-foreground underline underline-offset-2 cursor-pointer hover:text-foreground"
                                     >
                                         Select All
                                     </button>
@@ -113,7 +113,7 @@ const InvoiceTaskSelector = ({
                                         onClick={() => {
                                             setSelectedTasksForBilling({});
                                         }}
-                                        className="text-xs text-muted-foreground hover:text-foreground"
+                                        className="text-xs text-muted-foreground underline underline-offset-2 cursor-pointer hover:text-foreground"
                                     >
                                         Deselect All
                                     </button>

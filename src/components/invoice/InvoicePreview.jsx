@@ -42,7 +42,7 @@ const InvoicePreview = ({
             <button
                 type="button"
                 onClick={() => toggleSection('pricingTotals')}
-                className={`w-full px-4 py-3 text-left bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'pricingTotals' ? 'rounded-t-lg' : 'rounded-lg'}`}
+                className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'pricingTotals' ? 'rounded-t-lg' : 'rounded-lg'}`}
             >
                 <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium text-foreground">Pricing & Totals</h4>

@@ -1,7 +1,7 @@
 # TaskTime Makefile
 # Shorthand commands for common Docker operations
 
-.PHONY: help dev stop build install lint clean logs shell test test-run test-coverage
+.PHONY: help dev stop build install lint clean logs shell test test-run test-coverage release-gate
 
 # Default target - show help
 help:
@@ -20,6 +20,7 @@ help:
 	@echo "  make test     - Run vitest in watch mode"
 	@echo "  make test-run - Run vitest once"
 	@echo "  make test-coverage - Run vitest with coverage"
+	@echo "  make release-gate - Run coverage and build"
 	@echo ""
 
 # Start development server
@@ -61,6 +62,11 @@ test-run:
 
 test-coverage:
 	docker compose run --rm app npm run test:coverage
+
+# Release gate checks (coverage + build)
+release-gate:
+	docker compose run --rm app npm run test:coverage
+	docker compose run --rm app npm run build
 
 # View logs
 logs:
