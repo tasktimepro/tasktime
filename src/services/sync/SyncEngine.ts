@@ -2,6 +2,7 @@ import type { CloudProvider, SyncData, SyncMeta } from './providers/CloudProvide
 import { AuthorizationError } from './providers/GoogleDriveProvider';
 import { syncLog } from './debugLogger';
 import { generateChecksum, getDeviceId } from '@/utils/syncUtils';
+import { compareForMerge, type SyncableEntity } from '@/utils/syncableEntity';
 
 export type SyncState =
     | 'idle'
@@ -434,8 +435,8 @@ export class SyncEngine {
         for (const collection of collections) {
 
             merged[collection] = this.mergeCollection(
-                (local[collection] as Array<{ id: string; updatedAt: number }> | undefined) || [],
-                (remote[collection] as Array<{ id: string; updatedAt: number }> | undefined) || []
+                (local[collection] as SyncableEntity[] | undefined) || [],
+                (remote[collection] as SyncableEntity[] | undefined) || []
             );
         }
 
@@ -486,24 +487,41 @@ export class SyncEngine {
         return localLastActive >= remoteLastActive ? localTimer : remoteTimer;
     }
 
-    private mergeCollection<T extends { id: string; updatedAt: number; deletedAt?: number }>(
+    /**
+     * Merge two collections using deterministic conflict resolution.
+     * Uses compareForMerge which considers:
+     * 1. updatedAt timestamp (higher wins)
+     * 2. _syncSeq sequence number (higher wins if same timestamp)
+     * 3. id comparison (lexicographic for ultimate tie-break)
+     */
+    private mergeCollection<T extends SyncableEntity>(
         local: T[],
         remote: T[]
     ): T[] {
 
         const merged = new Map<string, T>();
 
+        // Add all local items first
         for (const item of local) {
-
             merged.set(item.id, item);
         }
 
+        // Merge remote items using deterministic comparison
         for (const item of remote) {
-
             const existing = merged.get(item.id);
-            if (!existing || item.updatedAt > existing.updatedAt) {
-
+            
+            if (!existing) {
+                // New item from remote
                 merged.set(item.id, item);
+            } else {
+                // Both exist - use deterministic comparison
+                // compareForMerge returns positive if second arg (item/remote) wins
+                const comparison = compareForMerge(existing, item);
+                if (comparison > 0) {
+                    // Remote item is newer/wins
+                    merged.set(item.id, item);
+                }
+                // If comparison <= 0, local item stays (already in merged)
             }
         }
 

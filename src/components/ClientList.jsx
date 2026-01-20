@@ -14,7 +14,7 @@ import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, Chevr
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
-import { softDeleteById, softDeleteByIds, isDeleted } from '../utils/syncableEntity.ts';
+import { softDeleteById, softDeleteByIds, isDeleted, withUpdateMetadata } from '../utils/syncableEntity.ts';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -112,10 +112,9 @@ const ClientList = ({
             setInvoices(softDeleteByIds(invoices, relatedInvoiceIds));
         } else {
             // Remove client reference from projects (update, not delete)
-            const now = Date.now();
             setProjects(projects.map(project => 
                 project.preferredClientId === clientId 
-                    ? { ...project, preferredClientId: null, updatedAt: now }
+                    ? withUpdateMetadata({ ...project, preferredClientId: null })
                     : project
             ));
         }
@@ -139,14 +138,14 @@ const ClientList = ({
             const relatedProjectIds = getRelatedProjects(clientId).map(p => p.id);
             setProjects(projects.map(project => 
                 relatedProjectIds.includes(project.id)
-                    ? { ...project, archived: true }
+                    ? withUpdateMetadata({ ...project, archived: true })
                     : project
             ));
         }
 
         // Archive the client
         const updatedClients = clients.map(client =>
-            client.id === clientId ? { ...client, archived: true } : client
+            client.id === clientId ? withUpdateMetadata({ ...client, archived: true }) : client
         );
         setClients(updatedClients);
 
@@ -162,7 +161,7 @@ const ClientList = ({
      */
     const handleUnarchiveClient = (clientId) => {
         const updatedClients = clients.map(client =>
-            client.id === clientId ? { ...client, archived: false } : client
+            client.id === clientId ? withUpdateMetadata({ ...client, archived: false }) : client
         );
         setClients(updatedClients);
         showSuccess('Client unarchived successfully!');

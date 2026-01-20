@@ -8,6 +8,7 @@ import Modal from './Modal';
 import { useToast } from '../hooks/useToast.ts';
 import { generateId } from '../utils/idUtils.ts';
 import { CURRENCY_NAMES, CURRENCY_SYMBOLS, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { withCreateMetadata } from '../utils/syncableEntity.ts';
 
 const CURRENCY_OPTIONS = Object.keys(CURRENCY_NAMES);
 
@@ -356,16 +357,15 @@ const OnboardingModal = ({
                 return;
             }
             
-            const newProject = {
+            const newProject = withCreateMetadata({
                 id: generateId(),
                 title: projectFormData.title,
                 hourlyRate: projectFormData.hourlyRate ? parseFloat(projectFormData.hourlyRate) : null,
                 currency: projectFormData.currency,
                 flatRate: false,
                 archived: false,
-                isPersonal: false,
-                createdAt: new Date().toISOString()
-            };
+                isPersonal: false
+            });
             
             onCreateProject(newProject);
             setCreatedProjectId(newProject.id);
@@ -381,15 +381,14 @@ const OnboardingModal = ({
                 return;
             }
             
-            const newTask = {
+            const newTask = withCreateMetadata({
                 id: generateId(),
                 title: taskFormData.title,
                 projectId: createdProjectId,
                 completed: false,
                 archived: false,
-                billable: true,
-                createdAt: new Date().toISOString()
-            };
+                billable: true
+            });
             
             onCreateTask(newTask);
             showSuccess('Task created successfully!');

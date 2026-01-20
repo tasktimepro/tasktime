@@ -6,11 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Notice } from '@/components/ui/notice';
 import { formatDurationWithSeconds, toDisplayDate, getTodayString, getCurrentTimeString, timestampToDateString, timestampToTimeString } from '../utils/dateUtils.ts';
 import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
 import { generateId } from '../utils/idUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { softDeleteById, isDeleted } from '../utils/syncableEntity.ts';
+import { softDeleteById, isDeleted, withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
 
 /**
  * TimeEntriesModal component - Modal for viewing and managing time entries for a task
@@ -99,6 +100,8 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
         note: ''
     });
 
+    const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState(null);
+
     // State for collapsible billed entries section
     const [showBilledEntries, setShowBilledEntries] = useState(false);
 
@@ -108,6 +111,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
             setEditingEntry(null);
             setShowAddForm(false);
             resetForms();
+            setPendingDeleteEntryId(null);
         }
     }, [isOpen]);
 
@@ -191,12 +195,12 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
 
         const updatedEntries = timeEntries.map(entry => 
             entry.id === editingEntry.id 
-                ? { 
+                ? withUpdateMetadata({ 
                     ...entry, 
                     start: startTimestamp, 
                     end: endTimestamp,
                     note: editForm.note.trim() || undefined
-                }
+                })
                 : entry
         );
 
@@ -212,13 +216,30 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
             showError('Cannot delete billed time entries. This entry was included in a previous invoice and must be preserved for accounting records.');
             return;
         }
-
-        if (window.confirm('Are you sure you want to delete this time entry?')) {
-            const updatedEntries = softDeleteById(timeEntries, entryId);
-            setTimeEntries(updatedEntries);
-            showSuccess('Time entry deleted successfully');
-        }
+        setPendingDeleteEntryId(entryId);
     };
+
+    const closeDeleteEntryModal = () => {
+
+        setPendingDeleteEntryId(null);
+    };
+
+    const confirmDeleteEntry = () => {
+
+        if (!pendingDeleteEntryId) {
+
+            return;
+        }
+
+        const updatedEntries = softDeleteById(timeEntries, pendingDeleteEntryId);
+        setTimeEntries(updatedEntries);
+        showSuccess('Time entry deleted successfully');
+        setPendingDeleteEntryId(null);
+    };
+
+    const pendingDeleteEntry = pendingDeleteEntryId
+        ? timeEntries.find(entry => entry.id === pendingDeleteEntryId)
+        : null;
 
     // Handle adding new entry
     const handleAddEntry = () => {
@@ -258,13 +279,13 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
             return;
         }
 
-        const newEntry = {
+        const newEntry = withCreateMetadata({
             id: generateId(),
             taskId: task.id,
             start: startTimestamp,
             end: endTimestamp,
             note: addForm.note.trim() || undefined
-        };
+        });
 
         setTimeEntries([...timeEntries, newEntry]);
         setShowAddForm(false);
@@ -437,14 +458,15 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
     );
 
     return (
-        <Modal 
-            isOpen={isOpen} 
-            onClose={onClose}
-            title={`Time Entries - ${task.title}`}
-            size="xl"
-            footer={footer}
-        >
-            <div className="space-y-4">
+        <>
+            <Modal 
+                isOpen={isOpen} 
+                onClose={onClose}
+                title={`Time Entries - ${task.title}`}
+                size="xl"
+                footer={footer}
+            >
+                <div className="space-y-4">
                 {/* Add New Entry Button */}
                 <div className="flex justify-between items-center">
                     <h3 className="text-sm font-medium text-foreground">
@@ -583,8 +605,39 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
                         </>
                     )}
                 </div>
-            </div>
-        </Modal>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={Boolean(pendingDeleteEntryId)}
+                onClose={closeDeleteEntryModal}
+                title="Delete time entry?"
+                description="This will permanently remove the time entry."
+                footer={(
+                    <div className="flex justify-end space-x-3">
+                        <Button
+                            variant="outline"
+                            onClick={closeDeleteEntryModal}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDeleteEntry}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                )}
+            >
+                <Notice
+                    title={pendingDeleteEntry
+                        ? `Deleting this time entry (${formatDurationWithSeconds(pendingDeleteEntry.end - pendingDeleteEntry.start)}) cannot be undone.`
+                        : 'Deleting this time entry cannot be undone.'}
+                    variant="destructive"
+                />
+            </Modal>
+        </>
     );
 };
 

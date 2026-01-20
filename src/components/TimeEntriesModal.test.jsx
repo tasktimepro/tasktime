@@ -174,7 +174,6 @@ describe('TimeEntriesModal', () => {
     it('deletes an existing time entry', async () => {
 
         const user = userEvent.setup()
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
         const entry = {
             id: 'entry-1',
             taskId: 'task-1',
@@ -191,7 +190,7 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getByTitle('Delete entry'))
 
-        expect(confirmSpy).toHaveBeenCalled()
+        await user.click(screen.getByRole('button', { name: 'Delete' }))
         expect(baseProps.setTimeEntries).toHaveBeenCalledTimes(1)
 
         const updatedEntries = baseProps.setTimeEntries.mock.calls[0][0]

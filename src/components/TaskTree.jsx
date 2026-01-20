@@ -9,7 +9,7 @@ import Modal from './Modal';
 import { generateId } from '../utils/idUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { deleteTaskWithCleanup } from '../utils/taskUtils.ts';
-import { isDeleted } from '../utils/syncableEntity.ts';
+import { isDeleted, withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -51,26 +51,24 @@ const TaskTree = ({
      * Create a new task
      */
     const handleCreateTask = (taskData) => {
-        const now = Date.now();
-        const newTask = {
+        const newTask = withCreateMetadata({
             id: generateId(),
             projectId: project.id,
             parentTaskId: taskData.parentTaskId,
             title: taskData.title.trim(),
-            createdAt: now,
-            lastActive: now, // Initialize lastActive to creation time
+            lastActive: Date.now(), // Initialize lastActive to creation time
             lastBilledAt: null, // Initialize as never billed
             billable: false, // Initialize as not billable by default
             billableSetByUser: false // Track if billable status has been explicitly set by user
-        };
+        });
 
         // Create a new tasks array with the new task added
         let updatedTasks = [...tasks, newTask];
         
-        // If this is a subtask, also update the parent task's lastActive
+        // If this is a subtask, also update the parent task's lastActive with sync metadata
         if (taskData.parentTaskId) {
             updatedTasks = updatedTasks.map(t => 
-                t.id === taskData.parentTaskId ? { ...t, lastActive: now } : t
+                t.id === taskData.parentTaskId ? withUpdateMetadata({ ...t, lastActive: Date.now() }) : t
             );
         }
 
@@ -98,9 +96,8 @@ const TaskTree = ({
      * Archive a task
      */
     const handleArchiveTask = (taskId) => {
-        const now = Date.now();
         const updatedTasks = tasks.map(task =>
-            task.id === taskId ? { ...task, archived: true, lastActive: now } : task
+            task.id === taskId ? withUpdateMetadata({ ...task, archived: true, lastActive: Date.now() }) : task
         );
         setTasks(updatedTasks);
     };
@@ -109,9 +106,8 @@ const TaskTree = ({
      * Unarchive a task
      */
     const handleUnarchiveTask = (taskId) => {
-        const now = Date.now();
         const updatedTasks = tasks.map(task =>
-            task.id === taskId ? { ...task, archived: false, lastActive: now } : task
+            task.id === taskId ? withUpdateMetadata({ ...task, archived: false, lastActive: Date.now() }) : task
         );
         setTasks(updatedTasks);
     };
@@ -122,8 +118,6 @@ const TaskTree = ({
      * between billable and non-billable states
      */
     const handleToggleBillable = (taskId) => {
-        const now = Date.now();
-        
         // Find the task to get its current billable status
         const targetTask = tasks.find(task => task.id === taskId);
         if (!targetTask) return;
@@ -134,12 +128,12 @@ const TaskTree = ({
         // Update the task, ensuring billable property is explicitly set
         // Also mark that this was set by the user to prevent auto-override
         const updatedTasks = tasks.map(task =>
-            task.id === taskId ? { 
+            task.id === taskId ? withUpdateMetadata({ 
                 ...task, 
                 billable: newBillableStatus, 
                 billableSetByUser: true, // Mark as explicitly set by user
-                lastActive: now 
-            } : task
+                lastActive: Date.now() 
+            }) : task
         );
         
         setTasks(updatedTasks);

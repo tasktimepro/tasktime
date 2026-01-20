@@ -11,7 +11,7 @@ import useMetricsCalculation from './dashboard/hooks/useMetricsCalculation';
 import MetricsCards from './dashboard/MetricsCards';
 import RecentTasks from './dashboard/RecentTasks';
 import ProjectsOverview from './dashboard/ProjectsOverview';
-import { isDeleted } from '../utils/syncableEntity.ts';
+import { isDeleted, withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -317,13 +317,13 @@ const Dashboard = ({
      * Create a time entry for the current timer session
      */
     const createTimeEntry = useCallback((taskId, startTime, endTime, note = undefined) => {
-        return {
+        return withCreateMetadata({
             id: `dashboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             taskId,
             start: startTime,
             end: endTime,
             note: note
-        };
+        });
     }, []);
 
     /**
@@ -379,7 +379,7 @@ const Dashboard = ({
         // Update task completion status and lastActive timestamp
         setTasks(prevTasks =>
             prevTasks.map(t =>
-                t.id === task.id ? { ...t, completed: newCompletedStatus, lastActive: now } : t
+                t.id === task.id ? withUpdateMetadata({ ...t, completed: newCompletedStatus, lastActive: now }) : t
             )
         );
     }, [currentTimer, isPaused, pausedElapsedTime, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTasks, setCompletedInCurrentSession]);

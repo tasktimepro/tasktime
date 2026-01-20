@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { generateId } from '../utils/idUtils.ts';
 import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
 
 /**
  * TimerControls component - Handles task timer functionality
@@ -71,13 +72,13 @@ function TimerControls({
         }
 
         // Create the time entry
-        const timeEntry = {
+        const timeEntry = withCreateMetadata({
             id: generateId(),
             taskId: taskId,
             start: startTime,
             end: endTime,
             note: note
-        };
+        });
         setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
         return true;
     };
@@ -185,7 +186,7 @@ function TimerControls({
             // Update the task's lastActive property to keep it at the top of recent tasks
             setTasks?.(prevTasks => 
                 prevTasks.map(t =>
-                    t.id === task.id ? { ...t, lastActive: now } : t
+                    t.id === task.id ? withUpdateMetadata({ ...t, lastActive: now }) : t
                 )
             );
         } else {
@@ -239,7 +240,7 @@ function TimerControls({
         if (setTasks) {
             setTasks(prevTasks => 
                 prevTasks.map(t =>
-                    t.id === task.id ? { ...t, lastActive: now } : t
+                    t.id === task.id ? withUpdateMetadata({ ...t, lastActive: now }) : t
                 )
             );
         }

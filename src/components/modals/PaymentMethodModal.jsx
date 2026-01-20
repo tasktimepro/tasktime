@@ -3,6 +3,7 @@ import Modal from '../Modal';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
 import { generateId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
+import { withCreateMetadata, withUpdateMetadata } from '../../utils/syncableEntity.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -120,7 +121,7 @@ const PaymentMethodModal = ({
             // Update existing payment method
             const updatedPaymentMethods = paymentMethods.map(method =>
                 method.id === editingPaymentMethod.id
-                    ? {
+                    ? withUpdateMetadata({
                         ...method,
                         title: formData.title.trim(),
                         fullName: formData.fullName.trim(),
@@ -131,7 +132,7 @@ const PaymentMethodModal = ({
                         paypal: formData.paypal.trim(),
                         custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
                         isDefault: formData.isDefault
-                    }
+                    })
                     : method
             );
 
@@ -148,7 +149,7 @@ const PaymentMethodModal = ({
             showSuccess('Payment method updated successfully');
         } else {
             // Create new payment method
-            const newPaymentMethod = {
+            const newPaymentMethod = withCreateMetadata({
                 id: generateId(),
                 title: formData.title.trim(),
                 fullName: formData.fullName.trim(),
@@ -158,9 +159,8 @@ const PaymentMethodModal = ({
                 bankAddress: formData.bankAddress.trim(),
                 paypal: formData.paypal.trim(),
                 custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
-                isDefault: formData.isDefault,
-                createdAt: Date.now()
-            };
+                isDefault: formData.isDefault
+            });
 
             let updatedPaymentMethods = [...paymentMethods, newPaymentMethod];
 

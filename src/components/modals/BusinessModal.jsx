@@ -3,6 +3,7 @@ import Modal from '../Modal';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
 import { generateId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
+import { withCreateMetadata, withUpdateMetadata } from '../../utils/syncableEntity.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -164,7 +165,7 @@ const BusinessModal = ({
             // Update existing business info
             const updatedBusinessInfos = businessInfos.map(info =>
                 info.id === editingBusinessInfo.id
-                    ? {
+                    ? withUpdateMetadata({
                         ...info,
                         title: formData.title.trim(),
                         businessName: formData.businessName.trim(),
@@ -183,7 +184,7 @@ const BusinessModal = ({
                         taxEnabled: formData.taxEnabled,
                         taxLabel: formData.taxLabel,
                         taxRate: parseFloat(formData.taxRate) || 0
-                    }
+                    })
                     : info
             );
 
@@ -200,7 +201,7 @@ const BusinessModal = ({
             showSuccess('Business info updated successfully');
         } else {
             // Create new business info
-            const newBusinessInfo = {
+            const newBusinessInfo = withCreateMetadata({
                 id: generateId(),
                 title: formData.title.trim(),
                 businessName: formData.businessName.trim(),
@@ -218,9 +219,8 @@ const BusinessModal = ({
                 isDefault: formData.isDefault,
                 taxEnabled: formData.taxEnabled,
                 taxLabel: formData.taxLabel,
-                taxRate: parseFloat(formData.taxRate) || 0,
-                createdAt: Date.now()
-            };
+                taxRate: parseFloat(formData.taxRate) || 0
+            });
 
             let updatedBusinessInfos = [...businessInfos, newBusinessInfo];
 

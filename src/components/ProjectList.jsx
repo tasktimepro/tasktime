@@ -17,7 +17,7 @@ import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts
 import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
-import { softDeleteById, softDeleteByIds, isDeleted } from '../utils/syncableEntity.ts';
+import { softDeleteById, softDeleteByIds, isDeleted, withUpdateMetadata } from '../utils/syncableEntity.ts';
 
 /**
  * ProjectList component - Displays and manages the list of projects
@@ -130,7 +130,7 @@ const ProjectList = ({
      */
     const handleArchiveProject = (projectId) => {
         const updatedProjects = projects.map(project =>
-            project.id === projectId ? { ...project, archived: true } : project
+            project.id === projectId ? withUpdateMetadata({ ...project, archived: true }) : project
         );
         setProjects(updatedProjects);
         showSuccess('Project archived successfully!');
@@ -141,7 +141,7 @@ const ProjectList = ({
      */
     const handleUnarchiveProject = (projectId) => {
         const updatedProjects = projects.map(project =>
-            project.id === projectId ? { ...project, archived: false } : project
+            project.id === projectId ? withUpdateMetadata({ ...project, archived: false }) : project
         );
         setProjects(updatedProjects);
         showSuccess('Project unarchived successfully!');

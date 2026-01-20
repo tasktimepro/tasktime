@@ -10,7 +10,7 @@ import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { parseStoredDate, toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
-import { filterDeleted } from '../utils/syncableEntity.ts';
+import { filterDeleted, withUpdateMetadata } from '../utils/syncableEntity.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 
@@ -282,10 +282,10 @@ const InvoicesList = ({
         }
 
         // Update the invoice with the new payment processed status
-        const updatedInvoice = {
+        const updatedInvoice = withUpdateMetadata({
             ...invoice,
             paymentProcessed: !invoice.paymentProcessed
-        };
+        });
 
         // Use functional update to properly update just this one invoice in the full invoices array
         // This is critical because projectInvoices is a filtered subset, not the full array

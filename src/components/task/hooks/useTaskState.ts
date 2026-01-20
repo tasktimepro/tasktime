@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../../../constants/app';
+import { withUpdateMetadata } from '../../../utils/syncableEntity';
 
 type TaskItem = {
     id: string;
@@ -115,7 +116,7 @@ const useTaskState = ({
             // Use functional update to avoid race conditions with other task updates
             setTasks(prevTasks =>
                 prevTasks.map(t =>
-                    t.id === task.id ? { ...t, billable: true, lastActive: Date.now() } : t
+                    t.id === task.id ? withUpdateMetadata({ ...t, billable: true, lastActive: Date.now() }) : t
                 )
             );
         }

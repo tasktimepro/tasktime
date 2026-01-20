@@ -3,6 +3,7 @@ import TimeEntriesModal from '../../TimeEntriesModal';
 import TaskHeader from '../TaskHeader';
 import TaskActions from '../TaskActions';
 import useTaskState from '../hooks/useTaskState';
+import { withCreateMetadata, withUpdateMetadata } from '../../../utils/syncableEntity.ts';
 
 /**
  * SubtaskItem component - Displays individual subtask.
@@ -55,19 +56,19 @@ const SubtaskItem = ({
         const now = Date.now();
 
         if (isTimerActive && currentTimer) {
-            const timeEntry = {
+            const timeEntry = withCreateMetadata({
                 id: `completion-${Date.now()}`,
                 taskId: task.id,
                 start: currentTimer.startTime,
                 end: now,
                 note: currentTimer.note
-            };
+            });
             setTimeEntries([...timeEntries, timeEntry]);
             setCurrentTimer(null);
         }
 
         const updatedTasks = tasks.map(t =>
-            t.id === task.id ? { ...t, completed: checked, lastActive: now } : t
+            t.id === task.id ? withUpdateMetadata({ ...t, completed: checked, lastActive: now }) : t
         );
 
         setTasks(updatedTasks);
@@ -83,7 +84,7 @@ const SubtaskItem = ({
 
         const now = Date.now();
         const updatedTasks = tasks.map(t =>
-            t.id === task.id ? { ...t, title: editTitle.trim(), lastActive: now } : t
+            t.id === task.id ? withUpdateMetadata({ ...t, title: editTitle.trim(), lastActive: now }) : t
         );
 
         setTasks(updatedTasks);

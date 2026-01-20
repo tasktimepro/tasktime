@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Notice } from '@/components/ui/notice';
 import { generateSlugId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
+import { withCreateMetadata, withUpdateMetadata } from '../../utils/syncableEntity.ts';
 import CustomCheckbox from '../CustomCheckbox';
 
 /**
@@ -201,17 +203,16 @@ const ProjectModal = ({
             return; // Hourly rate is required when not using flat rate for billable projects
         }
 
-        const newProject = {
+        const newProject = withCreateMetadata({
             id: generateSlugId(formData.title),
             title: formData.title,
             hourlyRate: formData.hourlyRate !== '' ? parseFloat(formData.hourlyRate) : null,
             flatRate: formData.flatRate || false,
             preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
             isPersonal: formData.isPersonal || false,
-            createdAt: Date.now(),
             lastBilledAt: null,
             archived: false
-        };
+        });
 
         setProjects([...projects, newProject]);
 
@@ -249,14 +250,14 @@ const ProjectModal = ({
 
         const updatedProjects = projects.map(project =>
             project.id === editingProject.id
-                ? {
+                ? withUpdateMetadata({
                     ...project,
                     title: formData.title,
                     hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
                     flatRate: formData.flatRate || false,
                     preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
                     isPersonal: formData.isPersonal || false
-                }
+                })
                 : project
         );
 
@@ -420,22 +421,16 @@ const ProjectModal = ({
 
                 {/* Rate Information from Client */}
                 {selectedClientRate && !formData.overrideRate && !formData.isPersonal && (
-                    <div className="bg-muted border border-border rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-blue-900 mb-2">Rate from Client</h4>
-                        {selectedClientRate.flatRate ? (
-                            <p className="text-sm text-blue-700">
-                                This client uses flat rate pricing (non-hourly basis)
-                            </p>
-                        ) : selectedClientRate.hourlyRate ? (
-                            <p className="text-sm text-blue-700">
-                                Hourly Rate: {selectedClientRate.hourlyRate}/hour
-                            </p>
-                        ) : (
-                            <p className="text-sm text-blue-700">
-                                No default rate set for this client
-                            </p>
-                        )}
-                    </div>
+                    <Notice
+                        title="Rate from Client"
+                        description={
+                            selectedClientRate.flatRate
+                                ? "This client uses flat rate pricing (non-hourly basis)"
+                                : selectedClientRate.hourlyRate
+                                    ? `Hourly Rate: ${selectedClientRate.hourlyRate}/hour`
+                                    : "No default rate set for this client"
+                        }
+                    />
                 )}
 
                 {/* Override Rate Checkbox */}

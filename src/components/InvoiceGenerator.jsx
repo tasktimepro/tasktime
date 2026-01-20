@@ -3,6 +3,7 @@ import { createInvoiceHTML } from '../utils/pdfUtils.ts';
 import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
 import InvoiceModal from './invoice/InvoiceModal';
 import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
 import * as InvoiceHandler from './invoice/InvoiceHandler.ts';
@@ -707,7 +708,7 @@ const InvoiceGenerator = ({
 
         const updatedTemplates = invoiceTemplates.map(t => 
             t.id === template.id 
-                ? { ...t, currentSequentialNumber: t.currentSequentialNumber + 1 }
+                ? withUpdateMetadata({ ...t, currentSequentialNumber: t.currentSequentialNumber + 1 })
                 : t
         );
         setInvoiceTemplates(updatedTemplates);
@@ -911,6 +912,11 @@ const InvoiceGenerator = ({
             })
         };
 
+        // Add sync metadata to invoice
+        const invoiceWithMeta = editingInvoice
+            ? withUpdateMetadata({ ...invoiceData, createdAt: editingInvoice.createdAt })
+            : withCreateMetadata(invoiceData);
+
         // Store invoice in the new separate invoices structure
         let updatedInvoices;
         let updatedProjectInvoiceIds = [];
@@ -918,16 +924,16 @@ const InvoiceGenerator = ({
         if (editingInvoice) {
             // Update existing invoice
             updatedInvoices = invoices.map(inv => 
-                inv.id === editingInvoice.id ? invoiceData : inv
+                inv.id === editingInvoice.id ? invoiceWithMeta : inv
             );
             if (selectedProject) {
                 updatedProjectInvoiceIds = selectedProject.invoiceIds || [];
             }
         } else {
             // Add new invoice
-            updatedInvoices = [...invoices, invoiceData];
+            updatedInvoices = [...invoices, invoiceWithMeta];
             if (selectedProject) {
-                updatedProjectInvoiceIds = [...(selectedProject.invoiceIds || []), invoiceData.id];
+                updatedProjectInvoiceIds = [...(selectedProject.invoiceIds || []), invoiceWithMeta.id];
             }
         }
 
@@ -970,7 +976,7 @@ const InvoiceGenerator = ({
             // expects to receive the complete array including all projects' tasks
             setTasks(prevTasks => prevTasks.map(task => {
                 if (billedTaskIds.includes(task.id) && task.projectId === selectedProject.id) {
-                    return { ...task, lastBilledAt: currentTime };
+                    return withUpdateMetadata({ ...task, lastBilledAt: currentTime });
                 }
                 return task;
             }));
@@ -978,10 +984,10 @@ const InvoiceGenerator = ({
             // Update project to include invoice ID (but don't update project lastBilledAt)
             const updatedProjects = projects.map(p => 
                 p.id === selectedProject.id 
-                    ? { 
+                    ? withUpdateMetadata({ 
                         ...p, 
                         invoiceIds: updatedProjectInvoiceIds
-                    }
+                    })
                     : p
             );
             setProjects(updatedProjects);
@@ -989,10 +995,10 @@ const InvoiceGenerator = ({
             // For edited invoices, just update the project invoice IDs
             const updatedProjects = projects.map(p => 
                 p.id === selectedProject.id 
-                    ? { 
+                    ? withUpdateMetadata({ 
                         ...p, 
                         invoiceIds: updatedProjectInvoiceIds
-                    }
+                    })
                     : p
             );
             setProjects(updatedProjects);

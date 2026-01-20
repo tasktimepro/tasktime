@@ -112,6 +112,47 @@ src/
 - Supports modal stacking (nested modals)
 - Use `openXxxModal()` functions from App.jsx
 
+### 🔄 Sync Metadata (CRITICAL)
+
+**All entity mutations MUST use sync metadata utilities from `src/utils/syncableEntity.ts`:**
+
+```typescript
+import { withCreateMetadata, withUpdateMetadata, softDelete } from '../utils/syncableEntity.ts';
+
+// Creating a new entity
+const newProject = withCreateMetadata({
+    id: generateId(),
+    title: 'My Project',
+    // ... other fields (do NOT include createdAt/updatedAt manually)
+});
+
+// Updating an existing entity
+const updatedTask = withUpdateMetadata({ ...task, title: newTitle });
+
+// Deleting an entity (soft-delete)
+const deletedClient = softDelete(client);
+// Or for arrays: softDeleteById(clients, clientId)
+```
+
+**Why this matters:**
+- Every entity needs `updatedAt` + `_syncSeq` for deterministic sync merging
+- Without these, `mergeCollection` produces unpredictable results
+- The `_syncSeq` counter handles same-millisecond edits across devices
+
+**Entity types that require sync metadata:**
+- `projects`, `tasks`, `timeEntries`, `invoices`
+- `clients`, `businessInfos`, `invoiceTemplates`, `paymentMethods`
+
+**Never create/update entities like this:**
+```typescript
+// ❌ WRONG - missing sync metadata
+const task = { id: generateId(), title: 'Task', createdAt: Date.now() };
+setTasks([...tasks, task]);
+
+// ❌ WRONG - missing updatedAt
+setTasks(tasks.map(t => t.id === id ? { ...t, completed: true } : t));
+```
+
 ---
 
 ## � Docker Development Environment
@@ -158,6 +199,8 @@ docker compose run --rm app npm run <script>
 6. **Don't use class components** — Functional only
 7. **Don't add new dependencies without justification** — Keep it lean
 8. **Don't run npm directly** — Use `docker compose run --rm app npm ...`
+9. **Don't create/update entities without sync metadata** — Always use `withCreateMetadata()` or `withUpdateMetadata()` from `syncableEntity.ts`
+10. **Don't manually set `createdAt`/`updatedAt`** — The sync utilities handle this
 
 ---
 
@@ -174,8 +217,7 @@ docker compose run --rm app npm run <script>
 
 | Document | Purpose |
 |----------|---------|
-| `docs/project_overview.md` | Full technical documentation |
-| `docs/client_edge_license_flow.md` | Future cloud/license architecture |
+| `docs/project_overview.md` | Full technical documentation || `docs/google-drive-sync-implementation.md` | Sync architecture and conflict resolution || `docs/client_edge_license_flow.md` | Future cloud/license architecture |
 | `_implan.md` | Original project plan and preferences |
 | `README.md` | User-facing documentation |
 
@@ -187,6 +229,8 @@ docker compose run --rm app npm run <script>
 2. **Check this file for rules** — Especially the "no legacy code" rule
 3. **App.jsx is the state hub** — All data flows from there
 4. **Keep tests updated** — Add or adjust tests whenever behavior changes or new workflows are added
+5. **Always use sync metadata utilities** — Every entity create/update MUST use `withCreateMetadata()` or `withUpdateMetadata()` from `syncableEntity.ts`. This is critical for reliable Google Drive sync.
+6. **Review `docs/google-drive-sync-implementation.md`** — Understand the merge strategy before modifying entity mutations
 
 ---
 
