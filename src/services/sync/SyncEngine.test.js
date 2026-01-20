@@ -184,4 +184,83 @@ describe('SyncEngine', () => {
             clients: [{ id: 'c1', name: 'Client A' }]
         });
     });
+
+    it('preserves local changes made during push (timer stop during sync)', async () => {
+        const provider = createProvider();
+        provider.hasRemoteChanges.mockResolvedValue(false);
+        
+        // Start with timer running
+        const timerRunning = {
+            taskId: 'task-1',
+            startTime: 1000,
+            paused: false,
+            lastActive: 1000
+        };
+        
+        // Timer stopped state
+        const timerStopped = null;
+        
+        // We need to simulate:
+        // 1. Init: baseline data (no timer)
+        // 2. First sync during init: still baseline (no push needed)
+        // 3. Later: scheduleSync is called with timer running
+        // 4. During push: timer is stopped
+        
+        let getCallCount = 0;
+        let pushStarted = false;
+        
+        // Simulate push taking some time (user stops timer during this)
+        provider.push.mockImplementation(async () => {
+            pushStarted = true;
+            await new Promise(resolve => setTimeout(resolve, 10));
+        });
+        
+        const getLocalData = vi.fn(async () => {
+            getCallCount++;
+            // First 2 calls during initialize - baseline data
+            if (getCallCount <= 2) {
+                return baseData();
+            }
+            // After that, timer is running (simulating user started timer after init)
+            // But if push has already started, timer was stopped during push
+            if (pushStarted) {
+                return { ...baseData(), timer: timerStopped };
+            }
+            return { ...baseData(), timer: timerRunning };
+        });
+        
+        let lastSavedData = null;
+        const setLocalData = vi.fn(async (data) => {
+            lastSavedData = data;
+        });
+
+        const engine = new SyncEngine({
+            provider,
+            getLocalData,
+            setLocalData
+        });
+
+        // Initialize (doesn't push because no changes)
+        await engine.initialize();
+        
+        // Clear mocks from initialization
+        setLocalData.mockClear();
+        provider.push.mockClear();
+        pushStarted = false;
+        
+        // Simulate user starting timer and triggering sync
+        // scheduleSync() will call sync() which will read local data (timer running)
+        // then push, and during push the timer gets stopped
+        await engine.sync();
+
+        // Verify push was called with timer running
+        expect(provider.push).toHaveBeenCalled();
+        const pushedData = provider.push.mock.calls[0][0];
+        expect(pushedData.timer).toEqual(timerRunning);
+
+        // The key assertion: the LAST setLocalData call should have preserved 
+        // the STOPPED timer (the latest state), not reverted to the running timer
+        expect(lastSavedData).not.toBeNull();
+        expect(lastSavedData.timer).toEqual(timerStopped);
+    });
 });
