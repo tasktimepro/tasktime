@@ -7,6 +7,7 @@ import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import { getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, formatDuration } from '../utils/dateUtils.ts';
+import { isDeleted } from '../utils/syncableEntity.ts';
 
 /**
  * ClientDashboard component - Main dashboard view for a selected client
@@ -49,16 +50,16 @@ const ClientDashboard = ({
         return projects.filter(project => project.preferredClientId === client.id);
     }, [projects, client.id]);
 
-    // Get tasks for client projects
+    // Get tasks for client projects (excluding deleted tasks)
     const clientTasks = useMemo(() => {
         const projectIds = clientProjects.map(p => p.id);
-        return tasks.filter(task => projectIds.includes(task.projectId));
+        return tasks.filter(task => projectIds.includes(task.projectId) && !isDeleted(task));
     }, [tasks, clientProjects]);
 
-    // Get time entries for client tasks
+    // Get time entries for client tasks (excluding deleted entries)
     const clientTimeEntries = useMemo(() => {
         const taskIds = clientTasks.map(t => t.id);
-        return timeEntries.filter(entry => taskIds.includes(entry.taskId));
+        return timeEntries.filter(entry => taskIds.includes(entry.taskId) && !isDeleted(entry));
     }, [timeEntries, clientTasks]);
 
     // Get invoices for this client (either project-specific or client-specific)
@@ -99,7 +100,8 @@ const ClientDashboard = ({
                     const task = clientTasks.find(t => t.id === entry.taskId);
                     if (!task || !projectTaskIds.includes(entry.taskId)) return false;
                     
-                    const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+                    // Use task.lastBilledAt only - if never billed, all entries are pending
+                    const taskLastBilledAt = task.lastBilledAt || 0;
                     return entry.start > taskLastBilledAt && task.billable === true;
                 });
 
@@ -169,8 +171,8 @@ const ClientDashboard = ({
             if (!task) return false;
             if (!entry.end || entry.end <= entry.start) return false;
             
-            // Use task-specific lastBilledAt, or task creation date if never billed
-            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            // Use task-specific lastBilledAt - if never billed, all entries are pending
+            const taskLastBilledAt = task.lastBilledAt || 0;
             
             // Only include entries created after this task's last billing date
             return entry.start > taskLastBilledAt;
@@ -216,8 +218,8 @@ const ClientDashboard = ({
             if (!task) return false;
             if (!entry.end || entry.end <= entry.start) return false;
             
-            // Use task-specific lastBilledAt, or task creation date if never billed
-            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            // Use task-specific lastBilledAt - if never billed, all entries are pending
+            const taskLastBilledAt = task.lastBilledAt || 0;
             
             // Only include entries created after this task's last billing date
             return entry.start > taskLastBilledAt;

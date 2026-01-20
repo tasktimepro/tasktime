@@ -9,6 +9,7 @@ import InvoicesList from './InvoicesList';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { isDeleted } from '../utils/syncableEntity.ts';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -64,14 +65,14 @@ const ProjectDashboard = ({
         setEditingInvoice(invoice);
     };
     
-    // Get tasks for this project
-    const projectTasks = tasks.filter(task => task.projectId === project.id);
+    // Get tasks for this project (excluding deleted tasks)
+    const projectTasks = tasks.filter(task => task.projectId === project.id && !isDeleted(task));
 
     // Get time entries for this project's tasks
     const projectTaskIds = projectTasks.map(task => task.id);
 
     const projectTimeEntries = timeEntries.filter(entry => 
-        projectTaskIds.includes(entry.taskId)
+        projectTaskIds.includes(entry.taskId) && !isDeleted(entry)
     );
 
     // Count visible tasks (not completed and not archived, including both parent tasks and subtasks)
@@ -122,8 +123,8 @@ const ProjectDashboard = ({
                 if (!task) return false;
                 if (!entry.end || entry.end <= entry.start) return false;
                 
-                // Use task-specific lastBilledAt, or task creation date if never billed
-                const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+                // Use task-specific lastBilledAt - if never billed, all entries are pending
+                const taskLastBilledAt = task.lastBilledAt || 0;
                 
                 // Only include entries created after this task's last billing date
                 return entry.start > taskLastBilledAt;

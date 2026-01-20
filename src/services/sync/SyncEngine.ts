@@ -150,156 +150,115 @@ export class SyncEngine {
             return;
         }
 
-        // Minimum interval removed: allow immediate sync after local changes
-
         this.isSyncing = true;
 
         try {
-
             this.setState('checking');
 
             if (this.provider.debugSnapshot) {
                 await this.provider.debugSnapshot();
             }
 
-            // Get current local state
+            // Step 1: Get current local state
             const localData = await this.getLocalData();
             const localChecksum = await generateChecksum(localData);
 
-            // Check if remote has changes we need to pull
-            let hasRemoteChanges = await this.provider.hasRemoteChanges(this.lastSyncedAt);
+            // Step 2: Always try to pull remote data (if it exists)
+            this.setState('pulling');
+            const remoteData = await this.provider.pull();
 
-            // Fallback: compare checksums if modifiedTime check says no changes
-            // This catches cases where local lastSyncedAt is stale or wrong
-            // Compare to lastLocalChecksum (state at last sync), NOT current localChecksum
-            // If remote differs from last-synced state, remote changed
-            // If remote matches last-synced state, any difference is local changes (should push, not pull)
-            if (!hasRemoteChanges) {
-                try {
-                    const meta = await this.provider.getMeta();
-                    if (meta?.checksum && meta.checksum !== this.lastLocalChecksum) {
-                        syncLog('sync:remote checksum differs from last sync, forcing pull', {
-                            remoteChecksum: meta.checksum,
-                            lastLocalChecksum: this.lastLocalChecksum,
-                        });
-                        hasRemoteChanges = true;
+            if (remoteData) {
+                const remoteChecksum = await generateChecksum(remoteData);
+                syncLog('sync:pulled', { localChecksum, remoteChecksum });
+
+                // Step 3: If data differs, ALWAYS merge at entity level
+                if (localChecksum !== remoteChecksum) {
+                    this.setState('merging');
+                    syncLog('sync:merging (data differs)');
+
+                    // Check if this is a new device with no real local data
+                    // If so, skip onConflict callback - just merge (which will take remote)
+                    const localHasData = this.hasRealData(localData);
+                    
+                    // Use onConflict callback only if:
+                    // 1. Callback is provided
+                    // 2. Local actually has data worth conflicting over
+                    const merged = (this.onConflict && localHasData)
+                        ? await this.onConflict(localData, remoteData)
+                        : this.autoMerge(localData, remoteData);
+                    const mergedChecksum = await generateChecksum(merged);
+
+                    // Only update local if merge actually changed something
+                    if (mergedChecksum !== localChecksum) {
+                        await this.setLocalDataSafely(merged);
+                        syncLog('sync:merge applied to local');
                     }
-                } catch {
-                    // Meta fetch failed, continue with modifiedTime result
-                }
-            }
 
-            syncLog('sync:check', { hasRemoteChanges, localChecksum, lastSyncedAt: this.lastSyncedAt });
+                    // Push the merged result back to remote
+                    this.setState('pushing');
+                    const newSyncVersion = Math.max(
+                        this.lastSyncVersion,
+                        remoteData._sync?.syncVersion || 0
+                    ) + 1;
 
-            if (hasRemoteChanges) {
+                    const withSyncMeta = {
+                        ...merged,
+                        _sync: {
+                            lastSyncedAt: Date.now(),
+                            deviceId: await getDeviceId(),
+                            syncVersion: newSyncVersion,
+                        },
+                    };
 
-                this.setState('pulling');
-                const remoteData = await this.provider.pull();
+                    const finalChecksum = await generateChecksum(withSyncMeta);
 
-                if (remoteData) {
+                    const meta: SyncMeta = {
+                        version: 1,
+                        syncVersion: newSyncVersion,
+                        lastModified: Date.now(),
+                        checksum: finalChecksum,
+                        deviceId: withSyncMeta._sync.deviceId,
+                        entryCount: this.countEntries(withSyncMeta),
+                    };
 
-                    const remoteChecksum = await generateChecksum(remoteData);
+                    await this.provider.push(withSyncMeta, meta);
+                    if ('invalidateCache' in this.provider && typeof this.provider.invalidateCache === 'function') {
+                        this.provider.invalidateCache();
+                    }
 
-                    syncLog('sync:pull', { localChecksum, remoteChecksum });
+                    // Re-check local data after push - user may have made changes during push
+                    const postPushLocalData = await this.getLocalData();
+                    const postPushChecksum = await generateChecksum(postPushLocalData);
 
-                    // If remote matches last synced state, prefer pushing local changes (no pull)
-                    if (remoteChecksum === this.lastLocalChecksum) {
-                        this.lastRemoteChecksum = remoteChecksum;
-
-                        if (localChecksum === this.lastLocalChecksum) {
-                            syncLog('sync:pull skipped (remote matches last sync)');
-                            const syncedAt = Date.now();
-                            this.lastSyncedAt = syncedAt;
-                            this.lastSyncCompletedAt = syncedAt;
-                            syncLog('sync:complete (no changes)');
-
-                            this.finalizeSync('idle');
-                            return;
-                        }
-
-                        syncLog('sync:remote matches last sync, prefer push');
-                        // Continue to push path below without returning
+                    if (postPushChecksum !== mergedChecksum) {
+                        // Local changed during push - preserve those changes, just update _sync
+                        syncLog('sync:local changed during push, preserving new changes');
+                        const preservedWithMeta = {
+                            ...postPushLocalData,
+                            _sync: withSyncMeta._sync,
+                        };
+                        await this.setLocalDataSafely(preservedWithMeta);
+                        this.lastLocalChecksum = finalChecksum; // Keep the pushed checksum so next sync picks up the new local changes
                     } else {
-
-                        // If checksums match, no actual data difference
-                        if (localChecksum === remoteChecksum) {
-                            syncLog('sync:pull skipped (data identical)');
-                        } else {
-                            // Check if local has changes we haven't pushed yet
-                            const localHasUnpushedChanges = localChecksum !== this.lastLocalChecksum;
-
-                            if (localHasUnpushedChanges) {
-                                // Conflict: both local and remote have changes
-                                syncLog('sync:conflict detected');
-                                this.setState('merging');
-
-                                // Re-read current local data to get the latest state for merging
-                                // This ensures any changes made during the pull are included
-                                const currentLocalData = await this.getLocalData();
-                                const currentLocalChecksum = await generateChecksum(currentLocalData);
-
-                                const merged = this.onConflict
-                                    ? await this.onConflict(currentLocalData, remoteData)
-                                    : this.autoMerge(currentLocalData, remoteData);
-
-                                // Check if local changed AGAIN during the merge
-                                const postMergeLocalData = await this.getLocalData();
-                                const postMergeLocalChecksum = await generateChecksum(postMergeLocalData);
-
-                                if (postMergeLocalChecksum === currentLocalChecksum) {
-                                    // Local didn't change during merge - safe to apply
-                                    await this.setLocalDataSafely(merged);
-                                    this.lastLocalChecksum = await generateChecksum(merged);
-                                    syncLog('sync:merged (local unchanged during merge)');
-                                } else {
-                                    // Local changed during merge - re-merge with newest local state
-                                    const reMerged = this.autoMerge(postMergeLocalData, merged);
-                                    await this.setLocalDataSafely(reMerged);
-                                    this.lastLocalChecksum = await generateChecksum(reMerged);
-                                    syncLog('sync:merged (local changed during merge, re-merged)');
-                                }
-                            } else {
-                                // No local changes at start - but check if local changed during pull
-                                const currentLocalData = await this.getLocalData();
-                                const currentLocalChecksum = await generateChecksum(currentLocalData);
-
-                                if (currentLocalChecksum === localChecksum) {
-                                    // Local didn't change - safe to apply remote
-                                    syncLog('sync:applying remote data');
-                                    await this.setLocalDataSafely(remoteData);
-                                    this.lastLocalChecksum = remoteChecksum;
-                                } else {
-                                    // Local changed during pull! Merge instead of overwriting
-                                    syncLog('sync:local changed during pull, merging instead');
-                                    const merged = this.autoMerge(currentLocalData, remoteData);
-                                    await this.setLocalDataSafely(merged);
-                                    this.lastLocalChecksum = await generateChecksum(merged);
-                                }
-                            }
-                            // Update syncVersion from remote data
-                            this.lastSyncVersion = remoteData._sync?.syncVersion || 0;
-                        }
-
-                        this.lastRemoteChecksum = remoteChecksum;
-
-                        // Complete sync after pull - skip push to avoid async state issues
-                        const syncedAt = Date.now();
-                        this.lastSyncedAt = syncedAt;
-                        this.lastSyncCompletedAt = syncedAt;
-                        syncLog('sync:complete (pulled)');
-
-                        this.finalizeSync('idle');
-                        return;
+                        // No changes during push - update with sync metadata
+                        await this.setLocalDataSafely(withSyncMeta);
+                        this.lastLocalChecksum = finalChecksum;
                     }
+
+                    this.lastSyncVersion = newSyncVersion;
+                    this.lastRemoteChecksum = finalChecksum;
+
+                    syncLog('sync:complete (merged and pushed)', { syncVersion: newSyncVersion });
+                } else {
+                    // Data is identical - just update sync metadata
+                    syncLog('sync:complete (data identical)');
+                    this.lastLocalChecksum = localChecksum;
+                    this.lastRemoteChecksum = remoteChecksum;
                 }
-            }
-
-            // No remote changes - check if we need to push local changes
-
-            if (localChecksum !== this.lastLocalChecksum) {
-
+            } else {
+                // No remote data exists - push local data
+                syncLog('sync:no remote data, pushing local');
                 this.setState('pushing');
-                syncLog('sync:pushing local changes');
 
                 const newSyncVersion = this.lastSyncVersion + 1;
                 const withSyncMeta = {
@@ -311,79 +270,49 @@ export class SyncEngine {
                     },
                 };
 
-                const withSyncChecksum = await generateChecksum(withSyncMeta);
+                const pushChecksum = await generateChecksum(withSyncMeta);
 
                 const meta: SyncMeta = {
                     version: 1,
                     syncVersion: newSyncVersion,
                     lastModified: Date.now(),
-                    checksum: withSyncChecksum,
+                    checksum: pushChecksum,
                     deviceId: withSyncMeta._sync.deviceId,
                     entryCount: this.countEntries(withSyncMeta),
                 };
 
                 await this.provider.push(withSyncMeta, meta);
-                // Invalidate cache since we just pushed
                 if ('invalidateCache' in this.provider && typeof this.provider.invalidateCache === 'function') {
                     this.provider.invalidateCache();
                 }
 
-                // Re-read current local data to check if it changed during push
-                // DO NOT blindly write back stale data - local state may have changed!
-                const currentLocalData = await this.getLocalData();
-                const currentLocalChecksum = await generateChecksum(currentLocalData);
+                // Re-check local data after push - user may have made changes during push
+                const postPushLocalData = await this.getLocalData();
+                const postPushChecksum = await generateChecksum(postPushLocalData);
 
-                if (currentLocalChecksum === localChecksum) {
-                    // Local data didn't change during push - safe to update _sync metadata
-                    await this.setLocalDataSafely(withSyncMeta);
-                    this.lastLocalChecksum = withSyncChecksum;
-                    syncLog('sync:pushed (local unchanged)', { syncVersion: newSyncVersion });
-                } else {
-                    // Local data changed during push! Only update _sync metadata on current data
-                    // The actual data changes will be synced in the queued follow-up sync
-                    const currentWithSyncMeta = {
-                        ...currentLocalData,
-                        _sync: {
-                            lastSyncedAt: Date.now(),
-                            deviceId: await getDeviceId(),
-                            syncVersion: newSyncVersion,
-                        },
+                if (postPushChecksum !== localChecksum) {
+                    // Local changed during push - preserve those changes, just update _sync
+                    syncLog('sync:local changed during push, preserving new changes');
+                    const preservedWithMeta = {
+                        ...postPushLocalData,
+                        _sync: withSyncMeta._sync,
                     };
-                    await this.setLocalDataSafely(currentWithSyncMeta);
-                    // Keep lastLocalChecksum as the checksum we pushed to remote
-                    // This ensures the next sync detects the local changes
-                    this.lastLocalChecksum = withSyncChecksum;
-                    syncLog('sync:pushed (local changed during sync, preserving new local state)', {
-                        syncVersion: newSyncVersion,
-                        pushedChecksum: withSyncChecksum,
-                        currentChecksum: currentLocalChecksum,
-                    });
+                    await this.setLocalDataSafely(preservedWithMeta);
+                    this.lastLocalChecksum = pushChecksum; // Keep the pushed checksum so next sync picks up the new local changes
+                } else {
+                    await this.setLocalDataSafely(withSyncMeta);
+                    this.lastLocalChecksum = pushChecksum;
                 }
 
                 this.lastSyncVersion = newSyncVersion;
-                this.lastRemoteChecksum = withSyncChecksum; // After push, remote matches what we pushed
+                this.lastRemoteChecksum = pushChecksum;
 
-                syncLog('sync:pushed', { syncVersion: newSyncVersion });
+                syncLog('sync:complete (initial push)', { syncVersion: newSyncVersion });
             }
 
             const syncedAt = Date.now();
             this.lastSyncedAt = syncedAt;
             this.lastSyncCompletedAt = syncedAt;
-
-            syncLog('sync:complete', { lastSyncedAt: this.lastSyncedAt, syncVersion: this.lastSyncVersion, lastLocalChecksum: this.lastLocalChecksum });
-
-            // Persist lastSyncedAt and syncVersion so future sessions don't treat remote as newer
-            // Re-read current data to avoid overwriting any changes made during sync
-            const finalLocalData = await this.getLocalData();
-            await this.setLocalDataSafely({
-                ...finalLocalData,
-                _sync: {
-                    ...(finalLocalData._sync || {}),
-                    deviceId: finalLocalData._sync?.deviceId || await getDeviceId(),
-                    lastSyncedAt: syncedAt,
-                    syncVersion: this.lastSyncVersion,
-                },
-            });
 
             this.finalizeSync('idle');
 
@@ -391,7 +320,6 @@ export class SyncEngine {
 
             console.error('Sync failed:', error);
             syncLog('sync:error', error);
-            // Handle authorization errors specially
             if (error instanceof AuthorizationError) {
                 this.onAuthError?.(error);
             }
@@ -669,6 +597,22 @@ export class SyncEngine {
             timeEntries: data.timeEntries?.length || 0,
             invoices: data.invoices?.length || 0,
         };
+    }
+
+    /**
+     * Check if local data has any real content worth conflicting over.
+     * Returns false if all entity arrays are empty (new device scenario).
+     */
+    private hasRealData(data: SyncData): boolean {
+        const counts = this.countEntries(data);
+        const hasEntities = counts.projects > 0 || 
+                           counts.tasks > 0 || 
+                           counts.timeEntries > 0 || 
+                           counts.invoices > 0 ||
+                           (data.clients?.length || 0) > 0 ||
+                           (data.businessInfos?.length || 0) > 0;
+        
+        return hasEntities;
     }
 
     /**

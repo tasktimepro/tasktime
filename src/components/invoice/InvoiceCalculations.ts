@@ -70,8 +70,8 @@ export const buildInvoiceTaskData = ({
         const task = projectTasks.find(t => t.id === entry.taskId);
         if (!task || task.projectId !== projectToUse.id) return false;
 
-        // Use task-specific lastBilledAt, or task creation date if never billed
-        const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+        // Use task-specific lastBilledAt - if never billed, all entries are pending
+        const taskLastBilledAt = task.lastBilledAt || 0;
 
         // Only include entries created after this task's last billing date
         return entry.start > taskLastBilledAt;

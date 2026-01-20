@@ -6,6 +6,7 @@ type TimeEntry = {
     taskId: string;
     start: number;
     end: number;
+    deletedAt?: number;
 };
 
 type TaskItem = {
@@ -13,6 +14,7 @@ type TaskItem = {
     projectId: string;
     billable?: boolean;
     lastBilledAt?: number;
+    deletedAt?: number;
 };
 
 type ProjectItem = {
@@ -71,7 +73,7 @@ const useMetricsCalculation = ({
      */
     const calculateMetrics = useCallback((startTime: number, endTime: number) => {
         const entriesInRange = timeEntries.filter(entry =>
-            entry.start >= startTime && entry.end <= endTime
+            entry.start >= startTime && entry.end <= endTime && !entry.deletedAt
         );
 
         const totalTime = entriesInRange.reduce((total, entry) => {
@@ -85,7 +87,7 @@ const useMetricsCalculation = ({
         const taskTimeMap: Record<string, { totalTime: number; project: ProjectItem; currency: string }> = {};
         entriesInRange.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
-            if (!task || task.billable !== true) return; // Only include explicitly billable tasks
+            if (!task || task.deletedAt || task.billable !== true) return; // Only include explicitly billable tasks, skip deleted tasks
 
             // Only include unbilled entries (after last billing date)
             const billingCutoff = task.lastBilledAt || 0;

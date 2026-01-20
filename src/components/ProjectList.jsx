@@ -154,8 +154,8 @@ const ProjectList = ({
         // If it's a flat rate project or no hourly rate is set, return 0 for the amount
         if (project.flatRate || !project.hourlyRate) return 0;
         
-        // Get tasks for this project
-        const projectTasks = tasks.filter(task => task.projectId === project.id);
+        // Get tasks for this project (excluding deleted tasks)
+        const projectTasks = tasks.filter(task => task.projectId === project.id && !isDeleted(task));
         
         // Get explicitly billable tasks (tasks with billable === true)
         const billableTasks = projectTasks.filter(task => task.billable === true);
@@ -163,6 +163,9 @@ const ProjectList = ({
         
         // Get time entries for this project's tasks with task-level billing filtering
         const unbilledEntries = timeEntries.filter(entry => {
+            // Skip deleted entries
+            if (isDeleted(entry)) return false;
+            
             // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
             
@@ -171,8 +174,8 @@ const ProjectList = ({
             if (!task) return false;
             if (!entry.end || entry.end <= entry.start) return false;
             
-            // Use task-specific lastBilledAt, or task creation date if never billed
-            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            // Use task-specific lastBilledAt - if never billed, all entries are pending
+            const taskLastBilledAt = task.lastBilledAt || 0;
             
             // Only include entries created after this task's last billing date
             return entry.start > taskLastBilledAt;
@@ -201,8 +204,8 @@ const ProjectList = ({
      * Calculate unbilled hours for a project (without rate requirement)
      */
     const calculateUnbilledHours = (project) => {
-        // Get tasks for this project
-        const projectTasks = tasks.filter(task => task.projectId === project.id);
+        // Get tasks for this project (excluding deleted tasks)
+        const projectTasks = tasks.filter(task => task.projectId === project.id && !isDeleted(task));
         
         // Get explicitly billable tasks (tasks with billable === true)
         const billableTasks = projectTasks.filter(task => task.billable === true);
@@ -210,6 +213,9 @@ const ProjectList = ({
         
         // Get time entries for this project's tasks with task-level billing filtering
         const unbilledEntries = timeEntries.filter(entry => {
+            // Skip deleted entries
+            if (isDeleted(entry)) return false;
+            
             // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
             
@@ -218,8 +224,8 @@ const ProjectList = ({
             if (!task) return false;
             if (!entry.end || entry.end <= entry.start) return false;
             
-            // Use task-specific lastBilledAt, or task creation date if never billed
-            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            // Use task-specific lastBilledAt - if never billed, all entries are pending
+            const taskLastBilledAt = task.lastBilledAt || 0;
             
             // Only include entries created after this task's last billing date
             return entry.start > taskLastBilledAt;

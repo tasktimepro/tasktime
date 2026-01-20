@@ -3,7 +3,7 @@ import { createInvoiceHTML } from '../utils/pdfUtils.ts';
 import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
+import { withCreateMetadata, withUpdateMetadata, isDeleted } from '../utils/syncableEntity.ts';
 import InvoiceModal from './invoice/InvoiceModal';
 import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
 import * as InvoiceHandler from './invoice/InvoiceHandler.ts';
@@ -949,7 +949,7 @@ const InvoiceGenerator = ({
             // Get all task IDs that should be marked as billed (including merged subtasks)
             // Make sure we only include tasks from the current project
             const billedTaskIds = [];
-            const projectTasks = tasks.filter(task => task.projectId === selectedProject.id);
+            const projectTasks = tasks.filter(task => task.projectId === selectedProject.id && !isDeleted(task));
             const projectTaskIds = new Set(projectTasks.map(task => task.id));
             
             invoiceTasks.forEach(task => {
@@ -1202,8 +1202,8 @@ const InvoiceGenerator = ({
 
     // Only calculate unbilled time if we have a project context and not in client dashboard
     if (currentProjectForCalculation) {
-        // Get all tasks for this project
-        const projectTasks = tasks.filter(task => task.projectId === currentProjectForCalculation.id);
+        // Get all tasks for this project (excluding deleted tasks)
+        const projectTasks = tasks.filter(task => task.projectId === currentProjectForCalculation.id && !isDeleted(task));
         
         // Get explicitly billable tasks (tasks with billable === true)
         const billableTasks = projectTasks.filter(task => task.billable === true);
@@ -1211,6 +1211,9 @@ const InvoiceGenerator = ({
         
         // Filter unbilled entries based on individual task billing dates AND billable status
         const unbilledEntries = timeEntries.filter(entry => {
+            // Skip deleted entries
+            if (isDeleted(entry)) return false;
+            
             // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
             
@@ -1219,8 +1222,8 @@ const InvoiceGenerator = ({
             if (!task) return false;
             if (!entry.end || entry.end <= entry.start) return false;
             
-            // Use task-specific lastBilledAt, or task creation date if never billed
-            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            // Use task-specific lastBilledAt - if never billed, all entries are pending
+            const taskLastBilledAt = task.lastBilledAt || 0;
             
             // Only include entries created after this task's last billing date
             return entry.start > taskLastBilledAt;

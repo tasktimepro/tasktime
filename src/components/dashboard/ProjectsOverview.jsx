@@ -66,21 +66,23 @@ const ProjectsOverview = ({
                                             )}
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        {/* Pending Bills */}
-                                        <div className="text-sm font-medium text-foreground">
-                                            {project.pendingAmount > 0 ? (
-                                                <>
-                                                    {formatCurrency(project.pendingAmount, getProjectCurrency(project, clients))}
-                                                </>
-                                            ) : (
-                                                <span className="text-muted-foreground">{formatCurrency(0, getProjectCurrency(project, clients))}</span>
-                                            )}
+                                    {!project.isPersonal && (
+                                        <div className="text-right">
+                                            {/* Pending Bills */}
+                                            <div className="text-sm font-medium text-foreground">
+                                                {project.pendingAmount > 0 ? (
+                                                    <>
+                                                        {formatCurrency(project.pendingAmount, getProjectCurrency(project, clients))}
+                                                    </>
+                                                ) : (
+                                                    <span className="text-muted-foreground">{formatCurrency(0, getProjectCurrency(project, clients))}</span>
+                                                )}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                bills
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            bills
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         ))}

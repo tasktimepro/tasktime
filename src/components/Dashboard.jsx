@@ -242,7 +242,7 @@ const Dashboard = ({
         const projectActivity = {};
         recentEntries.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
-            if (!task) return;
+            if (!task || isDeleted(task)) return;
 
             if (!projectActivity[task.projectId]) {
                 projectActivity[task.projectId] = {
@@ -258,7 +258,8 @@ const Dashboard = ({
             );
 
             // Calculate pending billable time with task-by-task rounding (consistent with invoice calculation)
-            const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+            // Use task.lastBilledAt only - if never billed, all entries are pending
+            const taskLastBilledAt = task.lastBilledAt || 0;
             if (entry.start > taskLastBilledAt && task.billable === true) {
                 if (!projectActivity[task.projectId].taskPendingTime) {
                     projectActivity[task.projectId].taskPendingTime = {};
