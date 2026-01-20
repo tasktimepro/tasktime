@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { isTokenExpired, getStoredToken, storeToken, clearStoredToken } from './googleAuthStorage';
+import { isTokenExpired, getStoredToken, storeToken, clearStoredToken, getTokenTimeRemaining } from './googleAuthStorage';
 
 // Mock IndexedDB
 const mockDb = {
@@ -133,6 +133,40 @@ describe('googleAuthStorage', () => {
 
             // Should not throw
             await expect(clearStoredToken()).resolves.toBeUndefined();
+        });
+    });
+
+    describe('getTokenTimeRemaining', () => {
+
+        it('returns 0 for null token', () => {
+            expect(getTokenTimeRemaining(null)).toBe(0);
+        });
+
+        it('returns 0 for token without expiresAt', () => {
+            const token = { accessToken: 'abc' };
+            expect(getTokenTimeRemaining(token)).toBe(0);
+        });
+
+        it('returns positive remaining time for valid token', () => {
+            vi.setSystemTime(new Date('2026-01-19T12:00:00Z'));
+
+            const token = {
+                accessToken: 'abc',
+                expiresAt: new Date('2026-01-19T12:10:00Z').getTime(),
+            };
+
+            expect(getTokenTimeRemaining(token)).toBe(600000);
+        });
+
+        it('clamps remaining time at 0 for expired token', () => {
+            vi.setSystemTime(new Date('2026-01-19T12:00:00Z'));
+
+            const token = {
+                accessToken: 'abc',
+                expiresAt: new Date('2026-01-19T11:59:30Z').getTime(),
+            };
+
+            expect(getTokenTimeRemaining(token)).toBe(0);
         });
     });
 });
