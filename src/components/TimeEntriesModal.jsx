@@ -10,6 +10,7 @@ import { formatDurationWithSeconds, toDisplayDate, getTodayString, getCurrentTim
 import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
 import { generateId } from '../utils/idUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { softDeleteById, isDeleted } from '../utils/syncableEntity.ts';
 
 /**
  * TimeEntriesModal component - Modal for viewing and managing time entries for a task
@@ -47,7 +48,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
     // Filter time entries for this task
     const taskTimeEntries = useMemo(() => {
         return timeEntries
-            .filter(entry => entry.taskId === task?.id)
+            .filter(entry => entry.taskId === task?.id && !isDeleted(entry))
             .sort((a, b) => b.start - a.start); // Most recent first
     }, [timeEntries, task?.id]);
 
@@ -204,7 +205,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
         showSuccess('Time entry updated successfully');
     };
 
-    // Handle deleting an entry
+    // Handle deleting an entry (soft-delete with tombstone)
     const handleDeleteEntry = (entryId) => {
         const entry = timeEntries.find(e => e.id === entryId);
         if (!canDeleteEntry(entry)) {
@@ -213,7 +214,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
         }
 
         if (window.confirm('Are you sure you want to delete this time entry?')) {
-            const updatedEntries = timeEntries.filter(entry => entry.id !== entryId);
+            const updatedEntries = softDeleteById(timeEntries, entryId);
             setTimeEntries(updatedEntries);
             showSuccess('Time entry deleted successfully');
         }

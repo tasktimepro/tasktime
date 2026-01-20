@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownTrayIcon, CogIcon, TrashIcon } from '@/components/ui/icons';
+import { ArrowDownTrayIcon, CogIcon, TrashIcon, CloudIcon } from '@/components/ui/icons';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import ExportImport from './ExportImport';
 import Preferences from './Preferences';
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
 import { useToast } from '../hooks/useToast.ts';
+import SyncSettings from './sync/SyncSettings';
 
 /**
  * Account component - Main account management page with side navigation
@@ -52,6 +53,12 @@ const Account = ({
             name: 'Preferences',
             icon: CogIcon,
             description: 'Manage your personal preferences'
+        },
+        {
+            id: 'sync',
+            name: 'Cloud Sync',
+            icon: CloudIcon,
+            description: 'Connect Google Drive sync'
         },
         {
             id: 'backup',
@@ -130,6 +137,8 @@ const Account = ({
         switch (activeTab) {
             case 'preferences':
                 return <Preferences preferences={preferences} setPreferences={setPreferences} />;
+            case 'sync':
+                return <SyncSettings />;
             case 'backup':
                 return (
                     <div>

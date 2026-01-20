@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import './App.css';
 import { useIndexedDB, useIndexedDBLoading } from './hooks/useIndexedDB.ts';
 import { useUrlState } from './hooks/useUrlState.ts';
@@ -14,10 +14,13 @@ import ModalManager from './components/modals/ModalManager';
 import ErrorBoundary from './components/ErrorBoundary';
 import OfflineIndicator from './components/OfflineIndicator';
 import InstallPrompt from './components/InstallPrompt';
+import SyncProvider from './components/sync/SyncProvider';
+import SyncStatus from './components/sync/SyncStatus';
 import { ToastProvider } from './components/ToastContainer';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon } from '@/components/ui/icons';
 import { TIMER_UPDATE_INTERVAL_MS, TIMER_HEARTBEAT_INTERVAL_MS, APP_VERSION } from './constants/app.ts';
+import { filterDeleted } from './utils/syncableEntity.ts';
 
 /** Original browser tab title */
 const ORIGINAL_TITLE = "TaskTime - Track your time by the task. Invoice without the mess.";
@@ -38,6 +41,10 @@ function App() {
     const [invoiceTemplates, setInvoiceTemplates, invoiceTemplatesStatus] = useIndexedDB('invoiceTemplates', []);
     const [preferences, setPreferences, preferencesStatus] = useIndexedDB('preferences', {});
     const [storedAppVersion, setStoredAppVersion, storedAppVersionStatus] = useIndexedDB('appVersion', null);
+    const [syncMeta, setSyncMeta, syncMetaStatus] = useIndexedDB('syncMeta', {
+        lastSyncedAt: 0,
+        deviceId: null
+    });
     
     // Dark mode state - persisted in preferences
     const [darkMode, setDarkMode] = useState(() => {
@@ -82,8 +89,16 @@ function App() {
         invoiceTemplatesStatus,
         preferencesStatus,
         timerStatus,
-        storedAppVersionStatus
+        storedAppVersionStatus,
+        syncMetaStatus
     ]);
+
+    // Filter out soft-deleted items for display (keep raw arrays for sync)
+    const activeProjects = useMemo(() => filterDeleted(projects), [projects]);
+    const activeTasks = useMemo(() => filterDeleted(tasks), [tasks]);
+    const activeTimeEntries = useMemo(() => filterDeleted(timeEntries), [timeEntries]);
+    const activeClients = useMemo(() => filterDeleted(clients), [clients]);
+    const activeInvoices = useMemo(() => filterDeleted(invoices), [invoices]);
 
     // Persist app version for future migration checks
     useEffect(() => {
@@ -98,6 +113,147 @@ function App() {
             setStoredAppVersion(APP_VERSION);
         }
     }, [storedAppVersion, storedAppVersionStatus.loading, setStoredAppVersion, APP_VERSION]);
+
+    const changeListenersRef = useRef(new Set());
+    const skipSyncUntilRef = useRef(0);
+
+    // Refs to hold latest state for sync callbacks (avoids dependency cycles)
+    const stateRef = useRef({
+        projects,
+        tasks,
+        timeEntries,
+        invoices,
+        clients,
+        businessInfos,
+        invoiceTemplates,
+        paymentMethods,
+        preferences,
+        timerState,
+        syncMeta
+    });
+
+    // Keep ref up to date
+    useEffect(() => {
+        stateRef.current = {
+            projects,
+            tasks,
+            timeEntries,
+            invoices,
+            clients,
+            businessInfos,
+            invoiceTemplates,
+            paymentMethods,
+            preferences,
+            timerState,
+            syncMeta
+        };
+    }, [projects, tasks, timeEntries, invoices, clients, businessInfos, invoiceTemplates, paymentMethods, preferences, timerState, syncMeta]);
+
+    const notifyLocalChange = useCallback(() => {
+
+        changeListenersRef.current.forEach((callback) => {
+            callback();
+        });
+    }, []);
+
+    const onLocalChange = useCallback((callback) => {
+
+        changeListenersRef.current.add(callback);
+
+        return () => {
+            changeListenersRef.current.delete(callback);
+        };
+    }, []);
+
+    useEffect(() => {
+
+        if (isLoading) {
+
+            return;
+        }
+
+        // Skip notifications while sync is applying data
+        if (Date.now() < skipSyncUntilRef.current) {
+
+            return;
+        }
+
+        notifyLocalChange();
+    }, [
+        isLoading,
+        projects,
+        tasks,
+        timeEntries,
+        invoices,
+        clients,
+        businessInfos,
+        invoiceTemplates,
+        paymentMethods,
+        preferences,
+        timerState,
+        syncMeta,
+        notifyLocalChange
+    ]);
+
+    const getLocalData = useCallback(async () => {
+
+        const s = stateRef.current;
+        return {
+            version: 1,
+            projects: s.projects,
+            tasks: s.tasks,
+            timeEntries: s.timeEntries,
+            invoices: s.invoices,
+            clients: s.clients,
+            businessInfos: s.businessInfos,
+            invoiceTemplates: s.invoiceTemplates,
+            paymentMethods: s.paymentMethods,
+            preferences: s.preferences,
+            timer: s.timerState,
+            _sync: s.syncMeta
+        };
+    }, []); // No dependencies - uses ref
+
+    const setLocalData = useCallback(async (data) => {
+
+        // Skip sync notifications for the next 500ms while applying synced data
+        skipSyncUntilRef.current = Date.now() + 500;
+
+        if (Array.isArray(data.projects)) {
+            setProjects(data.projects);
+        }
+        if (Array.isArray(data.tasks)) {
+            setTasks(data.tasks);
+        }
+        if (Array.isArray(data.timeEntries)) {
+            setTimeEntries(data.timeEntries);
+        }
+        if (Array.isArray(data.invoices)) {
+            setInvoices(data.invoices);
+        }
+        if (Array.isArray(data.clients)) {
+            setClients(data.clients);
+        }
+        if (Array.isArray(data.businessInfos)) {
+            setBusinessInfos(data.businessInfos);
+        }
+        if (Array.isArray(data.invoiceTemplates)) {
+            setInvoiceTemplates(data.invoiceTemplates);
+        }
+        if (Array.isArray(data.paymentMethods)) {
+            setPaymentMethods(data.paymentMethods);
+        }
+        if (data.preferences) {
+            setPreferences(data.preferences);
+        }
+        if (data.timer) {
+            setTimerState(data.timer);
+        }
+        if (data._sync) {
+            setSyncMeta(data._sync);
+        }
+    // Setters from useIndexedDB are stable, no need to list them
+    }, [setProjects, setTasks, setTimeEntries, setInvoices, setClients, setBusinessInfos, setInvoiceTemplates, setPaymentMethods, setPreferences, setTimerState, setSyncMeta]);
     
     // Modal state for form modals
     const [activeModal, setActiveModal] = useState(null);
@@ -430,6 +586,11 @@ function App() {
 
     return (
         <ToastProvider>
+            <SyncProvider
+                getLocalData={getLocalData}
+                setLocalData={setLocalData}
+                onLocalChange={onLocalChange}
+            >
             <div className="min-h-screen bg-background">
                 <div className="mx-auto w-full max-w-[100rem] px-6">
                 <div className="flex gap-6">
@@ -535,6 +696,7 @@ function App() {
                             <UserCircleIcon className="h-5 w-5 mr-3 flex-shrink-0" />
                             Account
                         </button>
+                        <SyncStatus className="mt-2" />
                         <OfflineIndicator className="mt-2" />
                     </div>
                 </aside>
@@ -795,10 +957,11 @@ function App() {
                 </main>
             </div>
             </div>
-            </div>
             
             {/* PWA Components */}
             <InstallPrompt />
+            </div>
+            </SyncProvider>
         </ToastProvider>
     );
 }

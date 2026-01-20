@@ -195,7 +195,11 @@ describe('TimeEntriesModal', () => {
         expect(baseProps.setTimeEntries).toHaveBeenCalledTimes(1)
 
         const updatedEntries = baseProps.setTimeEntries.mock.calls[0][0]
-        expect(updatedEntries).toHaveLength(0)
+        // Soft-delete: entry still exists but has deletedAt set
+        expect(updatedEntries).toHaveLength(1)
+        expect(updatedEntries[0].id).toBe('entry-1')
+        expect(updatedEntries[0].deletedAt).toBeDefined()
+        expect(updatedEntries[0].deletedAt).toBeGreaterThan(0)
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry deleted successfully')
     })
 })

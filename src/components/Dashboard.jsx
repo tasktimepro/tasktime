@@ -11,6 +11,7 @@ import useMetricsCalculation from './dashboard/hooks/useMetricsCalculation';
 import MetricsCards from './dashboard/MetricsCards';
 import RecentTasks from './dashboard/RecentTasks';
 import ProjectsOverview from './dashboard/ProjectsOverview';
+import { isDeleted } from '../utils/syncableEntity.ts';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -131,11 +132,11 @@ const Dashboard = ({
      */
     const recentTasks = useMemo(() => {
         const activeTasks = tasks.filter(task =>
-            (!task.completed && !task.archived) || completedInCurrentSession.has(task.id)
+            !isDeleted(task) && ((!task.completed && !task.archived) || completedInCurrentSession.has(task.id))
         );
 
         const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
-        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
+        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo && !isDeleted(entry));
 
         // Calculate task activity data
         const taskActivity = {};
@@ -235,7 +236,7 @@ const Dashboard = ({
      */
     const recentProjects = useMemo(() => {
         const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
-        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
+        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo && !isDeleted(entry));
 
         // Group by project
         const projectActivity = {};
@@ -270,7 +271,7 @@ const Dashboard = ({
         });
 
         const projectsWithActivity = projects
-            .filter(project => !project.archived) // Only exclude archived projects
+            .filter(project => !project.archived && !isDeleted(project)) // Exclude archived and deleted
             .map(project => {
                 // Use project activity if it exists, otherwise use defaults
                 const activity = projectActivity[project.id] || { totalTime: 0, lastActivity: 0, taskPendingTime: {} };

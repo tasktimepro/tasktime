@@ -60,6 +60,8 @@ vi.mock('./components/ErrorBoundary', () => ({ default: ({ children }) => childr
 vi.mock('./components/OfflineIndicator', () => ({ default: () => null }))
 vi.mock('./components/InstallPrompt', () => ({ default: () => null }))
 vi.mock('./components/ToastContainer', () => ({ ToastProvider: ({ children }) => children }))
+vi.mock('./components/sync/SyncProvider', () => ({ default: ({ children }) => children }))
+vi.mock('./components/sync/SyncStatus', () => ({ default: () => null }))
 
 if (!window.matchMedia) {
     window.matchMedia = vi.fn().mockImplementation(() => ({

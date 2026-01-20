@@ -9,6 +9,7 @@ import Modal from './Modal';
 import { generateId } from '../utils/idUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { deleteTaskWithCleanup } from '../utils/taskUtils.ts';
+import { isDeleted } from '../utils/syncableEntity.ts';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -33,8 +34,8 @@ const TaskTree = ({
     const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState(null);
     const { showSuccess } = useToast();
 
-    // Get tasks for this project
-    const projectTasks = tasks.filter(task => task.projectId === project.id);
+    // Get tasks for this project (exclude soft-deleted)
+    const projectTasks = tasks.filter(task => task.projectId === project.id && !isDeleted(task));
 
     // Get parent tasks (tasks without parentTaskId) that are not archived
     const parentTasks = projectTasks.filter(task => !task.parentTaskId && !task.archived);

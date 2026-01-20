@@ -2,14 +2,21 @@
  * Task utility functions for handling task operations
  */
 
+import { softDeleteByIds, type SyncableEntity } from './syncableEntity';
+
 type Task = {
     id: string;
     title?: string;
     parentTaskId?: string | null;
+    updatedAt: number;
+    deletedAt?: number;
 };
 
 type TimeEntry = {
+    id: string;
     taskId: string;
+    updatedAt: number;
+    deletedAt?: number;
 };
 
 type TimerState = {
@@ -74,12 +81,15 @@ export const deleteTaskWithCleanup = (
         taskIdsToDelete = [taskId];
     }
 
-    // Remove tasks
-    const updatedTasks = allTasks.filter(task => !taskIdsToDelete.includes(task.id));
+    // Soft-delete tasks (set deletedAt instead of removing)
+    const updatedTasks = softDeleteByIds(allTasks as (Task & SyncableEntity)[], taskIdsToDelete);
     setTasks(updatedTasks);
 
-    // Remove time entries for these tasks
-    const updatedTimeEntries = timeEntries.filter(entry => !taskIdsToDelete.includes(entry.taskId));
+    // Soft-delete time entries for these tasks
+    const timeEntryIdsToDelete = timeEntries
+        .filter(entry => taskIdsToDelete.includes(entry.taskId))
+        .map(entry => entry.id);
+    const updatedTimeEntries = softDeleteByIds(timeEntries as (TimeEntry & SyncableEntity)[], timeEntryIdsToDelete);
     setTimeEntries(updatedTimeEntries);
 
     // Clear current timer if it's for one of these tasks

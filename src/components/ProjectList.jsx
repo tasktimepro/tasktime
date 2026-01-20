@@ -17,6 +17,7 @@ import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts
 import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import { softDeleteById, softDeleteByIds, isDeleted } from '../utils/syncableEntity.ts';
 
 /**
  * ProjectList component - Displays and manages the list of projects
@@ -74,7 +75,7 @@ const ProjectList = ({
      */
     const performProjectDeletion = (projectId, deleteInvoices = false) => {
         // Get all task IDs that need to be deleted (including subtasks)
-        const projectTasks = tasks.filter(task => task.projectId === projectId);
+        const projectTasks = tasks.filter(task => task.projectId === projectId && !task.deletedAt);
         const allTaskIdsToDelete = new Set();
         
         // Add all project tasks and their subtasks
@@ -83,37 +84,38 @@ const ProjectList = ({
             taskIds.forEach(id => allTaskIdsToDelete.add(id));
         });
 
+        const taskIdsArray = Array.from(allTaskIdsToDelete);
+
         // Check if current timer is running on any task that will be deleted
         if (currentTimer && allTaskIdsToDelete.has(currentTimer.taskId)) {
             setCurrentTimer(null);
         }
 
-        // If deleteInvoices is true, remove associated invoices
+        // If deleteInvoices is true, soft-delete associated invoices
         if (deleteInvoices) {
             const project = projects.find(p => p.id === projectId);
             if (project && project.invoiceIds && project.invoiceIds.length > 0) {
-                const updatedInvoices = invoices.filter(invoice => 
-                    !project.invoiceIds.includes(invoice.id)
-                );
+                const updatedInvoices = softDeleteByIds(invoices, project.invoiceIds);
                 setInvoices(updatedInvoices);
             }
         }
 
-        // Remove the project
-        setProjects(projects.filter(project => project.id !== projectId));
+        // Soft-delete the project
+        setProjects(softDeleteById(projects, projectId));
         
-        // Remove all tasks for this project (including subtasks)
-        const updatedTasks = tasks.filter(task => !allTaskIdsToDelete.has(task.id));
+        // Soft-delete all tasks for this project (including subtasks)
+        const updatedTasks = softDeleteByIds(tasks, taskIdsArray);
         setTasks(updatedTasks);
         
-        // Remove all time entries for deleted tasks
-        const updatedTimeEntries = timeEntries.filter(entry => 
-            !allTaskIdsToDelete.has(entry.taskId)
-        );
+        // Soft-delete all time entries for deleted tasks
+        const timeEntryIdsToDelete = timeEntries
+            .filter(entry => allTaskIdsToDelete.has(entry.taskId))
+            .map(entry => entry.id);
+        const updatedTimeEntries = softDeleteByIds(timeEntries, timeEntryIdsToDelete);
         setTimeEntries(updatedTimeEntries);
         
         const deletedTaskCount = allTaskIdsToDelete.size;
-        const deletedTimeEntriesCount = timeEntries.length - updatedTimeEntries.length;
+        const deletedTimeEntriesCount = timeEntryIdsToDelete.length;
         
         // Close the edit form if the deleted project was being edited - Removed since using modal manager
 
@@ -327,9 +329,9 @@ const ProjectList = ({
             ) : (
                 <>
                     {/* Active Projects */}
-                    {projects.filter(p => !p.archived).length > 0 && (
+                    {projects.filter(p => !p.archived && !isDeleted(p)).length > 0 && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {projects.filter(p => !p.archived).map((project) => (
+                            {projects.filter(p => !p.archived && !isDeleted(p)).map((project) => (
                         <Card
                             key={project.id}
                             className="hover:shadow-md transition-shadow cursor-pointer relative"
@@ -440,12 +442,12 @@ const ProjectList = ({
                                 ) : (
                                     <ChevronRightIcon className="h-4 w-4 mr-1" />
                                 )}
-                                Archived Projects ({projects.filter(p => p.archived).length})
+                                Archived Projects ({projects.filter(p => p.archived && !isDeleted(p)).length})
                             </button>
 
                             {showArchivedProjects && (
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {projects.filter(p => p.archived).map((project) => (
+                                    {projects.filter(p => p.archived && !isDeleted(p)).map((project) => (
                                         <Card
                                             key={project.id}
                                             className="hover:shadow-md transition-shadow cursor-pointer relative"

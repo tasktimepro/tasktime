@@ -3,6 +3,7 @@ import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@/compon
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
+import { softDeleteById, isDeleted } from '../utils/syncableEntity.ts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -54,7 +55,7 @@ const InvoiceTemplates = ({
             return;
         }
 
-        const updatedTemplates = invoiceTemplates.filter(t => t.id !== pendingDeleteTemplateId);
+        const updatedTemplates = softDeleteById(invoiceTemplates, pendingDeleteTemplateId);
         setInvoiceTemplates(updatedTemplates);
         showSuccess('Template deleted successfully!');
         setPendingDeleteTemplateId(null);
@@ -63,6 +64,9 @@ const InvoiceTemplates = ({
     const pendingDeleteTemplate = pendingDeleteTemplateId
         ? invoiceTemplates.find((template) => template.id === pendingDeleteTemplateId)
         : null;
+
+    // Filter out soft-deleted templates for display
+    const activeTemplates = useMemo(() => invoiceTemplates.filter(t => !isDeleted(t)), [invoiceTemplates]);
 
     // Generate a static timestamp for previews that only changes when component mounts
     const staticTimestamp = useMemo(() => Date.now().toString(), []);
@@ -135,14 +139,14 @@ const InvoiceTemplates = ({
         }
     }, [staticDate]);
 
-    // Sort templates - default first, then by name
+    // Sort templates - default first, then by name (using activeTemplates which excludes deleted)
     const sortedTemplates = useMemo(() => {
-        return [...invoiceTemplates].sort((a, b) => {
+        return [...activeTemplates].sort((a, b) => {
             if (a.isDefault && !b.isDefault) return -1;
             if (!a.isDefault && b.isDefault) return 1;
             return a.name.localeCompare(b.name);
         });
-    }, [invoiceTemplates]);
+    }, [activeTemplates]);
 
     return (
         <div className="space-y-6">

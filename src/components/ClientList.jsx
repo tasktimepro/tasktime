@@ -14,6 +14,7 @@ import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, Chevr
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
+import { softDeleteById, softDeleteByIds, isDeleted } from '../utils/syncableEntity.ts';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -80,36 +81,47 @@ const ClientList = ({
     };
 
     /**
-     * Perform actual client deletion
+     * Perform actual client deletion (soft-delete with tombstones)
      */
     const performClientDeletion = (clientId, alsoDeleteProjects) => {
+        const relatedProjects = getRelatedProjects(clientId);
+        
         if (alsoDeleteProjects) {
             // Get related projects and their task/time entry IDs
-            const relatedProjectIds = getRelatedProjects(clientId).map(p => p.id);
+            const relatedProjectIds = relatedProjects.map(p => p.id);
             
-            // Delete related projects
-            setProjects(projects.filter(project => !relatedProjectIds.includes(project.id)));
+            // Soft-delete related projects
+            setProjects(softDeleteByIds(projects, relatedProjectIds));
             
-            // Delete tasks for related projects
-            const relatedTaskIds = tasks.filter(task => relatedProjectIds.includes(task.projectId)).map(t => t.id);
-            setTasks(tasks.filter(task => !relatedTaskIds.includes(task.id)));
+            // Soft-delete tasks for related projects
+            const relatedTaskIds = tasks
+                .filter(task => relatedProjectIds.includes(task.projectId))
+                .map(t => t.id);
+            setTasks(softDeleteByIds(tasks, relatedTaskIds));
             
-            // Delete time entries for related tasks
-            setTimeEntries(timeEntries.filter(entry => !relatedTaskIds.includes(entry.taskId)));
+            // Soft-delete time entries for related tasks
+            const relatedTimeEntryIds = timeEntries
+                .filter(entry => relatedTaskIds.includes(entry.taskId))
+                .map(e => e.id);
+            setTimeEntries(softDeleteByIds(timeEntries, relatedTimeEntryIds));
             
-            // Delete invoices for related projects
-            setInvoices(invoices.filter(invoice => !relatedProjectIds.includes(invoice.projectId)));
+            // Soft-delete invoices for related projects
+            const relatedInvoiceIds = invoices
+                .filter(invoice => relatedProjectIds.includes(invoice.projectId))
+                .map(i => i.id);
+            setInvoices(softDeleteByIds(invoices, relatedInvoiceIds));
         } else {
-            // Remove client reference from projects
+            // Remove client reference from projects (update, not delete)
+            const now = Date.now();
             setProjects(projects.map(project => 
                 project.preferredClientId === clientId 
-                    ? { ...project, preferredClientId: null }
+                    ? { ...project, preferredClientId: null, updatedAt: now }
                     : project
             ));
         }
 
-        // Remove the client
-        setClients(clients.filter(client => client.id !== clientId));
+        // Soft-delete the client
+        setClients(softDeleteById(clients, clientId));
 
         // Show appropriate success message
         const message = alsoDeleteProjects 
@@ -218,9 +230,9 @@ const ClientList = ({
             {/* Header */}
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-foreground">
-                    Clients {clients.filter(c => !c.archived).length > 0 && (
+                    Clients {clients.filter(c => !c.archived && !isDeleted(c)).length > 0 && (
                         <span>
-                            ({clients.filter(c => !c.archived).length})
+                            ({clients.filter(c => !c.archived && !isDeleted(c)).length})
                         </span>
                     )}
                 </h2>
@@ -233,7 +245,7 @@ const ClientList = ({
 
 
             {/* Clients Grid */}
-            {clients.filter(c => !c.archived).length === 0 && clients.filter(c => c.archived).length === 0 ? (
+            {clients.filter(c => !c.archived && !isDeleted(c)).length === 0 && clients.filter(c => c.archived && !isDeleted(c)).length === 0 ? (
                 <EmptyState
                     icon={UserGroupIcon}
                     title="No clients"
@@ -245,9 +257,9 @@ const ClientList = ({
             ) : (
                 <>
                     {/* Active Clients */}
-                    {clients.filter(c => !c.archived).length > 0 && (
+                    {clients.filter(c => !c.archived && !isDeleted(c)).length > 0 && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {clients.filter(c => !c.archived).map((client) => (
+                            {clients.filter(c => !c.archived && !isDeleted(c)).map((client) => (
                                 <Card
                                     key={client.id}
                                     className="hover:shadow-md transition-shadow cursor-pointer relative"
@@ -333,7 +345,7 @@ const ClientList = ({
                     )}
 
                     {/* Archived Clients Section */}
-                    {clients.filter(c => c.archived).length > 0 && (
+                    {clients.filter(c => c.archived && !isDeleted(c)).length > 0 && (
                         <div className="border-t pt-6">
                             <button
                                 onClick={() => setShowArchivedClients(!showArchivedClients)}
@@ -344,12 +356,12 @@ const ClientList = ({
                                 ) : (
                                     <ChevronRightIcon className="h-4 w-4 mr-1" />
                                 )}
-                                Archived Clients ({clients.filter(c => c.archived).length})
+                                Archived Clients ({clients.filter(c => c.archived && !isDeleted(c)).length})
                             </button>
 
                             {showArchivedClients && (
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {clients.filter(c => c.archived).map((client) => (
+                                    {clients.filter(c => c.archived && !isDeleted(c)).map((client) => (
                                         <Card
                                             key={client.id}
                                             className="hover:shadow-md transition-shadow cursor-pointer relative"

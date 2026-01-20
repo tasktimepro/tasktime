@@ -73,3 +73,22 @@ self.addEventListener('fetch', (event) => {
         })
     );
 });
+
+const notifyClients = async () => {
+    const clients = await self.clients.matchAll({ includeUncontrolled: true });
+    for (const client of clients) {
+        client.postMessage({ type: 'BACKGROUND_SYNC_TRIGGER' });
+    }
+};
+
+self.addEventListener('sync', (event) => {
+    if (event.tag === 'tasktime-sync') {
+        event.waitUntil(notifyClients());
+    }
+});
+
+self.addEventListener('periodicsync', (event) => {
+    if (event.tag === 'tasktime-periodic-sync') {
+        event.waitUntil(notifyClients());
+    }
+});

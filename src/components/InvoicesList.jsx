@@ -10,6 +10,7 @@ import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { parseStoredDate, toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
+import { filterDeleted } from '../utils/syncableEntity.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 
@@ -52,6 +53,9 @@ const InvoicesList = ({
     const [showPreview, setShowPreview] = useState(false);
     const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
     const { updateUrl } = useUrlState();
+
+    // Filter out soft-deleted invoices
+    const activeInvoices = useMemo(() => filterDeleted(projectInvoices), [projectInvoices]);
     
     // Default to overdue tab if there are overdue invoices, otherwise outstanding
     // But allow override via selectedTab prop
@@ -62,11 +66,11 @@ const InvoicesList = ({
         }
         
         // Otherwise use the existing logic
-        const hasOverdueInvoices = projectInvoices.some(invoice => 
+        const hasOverdueInvoices = activeInvoices.some(invoice => 
             !invoice.paymentProcessed && isInvoiceOverdue(invoice)
         );
         return hasOverdueInvoices ? 'overdue' : 'outstanding';
-    }, [projectInvoices, selectedTab]);
+    }, [activeInvoices, selectedTab]);
     
     const [activeTab, setActiveTab] = useState(defaultTab);
     
@@ -83,14 +87,14 @@ const InvoicesList = ({
     const [overduePage, setOverduePage] = useState(1);
     const ITEMS_PER_PAGE = 8;
 
-    // Filter invoices by payment status
+    // Filter invoices by payment status (using activeInvoices which excludes deleted)
     const outstandingInvoices = useMemo(() => 
-        projectInvoices.filter(invoice => !invoice.paymentProcessed),
-    [projectInvoices]);
+        activeInvoices.filter(invoice => !invoice.paymentProcessed),
+    [activeInvoices]);
 
     const paidInvoices = useMemo(() => 
-        projectInvoices.filter(invoice => invoice.paymentProcessed),
-    [projectInvoices]);
+        activeInvoices.filter(invoice => invoice.paymentProcessed),
+    [activeInvoices]);
 
     // Filter overdue invoices (subset of outstanding)
     const overdueInvoices = useMemo(() => 

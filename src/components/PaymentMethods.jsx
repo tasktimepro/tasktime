@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, CreditCardIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
+import { softDeleteById, isDeleted } from '../utils/syncableEntity.ts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -55,7 +56,7 @@ const PaymentMethods = ({
             return;
         }
 
-        setPaymentMethods(paymentMethods.filter(method => method.id !== pendingDeletePaymentMethodId));
+        setPaymentMethods(softDeleteById(paymentMethods, pendingDeletePaymentMethodId));
         showSuccess('Payment method deleted successfully');
         setPendingDeletePaymentMethodId(null);
     };
@@ -63,6 +64,9 @@ const PaymentMethods = ({
     const pendingDeletePaymentMethod = pendingDeletePaymentMethodId
         ? paymentMethods.find((method) => method.id === pendingDeletePaymentMethodId)
         : null;
+
+    // Filter out soft-deleted payment methods for display
+    const activeMethods = useMemo(() => paymentMethods.filter(m => !isDeleted(m)), [paymentMethods]);
 
     return (
         <div className="space-y-6">
@@ -84,7 +88,7 @@ const PaymentMethods = ({
             </div>
 
             {/* Payment Methods List */}
-            {paymentMethods.length === 0 ? (
+            {activeMethods.length === 0 ? (
                 <div className="text-center py-12">
                     <CreditCardIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h4 className="mt-2 text-sm font-medium text-foreground">No payment methods</h4>
@@ -101,7 +105,7 @@ const PaymentMethods = ({
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {paymentMethods.map((method) => (
+                    {activeMethods.map((method) => (
                         <Card
                             key={method.id}
                             className="hover:shadow-md transition-shadow"
