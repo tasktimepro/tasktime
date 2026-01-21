@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Notice } from '@/components/ui/notice';
 import { generateSlugId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
-import { withCreateMetadata, withUpdateMetadata } from '../../utils/syncableEntity.ts';
+import { useProjects } from '../../hooks/useProjects.ts';
+import { useClients } from '../../hooks/useClients.ts';
 import CustomCheckbox from '../CustomCheckbox';
 
 /**
@@ -17,10 +18,7 @@ import CustomCheckbox from '../CustomCheckbox';
 const ProjectModal = ({
     isOpen,
     onClose,
-    projects,
-    setProjects,
     editingProject = null,
-    clients,
     modalOptions = null,
     openClientModal,
     saveFormState,
@@ -29,6 +27,8 @@ const ProjectModal = ({
 }) => {
     const [selectedClientRate, setSelectedClientRate] = useState(null);
     const { showSuccess } = useToast();
+    const { projects, createProject, updateProject } = useProjects();
+    const { clients } = useClients();
 
     const [formData, setFormData] = useState({
         title: '',
@@ -203,7 +203,7 @@ const ProjectModal = ({
             return; // Hourly rate is required when not using flat rate for billable projects
         }
 
-        const newProject = withCreateMetadata({
+        createProject({
             id: generateSlugId(formData.title),
             title: formData.title,
             hourlyRate: formData.hourlyRate !== '' ? parseFloat(formData.hourlyRate) : null,
@@ -213,8 +213,6 @@ const ProjectModal = ({
             lastBilledAt: null,
             archived: false
         });
-
-        setProjects([...projects, newProject]);
 
         // Reset form
         setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false });
@@ -248,20 +246,13 @@ const ProjectModal = ({
             return; // Hourly rate is required when not using flat rate for billable projects
         }
 
-        const updatedProjects = projects.map(project =>
-            project.id === editingProject.id
-                ? withUpdateMetadata({
-                    ...project,
-                    title: formData.title,
-                    hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-                    flatRate: formData.flatRate || false,
-                    preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
-                    isPersonal: formData.isPersonal || false
-                })
-                : project
-        );
-
-        setProjects(updatedProjects);
+        updateProject(editingProject.id, {
+            title: formData.title,
+            hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+            flatRate: formData.flatRate || false,
+            preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
+            isPersonal: formData.isPersonal || false
+        });
 
         // Clear saved state since project was successfully updated  
         if (clearSavedState) {
@@ -489,9 +480,6 @@ const ProjectModal = ({
 ProjectModal.propTypes = {
     isOpen: PropTypes.bool.isRequired,
     onClose: PropTypes.func.isRequired,
-    projects: PropTypes.array.isRequired,
-    setProjects: PropTypes.func.isRequired,
-    clients: PropTypes.array.isRequired,
     editingProject: PropTypes.object,
     modalOptions: PropTypes.object,
     openClientModal: PropTypes.func,

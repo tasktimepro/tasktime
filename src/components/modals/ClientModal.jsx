@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
 import { generateSlugId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
-import { withCreateMetadata, withUpdateMetadata } from '../../utils/syncableEntity.ts';
+import { useClients } from '../../hooks/useClients.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,11 +17,10 @@ import Modal from '../Modal';
 const ClientModal = ({
     isOpen,
     onClose,
-    clients,
-    setClients,
     editingClient
 }) => {
     const { showSuccess } = useToast();
+    const { clients, createClient, updateClient } = useClients();
 
     const [formData, setFormData] = useState({
         title: '',
@@ -153,7 +152,7 @@ const ClientModal = ({
             return; // Hourly rate is required when not using flat rate
         }
 
-        const newClient = withCreateMetadata({
+        createClient({
             id: generateSlugId(formData.title),
             title: formData.title,
             clientName: formData.clientName,
@@ -176,7 +175,6 @@ const ClientModal = ({
             archived: false
         });
 
-        setClients([...clients, newClient]);
         showSuccess('Client created successfully!');
         onClose();
     };
@@ -199,33 +197,27 @@ const ClientModal = ({
             return; // Hourly rate is required when not using flat rate
         }
 
-        const updatedClients = clients.map(client =>
-            client.id === editingClient.id
-                ? withUpdateMetadata({
-                    ...client,
-                    title: formData.title,
-                    clientName: formData.clientName,
-                    contactPerson: formData.contactPerson,
-                    address: formData.address,
-                    city: formData.city,
-                    state: formData.state,
-                    zip: formData.zip,
-                    country: formData.country,
-                    registrationNumber: formData.registrationNumber,
-                    vat: formData.vat,
-                    taxNumber: formData.taxNumber,
-                    email: formData.email,
-                    phone: formData.phone,
-                    custom: formData.custom,
-                    disableTax: formData.disableTax,
-                    defaultCurrency: formData.defaultCurrency,
-                    hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-                    flatRate: formData.flatRate || false
-                })
-                : client
-        );
+        updateClient(editingClient.id, {
+            title: formData.title,
+            clientName: formData.clientName,
+            contactPerson: formData.contactPerson,
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            zip: formData.zip,
+            country: formData.country,
+            registrationNumber: formData.registrationNumber,
+            vat: formData.vat,
+            taxNumber: formData.taxNumber,
+            email: formData.email,
+            phone: formData.phone,
+            custom: formData.custom,
+            disableTax: formData.disableTax,
+            defaultCurrency: formData.defaultCurrency,
+            hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+            flatRate: formData.flatRate || false
+        });
 
-        setClients(updatedClients);
         showSuccess('Client updated successfully!');
         onClose();
     };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from '@/components/ui/icons';
 import TaskItem from './TaskItem';
 import { Button } from '@/components/ui/button';
@@ -6,36 +6,32 @@ import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Notice } from '@/components/ui/notice';
 import Modal from './Modal';
-import { generateId } from '../utils/idUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { deleteTaskWithCleanup } from '../utils/taskUtils.ts';
-import { isDeleted, withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
+import { useTasks } from '../hooks/useTasks.ts';
+import { useTimeEntries } from '../hooks/useTimeEntries.ts';
+import { useTimer } from '../hooks/useTimer.ts';
+import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
+ * Uses Yjs hooks directly for state management
  */
 const TaskTree = ({
-    project,
-    tasks,
-    setTasks,
-    timeEntries,
-    setTimeEntries,
-    currentTimer,
-    setCurrentTimer,
-    isPaused = false,
-    setIsPaused = null,
-    pausedElapsedTime = 0,
-    setPausedElapsedTime = null,
-    isGlobalTimer = false
+    project
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [showArchivedTasks, setShowArchivedTasks] = useState(false);
     const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState(null);
     const { showSuccess } = useToast();
+    
+    // Yjs hooks for state
+    const { tasks, createTask, updateTask, deleteTask } = useTasks({ projectId: project.id });
+    const { entries: timeEntries, deleteEntry } = useTimeEntries();
+    const { taskId: activeTimerTaskId, clearTimer } = useTimer();
 
-    // Get tasks for this project (exclude soft-deleted)
-    const projectTasks = tasks.filter(task => task.projectId === project.id && !isDeleted(task));
+    // Get tasks for this project
+    const projectTasks = tasks.filter(task => task.projectId === project.id);
 
     // Get parent tasks (tasks without parentTaskId) that are not archived
     const parentTasks = projectTasks.filter(task => !task.parentTaskId && !task.archived);
@@ -50,30 +46,24 @@ const TaskTree = ({
     /**
      * Create a new task
      */
-    const handleCreateTask = (taskData) => {
-        const newTask = withCreateMetadata({
-            id: generateId(),
+    const handleCreateTask = useCallback((taskData) => {
+        const newTask = createTask({
             projectId: project.id,
-            parentTaskId: taskData.parentTaskId,
+            parentTaskId: taskData.parentTaskId || null,
             title: taskData.title.trim(),
-            lastActive: Date.now(), // Initialize lastActive to creation time
-            lastBilledAt: null, // Initialize as never billed
-            billable: false, // Initialize as not billable by default
-            billableSetByUser: false // Track if billable status has been explicitly set by user
+            lastActive: Date.now(),
+            lastBilledAt: null,
+            billable: false,
+            billableSetByUser: false
         });
 
-        // Create a new tasks array with the new task added
-        let updatedTasks = [...tasks, newTask];
-        
-        // If this is a subtask, also update the parent task's lastActive with sync metadata
+        // If this is a subtask, also update the parent task's lastActive
         if (taskData.parentTaskId) {
-            updatedTasks = updatedTasks.map(t => 
-                t.id === taskData.parentTaskId ? withUpdateMetadata({ ...t, lastActive: Date.now() }) : t
-            );
+            updateTask(taskData.parentTaskId, { lastActive: Date.now() });
         }
-
-        setTasks(updatedTasks);
-    };
+        
+        return newTask;
+    }, [createTask, updateTask, project.id]);
 
     /**
      * Create a new main task
@@ -95,50 +85,34 @@ const TaskTree = ({
     /**
      * Archive a task
      */
-    const handleArchiveTask = (taskId) => {
-        const updatedTasks = tasks.map(task =>
-            task.id === taskId ? withUpdateMetadata({ ...task, archived: true, lastActive: Date.now() }) : task
-        );
-        setTasks(updatedTasks);
-    };
+    const handleArchiveTask = useCallback((taskId) => {
+        updateTask(taskId, { archived: true, lastActive: Date.now() });
+    }, [updateTask]);
 
     /**
      * Unarchive a task
      */
-    const handleUnarchiveTask = (taskId) => {
-        const updatedTasks = tasks.map(task =>
-            task.id === taskId ? withUpdateMetadata({ ...task, archived: false, lastActive: Date.now() }) : task
-        );
-        setTasks(updatedTasks);
-    };
+    const handleUnarchiveTask = useCallback((taskId) => {
+        updateTask(taskId, { archived: false, lastActive: Date.now() });
+    }, [updateTask]);
 
     /**
      * Toggle billable status for a task
-     * This function guarantees that a task can always be toggled
-     * between billable and non-billable states
      */
-    const handleToggleBillable = (taskId) => {
-        // Find the task to get its current billable status
+    const handleToggleBillable = useCallback((taskId) => {
         const targetTask = tasks.find(task => task.id === taskId);
         if (!targetTask) return;
         
-        // Create a definite boolean toggle (force it to be a boolean)
         const newBillableStatus = targetTask.billable !== true;
         
-        // Update the task, ensuring billable property is explicitly set
-        // Also mark that this was set by the user to prevent auto-override
-        const updatedTasks = tasks.map(task =>
-            task.id === taskId ? withUpdateMetadata({ 
-                ...task, 
-                billable: newBillableStatus, 
-                billableSetByUser: true, // Mark as explicitly set by user
-                lastActive: Date.now() 
-            }) : task
-        );
+        updateTask(taskId, {
+            billable: newBillableStatus,
+            billableSetByUser: true,
+            lastActive: Date.now()
+        });
         
-        setTasks(updatedTasks);
         showSuccess(`Task marked as ${newBillableStatus ? 'billable' : 'not billable'}`);
-    };
+    }, [tasks, updateTask, showSuccess]);
 
     /**
      * Delete a task and its subtasks
@@ -148,35 +122,43 @@ const TaskTree = ({
     };
 
     const closeDeleteTaskModal = () => {
-
         setPendingDeleteTaskId(null);
     };
 
-    const confirmDeleteTask = () => {
+    const confirmDeleteTask = useCallback(() => {
+        if (!pendingDeleteTaskId) return;
 
-        if (!pendingDeleteTaskId) {
+        const taskToDelete = tasks.find(t => t.id === pendingDeleteTaskId);
+        const taskTitle = taskToDelete?.title || 'Task';
+        const isMainTask = !!(taskToDelete && !taskToDelete.parentTaskId);
 
-            return;
+        // Get all task IDs to delete (including subtasks for main tasks)
+        const taskIdsToDelete = isMainTask 
+            ? getTaskIdsToDelete(pendingDeleteTaskId, tasks)
+            : [pendingDeleteTaskId];
+
+        // Delete time entries for these tasks
+        const entriesToDelete = timeEntries.filter(entry => 
+            taskIdsToDelete.includes(entry.taskId)
+        );
+        entriesToDelete.forEach(entry => deleteEntry(entry.id));
+
+        // Clear timer if it's for one of these tasks
+        if (activeTimerTaskId && taskIdsToDelete.includes(activeTimerTaskId)) {
+            clearTimer();
         }
 
-        const result = deleteTaskWithCleanup(
-            pendingDeleteTaskId,
-            tasks,
-            timeEntries,
-            currentTimer,
-            setTasks,
-            setTimeEntries,
-            setCurrentTimer
-        );
+        // Delete tasks
+        taskIdsToDelete.forEach(id => deleteTask(id));
 
-        // Show appropriate success message
-        const message = result.isMainTask && result.deletedCount > 1
-            ? `Task "${result.taskTitle}" and ${result.deletedCount - 1} subtask(s) deleted successfully`
-            : `Task "${result.taskTitle}" deleted successfully`;
+        // Show success message
+        const message = isMainTask && taskIdsToDelete.length > 1
+            ? `Task "${taskTitle}" and ${taskIdsToDelete.length - 1} subtask(s) deleted successfully`
+            : `Task "${taskTitle}" deleted successfully`;
         
         showSuccess(message);
         setPendingDeleteTaskId(null);
-    };
+    }, [pendingDeleteTaskId, tasks, timeEntries, activeTimerTaskId, deleteEntry, clearTimer, deleteTask, showSuccess]);
 
     /**
      * Start creating a subtask for a parent task
@@ -256,23 +238,11 @@ const TaskTree = ({
                                 <TaskItem
                                     key={task.id}
                                     task={task}
-                                    tasks={tasks}
-                                    setTasks={setTasks}
-                                    timeEntries={timeEntries}
-                                    setTimeEntries={setTimeEntries}
-                                    currentTimer={currentTimer}
-                                    setCurrentTimer={setCurrentTimer}
-                                    isPaused={isPaused}
-                                    setIsPaused={setIsPaused}
-                                    pausedElapsedTime={pausedElapsedTime}
-                                    setPausedElapsedTime={setPausedElapsedTime}
-                                    isGlobalTimer={isGlobalTimer}
                                     onDelete={() => handleDeleteTask(task.id)}
                                     onCreateSubtask={handleCreateTask}
                                     onArchive={() => handleArchiveTask(task.id)}
                                     onUnarchive={() => handleUnarchiveTask(task.id)}
-                                    onToggleBillable={handleToggleBillable} // Pass the function directly
-                                    allTasks={projectTasks}
+                                    onToggleBillable={handleToggleBillable}
                                 />
                             ))}
                         </div>
@@ -299,22 +269,10 @@ const TaskTree = ({
                                         <TaskItem
                                             key={task.id}
                                             task={task}
-                                            tasks={tasks}
-                                            setTasks={setTasks}
-                                            timeEntries={timeEntries}
-                                            setTimeEntries={setTimeEntries}
-                                            currentTimer={currentTimer}
-                                            setCurrentTimer={setCurrentTimer}
-                                            isPaused={isPaused}
-                                            setIsPaused={setIsPaused}
-                                            pausedElapsedTime={pausedElapsedTime}
-                                            setPausedElapsedTime={setPausedElapsedTime}
-                                            isGlobalTimer={isGlobalTimer}
                                             onDelete={() => handleDeleteTask(task.id)}
                                             onCreateSubtask={handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
                                             onToggleBillable={handleToggleBillable}
-                                            allTasks={projectTasks}
                                         />
                                     ))}
                                 </div>

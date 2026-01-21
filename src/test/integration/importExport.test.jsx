@@ -4,6 +4,12 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExportImport from '../../components/ExportImport'
 
+// Mock useTimer hook
+const mockTimerState = { isActive: false };
+vi.mock('../../hooks/useTimer.ts', () => ({
+    useTimer: () => mockTimerState
+}));
+
 describe('Import/Export integration', () => {
 
     const baseProps = {
@@ -15,8 +21,7 @@ describe('Import/Export integration', () => {
         businessInfos: [],
         clients: [],
         invoiceTemplates: [],
-        preferences: { currency: 'EUR' },
-        currentTimer: null
+        preferences: { currency: 'EUR' }
     }
 
     const setupExportMocks = () => {
@@ -168,14 +173,16 @@ describe('Import/Export integration', () => {
         expect(screen.getByText(/invalid/i)).toBeInTheDocument()
     })
 
-    it('shows active timer warning when currentTimer exists', async () => {
+    it('shows active timer warning when timer is active', async () => {
 
         const user = userEvent.setup()
+        
+        // Set timer as active
+        mockTimerState.isActive = true;
 
         render(
             <ExportImport
                 {...baseProps}
-                currentTimer={{ taskId: 'task-1', startTime: 0 }}
                 onImport={vi.fn()}
             />
         )
@@ -183,5 +190,8 @@ describe('Import/Export integration', () => {
         await user.click(screen.getByRole('button', { name: 'Import' }))
 
         expect(screen.getByText('Active Timer Detected!')).toBeInTheDocument()
+        
+        // Reset for other tests
+        mockTimerState.isActive = false;
     })
 })

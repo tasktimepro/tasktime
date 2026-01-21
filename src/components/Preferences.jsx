@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 /**
  * Preferences component - Manages user preferences including preferred currency
  */
-const Preferences = ({ preferences = {}, setPreferences }) => {
+const Preferences = ({ preferences = {}, updatePreferences }) => {
     const [preferredCurrency, setPreferredCurrency] = useState(DEFAULT_CURRENCY);
     const { showSuccess } = useToast();
 
@@ -23,11 +23,8 @@ const Preferences = ({ preferences = {}, setPreferences }) => {
         setPreferredCurrency(newCurrency);
         
         // Update preferences state
-        if (setPreferences) {
-            setPreferences(prev => ({
-                ...prev,
-                currency: newCurrency
-            }));
+        if (updatePreferences) {
+            updatePreferences({ currency: newCurrency });
         }
         
         // Dispatch custom event to notify other components

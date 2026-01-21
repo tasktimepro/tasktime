@@ -10,7 +10,7 @@ import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { parseStoredDate, toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
-import { filterDeleted, withUpdateMetadata } from '../utils/syncableEntity.ts';
+import { useInvoices } from '../hooks/useInvoices.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 
@@ -37,6 +37,7 @@ const isInvoiceOverdue = (invoice) => {
 
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
+ * Uses Yjs hooks for invoice updates
  */
 const InvoicesList = ({ 
     projectInvoices = [], 
@@ -45,7 +46,6 @@ const InvoicesList = ({
     businessInfos = [], 
     clients = [],
     hideNewInvoiceButton = false,
-    setInvoices,
     invoiceTemplates = [],
     selectedTab = null // New prop to preselect a tab
 }) => {
@@ -53,9 +53,12 @@ const InvoicesList = ({
     const [showPreview, setShowPreview] = useState(false);
     const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
     const { updateUrl } = useUrlState();
+    
+    // Yjs hook for invoice updates
+    const { updateInvoice } = useInvoices();
 
-    // Filter out soft-deleted invoices
-    const activeInvoices = useMemo(() => filterDeleted(projectInvoices), [projectInvoices]);
+    // Filter out soft-deleted invoices (projectInvoices already filtered by parent)
+    const activeInvoices = useMemo(() => projectInvoices, [projectInvoices]);
     
     // Default to overdue tab if there are overdue invoices, otherwise outstanding
     // But allow override via selectedTab prop
@@ -276,24 +279,10 @@ const InvoicesList = ({
      * Handle payment processed toggle
      */
     const handlePaymentProcessedToggle = (invoice) => {
-        if (!setInvoices) {
-            console.warn('setInvoices function not provided');
-            return;
-        }
-
-        // Update the invoice with the new payment processed status
-        const updatedInvoice = withUpdateMetadata({
-            ...invoice,
+        // Update the invoice with the new payment processed status using Yjs hook
+        updateInvoice(invoice.id, {
             paymentProcessed: !invoice.paymentProcessed
         });
-
-        // Use functional update to properly update just this one invoice in the full invoices array
-        // This is critical because projectInvoices is a filtered subset, not the full array
-        setInvoices(prevInvoices => 
-            prevInvoices.map(inv => 
-                inv.id === invoice.id ? updatedInvoice : inv
-            )
-        );
 
         // If marking as paid and we're on outstanding or overdue tab, and it's the last item on the page,
         // go to previous page if available

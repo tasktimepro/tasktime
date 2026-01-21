@@ -11,9 +11,81 @@ const toastMocks = vi.hoisted(() => ({
     showWarning: vi.fn()
 }))
 
+const invoiceHookMocks = vi.hoisted(() => ({
+
+    createInvoice: vi.fn((data) => ({ ...data, id: 'new-invoice-id' })),
+    updateInvoice: vi.fn()
+}))
+
+const projectHookMocks = vi.hoisted(() => ({
+
+    updateProject: vi.fn()
+}))
+
+const taskHookMocks = vi.hoisted(() => ({
+
+    updateTask: vi.fn()
+}))
+
+const templateHookMocks = vi.hoisted(() => ({
+
+    updateInvoiceTemplate: vi.fn()
+}))
+
 let modalConfig = {
     applyDateOverride: false
 }
+
+vi.mock('../hooks/useToast.ts', () => ({
+
+    useToast: () => ({
+        showSuccess: toastMocks.showSuccess,
+        showError: toastMocks.showError,
+        showWarning: toastMocks.showWarning
+    })
+}))
+
+vi.mock('../hooks/useInvoices.ts', () => ({
+
+    useInvoices: () => ({
+        invoices: [],
+        createInvoice: invoiceHookMocks.createInvoice,
+        updateInvoice: invoiceHookMocks.updateInvoice
+    })
+}))
+
+vi.mock('../hooks/useProjects.ts', () => ({
+
+    useProjects: () => ({
+        projects: [{ id: 'project-1', title: 'Project', hourlyRate: 100, invoiceIds: [] }],
+        updateProject: projectHookMocks.updateProject
+    })
+}))
+
+vi.mock('../hooks/useTasks.ts', () => ({
+
+    useTasks: () => ({
+        tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 }],
+        updateTask: taskHookMocks.updateTask
+    })
+}))
+
+vi.mock('../hooks/useInvoiceTemplates.ts', () => ({
+
+    useInvoiceTemplates: () => ({
+        invoiceTemplates: [
+            {
+                id: 'tpl-1',
+                isDefault: true,
+                invoiceNumberFormat: 'INV-{year}{month}{day}-{sequential}',
+                useSequentialNumbers: true,
+                currentSequentialNumber: 1,
+                dueDateType: 'none'
+            }
+        ],
+        updateInvoiceTemplate: templateHookMocks.updateInvoiceTemplate
+    })
+}))
 
 vi.mock('../hooks/useToast.ts', () => ({
 
@@ -68,28 +140,13 @@ describe('InvoiceGenerator', () => {
 
     const baseProject = { id: 'project-1', title: 'Project', hourlyRate: 100, invoiceIds: [] }
     const baseClient = { id: 'client-1', clientName: 'Client', defaultCurrency: 'EUR' }
-    const baseTask = { id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 }
     const baseEntry = { taskId: 'task-1', start: 0, end: 3600000 }
-    const templates = [
-        {
-            id: 'tpl-1',
-            isDefault: true,
-            invoiceNumberFormat: 'INV-{year}{month}{day}-{sequential}',
-            useSequentialNumbers: true,
-            currentSequentialNumber: 1,
-            dueDateType: 'none'
-        }
-    ]
 
     const renderGenerator = (props = {}) => {
         return render(
             <InvoiceGenerator
                 project={baseProject}
                 client={baseClient}
-                projects={[baseProject]}
-                setProjects={vi.fn()}
-                tasks={[baseTask]}
-                setTasks={vi.fn()}
                 timeEntries={[baseEntry]}
                 currentTimer={null}
                 isPaused={false}
@@ -98,10 +155,6 @@ describe('InvoiceGenerator', () => {
                 paymentMethods={[]}
                 businessInfos={[]}
                 clients={[baseClient]}
-                invoices={[]}
-                setInvoices={vi.fn()}
-                invoiceTemplates={templates}
-                setInvoiceTemplates={vi.fn()}
                 showButton={true}
                 {...props}
             />
@@ -124,27 +177,26 @@ describe('InvoiceGenerator', () => {
     it('creates a new invoice using date override and client currency', async () => {
 
         modalConfig.applyDateOverride = true
-        const setInvoices = vi.fn()
+        invoiceHookMocks.createInvoice.mockClear()
         const user = userEvent.setup()
 
-        renderGenerator({ setInvoices })
+        renderGenerator()
 
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
 
         await user.click(await screen.findByRole('button', { name: 'Set Override' }))
         await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
 
-        expect(setInvoices).toHaveBeenCalledTimes(1)
-        const savedInvoices = setInvoices.mock.calls[0][0]
-        expect(savedInvoices).toHaveLength(1)
-        expect(savedInvoices[0].date).toBe('2026-01-10')
-        expect(savedInvoices[0].dateOverride).toBe('2026-01-10')
-        expect(savedInvoices[0].currency).toBe('EUR')
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.date).toBe('2026-01-10')
+        expect(invoiceData.dateOverride).toBe('2026-01-10')
+        expect(invoiceData.currency).toBe('EUR')
     })
 
     it('updates an existing invoice without changing id or number', async () => {
 
-        const setInvoices = vi.fn()
+        invoiceHookMocks.updateInvoice.mockClear()
         const user = userEvent.setup()
         const editingInvoice = {
             id: 'inv-1',
@@ -159,17 +211,14 @@ describe('InvoiceGenerator', () => {
         }
 
         renderGenerator({
-            editingInvoice,
-            invoices: [editingInvoice],
-            setInvoices
+            editingInvoice
         })
 
         await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
 
-        expect(setInvoices).toHaveBeenCalledTimes(1)
-        const savedInvoices = setInvoices.mock.calls[0][0]
-        expect(savedInvoices).toHaveLength(1)
-        expect(savedInvoices[0].id).toBe('inv-1')
-        expect(savedInvoices[0].invoiceNumber).toBe('INV-OLD')
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
+        const [invoiceId, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
+        expect(invoiceId).toBe('inv-1')
+        expect(invoiceData.invoiceNumber).toBe('INV-OLD')
     })
 })

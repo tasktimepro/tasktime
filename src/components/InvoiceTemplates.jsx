@@ -2,8 +2,8 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
+import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
-import { softDeleteById, isDeleted } from '../utils/syncableEntity.ts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,14 +20,13 @@ import {
  * InvoiceTemplates component - Manages invoice templates with customizable formats
  */
 const InvoiceTemplates = ({ 
-    invoiceTemplates = [], 
-    setInvoiceTemplates,
     autoOpenCreate = false,
     // Modal functions
     openTemplateModal = null,
     editTemplateModal = null
 }) => {
     const { showSuccess } = useToast();
+    const { invoiceTemplates, deleteInvoiceTemplate } = useInvoiceTemplates();
     const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
 
     // Auto-open create modal when autoOpenCreate prop changes
@@ -55,8 +54,7 @@ const InvoiceTemplates = ({
             return;
         }
 
-        const updatedTemplates = softDeleteById(invoiceTemplates, pendingDeleteTemplateId);
-        setInvoiceTemplates(updatedTemplates);
+        deleteInvoiceTemplate(pendingDeleteTemplateId);
         showSuccess('Template deleted successfully!');
         setPendingDeleteTemplateId(null);
     };
@@ -64,9 +62,6 @@ const InvoiceTemplates = ({
     const pendingDeleteTemplate = pendingDeleteTemplateId
         ? invoiceTemplates.find((template) => template.id === pendingDeleteTemplateId)
         : null;
-
-    // Filter out soft-deleted templates for display
-    const activeTemplates = useMemo(() => invoiceTemplates.filter(t => !isDeleted(t)), [invoiceTemplates]);
 
     // Generate a static timestamp for previews that only changes when component mounts
     const staticTimestamp = useMemo(() => Date.now().toString(), []);
@@ -139,14 +134,14 @@ const InvoiceTemplates = ({
         }
     }, [staticDate]);
 
-    // Sort templates - default first, then by name (using activeTemplates which excludes deleted)
+    // Sort templates - default first, then by name
     const sortedTemplates = useMemo(() => {
-        return [...activeTemplates].sort((a, b) => {
+        return [...invoiceTemplates].sort((a, b) => {
             if (a.isDefault && !b.isDefault) return -1;
             if (!a.isDefault && b.isDefault) return 1;
             return a.name.localeCompare(b.name);
         });
-    }, [activeTemplates]);
+    }, [invoiceTemplates]);
 
     return (
         <div className="space-y-6">

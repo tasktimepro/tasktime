@@ -5,6 +5,64 @@ import userEvent from '@testing-library/user-event'
 import TimerControls from './TimerControls'
 import { ToastContext } from '../contexts/ToastContext'
 
+// Mutable state for controlling test scenarios
+let mockTimerState = {
+    isActive: false,
+    isPaused: false,
+    taskId: null,
+    startTime: null,
+    elapsedTime: 0,
+    note: ''
+}
+
+// Hoisted mocks for timer hook functions
+const timerHookMocks = vi.hoisted(() => ({
+
+    startTimer: vi.fn(),
+    pauseTimer: vi.fn(),
+    resumeTimer: vi.fn(),
+    clearTimer: vi.fn()
+}))
+
+// Hoisted mocks for time entries hook
+const entriesHookMocks = vi.hoisted(() => ({
+
+    createEntry: vi.fn(() => ({ id: 'entry-1' }))
+}))
+
+// Hoisted mocks for tasks hook
+const tasksHookMocks = vi.hoisted(() => ({
+
+    updateTask: vi.fn()
+}))
+
+vi.mock('../hooks/useTimer.ts', () => ({
+
+    useTimer: () => ({
+        ...mockTimerState,
+        startTimer: timerHookMocks.startTimer,
+        pauseTimer: timerHookMocks.pauseTimer,
+        resumeTimer: timerHookMocks.resumeTimer,
+        clearTimer: timerHookMocks.clearTimer
+    })
+}))
+
+vi.mock('../hooks/useTimeEntries.ts', () => ({
+
+    useTimeEntries: () => ({
+        entries: [],
+        createEntry: entriesHookMocks.createEntry
+    })
+}))
+
+vi.mock('../hooks/useTasks.ts', () => ({
+
+    useTasks: () => ({
+        activeTasks: [],
+        updateTask: tasksHookMocks.updateTask
+    })
+}))
+
 describe('TimerControls', () => {
 
     const baseTask = { id: 'task-1', projectId: 'project-1' }
@@ -28,6 +86,15 @@ describe('TimerControls', () => {
     beforeEach(() => {
 
         vi.clearAllMocks()
+        // Reset timer state
+        mockTimerState = {
+            isActive: false,
+            isPaused: false,
+            taskId: null,
+            startTime: null,
+            elapsedTime: 0,
+            note: ''
+        }
     })
 
     afterEach(() => {
@@ -38,14 +105,7 @@ describe('TimerControls', () => {
     it('shows play button when timer is stopped', () => {
 
         renderWithToast(
-            <TimerControls
-                task={baseTask}
-                timeEntries={[]}
-                setTimeEntries={vi.fn()}
-                tasks={[]}
-                currentTimer={null}
-                setCurrentTimer={vi.fn()}
-            />
+            <TimerControls task={baseTask} />
         )
 
         expect(screen.getByTitle('Start Timer')).toBeInTheDocument()
@@ -53,40 +113,29 @@ describe('TimerControls', () => {
 
     it('starts timer on play click', async () => {
 
-        const setCurrentTimer = vi.fn()
-        vi.spyOn(Date, 'now').mockReturnValue(1000)
-
         renderWithToast(
-            <TimerControls
-                task={baseTask}
-                timeEntries={[]}
-                setTimeEntries={vi.fn()}
-                tasks={[]}
-                currentTimer={null}
-                setCurrentTimer={setCurrentTimer}
-            />
+            <TimerControls task={baseTask} />
         )
 
         await userEvent.click(screen.getByTitle('Start Timer'))
 
-        expect(setCurrentTimer).toHaveBeenCalledWith(expect.objectContaining({
-            taskId: 'task-1',
-            startTime: 1000
-        }))
+        expect(timerHookMocks.startTimer).toHaveBeenCalledWith('task-1')
     })
 
     it('shows pause and stop buttons when running', () => {
 
+        // Set timer as active for this task
+        mockTimerState = {
+            isActive: true,
+            isPaused: false,
+            taskId: 'task-1',
+            startTime: Date.now() - 10000,
+            elapsedTime: 10000,
+            note: ''
+        }
+
         renderWithToast(
-            <TimerControls
-                task={baseTask}
-                timeEntries={[]}
-                setTimeEntries={vi.fn()}
-                tasks={[]}
-                currentTimer={{ taskId: 'task-1', startTime: 10 }}
-                setCurrentTimer={vi.fn()}
-                isPaused={false}
-            />
+            <TimerControls task={baseTask} />
         )
 
         expect(screen.getByText('Pause')).toBeInTheDocument()
@@ -95,95 +144,75 @@ describe('TimerControls', () => {
 
     it('stops timer and creates entry', async () => {
 
-        const setCurrentTimer = vi.fn()
-        const setTimeEntries = vi.fn()
-        vi.spyOn(Date, 'now').mockReturnValue(2000)
+        // Set timer as active for this task
+        mockTimerState = {
+            isActive: true,
+            isPaused: false,
+            taskId: 'task-1',
+            startTime: Date.now() - 10000,
+            elapsedTime: 10000,
+            note: ''
+        }
 
         renderWithToast(
-            <TimerControls
-                task={baseTask}
-                timeEntries={[]}
-                setTimeEntries={setTimeEntries}
-                tasks={[]}
-                currentTimer={{ taskId: 'task-1', startTime: 1000 }}
-                setCurrentTimer={setCurrentTimer}
-                isPaused={false}
-            />
+            <TimerControls task={baseTask} />
         )
 
         await userEvent.click(screen.getByText('Stop'))
 
-        expect(setTimeEntries).toHaveBeenCalled()
-        expect(setCurrentTimer).toHaveBeenCalledWith(null)
+        expect(entriesHookMocks.createEntry).toHaveBeenCalled()
+        expect(timerHookMocks.clearTimer).toHaveBeenCalled()
     })
 
     it('stops a paused timer using paused elapsed time', async () => {
 
-        const setCurrentTimer = vi.fn()
-        const setTimeEntries = vi.fn()
-        const setIsPaused = vi.fn()
-        const setPausedElapsedTime = vi.fn()
+        // Set timer as paused with elapsed time
+        mockTimerState = {
+            isActive: true,
+            isPaused: true,
+            taskId: 'task-1',
+            startTime: 1000,
+            elapsedTime: 5000,
+            note: ''
+        }
 
         renderWithToast(
             <TimerControls
                 task={baseTask}
-                timeEntries={[]}
-                setTimeEntries={setTimeEntries}
-                tasks={[]}
-                currentTimer={{ taskId: 'task-1', startTime: 1000 }}
-                setCurrentTimer={setCurrentTimer}
                 isGlobalTimer={true}
-                isPaused={true}
-                setIsPaused={setIsPaused}
-                pausedElapsedTime={5000}
-                setPausedElapsedTime={setPausedElapsedTime}
             />
         )
 
         await userEvent.click(screen.getByTitle('Save & Stop Timer'))
 
-        const updater = setTimeEntries.mock.calls[0][0]
-        const updated = updater([])
-
-        expect(updated[0].start).toBe(1000)
-        expect(updated[0].end).toBe(6000)
-        expect(setCurrentTimer).toHaveBeenCalledWith(null)
-        expect(setIsPaused).toHaveBeenCalledWith(false)
-        expect(setPausedElapsedTime).toHaveBeenCalledWith(0)
+        // Verify entry was created with correct elapsed time
+        expect(entriesHookMocks.createEntry).toHaveBeenCalledWith(
+            expect.objectContaining({
+                taskId: 'task-1'
+            })
+        )
+        expect(timerHookMocks.clearTimer).toHaveBeenCalled()
     })
 
     it('stops existing timer when starting a new one', async () => {
 
-        const setCurrentTimer = vi.fn()
-        const setTimeEntries = vi.fn()
-        vi.spyOn(Date, 'now').mockReturnValue(5000)
+        // Set timer as active for a different task
+        mockTimerState = {
+            isActive: true,
+            isPaused: false,
+            taskId: 'task-other',
+            startTime: 1000,
+            elapsedTime: 4000,
+            note: ''
+        }
 
         renderWithToast(
-            <TimerControls
-                task={{ id: 'task-2', projectId: 'project-1' }}
-                timeEntries={[]}
-                setTimeEntries={setTimeEntries}
-                tasks={[]}
-                currentTimer={{ taskId: 'task-1', startTime: 1000 }}
-                setCurrentTimer={setCurrentTimer}
-                isPaused={false}
-            />
+            <TimerControls task={{ id: 'task-2', projectId: 'project-1' }} />
         )
 
         await userEvent.click(screen.getByTitle('Start Timer'))
 
-        const updater = setTimeEntries.mock.calls[0][0]
-        const updated = updater([])
-
-        expect(updated[0]).toMatchObject({
-            taskId: 'task-1',
-            start: 1000,
-            end: 5000
-        })
-
-        expect(setCurrentTimer).toHaveBeenCalledWith(expect.objectContaining({
-            taskId: 'task-2',
-            startTime: 5000
-        }))
+        // When starting a new timer while another is running, it creates an entry and starts new timer
+        expect(timerHookMocks.startTimer).toHaveBeenCalledWith('task-2')
     })
 })

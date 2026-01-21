@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
+import { useTimer } from '../hooks/useTimer.ts';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -26,9 +27,9 @@ function ExportImport({
     clients = [],
     invoiceTemplates = [],
     preferences = {},
-    currentTimer = null,
     onImport 
 }) {
+    const { isActive: isTimerActive } = useTimer();
     const [showImportModal, setShowImportModal] = useState(false);
     const [importData, setImportData] = useState('');
     const [importError, setImportError] = useState('');
@@ -305,7 +306,7 @@ function ExportImport({
                     )}
 
                     {/* Active Timer Warning */}
-                    {currentTimer && (
+                    {isTimerActive && (
                         <div className="flex items-start gap-2 p-3 bg-muted border border-border rounded-lg">
                             <ExclamationTriangleIcon className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                             <div className="text-sm text-foreground">

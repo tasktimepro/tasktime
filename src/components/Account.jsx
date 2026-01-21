@@ -11,7 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
 import { useToast } from '../hooks/useToast.ts';
-import SyncSettings from './sync/SyncSettings';
+import { useYjs } from '../contexts/YjsContext';
+import { usePreferences } from '../hooks/usePreferences.ts';
+import YjsSyncSettings from './sync/YjsSyncSettings';
 
 /**
  * Account component - Main account management page with side navigation
@@ -25,26 +27,15 @@ const Account = ({
     businessInfos,
     clients,
     invoiceTemplates,
-    preferences,
-    currentTimer,
     onImport,
-    setProjects,
-    setTasks,
-    setTimeEntries,
-    setInvoices,
-    setPaymentMethods,
-    setBusinessInfos,
-    setClients,
-    setInvoiceTemplates,
-    setPreferences,
-    setCurrentTimer
 }) => {
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
+    const { clearAllData } = useYjs();
+    const { preferences, updatePreferences } = usePreferences();
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [_showDeleteProjectsModal, _setShowDeleteProjectsModal] = useState(false);
-    const [_showDeleteInvoicesModal, _setShowDeleteInvoicesModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     
     // Define sections in order (first will be default)
     const sideNavItems = useMemo(() => [
@@ -90,55 +81,39 @@ const Account = ({
     };
 
     // Delete all account data function
-    const handleDeleteAllData = () => {
+    const handleDeleteAllData = async () => {
         if (deleteConfirmationText !== 'Delete') {
             showError('Please type "Delete" to confirm');
             return;
         }
 
-        // Clear all localStorage data
-        setProjects([]);
-        setTasks([]);
-        setTimeEntries([]);
-        setInvoices([]);
-        setPaymentMethods([]);
-        setBusinessInfos([]);
-        setClients([]);
-        setInvoiceTemplates([]);
-        setPreferences({});
-        setCurrentTimer(null);
-
-        // Close modal and reset state
-        setShowDeleteModal(false);
-        setDeleteConfirmationText('');
-        
-        showSuccess('All account data has been permanently deleted');
-    };
-
-    // Temporary delete all invoices function
-    const _handleDeleteAllInvoices = () => {
-        setInvoices([]);
-        _setShowDeleteInvoicesModal(false);
-        showSuccess('All invoices have been deleted');
-    };
-
-    // Temporary delete all projects & related data function
-    const _handleDeleteAllProjects = () => {
-        setProjects([]);
-        setTasks([]);
-        setTimeEntries([]);
-        setInvoices([]);
-        setCurrentTimer(null);
-        _setShowDeleteProjectsModal(false);
-        showSuccess('All projects, tasks, time entries, and invoices have been deleted');
+        setIsDeleting(true);
+        try {
+            // Clear all data via Yjs store
+            await clearAllData();
+            
+            // Close modal and reset state
+            setShowDeleteModal(false);
+            setDeleteConfirmationText('');
+            
+            showSuccess('All account data has been permanently deleted');
+            
+            // Reload the page to reinitialize the store
+            window.location.reload();
+        } catch (error) {
+            console.error('Failed to delete all data:', error);
+            showError('Failed to delete data. Please try again.');
+        } finally {
+            setIsDeleting(false);
+        }
     };
     
     const renderContent = () => {
         switch (activeTab) {
             case 'preferences':
-                return <Preferences preferences={preferences} setPreferences={setPreferences} />;
+                return <Preferences preferences={preferences} updatePreferences={updatePreferences} />;
             case 'sync':
-                return <SyncSettings />;
+                return <YjsSyncSettings />;
             case 'backup':
                 return (
                     <div>
@@ -158,7 +133,6 @@ const Account = ({
                             clients={clients}
                             invoiceTemplates={invoiceTemplates}
                             preferences={preferences}
-                            currentTimer={currentTimer}
                             onImport={onImport}
                         />
                     </div>
@@ -305,9 +279,9 @@ const Account = ({
                         <Button
                             variant="destructive"
                             onClick={handleDeleteAllData}
-                            disabled={deleteConfirmationText !== 'Delete'}
+                            disabled={deleteConfirmationText !== 'Delete' || isDeleting}
                         >
-                            Delete All Data
+                            {isDeleting ? 'Deleting...' : 'Delete All Data'}
                         </Button>
                     </div>
                 }
@@ -342,74 +316,6 @@ const Account = ({
                             placeholder="Type 'Delete' here"
                         />
                     </div>
-                </div>
-            </Modal>
-
-            {/* Delete All Projects & Related Data Modal - Uncommented for demonstration */}
-            <Modal
-                isOpen={_showDeleteProjectsModal}
-                onClose={() => _setShowDeleteProjectsModal(false)}
-                title="Delete All Projects & Related Data"
-                size="md"
-                footer={
-                    <div className="flex justify-end space-x-3">
-                        <Button
-                            variant="secondary"
-                            onClick={() => _setShowDeleteProjectsModal(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={_handleDeleteAllProjects}
-                        >
-                            Delete All Projects & Related Data
-                        </Button>
-                    </div>
-                }
-            >
-                <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                        Are you sure you want to delete all projects, tasks, time entries, and invoices? This action cannot be undone.
-                    </p>
-                    <Notice title="What will be deleted" showIcon={false}>
-                        <p>
-                            All projects ({projects.length}), all tasks ({tasks.length}), all time entries ({timeEntries.length}), and all invoices ({invoices.length}).
-                        </p>
-                        <p className="mt-1 text-muted-foreground">
-                            <strong>What will remain:</strong> Business info, clients, invoice templates, and payment methods.
-                        </p>
-                    </Notice>
-                </div>
-            </Modal>
-
-            {/* Delete All Invoices Modal - Uncommented for demonstration */}
-            <Modal
-                isOpen={_showDeleteInvoicesModal}
-                onClose={() => _setShowDeleteInvoicesModal(false)}
-                title="Delete All Invoices"
-                size="md"
-                footer={
-                    <div className="flex justify-end space-x-3">
-                        <Button
-                            variant="secondary"
-                            onClick={() => _setShowDeleteInvoicesModal(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={_handleDeleteAllInvoices}
-                        >
-                            Delete All Invoices
-                        </Button>
-                    </div>
-                }
-            >
-                <div className="space-y-4">
-                    <p className="text-sm text-foreground">
-                        Are you sure you want to delete all {invoices.length} invoices? This action cannot be undone.
-                    </p>
                 </div>
             </Modal>
         </div>

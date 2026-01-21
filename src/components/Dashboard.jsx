@@ -5,36 +5,34 @@ import {
     millisecondsToHours
 } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
+import { useTasks } from '../hooks/useTasks';
+import { useTimeEntries } from '../hooks/useTimeEntries';
+import { useTimer } from '../hooks/useTimer';
 import { THIRTY_DAYS_MS, ONE_HOUR_MS, ONE_MINUTE_MS } from '../constants/app';
 import useCurrencyConversion from './dashboard/hooks/useCurrencyConversion';
 import useMetricsCalculation from './dashboard/hooks/useMetricsCalculation';
 import MetricsCards from './dashboard/MetricsCards';
 import RecentTasks from './dashboard/RecentTasks';
 import ProjectsOverview from './dashboard/ProjectsOverview';
-import { isDeleted, withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
  */
 const Dashboard = ({
     projects = [],
-    tasks = [],
-    timeEntries = [],
     invoices = [],
     clients = [],
-    currentTimer,
-    setCurrentTimer,
-    setTasks,
     navigateToProject,
     navigateToClient,
-    navigateToInvoices,
-    setIsPaused,
-    setPausedElapsedTime,
-    isPaused,
-    pausedElapsedTime,
-    setTimeEntries
+    navigateToInvoices
 }) => {
     const { showWarning } = useToast();
+    
+    // Use Yjs hooks directly
+    const { tasks, updateTask } = useTasks();
+    const { entries: timeEntries, createEntry } = useTimeEntries();
+    const { isActive: isTimerActive, taskId: timerTaskId, isPaused, elapsedTime, startTime: timerStartTime, note: timerNote, stop: stopTimer } = useTimer();
+    
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
     const [completedInCurrentSession, setCompletedInCurrentSession] = useState(new Set());
@@ -132,11 +130,11 @@ const Dashboard = ({
      */
     const recentTasks = useMemo(() => {
         const activeTasks = tasks.filter(task =>
-            !isDeleted(task) && ((!task.completed && !task.archived) || completedInCurrentSession.has(task.id))
+            ((!task.completed && !task.archived) || completedInCurrentSession.has(task.id))
         );
 
         const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
-        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo && !isDeleted(entry));
+        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
 
         // Calculate task activity data
         const taskActivity = {};
@@ -154,19 +152,19 @@ const Dashboard = ({
         });
 
         // For currently running timer, calculate display time
-        if (currentTimer) {
-            if (!taskActivity[currentTimer.taskId]) {
-                taskActivity[currentTimer.taskId] = {
+        if (isTimerActive) {
+            if (!taskActivity[timerTaskId]) {
+                taskActivity[timerTaskId] = {
                     totalTime: 0
                 };
             }
 
             // Add current session time to total time (for display only)
-            const currentSessionTime = Date.now() - currentTimer.startTime;
+            const currentSessionTime = Date.now() - timerStartTime;
             if (!isPaused) {
-                taskActivity[currentTimer.taskId].totalTime += currentSessionTime;
+                taskActivity[timerTaskId].totalTime += currentSessionTime;
             } else {
-                taskActivity[currentTimer.taskId].totalTime += pausedElapsedTime;
+                taskActivity[timerTaskId].totalTime += elapsedTime;
             }
         }
 
@@ -204,10 +202,10 @@ const Dashboard = ({
         });
 
         // If a task has a running timer, make it appear at the top
-        if (currentTimer) {
+        if (isTimerActive) {
             const currentTime = Date.now();
             enhancedTasks.forEach(task => {
-                if (task.id === currentTimer.taskId) {
+                if (task.id === timerTaskId) {
                     task.lastActive = currentTime;
                 }
             });
@@ -229,20 +227,20 @@ const Dashboard = ({
         }
 
         return sortedTasks;
-    }, [tasks, timeEntries, projects, taskSearchQuery, completedInCurrentSession, currentTimer, isPaused, pausedElapsedTime]);
+    }, [tasks, timeEntries, projects, taskSearchQuery, completedInCurrentSession, isTimerActive, timerTaskId, isPaused, elapsedTime]);
 
     /**
      * Get recent projects with total time and pending billable amount
      */
     const recentProjects = useMemo(() => {
         const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
-        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo && !isDeleted(entry));
+        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
 
         // Group by project
         const projectActivity = {};
         recentEntries.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
-            if (!task || isDeleted(task)) return;
+            if (!task) return;
 
             if (!projectActivity[task.projectId]) {
                 projectActivity[task.projectId] = {
@@ -272,7 +270,7 @@ const Dashboard = ({
         });
 
         const projectsWithActivity = projects
-            .filter(project => !project.archived && !isDeleted(project)) // Exclude archived and deleted
+            .filter(project => !project.archived) // Exclude archived
             .map(project => {
                 // Use project activity if it exists, otherwise use defaults
                 const activity = projectActivity[project.id] || { totalTime: 0, lastActivity: 0, taskPendingTime: {} };
@@ -315,19 +313,6 @@ const Dashboard = ({
     }, [projects, tasks, timeEntries, projectSearchQuery, clients]);
 
     /**
-     * Create a time entry for the current timer session
-     */
-    const createTimeEntry = useCallback((taskId, startTime, endTime, note = undefined) => {
-        return withCreateMetadata({
-            id: `dashboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            taskId,
-            start: startTime,
-            end: endTime,
-            note: note
-        });
-    }, []);
-
-    /**
      * Toggle task completion status
      */
     const handleCompleteTask = useCallback((task) => {
@@ -354,36 +339,25 @@ const Dashboard = ({
         }
 
         // If timer is active for this task and we're completing it, stop the timer
-        if (newCompletedStatus && currentTimer?.taskId === task.id) {
+        if (newCompletedStatus && timerTaskId === task.id && isTimerActive) {
             // Create time entry with proper duration based on pause state
-            let timeEntry;
+            const endTime = isPaused && elapsedTime > 0
+                ? timerStartTime + elapsedTime
+                : now;
 
-            if (isPaused && pausedElapsedTime > 0) {
-                // For paused timer, use the elapsed time we already calculated
-                timeEntry = createTimeEntry(
-                    task.id,
-                    currentTimer.startTime,
-                    currentTimer.startTime + pausedElapsedTime,
-                    currentTimer.note
-                );
-            } else {
-                // For active timer, calculate duration from start to now
-                timeEntry = createTimeEntry(task.id, currentTimer.startTime, now, currentTimer.note);
-            }
+            createEntry({
+                taskId: task.id,
+                start: timerStartTime,
+                end: endTime,
+                note: timerNote
+            });
 
-            setTimeEntries(prev => [...prev, timeEntry]);
-            setCurrentTimer(null);
-            setIsPaused(false);
-            setPausedElapsedTime(0);
+            stopTimer();
         }
 
         // Update task completion status and lastActive timestamp
-        setTasks(prevTasks =>
-            prevTasks.map(t =>
-                t.id === task.id ? withUpdateMetadata({ ...t, completed: newCompletedStatus, lastActive: now }) : t
-            )
-        );
-    }, [currentTimer, isPaused, pausedElapsedTime, createTimeEntry, setTimeEntries, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTasks, setCompletedInCurrentSession]);
+        updateTask(task.id, { completed: newCompletedStatus, lastActive: now });
+    }, [isTimerActive, timerTaskId, isPaused, elapsedTime, timerStartTime, timerNote, createEntry, stopTimer, updateTask, setCompletedInCurrentSession]);
 
     /**
      * Handle clicking on task title to navigate to project
@@ -410,29 +384,19 @@ const Dashboard = ({
         if (task.completed) return null;
 
         // If timer is active for another task and this task should be disabled, don't render controls
-        if (shouldDisable && currentTimer && currentTimer.taskId !== task.id) {
+        if (shouldDisable && isTimerActive && timerTaskId !== task.id) {
             return null;
         }
 
         return (
             <TaskTimer
                 task={task}
-                timeEntries={timeEntries}
-                setTimeEntries={setTimeEntries}
-                tasks={tasks}
-                currentTimer={currentTimer}
-                setCurrentTimer={setCurrentTimer}
                 isGlobalTimer={true}
-                isPaused={isPaused}
-                setIsPaused={setIsPaused}
-                pausedElapsedTime={pausedElapsedTime}
-                setPausedElapsedTime={setPausedElapsedTime}
                 showTimeDisplay={false}
                 size="sm"
-                setTasks={setTasks}
             />
         );
-    }, [currentTimer, isPaused, pausedElapsedTime, setCurrentTimer, setIsPaused, setPausedElapsedTime, setTimeEntries, timeEntries, setTasks, tasks]);
+    }, [isTimerActive, timerTaskId]);
 
     /**
      * Render task title with navigation
@@ -491,8 +455,6 @@ const Dashboard = ({
                     recentTasks={recentTasks}
                     taskSearchQuery={taskSearchQuery}
                     setTaskSearchQuery={setTaskSearchQuery}
-                    currentTimer={currentTimer}
-                    isPaused={isPaused}
                     handleCompleteTask={handleCompleteTask}
                     renderTaskTitle={renderTaskTitle}
                     handleTaskTitleClick={handleTaskTitleClick}

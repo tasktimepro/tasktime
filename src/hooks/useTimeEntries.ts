@@ -1,0 +1,172 @@
+/**
+ * useTimeEntries - React hook for time entries (multi-doc aware)
+ * 
+ * Handles active entries and on-demand loading of historical entries by year
+ */
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useYjs } from '@/contexts/YjsContext';
+import type { TimeEntry } from '@/stores/yjs/types';
+import { generateId } from '@/utils/idUtils';
+
+export interface UseTimeEntriesOptions {
+    /** Filter to a specific task */
+    taskId?: string;
+    /** Start date filter (timestamp) */
+    startDate?: number;
+    /** End date filter (timestamp) */
+    endDate?: number;
+    /** Project ID to filter by (via tasks) */
+    projectId?: string;
+}
+
+export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
+    const { store, isReady, loadEntriesForYear, getAvailableYears } = useYjs();
+    
+    // State
+    const [entries, setEntries] = useState<TimeEntry[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [loadingYears, setLoadingYears] = useState<Set<number>>(new Set());
+    const [loadedYears, setLoadedYears] = useState<Set<number>>(new Set());
+
+    // Sync entries from store
+    const syncEntries = useCallback(() => {
+        if (!isReady) return;
+
+        const allEntries = store.getAllTimeEntries();
+        
+        // Apply filters
+        let filtered = allEntries;
+        
+        if (options.taskId) {
+            filtered = filtered.filter(e => e.taskId === options.taskId);
+        }
+        
+        if (options.startDate !== undefined) {
+            filtered = filtered.filter(e => e.start >= options.startDate!);
+        }
+        
+        if (options.endDate !== undefined) {
+            filtered = filtered.filter(e => e.start <= options.endDate!);
+        }
+        
+        // Sort by start time descending (most recent first)
+        filtered.sort((a, b) => b.start - a.start);
+        
+        setEntries(filtered);
+        setIsLoading(false);
+    }, [isReady, store, options.taskId, options.startDate, options.endDate]);
+
+    // Initial load and subscribe to active entries
+    useEffect(() => {
+        if (!isReady) return;
+
+        syncEntries();
+
+        // Subscribe to active entries
+        const handler = () => syncEntries();
+        store.activeTimeEntries.observe(handler);
+
+        return () => store.activeTimeEntries.unobserve(handler);
+    }, [isReady, store, syncEntries]);
+
+    // Auto-load years for date range
+    useEffect(() => {
+        if (!isReady || options.startDate === undefined || options.endDate === undefined) return;
+
+        const startYear = new Date(options.startDate).getFullYear();
+        const endYear = new Date(options.endDate).getFullYear();
+
+        for (let year = startYear; year <= endYear; year++) {
+            if (!store.isYearLoaded(year) && !loadingYears.has(year) && !loadedYears.has(year)) {
+                loadYear(year);
+            }
+        }
+    }, [isReady, options.startDate, options.endDate, store, loadingYears, loadedYears]);
+
+    // Load entries for a specific year
+    const loadYear = useCallback(async (year: number) => {
+        if (loadingYears.has(year) || loadedYears.has(year)) return;
+
+        setLoadingYears(prev => new Set(prev).add(year));
+        
+        try {
+            await loadEntriesForYear(year);
+            setLoadedYears(prev => new Set(prev).add(year));
+            syncEntries();
+        } finally {
+            setLoadingYears(prev => {
+                const next = new Set(prev);
+                next.delete(year);
+                return next;
+            });
+        }
+    }, [loadEntriesForYear, loadingYears, loadedYears, syncEntries]);
+
+    // CRUD operations
+    const createEntry = useCallback((data: Omit<TimeEntry, 'id'>): TimeEntry => {
+        if (!isReady) throw new Error('Store not ready');
+        
+        const entry: TimeEntry = {
+            id: generateId(),
+            ...data,
+        };
+        store.activeTimeEntries.set(entry.id, entry);
+        return entry;
+    }, [isReady, store]);
+
+    const updateEntry = useCallback((id: string, updates: Partial<TimeEntry>): TimeEntry | undefined => {
+        if (!isReady) return undefined;
+        
+        // Check active entries first
+        const activeEntry = store.activeTimeEntries.get(id);
+        if (activeEntry) {
+            const updated = { ...activeEntry, ...updates };
+            store.activeTimeEntries.set(id, updated);
+            return updated;
+        }
+        
+        // Note: Updating archived entries would require loading the year doc
+        // For now, we only support updating active entries
+        return undefined;
+    }, [isReady, store]);
+
+    const deleteEntry = useCallback((id: string): boolean => {
+        if (!isReady) return false;
+        return store.activeTimeEntries.delete(id);
+    }, [isReady, store]);
+
+    // Get entries for a specific task
+    const getEntriesForTask = useCallback((taskId: string): TimeEntry[] => {
+        return entries.filter(e => e.taskId === taskId);
+    }, [entries]);
+
+    // Get total time for a task
+    const getTotalTimeForTask = useCallback((taskId: string): number => {
+        return getEntriesForTask(taskId).reduce((sum, e) => sum + (e.end - e.start), 0);
+    }, [getEntriesForTask]);
+
+    // Stats
+    const totalTime = useMemo(() => {
+        return entries.reduce((sum, e) => sum + (e.end - e.start), 0);
+    }, [entries]);
+
+    return {
+        // Data
+        entries,
+        isLoading,
+        isLoadingMore: loadingYears.size > 0,
+        totalTime,
+        
+        // CRUD
+        createEntry,
+        updateEntry,
+        deleteEntry,
+        
+        // Helpers
+        getEntriesForTask,
+        getTotalTimeForTask,
+        loadYear,
+        getAvailableYears,
+    };
+}

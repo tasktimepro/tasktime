@@ -7,7 +7,6 @@ import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import { getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, formatDuration } from '../utils/dateUtils.ts';
-import { isDeleted } from '../utils/syncableEntity.ts';
 
 /**
  * ClientDashboard component - Main dashboard view for a selected client
@@ -50,16 +49,16 @@ const ClientDashboard = ({
         return projects.filter(project => project.preferredClientId === client.id);
     }, [projects, client.id]);
 
-    // Get tasks for client projects (excluding deleted tasks)
+    // Get tasks for client projects
     const clientTasks = useMemo(() => {
         const projectIds = clientProjects.map(p => p.id);
-        return tasks.filter(task => projectIds.includes(task.projectId) && !isDeleted(task));
+        return tasks.filter(task => projectIds.includes(task.projectId));
     }, [tasks, clientProjects]);
 
-    // Get time entries for client tasks (excluding deleted entries)
+    // Get time entries for client tasks
     const clientTimeEntries = useMemo(() => {
         const taskIds = clientTasks.map(t => t.id);
-        return timeEntries.filter(entry => taskIds.includes(entry.taskId) && !isDeleted(entry));
+        return timeEntries.filter(entry => taskIds.includes(entry.taskId));
     }, [timeEntries, clientTasks]);
 
     // Get invoices for this client (either project-specific or client-specific)
@@ -299,10 +298,6 @@ const ClientDashboard = ({
                 {/* Create Invoice Button */}
                 <InvoiceGenerator
                     client={client}
-                    projects={projects}
-                    setProjects={setProjects}
-                    tasks={clientTasks}
-                    setTasks={setTasks}
                     timeEntries={clientTimeEntries}
                     currentTimer={currentTimer}
                     isPaused={isPaused}
@@ -311,10 +306,6 @@ const ClientDashboard = ({
                     paymentMethods={paymentMethods}
                     businessInfos={businessInfos}
                     clients={clients}
-                    invoices={invoices}
-                    setInvoices={setInvoices}
-                    invoiceTemplates={invoiceTemplates}
-                    setInvoiceTemplates={setInvoiceTemplates}
                     showButton={true}
                     // Modal functions
                     openClientModal={openClientModal}
@@ -520,7 +511,6 @@ const ClientDashboard = ({
                         businessInfos={businessInfos}
                         clients={clients}
                         hideNewInvoiceButton={true}
-                        setInvoices={setInvoices}
                         invoiceTemplates={invoiceTemplates}
                     />
                 </CardContent>

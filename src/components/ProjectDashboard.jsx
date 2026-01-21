@@ -9,7 +9,6 @@ import InvoicesList from './InvoicesList';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { isDeleted } from '../utils/syncableEntity.ts';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -65,14 +64,14 @@ const ProjectDashboard = ({
         setEditingInvoice(invoice);
     };
     
-    // Get tasks for this project (excluding deleted tasks)
-    const projectTasks = tasks.filter(task => task.projectId === project.id && !isDeleted(task));
+    // Get tasks for this project
+    const projectTasks = tasks.filter(task => task.projectId === project.id);
 
     // Get time entries for this project's tasks
     const projectTaskIds = projectTasks.map(task => task.id);
 
     const projectTimeEntries = timeEntries.filter(entry => 
-        projectTaskIds.includes(entry.taskId) && !isDeleted(entry)
+        projectTaskIds.includes(entry.taskId)
     );
 
     // Count visible tasks (not completed and not archived, including both parent tasks and subtasks)
@@ -190,20 +189,12 @@ const ProjectDashboard = ({
                 {!project.isPersonal && (
                     <InvoiceGenerator
                         project={project}
-                        projects={projects}
-                        setProjects={setProjects}
-                        tasks={projectTasks}
-                        setTasks={setTasks}
                         timeEntries={projectTimeEntries}
                         currentTimer={currentTimer}
                         isPaused={isPaused}
                         paymentMethods={paymentMethods}
                         businessInfos={businessInfos}
                         clients={clients}
-                        invoices={invoices}
-                        setInvoices={setInvoices}
-                        invoiceTemplates={invoiceTemplates}
-                        setInvoiceTemplates={setInvoiceTemplates}
                         // Modal functions
                         openClientModal={openClientModal}
                         openProjectModal={openProjectModal}
@@ -316,17 +307,6 @@ const ProjectDashboard = ({
                 <CardContent>
                     <TaskTree
                         project={project}
-                        tasks={tasks}
-                        setTasks={setTasks}
-                        timeEntries={timeEntries}
-                        setTimeEntries={setTimeEntries}
-                        currentTimer={currentTimer}
-                        setCurrentTimer={setCurrentTimer}
-                        isPaused={isPaused}
-                        setIsPaused={setIsPaused}
-                        pausedElapsedTime={pausedElapsedTime}
-                        setPausedElapsedTime={setPausedElapsedTime}
-                        isGlobalTimer={true}
                     />
                 </CardContent>
             </Card>
@@ -342,10 +322,6 @@ const ProjectDashboard = ({
                             
                             <InvoiceGenerator
                                 project={project}
-                                projects={projects}
-                                setProjects={setProjects}
-                                tasks={projectTasks}
-                                setTasks={setTasks}
                                 timeEntries={projectTimeEntries}
                                 currentTimer={currentTimer}
                                 isPaused={isPaused}
@@ -354,10 +330,6 @@ const ProjectDashboard = ({
                                 paymentMethods={paymentMethods}
                                 businessInfos={businessInfos}
                                 clients={clients}
-                                invoices={invoices}
-                                setInvoices={setInvoices}
-                                invoiceTemplates={invoiceTemplates}
-                                setInvoiceTemplates={setInvoiceTemplates}
                                 // Modal functions
                                 openClientModal={openClientModal}
                                 openProjectModal={openProjectModal}
@@ -376,7 +348,6 @@ const ProjectDashboard = ({
                             businessInfos={businessInfos}
                             clients={clients}
                             hideNewInvoiceButton={true}
-                            setInvoices={setInvoices}
                             invoiceTemplates={invoiceTemplates}
                         />
                     </CardContent>

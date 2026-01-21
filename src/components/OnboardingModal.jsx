@@ -6,9 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ChartBarIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, DocumentTextIcon, RocketLaunchIcon } from '@/components/ui/icons';
 import Modal from './Modal';
 import { useToast } from '../hooks/useToast.ts';
-import { generateId } from '../utils/idUtils.ts';
+import { useProjects } from '../hooks/useProjects.ts';
+import { useTasks } from '../hooks/useTasks.ts';
 import { CURRENCY_NAMES, CURRENCY_SYMBOLS, getPreferredCurrency } from '../utils/currencyUtils.ts';
-import { withCreateMetadata } from '../utils/syncableEntity.ts';
 
 const CURRENCY_OPTIONS = Object.keys(CURRENCY_NAMES);
 
@@ -17,17 +17,15 @@ const CURRENCY_OPTIONS = Object.keys(CURRENCY_NAMES);
  * @param {Object} props
  * @param {boolean} props.isOpen
  * @param {Function} props.onComplete
- * @param {Function} props.onCreateProject
- * @param {Function} props.onCreateTask
  */
 const OnboardingModal = ({
     isOpen,
-    onComplete,
-    onCreateProject,
-    onCreateTask
+    onComplete
 }) => {
 
     const { showSuccess, showWarning, showError } = useToast();
+    const { createProject } = useProjects();
+    const { createTask } = useTasks();
 
     const [currentSlide, setCurrentSlide] = useState(0);
     const [createdProjectId, setCreatedProjectId] = useState(null);
@@ -357,8 +355,7 @@ const OnboardingModal = ({
                 return;
             }
             
-            const newProject = withCreateMetadata({
-                id: generateId(),
+            const newProject = createProject({
                 title: projectFormData.title,
                 hourlyRate: projectFormData.hourlyRate ? parseFloat(projectFormData.hourlyRate) : null,
                 currency: projectFormData.currency,
@@ -367,7 +364,6 @@ const OnboardingModal = ({
                 isPersonal: false
             });
             
-            onCreateProject(newProject);
             setCreatedProjectId(newProject.id);
             showSuccess('Project created successfully!');
         } else if (currentSlide === 2) {
@@ -381,8 +377,7 @@ const OnboardingModal = ({
                 return;
             }
             
-            const newTask = withCreateMetadata({
-                id: generateId(),
+            createTask({
                 title: taskFormData.title,
                 projectId: createdProjectId,
                 completed: false,
@@ -390,7 +385,6 @@ const OnboardingModal = ({
                 billable: true
             });
             
-            onCreateTask(newTask);
             showSuccess('Task created successfully!');
         }
         

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../Modal';
 import { PlusIcon } from '@/components/ui/icons';
 import { useToast } from '../../hooks/useToast.ts';
+import { useInvoiceTemplates } from '../../hooks/useInvoiceTemplates.ts';
 import { toDisplayDate } from '../../utils/dateUtils.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,11 +16,10 @@ import CustomCheckbox from '../CustomCheckbox';
 const TemplateModal = ({
     isOpen,
     onClose,
-    invoiceTemplates,
-    setInvoiceTemplates,
     editingTemplate = null
 }) => {
     const { showSuccess, showError } = useToast();
+    const { invoiceTemplates, createInvoiceTemplate, updateInvoiceTemplate, setDefault } = useInvoiceTemplates();
     
     const [formData, setFormData] = useState({
         name: '',
@@ -190,37 +190,39 @@ const TemplateModal = ({
             return;
         }
 
-        const templateData = {
-            ...formData,
-            id: editingTemplate ? editingTemplate.id : `template-${Date.now()}`,
-            createdAt: editingTemplate ? editingTemplate.createdAt : Date.now(),
-            updatedAt: Date.now(),
-            name: formData.name.trim(),
-            currentSequentialNumber: editingTemplate ? editingTemplate.currentSequentialNumber : formData.sequentialNumberStart,
-            lastSequentialYear: editingTemplate ? editingTemplate.lastSequentialYear : null
-        };
-
-        let updatedTemplates;
         if (editingTemplate) {
             // Update existing template
-            updatedTemplates = invoiceTemplates.map(t => 
-                t.id === editingTemplate.id ? templateData : t
-            );
+            updateInvoiceTemplate(editingTemplate.id, {
+                ...formData,
+                name: formData.name.trim(),
+                currentSequentialNumber: editingTemplate.currentSequentialNumber || formData.sequentialNumberStart,
+                lastSequentialYear: editingTemplate.lastSequentialYear || null
+            });
+
+            // If this template is set as default, remove default from others
+            if (formData.isDefault) {
+                setDefault(editingTemplate.id);
+            }
+
+            showSuccess('Template updated successfully!');
         } else {
             // Add new template
-            updatedTemplates = [...invoiceTemplates, templateData];
+            const newTemplate = createInvoiceTemplate({
+                id: `template-${Date.now()}`,
+                ...formData,
+                name: formData.name.trim(),
+                currentSequentialNumber: formData.sequentialNumberStart,
+                lastSequentialYear: null
+            });
+
+            // If this template is set as default, remove default from others
+            if (formData.isDefault) {
+                setDefault(newTemplate.id);
+            }
+
+            showSuccess('Template created successfully!');
         }
 
-        // If this template is set as default, remove default from others
-        if (formData.isDefault) {
-            updatedTemplates = updatedTemplates.map(t => ({
-                ...t,
-                isDefault: t.id === templateData.id
-            }));
-        }
-
-        setInvoiceTemplates(updatedTemplates);
-        showSuccess(editingTemplate ? 'Template updated successfully!' : 'Template created successfully!');
         onClose();
     };
 

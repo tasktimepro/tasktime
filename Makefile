@@ -89,3 +89,69 @@ npm:
 		exit 1; \
 	fi
 	docker compose run --rm app npm $(CMD)
+
+# ============================================================================
+# Cloudflare Worker Commands
+# ============================================================================
+# Set CLOUDFLARE_API_TOKEN in your environment or .env file
+# Create token at: https://dash.cloudflare.com/profile/api-tokens
+# Required permissions: Workers Scripts (Edit), Workers KV Storage (Edit), Account Settings (Read)
+
+# Create KV namespaces (run once)
+worker-kv-create:
+	@if [ -z "$(CLOUDFLARE_API_TOKEN)" ]; then \
+		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
+		echo "Create token at: https://dash.cloudflare.com/profile/api-tokens"; \
+		exit 1; \
+	fi
+	cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+		-e CLOUDFLARE_API_TOKEN=$(CLOUDFLARE_API_TOKEN) \
+		node:20-alpine npx wrangler kv:namespace create SESSIONS
+	@echo ""
+	@echo "Copy the ID above and update cloudflare/wrangler.toml"
+	@echo "Then run: make worker-kv-create-preview"
+
+worker-kv-create-preview:
+	@if [ -z "$(CLOUDFLARE_API_TOKEN)" ]; then \
+		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
+		exit 1; \
+	fi
+	cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+		-e CLOUDFLARE_API_TOKEN=$(CLOUDFLARE_API_TOKEN) \
+		node:20-alpine npx wrangler kv:namespace create SESSIONS --preview
+	@echo ""
+	@echo "Copy the preview_id above and update cloudflare/wrangler.toml"
+
+# Set a secret (usage: make worker-secret NAME=GOOGLE_CLIENT_ID VALUE=xxx)
+worker-secret:
+	@if [ -z "$(CLOUDFLARE_API_TOKEN)" ]; then \
+		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
+		exit 1; \
+	fi
+	@if [ -z "$(NAME)" ] || [ -z "$(VALUE)" ]; then \
+		echo "Usage: make worker-secret NAME=<secret-name> VALUE=<secret-value>"; \
+		exit 1; \
+	fi
+	cd cloudflare && echo "$(VALUE)" | docker run --rm -i -v "$$(pwd):/app" -w /app \
+		-e CLOUDFLARE_API_TOKEN=$(CLOUDFLARE_API_TOKEN) \
+		node:20-alpine npx wrangler secret put $(NAME)
+
+# Deploy the worker
+worker-deploy:
+	@if [ -z "$(CLOUDFLARE_API_TOKEN)" ]; then \
+		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
+		exit 1; \
+	fi
+	cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+		-e CLOUDFLARE_API_TOKEN=$(CLOUDFLARE_API_TOKEN) \
+		node:20-alpine npx wrangler deploy
+
+# View worker logs
+worker-logs:
+	@if [ -z "$(CLOUDFLARE_API_TOKEN)" ]; then \
+		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
+		exit 1; \
+	fi
+	cd cloudflare && docker run --rm -it -v "$$(pwd):/app" -w /app \
+		-e CLOUDFLARE_API_TOKEN=$(CLOUDFLARE_API_TOKEN) \
+		node:20-alpine npx wrangler tail

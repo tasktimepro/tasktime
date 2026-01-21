@@ -1,27 +1,19 @@
 import SubtaskItem from './SubtaskItem';
 import SubtaskCreateForm from './SubtaskCreateForm';
-import { deleteTaskWithCleanup } from '../../../utils/taskUtils.ts';
+import { useTasks } from '../../../hooks/useTasks';
+import { useTimeEntries } from '../../../hooks/useTimeEntries';
+import { useTimer } from '../../../hooks/useTimer';
+import { getTaskIdsToDelete } from '../../../utils/taskUtils.ts';
 
 /**
  * SubtaskSection component - Renders subtasks list and create form.
+ * Uses Yjs hooks directly for state management.
  * @param {Object} props
  */
 const SubtaskSection = ({
     subtasks,
     task,
-    tasks,
-    setTasks,
-    timeEntries,
-    setTimeEntries,
-    currentTimer,
-    setCurrentTimer,
-    isPaused,
-    setIsPaused,
-    pausedElapsedTime,
-    setPausedElapsedTime,
-    isGlobalTimer,
     onToggleBillable,
-    allTasks,
     onCreateSubtask,
     showCreateSubtaskForm,
     setShowCreateSubtaskForm,
@@ -34,9 +26,35 @@ const SubtaskSection = ({
     isRelatedToActiveTimer,
     showSuccess
 }) => {
+    // Yjs hooks for state
+    const { tasks, deleteTask } = useTasks();
+    const { entries: timeEntries, deleteEntry } = useTimeEntries();
+    const { isPaused, taskId: activeTimerTaskId, clearTimer } = useTimer();
+    
     if (isArchived || (subtasks.length === 0 && !onCreateSubtask)) {
         return null;
     }
+
+    /**
+     * Handle subtask deletion with cleanup
+     */
+    const handleDeleteSubtask = (subtaskId, subtaskTitle) => {
+        if (window.confirm('Are you sure you want to delete this subtask?')) {
+            // Delete time entries for this subtask
+            const entriesToDelete = timeEntries.filter(e => e.taskId === subtaskId);
+            entriesToDelete.forEach(e => deleteEntry(e.id));
+            
+            // Clear timer if active on this subtask
+            if (activeTimerTaskId === subtaskId) {
+                clearTimer();
+            }
+            
+            // Delete the subtask
+            deleteTask(subtaskId);
+            
+            showSuccess(`Subtask "${subtaskTitle}" deleted successfully`);
+        }
+    };
 
     return (
         <div className="border-t border-border bg-muted/40 rounded-b-lg">
@@ -45,34 +63,8 @@ const SubtaskSection = ({
                     <SubtaskItem
                         key={subtask.id}
                         task={subtask}
-                        tasks={tasks}
-                        setTasks={setTasks}
-                        timeEntries={timeEntries}
-                        setTimeEntries={setTimeEntries}
-                        currentTimer={currentTimer}
-                        setCurrentTimer={setCurrentTimer}
-                        isPaused={isPaused}
-                        setIsPaused={setIsPaused}
-                        pausedElapsedTime={pausedElapsedTime}
-                        setPausedElapsedTime={setPausedElapsedTime}
-                        isGlobalTimer={isGlobalTimer}
                         onToggleBillable={onToggleBillable}
-                        allTasks={allTasks}
-                        onDelete={() => {
-                            if (window.confirm('Are you sure you want to delete this subtask?')) {
-                                const result = deleteTaskWithCleanup(
-                                    subtask.id,
-                                    tasks,
-                                    timeEntries,
-                                    currentTimer,
-                                    setTasks,
-                                    setTimeEntries,
-                                    setCurrentTimer
-                                );
-
-                                showSuccess(`Subtask "${result.taskTitle}" deleted successfully`);
-                            }
-                        }}
+                        onDelete={() => handleDeleteSubtask(subtask.id, subtask.title)}
                     />
                 ))}
 

@@ -2,26 +2,16 @@ import { ArchiveBoxIcon, ArchiveRestoreIcon, ClockIcon, CurrencyDollarIcon, Tras
 import { Button } from '@/components/ui/button';
 import TaskTimer from '../../TaskTimer';
 import TaskDropdown from './TaskDropdown';
+import { useTimer } from '../../../hooks/useTimer';
 
 /**
  * TaskActions component - Right-side action buttons and timer controls.
+ * Now uses Yjs hooks directly for timer state.
  * @param {Object} props
  */
 const TaskActions = ({
     task,
-    tasks,
-    timeEntries,
-    setTimeEntries,
-    currentTimer,
-    setCurrentTimer,
-    isPaused,
-    setIsPaused,
-    pausedElapsedTime,
-    setPausedElapsedTime,
-    isGlobalTimer,
-    setTasks,
     isEditing,
-    isTimerActive,
     anyTimerActive,
     isArchived,
     isCompleted,
@@ -33,6 +23,10 @@ const TaskActions = ({
     onShowTimeEntries,
     onEdit
 }) => {
+    // Use Yjs timer hook directly
+    const { isActive, isPaused, taskId } = useTimer();
+    const isTimerActive = isActive && taskId === task.id;
+    
     if (isEditing) {
         return null;
     }
@@ -42,18 +36,7 @@ const TaskActions = ({
             {isTimerActive && !isPaused ? (
                 <TaskTimer
                     task={task}
-                    timeEntries={timeEntries}
-                    setTimeEntries={setTimeEntries}
-                    tasks={tasks}
-                    currentTimer={currentTimer}
-                    setCurrentTimer={setCurrentTimer}
-                    isPaused={isPaused}
-                    setIsPaused={setIsPaused}
-                    pausedElapsedTime={pausedElapsedTime}
-                    setPausedElapsedTime={setPausedElapsedTime}
-                    isGlobalTimer={isGlobalTimer}
                     showTimeDisplay={false}
-                    setTasks={setTasks}
                 />
             ) : isArchived ? (
                 <div className="flex items-center space-x-2">
@@ -100,18 +83,7 @@ const TaskActions = ({
                 <>
                     <TaskTimer
                         task={task}
-                        timeEntries={timeEntries}
-                        setTimeEntries={setTimeEntries}
-                        tasks={tasks}
-                        currentTimer={currentTimer}
-                        setCurrentTimer={setCurrentTimer}
-                        isPaused={isPaused}
-                        setIsPaused={setIsPaused}
-                        pausedElapsedTime={pausedElapsedTime}
-                        setPausedElapsedTime={setPausedElapsedTime}
-                        isGlobalTimer={isGlobalTimer}
                         showTimeDisplay={false}
-                        setTasks={setTasks}
                     />
 
                     <Button

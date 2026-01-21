@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { useState } from 'react';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
@@ -17,23 +16,17 @@ import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts
 import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
-import { softDeleteById, softDeleteByIds, isDeleted, withUpdateMetadata } from '../utils/syncableEntity.ts';
+import { useProjects } from '../hooks/useProjects.ts';
+import { useTasks } from '../hooks/useTasks.ts';
+import { useTimeEntries } from '../hooks/useTimeEntries.ts';
+import { useInvoices } from '../hooks/useInvoices.ts';
+import { useTimer } from '../hooks/useTimer.ts';
 
 /**
  * ProjectList component - Displays and manages the list of projects
  */
 const ProjectList = ({ 
-    projects, 
-    setProjects, 
-    tasks = [], 
-    setTasks, 
-    timeEntries = [], 
-    setTimeEntries, 
-    currentTimer, 
-    setCurrentTimer, 
     onSelectProject,
-    invoices = [],
-    setInvoices,
     clients = [],
     openProjectModal,
     editProjectModal
@@ -42,6 +35,13 @@ const ProjectList = ({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState(null);
     const { showSuccess } = useToast();
+    
+    // Yjs hooks for data access
+    const { projects, updateProject, deleteProject } = useProjects();
+    const { tasks, deleteTask } = useTasks();
+    const { entries: timeEntries, deleteEntry } = useTimeEntries();
+    const { deleteInvoice } = useInvoices();
+    const { timerState, clearTimer } = useTimer();
 
     // Update showCreateForm when the prop changes - Removed since using modal manager
 
@@ -73,7 +73,7 @@ const ProjectList = ({
     /**
      * Perform the actual project deletion
      */
-    const performProjectDeletion = (projectId, deleteInvoices = false) => {
+    const performProjectDeletion = (projectId, shouldDeleteInvoices = false) => {
         // Get all task IDs that need to be deleted (including subtasks)
         const projectTasks = tasks.filter(task => task.projectId === projectId && !task.deletedAt);
         const allTaskIdsToDelete = new Set();
@@ -87,32 +87,29 @@ const ProjectList = ({
         const taskIdsArray = Array.from(allTaskIdsToDelete);
 
         // Check if current timer is running on any task that will be deleted
-        if (currentTimer && allTaskIdsToDelete.has(currentTimer.taskId)) {
-            setCurrentTimer(null);
+        if (timerState.taskId && allTaskIdsToDelete.has(timerState.taskId)) {
+            clearTimer();
         }
 
-        // If deleteInvoices is true, soft-delete associated invoices
-        if (deleteInvoices) {
+        // If shouldDeleteInvoices is true, delete associated invoices
+        if (shouldDeleteInvoices) {
             const project = projects.find(p => p.id === projectId);
             if (project && project.invoiceIds && project.invoiceIds.length > 0) {
-                const updatedInvoices = softDeleteByIds(invoices, project.invoiceIds);
-                setInvoices(updatedInvoices);
+                project.invoiceIds.forEach(invoiceId => deleteInvoice(invoiceId));
             }
         }
 
-        // Soft-delete the project
-        setProjects(softDeleteById(projects, projectId));
+        // Delete the project
+        deleteProject(projectId);
         
-        // Soft-delete all tasks for this project (including subtasks)
-        const updatedTasks = softDeleteByIds(tasks, taskIdsArray);
-        setTasks(updatedTasks);
+        // Delete all tasks for this project (including subtasks)
+        taskIdsArray.forEach(taskId => deleteTask(taskId));
         
-        // Soft-delete all time entries for deleted tasks
+        // Delete all time entries for deleted tasks
         const timeEntryIdsToDelete = timeEntries
             .filter(entry => allTaskIdsToDelete.has(entry.taskId))
             .map(entry => entry.id);
-        const updatedTimeEntries = softDeleteByIds(timeEntries, timeEntryIdsToDelete);
-        setTimeEntries(updatedTimeEntries);
+        timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
         
         const deletedTaskCount = allTaskIdsToDelete.size;
         const deletedTimeEntriesCount = timeEntryIdsToDelete.length;
@@ -121,7 +118,7 @@ const ProjectList = ({
 
         // Show appropriate success message
         const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
-        const invoiceMessage = deleteInvoices ? ' Associated invoices were also deleted.' : '';
+        const invoiceMessage = shouldDeleteInvoices ? ' Associated invoices were also deleted.' : '';
         showSuccess(baseMessage + invoiceMessage);
     };
 
@@ -129,10 +126,7 @@ const ProjectList = ({
      * Archive a project
      */
     const handleArchiveProject = (projectId) => {
-        const updatedProjects = projects.map(project =>
-            project.id === projectId ? withUpdateMetadata({ ...project, archived: true }) : project
-        );
-        setProjects(updatedProjects);
+        updateProject(projectId, { archived: true });
         showSuccess('Project archived successfully!');
     };
 
@@ -140,10 +134,7 @@ const ProjectList = ({
      * Unarchive a project
      */
     const handleUnarchiveProject = (projectId) => {
-        const updatedProjects = projects.map(project =>
-            project.id === projectId ? withUpdateMetadata({ ...project, archived: false }) : project
-        );
-        setProjects(updatedProjects);
+        updateProject(projectId, { archived: false });
         showSuccess('Project unarchived successfully!');
     };
 
@@ -154,8 +145,8 @@ const ProjectList = ({
         // If it's a flat rate project or no hourly rate is set, return 0 for the amount
         if (project.flatRate || !project.hourlyRate) return 0;
         
-        // Get tasks for this project (excluding deleted tasks)
-        const projectTasks = tasks.filter(task => task.projectId === project.id && !isDeleted(task));
+        // Get tasks for this project
+        const projectTasks = tasks.filter(task => task.projectId === project.id);
         
         // Get explicitly billable tasks (tasks with billable === true)
         const billableTasks = projectTasks.filter(task => task.billable === true);
@@ -163,9 +154,6 @@ const ProjectList = ({
         
         // Get time entries for this project's tasks with task-level billing filtering
         const unbilledEntries = timeEntries.filter(entry => {
-            // Skip deleted entries
-            if (isDeleted(entry)) return false;
-            
             // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
             
@@ -204,8 +192,8 @@ const ProjectList = ({
      * Calculate unbilled hours for a project (without rate requirement)
      */
     const calculateUnbilledHours = (project) => {
-        // Get tasks for this project (excluding deleted tasks)
-        const projectTasks = tasks.filter(task => task.projectId === project.id && !isDeleted(task));
+        // Get tasks for this project
+        const projectTasks = tasks.filter(task => task.projectId === project.id);
         
         // Get explicitly billable tasks (tasks with billable === true)
         const billableTasks = projectTasks.filter(task => task.billable === true);
@@ -213,9 +201,6 @@ const ProjectList = ({
         
         // Get time entries for this project's tasks with task-level billing filtering
         const unbilledEntries = timeEntries.filter(entry => {
-            // Skip deleted entries
-            if (isDeleted(entry)) return false;
-            
             // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
             
@@ -335,9 +320,9 @@ const ProjectList = ({
             ) : (
                 <>
                     {/* Active Projects */}
-                    {projects.filter(p => !p.archived && !isDeleted(p)).length > 0 && (
+                    {projects.filter(p => !p.archived).length > 0 && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {projects.filter(p => !p.archived && !isDeleted(p)).map((project) => (
+                            {projects.filter(p => !p.archived).map((project) => (
                         <Card
                             key={project.id}
                             className="hover:shadow-md transition-shadow cursor-pointer relative"
@@ -448,12 +433,12 @@ const ProjectList = ({
                                 ) : (
                                     <ChevronRightIcon className="h-4 w-4 mr-1" />
                                 )}
-                                Archived Projects ({projects.filter(p => p.archived && !isDeleted(p)).length})
+                                Archived Projects ({projects.filter(p => p.archived).length})
                             </button>
 
                             {showArchivedProjects && (
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {projects.filter(p => p.archived && !isDeleted(p)).map((project) => (
+                                    {projects.filter(p => p.archived).map((project) => (
                                         <Card
                                             key={project.id}
                                             className="hover:shadow-md transition-shadow cursor-pointer relative"

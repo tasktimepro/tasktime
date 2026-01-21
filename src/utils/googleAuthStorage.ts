@@ -6,10 +6,22 @@ interface StoredToken {
     scope?: string;
 }
 
+/**
+ * Session storage for Worker-based auth
+ * The session ID is a reference to server-side tokens
+ */
+interface StoredSession {
+    sessionId: string;
+    userId: string;
+    email: string;
+    createdAt: string;
+}
+
 const DB_NAME = 'tasktime-db';
 const DB_VERSION = 1;
 const STORE_NAME = 'app-data';
 const TOKEN_KEY = 'google-auth-token';
+const SESSION_KEY = 'google-auth-session';
 const EXPIRY_BUFFER_MS = 60_000;
 
 const getDB = () => {
@@ -89,4 +101,50 @@ export const getTokenTimeRemaining = (token: StoredToken | null): number => {
     return Math.max(0, remaining);
 };
 
-export type { StoredToken };
+// ============================================================================
+// Session Storage (for Worker-based auth)
+// ============================================================================
+
+export const getStoredSession = async (): Promise<StoredSession | null> => {
+
+    try {
+
+        const db = await getDB();
+        const session = await db.get(STORE_NAME, SESSION_KEY) as StoredSession | undefined;
+
+        return session ?? null;
+
+    } catch (error) {
+
+        console.error('Error loading session from IndexedDB:', error);
+        return null;
+    }
+};
+
+export const storeSession = async (session: StoredSession): Promise<void> => {
+
+    try {
+
+        const db = await getDB();
+        await db.put(STORE_NAME, session, SESSION_KEY);
+
+    } catch (error) {
+
+        console.error('Error saving session to IndexedDB:', error);
+    }
+};
+
+export const clearStoredSession = async (): Promise<void> => {
+
+    try {
+
+        const db = await getDB();
+        await db.delete(STORE_NAME, SESSION_KEY);
+
+    } catch (error) {
+
+        console.error('Error clearing session from IndexedDB:', error);
+    }
+};
+
+export type { StoredToken, StoredSession };

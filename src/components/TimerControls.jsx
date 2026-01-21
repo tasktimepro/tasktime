@@ -1,68 +1,63 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { PlayIcon, PauseIcon, StopIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
-import { generateId } from '../utils/idUtils.ts';
 import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
+import { useTimer } from '../hooks/useTimer.ts';
+import { useTimeEntries } from '../hooks/useTimeEntries.ts';
+import { useTasks } from '../hooks/useTasks.ts';
 
 /**
- * TimerControls component - Handles task timer functionality
+ * TimerControls component - Handles task timer functionality using Yjs hooks directly
+ * 
  * @param {Object} props - Component props
- * @param {Object} props.task - Task object
- * @param {Array} props.timeEntries - All time entries for validation
- * @param {Function} props.setTimeEntries - Function to update time entries
- * @param {Array} props.tasks - All tasks for overlap validation
- * @param {Object} props.currentTimer - Current active timer
- * @param {Function} props.setCurrentTimer - Function to update current timer
+ * @param {Object} props.task - Task object for this timer
  * @param {string} props.size - Size variant ('sm' or normal)
  * @param {boolean} props.isGlobalTimer - Whether this is being used in global timer (affects styling)
- * @param {boolean} props.isPaused - Whether the timer is paused
- * @param {Function} props.setIsPaused - Function to set paused state
- * @param {number} props.pausedElapsedTime - Time elapsed when timer was paused
  * @param {Function} props.onComplete - Function called when timer is completely stopped
  */
 function TimerControls({
     task,
-    timeEntries = [],
-    setTimeEntries,
-    tasks = [],
-    currentTimer,
-    setCurrentTimer,
     size = 'normal',
-    // New props for handling paused state
     isGlobalTimer = false,
-    isPaused = false,
-    setIsPaused = null,
-    pausedElapsedTime = 0,
-    setPausedElapsedTime = null,
-    onComplete = null,
-    setTasks = null
+    onComplete = null
 }) {
     const { showError } = useToast();
-    const isTimerActive = currentTimer && currentTimer.taskId === task.id;
+    
+    // Use Yjs hooks directly
+    const {
+        isActive,
+        isPaused,
+        taskId: activeTaskId,
+        startTime,
+        elapsedTime,
+        note,
+        startTimer: timerStart,
+        pauseTimer: timerPause,
+        resumeTimer: timerResume,
+        clearTimer
+    } = useTimer();
+    
+    const { entries, createEntry } = useTimeEntries();
+    const { activeTasks, updateTask } = useTasks();
+    
+    const isTimerActive = isActive && activeTaskId === task.id;
+    const isTimerPaused = isTimerActive && isPaused;
 
     /**
-     * Validate and create a time entry with overlap checking
-     * @param {string} taskId - Task ID for the entry
-     * @param {number} startTime - Start timestamp
-     * @param {number} endTime - End timestamp
-     * @param {string} note - Optional note
-     * @returns {boolean} - Whether the entry was created successfully
+     * Validate time entry doesn't overlap with existing entries
      */
-    const createValidatedTimeEntry = (taskId, startTime, endTime, note) => {
-        // Find the task to get its project ID
-        const entryTask = tasks.find(t => t.id === taskId) || task;
+    const validateTimeEntry = useCallback((taskId, entryStartTime, endTime) => {
+        const entryTask = activeTasks.find(t => t.id === taskId) || task;
         const projectId = entryTask?.projectId;
 
-        // Only validate if we have tasks data for proper overlap checking
-        if (tasks.length > 0 && projectId) {
+        if (activeTasks.length > 0 && projectId) {
             const overlapCheck = checkTimeOverlap(
-                startTime,
+                entryStartTime,
                 endTime,
                 projectId,
-                timeEntries,
-                tasks
+                entries,
+                activeTasks
             );
 
             if (!overlapCheck.isValid) {
@@ -70,198 +65,97 @@ function TimerControls({
                 return false;
             }
         }
-
-        // Create the time entry
-        const timeEntry = withCreateMetadata({
-            id: generateId(),
-            taskId: taskId,
-            start: startTime,
-            end: endTime,
-            note: note
-        });
-        setTimeEntries(prevEntries => [...prevEntries, timeEntry]);
         return true;
-    };
+    }, [activeTasks, entries, task, showError]);
+
+    /**
+     * Create a time entry with overlap validation
+     */
+    const createValidatedEntry = useCallback((taskId, start, end, entryNote) => {
+        if (!validateTimeEntry(taskId, start, end)) {
+            return false;
+        }
+        createEntry({ taskId, start, end, note: entryNote });
+        return true;
+    }, [validateTimeEntry, createEntry]);
 
     /**
      * Start timer for current task
      */
-    const startTimer = () => {
-        // If there's a paused timer, we should resume it instead of creating a new one
-        if (isPaused && currentTimer && currentTimer.taskId === task.id && setIsPaused) {
-            resumeTimer();
+    const handleStart = useCallback(() => {
+        // If this task's timer is paused, resume it
+        if (isTimerPaused) {
+            timerResume();
             return;
         }
         
-        // Stop any existing timer first
-        if (currentTimer) {
-            // Check if the existing timer is paused (for a different task)
-            if (isPaused && setIsPaused && setPausedElapsedTime) {
-                // For paused timer of different task, create time entry with paused time
-                const created = createValidatedTimeEntry(
-                    currentTimer.taskId,
-                    currentTimer.startTime,
-                    currentTimer.startTime + pausedElapsedTime,
-                    currentTimer.note
-                );
-                if (!created) return; // Don't start new timer if validation failed
-                
-                // Reset paused state
-                setIsPaused(false);
-                setPausedElapsedTime(0);
-            } else {
-                // For running timer, create time entry with current time
-                const created = createValidatedTimeEntry(
-                    currentTimer.taskId,
-                    currentTimer.startTime,
-                    Date.now(),
-                    currentTimer.note
-                );
-                if (!created) return; // Don't start new timer if validation failed
+        // If another timer is running, stop it first and create its entry
+        if (isActive && activeTaskId !== task.id) {
+            // Calculate end time for the existing timer
+            const existingStart = startTime;
+            const existingEnd = isPaused 
+                ? existingStart + elapsedTime 
+                : Date.now();
+            
+            // Create entry for existing timer with validation
+            if (!createValidatedEntry(activeTaskId, existingStart, existingEnd, note)) {
+                return; // Don't start new timer if validation failed
             }
+            clearTimer();
         }
 
         // Start new timer
-        setCurrentTimer({
-            taskId: task.id,
-            startTime: Date.now(),
-            note: undefined // Initialize with no note
-        });
+        timerStart(task.id);
+    }, [isTimerPaused, isActive, activeTaskId, task.id, startTime, isPaused, elapsedTime, note, 
+        timerResume, createValidatedEntry, clearTimer, timerStart]);
+
+    /**
+     * Pause the timer
+     */
+    const handlePause = useCallback(() => {
+        if (!isTimerActive) return;
         
-        // If we have access to the isPaused state, make sure it's set to false
-        if (setIsPaused) {
-            setIsPaused(false);
-        }
+        timerPause();
         
-        // Reset paused elapsed time if we have access to it
-        if (setPausedElapsedTime) {
-            setPausedElapsedTime(0);
-        }
-    };
+        // Update task's lastActive
+        updateTask(task.id, { lastActive: Date.now() });
+    }, [isTimerActive, timerPause, updateTask, task.id]);
 
     /**
      * Resume a paused timer
      */
-    const resumeTimer = () => {
-        if (!currentTimer || !isPaused || currentTimer.taskId !== task.id) return;
-        
-        // When resuming, continue the existing timer from where it was paused
-        // We need to adjust the startTime to account for the pause duration
-        
-        // Calculate how much time has passed during the pause
-        const pauseDuration = Date.now() - (currentTimer.startTime + pausedElapsedTime);
-        
-        // Adjust the startTime to make sure the timer continues from the pause point
-        setCurrentTimer({
-            ...currentTimer,
-            startTime: currentTimer.startTime + pauseDuration,
-            note: currentTimer.note
-        });
-        
-        setIsPaused(false);
-    };
+    const handleResume = useCallback(() => {
+        if (!isTimerPaused) return;
+        timerResume();
+    }, [isTimerPaused, timerResume]);
 
     /**
-     * Pause timer but don't create time entry
-     * Instead, just mark it as paused and save the elapsed time
+     * Stop timer and create time entry
      */
-    const pauseTimer = () => {
-        if (!currentTimer || currentTimer.taskId !== task.id) return;
+    const handleStop = useCallback(() => {
+        if (!isTimerActive) return;
 
         const now = Date.now();
+        const entryStart = startTime;
+        const entryEnd = isPaused ? entryStart + elapsedTime : now;
         
-        // If we have access to the isPaused state setter, use it
-        if (setIsPaused) {
-            // Calculate elapsed time up to the pause moment
-            const elapsedTime = now - currentTimer.startTime;
-            
-            // Store the elapsed time in the paused state
-            // We'll create the time entry only when the timer is resumed or stopped
-            if (typeof setPausedElapsedTime === 'function') {
-                setPausedElapsedTime(elapsedTime);
-            }
-            
-            setIsPaused(true);
-            
-            // Update the task's lastActive property to keep it at the top of recent tasks
-            setTasks?.(prevTasks => 
-                prevTasks.map(t =>
-                    t.id === task.id ? withUpdateMetadata({ ...t, lastActive: now }) : t
-                )
-            );
-        } else {
-            // Legacy behavior - create entry and stop timer with validation
-            // This branch should only run if called from a component that doesn't support pausing
-            const created = createValidatedTimeEntry(
-                task.id,
-                currentTimer.startTime,
-                now,
-                currentTimer.note
-            );
-            if (created) {
-                setCurrentTimer(null);
-            }
-        }
-    };
-
-    /**
-     * Stop timer completely and remove it
-     */
-    const stopTimer = () => {
-
-        if (!currentTimer || currentTimer.taskId !== task.id) return;
-
-        const now = Date.now();
-        
-        // Create the appropriate time entry based on the timer's state with validation
-        let created = false;
-        if (isPaused) {
-            // For paused timer, use the paused elapsed time
-            created = createValidatedTimeEntry(
-                task.id,
-                currentTimer.startTime,
-                currentTimer.startTime + pausedElapsedTime,
-                currentTimer.note
-            );
-        } else {
-            // For active timer, calculate duration from start to now
-            created = createValidatedTimeEntry(
-                task.id,
-                currentTimer.startTime,
-                now,
-                currentTimer.note
-            );
+        // Validate and create entry
+        if (!createValidatedEntry(task.id, entryStart, entryEnd, note)) {
+            return; // Don't clear timer if validation failed
         }
         
-        // Only proceed with cleanup if entry was created successfully
-        if (!created) return;
+        // Update task's lastActive
+        updateTask(task.id, { lastActive: now });
         
-        // Update the task's lastActive property to keep it at the top of recent tasks
-        if (setTasks) {
-            setTasks(prevTasks => 
-                prevTasks.map(t =>
-                    t.id === task.id ? withUpdateMetadata({ ...t, lastActive: now }) : t
-                )
-            );
-        }
-
-        // Remove the timer entirely
-        setCurrentTimer(null);
+        // Clear the timer
+        clearTimer();
         
-        // Reset paused state and elapsed time if we have access to them
-        if (setIsPaused) {
-            setIsPaused(false);
-        }
-        
-        if (setPausedElapsedTime) {
-            setPausedElapsedTime(0);
-        }
-        
-        // Call onComplete callback if provided
+        // Call completion callback
         if (onComplete) {
             onComplete();
         }
-    };
+    }, [isTimerActive, startTime, isPaused, elapsedTime, task.id, note, 
+        createValidatedEntry, updateTask, clearTimer, onComplete]);
 
     // Determine icon size based on size prop
     const iconSize = size === 'sm' ? 'h-5 w-5' : 'h-5 w-5';
@@ -273,19 +167,19 @@ function TimerControls({
                 <Button
                     variant="ghost"
                     size="icon"
-                    onClick={startTimer}
+                    onClick={handleStart}
                     className="h-8 w-8 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-100 dark:hover:bg-green-900"
                     title="Start Timer"
                 >
                     <PlayIcon className={iconSize} />
                 </Button>
-            ) : isPaused ? (
+            ) : isTimerPaused ? (
                 // For paused state, show resume and stop buttons
                 <div className="flex space-x-1">
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={resumeTimer}
+                        onClick={handleResume}
                         className="h-8 w-8 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-100 dark:hover:bg-green-900"
                         title="Resume Timer"
                     >
@@ -295,7 +189,7 @@ function TimerControls({
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={stopTimer}
+                            onClick={handleStop}
                             className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
                             title="Save & Stop Timer"
                         >
@@ -310,7 +204,7 @@ function TimerControls({
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={pauseTimer}
+                            onClick={handlePause}
                             className="h-8 w-8 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-accent"
                             title="Pause Timer"
                         >
@@ -320,7 +214,7 @@ function TimerControls({
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={pauseTimer}
+                            onClick={handlePause}
                             className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-accent"
                             title="Pause Timer"
                             leadingIcon={PauseIcon}
@@ -332,7 +226,7 @@ function TimerControls({
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={stopTimer}
+                            onClick={handleStop}
                             className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
                             title="Save & Stop Timer"
                         >
@@ -342,7 +236,7 @@ function TimerControls({
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={stopTimer}
+                            onClick={handleStop}
                             className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
                             title="Save & Stop Timer"
                             leadingIcon={StopIcon}

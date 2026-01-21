@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../Modal';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
-import { generateId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
-import { withCreateMetadata, withUpdateMetadata } from '../../utils/syncableEntity.ts';
+import { usePaymentMethods } from '../../hooks/usePaymentMethods.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,11 +15,10 @@ import CustomCheckbox from '../CustomCheckbox';
 const PaymentMethodModal = ({
     isOpen,
     onClose,
-    paymentMethods,
-    setPaymentMethods,
     editingPaymentMethod = null
 }) => {
     const { showSuccess } = useToast();
+    const { paymentMethods, createPaymentMethod, updatePaymentMethod, setDefault } = usePaymentMethods();
     
     const [formData, setFormData] = useState({
         title: '',
@@ -119,38 +117,7 @@ const PaymentMethodModal = ({
 
         if (editingPaymentMethod) {
             // Update existing payment method
-            const updatedPaymentMethods = paymentMethods.map(method =>
-                method.id === editingPaymentMethod.id
-                    ? withUpdateMetadata({
-                        ...method,
-                        title: formData.title.trim(),
-                        fullName: formData.fullName.trim(),
-                        bank: formData.bank.trim(),
-                        iban: formData.iban.trim(),
-                        swift: formData.swift.trim(),
-                        bankAddress: formData.bankAddress.trim(),
-                        paypal: formData.paypal.trim(),
-                        custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
-                        isDefault: formData.isDefault
-                    })
-                    : method
-            );
-
-            // If this payment method is set as default, remove default from others
-            let finalUpdatedPaymentMethods = updatedPaymentMethods;
-            if (formData.isDefault) {
-                finalUpdatedPaymentMethods = updatedPaymentMethods.map(method => ({
-                    ...method,
-                    isDefault: method.id === editingPaymentMethod.id
-                }));
-            }
-
-            setPaymentMethods(finalUpdatedPaymentMethods);
-            showSuccess('Payment method updated successfully');
-        } else {
-            // Create new payment method
-            const newPaymentMethod = withCreateMetadata({
-                id: generateId(),
+            updatePaymentMethod(editingPaymentMethod.id, {
                 title: formData.title.trim(),
                 fullName: formData.fullName.trim(),
                 bank: formData.bank.trim(),
@@ -162,17 +129,31 @@ const PaymentMethodModal = ({
                 isDefault: formData.isDefault
             });
 
-            let updatedPaymentMethods = [...paymentMethods, newPaymentMethod];
+            // If this payment method is set as default, remove default from others
+            if (formData.isDefault) {
+                setDefault(editingPaymentMethod.id);
+            }
+
+            showSuccess('Payment method updated successfully');
+        } else {
+            // Create new payment method
+            const newPaymentMethod = createPaymentMethod({
+                title: formData.title.trim(),
+                fullName: formData.fullName.trim(),
+                bank: formData.bank.trim(),
+                iban: formData.iban.trim(),
+                swift: formData.swift.trim(),
+                bankAddress: formData.bankAddress.trim(),
+                paypal: formData.paypal.trim(),
+                custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
+                isDefault: formData.isDefault
+            });
 
             // If this payment method is set as default, remove default from others
             if (formData.isDefault) {
-                updatedPaymentMethods = updatedPaymentMethods.map(method => ({
-                    ...method,
-                    isDefault: method.id === newPaymentMethod.id
-                }));
+                setDefault(newPaymentMethod.id);
             }
 
-            setPaymentMethods(updatedPaymentMethods);
             showSuccess('Payment method created successfully');
         }
 

@@ -8,46 +8,38 @@ import { formatActiveTimer, formatDurationWithSeconds } from '../utils/dateUtils
 import { checkTimerStartOverlap } from '../utils/timeValidationUtils';
 import TaskTimer from './TaskTimer';
 import { useToast } from '../hooks/useToast';
+import { useTimer } from '../hooks/useTimer';
+import { useTasks } from '../hooks/useTasks';
+import { useProjects } from '../hooks/useProjects';
+import { useTimeEntries } from '../hooks/useTimeEntries';
 import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
 
 /**
  * GlobalTimer component - Shows active timer in the header
+ * Uses Yjs hooks for all state management
  * @param {Object} props - Component props
- * @param {Object} props.currentTimer - Current active timer object
- * @param {Function} props.setCurrentTimer - Function to update current timer
- * @param {Array} props.tasks - All tasks array
- * @param {Array} props.projects - All projects array
- * @param {Function} props.setTimeEntries - Function to update time entries
- * @param {boolean} props.isPaused - Global pause state
- * @param {Function} props.setIsPaused - Function to set global pause state
- * @param {number} props.pausedElapsedTime - Global paused elapsed time
- * @param {Function} props.setPausedElapsedTime - Function to set global paused elapsed time
  * @param {Function} props.navigateToProject - Function to navigate to project page
  * @param {Function} props.onClose - Function called when timer is closed
  */
 const GlobalTimer = ({
-    currentTimer,
-    setCurrentTimer,
-    tasks,
-    projects,
-    setTimeEntries,
-    isPaused,
-    setIsPaused,
-    pausedElapsedTime,
-    setPausedElapsedTime,
     navigateToProject,
-    onClose,
-    setTasks,
-    timeEntries = [] // Add timeEntries prop for validation
+    onClose
 }) => {
     const { showSuccess, showError } = useToast();
+    
+    // Yjs hooks for state
+    const { isActive, isPaused, taskId, elapsedTime, startTime, note, updateTimer } = useTimer();
+    const { tasks } = useTasks();
+    const { projects } = useProjects();
+    const { entries: timeEntries } = useTimeEntries();
+    
     const [displayTime, setDisplayTime] = useState('');
     const [isExpanded, setIsExpanded] = useState(false);
     const [startTimeInput, setStartTimeInput] = useState('');
     const [noteInput, setNoteInput] = useState('');
 
     // Find the task associated with the current timer
-    const currentTask = tasks.find(task => task.id === currentTimer?.taskId);
+    const currentTask = tasks.find(task => task.id === taskId);
     
     // Find the project associated with the current task
     const currentProject = currentTask ? projects.find(project => project.id === currentTask.projectId) : null;
@@ -65,26 +57,26 @@ const GlobalTimer = ({
      * Initialize start time input when timer changes
      */
     useEffect(() => {
-        if (currentTimer) {
-            const startDate = new Date(currentTimer.startTime);
+        if (isActive && startTime) {
+            const startDate = new Date(startTime);
             const timeString = startDate.toTimeString().slice(0, 8); // HH:MM:SS format
             setStartTimeInput(timeString);
             
             // Initialize note from timer if it exists
-            setNoteInput(currentTimer.note || '');
+            setNoteInput(note || '');
         }
-    }, [currentTimer]);
+    }, [isActive, startTime, note]);
 
     /**
      * Handle form submission (update both start time and note)
      */
     const handleSubmitChanges = () => {
-        if (!currentTimer) return;
+        if (!isActive || !startTime) return;
 
         try {
             // Parse and validate start time if it was changed
             const [hours, minutes, seconds] = startTimeInput.split(':').map(Number);
-            const currentDate = new Date(currentTimer.startTime);
+            const currentDate = new Date(startTime);
             const newStartTime = new Date(currentDate);
             newStartTime.setHours(hours, minutes, seconds || 0);
 
@@ -95,8 +87,8 @@ const GlobalTimer = ({
             }
 
             // Get the project ID for the current task
-            const currentTask = tasks.find(task => task.id === currentTimer.taskId);
-            if (!currentTask) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) {
                 showError('Task not found');
                 return;
             }
@@ -105,7 +97,7 @@ const GlobalTimer = ({
             const overlapCheck = checkTimerStartOverlap(
                 newStartTime.getTime(),
                 Date.now(), // Current time as potential end time
-                currentTask.projectId,
+                task.projectId,
                 timeEntries,
                 tasks
             );
@@ -116,8 +108,7 @@ const GlobalTimer = ({
             }
 
             // Update the timer with both start time and note
-            setCurrentTimer({
-                ...currentTimer,
+            updateTimer({
                 startTime: newStartTime.getTime(),
                 note: noteInput.trim() || undefined
             });
@@ -131,37 +122,37 @@ const GlobalTimer = ({
 
     // Update timer display every second (only when not paused)
     useEffect(() => {
-        if (!currentTimer) return;
+        if (!isActive || !startTime) return;
         
         // When paused, don't update - just keep the frozen display time
         if (isPaused) return;
 
-        const updateTimer = () => {
+        const updateTimerDisplay = () => {
             // Calculate elapsed time in ms for active timer
-            const elapsedMs = Date.now() - currentTimer.startTime;
+            const elapsedMs = Date.now() - startTime;
             const formattedTime = formatActiveTimer(elapsedMs);
             setDisplayTime(formattedTime);
         };
 
         // Update immediately
-        updateTimer();
+        updateTimerDisplay();
 
         // Then update every second
-        const interval = setInterval(updateTimer, TIMER_UPDATE_INTERVAL_MS);
+        const interval = setInterval(updateTimerDisplay, TIMER_UPDATE_INTERVAL_MS);
 
         return () => clearInterval(interval);
-    }, [currentTimer, isPaused]);
+    }, [isActive, startTime, isPaused]);
 
     // Initialize display time when component mounts with a paused timer
-    // or when pausedElapsedTime changes while paused
+    // or when elapsedTime changes while paused
     useEffect(() => {
-        if (isPaused && pausedElapsedTime > 0) {
-            const formattedPausedTime = formatDurationWithSeconds(pausedElapsedTime);
+        if (isPaused && elapsedTime > 0) {
+            const formattedPausedTime = formatDurationWithSeconds(elapsedTime);
             setDisplayTime(formattedPausedTime);
         }
-    }, [isPaused, pausedElapsedTime]);
+    }, [isPaused, elapsedTime]);
 
-    if (!currentTimer || !currentTask) {
+    if (!isActive || !currentTask) {
         return null;
     }
 
@@ -205,18 +196,8 @@ const GlobalTimer = ({
                     {/* Control buttons - using TaskTimer component */}
                     <TaskTimer
                         task={currentTask}
-                        timeEntries={timeEntries}
-                        setTimeEntries={setTimeEntries}
-                        tasks={tasks}
-                        currentTimer={currentTimer}
-                        setCurrentTimer={setCurrentTimer}
                         isGlobalTimer={true}
-                        isPaused={isPaused}
-                        setIsPaused={setIsPaused}
-                        pausedElapsedTime={pausedElapsedTime}
-                        setPausedElapsedTime={setPausedElapsedTime}
                         showTimeDisplay={false}
-                        setTasks={setTasks}
                         onComplete={() => {
                             // Call onClose when timer is completely stopped
                             if (onClose) onClose();

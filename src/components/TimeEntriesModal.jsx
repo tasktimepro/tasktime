@@ -9,22 +9,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Notice } from '@/components/ui/notice';
 import { formatDurationWithSeconds, toDisplayDate, getTodayString, getCurrentTimeString, timestampToDateString, timestampToTimeString } from '../utils/dateUtils.ts';
 import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
-import { generateId } from '../utils/idUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { softDeleteById, isDeleted, withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
+import { useTimeEntries } from '../hooks/useTimeEntries.ts';
+import { useTasks } from '../hooks/useTasks.ts';
 
 /**
  * TimeEntriesModal component - Modal for viewing and managing time entries for a task
+ * Uses Yjs hooks directly for state management
  * @param {Object} props - Component props
  * @param {boolean} props.isOpen - Whether modal is open
  * @param {Function} props.onClose - Function to close modal
  * @param {Object} props.task - Task object
- * @param {Array} props.timeEntries - Array of all time entries
- * @param {Function} props.setTimeEntries - Function to update time entries
- * @param {Array} props.allTasks - Array of all tasks (for overlap validation)
  */
-const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, allTasks = [] }) => {
+const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     const { showSuccess, showError } = useToast();
+    
+    // Yjs hooks for state
+    const { entries: timeEntries, createEntry, updateEntry, deleteEntry } = useTimeEntries();
+    const { tasks: allTasks } = useTasks();
 
     // Helper functions for billing protection
 
@@ -49,7 +51,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
     // Filter time entries for this task
     const taskTimeEntries = useMemo(() => {
         return timeEntries
-            .filter(entry => entry.taskId === task?.id && !isDeleted(entry))
+            .filter(entry => entry.taskId === task?.id)
             .sort((a, b) => b.start - a.start); // Most recent first
     }, [timeEntries, task?.id]);
 
@@ -193,18 +195,12 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
             return;
         }
 
-        const updatedEntries = timeEntries.map(entry => 
-            entry.id === editingEntry.id 
-                ? withUpdateMetadata({ 
-                    ...entry, 
-                    start: startTimestamp, 
-                    end: endTimestamp,
-                    note: editForm.note.trim() || undefined
-                })
-                : entry
-        );
+        updateEntry(editingEntry.id, {
+            start: startTimestamp,
+            end: endTimestamp,
+            note: editForm.note.trim() || undefined
+        });
 
-        setTimeEntries(updatedEntries);
         setEditingEntry(null);
         showSuccess('Time entry updated successfully');
     };
@@ -231,8 +227,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
             return;
         }
 
-        const updatedEntries = softDeleteById(timeEntries, pendingDeleteEntryId);
-        setTimeEntries(updatedEntries);
+        deleteEntry(pendingDeleteEntryId);
         showSuccess('Time entry deleted successfully');
         setPendingDeleteEntryId(null);
     };
@@ -279,15 +274,13 @@ const TimeEntriesModal = ({ isOpen, onClose, task, timeEntries, setTimeEntries, 
             return;
         }
 
-        const newEntry = withCreateMetadata({
-            id: generateId(),
+        createEntry({
             taskId: task.id,
             start: startTimestamp,
             end: endTimestamp,
             note: addForm.note.trim() || undefined
         });
 
-        setTimeEntries([...timeEntries, newEntry]);
         setShowAddForm(false);
         resetForms();
         showSuccess('Time entry added successfully');

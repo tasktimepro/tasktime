@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import CustomCheckbox from '../CustomCheckbox';
 import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
+import { useTimer } from '../../hooks/useTimer';
 
 /**
  * RecentTasks component - Recent task list with search and controls.
@@ -12,13 +13,13 @@ const RecentTasks = ({
     recentTasks,
     taskSearchQuery,
     setTaskSearchQuery,
-    currentTimer,
-    isPaused,
     handleCompleteTask,
     renderTaskTitle,
     handleTaskTitleClick,
     renderTaskControls
 }) => {
+    const { isActive: isTimerRunning, taskId: timerTaskId, isPaused } = useTimer();
+
     return (
         <Card>
             <CardHeader className="pb-4">
@@ -45,8 +46,8 @@ const RecentTasks = ({
                         {recentTasks.map((task) => {
                             // Determine if this task should be disabled
                             // If any timer is running (not paused) and it's not for this task, disable the task
-                            const isTimerActive = currentTimer?.taskId === task.id;
-                            const shouldDisable = currentTimer && !isPaused && !isTimerActive;
+                            const isTimerActive = timerTaskId === task.id;
+                            const shouldDisable = isTimerRunning && !isPaused && !isTimerActive;
 
                             return (
                                 <div key={task.id} className={`px-3 py-3 hover:bg-muted ${task.completed ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
@@ -95,8 +96,8 @@ const RecentTasks = ({
                                     {task.subtasks && task.subtasks.length > 0 && (
                                         <div className="ml-8 mt-2">
                                             {task.subtasks.map(subtask => {
-                                                const subtaskTimerActive = currentTimer?.taskId === subtask.id;
-                                                const subtaskShouldDisable = currentTimer && !isPaused && !subtaskTimerActive;
+                                                const subtaskTimerActive = timerTaskId === subtask.id;
+                                                const subtaskShouldDisable = isTimerRunning && !isPaused && !subtaskTimerActive;
                                                 const subtaskWithProject = { ...subtask, project: task.project };
 
                                                 return (

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../Modal';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
-import { generateId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
-import { withCreateMetadata, withUpdateMetadata } from '../../utils/syncableEntity.ts';
+import { useBusinessInfos } from '../../hooks/useBusinessInfos.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,11 +15,10 @@ import CustomCheckbox from '../CustomCheckbox';
 const BusinessModal = ({
     isOpen,
     onClose,
-    businessInfos,
-    setBusinessInfos,
     editingBusinessInfo = null
 }) => {
     const { showSuccess } = useToast();
+    const { businessInfos, createBusinessInfo, updateBusinessInfo, setDefault } = useBusinessInfos();
     
     const [formData, setFormData] = useState({
         title: '',
@@ -163,46 +161,7 @@ const BusinessModal = ({
 
         if (editingBusinessInfo) {
             // Update existing business info
-            const updatedBusinessInfos = businessInfos.map(info =>
-                info.id === editingBusinessInfo.id
-                    ? withUpdateMetadata({
-                        ...info,
-                        title: formData.title.trim(),
-                        businessName: formData.businessName.trim(),
-                        address: formData.address.trim(),
-                        city: formData.city.trim(),
-                        state: formData.state.trim(),
-                        zip: formData.zip.trim(),
-                        country: formData.country.trim(),
-                        registrationNumber: formData.registrationNumber.trim(),
-                        vat: formData.vat.trim(),
-                        taxNumber: formData.taxNumber.trim(),
-                        email: formData.email.trim(),
-                        phone: formData.phone.trim(),
-                        custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
-                        isDefault: formData.isDefault,
-                        taxEnabled: formData.taxEnabled,
-                        taxLabel: formData.taxLabel,
-                        taxRate: parseFloat(formData.taxRate) || 0
-                    })
-                    : info
-            );
-
-            // If this business info is set as default, remove default from others
-            let finalUpdatedBusinessInfos = updatedBusinessInfos;
-            if (formData.isDefault) {
-                finalUpdatedBusinessInfos = updatedBusinessInfos.map(info => ({
-                    ...info,
-                    isDefault: info.id === editingBusinessInfo.id
-                }));
-            }
-
-            setBusinessInfos(finalUpdatedBusinessInfos);
-            showSuccess('Business info updated successfully');
-        } else {
-            // Create new business info
-            const newBusinessInfo = withCreateMetadata({
-                id: generateId(),
+            updateBusinessInfo(editingBusinessInfo.id, {
                 title: formData.title.trim(),
                 businessName: formData.businessName.trim(),
                 address: formData.address.trim(),
@@ -222,17 +181,39 @@ const BusinessModal = ({
                 taxRate: parseFloat(formData.taxRate) || 0
             });
 
-            let updatedBusinessInfos = [...businessInfos, newBusinessInfo];
+            // If this business info is set as default, remove default from others
+            if (formData.isDefault) {
+                setDefault(editingBusinessInfo.id);
+            }
+
+            showSuccess('Business info updated successfully');
+        } else {
+            // Create new business info
+            const newBusinessInfo = createBusinessInfo({
+                title: formData.title.trim(),
+                businessName: formData.businessName.trim(),
+                address: formData.address.trim(),
+                city: formData.city.trim(),
+                state: formData.state.trim(),
+                zip: formData.zip.trim(),
+                country: formData.country.trim(),
+                registrationNumber: formData.registrationNumber.trim(),
+                vat: formData.vat.trim(),
+                taxNumber: formData.taxNumber.trim(),
+                email: formData.email.trim(),
+                phone: formData.phone.trim(),
+                custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
+                isDefault: formData.isDefault,
+                taxEnabled: formData.taxEnabled,
+                taxLabel: formData.taxLabel,
+                taxRate: parseFloat(formData.taxRate) || 0
+            });
 
             // If this business info is set as default, remove default from others
             if (formData.isDefault) {
-                updatedBusinessInfos = updatedBusinessInfos.map(info => ({
-                    ...info,
-                    isDefault: info.id === newBusinessInfo.id
-                }));
+                setDefault(newBusinessInfo.id);
             }
 
-            setBusinessInfos(updatedBusinessInfos);
             showSuccess('Business info created successfully');
         }
 

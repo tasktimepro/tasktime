@@ -1,35 +1,25 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import TaskHeader from './task/TaskHeader';
 import TaskActions from './task/TaskActions';
 import SubtaskSection from './task/SubtaskSection';
 import TimeEntriesModal from './TimeEntriesModal';
 import { useToast } from '../hooks/useToast';
-import useTaskState from './task/hooks/useTaskState';
-import { withCreateMetadata, withUpdateMetadata } from '../utils/syncableEntity.ts';
+import { useTasks } from '../hooks/useTasks';
+import { useTimeEntries } from '../hooks/useTimeEntries';
+import { useTimer } from '../hooks/useTimer';
 
 /**
  * TaskItem component - Displays individual task with timer controls and subtasks.
+ * Uses Yjs hooks directly for state management
  * @param {Object} props
  */
 const TaskItem = ({
     task,
-    tasks,
-    setTasks,
-    timeEntries,
-    setTimeEntries,
-    currentTimer,
-    setCurrentTimer,
-    isPaused = false,
-    setIsPaused = null,
-    pausedElapsedTime = 0,
-    setPausedElapsedTime = null,
-    isGlobalTimer = false,
     onDelete,
     onCreateSubtask,
     onArchive,
     onUnarchive,
-    onToggleBillable,
-    allTasks
+    onToggleBillable
 }) => {
 
     const [isEditing, setIsEditing] = useState(false);
@@ -38,99 +28,92 @@ const TaskItem = ({
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
     const { showSuccess } = useToast();
-
-    const taskList = allTasks || tasks;
+    
+    // Yjs hooks for state
+    const { tasks, updateTask } = useTasks();
+    const { entries: timeEntries, createEntry } = useTimeEntries();
+    const { isActive: isAnyTimerActive, isPaused, taskId: activeTimerTaskId, startTime: timerStartTime, note: timerNote, stopTimer, clearTimer } = useTimer();
 
     const subtasks = useMemo(() => {
+        return tasks.filter((t) => t.parentTaskId === task.id);
+    }, [tasks, task.id]);
 
-        return taskList.filter((t) => t.parentTaskId === task.id);
-    }, [taskList, task.id]);
+    // Compute task state
+    const isTimerActive = isAnyTimerActive && activeTimerTaskId === task.id;
+    const isCompleted = task.completed || false;
+    const isArchived = task.archived || false;
+    
+    // Check if this task or any subtask has active timer
+    const subtaskIds = useMemo(() => subtasks.map(s => s.id), [subtasks]);
+    const isRelatedToActiveTimer = isAnyTimerActive && (
+        activeTimerTaskId === task.id || subtaskIds.includes(activeTimerTaskId)
+    );
+    
+    // Should dim if another task (not related) has an active timer
+    const shouldDimTask = isAnyTimerActive && !isRelatedToActiveTimer;
 
-    const {
-        mainTaskTime,
-        totalTimeWithSubtasks,
-        isTimerActive,
-        anyTimerActive,
-        isCompleted,
-        isArchived,
-        isRelatedToActiveTimer,
-        shouldDimTask
-    } = useTaskState({
-        task,
-        tasks,
-        timeEntries,
-        currentTimer,
-        isPaused,
-        subtasks,
-        setTasks
-    });
+    // Calculate total time for this task
+    const mainTaskTime = useMemo(() => {
+        return timeEntries
+            .filter(e => e.taskId === task.id)
+            .reduce((sum, e) => sum + (e.end - e.start), 0);
+    }, [timeEntries, task.id]);
+
+    // Calculate total time including subtasks
+    const totalTimeWithSubtasks = useMemo(() => {
+        const allTaskIds = [task.id, ...subtaskIds];
+        return timeEntries
+            .filter(e => allTaskIds.includes(e.taskId))
+            .reduce((sum, e) => sum + (e.end - e.start), 0);
+    }, [timeEntries, task.id, subtaskIds]);
 
     /**
      * Toggle task completion status.
      * @param {boolean} checked
      */
-    const handleToggleComplete = (checked) => {
-
+    const handleToggleComplete = useCallback((checked) => {
         const now = Date.now();
 
-        if (isTimerActive && currentTimer) {
-            const timeEntry = withCreateMetadata({
-                id: `completion-${Date.now()}`,
+        // If timer is active for this task, stop it and create entry
+        if (isTimerActive && timerStartTime) {
+            createEntry({
                 taskId: task.id,
-                start: currentTimer.startTime,
+                start: timerStartTime,
                 end: now,
-                note: currentTimer.note
+                note: timerNote
             });
-
-            setTimeEntries([...timeEntries, timeEntry]);
-            setCurrentTimer(null);
+            clearTimer();
         }
 
-        const updatedTasks = tasks.map((t) => (
-            t.id === task.id
-                ? withUpdateMetadata({ ...t, completed: checked, lastActive: now })
-                : t
-        ));
-
-        setTasks(updatedTasks);
-    };
+        updateTask(task.id, { completed: checked, lastActive: now });
+    }, [isTimerActive, timerStartTime, timerNote, task.id, createEntry, clearTimer, updateTask]);
 
     /**
      * Update task title.
      * @param {Event} e
      */
-    const handleUpdateTitle = (e) => {
-
+    const handleUpdateTitle = useCallback((e) => {
         e.preventDefault();
 
         if (!editTitle.trim()) return;
 
-        const now = Date.now();
-        const updatedTasks = tasks.map((t) => (
-            t.id === task.id
-                ? withUpdateMetadata({ ...t, title: editTitle.trim(), lastActive: now })
-                : t
-        ));
-
-        setTasks(updatedTasks);
+        updateTask(task.id, { title: editTitle.trim(), lastActive: Date.now() });
         setIsEditing(false);
-    };
+    }, [editTitle, task.id, updateTask]);
 
     /**
      * Cancel editing.
      */
-    const cancelEdit = () => {
-
+    const cancelEdit = useCallback(() => {
         setEditTitle(task.title);
         setIsEditing(false);
-    };
+    }, [task.title]);
 
     /**
      * Create a new subtask.
      * @param {Event} e
      */
-    const handleCreateSubtask = (e) => {
-
+    const handleCreateSubtask = useCallback((e) => {
         e.preventDefault();
 
         if (!newSubtaskTitle.trim()) return;
@@ -144,16 +127,15 @@ const TaskItem = ({
             setNewSubtaskTitle('');
             setShowCreateSubtaskForm(false);
         }
-    };
+    }, [newSubtaskTitle, task.id, onCreateSubtask]);
 
     /**
      * Cancel subtask creation.
      */
-    const cancelCreateSubtask = () => {
-
+    const cancelCreateSubtask = useCallback(() => {
         setNewSubtaskTitle('');
         setShowCreateSubtaskForm(false);
-    };
+    }, []);
 
     return (
         <div className={`bg-card border border-border rounded-lg overflow-hidden ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
@@ -177,20 +159,9 @@ const TaskItem = ({
 
                     <TaskActions
                         task={task}
-                        tasks={taskList}
-                        timeEntries={timeEntries}
-                        setTimeEntries={setTimeEntries}
-                        currentTimer={currentTimer}
-                        setCurrentTimer={setCurrentTimer}
-                        isPaused={isPaused}
-                        setIsPaused={setIsPaused}
-                        pausedElapsedTime={pausedElapsedTime}
-                        setPausedElapsedTime={setPausedElapsedTime}
-                        isGlobalTimer={isGlobalTimer}
-                        setTasks={setTasks}
                         isEditing={isEditing}
                         isTimerActive={isTimerActive}
-                        anyTimerActive={anyTimerActive}
+                        anyTimerActive={isAnyTimerActive}
                         isArchived={isArchived}
                         isCompleted={isCompleted}
                         isRelatedToActiveTimer={isRelatedToActiveTimer}
@@ -208,27 +179,12 @@ const TaskItem = ({
                 isOpen={showTimeEntriesModal}
                 onClose={() => setShowTimeEntriesModal(false)}
                 task={task}
-                timeEntries={timeEntries}
-                setTimeEntries={setTimeEntries}
-                allTasks={taskList}
             />
 
             <SubtaskSection
                 subtasks={subtasks}
                 task={task}
-                tasks={tasks}
-                setTasks={setTasks}
-                timeEntries={timeEntries}
-                setTimeEntries={setTimeEntries}
-                currentTimer={currentTimer}
-                setCurrentTimer={setCurrentTimer}
-                isPaused={isPaused}
-                setIsPaused={setIsPaused}
-                pausedElapsedTime={pausedElapsedTime}
-                setPausedElapsedTime={setPausedElapsedTime}
-                isGlobalTimer={isGlobalTimer}
                 onToggleBillable={onToggleBillable}
-                allTasks={taskList}
                 onCreateSubtask={onCreateSubtask}
                 showCreateSubtaskForm={showCreateSubtaskForm}
                 setShowCreateSubtaskForm={setShowCreateSubtaskForm}
@@ -237,7 +193,7 @@ const TaskItem = ({
                 handleCreateSubtask={handleCreateSubtask}
                 cancelCreateSubtask={cancelCreateSubtask}
                 isArchived={isArchived}
-                anyTimerActive={anyTimerActive}
+                anyTimerActive={isAnyTimerActive}
                 isRelatedToActiveTimer={isRelatedToActiveTimer}
                 showSuccess={showSuccess}
             />

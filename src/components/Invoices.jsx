@@ -189,7 +189,6 @@ const Invoices = ({
                             paymentMethods={paymentMethods}
                             businessInfos={businessInfos}
                             clients={clients}
-                            setInvoices={setInvoices}
                             invoiceTemplates={invoiceTemplates}
                             selectedTab={urlParams.tab} // Pass the tab from URL
                         />
@@ -198,8 +197,6 @@ const Invoices = ({
                 
                 {activeTab === 'templates' && (
                     <InvoiceTemplates 
-                        invoiceTemplates={invoiceTemplates} 
-                        setInvoiceTemplates={setInvoiceTemplates}
                         autoOpenCreate={urlParams.create === 'template'}
                         openTemplateModal={openTemplateModal}
                         editTemplateModal={editTemplateModal}
@@ -208,8 +205,6 @@ const Invoices = ({
                 
                 {activeTab === 'payment-methods' && (
                     <PaymentMethods 
-                        paymentMethods={paymentMethods} 
-                        setPaymentMethods={setPaymentMethods}
                         autoOpenCreate={urlParams.create === 'payment-method'}
                         openPaymentMethodModal={openPaymentMethodModal}
                         editPaymentMethodModal={editPaymentMethodModal}
@@ -218,8 +213,6 @@ const Invoices = ({
                 
                 {activeTab === 'business-info' && (
                     <BusinessInfo 
-                        businessInfos={businessInfos} 
-                        setBusinessInfos={setBusinessInfos}
                         autoOpenCreate={urlParams.create === 'business-info'}
                         openBusinessModal={openBusinessModal}
                         editBusinessModal={editBusinessModal}
@@ -231,43 +224,13 @@ const Invoices = ({
             {showInvoiceModal && (
                 <InvoiceGenerator
                     project={null} // No project context for standalone invoices
-                    projects={projects}
-                    setProjects={setProjects}
-                    tasks={tasks}
-                    setTasks={setTasks}
                     timeEntries={timeEntries}
                     currentTimer={currentTimer}
                     isPaused={isPaused}
                     editingInvoice={editingInvoice}
                     paymentMethods={paymentMethods}
-                    onNavigateToPaymentMethods={() => {
-                        setShowInvoiceModal(false);
-                        updateUrl({ section: 'payment-methods', create: 'payment-method' });
-                    }}
                     businessInfos={businessInfos}
-                    onNavigateToBusinessInfo={() => {
-                        setShowInvoiceModal(false);
-                        updateUrl({ section: 'business-info', create: 'business-info' });
-                    }}
                     clients={clients}
-                    onNavigateToClients={() => {
-                        setShowInvoiceModal(false);
-                        navigateToClients({ create: 'client' });
-                    }}
-                    onNavigateToProjects={() => {
-                        setShowInvoiceModal(false);
-                        // Use the navigateToProjects function that's passed as a prop
-                        // and pass the create parameter to open the project form
-                        navigateToProjects({ create: 'project' });
-                    }}
-                    invoices={invoices}
-                    setInvoices={setInvoices}
-                    invoiceTemplates={invoiceTemplates}
-                    setInvoiceTemplates={setInvoiceTemplates}
-                    onNavigateToTemplates={() => {
-                        setShowInvoiceModal(false);
-                        updateUrl({ section: 'templates', create: 'template' });
-                    }}
                     onInvoiceSaved={() => {
                         setShowInvoiceModal(false);
                         setEditingInvoice(null);

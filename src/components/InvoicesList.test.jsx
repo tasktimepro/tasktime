@@ -6,6 +6,11 @@ import InvoicesList from './InvoicesList'
 
 const updateUrlMock = vi.fn()
 
+const invoiceHookMocks = vi.hoisted(() => ({
+
+    updateInvoice: vi.fn()
+}))
+
 vi.mock('../utils/pdfUtils.ts', () => ({
     generatePDF: vi.fn(),
     createInvoiceHTML: vi.fn(() => '<div />')
@@ -13,6 +18,13 @@ vi.mock('../utils/pdfUtils.ts', () => ({
 
 vi.mock('../hooks/useUrlState.ts', () => ({
     useUrlState: () => ({ updateUrl: updateUrlMock })
+}))
+
+vi.mock('../hooks/useInvoices.ts', () => ({
+
+    useInvoices: () => ({
+        updateInvoice: invoiceHookMocks.updateInvoice
+    })
 }))
 
 describe('InvoicesList', () => {
@@ -57,7 +69,7 @@ describe('InvoicesList', () => {
             <InvoicesList
                 projectInvoices={[overdueInvoice]}
                 onEditInvoice={vi.fn()}
-                setInvoices={vi.fn()}
+                
                 paymentMethods={[]}
                 businessInfos={[]}
                 clients={[]}
@@ -81,7 +93,7 @@ describe('InvoicesList', () => {
             <InvoicesList
                 projectInvoices={[outstandingInvoice]}
                 onEditInvoice={vi.fn()}
-                setInvoices={vi.fn()}
+                
                 paymentMethods={[]}
                 businessInfos={[]}
                 clients={[]}
@@ -105,7 +117,7 @@ describe('InvoicesList', () => {
             <InvoicesList
                 projectInvoices={[paidInvoice]}
                 onEditInvoice={vi.fn()}
-                setInvoices={vi.fn()}
+                
                 paymentMethods={[]}
                 businessInfos={[]}
                 clients={[]}
@@ -119,13 +131,12 @@ describe('InvoicesList', () => {
 
     it('toggles paid status without corrupting list', async () => {
 
-        const setInvoices = vi.fn()
+        invoiceHookMocks.updateInvoice.mockClear()
 
         render(
             <InvoicesList
                 projectInvoices={[baseInvoice]}
                 onEditInvoice={vi.fn()}
-                setInvoices={setInvoices}
                 paymentMethods={[]}
                 businessInfos={[]}
                 clients={[]}
@@ -135,13 +146,8 @@ describe('InvoicesList', () => {
 
         await user.click(screen.getByRole('button', { name: 'Mark as Paid' }))
 
-        expect(setInvoices).toHaveBeenCalledTimes(1)
-
-        const updater = setInvoices.mock.calls[0][0]
-        const updated = updater([baseInvoice])
-
-        expect(updated).toHaveLength(1)
-        expect(updated[0].paymentProcessed).toBe(true)
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith('inv-1', { paymentProcessed: true })
     })
 
     it('warns before editing paid invoices', async () => {
@@ -153,7 +159,7 @@ describe('InvoicesList', () => {
             <InvoicesList
                 projectInvoices={[paidInvoice]}
                 onEditInvoice={onEditInvoice}
-                setInvoices={vi.fn()}
+                
                 paymentMethods={[]}
                 businessInfos={[]}
                 clients={[]}
@@ -183,7 +189,7 @@ describe('InvoicesList', () => {
             <InvoicesList
                 projectInvoices={invoices}
                 onEditInvoice={vi.fn()}
-                setInvoices={vi.fn()}
+                
                 paymentMethods={[]}
                 businessInfos={[]}
                 clients={[]}
@@ -206,7 +212,7 @@ describe('InvoicesList', () => {
             <InvoicesList
                 projectInvoices={[]}
                 onEditInvoice={vi.fn()}
-                setInvoices={vi.fn()}
+                
                 paymentMethods={[]}
                 businessInfos={[]}
                 clients={[]}

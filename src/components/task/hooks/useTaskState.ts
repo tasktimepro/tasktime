@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../../../constants/app';
-import { withUpdateMetadata } from '../../../utils/syncableEntity';
+import { useTasks } from '../../../hooks/useTasks';
+import { useTimer } from '../../../hooks/useTimer';
 
 type TaskItem = {
     id: string;
@@ -18,18 +19,10 @@ type TimeEntry = {
     end?: number;
 };
 
-type TimerState = {
-    taskId: string;
-} | null;
-
 type UseTaskStateParams = {
     task: TaskItem;
-    tasks: TaskItem[];
     timeEntries: TimeEntry[];
-    currentTimer: TimerState;
-    isPaused: boolean;
     subtasks?: TaskItem[];
-    setTasks?: (updater: (prevTasks: TaskItem[]) => TaskItem[]) => void;
 };
 
 /**
@@ -39,13 +32,12 @@ type UseTaskStateParams = {
  */
 const useTaskState = ({
     task,
-    tasks,
     timeEntries,
-    currentTimer,
-    isPaused,
-    subtasks = [],
-    setTasks
+    subtasks = []
 }: UseTaskStateParams) => {
+    const { updateTask } = useTasks();
+    const { isActive: anyTimerActive, taskId: timerTaskId, isPaused } = useTimer();
+    
     const taskTimeEntries = useMemo(() => {
         return timeEntries.filter(entry => entry.taskId === task.id);
     }, [timeEntries, task.id]);
@@ -83,10 +75,9 @@ const useTaskState = ({
     const mainTaskTime = taskTime;
     const totalTimeWithSubtasks = totalTime;
 
-    const isTimerActive = currentTimer && currentTimer.taskId === task.id;
-    const anyTimerActive = currentTimer !== null;
+    const isTimerActive = anyTimerActive && timerTaskId === task.id;
     const subtaskTimerActive = subtasks.some(subtask =>
-        currentTimer && currentTimer.taskId === subtask.id
+        anyTimerActive && timerTaskId === subtask.id
     );
 
     const isCompleted = task.completed || false;
@@ -110,17 +101,10 @@ const useTaskState = ({
     }, [taskTimeEntries, task.lastBilledAt, task.createdAt]);
 
     useEffect(() => {
-        if (!setTasks) return;
-
         if (hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
-            // Use functional update to avoid race conditions with other task updates
-            setTasks(prevTasks =>
-                prevTasks.map(t =>
-                    t.id === task.id ? withUpdateMetadata({ ...t, billable: true, lastActive: Date.now() }) : t
-                )
-            );
+            updateTask(task.id, { billable: true, lastActive: Date.now() });
         }
-    }, [hasSignificantBillableTime, task.billable, task.billableSetByUser, task.id, setTasks]);
+    }, [hasSignificantBillableTime, task.billable, task.billableSetByUser, task.id, updateTask]);
 
     return {
         taskTimeEntries,

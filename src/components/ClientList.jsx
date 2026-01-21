@@ -1,5 +1,5 @@
-import PropTypes from 'prop-types';
 import { useState } from 'react';
+import PropTypes from 'prop-types';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,22 +14,16 @@ import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, Chevr
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
-import { softDeleteById, softDeleteByIds, isDeleted, withUpdateMetadata } from '../utils/syncableEntity.ts';
+import { useClients } from '../hooks/useClients.ts';
+import { useProjects } from '../hooks/useProjects.ts';
+import { useTasks } from '../hooks/useTasks.ts';
+import { useTimeEntries } from '../hooks/useTimeEntries.ts';
+import { useInvoices } from '../hooks/useInvoices.ts';
 
 /**
  * ClientList component - Displays and manages the list of clients
  */
 const ClientList = ({ 
-    clients, 
-    setClients, 
-    projects = [],
-    setProjects,
-    tasks = [], 
-    setTasks, 
-    timeEntries = [], 
-    setTimeEntries, 
-    invoices = [],
-    setInvoices,
     onSelectClient,
     openClientModal,
     editClientModal
@@ -40,6 +34,13 @@ const ClientList = ({
     const [showArchiveProjectsModal, setShowArchiveProjectsModal] = useState(false);
     const [relatedProjects, setRelatedProjects] = useState([]);
     const { showSuccess } = useToast();
+    
+    // Yjs hooks for data access
+    const { clients, updateClient, deleteClient } = useClients();
+    const { projects, updateProject, deleteProject } = useProjects();
+    const { tasks, deleteTask } = useTasks();
+    const { entries: timeEntries, deleteEntry } = useTimeEntries();
+    const { invoices, deleteInvoice } = useInvoices();
 
     // Form data removed - using modal manager now
 
@@ -84,47 +85,45 @@ const ClientList = ({
      * Perform actual client deletion (soft-delete with tombstones)
      */
     const performClientDeletion = (clientId, alsoDeleteProjects) => {
-        const relatedProjects = getRelatedProjects(clientId);
+        const clientRelatedProjects = getRelatedProjects(clientId);
         
         if (alsoDeleteProjects) {
             // Get related projects and their task/time entry IDs
-            const relatedProjectIds = relatedProjects.map(p => p.id);
+            const relatedProjectIds = clientRelatedProjects.map(p => p.id);
             
-            // Soft-delete related projects
-            setProjects(softDeleteByIds(projects, relatedProjectIds));
+            // Delete related projects
+            relatedProjectIds.forEach(id => deleteProject(id));
             
-            // Soft-delete tasks for related projects
+            // Delete tasks for related projects
             const relatedTaskIds = tasks
                 .filter(task => relatedProjectIds.includes(task.projectId))
                 .map(t => t.id);
-            setTasks(softDeleteByIds(tasks, relatedTaskIds));
+            relatedTaskIds.forEach(id => deleteTask(id));
             
-            // Soft-delete time entries for related tasks
+            // Delete time entries for related tasks
             const relatedTimeEntryIds = timeEntries
                 .filter(entry => relatedTaskIds.includes(entry.taskId))
                 .map(e => e.id);
-            setTimeEntries(softDeleteByIds(timeEntries, relatedTimeEntryIds));
+            relatedTimeEntryIds.forEach(id => deleteEntry(id));
             
-            // Soft-delete invoices for related projects
+            // Delete invoices for related projects
             const relatedInvoiceIds = invoices
                 .filter(invoice => relatedProjectIds.includes(invoice.projectId))
                 .map(i => i.id);
-            setInvoices(softDeleteByIds(invoices, relatedInvoiceIds));
+            relatedInvoiceIds.forEach(id => deleteInvoice(id));
         } else {
             // Remove client reference from projects (update, not delete)
-            setProjects(projects.map(project => 
-                project.preferredClientId === clientId 
-                    ? withUpdateMetadata({ ...project, preferredClientId: null })
-                    : project
-            ));
+            projects
+                .filter(project => project.preferredClientId === clientId)
+                .forEach(project => updateProject(project.id, { preferredClientId: null }));
         }
 
-        // Soft-delete the client
-        setClients(softDeleteById(clients, clientId));
+        // Delete the client
+        deleteClient(clientId);
 
         // Show appropriate success message
         const message = alsoDeleteProjects 
-            ? `Client and ${relatedProjects.length} related project(s) deleted successfully.`
+            ? `Client and ${clientRelatedProjects.length} related project(s) deleted successfully.`
             : 'Client deleted successfully.';
         showSuccess(message);
     };
@@ -136,18 +135,11 @@ const ClientList = ({
         if (alsoArchiveProjects) {
             // Archive related projects
             const relatedProjectIds = getRelatedProjects(clientId).map(p => p.id);
-            setProjects(projects.map(project => 
-                relatedProjectIds.includes(project.id)
-                    ? withUpdateMetadata({ ...project, archived: true })
-                    : project
-            ));
+            relatedProjectIds.forEach(id => updateProject(id, { archived: true }));
         }
 
         // Archive the client
-        const updatedClients = clients.map(client =>
-            client.id === clientId ? withUpdateMetadata({ ...client, archived: true }) : client
-        );
-        setClients(updatedClients);
+        updateClient(clientId, { archived: true });
 
         // Show appropriate success message
         const message = alsoArchiveProjects 
@@ -160,10 +152,7 @@ const ClientList = ({
      * Unarchive a client
      */
     const handleUnarchiveClient = (clientId) => {
-        const updatedClients = clients.map(client =>
-            client.id === clientId ? withUpdateMetadata({ ...client, archived: false }) : client
-        );
-        setClients(updatedClients);
+        updateClient(clientId, { archived: false });
         showSuccess('Client unarchived successfully!');
     };
 
@@ -229,9 +218,9 @@ const ClientList = ({
             {/* Header */}
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-foreground">
-                    Clients {clients.filter(c => !c.archived && !isDeleted(c)).length > 0 && (
+                    Clients {clients.filter(c => !c.archived).length > 0 && (
                         <span>
-                            ({clients.filter(c => !c.archived && !isDeleted(c)).length})
+                            ({clients.filter(c => !c.archived).length})
                         </span>
                     )}
                 </h2>
@@ -244,7 +233,7 @@ const ClientList = ({
 
 
             {/* Clients Grid */}
-            {clients.filter(c => !c.archived && !isDeleted(c)).length === 0 && clients.filter(c => c.archived && !isDeleted(c)).length === 0 ? (
+            {clients.filter(c => !c.archived).length === 0 && clients.filter(c => c.archived).length === 0 ? (
                 <EmptyState
                     icon={UserGroupIcon}
                     title="No clients"
@@ -256,9 +245,9 @@ const ClientList = ({
             ) : (
                 <>
                     {/* Active Clients */}
-                    {clients.filter(c => !c.archived && !isDeleted(c)).length > 0 && (
+                    {clients.filter(c => !c.archived).length > 0 && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {clients.filter(c => !c.archived && !isDeleted(c)).map((client) => (
+                            {clients.filter(c => !c.archived).map((client) => (
                                 <Card
                                     key={client.id}
                                     className="hover:shadow-md transition-shadow cursor-pointer relative"
@@ -344,7 +333,7 @@ const ClientList = ({
                     )}
 
                     {/* Archived Clients Section */}
-                    {clients.filter(c => c.archived && !isDeleted(c)).length > 0 && (
+                    {clients.filter(c => c.archived).length > 0 && (
                         <div className="border-t pt-6">
                             <button
                                 onClick={() => setShowArchivedClients(!showArchivedClients)}
@@ -355,12 +344,12 @@ const ClientList = ({
                                 ) : (
                                     <ChevronRightIcon className="h-4 w-4 mr-1" />
                                 )}
-                                Archived Clients ({clients.filter(c => c.archived && !isDeleted(c)).length})
+                                Archived Clients ({clients.filter(c => c.archived).length})
                             </button>
 
                             {showArchivedClients && (
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {clients.filter(c => c.archived && !isDeleted(c)).map((client) => (
+                                    {clients.filter(c => c.archived).map((client) => (
                                         <Card
                                             key={client.id}
                                             className="hover:shadow-md transition-shadow cursor-pointer relative"
@@ -563,16 +552,6 @@ const ClientList = ({
 };
 
 ClientList.propTypes = {
-    clients: PropTypes.array.isRequired,
-    setClients: PropTypes.func.isRequired,
-    projects: PropTypes.array,
-    setProjects: PropTypes.func,
-    tasks: PropTypes.array,
-    setTasks: PropTypes.func,
-    timeEntries: PropTypes.array,
-    setTimeEntries: PropTypes.func,
-    invoices: PropTypes.array,
-    setInvoices: PropTypes.func,
     onSelectClient: PropTypes.func.isRequired,
     openClientModal: PropTypes.func.isRequired,
     editClientModal: PropTypes.func.isRequired

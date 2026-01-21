@@ -1,14 +1,30 @@
 /// <reference path="../types/google-identity.d.ts" />
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { GOOGLE_CONFIG } from '@/config/google';
-import { getStoredToken, storeToken, clearStoredToken, isTokenExpired, getTokenTimeRemaining } from '@/utils/googleAuthStorage';
+/**
+ * Unified Google Auth hook
+ * 
+ * When VITE_SYNC_WORKER_URL is set:
+ *   - Uses Cloudflare Worker for OAuth and token management
+ *   - Refresh tokens stored server-side (persistent across browser restarts)
+ *   - No client-side token refresh scheduling needed
+ * 
+ * When VITE_SYNC_WORKER_URL is NOT set:
+ *   - Falls back to direct SPA auth via Google Identity Services
+ *   - Tokens stored in IndexedDB (lost on token expiry if user is away)
+ */
+
+import { useState, useEffect, useCallback } from 'react';
+import { GOOGLE_CONFIG, SYNC_WORKER_CONFIG } from '@/config/google';
+import { 
+    getStoredToken, storeToken, clearStoredToken, isTokenExpired,
+    getStoredSession, storeSession, clearStoredSession, type StoredSession
+} from '@/utils/googleAuthStorage';
 
 export interface GoogleUser {
     id: string;
     email: string;
-    name: string;
-    picture: string;
+    name?: string;
+    picture?: string;
 }
 
 interface AuthState {
@@ -16,12 +32,28 @@ interface AuthState {
     isLoading: boolean;
     user: GoogleUser | null;
     accessToken: string | null;
+    sessionId: string | null;
     error: string | null;
 }
 
-// Refresh token 5 minutes before expiry
-const REFRESH_BEFORE_EXPIRY_MS = 5 * 60 * 1000;
+// Check if Worker mode is enabled
+const USE_WORKER = Boolean(SYNC_WORKER_CONFIG.workerUrl);
 
+// Simple pub/sub so multiple hook instances stay in sync without reloads
+const authSubscribers = new Set<() => void>();
+const notifyAuthSubscribers = () => {
+    authSubscribers.forEach(subscriber => {
+        try {
+            subscriber();
+        } catch (error) {
+            console.error('Auth subscriber error:', error);
+        }
+    });
+};
+
+/**
+ * Google Auth hook - automatically uses Worker or SPA mode based on config
+ */
 export const useGoogleAuth = () => {
 
     const [state, setState] = useState<AuthState>({
@@ -29,268 +61,308 @@ export const useGoogleAuth = () => {
         isLoading: true,
         user: null,
         accessToken: null,
+        sessionId: null,
         error: null,
     });
 
-    const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // ============================================
+    // WORKER MODE - Cloudflare Worker handles tokens
+    // ============================================
 
-    const clearRefreshTimer = useCallback(() => {
-        if (refreshTimerRef.current) {
-            clearTimeout(refreshTimerRef.current);
-            refreshTimerRef.current = null;
+    const validateWorkerSession = useCallback(async (session: StoredSession): Promise<boolean> => {
+
+        try {
+            const response = await fetch(SYNC_WORKER_CONFIG.endpoints.authStatus, {
+                method: 'GET',
+                headers: { 'X-Session-Id': session.sessionId },
+            });
+            if (!response.ok) return false;
+            const data = await response.json();
+            return data.authenticated === true;
+        } catch {
+            return false;
         }
     }, []);
 
-    // Silent token refresh - uses prompt: '' to avoid user interaction
-    const refreshTokenSilently = useCallback((): Promise<void> => {
+
+    const signInWithWorker = useCallback(async (): Promise<void> => {
+
+        setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+        try {
+            // 1. Get auth URL from Worker
+            const initResponse = await fetch(SYNC_WORKER_CONFIG.endpoints.authInit, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    redirectUri: `${window.location.origin}/auth/callback`,
+                }),
+            });
+
+            if (!initResponse.ok) throw new Error('Failed to initialize auth flow');
+
+            const { authUrl, state: authState } = await initResponse.json();
+            sessionStorage.setItem('google_auth_state', authState);
+
+            // 2. Open popup for OAuth
+            const popup = openAuthPopup(authUrl);
+
+            // 3. Wait for callback
+            const code = await waitForAuthCallback(popup, authState);
+
+            // 4. Exchange code for session via Worker
+            const callbackResponse = await fetch(SYNC_WORKER_CONFIG.endpoints.authCallback, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code,
+                    redirectUri: `${window.location.origin}/auth/callback`,
+                }),
+            });
+
+            if (!callbackResponse.ok) {
+                const error = await callbackResponse.json();
+                throw new Error(error.error || 'Authentication failed');
+            }
+
+            const { sessionId, user } = await callbackResponse.json();
+
+            // 5. Store session
+            await storeSession({
+                sessionId,
+                userId: user.id,
+                email: user.email,
+                createdAt: new Date().toISOString(),
+            });
+
+            setState({
+                isSignedIn: true,
+                isLoading: false,
+                user,
+                accessToken: null, // Worker mode doesn't expose access token
+                sessionId,
+                error: null,
+            });
+
+            notifyAuthSubscribers();
+
+        } catch (error) {
+            setState(prev => ({
+                ...prev,
+                isLoading: false,
+                error: error instanceof Error ? error.message : 'Sign in failed',
+            }));
+        }
+    }, []);
+
+    const signOutFromWorker = useCallback(async (): Promise<void> => {
+
+        if (state.sessionId) {
+            try {
+                await fetch(SYNC_WORKER_CONFIG.endpoints.authRevoke, {
+                    method: 'POST',
+                    headers: { 'X-Session-Id': state.sessionId },
+                });
+            } catch {
+                // Ignore revoke errors
+            }
+        }
+
+        await clearStoredSession();
+
+        setState({
+            isSignedIn: false,
+            isLoading: false,
+            user: null,
+            accessToken: null,
+            sessionId: null,
+            error: null,
+        });
+
+        notifyAuthSubscribers();
+    }, [state.sessionId]);
+
+    // ============================================
+    // SPA MODE - Direct Google Identity Services (fallback)
+    // ============================================
+
+    const validateSpaToken = useCallback(async (accessToken: string): Promise<GoogleUser | null> => {
+
+        try {
+            const response = await fetch(
+                'https://www.googleapis.com/oauth2/v3/userinfo',
+                { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+            if (!response.ok) return null;
+            const data = await response.json();
+            return { id: data.sub, email: data.email, name: data.name, picture: data.picture };
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const syncFromStorage = useCallback(async () => {
+
+        if (USE_WORKER) {
+            const session = await getStoredSession();
+            if (session) {
+                const isValid = await validateWorkerSession(session);
+                if (isValid) {
+                    setState({
+                        isSignedIn: true,
+                        isLoading: false,
+                        user: { id: session.userId, email: session.email },
+                        accessToken: null,
+                        sessionId: session.sessionId,
+                        error: null,
+                    });
+                    return;
+                }
+                await clearStoredSession();
+            }
+            setState(prev => ({ ...prev, isLoading: false }));
+
+        } else {
+            const storedToken = await getStoredToken();
+            if (storedToken && !isTokenExpired(storedToken)) {
+                const user = await validateSpaToken(storedToken.accessToken);
+                if (user) {
+                    setState({
+                        isSignedIn: true,
+                        isLoading: false,
+                        user,
+                        accessToken: storedToken.accessToken,
+                        sessionId: null,
+                        error: null,
+                    });
+                    return;
+                }
+                await clearStoredToken();
+            }
+            setState(prev => ({ ...prev, isLoading: false }));
+        }
+    }, [validateWorkerSession, validateSpaToken]);
+
+    const signInWithSpa = useCallback(async (): Promise<void> => {
 
         return new Promise((resolve, reject) => {
 
-            if (!window.google?.accounts?.oauth2 || !GOOGLE_CONFIG.clientId) {
-                reject(new Error('Google Identity Services not available'));
+            if (!GOOGLE_CONFIG.clientId) {
+                setState(prev => ({ ...prev, error: 'Missing Google client ID' }));
+                reject(new Error('Missing Google client ID'));
+                return;
+            }
+
+            if (!window.google?.accounts?.oauth2) {
+                setState(prev => ({ ...prev, error: 'Google Identity Services not loaded' }));
+                reject(new Error('Google Identity Services not loaded'));
                 return;
             }
 
             const client = window.google.accounts.oauth2.initTokenClient({
                 client_id: GOOGLE_CONFIG.clientId,
                 scope: GOOGLE_CONFIG.scopes,
-                prompt: '', // Empty string = silent refresh without user interaction
                 callback: async (response) => {
 
                     if (response.error) {
-                        console.warn('Silent token refresh failed:', response.error);
-                        // Don't sign out - token might still be valid, just couldn't refresh
+                        setState(prev => ({ ...prev, error: response.error_description || response.error }));
                         reject(new Error(response.error));
                         return;
                     }
 
-                    const newExpiresAt = Date.now() + (response.expires_in * 1000);
+                    const expiresAt = Date.now() + (response.expires_in * 1000);
+                    await storeToken({ accessToken: response.access_token, expiresAt, scope: response.scope });
 
-                    await storeToken({
+                    const user = await validateSpaToken(response.access_token);
+                    if (!user) {
+                        setState(prev => ({ ...prev, error: 'Failed to get user info' }));
+                        reject(new Error('Failed to get user info'));
+                        return;
+                    }
+
+                    setState({
+                        isSignedIn: true,
+                        isLoading: false,
+                        user,
                         accessToken: response.access_token,
-                        expiresAt: newExpiresAt,
-                        scope: response.scope,
+                        sessionId: null,
+                        error: null,
                     });
-
-                    setState(prev => ({
-                        ...prev,
-                        accessToken: response.access_token,
-                    }));
-
-                    console.log('Google token silently refreshed, expires in', Math.round(response.expires_in / 60), 'minutes');
+                    notifyAuthSubscribers();
                     resolve();
                 },
             });
 
             client.requestAccessToken();
         });
-    }, []);
+    }, [validateSpaToken]);
 
-    // Schedule a token refresh before it expires
-    const scheduleTokenRefresh = useCallback(async () => {
-
-        clearRefreshTimer();
-
-        const storedToken = await getStoredToken();
-        if (!storedToken) return;
-
-        const timeRemaining = getTokenTimeRemaining(storedToken);
-        const refreshIn = Math.max(0, timeRemaining - REFRESH_BEFORE_EXPIRY_MS);
-
-        // Don't schedule if token is already expired or about to expire
-        if (timeRemaining <= REFRESH_BEFORE_EXPIRY_MS) {
-            // Token is about to expire, try refreshing now
-            try {
-                await refreshTokenSilently();
-                // Schedule next refresh after successful refresh
-                scheduleTokenRefresh();
-            } catch {
-                console.warn('Token refresh failed, user may need to re-authenticate');
-            }
-            return;
-        }
-
-        console.log('Token refresh scheduled in', Math.round(refreshIn / 60000), 'minutes');
-
-        refreshTimerRef.current = setTimeout(async () => {
-
-            try {
-                await refreshTokenSilently();
-                // Schedule next refresh after successful refresh
-                scheduleTokenRefresh();
-            } catch {
-                console.warn('Scheduled token refresh failed');
-            }
-        }, refreshIn);
-    }, [clearRefreshTimer, refreshTokenSilently]);
-
-    const validateAndSetToken = useCallback(async (accessToken: string) => {
-
-        try {
-
-            const userInfo = await fetchUserInfo(accessToken);
-
-            setState({
-                isSignedIn: true,
-                isLoading: false,
-                user: userInfo,
-                accessToken,
-                error: null,
-            });
-
-        } catch (error) {
-
-            console.error('Failed to validate Google access token:', error);
-
-            const errorMessage = error instanceof Error ? error.message : 'Token validation failed.';
-            const isNetworkError = errorMessage.includes('Network error');
-
-            // Only clear token if it's actually expired/revoked, not for network errors
-            if (!isNetworkError) {
-                await clearStoredToken();
-            }
-
-            setState({
-                isSignedIn: false,
-                isLoading: false,
-                user: null,
-                accessToken: null,
-                error: isNetworkError
-                    ? 'Unable to verify Google account. Check your connection.'
-                    : 'Google authorization expired. Reconnect Google Drive.',
-            });
-        }
-    }, []);
-
-    useEffect(() => {
-
-        const initGoogleAuth = async () => {
-
-            const storedToken = await getStoredToken();
-
-            if (storedToken && !isTokenExpired(storedToken)) {
-
-                await validateAndSetToken(storedToken.accessToken);
-                // Schedule automatic token refresh
-                scheduleTokenRefresh();
-                return;
-            }
-
-            setState(prevState => ({
-                ...prevState,
-                isLoading: false,
-            }));
-        };
-
-        if (window.google?.accounts?.oauth2) {
-
-            initGoogleAuth();
-            return;
-        }
-
-        const checkGoogle = setInterval(() => {
-
-            if (window.google?.accounts?.oauth2) {
-
-                clearInterval(checkGoogle);
-                initGoogleAuth();
-            }
-        }, 100);
-
-        const loadingTimeout = setTimeout(() => {
-            setState(prevState => ({
-                ...prevState,
-                isLoading: false,
-                error: prevState.error || 'Google Identity Services not loaded.'
-            }));
-        }, 2000);
-
-        return () => {
-            clearInterval(checkGoogle);
-            clearTimeout(loadingTimeout);
-        };
-    }, [validateAndSetToken, scheduleTokenRefresh]);
-
-    const signIn = useCallback(async () => {
-
-        return new Promise((resolve, reject) => {
-
-            if (!GOOGLE_CONFIG.clientId) {
-
-                const message = 'Missing Google client ID. Set VITE_GOOGLE_CLIENT_ID.';
-                setState(prevState => ({
-                    ...prevState,
-                    isLoading: false,
-                    error: message
-                }));
-                reject(new Error(message));
-                return;
-            }
-
-            if (!window.google?.accounts?.oauth2) {
-
-                setState(prevState => ({
-                    ...prevState,
-                    isLoading: false,
-                    error: 'Google Identity Services not loaded.'
-                }));
-                reject(new Error('Google Identity Services not loaded.'));
-                return;
-            }
-
-            const client = window.google.accounts.oauth2.initTokenClient({
-                client_id: GOOGLE_CONFIG.clientId,
-                scope: GOOGLE_CONFIG.scopes,
-                callback: async (response) => {
-                    if (response.error) {
-                        setState(prevState => ({
-                            ...prevState,
-                            error: response.error_description || response.error,
-                        }));
-                        reject(response.error);
-                        return;
-                    }
-
-                    await storeToken({
-                        accessToken: response.access_token,
-                        expiresAt: Date.now() + (response.expires_in * 1000),
-                        scope: response.scope,
-                    });
-
-                    await validateAndSetToken(response.access_token);
-                    // Schedule automatic token refresh
-                    scheduleTokenRefresh();
-                    resolve(response);
-                },
-            });
-
-            client.requestAccessToken();
-        });
-    }, [validateAndSetToken, scheduleTokenRefresh]);
-
-    const signOut = useCallback(async () => {
-
-        clearRefreshTimer();
+    const signOutFromSpa = useCallback(async (): Promise<void> => {
 
         if (state.accessToken && window.google?.accounts?.oauth2) {
-
             window.google.accounts.oauth2.revoke(state.accessToken, () => undefined);
         }
 
         await clearStoredToken();
+
         setState({
             isSignedIn: false,
             isLoading: false,
             user: null,
             accessToken: null,
+            sessionId: null,
             error: null,
         });
-    }, [state.accessToken, clearRefreshTimer]);
 
-    // Cleanup refresh timer on unmount
+        notifyAuthSubscribers();
+    }, [state.accessToken]);
+
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+
     useEffect(() => {
-        return () => clearRefreshTimer();
-    }, [clearRefreshTimer]);
+
+        // For SPA mode, wait for Google Identity Services to load
+        if (!USE_WORKER && !window.google?.accounts?.oauth2) {
+            const checkGoogle = setInterval(() => {
+                if (window.google?.accounts?.oauth2) {
+                    clearInterval(checkGoogle);
+                    syncFromStorage();
+                }
+            }, 100);
+
+            const timeout = setTimeout(() => {
+                clearInterval(checkGoogle);
+                setState(prev => ({ ...prev, isLoading: false }));
+            }, 2000);
+
+            return () => {
+                clearInterval(checkGoogle);
+                clearTimeout(timeout);
+            };
+        }
+
+        syncFromStorage();
+
+        const handleExternalAuthChange = () => {
+            syncFromStorage();
+        };
+
+        authSubscribers.add(handleExternalAuthChange);
+
+        return () => {
+            authSubscribers.delete(handleExternalAuthChange);
+        };
+
+    }, [syncFromStorage]);
+
+    // ============================================
+    // UNIFIED API
+    // ============================================
+
+    const signIn = USE_WORKER ? signInWithWorker : signInWithSpa;
+    const signOut = USE_WORKER ? signOutFromWorker : signOutFromSpa;
 
     return {
         ...state,
@@ -299,33 +371,69 @@ export const useGoogleAuth = () => {
     };
 };
 
-const fetchUserInfo = async (accessToken: string): Promise<GoogleUser> => {
+// ============================================
+// HELPER FUNCTIONS (for Worker OAuth popup flow)
+// ============================================
 
-    let response: Response;
+function openAuthPopup(url: string): Window {
 
-    try {
-        response = await fetch(
-            'https://www.googleapis.com/oauth2/v3/userinfo',
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-    } catch (networkError) {
-        // Network error - don't clear token, just throw
-        throw new Error('Network error while validating Google token.');
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.innerWidth - width) / 2;
+    const top = window.screenY + (window.innerHeight - height) / 2;
+
+    const popup = window.open(url, 'google-auth', `width=${width},height=${height},left=${left},top=${top},popup=1`);
+
+    if (!popup) {
+        throw new Error('Failed to open auth popup. Check popup blocker settings.');
     }
 
-    if (!response.ok) {
-        if (response.status === 401) {
-            throw new Error('Google token expired or revoked.');
-        }
-        throw new Error(`Failed to fetch Google user info: ${response.status}`);
-    }
+    return popup;
+}
 
-    const data = await response.json();
+function waitForAuthCallback(popup: Window, expectedState: string): Promise<string> {
 
-    return {
-        id: data.sub,
-        email: data.email,
-        name: data.name,
-        picture: data.picture,
-    };
-};
+    return new Promise((resolve, reject) => {
+
+        let settled = false;
+
+        const cleanup = () => {
+            window.removeEventListener('message', handleMessage);
+            clearTimeout(timeoutId);
+        };
+
+        const timeoutId = setTimeout(() => {
+            cleanup();
+            if (!settled) {
+                settled = true;
+                reject(new Error('Authentication timed out. Please try again.'));
+            }
+        }, 120000);
+
+        const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+
+            const { type, code, state, error } = event.data || {};
+            if (type !== 'google-auth-callback') return;
+
+            cleanup();
+
+            if (error) {
+                settled = true;
+                reject(new Error(error));
+                return;
+            }
+
+            if (state !== expectedState) {
+                settled = true;
+                reject(new Error('Invalid auth state - possible CSRF attack'));
+                return;
+            }
+
+            settled = true;
+            resolve(code);
+        };
+
+        window.addEventListener('message', handleMessage);
+    });
+}

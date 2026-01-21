@@ -1,7 +1,7 @@
 # Agent Instructions for TaskTime
 
 > **Purpose:** Guidelines and context for AI agents working on this codebase  
-> **Last Updated:** January 16, 2026
+> **Last Updated:** January 20, 2026
 
 ---
 
@@ -30,9 +30,10 @@
 
 - **Framework:** React 19 + Vite
 - **Styling:** Tailwind CSS
-- **Storage:** IndexedDB (via `idb` package) — NOT localStorage
-- **State:** Lifted state in App.jsx with custom hooks
+- **Storage:** Yjs CRDT with IndexedDB persistence (via `y-indexeddb`)
+- **State:** Yjs-backed React hooks in App.jsx
 - **Routing:** Path-based via `useUrlState` hook (e.g., `/projects`, `/clients/123`)
+- **Sync:** Yjs + Google Drive (delta-based, conflict-free)
 
 ---
 
@@ -44,17 +45,28 @@
 - Custom `useUrlState` hook (not React Router)
 - Supports browser back/forward navigation
 
-### Storage: IndexedDB
-- Use `idb` package (Jake Archibald's wrapper)
-- Single database: `tasktime-db`
-- Single object store: `app-data`
-- Keys match old localStorage keys: `projects`, `tasks`, `timeEntries`, etc.
-- Hook: `useIndexedDB` (async, returns loading state)
+### Storage: Yjs CRDT
+- **Engine:** Yjs for conflict-free sync
+- **Persistence:** y-indexeddb for local storage
+- **Multi-doc architecture:** Data split by type/time period
+- **Sync provider:** Google Drive (delta uploads)
+
+**Document structure:**
+| Document | Contents | Loading |
+|----------|----------|---------|
+| `core` | projects, tasks, clients, businessInfos, templates | Always |
+| `entries-active` | Last 90 days of time entries | Always |
+| `entries-{year}` | Historical entries by year | On-demand |
+| `tasks-archived` | Archived tasks | On-demand |
+| `invoices-archived` | Paid invoices from past years | On-demand |
 
 ### State Management
-- All app state lives in `App.jsx`
-- Custom hooks for persistence (`useIndexedDB`)
-- Props passed down (yes, there's prop drilling — acceptable for now)
+- All app state powered by Yjs hooks
+- Entity hooks: `useProjects()`, `useTasks()`, `useTimeEntries()`, `useTimer()`, etc.
+- **All components now use hooks directly** - no prop drilling for mutations
+- Timer/task components fully migrated to hooks (TimerControls, GlobalTimer, TaskTree, TaskItem, etc.)
+- Invoice components fully migrated (InvoiceGenerator, InvoicesList use Yjs hooks)
+- Account/Settings fully migrated (usePreferences, useYjs().clearAllData)
 - Toast notifications via `ToastContext`
 
 ### Component Patterns
@@ -84,10 +96,13 @@
 src/
 ├── components/     # React components
 │   ├── modals/     # Modal components
-│   └── invoice/    # Invoice-specific components
-├── hooks/          # Custom React hooks
-├── contexts/       # React contexts
+│   ├── invoice/    # Invoice-specific components
+│   └── sync/       # Sync status/settings (Yjs)
+├── hooks/          # Custom React hooks (Yjs entity hooks)
+├── contexts/       # React contexts (Toast, Yjs)
+├── stores/yjs/     # Yjs store, doc manager, providers
 ├── utils/          # Pure utility functions
+├── types/          # TypeScript declarations
 └── styles/         # CSS files
 ```
 
@@ -97,9 +112,9 @@ src/
 
 ### Timer System
 - Single active timer only (enforced)
-- Timer state: `{ startTime, taskId, paused, elapsedTime, note }`
+- Timer state managed by `useTimer()` hook
 - Pause preserves elapsed time, doesn't create entry
-- Stop creates the time entry
+- Stop creates the time entry automatically
 
 ### Data Relationships
 - Projects have `invoiceIds[]` (references, not embedded)
@@ -112,50 +127,61 @@ src/
 - Supports modal stacking (nested modals)
 - Use `openXxxModal()` functions from App.jsx
 
-### 🔄 Sync Metadata (CRITICAL)
+### 🔄 Sync System - Yjs (ACTIVE)
 
-**All entity mutations MUST use sync metadata utilities from `src/utils/syncableEntity.ts`:**
+**TaskTime uses Yjs for conflict-free sync.** The system is in `src/stores/yjs/`:
 
+- **CRDT-based sync** - Conflicts resolved automatically by Yjs
+- **Multi-document architecture** - Data split for scaling
+- **Delta-based uploads** - Only changes sync, not full state
+- **Automatic archival** - Old entries archived by year
+
+**Hooks (in `src/hooks/`):**
 ```typescript
-import { withCreateMetadata, withUpdateMetadata, softDelete } from '../utils/syncableEntity.ts';
-
-// Creating a new entity
-const newProject = withCreateMetadata({
-    id: generateId(),
-    title: 'My Project',
-    // ... other fields (do NOT include createdAt/updatedAt manually)
-});
-
-// Updating an existing entity
-const updatedTask = withUpdateMetadata({ ...task, title: newTitle });
-
-// Deleting an entity (soft-delete)
-const deletedClient = softDelete(client);
-// Or for arrays: softDeleteById(clients, clientId)
+const { projects, createProject, updateProject, deleteProject } = useProjects();
+const { tasks, createTask, updateTask, archiveTask } = useTasks();
+const { entries, createEntry, loadYear } = useTimeEntries();
+const { isActive, startTimer, stopTimer, pauseTimer } = useTimer();
+const { clients, createClient } = useClients();
+const { invoices, createInvoice } = useInvoices();
+const { preferences, updatePreferences } = usePreferences();
 ```
 
-**Why this matters:**
-- Every entity needs `updatedAt` + `_syncSeq` for deterministic sync merging
-- Without these, `mergeCollection` produces unpredictable results
-- The `_syncSeq` counter handles same-millisecond edits across devices
+**Key files:**
+- `src/stores/yjs/YjsStore.ts` - Main store facade
+- `src/stores/yjs/YjsDocManager.ts` - Multi-doc management
+- `src/contexts/YjsContext.tsx` - React context provider
+- `src/hooks/use*.ts` - Entity-specific hooks
+- `src/components/sync/YjsSyncStatus.tsx` - Status indicator
+- `src/components/sync/YjsSyncSettings.tsx` - Settings panel
 
-**Entity types that require sync metadata:**
-- `projects`, `tasks`, `timeEntries`, `invoices`
-- `clients`, `businessInfos`, `invoiceTemplates`, `paymentMethods`
+### 🔐 Google Drive Auth - Cloudflare Worker
 
-**Never create/update entities like this:**
-```typescript
-// ❌ WRONG - missing sync metadata
-const task = { id: generateId(), title: 'Task', createdAt: Date.now() };
-setTasks([...tasks, task]);
+**Token persistence is handled by a Cloudflare Worker** to solve OAuth token expiry:
 
-// ❌ WRONG - missing updatedAt
-setTasks(tasks.map(t => t.id === id ? { ...t, completed: true } : t));
+- **Worker URL:** `https://tasktime-sync.owenfar1.workers.dev`
+- **Source:** `cloudflare/` folder (TypeScript, no node_modules)
+- **Features:** Secure refresh token storage, auto-refresh, Drive API proxy
+
+**How it works:**
+1. OAuth popup → Worker exchanges code for tokens
+2. Worker encrypts and stores refresh token in KV
+3. Worker returns session ID to app (stored in localStorage)
+4. All Drive API calls go through Worker with session ID
+5. Worker auto-refreshes access tokens as needed
+
+**Worker commands (Makefile):**
+```bash
+make worker-deploy    # Deploy Worker (requires CLOUDFLARE_API_TOKEN env var)
+make worker-logs      # View Worker logs
+make worker-secret    # Set a secret (KEY=... VALUE=...)
 ```
+
+**Local development:** Set `VITE_SYNC_WORKER_URL` in `.env.local`
 
 ---
 
-## � Docker Development Environment
+## 🐳 Docker Development Environment
 
 **All npm/node commands run through Docker, NOT locally.**
 ### Quick Commands (Makefile)
@@ -191,7 +217,7 @@ docker compose run --rm app npm run <script>
 
 ## 🚫 Things to Avoid
 
-1. **Don't use localStorage** — We use IndexedDB now
+1. **Don't use localStorage** — We use Yjs + IndexedDB
 2. **Don't add console.log** — Remove debug statements
 3. **Don't create migration code** — We're pre-production
 4. **Don't keep old code "just in case"** — Delete it
@@ -199,17 +225,39 @@ docker compose run --rm app npm run <script>
 6. **Don't use class components** — Functional only
 7. **Don't add new dependencies without justification** — Keep it lean
 8. **Don't run npm directly** — Use `docker compose run --rm app npm ...`
-9. **Don't create/update entities without sync metadata** — Always use `withCreateMetadata()` or `withUpdateMetadata()` from `syncableEntity.ts`
-10. **Don't manually set `createdAt`/`updatedAt`** — The sync utilities handle this
+9. **Use Yjs hooks** — `useProjects()`, `useTasks()`, etc. for all data access
+10. **Don't create new useIndexedDB calls** — All new state should use Yjs
 
 ---
 
 ## 📊 Current State (January 2026)
 
-### Next Phases
-- [ ] Testing infrastructure (Jest + React Testing Library)
+### Completed
+- [x] Yjs sync system (Phases 1-6: core, Drive provider, React hooks, App migration, sync reliability, component migration)
+- [x] Phase 7: Token persistence with Cloudflare Workers
+- [x] App.jsx fully migrated to Yjs hooks
+- [x] Old SyncEngine removed
+- [x] YjsSyncStatus and YjsSyncSettings components
+- [x] Timer components migrated (TimerControls, TaskTimer, GlobalTimer)
+- [x] Task components migrated (TaskTree, TaskItem, TaskActions, SubtaskSection, SubtaskItem)
+- [x] TimeEntriesModal migrated to Yjs hooks
+- [x] InvoiceGenerator migrated to Yjs hooks
+- [x] InvoicesList migrated to Yjs hooks
+- [x] ProjectList/ClientList cascade deletes migrated to Yjs hooks
+- [x] Account clear data migrated to use Yjs store clearAllData()
+- [x] Preferences migrated to usePreferences() hook
+- [x] ExportImport migrated to useTimer() hook
+- [x] PaymentMethods, BusinessInfo, InvoiceTemplates migrated to Yjs hooks
+- [x] Dashboard and RecentTasks migrated to Yjs hooks
+- [x] useTaskState migrated to Yjs hooks
+- [x] `syncableEntity.ts` deleted (no longer needed)
+- [x] Cloudflare Worker deployed (`cloudflare/` folder)
+- [x] Worker-based auth flow (OAuth popup → Worker proxy)
+- [x] Encrypted refresh token storage in Cloudflare KV
+
+### Next Steps
 - [ ] TypeScript migration (gradual)
-- [ ] Cloud features (Google OAuth, Drive backup, multi-device sync)
+- [ ] Testing infrastructure improvements
 
 ---
 
@@ -217,7 +265,8 @@ docker compose run --rm app npm run <script>
 
 | Document | Purpose |
 |----------|---------|
-| `docs/project_overview.md` | Full technical documentation || `docs/google-drive-sync-implementation.md` | Sync architecture and conflict resolution || `docs/client_edge_license_flow.md` | Future cloud/license architecture |
+| `docs/project_overview.md` | Full technical documentation |
+| `docs/yjs-sync-implementation-plan.md` | Yjs sync architecture |
 | `_implan.md` | Original project plan and preferences |
 | `README.md` | User-facing documentation |
 
@@ -227,10 +276,10 @@ docker compose run --rm app npm run <script>
 
 1. **Read `docs/project_overview.md` first** — It has the full architecture
 2. **Check this file for rules** — Especially the "no legacy code" rule
-3. **App.jsx is the state hub** — All data flows from there
-4. **Keep tests updated** — Add or adjust tests whenever behavior changes or new workflows are added
-5. **Always use sync metadata utilities** — Every entity create/update MUST use `withCreateMetadata()` or `withUpdateMetadata()` from `syncableEntity.ts`. This is critical for reliable Google Drive sync.
-6. **Review `docs/google-drive-sync-implementation.md`** — Understand the merge strategy before modifying entity mutations
+3. **App.jsx uses Yjs hooks** — All state is managed by Yjs
+4. **Keep tests updated** — Add or adjust tests whenever behavior changes
+5. **Use Yjs hooks directly** — `useProjects()`, `useTasks()`, etc. from `src/hooks/`
+6. **Review `docs/yjs-sync-implementation-plan.md`** — Understand the CRDT-based sync system
 
 ---
 

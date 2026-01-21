@@ -3,13 +3,16 @@ import { createInvoiceHTML } from '../utils/pdfUtils.ts';
 import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { withCreateMetadata, withUpdateMetadata, isDeleted } from '../utils/syncableEntity.ts';
 import InvoiceModal from './invoice/InvoiceModal';
 import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
 import * as InvoiceHandler from './invoice/InvoiceHandler.ts';
 import useInvoicePricing from './invoice/hooks/useInvoicePricing.ts';
 import { calculateDueDate, generateInvoiceNumber } from './invoice/utils/invoiceDateUtils.ts';
 import { buildInvoiceTaskData } from './invoice/InvoiceCalculations.ts';
+import { useInvoices } from '../hooks/useInvoices.ts';
+import { useProjects } from '../hooks/useProjects.ts';
+import { useTasks } from '../hooks/useTasks.ts';
+import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -17,10 +20,6 @@ import { buildInvoiceTaskData } from './invoice/InvoiceCalculations.ts';
 const InvoiceGenerator = ({ 
     project, 
     client, // Add client prop for pre-selection
-    projects, 
-    setProjects, 
-    tasks,
-    setTasks,
     timeEntries,
     currentTimer,
     isPaused,
@@ -29,10 +28,6 @@ const InvoiceGenerator = ({
     paymentMethods = [],
     businessInfos = [],
     clients = [],
-    invoices = [],
-    setInvoices,
-    invoiceTemplates = [],
-    setInvoiceTemplates,
     showButton = true,
     // Modal stacking functions
     openClientModal,
@@ -41,6 +36,12 @@ const InvoiceGenerator = ({
     openPaymentMethodModal,
     openTemplateModal
 }) => {
+    // Yjs hooks for data access
+    const { invoices, createInvoice, updateInvoice } = useInvoices();
+    const { projects, updateProject } = useProjects();
+    const { tasks, updateTask } = useTasks();
+    const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
+    
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
@@ -706,13 +707,8 @@ const InvoiceGenerator = ({
     const updateTemplateSequentialNumber = useCallback((template) => {
         if (!template || !template.useSequentialNumbers) return;
 
-        const updatedTemplates = invoiceTemplates.map(t => 
-            t.id === template.id 
-                ? withUpdateMetadata({ ...t, currentSequentialNumber: t.currentSequentialNumber + 1 })
-                : t
-        );
-        setInvoiceTemplates(updatedTemplates);
-    }, [invoiceTemplates, setInvoiceTemplates]);
+        updateInvoiceTemplate(template.id, { currentSequentialNumber: template.currentSequentialNumber + 1 });
+    }, [updateInvoiceTemplate]);
 
     /**
      * Save invoice (create new or update existing)
@@ -907,39 +903,25 @@ const InvoiceGenerator = ({
                     ? toDisplayDate(new Date(invoiceDateOverride))
                     : (editingInvoice ? toDisplayDate(editingInvoice.date) : toDisplayDate(new Date())),
                 dueDate: dueDate ? toDisplayDate(dueDate) : null,
-                currency: selectedClient?.defaultCurrency || getPreferredCurrency(),
-                createdAt: editingInvoice ? editingInvoice.createdAt : Date.now()
+                currency: selectedClient?.defaultCurrency || getPreferredCurrency()
             })
         };
 
-        // Add sync metadata to invoice
-        const invoiceWithMeta = editingInvoice
-            ? withUpdateMetadata({ ...invoiceData, createdAt: editingInvoice.createdAt })
-            : withCreateMetadata(invoiceData);
-
         // Store invoice in the new separate invoices structure
-        let updatedInvoices;
         let updatedProjectInvoiceIds = [];
         
         if (editingInvoice) {
-            // Update existing invoice
-            updatedInvoices = invoices.map(inv => 
-                inv.id === editingInvoice.id ? invoiceWithMeta : inv
-            );
+            // Update existing invoice - preserving original createdAt
+            updateInvoice(editingInvoice.id, { ...invoiceData, createdAt: editingInvoice.createdAt });
             if (selectedProject) {
                 updatedProjectInvoiceIds = selectedProject.invoiceIds || [];
             }
         } else {
-            // Add new invoice
-            updatedInvoices = [...invoices, invoiceWithMeta];
+            // Add new invoice - createInvoice auto-generates id and timestamps
+            const newInvoice = createInvoice(invoiceData);
             if (selectedProject) {
-                updatedProjectInvoiceIds = [...(selectedProject.invoiceIds || []), invoiceWithMeta.id];
+                updatedProjectInvoiceIds = [...(selectedProject.invoiceIds || []), newInvoice.id];
             }
-        }
-
-        // Update invoices storage - check if setInvoices is a function
-        if (typeof setInvoices === 'function') {
-            setInvoices(updatedInvoices);
         }
 
         // Update tasks to set lastBilledAt for billed tasks and projects
@@ -949,7 +931,7 @@ const InvoiceGenerator = ({
             // Get all task IDs that should be marked as billed (including merged subtasks)
             // Make sure we only include tasks from the current project
             const billedTaskIds = [];
-            const projectTasks = tasks.filter(task => task.projectId === selectedProject.id && !isDeleted(task));
+            const projectTasks = tasks.filter(task => task.projectId === selectedProject.id);
             const projectTaskIds = new Set(projectTasks.map(task => task.id));
             
             invoiceTasks.forEach(task => {
@@ -970,38 +952,18 @@ const InvoiceGenerator = ({
             });
             
             // Update lastBilledAt for all tasks that were included in this invoice
-            // IMPORTANT: Only modify tasks from the current project to prevent affecting tasks in other projects
-            // CRITICAL FIX: Use a functional update to ensure we work with the complete tasks array
-            // The 'tasks' prop might be filtered (e.g., only current project's tasks), but setTasks 
-            // expects to receive the complete array including all projects' tasks
-            setTasks(prevTasks => prevTasks.map(task => {
-                if (billedTaskIds.includes(task.id) && task.projectId === selectedProject.id) {
-                    return withUpdateMetadata({ ...task, lastBilledAt: currentTime });
+            billedTaskIds.forEach(taskId => {
+                const task = tasks.find(t => t.id === taskId);
+                if (task && task.projectId === selectedProject.id) {
+                    updateTask(taskId, { lastBilledAt: currentTime });
                 }
-                return task;
-            }));
+            });
             
             // Update project to include invoice ID (but don't update project lastBilledAt)
-            const updatedProjects = projects.map(p => 
-                p.id === selectedProject.id 
-                    ? withUpdateMetadata({ 
-                        ...p, 
-                        invoiceIds: updatedProjectInvoiceIds
-                    })
-                    : p
-            );
-            setProjects(updatedProjects);
+            updateProject(selectedProject.id, { invoiceIds: updatedProjectInvoiceIds });
         } else if (selectedProject) {
             // For edited invoices, just update the project invoice IDs
-            const updatedProjects = projects.map(p => 
-                p.id === selectedProject.id 
-                    ? withUpdateMetadata({ 
-                        ...p, 
-                        invoiceIds: updatedProjectInvoiceIds
-                    })
-                    : p
-            );
-            setProjects(updatedProjects);
+            updateProject(selectedProject.id, { invoiceIds: updatedProjectInvoiceIds });
         }
 
         // Reset form
@@ -1202,8 +1164,8 @@ const InvoiceGenerator = ({
 
     // Only calculate unbilled time if we have a project context and not in client dashboard
     if (currentProjectForCalculation) {
-        // Get all tasks for this project (excluding deleted tasks)
-        const projectTasks = tasks.filter(task => task.projectId === currentProjectForCalculation.id && !isDeleted(task));
+        // Get all tasks for this project
+        const projectTasks = tasks.filter(task => task.projectId === currentProjectForCalculation.id);
         
         // Get explicitly billable tasks (tasks with billable === true)
         const billableTasks = projectTasks.filter(task => task.billable === true);
@@ -1211,9 +1173,6 @@ const InvoiceGenerator = ({
         
         // Filter unbilled entries based on individual task billing dates AND billable status
         const unbilledEntries = timeEntries.filter(entry => {
-            // Skip deleted entries
-            if (isDeleted(entry)) return false;
-            
             // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
             

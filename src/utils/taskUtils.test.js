@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getTaskIdsToDelete, hasSubtasks, getSubtasks, deleteTaskWithCleanup } from './taskUtils'
+import { getTaskIdsToDelete, hasSubtasks, getSubtasks } from './taskUtils'
 
 describe('taskUtils', () => {
 
@@ -63,58 +63,6 @@ describe('taskUtils', () => {
 
             const subtasks = getSubtasks('task-2', mockTasks)
             expect(subtasks).toEqual([])
-        })
-    })
-
-    describe('deleteTaskWithCleanup', () => {
-
-        it('removes main task, subtasks, and entries', () => {
-
-            const setTasks = vi.fn()
-            const setTimeEntries = vi.fn()
-            const setCurrentTimer = vi.fn()
-
-            const timeEntries = [
-                { taskId: 'task-1' },
-                { taskId: 'task-2' },
-                { taskId: 'task-4' }
-            ]
-
-            const result = deleteTaskWithCleanup(
-                'task-1',
-                mockTasks,
-                timeEntries,
-                { taskId: 'task-2' },
-                setTasks,
-                setTimeEntries,
-                setCurrentTimer
-            )
-
-            expect(setTasks).toHaveBeenCalled()
-            expect(setTimeEntries).toHaveBeenCalled()
-            expect(setCurrentTimer).toHaveBeenCalledWith(null)
-            expect(result.deletedCount).toBe(3)
-            expect(result.isMainTask).toBe(true)
-        })
-
-        it('removes only subtask and its entries', () => {
-
-            const setTasks = vi.fn()
-            const setTimeEntries = vi.fn()
-            const setCurrentTimer = vi.fn()
-
-            const result = deleteTaskWithCleanup(
-                'task-2',
-                mockTasks,
-                [{ taskId: 'task-2' }, { taskId: 'task-1' }],
-                null,
-                setTasks,
-                setTimeEntries,
-                setCurrentTimer
-            )
-
-            expect(result.deletedCount).toBe(1)
-            expect(result.isMainTask).toBe(false)
         })
     })
 })

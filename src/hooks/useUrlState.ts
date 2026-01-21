@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-type ViewName = 'dashboard' | 'projects' | 'clients' | 'invoices' | 'account';
+type ViewName = 'dashboard' | 'projects' | 'clients' | 'invoices' | 'account' | 'auth-callback';
 
 type UrlParams = {
     view: ViewName;
@@ -60,6 +60,12 @@ function getParamsFromUrl(): UrlParams {
                 break;
             case 'account':
                 view = 'account';
+                break;
+            case 'auth':
+                // Handle /auth/callback path
+                if (pathParts[1] === 'callback') {
+                    view = 'auth-callback';
+                }
                 break;
             default:
                 view = 'dashboard';

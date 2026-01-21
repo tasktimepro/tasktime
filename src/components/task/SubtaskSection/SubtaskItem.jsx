@@ -1,103 +1,87 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import TimeEntriesModal from '../../TimeEntriesModal';
 import TaskHeader from '../TaskHeader';
 import TaskActions from '../TaskActions';
-import useTaskState from '../hooks/useTaskState';
-import { withCreateMetadata, withUpdateMetadata } from '../../../utils/syncableEntity.ts';
+import { useTasks } from '../../../hooks/useTasks';
+import { useTimeEntries } from '../../../hooks/useTimeEntries';
+import { useTimer } from '../../../hooks/useTimer';
 
 /**
  * SubtaskItem component - Displays individual subtask.
+ * Uses Yjs hooks directly for state management.
  * @param {Object} props
  */
 const SubtaskItem = ({
     task,
-    tasks,
-    setTasks,
-    timeEntries,
-    setTimeEntries,
-    currentTimer,
-    setCurrentTimer,
-    isPaused = false,
-    setIsPaused = null,
-    pausedElapsedTime = 0,
-    setPausedElapsedTime = null,
-    isGlobalTimer = false,
     onToggleBillable,
-    onDelete,
-    allTasks
+    onDelete
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
 
-    const {
-        mainTaskTime,
-        totalTimeWithSubtasks,
-        isTimerActive,
-        anyTimerActive,
-        isCompleted,
-        isArchived,
-        isRelatedToActiveTimer,
-        shouldDimTask
-    } = useTaskState({
-        task,
-        tasks,
-        timeEntries,
-        currentTimer,
-        isPaused,
-        subtasks: [],
-        setTasks
-    });
+    // Yjs hooks for state
+    const { updateTask } = useTasks();
+    const { entries: timeEntries, createEntry } = useTimeEntries();
+    const { isActive: isAnyTimerActive, isPaused, taskId: activeTimerTaskId, startTime: timerStartTime, note: timerNote, clearTimer } = useTimer();
+
+    // Compute state
+    const isTimerActive = isAnyTimerActive && activeTimerTaskId === task.id;
+    const isCompleted = task.completed || false;
+    const isArchived = task.archived || false;
+    
+    // For subtasks, isRelatedToActiveTimer is just whether this subtask has the timer
+    const isRelatedToActiveTimer = isTimerActive;
+    
+    // Should dim if another task has active timer
+    const shouldDimTask = isAnyTimerActive && !isRelatedToActiveTimer;
+
+    // Calculate time for this subtask
+    const mainTaskTime = useMemo(() => {
+        return timeEntries
+            .filter(e => e.taskId === task.id)
+            .reduce((sum, e) => sum + (e.end - e.start), 0);
+    }, [timeEntries, task.id]);
 
     /**
      * Toggle subtask completion status
      */
-    const handleToggleComplete = (checked) => {
+    const handleToggleComplete = useCallback((checked) => {
         const now = Date.now();
 
-        if (isTimerActive && currentTimer) {
-            const timeEntry = withCreateMetadata({
-                id: `completion-${Date.now()}`,
+        // If timer is active for this task, stop it and create entry
+        if (isTimerActive && timerStartTime) {
+            createEntry({
                 taskId: task.id,
-                start: currentTimer.startTime,
+                start: timerStartTime,
                 end: now,
-                note: currentTimer.note
+                note: timerNote
             });
-            setTimeEntries([...timeEntries, timeEntry]);
-            setCurrentTimer(null);
+            clearTimer();
         }
 
-        const updatedTasks = tasks.map(t =>
-            t.id === task.id ? withUpdateMetadata({ ...t, completed: checked, lastActive: now }) : t
-        );
-
-        setTasks(updatedTasks);
-    };
+        updateTask(task.id, { completed: checked, lastActive: now });
+    }, [isTimerActive, timerStartTime, timerNote, task.id, createEntry, clearTimer, updateTask]);
 
     /**
      * Update subtask title
      */
-    const handleUpdateTitle = (e) => {
+    const handleUpdateTitle = useCallback((e) => {
         e.preventDefault();
 
         if (!editTitle.trim()) return;
 
-        const now = Date.now();
-        const updatedTasks = tasks.map(t =>
-            t.id === task.id ? withUpdateMetadata({ ...t, title: editTitle.trim(), lastActive: now }) : t
-        );
-
-        setTasks(updatedTasks);
+        updateTask(task.id, { title: editTitle.trim(), lastActive: Date.now() });
         setIsEditing(false);
-    };
+    }, [editTitle, task.id, updateTask]);
 
     /**
      * Cancel editing
      */
-    const cancelEdit = () => {
+    const cancelEdit = useCallback(() => {
         setEditTitle(task.title);
         setIsEditing(false);
-    };
+    }, [task.title]);
 
     return (
         <div className={`flex items-center justify-between py-2 rounded-md hover:bg-muted transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
@@ -113,26 +97,15 @@ const SubtaskItem = ({
                 onCancelEdit={cancelEdit}
                 onShowTimeEntries={() => setShowTimeEntriesModal(true)}
                 mainTaskTime={mainTaskTime}
-                totalTimeWithSubtasks={totalTimeWithSubtasks}
+                totalTimeWithSubtasks={mainTaskTime}
                 isSubtask={true}
             />
 
             <TaskActions
                 task={task}
-                tasks={allTasks || tasks}
-                timeEntries={timeEntries}
-                setTimeEntries={setTimeEntries}
-                currentTimer={currentTimer}
-                setCurrentTimer={setCurrentTimer}
-                isPaused={isPaused}
-                setIsPaused={setIsPaused}
-                pausedElapsedTime={pausedElapsedTime}
-                setPausedElapsedTime={setPausedElapsedTime}
-                isGlobalTimer={isGlobalTimer}
-                setTasks={setTasks}
                 isEditing={isEditing}
                 isTimerActive={isTimerActive}
-                anyTimerActive={anyTimerActive}
+                anyTimerActive={isAnyTimerActive}
                 isArchived={isArchived}
                 isCompleted={isCompleted}
                 isRelatedToActiveTimer={isRelatedToActiveTimer}
@@ -146,9 +119,6 @@ const SubtaskItem = ({
                 isOpen={showTimeEntriesModal}
                 onClose={() => setShowTimeEntriesModal(false)}
                 task={task}
-                timeEntries={timeEntries}
-                setTimeEntries={setTimeEntries}
-                allTasks={allTasks}
             />
         </div>
     );

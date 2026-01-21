@@ -9,6 +9,7 @@ import InvoiceModal from '../invoice/InvoiceModal';
 /**
  * ModalManager - Central manager for all form modals
  * Provides a unified interface to trigger any form modal from any view in the app
+ * All modals now use Yjs hooks directly for data access
  */
 const ModalManager = ({
     // Modal states
@@ -17,27 +18,7 @@ const ModalManager = ({
     editingItem,
     setEditingItem,
     modalOptions,
-    setModalOptions,
-    
-    // Client modal props
-    clients,
-    setClients,
-
-    // Project modal props
-    projects,
-    setProjects,
-    
-    // Template modal props
-    invoiceTemplates,
-    setInvoiceTemplates,
-    
-    // Payment method modal props
-    paymentMethods,
-    setPaymentMethods,
-    
-    // Business modal props
-    businessInfos,
-    setBusinessInfos
+    setModalOptions
 }) => {
     // Modal stack to preserve states when opening nested modals
     const [modalStack, setModalStack] = useState([]);
@@ -105,8 +86,6 @@ const ModalManager = ({
                 <ClientModal
                     isOpen={true}
                     onClose={closeModal}
-                    clients={clients}
-                    setClients={setClients}
                     editingClient={editingItem}
                 />
             )}
@@ -116,10 +95,7 @@ const ModalManager = ({
                 <ProjectModal
                     isOpen={true}
                     onClose={closeModal}
-                    projects={projects}
-                    setProjects={setProjects}
                     editingProject={editingItem}
-                    clients={clients}
                     modalOptions={modalOptions}
                     openClientModal={() => openNestedModal('client')}
                     saveFormState={(formData) => saveCurrentModalState('project', formData)}
@@ -133,8 +109,6 @@ const ModalManager = ({
                 <TemplateModal
                     isOpen={true}
                     onClose={closeModal}
-                    invoiceTemplates={invoiceTemplates}
-                    setInvoiceTemplates={setInvoiceTemplates}
                     editingTemplate={editingItem}
                 />
             )}
@@ -144,8 +118,6 @@ const ModalManager = ({
                 <PaymentMethodModal
                     isOpen={true}
                     onClose={closeModal}
-                    paymentMethods={paymentMethods}
-                    setPaymentMethods={setPaymentMethods}
                     editingPaymentMethod={editingItem}
                 />
             )}
@@ -155,8 +127,6 @@ const ModalManager = ({
                 <BusinessModal
                     isOpen={true}
                     onClose={closeModal}
-                    businessInfos={businessInfos}
-                    setBusinessInfos={setBusinessInfos}
                     editingBusinessInfo={editingItem}
                 />
             )}

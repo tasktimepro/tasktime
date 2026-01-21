@@ -3,6 +3,22 @@ import { renderHook, waitFor } from '@testing-library/react'
 import useTaskState from './useTaskState'
 import { BILLABLE_TIME_THRESHOLD_MS } from '../../../constants/app'
 
+// Mock the hooks
+const mockUpdateTask = vi.fn()
+vi.mock('../../../hooks/useTasks', () => ({
+    useTasks: () => ({
+        updateTask: mockUpdateTask
+    })
+}))
+
+vi.mock('../../../hooks/useTimer', () => ({
+    useTimer: () => ({
+        isActive: false,
+        taskId: null,
+        isPaused: false
+    })
+}))
+
 describe('useTaskState', () => {
 
     const baseTask = {
@@ -14,16 +30,14 @@ describe('useTaskState', () => {
 
     const baseParams = {
         task: baseTask,
-        tasks: [baseTask],
         timeEntries: [],
-        currentTimer: null,
-        isPaused: false,
         subtasks: []
     }
 
     beforeEach(() => {
 
         vi.spyOn(Date, 'now').mockReturnValue(123)
+        mockUpdateTask.mockClear()
     })
 
     afterEach(() => {
@@ -33,41 +47,31 @@ describe('useTaskState', () => {
 
     it('auto-marks billable after threshold when not user-set', async () => {
 
-        const setTasks = vi.fn()
         const timeEntries = [{ taskId: 'task-1', start: 1, end: BILLABLE_TIME_THRESHOLD_MS + 1 }]
 
         renderHook(() => useTaskState({
             ...baseParams,
-            timeEntries,
-            setTasks
+            timeEntries
         }))
 
         await waitFor(() => {
-            expect(setTasks).toHaveBeenCalledTimes(1)
+            expect(mockUpdateTask).toHaveBeenCalledTimes(1)
+            expect(mockUpdateTask).toHaveBeenCalledWith('task-1', { billable: true, lastActive: 123 })
         })
-
-        const updater = setTasks.mock.calls[0][0]
-        const updated = updater([baseTask])
-
-        expect(updated[0].billable).toBe(true)
-        expect(updated[0].lastActive).toBe(123)
     })
 
     it('does not auto-mark when user explicitly set billing', async () => {
 
-        const setTasks = vi.fn()
         const timeEntries = [{ taskId: 'task-1', start: 0, end: BILLABLE_TIME_THRESHOLD_MS }]
 
         renderHook(() => useTaskState({
             ...baseParams,
             task: { ...baseTask, billableSetByUser: true },
-            tasks: [{ ...baseTask, billableSetByUser: true }],
-            timeEntries,
-            setTasks
+            timeEntries
         }))
 
         await waitFor(() => {
-            expect(setTasks).not.toHaveBeenCalled()
+            expect(mockUpdateTask).not.toHaveBeenCalled()
         })
     })
 })

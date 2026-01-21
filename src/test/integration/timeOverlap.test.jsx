@@ -1,62 +1,102 @@
-import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import TimeEntriesModal from '../../components/TimeEntriesModal'
-import { ToastContext } from '../../contexts/ToastContext'
+/**
+ * Integration test for time overlap detection
+ * Tests that users cannot create overlapping time entries
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import TimeEntriesModal from '../../components/TimeEntriesModal';
+import { ToastContext } from '../../contexts/ToastContext';
 
-describe('Time entry overlap integration', () => {
+// Mock hooks with hoisted mocks
+const mockCreateEntry = vi.fn();
+const mockUpdateEntry = vi.fn();
+const mockDeleteEntry = vi.fn();
+
+const mockEntries = [
+    {
+        id: 'entry-1',
+        taskId: 'task-1',
+        start: new Date('2026-01-19T10:00:00').getTime(),
+        end: new Date('2026-01-19T11:00:00').getTime()
+    }
+];
+
+vi.mock('../../hooks/useTimeEntries.ts', () => ({
+    useTimeEntries: () => ({
+        entries: mockEntries,
+        createEntry: mockCreateEntry,
+        updateEntry: mockUpdateEntry,
+        deleteEntry: mockDeleteEntry
+    })
+}));
+
+vi.mock('../../hooks/useTasks.ts', () => ({
+    useTasks: () => ({
+        tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Test Task' }],
+        activeTasks: [{ id: 'task-1', projectId: 'project-1', title: 'Test Task' }]
+    })
+}));
+
+describe('Time Overlap Detection', () => {
 
     const toastContextValue = {
-        addToast: vi.fn(),
-        removeToast: vi.fn(),
         showSuccess: vi.fn(),
         showError: vi.fn(),
+        showWarning: vi.fn(),
         showInfo: vi.fn(),
-        showWarning: vi.fn()
-    }
+        toasts: [],
+        removeToast: vi.fn()
+    };
 
-    const task = { id: 'task-1', projectId: 'project-1', title: 'Task' }
-    const allTasks = [task]
+    const mockTask = {
+        id: 'task-1',
+        projectId: 'project-1',
+        title: 'Test Task'
+    };
 
-    it('blocks overlapping manual entries', async () => {
+    const defaultProps = {
+        isOpen: true,
+        onClose: vi.fn(),
+        task: mockTask
+    };
 
-        const user = userEvent.setup()
-        const setTimeEntries = vi.fn()
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('prevents creating an overlapping time entry', async () => {
 
         render(
             <ToastContext.Provider value={toastContextValue}>
-                <TimeEntriesModal
-                    isOpen
-                    onClose={vi.fn()}
-                    task={task}
-                    timeEntries={[{
-                        id: 'entry-1',
-                        taskId: 'task-1',
-                        start: new Date('2026-01-19T10:00:00').getTime(),
-                        end: new Date('2026-01-19T11:00:00').getTime()
-                    }]}
-                    setTimeEntries={setTimeEntries}
-                    allTasks={allTasks}
-                />
+                <TimeEntriesModal {...defaultProps} />
             </ToastContext.Provider>
-        )
+        );
 
-        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
+        // Click the Add Entry button to show the form
+        const addButton = screen.getByText('Add Entry');
+        fireEvent.click(addButton);
 
-        await user.clear(screen.getByLabelText('Start Date'))
-        await user.type(screen.getByLabelText('Start Date'), '2026-01-19')
-        await user.clear(screen.getByLabelText('Start Time'))
-        await user.type(screen.getByLabelText('Start Time'), '10:30:00')
-        await user.clear(screen.getByLabelText('End Date'))
-        await user.type(screen.getByLabelText('End Date'), '2026-01-19')
-        await user.clear(screen.getByLabelText('End Time'))
-        await user.type(screen.getByLabelText('End Time'), '11:30:00')
+        // Wait for form to appear
+        await waitFor(() => {
+            expect(screen.getByLabelText('Start Time')).toBeInTheDocument();
+        });
 
-        const buttons = screen.getAllByRole('button', { name: 'Add Entry' })
-        await user.click(buttons[1])
+        // Fill in overlapping times (10:30 - 10:45 overlaps with existing 10:00 - 11:00)
+        const startInput = screen.getByLabelText('Start Time');
+        const endInput = screen.getByLabelText('End Time');
 
-        expect(toastContextValue.showError).toHaveBeenCalled()
-        expect(setTimeEntries).not.toHaveBeenCalled()
-    })
-})
+        fireEvent.change(startInput, { target: { value: '10:30' } });
+        fireEvent.change(endInput, { target: { value: '10:45' } });
+
+        // Submit the form - the second "Add Entry" button submits the form
+        const saveButtons = screen.getAllByText('Add Entry');
+        fireEvent.click(saveButtons[1]); // The form submit button
+
+        // Should show error toast and NOT call createEntry
+        await waitFor(() => {
+            expect(toastContextValue.showError).toHaveBeenCalled();
+        });
+
+        expect(mockCreateEntry).not.toHaveBeenCalled();
+    });
+});

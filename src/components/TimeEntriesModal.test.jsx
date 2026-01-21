@@ -10,11 +10,38 @@ const toastMocks = vi.hoisted(() => ({
     showError: vi.fn()
 }))
 
+const timeEntriesHookMocks = vi.hoisted(() => ({
+
+    createEntry: vi.fn(() => ({ id: 'generated-id' })),
+    updateEntry: vi.fn(),
+    deleteEntry: vi.fn(() => true)
+}))
+
+let mockTimeEntries = []
+
 vi.mock('../hooks/useToast.ts', () => ({
 
     useToast: () => ({
         showSuccess: toastMocks.showSuccess,
         showError: toastMocks.showError
+    })
+}))
+
+vi.mock('../hooks/useTimeEntries.ts', () => ({
+
+    useTimeEntries: () => ({
+        entries: mockTimeEntries,
+        createEntry: timeEntriesHookMocks.createEntry,
+        updateEntry: timeEntriesHookMocks.updateEntry,
+        deleteEntry: timeEntriesHookMocks.deleteEntry
+    })
+}))
+
+vi.mock('../hooks/useTasks.ts', () => ({
+
+    useTasks: () => ({
+        tasks: [{ id: 'task-1', title: 'Task One', projectId: 'project-1' }],
+        activeTasks: [{ id: 'task-1', title: 'Task One', projectId: 'project-1' }]
     })
 }))
 
@@ -35,8 +62,6 @@ describe('TimeEntriesModal', () => {
         isOpen: true,
         onClose: vi.fn(),
         task: baseTask,
-        timeEntries: [],
-        setTimeEntries: vi.fn(),
         allTasks: [baseTask]
     }
 
@@ -44,7 +69,10 @@ describe('TimeEntriesModal', () => {
 
         toastMocks.showSuccess.mockClear()
         toastMocks.showError.mockClear()
-        baseProps.setTimeEntries.mockClear()
+        timeEntriesHookMocks.createEntry.mockClear()
+        timeEntriesHookMocks.updateEntry.mockClear()
+        timeEntriesHookMocks.deleteEntry.mockClear()
+        mockTimeEntries = []
     })
 
     afterEach(() => {
@@ -76,17 +104,15 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[1])
 
-        expect(baseProps.setTimeEntries).toHaveBeenCalledTimes(1)
+        expect(timeEntriesHookMocks.createEntry).toHaveBeenCalledTimes(1)
 
-        const updatedEntries = baseProps.setTimeEntries.mock.calls[0][0]
-        expect(updatedEntries).toHaveLength(1)
-        expect(updatedEntries[0]).toMatchObject({
-            id: 'generated-id',
+        const entryData = timeEntriesHookMocks.createEntry.mock.calls[0][0]
+        expect(entryData).toMatchObject({
             taskId: 'task-1',
             note: 'Manual entry'
         })
-        expect(updatedEntries[0].start).toBeTypeOf('number')
-        expect(updatedEntries[0].end).toBeTypeOf('number')
+        expect(entryData.start).toBeTypeOf('number')
+        expect(entryData.end).toBeTypeOf('number')
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry added successfully')
     })
 
@@ -113,7 +139,7 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[1])
 
-        expect(baseProps.setTimeEntries).not.toHaveBeenCalled()
+        expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
         expect(toastMocks.showError).toHaveBeenCalledWith('End time must be after start time')
     })
 
@@ -133,7 +159,7 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[1])
 
-        expect(baseProps.setTimeEntries).not.toHaveBeenCalled()
+        expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
         expect(toastMocks.showError).toHaveBeenCalledWith('Please fill in all date and time fields')
     })
 
@@ -148,10 +174,12 @@ describe('TimeEntriesModal', () => {
             note: 'Original'
         }
 
+        // Set up mock entries for this test
+        mockTimeEntries = [entry]
+
         render(
             <TimeEntriesModal
                 {...baseProps}
-                timeEntries={[entry]}
             />
         )
 
@@ -162,12 +190,11 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getByRole('button', { name: 'Save Changes' }))
 
-        expect(baseProps.setTimeEntries).toHaveBeenCalledTimes(1)
+        expect(timeEntriesHookMocks.updateEntry).toHaveBeenCalledTimes(1)
 
-        const updatedEntries = baseProps.setTimeEntries.mock.calls[0][0]
-        expect(updatedEntries).toHaveLength(1)
-        expect(updatedEntries[0].id).toBe('entry-1')
-        expect(updatedEntries[0].end).toBeGreaterThan(entry.end)
+        const [entryId, updates] = timeEntriesHookMocks.updateEntry.mock.calls[0]
+        expect(entryId).toBe('entry-1')
+        expect(updates.end).toBeGreaterThan(entry.end)
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry updated successfully')
     })
 
@@ -181,24 +208,20 @@ describe('TimeEntriesModal', () => {
             end: new Date('2026-01-19T11:00:00').getTime()
         }
 
+        // Set up mock entries for this test
+        mockTimeEntries = [entry]
+
         render(
             <TimeEntriesModal
                 {...baseProps}
-                timeEntries={[entry]}
             />
         )
 
         await user.click(screen.getByTitle('Delete entry'))
 
         await user.click(screen.getByRole('button', { name: 'Delete' }))
-        expect(baseProps.setTimeEntries).toHaveBeenCalledTimes(1)
-
-        const updatedEntries = baseProps.setTimeEntries.mock.calls[0][0]
-        // Soft-delete: entry still exists but has deletedAt set
-        expect(updatedEntries).toHaveLength(1)
-        expect(updatedEntries[0].id).toBe('entry-1')
-        expect(updatedEntries[0].deletedAt).toBeDefined()
-        expect(updatedEntries[0].deletedAt).toBeGreaterThan(0)
+        expect(timeEntriesHookMocks.deleteEntry).toHaveBeenCalledTimes(1)
+        expect(timeEntriesHookMocks.deleteEntry).toHaveBeenCalledWith('entry-1')
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry deleted successfully')
     })
 })

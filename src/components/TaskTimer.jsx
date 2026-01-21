@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { formatActiveTimer } from '../utils/dateUtils';
 import TimerControls from './TimerControls';
+import { useTimer } from '../hooks/useTimer';
 import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
 
 /**
@@ -8,41 +9,37 @@ import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
  * 
  * This component consolidates timer logic for consistent display and behavior
  * across all places where timers are shown (Dashboard, ProjectDashboard, etc.)
+ * Now uses Yjs hooks directly for timer state.
  */
 const TaskTimer = ({
     task,
-    timeEntries,
-    setTimeEntries,
-    tasks = [], // All tasks for overlap validation
-    currentTimer,
-    setCurrentTimer,
-    isPaused = false,
-    setIsPaused = null,
-    pausedElapsedTime = 0,
-    setPausedElapsedTime = null,
     size = 'normal',
     showTimeDisplay = true,
     isGlobalTimer = false,
-    onComplete = null,
-    setTasks = null
+    onComplete = null
 }) => {
     const [currentTime, setCurrentTime] = useState('');
-    const [pausedTime, setPausedTime] = useState('');
     
-    const isTimerActive = currentTimer && currentTimer.taskId === task.id;
+    // Use Yjs timer hook directly
+    const { isActive, isPaused, taskId, elapsedTime } = useTimer();
+    
+    const isTimerActive = isActive && taskId === task.id;
+    const isTimerPaused = isTimerActive && isPaused;
 
     // Update timer display every second
     useEffect(() => {
-        if (!currentTimer || currentTimer.taskId !== task.id) return;
+        if (!isTimerActive) return;
         
-        // For active timers, show elapsed time since start
+        // For paused timers, just show the elapsed time once
+        if (isTimerPaused) {
+            const formattedTime = formatActiveTimer(elapsedTime);
+            setCurrentTime(formattedTime);
+            return;
+        }
+        
+        // For active timers, update every second
         const updateTimer = () => {
-            if (isPaused) return; // Skip updates when paused
-            
-            // Calculate elapsed time in ms for active timer
-            const elapsedMs = Date.now() - currentTimer.startTime;
-            // Format to time string
-            const formattedTime = formatActiveTimer(elapsedMs);
+            const formattedTime = formatActiveTimer(elapsedTime);
             setCurrentTime(formattedTime);
         };
 
@@ -53,44 +50,25 @@ const TaskTimer = ({
         const interval = setInterval(updateTimer, TIMER_UPDATE_INTERVAL_MS);
 
         return () => clearInterval(interval);
-    }, [currentTimer, isPaused, task.id]);
-
-    // For paused timers, display the paused elapsed time
-    useEffect(() => {
-        if (isPaused && pausedElapsedTime > 0 && currentTimer?.taskId === task.id) {
-            // Format the paused elapsed time directly (it's already in ms)
-            const formattedPausedTime = formatActiveTimer(pausedElapsedTime);
-            setPausedTime(formattedPausedTime);
-        }
-    }, [isPaused, pausedElapsedTime, currentTimer, task.id]);
+    }, [isTimerActive, isTimerPaused, elapsedTime]);
 
     return (
         <div className="flex items-center space-x-2">
             {showTimeDisplay && isTimerActive && (
                 <span className={`text-xs font-mono ${
-                    isPaused 
+                    isTimerPaused 
                         ? 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900' 
                         : 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900'
                 } px-2 py-1 rounded-md min-w-[32px] inline-block text-center`}>
-                    {isPaused ? pausedTime : currentTime}
+                    {currentTime}
                 </span>
             )}
             
             <TimerControls
                 task={task}
-                timeEntries={timeEntries}
-                setTimeEntries={setTimeEntries}
-                tasks={tasks}
-                currentTimer={currentTimer}
-                setCurrentTimer={setCurrentTimer}
-                isPaused={isPaused}
-                setIsPaused={setIsPaused}
-                pausedElapsedTime={pausedElapsedTime}
-                setPausedElapsedTime={setPausedElapsedTime}
                 size={size}
                 isGlobalTimer={isGlobalTimer}
                 onComplete={onComplete}
-                setTasks={setTasks}
             />
         </div>
     );

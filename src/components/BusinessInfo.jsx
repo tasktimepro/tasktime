@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, BuildingOfficeIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
+import { useBusinessInfos } from '../hooks/useBusinessInfos.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
-import { softDeleteById, isDeleted } from '../utils/syncableEntity.ts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,14 +20,13 @@ import {
  * BusinessInfo component - Manages global business information for invoices
  */
 const BusinessInfo = ({ 
-    businessInfos, 
-    setBusinessInfos,
     autoOpenCreate = false,
     // Modal functions
     openBusinessModal = null,
     editBusinessModal = null
 }) => {
     const { showSuccess } = useToast();
+    const { businessInfos, deleteBusinessInfo } = useBusinessInfos();
     const [pendingDeleteBusinessId, setPendingDeleteBusinessId] = useState(null);
 
     // Auto-open create modal when autoOpenCreate prop changes
@@ -56,7 +55,7 @@ const BusinessInfo = ({
             return;
         }
 
-        setBusinessInfos(softDeleteById(businessInfos, pendingDeleteBusinessId));
+        deleteBusinessInfo(pendingDeleteBusinessId);
         showSuccess('Business info deleted successfully');
         setPendingDeleteBusinessId(null);
     };
@@ -64,9 +63,6 @@ const BusinessInfo = ({
     const pendingDeleteBusiness = pendingDeleteBusinessId
         ? businessInfos.find((info) => info.id === pendingDeleteBusinessId)
         : null;
-
-    // Filter out soft-deleted business infos for display
-    const activeBusinessInfos = useMemo(() => businessInfos.filter(b => !isDeleted(b)), [businessInfos]);
 
     return (
         <div className="space-y-6">
@@ -90,7 +86,7 @@ const BusinessInfo = ({
 
 
             {/* Business List */}
-            {activeBusinessInfos.length === 0 ? (
+            {businessInfos.length === 0 ? (
                 <div className="text-center py-12">
                     <BuildingOfficeIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h4 className="mt-2 text-sm font-medium text-foreground">No business yet</h4>
@@ -107,7 +103,7 @@ const BusinessInfo = ({
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {activeBusinessInfos.map((info) => (
+                    {businessInfos.map((info) => (
                         <Card
                             key={info.id}
                             className="hover:shadow-md transition-shadow"
