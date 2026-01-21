@@ -1,22 +1,15 @@
-/// <reference path="../types/google-identity.d.ts" />
-
 /**
- * Unified Google Auth hook
+ * Google Auth hook - Worker mode only
  * 
- * When VITE_SYNC_WORKER_URL is set:
- *   - Uses Cloudflare Worker for OAuth and token management
- *   - Refresh tokens stored server-side (persistent across browser restarts)
- *   - No client-side token refresh scheduling needed
- * 
- * When VITE_SYNC_WORKER_URL is NOT set:
- *   - Falls back to direct SPA auth via Google Identity Services
- *   - Tokens stored in IndexedDB (lost on token expiry if user is away)
+ * Uses Cloudflare Worker for OAuth and token management:
+ * - Refresh tokens stored server-side (persistent across browser restarts)
+ * - No client-side token refresh scheduling needed
+ * - Requires VITE_SYNC_WORKER_URL to be set
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { GOOGLE_CONFIG, SYNC_WORKER_CONFIG } from '@/config/google';
+import { SYNC_WORKER_CONFIG } from '@/config/google';
 import { 
-    getStoredToken, storeToken, clearStoredToken, isTokenExpired,
     getStoredSession, storeSession, clearStoredSession, type StoredSession
 } from '@/utils/googleAuthStorage';
 
@@ -36,8 +29,10 @@ interface AuthState {
     error: string | null;
 }
 
-// Check if Worker mode is enabled
-const USE_WORKER = Boolean(SYNC_WORKER_CONFIG.workerUrl);
+// Verify Worker mode is enabled
+if (!SYNC_WORKER_CONFIG.isEnabled) {
+    console.error('[useGoogleAuth] VITE_SYNC_WORKER_URL not configured - Google Drive sync will not work');
+}
 
 // Simple pub/sub so multiple hook instances stay in sync without reloads
 const authSubscribers = new Set<() => void>();
@@ -183,165 +178,41 @@ export const useGoogleAuth = () => {
     }, [state.sessionId]);
 
     // ============================================
-    // SPA MODE - Direct Google Identity Services (fallback)
+    // RESTORE SESSION FROM STORAGE
     // ============================================
-
-    const validateSpaToken = useCallback(async (accessToken: string): Promise<GoogleUser | null> => {
-
-        try {
-            const response = await fetch(
-                'https://www.googleapis.com/oauth2/v3/userinfo',
-                { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            if (!response.ok) return null;
-            const data = await response.json();
-            return { id: data.sub, email: data.email, name: data.name, picture: data.picture };
-        } catch {
-            return null;
-        }
-    }, []);
 
     const syncFromStorage = useCallback(async () => {
 
-        if (USE_WORKER) {
-            const session = await getStoredSession();
-            if (session) {
-                const isValid = await validateWorkerSession(session);
-                if (isValid) {
-                    setState({
-                        isSignedIn: true,
-                        isLoading: false,
-                        user: { id: session.userId, email: session.email },
-                        accessToken: null,
-                        sessionId: session.sessionId,
-                        error: null,
-                    });
-                    return;
-                }
-                await clearStoredSession();
-            }
-            setState(prev => ({ ...prev, isLoading: false }));
-
-        } else {
-            const storedToken = await getStoredToken();
-            if (storedToken && !isTokenExpired(storedToken)) {
-                const user = await validateSpaToken(storedToken.accessToken);
-                if (user) {
-                    setState({
-                        isSignedIn: true,
-                        isLoading: false,
-                        user,
-                        accessToken: storedToken.accessToken,
-                        sessionId: null,
-                        error: null,
-                    });
-                    return;
-                }
-                await clearStoredToken();
-            }
-            setState(prev => ({ ...prev, isLoading: false }));
-        }
-    }, [validateWorkerSession, validateSpaToken]);
-
-    const signInWithSpa = useCallback(async (): Promise<void> => {
-
-        return new Promise((resolve, reject) => {
-
-            if (!GOOGLE_CONFIG.clientId) {
-                setState(prev => ({ ...prev, error: 'Missing Google client ID' }));
-                reject(new Error('Missing Google client ID'));
-                return;
-            }
-
-            if (!window.google?.accounts?.oauth2) {
-                setState(prev => ({ ...prev, error: 'Google Identity Services not loaded' }));
-                reject(new Error('Google Identity Services not loaded'));
-                return;
-            }
-
-            const client = window.google.accounts.oauth2.initTokenClient({
-                client_id: GOOGLE_CONFIG.clientId,
-                scope: GOOGLE_CONFIG.scopes,
-                callback: async (response) => {
-
-                    if (response.error) {
-                        setState(prev => ({ ...prev, error: response.error_description || response.error }));
-                        reject(new Error(response.error));
-                        return;
-                    }
-
-                    const expiresAt = Date.now() + (response.expires_in * 1000);
-                    await storeToken({ accessToken: response.access_token, expiresAt, scope: response.scope });
-
-                    const user = await validateSpaToken(response.access_token);
-                    if (!user) {
-                        setState(prev => ({ ...prev, error: 'Failed to get user info' }));
-                        reject(new Error('Failed to get user info'));
-                        return;
-                    }
-
-                    setState({
-                        isSignedIn: true,
-                        isLoading: false,
-                        user,
-                        accessToken: response.access_token,
-                        sessionId: null,
-                        error: null,
-                    });
-                    notifyAuthSubscribers();
-                    resolve();
-                },
-            });
-
-            client.requestAccessToken();
-        });
-    }, [validateSpaToken]);
-
-    const signOutFromSpa = useCallback(async (): Promise<void> => {
-
-        if (state.accessToken && window.google?.accounts?.oauth2) {
-            window.google.accounts.oauth2.revoke(state.accessToken, () => undefined);
+        if (!SYNC_WORKER_CONFIG.isEnabled) {
+            console.error('[useGoogleAuth] Worker URL not configured');
+            setState(prev => ({ ...prev, isLoading: false, error: 'Sync Worker not configured' }));
+            return;
         }
 
-        await clearStoredToken();
-
-        setState({
-            isSignedIn: false,
-            isLoading: false,
-            user: null,
-            accessToken: null,
-            sessionId: null,
-            error: null,
-        });
-
-        notifyAuthSubscribers();
-    }, [state.accessToken]);
+        const session = await getStoredSession();
+        if (session) {
+            const isValid = await validateWorkerSession(session);
+            if (isValid) {
+                setState({
+                    isSignedIn: true,
+                    isLoading: false,
+                    user: { id: session.userId, email: session.email },
+                    accessToken: null,
+                    sessionId: session.sessionId,
+                    error: null,
+                });
+                return;
+            }
+            await clearStoredSession();
+        }
+        setState(prev => ({ ...prev, isLoading: false }));
+    }, [validateWorkerSession]);
 
     // ============================================
     // INITIALIZATION
     // ============================================
 
     useEffect(() => {
-
-        // For SPA mode, wait for Google Identity Services to load
-        if (!USE_WORKER && !window.google?.accounts?.oauth2) {
-            const checkGoogle = setInterval(() => {
-                if (window.google?.accounts?.oauth2) {
-                    clearInterval(checkGoogle);
-                    syncFromStorage();
-                }
-            }, 100);
-
-            const timeout = setTimeout(() => {
-                clearInterval(checkGoogle);
-                setState(prev => ({ ...prev, isLoading: false }));
-            }, 2000);
-
-            return () => {
-                clearInterval(checkGoogle);
-                clearTimeout(timeout);
-            };
-        }
 
         syncFromStorage();
 
@@ -357,17 +228,10 @@ export const useGoogleAuth = () => {
 
     }, [syncFromStorage]);
 
-    // ============================================
-    // UNIFIED API
-    // ============================================
-
-    const signIn = USE_WORKER ? signInWithWorker : signInWithSpa;
-    const signOut = USE_WORKER ? signOutFromWorker : signOutFromSpa;
-
     return {
         ...state,
-        signIn,
-        signOut,
+        signIn: signInWithWorker,
+        signOut: signOutFromWorker,
     };
 };
 
