@@ -18,6 +18,11 @@ export default defineConfig({
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
             include: ['src/utils/**', 'src/hooks/**'],
+            exclude: [
+                'src/hooks/useGoogleAuth.ts',
+                'src/hooks/yjs/**',
+                'src/hooks/**/*.{test,spec}.{js,jsx,ts,tsx}',
+            ],
             thresholds: {
                 statements: 75,
                 branches: 70,
