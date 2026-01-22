@@ -8,20 +8,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useToast } from '@/hooks/useToast';
-import { ArrowPathIcon, CheckIcon, CloudIcon, ExclamationTriangleIcon, MoreHorizontalIcon, TrashIcon } from '@/components/ui/icons';
+import { ArrowPathIcon, CheckIcon, CloudIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import Modal from '@/components/Modal';
 import { formatDistanceToNow } from 'date-fns';
 
-type ConfirmDialogType = 'disconnect' | 'deleteLocal' | null;
+type ConfirmDialogType = 'disconnect' | null;
 
 export default function YjsSyncSettings() {
 
@@ -29,7 +22,7 @@ export default function YjsSyncSettings() {
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogType>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const { isReady, isSyncing, syncState, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive, clearAllData } = useYjs();
+    const { isReady, isSyncing, syncState, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive } = useYjs();
     const { isSignedIn, isLoading: authLoading, user, signIn, signOut } = useGoogleAuth();
     const { showSuccess, showError } = useToast();
 
@@ -148,48 +141,6 @@ export default function YjsSyncSettings() {
         }
     };
 
-    /**
-     * Sync & Disconnect - syncs first, then disconnects.
-     * Same as handleDisconnect but triggered from dropdown.
-     */
-    const handleSyncAndDisconnect = () => {
-        setConfirmDialog('disconnect');
-    };
-
-    /**
-     * Disconnect & Delete Local - syncs first, then deletes local data.
-     * This is the DESTRUCTIVE option.
-     */
-    const handleDisconnectAndDeleteLocal = () => {
-        setConfirmDialog('deleteLocal');
-    };
-
-    const confirmDeleteLocal = async () => {
-        setIsProcessing(true);
-        try {
-            // MUST sync before deleting to ensure Drive has latest data
-            await forceSyncDrive();
-            showSuccess('Synced successfully');
-            
-            // Now safe to disconnect and delete local data
-            disconnectDrive();
-            await signOut();
-            await clearAllData();
-            showSuccess('Disconnected and local data deleted');
-            
-            // Reload to reinitialize
-            window.location.reload();
-        } catch (error) {
-            console.error('[YjsSyncSettings] Sync failed before delete:', error);
-            showError('Sync failed. Cannot delete local data until sync succeeds.');
-            // DO NOT delete if sync failed - data would be lost forever
-            return;
-        } finally {
-            setIsProcessing(false);
-            setConfirmDialog(null);
-        }
-    };
-
     const handleForceSync = async () => {
         try {
             await forceSyncDrive();
@@ -243,36 +194,6 @@ export default function YjsSyncSettings() {
                                     >
                                         Sync Now
                                     </Button>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-muted-foreground hover:bg-muted rounded-full transition-colors group"
-                                                title="More actions"
-                                                aria-label="More actions"
-                                            >
-                                                <MoreHorizontalIcon className="h-5 w-5 group-hover:text-muted-foreground" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem
-                                                onClick={handleSyncAndDisconnect}
-                                                className="cursor-pointer hover:bg-accent focus:bg-accent"
-                                            >
-                                                <ArrowPathIcon className="h-4 w-4" />
-                                                <span>Sync & Disconnect</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                onClick={handleDisconnectAndDeleteLocal}
-                                                className="cursor-pointer hover:bg-accent focus:bg-accent hover:text-red-600 dark:hover:text-red-400 focus:text-red-600 dark:focus:text-red-400"
-                                            >
-                                                <TrashIcon className="h-4 w-4" />
-                                                <span>Disconnect & Delete Local Data</span>
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
                                 </>
                             ) : (
                                 <Button onClick={handleConnect} leadingIcon={CloudIcon}>
@@ -314,40 +235,6 @@ export default function YjsSyncSettings() {
                 </p>
             </Modal>
 
-            {/* Delete Local Data Confirmation Modal */}
-            <Modal
-                isOpen={confirmDialog === 'deleteLocal'}
-                onClose={() => !isProcessing && setConfirmDialog(null)}
-                title="Delete Local Data?"
-                size="md"
-                footer={
-                    <div className="flex justify-end gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => setConfirmDialog(null)}
-                            disabled={isProcessing}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={confirmDeleteLocal}
-                            disabled={isProcessing}
-                        >
-                            {isProcessing ? 'Syncing...' : 'Delete Local Data'}
-                        </Button>
-                    </div>
-                }
-            >
-                <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                        Your data will be synced to Google Drive first, then all local data will be permanently deleted from this device.
-                    </p>
-                    <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                        ⚠️ If the sync fails, no data will be deleted to prevent data loss.
-                    </p>
-                </div>
-            </Modal>
         </div>
     );
 }

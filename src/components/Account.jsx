@@ -39,6 +39,7 @@ const Account = ({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
+    const [showSignOutModal, setShowSignOutModal] = useState(false);
     
     // Define sections in order (first will be default)
     const sideNavItems = useMemo(() => [
@@ -262,7 +263,7 @@ const Account = ({
                 {isDriveConnected && (
                     <Button
                         variant="ghost"
-                        onClick={handleAccountSignOut}
+                        onClick={() => setShowSignOutModal(true)}
                         disabled={isSigningOut}
                         leadingIcon={SignOutIcon}
                     >
@@ -302,7 +303,7 @@ const Account = ({
                     setShowDeleteModal(false);
                     setDeleteConfirmationText('');
                 }}
-                title="⚠️ Delete All Account Data"
+                title="Delete All Account Data"
                 size="md"
                 footer={
                     <div className="flex justify-end space-x-3">
@@ -318,6 +319,7 @@ const Account = ({
                         <Button
                             variant="destructive"
                             onClick={handleDeleteAllData}
+                            leadingIcon={TrashIcon}
                             disabled={deleteConfirmationText !== 'Delete' || isDeleting}
                         >
                             {isDeleting ? 'Deleting...' : 'Delete All Data'}
@@ -326,6 +328,17 @@ const Account = ({
                 }
             >
                 <div className="space-y-4">
+                    {isDriveConnected && (
+                        <Notice
+                            title="You have an active Cloud Sync connection"
+                            icon={CloudIcon}
+                            variant="warning"
+                        >
+                            <p>
+                                Deleting data without disconnecting will remove your data from the cloud backup as well.
+                            </p>
+                        </Notice>
+                    )}
                     <Notice
                         title="This action cannot be undone"
                         icon={TrashIcon}
@@ -344,7 +357,7 @@ const Account = ({
                     </Notice>
 
                     <div className="space-y-2">
-                        <Label htmlFor="confirmDelete">
+                        <Label htmlFor="confirmDelete" className="block">
                             Type <strong>"Delete"</strong> to confirm:
                         </Label>
                         <Input
@@ -355,6 +368,39 @@ const Account = ({
                             placeholder="Type 'Delete' here"
                         />
                     </div>
+                </div>
+            </Modal>
+
+            {/* Sign Out Confirmation Modal */}
+            <Modal
+                isOpen={showSignOutModal}
+                onClose={() => !isSigningOut && setShowSignOutModal(false)}
+                title="Sign out & delete local data?"
+                size="md"
+                footer={
+                    <div className="flex justify-end space-x-3">
+                        <Button
+                            variant="secondary"
+                            onClick={() => setShowSignOutModal(false)}
+                            disabled={isSigningOut}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleAccountSignOut}
+                            disabled={isSigningOut}
+                            leadingIcon={SignOutIcon}
+                        >
+                            {isSigningOut ? 'Signing out...' : 'Sync & Sign out'}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                        We will sync your latest changes to Google Drive before signing you out.
+                        After the sync completes, all local data on this device will be removed.
+                    </p>
                 </div>
             </Modal>
         </div>

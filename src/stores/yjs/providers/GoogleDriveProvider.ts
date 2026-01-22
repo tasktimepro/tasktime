@@ -246,12 +246,13 @@ export class YjsDriveProvider {
             console.error('[YjsDriveProvider] Sync failed:', error);
             if (error instanceof AuthorizationError) {
                 this.setState('error');
+                throw error; // Auth errors should propagate
             } else {
                 // For network errors, stay connected but mark as error temporarily
                 this.setState('error');
-                // Retry in next interval
+                // Don't throw - pending deltas are preserved and will retry on next interval
+                // Throwing here could cause the app to lose track of the sync state
             }
-            throw error;
         } finally {
             this.isSyncing = false;
             const hasPending = this.hasPendingDeltas();
@@ -294,9 +295,14 @@ export class YjsDriveProvider {
         // 2. Push local changes
         if (this.forceFullStateDocs.has(docName)) {
             // Push full state after reconnect to capture offline changes
+            // Note: pushFullState handles its own error recovery and will re-add to forceFullStateDocs on failure
+            this.forceFullStateDocs.delete(docName); // Remove before push
             await this.pushFullState(docName, doc, true);
-            this.forceFullStateDocs.delete(docName);
-            this.pendingDeltas.set(docName, []);
+            // If pushFullState failed, it re-added to forceFullStateDocs, so don't clear pending
+            if (!this.forceFullStateDocs.has(docName)) {
+                // Success - clear any pending deltas (they're now in the full state)
+                this.pendingDeltas.set(docName, []);
+            }
         } else {
             await this.pushDeltas(docName, doc);
         }
@@ -441,15 +447,19 @@ export class YjsDriveProvider {
             // Update manifest
             this.manifest.addDelta(docName, deltaId);
 
-            // Only clear pending after a successful upload/manifest update
+            // CRITICAL: Save manifest immediately after adding delta
+            // This ensures the delta is recorded even if subsequent operations fail
+            await this.manifest.save();
+
+            // Only clear pending after manifest is persisted to Drive
             this.pendingDeltas.set(docName, []);
+
+            this.log(`push: delta ${deltaId} for ${docName}`, { bytes: mergedDelta.length });
         } catch (error) {
             // Preserve pending deltas so they retry on next sync
-            console.error(`[DriveSync] Failed to push delta for ${docName}, will retry`, error);
-            throw error;
+            console.error(`[DriveSync] Failed to push delta for ${docName}, will retry on next sync`, error);
+            // Don't rethrow - let sync continue with other docs and retry later
         }
-
-        this.log(`push: delta ${deltaId} for ${docName}`, { bytes: mergedDelta.length, pendingAfter: this.pendingDeltas.get(docName)?.length ?? 0 });
     }
 
     /**
@@ -464,41 +474,49 @@ export class YjsDriveProvider {
 
         const blob = new Blob([fullState.buffer as ArrayBuffer], { type: 'application/octet-stream' });
 
-        // Check if file already exists
-        const existingFileId = this.manifest.getFileId(stateFileName);
-        if (existingFileId) {
-            await this.manifest.updateFile(existingFileId, stateFileName, blob);
-        } else {
-            const fileId = await this.manifest.createFile(stateFileName, blob);
-            this.manifest.setFileId(stateFileName, fileId);
-        }
-
-        const nextStateVersion = docManifest.stateVersion + 1;
-
-        if (clearDeltas && docManifest.deltas.length > 0) {
-            for (const delta of docManifest.deltas) {
-                const deltaFileName = `tasktime-yjs-${docName}-delta-${delta.id}.bin`;
-                await this.manifest.deleteFileByName(deltaFileName);
+        try {
+            // Check if file already exists
+            const existingFileId = this.manifest.getFileId(stateFileName);
+            if (existingFileId) {
+                await this.manifest.updateFile(existingFileId, stateFileName, blob);
+            } else {
+                const fileId = await this.manifest.createFile(stateFileName, blob);
+                this.manifest.setFileId(stateFileName, fileId);
             }
 
-            this.manifest.updateDocManifest(docName, {
-                stateVersion: nextStateVersion,
-                lastCompaction: new Date().toISOString(),
-                deltas: [],
-            });
-            // Save manifest immediately after clearing deltas to prevent orphaned references
-            await this.manifest.save();
-        } else {
-            // Update manifest
-            this.manifest.updateDocManifest(docName, {
-                stateVersion: nextStateVersion,
-                lastCompaction: new Date().toISOString(),
-            });
-        }
+            const nextStateVersion = docManifest.stateVersion + 1;
 
-        this.appliedStateVersions.set(docName, nextStateVersion);
-        this.appliedDeltaIds.set(docName, new Set());
-        this.log(`push: full state for ${docName}`, { bytes: fullState.length, version: nextStateVersion });
+            if (clearDeltas && docManifest.deltas.length > 0) {
+                for (const delta of docManifest.deltas) {
+                    const deltaFileName = `tasktime-yjs-${docName}-delta-${delta.id}.bin`;
+                    await this.manifest.deleteFileByName(deltaFileName);
+                }
+
+                this.manifest.updateDocManifest(docName, {
+                    stateVersion: nextStateVersion,
+                    lastCompaction: new Date().toISOString(),
+                    deltas: [],
+                });
+            } else {
+                // Update manifest
+                this.manifest.updateDocManifest(docName, {
+                    stateVersion: nextStateVersion,
+                    lastCompaction: new Date().toISOString(),
+                });
+            }
+
+            // CRITICAL: Always save manifest after state upload succeeds
+            await this.manifest.save();
+
+            this.appliedStateVersions.set(docName, nextStateVersion);
+            this.appliedDeltaIds.set(docName, new Set());
+            this.log(`push: full state for ${docName}`, { bytes: fullState.length, version: nextStateVersion });
+        } catch (error) {
+            // Keep doc in forceFullStateDocs so it retries on next sync
+            this.forceFullStateDocs.add(docName);
+            console.error(`[DriveSync] Failed to push full state for ${docName}, will retry`, error);
+            // Don't rethrow - let sync continue with other docs
+        }
     }
 
     // =========================================================================

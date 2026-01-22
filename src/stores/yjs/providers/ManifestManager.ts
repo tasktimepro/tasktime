@@ -445,7 +445,7 @@ export class ManifestManager {
     /**
      * Create a new file in appDataFolder
      */
-    async createFile(name: string, blob: Blob): Promise<string> {
+    async createFile(name: string, blob: Blob, retryCount = 0): Promise<string> {
         const metadata = {
             name,
             mimeType: blob.type,
@@ -473,7 +473,17 @@ export class ManifestManager {
             if (response.status === 401 || response.status === 403) {
                 throw new AuthorizationError('Google authorization expired.');
             }
-            throw new Error(`Drive upload error: ${response.status}`);
+
+            // Retry transient errors with exponential backoff
+            if ((response.status >= 500 || response.status === 429) && retryCount < 3) {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
+                console.warn(`[ManifestManager] createFile ${name} failed with ${response.status}, retrying in ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
+                return this.createFile(name, blob, retryCount + 1);
+            }
+
+            const text = await response.text();
+            throw new Error(`Drive upload error ${response.status}: ${text}`);
         }
 
         const result = await response.json();
@@ -484,7 +494,7 @@ export class ManifestManager {
     /**
      * Update an existing file
      */
-    async updateFile(fileId: string, name: string, blob: Blob): Promise<void> {
+    async updateFile(fileId: string, name: string, blob: Blob, retryCount = 0): Promise<void> {
         const metadata = {
             name,
             mimeType: blob.type,
@@ -511,7 +521,17 @@ export class ManifestManager {
             if (response.status === 401 || response.status === 403) {
                 throw new AuthorizationError('Google authorization expired.');
             }
-            throw new Error(`Drive update error: ${response.status}`);
+
+            // Retry transient errors with exponential backoff
+            if ((response.status >= 500 || response.status === 429) && retryCount < 3) {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
+                console.warn(`[ManifestManager] updateFile ${name} failed with ${response.status}, retrying in ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
+                return this.updateFile(fileId, name, blob, retryCount + 1);
+            }
+
+            const text = await response.text();
+            throw new Error(`Drive update error ${response.status}: ${text}`);
         }
     }
 
