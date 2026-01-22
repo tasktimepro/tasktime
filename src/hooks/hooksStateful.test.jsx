@@ -60,7 +60,7 @@ describe('stateful hooks', () => {
         expect(setSpy).toHaveBeenCalledWith('theme', 'light')
         expect(setSpy).toHaveBeenCalledWith('currency', 'EUR')
         expect(setSpy).toHaveBeenCalledWith('theme', 'system')
-        expect(setSpy).toHaveBeenCalledWith('currency', 'USD')
+        expect(setSpy).toHaveBeenCalledWith('currency', 'EUR')
     })
 
     it('manages time entries with filters and CRUD', async () => {

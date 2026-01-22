@@ -9,7 +9,7 @@ import { useYjs } from '@/contexts/YjsContext';
 import type { Preferences } from '@/stores/yjs/types';
 
 const DEFAULT_PREFERENCES: Preferences = {
-    currency: 'USD',
+    currency: 'EUR',
     dateFormat: 'MM/dd/yyyy',
     timeFormat: '12h',
     theme: 'system',

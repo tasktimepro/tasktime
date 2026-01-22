@@ -128,7 +128,7 @@ describe('Timer workflow integration', () => {
         )
 
         // Click stop
-        await user.click(screen.getByText('Stop'))
+        await user.click(screen.getByTitle('Save & Stop Timer'))
         expect(entriesHookMocks.createEntry).toHaveBeenCalled()
         expect(timerHookMocks.clearTimer).toHaveBeenCalled()
     })

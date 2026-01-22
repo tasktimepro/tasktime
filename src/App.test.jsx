@@ -145,7 +145,7 @@ vi.mock('./hooks/usePaymentMethods.ts', () => ({
 vi.mock('./hooks/usePreferences.ts', () => ({
     usePreferences: () => ({
         preferences: {
-            currency: 'USD',
+            currency: 'EUR',
             dateFormat: 'MM/dd/yyyy',
             timeFormat: '12h',
             theme: 'system',

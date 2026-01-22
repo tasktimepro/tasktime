@@ -138,8 +138,8 @@ describe('TimerControls', () => {
             <TimerControls task={baseTask} />
         )
 
-        expect(screen.getByText('Pause')).toBeInTheDocument()
-        expect(screen.getByText('Stop')).toBeInTheDocument()
+        expect(screen.getByTitle('Pause Timer')).toBeInTheDocument()
+        expect(screen.getByTitle('Save & Stop Timer')).toBeInTheDocument()
     })
 
     it('stops timer and creates entry', async () => {
@@ -158,7 +158,7 @@ describe('TimerControls', () => {
             <TimerControls task={baseTask} />
         )
 
-        await userEvent.click(screen.getByText('Stop'))
+        await userEvent.click(screen.getByTitle('Save & Stop Timer'))
 
         expect(entriesHookMocks.createEntry).toHaveBeenCalled()
         expect(timerHookMocks.clearTimer).toHaveBeenCalled()
