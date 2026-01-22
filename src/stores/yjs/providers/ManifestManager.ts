@@ -57,6 +57,7 @@ export class ManifestManager {
     private manifestFileId: string | null = null;
     private manifest: Manifest | null = null;
     private fileIdCache: Map<string, string> = new Map();
+    private lastManifestModifiedTime: string | null = null;
 
     constructor(accessToken: string, sessionId?: string | null) {
         this.accessToken = accessToken;
@@ -99,9 +100,14 @@ export class ManifestManager {
 
         if (manifestFile) {
             this.manifestFileId = manifestFile.id;
+            this.lastManifestModifiedTime = manifestFile.modifiedTime;
             const content = await this.downloadFileAsJson(manifestFile.id);
             this.manifest = content as Manifest;
             console.log('[ManifestManager] Loaded manifest from Drive');
+            console.log('[ManifestManager] State snapshot:', {
+                docs: this.manifest?.documents,
+                lastSync: this.manifest?.lastSync,
+            });
         } else {
             // Create new manifest
             this.manifest = {
@@ -114,6 +120,7 @@ export class ManifestManager {
         }
 
         // Build file ID cache for quick lookups
+        this.fileIdCache.clear();
         for (const file of files) {
             this.fileIdCache.set(file.name, file.id);
         }
@@ -129,6 +136,11 @@ export class ManifestManager {
 
         this.manifest.lastSync = new Date().toISOString();
 
+        console.log('[ManifestManager] Saving manifest snapshot:', {
+            docs: this.manifest.documents,
+            lastSync: this.manifest.lastSync,
+        });
+
         const blob = new Blob(
             [JSON.stringify(this.manifest, null, 2)],
             { type: 'application/json' }
@@ -142,6 +154,40 @@ export class ManifestManager {
         }
 
         console.log('[ManifestManager] Saved manifest to Drive');
+    }
+
+    /**
+     * Check if manifest has changed on Drive since last load
+     * Does a lightweight metadata check instead of full download
+     * @returns true if changed or unknown, false if definitely unchanged
+     */
+    async hasManifestChanged(): Promise<boolean> {
+        if (!this.manifestFileId || !this.lastManifestModifiedTime) {
+            // No cached info, assume changed
+            return true;
+        }
+
+        try {
+            // Fetch just the manifest file metadata
+            const response = await this.request(
+                `/files/${this.manifestFileId}?fields=modifiedTime`
+            );
+            const { modifiedTime } = await response.json();
+
+            if (modifiedTime !== this.lastManifestModifiedTime) {
+                console.log('[ManifestManager] Manifest changed on Drive', {
+                    cached: this.lastManifestModifiedTime,
+                    remote: modifiedTime,
+                });
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            // On error, assume changed to be safe
+            console.warn('[ManifestManager] Could not check manifest modifiedTime:', error);
+            return true;
+        }
     }
 
     /**
@@ -213,6 +259,16 @@ export class ManifestManager {
     }
 
     /**
+     * Remove a specific delta from a document's manifest (for pruning orphaned deltas)
+     */
+    removeDelta(docName: string, deltaId: string): void {
+        const doc = this.manifest?.documents[docName];
+        if (doc) {
+            doc.deltas = doc.deltas.filter(d => d.id !== deltaId);
+        }
+    }
+
+    /**
      * Clear all deltas after compaction
      */
     clearDeltas(docName: string): void {
@@ -263,6 +319,48 @@ export class ManifestManager {
      */
     getFileId(fileName: string): string | null {
         return this.fileIdCache.get(fileName) ?? null;
+    }
+
+    /**
+     * Get file ID, with fallback to Drive lookup if not in cache
+     * Use this for critical files that must be found
+     */
+    async getFileIdWithFallback(fileName: string): Promise<string | null> {
+        // Try cache first
+        const cached = this.fileIdCache.get(fileName);
+        if (cached) return cached;
+
+        // Fallback: search Drive for the file
+        console.log(`[ManifestManager] File not in cache, searching Drive: ${fileName}`);
+        try {
+            const query = encodeURIComponent(`name='${fileName}'`);
+            const response = await this.request(
+                `/files?spaces=appDataFolder&q=${query}&fields=files(id,name)`
+            );
+            const { files } = await response.json();
+            
+            if (files && files.length > 0) {
+                const fileId = files[0].id;
+                this.fileIdCache.set(fileName, fileId);
+                console.log(`[ManifestManager] Found file on Drive: ${fileName} -> ${fileId}`);
+                return fileId;
+            }
+        } catch (error) {
+            console.warn(`[ManifestManager] Failed to search for file ${fileName}:`, error);
+        }
+
+        return null;
+    }
+
+    /**
+     * Refresh file ID cache from Drive
+     */
+    async refreshFileCache(): Promise<void> {
+        const files = await this.listAppDataFiles();
+        this.fileIdCache.clear();
+        for (const file of files) {
+            this.fileIdCache.set(file.name, file.id);
+        }
     }
 
     /**
@@ -421,7 +519,17 @@ export class ManifestManager {
      * Delete a file by ID
      */
     async deleteFileById(fileId: string): Promise<void> {
-        await this.request(`/files/${fileId}`, { method: 'DELETE' });
+        try {
+            await this.request(`/files/${fileId}`, { method: 'DELETE' });
+        } catch (error) {
+            // If the file is already gone, treat as success to avoid breaking sync
+            const message = error instanceof Error ? error.message : String(error);
+            if (message.includes('404')) {
+                console.warn('[ManifestManager] deleteFileById: file missing, skipping');
+                return;
+            }
+            throw error;
+        }
     }
 
     /**

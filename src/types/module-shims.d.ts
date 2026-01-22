@@ -65,3 +65,22 @@ declare module 'date-fns' {
     export function isSameDay(dateLeft: Date | number, dateRight: Date | number): boolean;
     export function parseISO(dateString: string): Date;
 }
+
+declare module '@/components/Modal' {
+    import { ReactNode } from 'react';
+    
+    interface ModalProps {
+        isOpen: boolean;
+        onClose: () => void;
+        children: ReactNode;
+        title?: string;
+        description?: string;
+        size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | 'full';
+        showCloseButton?: boolean;
+        className?: string;
+        footer?: ReactNode;
+    }
+    
+    const Modal: (props: ModalProps) => JSX.Element;
+    export default Modal;
+}

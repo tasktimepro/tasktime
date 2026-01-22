@@ -18,8 +18,9 @@ import type { DocName, SyncState } from '../types';
 export { AuthorizationError };
 
 const COMPACTION_THRESHOLD = 10; // Compact after 10 deltas
-const SYNC_INTERVAL_MS = 15_000; // 15 seconds
+const SYNC_INTERVAL_MS = 60_000; // 60 seconds (reduced from 15s to minimize requests)
 const SYNC_DEBOUNCE_MS = 100; // Small debounce to batch rapid changes
+const PULL_THROTTLE_MS = 30_000; // Skip pull if no local changes and last pull was < 30s ago
 
 export class YjsDriveProvider {
 
@@ -43,6 +44,19 @@ export class YjsDriveProvider {
     private appliedStateVersions: Map<DocName, number> = new Map();
     private appliedDeltaIds: Map<DocName, Set<string>> = new Map();
 
+    // Track last pull time and manifest modifiedTime for throttling
+    private lastPullAt: number = 0;
+    private lastManifestModifiedTime: string | null = null;
+
+    private log(message: string, extra?: unknown): void {
+        const ts = new Date().toISOString();
+        if (extra !== undefined) {
+            console.log(`[DriveSync] ${ts} ${message}`, extra);
+        } else {
+            console.log(`[DriveSync] ${ts} ${message}`);
+        }
+    }
+
     constructor(docManager: YjsDocManager, accessToken: string, sessionId?: string | null) {
         this.docManager = docManager;
         this.accessToken = accessToken;
@@ -62,18 +76,25 @@ export class YjsDriveProvider {
 
         try {
             this.setState('syncing');
+            this.log('connect: starting');
 
             // Load manifest from Drive
             await this.manifest.load();
+            this.log('connect: manifest loaded');
 
             // Force a full state push for all loaded docs after reconnect
             this.forceFullStateDocs = new Set(this.docManager.getLoadedDocs());
+            this.log('connect: force full state for docs', Array.from(this.forceFullStateDocs));
 
             // Sync all currently loaded documents
             for (const docName of this.docManager.getLoadedDocs()) {
                 await this.syncDoc(docName);
                 this.subscribeToDoc(docName);
             }
+
+            // Save manifest updates from initial sync (e.g., cleared deltas, new state versions)
+            await this.manifest.save();
+            this.log('connect: manifest saved');
 
             // Start periodic sync
             this.syncInterval = setInterval(() => {
@@ -82,7 +103,7 @@ export class YjsDriveProvider {
 
             this.connected = true;
             this.setState('idle');
-            console.log('[YjsDriveProvider] Connected to Google Drive');
+            this.log('connect: connected');
 
         } catch (error) {
             console.error('[YjsDriveProvider] Connection failed:', error);
@@ -148,7 +169,7 @@ export class YjsDriveProvider {
 
     /**
      * Perform a full sync of all loaded documents
-     * @param force - If true, bypasses the isSyncing guard (for manual Sync Now)
+     * @param force - If true, bypasses the isSyncing guard and throttle (for manual Sync Now / visibility change)
      */
     async sync(force: boolean = false): Promise<void> {
         if (!this.connected) {
@@ -157,13 +178,13 @@ export class YjsDriveProvider {
         }
 
         if (this.isSyncing && !force) {
-            console.log('[YjsDriveProvider] Sync already in progress, skipping');
+            this.log('sync: already in progress, skipping');
             return;
         }
 
         // Wait for current sync to finish if forcing
         if (this.isSyncing && force) {
-            console.log('[YjsDriveProvider] Waiting for current sync to complete...');
+            this.log('sync(force): waiting for current sync to complete...');
             // Simple wait - check every 100ms for up to 5 seconds
             for (let i = 0; i < 50 && this.isSyncing; i++) {
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -173,20 +194,44 @@ export class YjsDriveProvider {
             }
         }
 
+        const hasPendingLocal = this.hasPendingDeltas();
+        const timeSinceLastPull = Date.now() - this.lastPullAt;
+
+        // Pull throttle: skip manifest reload if no local changes and last pull was recent
+        // Unless force=true (manual sync, visibility change, online event)
+        const shouldThrottlePull = !force && !hasPendingLocal && timeSinceLastPull < PULL_THROTTLE_MS;
+
+        if (shouldThrottlePull) {
+            this.log('sync: throttled (no local changes, recent pull)', { timeSinceLastPull });
+            return;
+        }
+
         this.isSyncing = true;
         this.setState('syncing');
+        const loadedDocs = this.docManager.getLoadedDocs();
+        this.log('sync: started', { docs: loadedDocs, force, hasPendingLocal });
 
         try {
-            // Reload manifest from Drive to get latest changes from other devices
-            await this.manifest.load();
+            // Check if manifest has changed before doing full reload
+            const manifestChanged = await this.manifest.hasManifestChanged();
+            
+            if (manifestChanged || force || hasPendingLocal) {
+                // Reload manifest from Drive to get latest changes from other devices
+                await this.manifest.load();
+                this.lastPullAt = Date.now();
+                this.log('sync: manifest reloaded (changed or forced)');
+            } else {
+                this.log('sync: manifest unchanged, skipping pull');
+            }
 
-            // Sync each loaded document
-            for (const docName of this.docManager.getLoadedDocs()) {
-                await this.syncDoc(docName);
+            // Sync each loaded document (pull if manifest changed, always push pending)
+            for (const docName of loadedDocs) {
+                await this.syncDoc(docName, manifestChanged || force);
             }
 
             // Save updated manifest
             await this.manifest.save();
+            this.log('sync: manifest saved, lastSync', this.manifest.getLastSync());
 
             this.setState('idle');
 
@@ -202,6 +247,8 @@ export class YjsDriveProvider {
             throw error;
         } finally {
             this.isSyncing = false;
+            const hasPending = this.hasPendingDeltas();
+            this.log('sync: finished', { pending: hasPending });
 
             // If changes arrived during sync, run another pass immediately
             if (this.hasPendingDeltas()) {
@@ -222,16 +269,20 @@ export class YjsDriveProvider {
 
     /**
      * Sync a single document
+     * @param shouldPull - Whether to pull remote changes (false if manifest unchanged)
      */
-    private async syncDoc(docName: DocName): Promise<void> {
+    private async syncDoc(docName: DocName, shouldPull: boolean = true): Promise<void> {
         const doc = this.docManager.getDocSync(docName);
         if (!doc) return;
 
         // Ensure doc has a manifest entry
         const docManifest = this.manifest.ensureDocManifest(docName);
+        this.log('syncDoc: start', { docName, stateVersion: docManifest.stateVersion, deltas: docManifest.deltas.length, shouldPull });
 
-        // 1. Pull remote state and deltas
-        await this.pullDoc(docName, doc);
+        // 1. Pull remote state and deltas (only if manifest changed)
+        if (shouldPull) {
+            await this.pullDoc(docName, doc);
+        }
 
         // 2. Push local changes
         if (this.forceFullStateDocs.has(docName)) {
@@ -247,6 +298,8 @@ export class YjsDriveProvider {
         if (docManifest.deltas.length >= COMPACTION_THRESHOLD) {
             await this.compactDoc(docName, doc);
         }
+
+        this.log('syncDoc: done', { docName, pending: this.pendingDeltas.get(docName)?.length ?? 0, appliedVersion: this.appliedStateVersions.get(docName) });
     }
 
     // =========================================================================
@@ -266,7 +319,12 @@ export class YjsDriveProvider {
 
         // Pull base state only if version changed
         if (docManifest.stateVersion > appliedVersion) {
-            const stateFileId = this.manifest.getFileId(docManifest.stateFile);
+            let stateFileId = await this.manifest.getFileIdWithFallback(docManifest.stateFile);
+            if (!stateFileId) {
+                await this.manifest.refreshFileCache();
+                stateFileId = await this.manifest.getFileIdWithFallback(docManifest.stateFile);
+            }
+
             if (stateFileId) {
                 try {
                     const stateBuffer = await this.manifest.downloadFileAsArrayBuffer(stateFileId);
@@ -274,7 +332,7 @@ export class YjsDriveProvider {
 
                     if (stateArray.length > 0) {
                         applyUpdate(doc, stateArray, 'remote');
-                        console.log(`[YjsDriveProvider] Applied base state v${docManifest.stateVersion} for ${docName} (${stateArray.length} bytes)`);
+                        this.log(`pull: applied base state v${docManifest.stateVersion} for ${docName}`, { bytes: stateArray.length });
                     }
 
                     // Mark as applied and clear old deltas (they're included in the new state)
@@ -284,17 +342,27 @@ export class YjsDriveProvider {
                 } catch (error) {
                     console.warn(`[YjsDriveProvider] Could not pull base state for ${docName}:`, error);
                 }
+            } else {
+                console.warn(`[YjsDriveProvider] State file not found for ${docName}: ${docManifest.stateFile}`);
             }
         }
 
         // Pull only new deltas (not already applied)
+        // Track orphaned deltas that need to be pruned from manifest
+        const orphanedDeltaIds: string[] = [];
+
         for (const delta of docManifest.deltas) {
             if (appliedDeltas.has(delta.id)) {
                 continue; // Already applied
             }
 
             const deltaFileName = `tasktime-yjs-${docName}-delta-${delta.id}.bin`;
-            const deltaFileId = this.manifest.getFileId(deltaFileName);
+            let deltaFileId = await this.manifest.getFileIdWithFallback(deltaFileName);
+
+            if (!deltaFileId) {
+                await this.manifest.refreshFileCache();
+                deltaFileId = await this.manifest.getFileIdWithFallback(deltaFileName);
+            }
 
             if (deltaFileId) {
                 try {
@@ -303,7 +371,7 @@ export class YjsDriveProvider {
 
                     if (deltaArray.length > 0) {
                         applyUpdate(doc, deltaArray, 'remote');
-                        console.log(`[YjsDriveProvider] Applied delta ${delta.id} for ${docName}`);
+                        this.log(`pull: applied delta ${delta.id} for ${docName}`);
                     }
 
                     // Mark as applied
@@ -312,7 +380,22 @@ export class YjsDriveProvider {
                 } catch (error) {
                     console.warn(`[YjsDriveProvider] Could not pull delta ${delta.id}:`, error);
                 }
+            } else {
+                // Delta file referenced in manifest but not found on Drive - it's orphaned
+                // Mark for pruning from manifest (file was deleted but manifest wasn't updated)
+                console.warn(`[YjsDriveProvider] Delta file orphaned (not in Drive), pruning: ${deltaFileName}`);
+                orphanedDeltaIds.push(delta.id);
             }
+        }
+
+        // Prune orphaned deltas from manifest
+        if (orphanedDeltaIds.length > 0) {
+            for (const deltaId of orphanedDeltaIds) {
+                this.manifest.removeDelta(docName, deltaId);
+            }
+            // Save manifest to persist the cleanup
+            await this.manifest.save();
+            this.log(`pull: pruned ${orphanedDeltaIds.length} orphaned deltas for ${docName}`);
         }
     }
 
@@ -350,7 +433,7 @@ export class YjsDriveProvider {
         // Update manifest
         this.manifest.addDelta(docName, deltaId);
 
-        console.log(`[YjsDriveProvider] Pushed delta ${deltaId} for ${docName} (${mergedDelta.length} bytes)`);
+        this.log(`push: delta ${deltaId} for ${docName}`, { bytes: mergedDelta.length, pendingAfter: this.pendingDeltas.get(docName)?.length ?? 0 });
     }
 
     /**
@@ -387,6 +470,8 @@ export class YjsDriveProvider {
                 lastCompaction: new Date().toISOString(),
                 deltas: [],
             });
+            // Save manifest immediately after clearing deltas to prevent orphaned references
+            await this.manifest.save();
         } else {
             // Update manifest
             this.manifest.updateDocManifest(docName, {
@@ -397,8 +482,7 @@ export class YjsDriveProvider {
 
         this.appliedStateVersions.set(docName, nextStateVersion);
         this.appliedDeltaIds.set(docName, new Set());
-
-        console.log(`[YjsDriveProvider] Pushed full state for ${docName} (${fullState.length} bytes)`);
+        this.log(`push: full state for ${docName}`, { bytes: fullState.length, version: nextStateVersion });
     }
 
     // =========================================================================
@@ -438,15 +522,15 @@ export class YjsDriveProvider {
             await this.manifest.deleteFileByName(deltaFileName);
         }
 
-        // Update manifest
+        // Update manifest and save immediately to prevent orphaned delta references
         this.manifest.clearDeltas(docName);
+        await this.manifest.save();
 
         // Update local tracking - new state version, clear applied deltas
         const newVersion = (this.appliedStateVersions.get(docName) ?? 0) + 1;
         this.appliedStateVersions.set(docName, newVersion);
         this.appliedDeltaIds.set(docName, new Set());
-
-        console.log(`[YjsDriveProvider] Compacted ${docName} (${fullState.length} bytes, ${deltasToRemove} deltas removed)`);
+        this.log(`compact: ${docName}`, { bytes: fullState.length, deltasRemoved: deltasToRemove, version: newVersion });
     }
 
     // =========================================================================
@@ -469,13 +553,15 @@ export class YjsDriveProvider {
             }
             this.pendingDeltas.get(docName)!.push(update);
 
+            this.log('doc update queued', { docName, pending: this.pendingDeltas.get(docName)?.length });
+
             // Debounce sync
             this.scheduleSync();
         };
 
         doc.on('update', handler);
         this.docUpdateHandlers.set(docName, handler);
-        console.log(`[YjsDriveProvider] Subscribed to updates for ${docName}`);
+        this.log(`subscribe: ${docName}`);
     }
 
     /**
@@ -503,6 +589,8 @@ export class YjsDriveProvider {
         this.syncDebounceTimer = setTimeout(() => {
             this.sync().catch(console.error);
         }, SYNC_DEBOUNCE_MS);
+
+        this.log('scheduleSync: debounced');
     }
 
     // =========================================================================
@@ -540,6 +628,7 @@ export class YjsDriveProvider {
     updateAccessToken(token: string): void {
         this.accessToken = token;
         this.manifest.updateAccessToken(token);
+        this.log('token updated');
     }
 
     /**
@@ -548,6 +637,7 @@ export class YjsDriveProvider {
     updateSessionId(sessionId: string | null): void {
         this.sessionId = sessionId;
         this.manifest.updateSessionId(sessionId);
+        this.log('session updated');
     }
 
     // =========================================================================

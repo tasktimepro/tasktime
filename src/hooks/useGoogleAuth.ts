@@ -150,9 +150,11 @@ export const useGoogleAuth = () => {
         }
     }, []);
 
-    const signOutFromWorker = useCallback(async (): Promise<void> => {
+    const signOutFromWorker = useCallback(async (options?: { revoke?: boolean }): Promise<void> => {
 
-        if (state.sessionId) {
+        const revoke = options?.revoke ?? false;
+
+        if (revoke && state.sessionId) {
             try {
                 await fetch(SYNC_WORKER_CONFIG.endpoints.authRevoke, {
                     method: 'POST',
@@ -231,7 +233,8 @@ export const useGoogleAuth = () => {
     return {
         ...state,
         signIn: signInWithWorker,
-        signOut: signOutFromWorker,
+        signOut: () => signOutFromWorker({ revoke: false }),
+        revokeAccess: () => signOutFromWorker({ revoke: true }),
     };
 };
 

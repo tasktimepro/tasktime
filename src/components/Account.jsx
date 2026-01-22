@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownTrayIcon, CogIcon, TrashIcon, CloudIcon } from '@/components/ui/icons';
+import { ArrowDownTrayIcon, CogIcon, TrashIcon, CloudIcon, SignOutIcon } from '@/components/ui/icons';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import ExportImport from './ExportImport';
 import Preferences from './Preferences';
@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
 import { useToast } from '../hooks/useToast.ts';
 import { useYjs } from '../contexts/YjsContext';
+import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import YjsSyncSettings from './sync/YjsSyncSettings';
 
@@ -31,11 +32,13 @@ const Account = ({
 }) => {
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
-    const { clearAllData } = useYjs();
+    const { clearAllData, isDriveConnected, forceSyncDrive, disconnectDrive } = useYjs();
+    const { signOut } = useGoogleAuth();
     const { preferences, updatePreferences } = usePreferences();
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isSigningOut, setIsSigningOut] = useState(false);
     
     // Define sections in order (first will be default)
     const sideNavItems = useMemo(() => [
@@ -81,6 +84,8 @@ const Account = ({
     };
 
     // Delete all account data function
+    // Note: This only clears local data, does NOT sync or disconnect from Drive
+    // This is useful for testing resync behavior
     const handleDeleteAllData = async () => {
         if (deleteConfirmationText !== 'Delete') {
             showError('Please type "Delete" to confirm');
@@ -89,14 +94,14 @@ const Account = ({
 
         setIsDeleting(true);
         try {
-            // Clear all data via Yjs store
+            // Clear all data via Yjs store (does NOT disconnect from Drive)
             await clearAllData();
             
             // Close modal and reset state
             setShowDeleteModal(false);
             setDeleteConfirmationText('');
             
-            showSuccess('All account data has been permanently deleted');
+            showSuccess('All local data has been deleted');
             
             // Reload the page to reinitialize the store
             window.location.reload();
@@ -105,6 +110,28 @@ const Account = ({
             showError('Failed to delete data. Please try again.');
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleAccountSignOut = async () => {
+        setIsSigningOut(true);
+
+        try {
+            // MUST sync before deleting local data to prevent data loss
+            await forceSyncDrive();
+            showSuccess('Synced to Google Drive');
+            
+            // Now safe to disconnect and clear local data
+            disconnectDrive();
+            await signOut();
+            await clearAllData();
+            showSuccess('Signed out and local data cleared');
+            window.location.reload();
+        } catch (error) {
+            console.error('Failed to sign out:', error);
+            // DO NOT delete local data if sync failed - would cause data loss
+            showError('Sync failed. Please resolve sync issues before signing out.');
+            setIsSigningOut(false);
         }
     };
     
@@ -227,9 +254,21 @@ const Account = ({
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-foreground">Account</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Manage your account settings</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-foreground">Account</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">Manage your account settings</p>
+                </div>
+                {isDriveConnected && (
+                    <Button
+                        variant="ghost"
+                        onClick={handleAccountSignOut}
+                        disabled={isSigningOut}
+                        leadingIcon={SignOutIcon}
+                    >
+                        {isSigningOut ? 'Signing out...' : 'Sign out'}
+                    </Button>
+                )}
             </div>
 
             {/* Navigation Tabs */}

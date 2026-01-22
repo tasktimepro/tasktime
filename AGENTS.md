@@ -155,6 +155,13 @@ const { preferences, updatePreferences } = usePreferences();
 - `src/components/sync/YjsSyncStatus.tsx` - Status indicator
 - `src/components/sync/YjsSyncSettings.tsx` - Settings panel
 
+**Sync Behavior (Jan 22, 2026 optimizations):**
+- **Sync interval:** 60 seconds (reduced from 15s to minimize Cloudflare requests)
+- **Pull throttle:** 30 seconds - skips manifest reload if no local changes and last pull was recent
+- **Manifest change check:** Before full download, checks `modifiedTime` via metadata request
+- **Force sync triggers:** Tab visibility change, network online event (always bypass throttle)
+- **Fallback file lookup:** If delta file not in cache, searches Drive directly
+
 ### 🔐 Google Drive Auth - Cloudflare Worker
 
 **Token persistence is handled by a Cloudflare Worker** to solve OAuth token expiry:
@@ -235,6 +242,7 @@ docker compose run --rm app npm run <script>
 ### Completed
 - [x] Yjs sync system (Phases 1-6: core, Drive provider, React hooks, App migration, sync reliability, component migration)
 - [x] Phase 7: Token persistence with Cloudflare Workers
+- [x] Phase 8: Sync optimizations (60s interval, pull throttle, manifest change check, fallback file lookup)
 - [x] App.jsx fully migrated to Yjs hooks
 - [x] Old SyncEngine removed
 - [x] YjsSyncStatus and YjsSyncSettings components
