@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, UserGroupIcon } from '@/components/ui/icons';
+import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, UserGroupIcon, SortIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
@@ -19,6 +20,8 @@ import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
+import { usePreferences } from '../hooks/usePreferences.ts';
+import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -41,6 +44,116 @@ const ClientList = ({
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { invoices, deleteInvoice } = useInvoices();
+    const { preferences, updatePreferences } = usePreferences();
+
+    const clientSort = preferences.clientSort || 'createdAt';
+
+    const handleSortChange = (value) => {
+
+        updatePreferences({ clientSort: value });
+    };
+
+    const activeClients = useMemo(() => {
+
+        return clients.filter(client => !client.archived);
+    }, [clients]);
+
+    const archivedClients = useMemo(() => {
+
+        return clients.filter(client => client.archived);
+    }, [clients]);
+
+    const taskProjectMap = useMemo(() => {
+
+        const map = new Map();
+        tasks.forEach(task => {
+            if (task.projectId) {
+                map.set(task.id, task.projectId);
+            }
+        });
+        return map;
+    }, [tasks]);
+
+    const projectTaskActiveMap = useMemo(() => {
+
+        const map = new Map();
+        tasks.forEach(task => {
+            if (!task.projectId) return;
+
+            const lastActive = task.lastActive || 0;
+            const current = map.get(task.projectId) || 0;
+
+            if (lastActive > current) {
+                map.set(task.projectId, lastActive);
+            }
+        });
+
+        return map;
+    }, [tasks]);
+
+    const projectLastActiveMap = useMemo(() => {
+
+        const map = new Map();
+        timeEntries.forEach(entry => {
+            const projectId = taskProjectMap.get(entry.taskId);
+            if (!projectId) return;
+
+            const activityTime = entry.end && entry.end > 0 ? entry.end : entry.start;
+            if (!activityTime) return;
+
+            const current = map.get(projectId) || 0;
+            if (activityTime > current) {
+                map.set(projectId, activityTime);
+            }
+        });
+
+        projectTaskActiveMap.forEach((lastActive, projectId) => {
+            const current = map.get(projectId) || 0;
+            if (lastActive > current) {
+                map.set(projectId, lastActive);
+            }
+        });
+
+        return map;
+    }, [timeEntries, taskProjectMap, projectTaskActiveMap]);
+
+    const clientLastActiveMap = useMemo(() => {
+
+        const map = new Map();
+        projects.forEach(project => {
+            const clientId = project.preferredClientId;
+            if (!clientId) return;
+
+            const projectLastActive = projectLastActiveMap.get(project.id) || 0;
+            const current = map.get(clientId) || 0;
+            if (projectLastActive > current) {
+                map.set(clientId, projectLastActive);
+            }
+        });
+        return map;
+    }, [projects, projectLastActiveMap]);
+
+    const sortedActiveClients = useMemo(() => {
+
+        return sortItems({
+            items: activeClients,
+            sortBy: clientSort,
+            getName: (client) => client.title || client.name || '',
+            getCreatedAt: (client) => client.createdAt,
+            getLastActive: (client) => clientLastActiveMap.get(client.id),
+        });
+    }, [activeClients, clientSort, clientLastActiveMap]);
+
+    const sortedArchivedClients = useMemo(() => {
+
+        return sortItems({
+            items: archivedClients,
+            sortBy: clientSort,
+            getName: (client) => client.title || client.name || '',
+            getCreatedAt: (client) => client.createdAt,
+            getLastActive: (client) => clientLastActiveMap.get(client.id),
+        });
+    }, [archivedClients, clientSort, clientLastActiveMap]);
 
     // Form data removed - using modal manager now
 
@@ -218,22 +331,37 @@ const ClientList = ({
             {/* Header */}
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-foreground">
-                    Clients {clients.filter(c => !c.archived).length > 0 && (
+                    Clients {activeClients.length > 0 && (
                         <span>
-                            ({clients.filter(c => !c.archived).length})
+                            ({activeClients.length})
                         </span>
                     )}
                 </h2>
 
-                <Button onClick={() => openClientModal()} leadingIcon={PlusIcon}>
-                    New Client
-                </Button>
+                <div className="flex items-center space-x-3">
+                    <Select value={clientSort} onValueChange={handleSortChange}>
+                        <SelectTrigger className="w-[152px]" aria-label="Sort clients" leadingIcon={SortIcon}>
+                            <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {SORT_OPTIONS.map(option => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Button onClick={() => openClientModal()} leadingIcon={PlusIcon}>
+                        New Client
+                    </Button>
+                </div>
             </div>
 
 
 
             {/* Clients Grid */}
-            {clients.filter(c => !c.archived).length === 0 && clients.filter(c => c.archived).length === 0 ? (
+            {activeClients.length === 0 && archivedClients.length === 0 ? (
                 <EmptyState
                     icon={UserGroupIcon}
                     title="No clients"
@@ -245,9 +373,9 @@ const ClientList = ({
             ) : (
                 <>
                     {/* Active Clients */}
-                    {clients.filter(c => !c.archived).length > 0 && (
+                    {sortedActiveClients.length > 0 && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {clients.filter(c => !c.archived).map((client) => (
+                            {sortedActiveClients.map((client) => (
                                 <Card
                                     key={client.id}
                                     className="hover:shadow-md transition-shadow cursor-pointer relative"
@@ -344,12 +472,12 @@ const ClientList = ({
                                 ) : (
                                     <ChevronRightIcon className="h-4 w-4 mr-1" />
                                 )}
-                                Archived Clients ({clients.filter(c => c.archived).length})
+                                Archived Clients ({archivedClients.length})
                             </button>
 
                             {showArchivedClients && (
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {clients.filter(c => c.archived).map((client) => (
+                                    {sortedArchivedClients.map((client) => (
                                         <Card
                                             key={client.id}
                                             className="hover:shadow-md transition-shadow cursor-pointer relative"

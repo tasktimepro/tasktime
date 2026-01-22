@@ -9,6 +9,7 @@ export {
     Archive as ArchiveBoxIcon,
     ArchiveRestore as ArchiveRestoreIcon,
     ArrowLeft as ArrowLeftIcon,
+    ArrowUpDown as SortIcon,
     BarChart3 as ChartBarIcon,
     Banknote as BanknotesIcon,
     Building2 as BuildingOfficeIcon,

@@ -30,6 +30,8 @@ export interface YjsContextValue {
     manualSyncInProgress: boolean;
     /** Last successful sync timestamp (ms since epoch) or null */
     lastSyncedAt: number | null;
+    /** Whether there are local changes pending upload */
+    hasPendingSyncChanges: () => boolean;
     /** Manually trigger Drive sync */
     forceSyncDrive: () => Promise<void>;
     /** Disconnect Drive sync */
@@ -228,6 +230,10 @@ export function YjsProvider({ children }: YjsProviderProps) {
         await store.clearAllData();
     }, [store]);
 
+    const hasPendingSyncChanges = useCallback(() => {
+        return store.hasPendingSyncChanges();
+    }, [store]);
+
     // --- Context value ---
 
     const value: YjsContextValue = useMemo(() => ({
@@ -240,6 +246,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         hasSynced,
         manualSyncInProgress,
         lastSyncedAt,
+        hasPendingSyncChanges,
         forceSyncDrive,
         disconnectDrive,
         loadEntriesForYear,
@@ -256,6 +263,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         hasSynced,
         manualSyncInProgress,
         lastSyncedAt,
+        hasPendingSyncChanges,
         forceSyncDrive,
         disconnectDrive,
         loadEntriesForYear,

@@ -164,7 +164,7 @@ const GlobalTimer = ({
     const timeColor = isPaused ? 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900' : 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900';
 
     return (
-        <div className={`border ${borderColor} rounded-lg px-4 py-2 ${isExpanded ? 'space-y-3 w-[26rem] max-w-full' : ''}`}>
+        <div className={`border ${borderColor} rounded-lg px-4 py-2 ${isExpanded ? 'space-y-3 min-w-[26rem] max-w-full' : ''}`}>
             {/* Main timer row */}
             <div className="flex items-center justify-center space-x-3">
                 {/* Timer info */}

@@ -97,6 +97,24 @@ export class YjsDocManager {
     }
 
     /**
+     * Delete IndexedDB databases for the given doc names
+     */
+    async deleteDatabases(docNames: DocName[]): Promise<void> {
+        if (typeof indexedDB === 'undefined') {
+            return;
+        }
+
+        await Promise.all(docNames.map((name) => {
+            return new Promise<void>((resolve) => {
+                const request = indexedDB.deleteDatabase(`tasktime-yjs-${name}`);
+                request.onsuccess = () => resolve();
+                request.onerror = () => resolve();
+                request.onblocked = () => resolve();
+            });
+        }));
+    }
+
+    /**
      * Load a document from IndexedDB
      */
     private async loadDoc(name: DocName): Promise<Y.Doc> {

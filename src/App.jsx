@@ -54,7 +54,7 @@ function App() {
  */
 function AppContent() {
 
-    const { isReady, syncState, isSyncing, manualSyncInProgress } = useYjs();
+    const { isReady, syncState, isSyncing, manualSyncInProgress, hasPendingSyncChanges } = useYjs();
     const toast = useContext(ToastContext);
 
     // === Yjs Data Hooks ===
@@ -170,8 +170,18 @@ function AppContent() {
                 return;
             }
 
+            if (!hasPendingSyncChanges()) {
+                return;
+            }
+
             // Only fire when the pointer leaves the window (not when hovering child elements)
-            const leavingWindow = !event.relatedTarget || event.relatedTarget === document.documentElement;
+            const { clientX, clientY, relatedTarget } = event;
+            const leavingWindow = relatedTarget === null && (
+                clientX <= 0 ||
+                clientY <= 0 ||
+                clientX >= window.innerWidth ||
+                clientY >= window.innerHeight
+            );
             if (!leavingWindow || syncToastShownRef.current) {
                 return;
             }
@@ -183,7 +193,7 @@ function AppContent() {
         window.addEventListener('mouseout', handleMouseOut);
         return () => window.removeEventListener('mouseout', handleMouseOut);
 
-    }, [isSyncing, manualSyncInProgress, toast]);
+    }, [isSyncing, manualSyncInProgress, hasPendingSyncChanges, toast]);
 
     // === Dark Mode ===
     const [darkMode, setDarkMode] = useState(() => {

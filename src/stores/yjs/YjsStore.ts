@@ -546,6 +546,13 @@ export class YjsStore {
     }
 
     /**
+     * Check if there are local changes pending upload
+     */
+    hasPendingSyncChanges(): boolean {
+        return this.driveProvider?.hasLocalChangesToPush() ?? false;
+    }
+
+    /**
      * Update access token (for token refresh)
      */
     updateDriveAccessToken(token: string): void {
@@ -585,41 +592,27 @@ export class YjsStore {
         this.driveProvider?.disconnect();
         this.driveProvider = null;
 
-        // Helper to clear a Y.Map
-        const clearYMap = (map: Y.Map<unknown>) => {
-            const keys = Array.from(map.keys());
-            keys.forEach(key => map.delete(key));
-        };
-
-        // Clear all collections in core doc
-        this._coreDoc?.transact(() => {
-            clearYMap(this.projects);
-            clearYMap(this.tasks);
-            clearYMap(this.clients);
-            clearYMap(this.businessInfos);
-            clearYMap(this.invoiceTemplates);
-            clearYMap(this.paymentMethods);
-            clearYMap(this.invoices);
-            clearYMap(this._coreDoc!.getMap('preferences'));
-            clearYMap(this._coreDoc!.getMap('timer'));
-        });
-
-        // Clear active time entries
-        this._activeEntriesDoc?.transact(() => {
-            clearYMap(this.activeTimeEntries);
-        });
-
-        // Clear archived docs if loaded
-        if (this._archivedTasksDoc) {
-            this._archivedTasksDoc.transact(() => {
-                clearYMap(this._archivedTasksDoc!.getMap('tasks'));
-            });
+        // Destroy in-memory docs and remove IndexedDB persistence to avoid syncing deletions
+        const docNames = new Set<DocName>([
+            'core',
+            'entries-active',
+            'tasks-archived',
+            'invoices-archived'
+        ]);
+        for (const name of this.docManager.getLoadedDocs()) {
+            docNames.add(name);
         }
-        if (this._archivedInvoicesDoc) {
-            this._archivedInvoicesDoc.transact(() => {
-                clearYMap(this._archivedInvoicesDoc!.getMap('invoices'));
-            });
-        }
+
+        this.docManager.destroy();
+        await this.docManager.deleteDatabases(Array.from(docNames));
+
+        this._coreDoc = null;
+        this._activeEntriesDoc = null;
+        this._archivedTasksDoc = null;
+        this._archivedTasksLoading = null;
+        this._archivedInvoicesDoc = null;
+        this._archivedInvoicesLoading = null;
+        this._isReady = false;
 
         // Delete all IndexedDB databases
         const dbNames = [

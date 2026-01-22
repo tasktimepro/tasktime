@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon } from '@/components/ui/icons';
+import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon, SortIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
@@ -21,6 +22,8 @@ import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useTimer } from '../hooks/useTimer.ts';
+import { usePreferences } from '../hooks/usePreferences.ts';
+import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 
 /**
  * ProjectList component - Displays and manages the list of projects
@@ -42,6 +45,100 @@ const ProjectList = ({
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { deleteInvoice } = useInvoices();
     const { timerState, clearTimer } = useTimer();
+    const { preferences, updatePreferences } = usePreferences();
+
+    const projectSort = preferences.projectSort || 'createdAt';
+
+    const handleSortChange = (value) => {
+
+        updatePreferences({ projectSort: value });
+    };
+
+    const activeProjects = useMemo(() => {
+
+        return projects.filter(project => !project.archived);
+    }, [projects]);
+
+    const archivedProjects = useMemo(() => {
+
+        return projects.filter(project => project.archived);
+    }, [projects]);
+
+    const taskProjectMap = useMemo(() => {
+
+        const map = new Map();
+        tasks.forEach(task => {
+            if (task.projectId) {
+                map.set(task.id, task.projectId);
+            }
+        });
+        return map;
+    }, [tasks]);
+
+    const projectTaskActiveMap = useMemo(() => {
+
+        const map = new Map();
+        tasks.forEach(task => {
+            if (!task.projectId) return;
+
+            const lastActive = task.lastActive || 0;
+            const current = map.get(task.projectId) || 0;
+
+            if (lastActive > current) {
+                map.set(task.projectId, lastActive);
+            }
+        });
+
+        return map;
+    }, [tasks]);
+
+    const projectLastActiveMap = useMemo(() => {
+
+        const map = new Map();
+        timeEntries.forEach(entry => {
+            const projectId = taskProjectMap.get(entry.taskId);
+            if (!projectId) return;
+
+            const activityTime = entry.end && entry.end > 0 ? entry.end : entry.start;
+            if (!activityTime) return;
+
+            const current = map.get(projectId) || 0;
+            if (activityTime > current) {
+                map.set(projectId, activityTime);
+            }
+        });
+
+        projectTaskActiveMap.forEach((lastActive, projectId) => {
+            const current = map.get(projectId) || 0;
+            if (lastActive > current) {
+                map.set(projectId, lastActive);
+            }
+        });
+
+        return map;
+    }, [timeEntries, taskProjectMap, projectTaskActiveMap]);
+
+    const sortedActiveProjects = useMemo(() => {
+
+        return sortItems({
+            items: activeProjects,
+            sortBy: projectSort,
+            getName: (project) => project.title || '',
+            getCreatedAt: (project) => project.createdAt,
+            getLastActive: (project) => projectLastActiveMap.get(project.id),
+        });
+    }, [activeProjects, projectSort, projectLastActiveMap]);
+
+    const sortedArchivedProjects = useMemo(() => {
+
+        return sortItems({
+            items: archivedProjects,
+            sortBy: projectSort,
+            getName: (project) => project.title || '',
+            getCreatedAt: (project) => project.createdAt,
+            getLastActive: (project) => projectLastActiveMap.get(project.id),
+        });
+    }, [archivedProjects, projectSort, projectLastActiveMap]);
 
     // Update showCreateForm when the prop changes - Removed since using modal manager
 
@@ -290,25 +387,40 @@ const ProjectList = ({
             {/* Header */}
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-foreground">
-                    Projects {projects.filter(p => !p.archived).length > 0 && (
+                    Projects {activeProjects.length > 0 && (
                         <span>
-                            ({projects.filter(p => !p.archived).length})
+                            ({activeProjects.length})
                         </span>
                     )}
                 </h2>
 
-                <Button 
-                    onClick={() => openProjectModal()} 
-                    leadingIcon={PlusIcon}
-                >
-                    New Project
-                </Button>
+                <div className="flex items-center space-x-3">
+                    <Select value={projectSort} onValueChange={handleSortChange}>
+                        <SelectTrigger className="w-[152px]" aria-label="Sort projects" leadingIcon={SortIcon}>
+                            <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {SORT_OPTIONS.map(option => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Button 
+                        onClick={() => openProjectModal()} 
+                        leadingIcon={PlusIcon}
+                    >
+                        New Project
+                    </Button>
+                </div>
             </div>
 
 
 
             {/* Projects Grid */}
-            {projects.filter(p => !p.archived).length === 0 && projects.filter(p => p.archived).length === 0 ? (
+            {activeProjects.length === 0 && archivedProjects.length === 0 ? (
                 <EmptyState
                     icon={ClipboardDocumentCheckIcon}
                     title="No projects"
@@ -320,9 +432,9 @@ const ProjectList = ({
             ) : (
                 <>
                     {/* Active Projects */}
-                    {projects.filter(p => !p.archived).length > 0 && (
+                    {sortedActiveProjects.length > 0 && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {projects.filter(p => !p.archived).map((project) => (
+                            {sortedActiveProjects.map((project) => (
                         <Card
                             key={project.id}
                             className="hover:shadow-md transition-shadow cursor-pointer relative"
@@ -433,12 +545,12 @@ const ProjectList = ({
                                 ) : (
                                     <ChevronRightIcon className="h-4 w-4 mr-1" />
                                 )}
-                                Archived Projects ({projects.filter(p => p.archived).length})
+                                Archived Projects ({archivedProjects.length})
                             </button>
 
                             {showArchivedProjects && (
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {projects.filter(p => p.archived).map((project) => (
+                                    {sortedArchivedProjects.map((project) => (
                                         <Card
                                             key={project.id}
                                             className="hover:shadow-md transition-shadow cursor-pointer relative"

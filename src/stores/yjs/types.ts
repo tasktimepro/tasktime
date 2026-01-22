@@ -122,6 +122,8 @@ export interface Preferences {
     weekStartsOn?: number;
     showCompletedTasks?: boolean;
     defaultBillable?: boolean;
+    projectSort?: 'createdAt' | 'lastActive' | 'name';
+    clientSort?: 'createdAt' | 'lastActive' | 'name';
 }
 
 export interface TimerState {

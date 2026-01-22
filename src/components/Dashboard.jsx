@@ -402,7 +402,7 @@ const Dashboard = ({
      * Render task title with navigation
      */
     const renderTaskTitle = useCallback((task, isCompleted) => {
-        const baseClasses = `text-sm font-medium truncate text-left transition-colors ${
+        const baseClasses = `block w-full text-sm font-medium truncate text-left transition-colors ${
             isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
         }`;
 

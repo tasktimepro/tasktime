@@ -30,6 +30,8 @@ const TaskTree = ({
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { taskId: activeTimerTaskId, clearTimer } = useTimer();
 
+    const allowBillableToggle = !project.isPersonal;
+
     // Get tasks for this project
     const projectTasks = tasks.filter(task => task.projectId === project.id);
 
@@ -242,7 +244,7 @@ const TaskTree = ({
                                     onCreateSubtask={handleCreateTask}
                                     onArchive={() => handleArchiveTask(task.id)}
                                     onUnarchive={() => handleUnarchiveTask(task.id)}
-                                    onToggleBillable={handleToggleBillable}
+                                    onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
                                 />
                             ))}
                         </div>
@@ -272,7 +274,7 @@ const TaskTree = ({
                                             onDelete={() => handleDeleteTask(task.id)}
                                             onCreateSubtask={handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
-                                            onToggleBillable={handleToggleBillable}
+                                            onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
                                         />
                                     ))}
                                 </div>

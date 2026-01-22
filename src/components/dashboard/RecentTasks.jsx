@@ -51,13 +51,13 @@ const RecentTasks = ({
 
                             return (
                                 <div key={task.id} className={`px-3 py-3 hover:bg-muted ${task.completed ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
-                                    <div className="flex items-center space-x-3">
+                                    <div className="flex items-center gap-3">
                                         <CustomCheckbox
                                             checked={task.completed}
                                             onChange={(checked) => handleCompleteTask(task, checked)}
                                             disabled={shouldDisable}
                                         />
-                                        <div className="flex-1 min-w-0 space-y-1">
+                                        <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
                                             {renderTaskTitle(task, task.completed)}
                                             <p className={`text-xs truncate ${task.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                 {task.parentTaskId ? (
@@ -85,10 +85,10 @@ const RecentTasks = ({
                                                 )}
                                             </p>
                                         </div>
-                                        <div className={`text-xs ${task.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                        <div className={`flex-shrink-0 text-xs ${task.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                             {formatDurationWithSeconds(task.recentTime)}
                                         </div>
-                                        <div className="flex space-x-1">
+                                        <div className="flex flex-shrink-0 space-x-1">
                                             {renderTaskControls(task, shouldDisable)}
                                         </div>
                                     </div>
@@ -101,13 +101,13 @@ const RecentTasks = ({
                                                 const subtaskWithProject = { ...subtask, project: task.project };
 
                                                 return (
-                                                    <div key={subtask.id} className={`flex items-center space-x-3 py-2 ${subtaskShouldDisable ? 'opacity-50' : ''}`}>
+                                                    <div key={subtask.id} className={`flex items-center gap-3 py-2 ${subtaskShouldDisable ? 'opacity-50' : ''}`}>
                                                         <CustomCheckbox
                                                             checked={subtask.completed}
                                                             onChange={(checked) => handleCompleteTask(subtask, checked)}
                                                             disabled={subtaskShouldDisable}
                                                         />
-                                                        <div className="flex-1 min-w-0 space-y-1">
+                                                        <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
                                                             {renderTaskTitle(subtaskWithProject, subtask.completed)}
                                                             <p className={`text-xs truncate ${subtask.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                                 {task.project ? (
@@ -121,10 +121,10 @@ const RecentTasks = ({
                                                                 ) : 'Unknown Project'}
                                                             </p>
                                                         </div>
-                                                        <div className={`text-xs ${subtask.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                                        <div className={`flex-shrink-0 text-xs ${subtask.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                             {formatDurationWithSeconds(subtask.recentTime)}
                                                         </div>
-                                                        <div className="flex space-x-1">
+                                                        <div className="flex flex-shrink-0 space-x-1">
                                                             {renderTaskControls(subtask, subtaskShouldDisable)}
                                                         </div>
                                                     </div>

@@ -276,6 +276,17 @@ export class YjsDriveProvider {
     }
 
     /**
+     * Check if there are local changes that need to be pushed
+     */
+    hasLocalChangesToPush(): boolean {
+        if (this.forceFullStateDocs.size > 0) {
+            return true;
+        }
+
+        return this.hasPendingDeltas();
+    }
+
+    /**
      * Sync a single document
      * @param shouldPull - Whether to pull remote changes (false if manifest unchanged)
      */

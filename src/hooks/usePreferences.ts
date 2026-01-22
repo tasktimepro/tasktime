@@ -17,6 +17,8 @@ const DEFAULT_PREFERENCES: Preferences = {
     weekStartsOn: 0, // Sunday
     showCompletedTasks: true,
     defaultBillable: true,
+    projectSort: 'createdAt',
+    clientSort: 'createdAt',
 };
 
 export function usePreferences() {

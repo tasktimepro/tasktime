@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ const ProjectModal = ({
     clearSavedState
 }) => {
     const [selectedClientRate, setSelectedClientRate] = useState(null);
+    const lastInitKeyRef = useRef(null);
     const { showSuccess } = useToast();
     const { projects, createProject, updateProject } = useProjects();
     const { clients } = useClients();
@@ -39,8 +40,23 @@ const ProjectModal = ({
         isPersonal: false
     });
 
-    // Initialize form data when editing a project
+    // Initialize form data when opening or changing context
     useEffect(() => {
+        if (!isOpen) {
+            lastInitKeyRef.current = null;
+            return;
+        }
+
+        const initKey = editingProject?.id
+            ? `edit:${editingProject.id}`
+            : (modalOptions?.preselectedClientId ? `new:${modalOptions.preselectedClientId}` : 'new');
+
+        if (lastInitKeyRef.current === initKey) {
+            return;
+        }
+
+        lastInitKeyRef.current = initKey;
+
         if (editingProject) {
             // Find the client for this project
             const projectClient = editingProject.preferredClientId ? clients.find(c => c.id === editingProject.preferredClientId) : null;
@@ -115,7 +131,7 @@ const ProjectModal = ({
                 }
             }
         }
-    }, [editingProject, clients, getSavedState, modalOptions]);
+    }, [isOpen, editingProject, clients, modalOptions, getSavedState]);
 
     // Save form state whenever it changes (debounced)
     useEffect(() => {
