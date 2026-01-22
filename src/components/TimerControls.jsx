@@ -174,7 +174,7 @@ function TimerControls({
                     <PlayIcon className={iconSize} />
                 </Button>
             ) : isTimerPaused ? (
-                // For paused state, show resume and stop buttons
+                // For paused state, show resume and stop buttons (icons only)
                 <div className="flex space-x-1">
                     <Button
                         variant="ghost"
@@ -185,65 +185,37 @@ function TimerControls({
                     >
                         <PlayIcon className={iconSize} />
                     </Button>
-                    {isGlobalTimer && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleStop}
-                            className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
-                            title="Save & Stop Timer"
-                        >
-                            <StopIcon className={iconSize} />
-                        </Button>
-                    )}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleStop}
+                        className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
+                        title="Save & Stop Timer"
+                    >
+                        <StopIcon className={iconSize} />
+                    </Button>
                 </div>
             ) : (
                 // For active (running) state, show pause and stop buttons
                 <div className="flex space-x-1">
-                    {isGlobalTimer ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handlePause}
-                            className="h-8 w-8 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-accent"
-                            title="Pause Timer"
-                        >
-                            <PauseIcon className={iconSize} />
-                        </Button>
-                    ) : (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handlePause}
-                            className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-accent"
-                            title="Pause Timer"
-                            leadingIcon={PauseIcon}
-                        >
-                            Pause
-                        </Button>
-                    )}
-                    {isGlobalTimer ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleStop}
-                            className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
-                            title="Save & Stop Timer"
-                        >
-                            <StopIcon className={iconSize} />
-                        </Button>
-                    ) : (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleStop}
-                            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
-                            title="Save & Stop Timer"
-                            leadingIcon={StopIcon}
-                        >
-                            Stop
-                        </Button>
-                    )}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handlePause}
+                        className="h-8 w-8 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-accent"
+                        title="Pause Timer"
+                    >
+                        <PauseIcon className={iconSize} />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleStop}
+                        className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
+                        title="Save & Stop Timer"
+                    >
+                        <StopIcon className={iconSize} />
+                    </Button>
                 </div>
             )}
         </div>

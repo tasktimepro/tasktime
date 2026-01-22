@@ -197,6 +197,13 @@ export class YjsDriveProvider {
         const hasPendingLocal = this.hasPendingDeltas();
         const timeSinceLastPull = Date.now() - this.lastPullAt;
 
+        // On a forced sync, ensure every loaded doc does a full-state push to heal any missed deltas
+        if (force) {
+            for (const docName of this.docManager.getLoadedDocs()) {
+                this.forceFullStateDocs.add(docName);
+            }
+        }
+
         // Pull throttle: skip manifest reload if no local changes and last pull was recent
         // Unless force=true (manual sync, visibility change, online event)
         const shouldThrottlePull = !force && !hasPendingLocal && timeSinceLastPull < PULL_THROTTLE_MS;
@@ -420,18 +427,27 @@ export class YjsDriveProvider {
 
         // Merge all pending deltas into one
         const mergedDelta = mergeUpdates(pending);
-        this.pendingDeltas.set(docName, []);
 
         // Upload as delta file
         const deltaId = crypto.randomUUID().slice(0, 8);
         const deltaFileName = `tasktime-yjs-${docName}-delta-${deltaId}.bin`;
 
         const blob = new Blob([mergedDelta.buffer as ArrayBuffer], { type: 'application/octet-stream' });
-        const fileId = await this.manifest.createFile(deltaFileName, blob);
-        this.manifest.setFileId(deltaFileName, fileId);
 
-        // Update manifest
-        this.manifest.addDelta(docName, deltaId);
+        try {
+            const fileId = await this.manifest.createFile(deltaFileName, blob);
+            this.manifest.setFileId(deltaFileName, fileId);
+
+            // Update manifest
+            this.manifest.addDelta(docName, deltaId);
+
+            // Only clear pending after a successful upload/manifest update
+            this.pendingDeltas.set(docName, []);
+        } catch (error) {
+            // Preserve pending deltas so they retry on next sync
+            console.error(`[DriveSync] Failed to push delta for ${docName}, will retry`, error);
+            throw error;
+        }
 
         this.log(`push: delta ${deltaId} for ${docName}`, { bytes: mergedDelta.length, pendingAfter: this.pendingDeltas.get(docName)?.length ?? 0 });
     }

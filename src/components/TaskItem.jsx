@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import TaskHeader from './task/TaskHeader';
 import TaskActions from './task/TaskActions';
 import SubtaskSection from './task/SubtaskSection';
@@ -7,6 +7,7 @@ import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
 import { useTimer } from '../hooks/useTimer';
+import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app';
 
 /**
  * TaskItem component - Displays individual task with timer controls and subtasks.
@@ -55,7 +56,7 @@ const TaskItem = ({
     // Calculate total time for this task
     const mainTaskTime = useMemo(() => {
         return timeEntries
-            .filter(e => e.taskId === task.id)
+            .filter(e => e.taskId === task.id && typeof e.end === 'number')
             .reduce((sum, e) => sum + (e.end - e.start), 0);
     }, [timeEntries, task.id]);
 
@@ -63,9 +64,32 @@ const TaskItem = ({
     const totalTimeWithSubtasks = useMemo(() => {
         const allTaskIds = [task.id, ...subtaskIds];
         return timeEntries
-            .filter(e => allTaskIds.includes(e.taskId))
+            .filter(e => allTaskIds.includes(e.taskId) && typeof e.end === 'number')
             .reduce((sum, e) => sum + (e.end - e.start), 0);
     }, [timeEntries, task.id, subtaskIds]);
+
+    // Auto-mark billable when significant time logged (post last billed) and user hasn't set it
+    const hasSignificantBillableTime = useMemo(() => {
+        const cutoff = task.lastBilledAt || task.createdAt || 0;
+        const relevantEntries = timeEntries.filter((entry) => {
+            if (!entry || typeof entry.end !== 'number') return false;
+            if (entry.end <= entry.start) return false;
+            const belongsToTask = entry.taskId === task.id || subtaskIds.includes(entry.taskId);
+            return belongsToTask && entry.start > cutoff;
+        });
+
+        const totalBillableMs = relevantEntries.reduce((total, entry) => {
+            return total + (entry.end - entry.start);
+        }, 0);
+
+        return totalBillableMs >= BILLABLE_TIME_THRESHOLD_MS;
+    }, [timeEntries, task.id, subtaskIds, task.lastBilledAt, task.createdAt]);
+
+    useEffect(() => {
+        if (hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
+            updateTask(task.id, { billable: true, lastActive: Date.now() });
+        }
+    }, [hasSignificantBillableTime, task.billableSetByUser, task.billable, task.id, updateTask]);
 
     /**
      * Toggle task completion status.

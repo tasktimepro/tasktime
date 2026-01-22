@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback, useContext } from 'react';
 import './App.css';
 import { YjsProvider, useYjs } from './contexts/YjsContext.tsx';
 import { useProjects } from './hooks/useProjects.ts';
@@ -27,6 +27,7 @@ import OfflineIndicator from './components/OfflineIndicator';
 import InstallPrompt from './components/InstallPrompt';
 import YjsSyncStatus from './components/sync/YjsSyncStatus';
 import { ToastProvider } from './components/ToastContainer';
+import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon } from '@/components/ui/icons';
 import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
@@ -53,7 +54,8 @@ function App() {
  */
 function AppContent() {
 
-    const { isReady, syncState, isSyncing } = useYjs();
+    const { isReady, syncState, isSyncing, manualSyncInProgress } = useYjs();
+    const toast = useContext(ToastContext);
 
     // === Yjs Data Hooks ===
     const { 
@@ -147,6 +149,41 @@ function AppContent() {
     const isLoading = !isReady || projectsLoading || tasksLoading || entriesLoading || 
         clientsLoading || invoicesLoading || businessLoading || templatesLoading || 
         paymentsLoading || preferencesLoading || timerLoading;
+
+    // Show a one-time toast if the user mouses out while uploads are in-flight
+    const syncToastShownRef = useRef(false);
+
+    // Reset the toast guard when syncing finishes
+    useEffect(() => {
+        if (!isSyncing && !manualSyncInProgress) {
+            syncToastShownRef.current = false;
+        }
+    }, [isSyncing, manualSyncInProgress]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !toast) {
+            return undefined;
+        }
+
+        const handleMouseOut = (event) => {
+            if (!isSyncing && !manualSyncInProgress) {
+                return;
+            }
+
+            // Only fire when the pointer leaves the window (not when hovering child elements)
+            const leavingWindow = !event.relatedTarget || event.relatedTarget === document.documentElement;
+            if (!leavingWindow || syncToastShownRef.current) {
+                return;
+            }
+
+            syncToastShownRef.current = true;
+            toast.showInfo('Uploading changes… your data is safe locally.', 3500);
+        };
+
+        window.addEventListener('mouseout', handleMouseOut);
+        return () => window.removeEventListener('mouseout', handleMouseOut);
+
+    }, [isSyncing, manualSyncInProgress, toast]);
 
     // === Dark Mode ===
     const [darkMode, setDarkMode] = useState(() => {
