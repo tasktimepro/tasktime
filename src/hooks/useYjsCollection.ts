@@ -103,11 +103,17 @@ export function useYjsCollection<T extends { id: string }>(
         }
         const id = (data as { id?: string }).id || generateId();
         const now = Date.now();
+        const createdAt = typeof (data as { createdAt?: number }).createdAt === 'number'
+            ? (data as { createdAt?: number }).createdAt as number
+            : now;
+        const updatedAt = typeof (data as { updatedAt?: number }).updatedAt === 'number'
+            ? (data as { updatedAt?: number }).updatedAt as number
+            : now;
         const item = { 
             ...data, 
             id,
-            createdAt: now,
-            updatedAt: now,
+            createdAt,
+            updatedAt,
         } as unknown as T;
         yMap.set(id, item);
         return item;

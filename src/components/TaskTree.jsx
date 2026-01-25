@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
-import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from '@/components/ui/icons';
+import React, { useState, useCallback, useMemo } from 'react';
+import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, SortIcon } from '@/components/ui/icons';
 import TaskItem from './TaskItem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Notice } from '@/components/ui/notice';
 import Modal from './Modal';
 import { useToast } from '../hooks/useToast.ts';
@@ -11,6 +12,7 @@ import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTimer } from '../hooks/useTimer.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -23,6 +25,7 @@ const TaskTree = ({
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [showArchivedTasks, setShowArchivedTasks] = useState(false);
     const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState(null);
+    const [taskSort, setTaskSort] = useState('lastActive');
     const { showSuccess } = useToast();
     
     // Yjs hooks for state
@@ -40,6 +43,33 @@ const TaskTree = ({
 
     // Get archived parent tasks
     const archivedTasks = projectTasks.filter(task => !task.parentTaskId && task.archived);
+
+    const visibleTasksCount = useMemo(() => {
+
+        return projectTasks.filter(task => !task.completed && !task.archived).length;
+    }, [projectTasks]);
+
+    const sortedParentTasks = useMemo(() => {
+
+        return sortItems({
+            items: parentTasks,
+            sortBy: taskSort,
+            getName: (task) => task.title || '',
+            getCreatedAt: (task) => task.createdAt,
+            getLastActive: (task) => task.lastActive || task.createdAt,
+        });
+    }, [parentTasks, taskSort]);
+
+    const sortedArchivedTasks = useMemo(() => {
+
+        return sortItems({
+            items: archivedTasks,
+            sortBy: taskSort,
+            getName: (task) => task.title || '',
+            getCreatedAt: (task) => task.createdAt,
+            getLastActive: (task) => task.lastActive || task.createdAt,
+        });
+    }, [archivedTasks, taskSort]);
 
     const pendingDeleteTask = pendingDeleteTaskId
         ? tasks.find(task => task.id === pendingDeleteTaskId)
@@ -180,6 +210,45 @@ const TaskTree = ({
 
     return (
         <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-foreground">
+                    Tasks ({visibleTasksCount})
+                </h3>
+
+                <div className="flex items-center space-x-3">
+                    <Select value={taskSort} onValueChange={setTaskSort}>
+                        <SelectTrigger
+                            className="h-9 w-9"
+                            aria-label="Sort tasks"
+                            leadingIcon={SortIcon}
+                            hideCaret
+                            iconOnly
+                        >
+                            <span className="sr-only">
+                                <SelectValue placeholder="Sort by" />
+                            </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {SORT_OPTIONS.map(option => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {!showCreateForm && (
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowCreateForm(true)}
+                            leadingIcon={PlusIcon}
+                        >
+                            Add Task
+                        </Button>
+                    )}
+                </div>
+            </div>
+
             {/* Create Task Form */}
             {showCreateForm && (
                 <div className="bg-muted border border-border rounded-lg p-4">
@@ -212,17 +281,6 @@ const TaskTree = ({
                 </div>
             )}
 
-            {/* Add Task Button */}
-            {!showCreateForm && (
-                <Button
-                    variant="outline"
-                    onClick={() => setShowCreateForm(true)}
-                    leadingIcon={PlusIcon}
-                >
-                    Add Task
-                </Button>
-            )}
-
             {/* Tasks List */}
             {parentTasks.length === 0 && archivedTasks.length === 0 ? (
                 <EmptyState
@@ -234,9 +292,9 @@ const TaskTree = ({
             ) : (
                 <>
                     {/* Active Tasks */}
-                    {parentTasks.length > 0 && (
+                    {sortedParentTasks.length > 0 && (
                         <div className="space-y-4">
-                            {parentTasks.map((task) => (
+                            {sortedParentTasks.map((task) => (
                                 <TaskItem
                                     key={task.id}
                                     task={task}
@@ -251,7 +309,7 @@ const TaskTree = ({
                     )}
 
                     {/* Archived Tasks Section */}
-                    {archivedTasks.length > 0 && (
+                    {sortedArchivedTasks.length > 0 && (
                         <div className="mt-8 border-t pt-6">
                             <button
                                 onClick={() => setShowArchivedTasks(!showArchivedTasks)}
@@ -262,12 +320,12 @@ const TaskTree = ({
                                 ) : (
                                     <ChevronRightIcon className="h-4 w-4 mr-1" />
                                 )}
-                                Archived Tasks ({archivedTasks.length})
+                                Archived Tasks ({sortedArchivedTasks.length})
                             </button>
 
                             {showArchivedTasks && (
                                 <div className="space-y-2 scrollable-container">
-                                    {archivedTasks.map((task) => (
+                                    {sortedArchivedTasks.map((task) => (
                                         <TaskItem
                                             key={task.id}
                                             task={task}

@@ -12,12 +12,13 @@ const SelectGroup = SelectPrimitive.Group
 
 const SelectValue = SelectPrimitive.Value
 
-const SelectTrigger = React.forwardRef(({ className, children, leadingIcon: LeadingIcon, ...props }, ref) => (
+const SelectTrigger = React.forwardRef(({ className, children, leadingIcon: LeadingIcon, hideCaret = false, iconOnly = false, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
       "flex h-9 w-full cursor-pointer items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-      LeadingIcon && "gap-2",
+      LeadingIcon && !iconOnly && "gap-2",
+      iconOnly && "w-9 justify-center px-0",
       className
     )}
     {...props}>
@@ -25,24 +26,26 @@ const SelectTrigger = React.forwardRef(({ className, children, leadingIcon: Lead
       <LeadingIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
     )}
     {children}
-    <SelectPrimitive.Icon asChild>
-      <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
-        <svg
-          viewBox="0 0 12 4"
-          className="h-3 w-3"
-          aria-hidden="true"
-        >
-          <path
-            d="M1 1.5L6 6.5L11 1.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </span>
-    </SelectPrimitive.Icon>
+    {!hideCaret && (
+      <SelectPrimitive.Icon asChild>
+        <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
+          <svg
+            viewBox="0 0 12 4"
+            className="h-3 w-3"
+            aria-hidden="true"
+          >
+            <path
+              d="M1 1.5L6 6.5L11 1.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </SelectPrimitive.Icon>
+    )}
   </SelectPrimitive.Trigger>
 ))
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName

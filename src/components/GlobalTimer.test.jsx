@@ -62,8 +62,6 @@ vi.mock('../hooks/useProjects.ts', () => ({
 describe('GlobalTimer', () => {
 
     const toastContextValue = {
-        addToast: vi.fn(),
-        removeToast: vi.fn(),
         showSuccess: vi.fn(),
         showError: vi.fn(),
         showInfo: vi.fn(),

@@ -97,10 +97,7 @@ export const calculateDueDate = (
         }
 
         default: {
-            // Backward compatibility with old 'fixed' and 'net' types
-            const dueDate = new Date(invoiceDate);
-            dueDate.setDate(dueDate.getDate() + (Number(template.dueDateDays) || 30));
-            return toStorageDate(dueDate);
+            return null;
         }
     }
 };

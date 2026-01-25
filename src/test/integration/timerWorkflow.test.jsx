@@ -66,8 +66,6 @@ describe('Timer workflow integration', () => {
 
     const task = { id: 'task-1', projectId: 'project-1', title: 'Test Task' }
     const toastContextValue = {
-        addToast: vi.fn(),
-        removeToast: vi.fn(),
         showSuccess: vi.fn(),
         showError: vi.fn(),
         showInfo: vi.fn(),

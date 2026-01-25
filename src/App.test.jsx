@@ -14,14 +14,16 @@ vi.mock('./contexts/YjsContext.tsx', () => ({
     YjsProvider: ({ children }) => children,
     useYjs: () => ({
         isReady: true,
-        syncState: 'idle',
         isSyncing: false,
+        manualSyncInProgress: false,
+        hasPendingSyncChanges: () => false,
         isDriveConnected: false,
         forceSyncDrive: vi.fn(),
         loadEntriesForYear: vi.fn(),
         loadArchivedTasks: vi.fn(),
         loadArchivedInvoices: vi.fn(),
         getAvailableYears: vi.fn().mockResolvedValue([]),
+        clearAllData: vi.fn(),
     }),
 }))
 
@@ -243,9 +245,9 @@ describe('App component', () => {
         vi.restoreAllMocks()
     })
 
-    it('renders the dashboard view by default', () => {
+    it('renders the dashboard view by default', async () => {
         render(<App />)
-        expect(screen.getByTestId('dashboard')).toBeInTheDocument()
+        expect(await screen.findByTestId('dashboard')).toBeInTheDocument()
     })
 
     it('renders the navigation sidebar', () => {

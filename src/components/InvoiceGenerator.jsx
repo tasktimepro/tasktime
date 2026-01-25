@@ -13,6 +13,7 @@ import { useInvoices } from '../hooks/useInvoices.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
+import { useTimer } from '../hooks/useTimer.ts';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -21,8 +22,6 @@ const InvoiceGenerator = ({
     project, 
     client, // Add client prop for pre-selection
     timeEntries,
-    currentTimer,
-    isPaused,
     editingInvoice,
     onInvoiceSaved,
     paymentMethods = [],
@@ -41,6 +40,7 @@ const InvoiceGenerator = ({
     const { projects, updateProject } = useProjects();
     const { tasks, updateTask } = useTasks();
     const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
+    const { isActive: isTimerActive, isPaused: isTimerPaused } = useTimer();
     
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -104,12 +104,9 @@ const InvoiceGenerator = ({
         }
 
         // If editing an invoice, use its payment method
-        if (editingInvoice && editingInvoice.paymentMethodId) {
-            const paymentMethod = paymentMethods.find(pm => pm.id === editingInvoice.paymentMethodId);
-            if (paymentMethod) {
-                setSelectedPaymentMethod(paymentMethod);
-                return;
-            }
+        if (editingInvoice && editingInvoice.paymentMethod) {
+            setSelectedPaymentMethod(editingInvoice.paymentMethod);
+            return;
         }
         
         // PRIORITY 1: Look for last used payment method for this client across all invoices
@@ -119,12 +116,9 @@ const InvoiceGenerator = ({
                 .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
             
             for (const invoice of clientInvoices) {
-                if (invoice.paymentMethodId) {
-                    const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                    if (paymentMethod) {
-                        setSelectedPaymentMethod(paymentMethod);
-                        return;
-                    }
+                if (invoice.paymentMethod) {
+                    setSelectedPaymentMethod(invoice.paymentMethod);
+                    return;
                 }
             }
         }
@@ -133,12 +127,9 @@ const InvoiceGenerator = ({
         if (!projectManuallyChanged && projectInvoices.length > 0) {
             for (let i = projectInvoices.length - 1; i >= 0; i--) {
                 const invoice = projectInvoices[i];
-                if (invoice.paymentMethodId) {
-                    const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                    if (paymentMethod) {
-                        setSelectedPaymentMethod(paymentMethod);
-                        return;
-                    }
+                if (invoice.paymentMethod) {
+                    setSelectedPaymentMethod(invoice.paymentMethod);
+                    return;
                 }
             }
         }
@@ -170,12 +161,9 @@ const InvoiceGenerator = ({
         }
 
         // If editing an invoice, use its business info
-        if (editingInvoice && editingInvoice.businessInfoId) {
-            const businessInfo = businessInfos.find(bi => bi.id === editingInvoice.businessInfoId);
-            if (businessInfo) {
-                setSelectedBusinessInfo(businessInfo);
-                return;
-            }
+        if (editingInvoice && editingInvoice.businessInfo) {
+            setSelectedBusinessInfo(editingInvoice.businessInfo);
+            return;
         }
         
         // PRIORITY 1: Look for last used business info for this client across all invoices
@@ -185,12 +173,9 @@ const InvoiceGenerator = ({
                 .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
             
             for (const invoice of clientInvoices) {
-                if (invoice.businessInfoId) {
-                    const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
-                    if (businessInfo) {
-                        setSelectedBusinessInfo(businessInfo);
-                        return;
-                    }
+                if (invoice.businessInfo) {
+                    setSelectedBusinessInfo(invoice.businessInfo);
+                    return;
                 }
             }
         }
@@ -199,12 +184,9 @@ const InvoiceGenerator = ({
         if (!projectManuallyChanged && projectInvoices.length > 0) {
             for (let i = projectInvoices.length - 1; i >= 0; i--) {
                 const invoice = projectInvoices[i];
-                if (invoice.businessInfoId) {
-                    const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
-                    if (businessInfo) {
-                        setSelectedBusinessInfo(businessInfo);
-                        return;
-                    }
+                if (invoice.businessInfo) {
+                    setSelectedBusinessInfo(invoice.businessInfo);
+                    return;
                 }
             }
         }
@@ -338,12 +320,9 @@ const InvoiceGenerator = ({
         }
 
         // If editing an invoice and it has a template reference, use it
-        if (editingInvoice && editingInvoice.templateId) {
-            const template = invoiceTemplates.find(t => t.id === editingInvoice.templateId);
-            if (template) {
-                setSelectedTemplate(template);
-                return;
-            }
+        if (editingInvoice && editingInvoice.template) {
+            setSelectedTemplate(editingInvoice.template);
+            return;
         }
         
         // If not editing an invoice, we need to select a template
@@ -355,12 +334,9 @@ const InvoiceGenerator = ({
                     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
                 
                 for (const invoice of clientInvoices) {
-                    if (invoice.templateId) {
-                        const lastTemplate = invoiceTemplates.find(t => t.id === invoice.templateId);
-                        if (lastTemplate) {
-                            setSelectedTemplate(lastTemplate);
-                            return;
-                        }
+                    if (invoice.template) {
+                        setSelectedTemplate(invoice.template);
+                        return;
                     }
                 }
             }
@@ -374,12 +350,9 @@ const InvoiceGenerator = ({
                 if (projectInvoices.length > 0) {
                     const lastInvoice = projectInvoices[projectInvoices.length - 1];
                     
-                    if (lastInvoice.templateId) {
-                        const lastTemplate = invoiceTemplates.find(t => t.id === lastInvoice.templateId);
-                        if (lastTemplate) {
-                            setSelectedTemplate(lastTemplate);
-                            return;
-                        }
+                    if (lastInvoice.template) {
+                        setSelectedTemplate(lastInvoice.template);
+                        return;
                     }
                 }
             }
@@ -826,14 +799,10 @@ const InvoiceGenerator = ({
             taxRate: pricing.taxRate,
             taxLabel: pricing.taxLabel,
             taxOverride: taxOverride.enabled ? taxOverride : null,
-            // Store full objects instead of just IDs for permanent access
-            paymentMethodId: selectedPaymentMethod?.id || null, // Keep for backward compatibility
             paymentMethod: selectedPaymentMethod ? { ...selectedPaymentMethod } : null,
-            businessInfoId: selectedBusinessInfo?.id || null, // Keep for backward compatibility
             businessInfo: selectedBusinessInfo ? { ...selectedBusinessInfo } : null,
             clientId: selectedClient?.id || null,
             currency: selectedClient?.defaultCurrency || getPreferredCurrency(),
-            templateId: selectedTemplate?.id || null, // Keep for backward compatibility
             template: selectedTemplate ? { ...selectedTemplate } : null,
             invoiceNumber: invoiceNumber,
             // Store dates in ISO format (YYYY-MM-DD) for portability
@@ -998,7 +967,7 @@ const InvoiceGenerator = ({
         if (showInvoiceForm) return;
         
         // Check if a timer is currently active (running, not paused)
-        if (currentTimer && !isPaused) {
+        if (isTimerActive && !isTimerPaused) {
             showError('Cannot generate an invoice while a timer is active. Please pause the timer first.');
             return;
         }
@@ -1142,7 +1111,7 @@ const InvoiceGenerator = ({
             }
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, currentTimer, isPaused, showError, client]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, isTimerActive, isTimerPaused, showError, client]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {

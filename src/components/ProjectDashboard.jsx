@@ -9,32 +9,21 @@ import InvoicesList from './InvoicesList';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { useTimer } from '../hooks/useTimer.ts';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
  */
 const ProjectDashboard = ({
     project,
-    projects,
-    setProjects,
     tasks,
-    setTasks,
     timeEntries,
-    setTimeEntries,
-    currentTimer,
-    setCurrentTimer,
-    isPaused,
-    setIsPaused,
-    pausedElapsedTime,
-    setPausedElapsedTime,
     onBackToProjects,
     paymentMethods,
     businessInfos,
     clients,
     invoices,
-    setInvoices,
     invoiceTemplates,
-    setInvoiceTemplates,
     // Modal functions
     openClientModal,
     openProjectModal,
@@ -45,6 +34,7 @@ const ProjectDashboard = ({
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
     const { showError } = useToast();
+    const { isActive: isTimerActive, isPaused } = useTimer();
     
     // Get invoices for this project
     const projectInvoices = invoices.filter(invoice => 
@@ -56,7 +46,7 @@ const ProjectDashboard = ({
      */
     const handleEditInvoice = (invoice) => {
         // Check if a timer is currently active (running, not paused)
-        if (currentTimer && !isPaused) {
+        if (isTimerActive && !isPaused) {
             showError('Cannot update an invoice while a timer is active. Please pause the timer first.');
             return;
         }
@@ -190,8 +180,6 @@ const ProjectDashboard = ({
                     <InvoiceGenerator
                         project={project}
                         timeEntries={projectTimeEntries}
-                        currentTimer={currentTimer}
-                        isPaused={isPaused}
                         paymentMethods={paymentMethods}
                         businessInfos={businessInfos}
                         clients={clients}
@@ -298,13 +286,7 @@ const ProjectDashboard = ({
 
             {/* Task Tree */}
             <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg">
-                        Tasks ({visibleTasksCount})
-                    </CardTitle>
-                </CardHeader>
-
-                <CardContent>
+                <CardContent className="pt-6">
                     <TaskTree
                         project={project}
                     />
@@ -323,8 +305,6 @@ const ProjectDashboard = ({
                             <InvoiceGenerator
                                 project={project}
                                 timeEntries={projectTimeEntries}
-                                currentTimer={currentTimer}
-                                isPaused={isPaused}
                                 editingInvoice={editingInvoice}
                                 onInvoiceSaved={() => setEditingInvoice(null)}
                                 paymentMethods={paymentMethods}

@@ -378,38 +378,29 @@ export const handleProjectSelection = (
                     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
                 
                 for (const invoice of clientInvoices) {
-                    if (invoice.businessInfoId) {
-                        const businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
-                        if (businessInfo) {
-                            setSelectedBusinessInfo(businessInfo);
-                            clientBusinessInfoSet = true;
-                            break;
-                        }
+                    if (invoice.businessInfo) {
+                        setSelectedBusinessInfo(invoice.businessInfo);
+                        clientBusinessInfoSet = true;
+                        break;
                     }
                 }
                 
                 // PRIORITY 1: Look for last used payment method for this client across all invoices
                 for (const invoice of clientInvoices) {
-                    if (invoice.paymentMethodId) {
-                        const paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                        if (paymentMethod) {
-                            setSelectedPaymentMethod(paymentMethod);
-                            clientPaymentMethodSet = true;
-                            break;
-                        }
+                    if (invoice.paymentMethod) {
+                        setSelectedPaymentMethod(invoice.paymentMethod);
+                        clientPaymentMethodSet = true;
+                        break;
                     }
                 }
                 
                 // PRIORITY 1: Look for last used template for this client across all invoices
                 if (setSelectedTemplate && invoiceTemplates) {
                     for (const invoice of clientInvoices) {
-                        if (invoice.templateId) {
-                            const template = invoiceTemplates.find(t => t.id === invoice.templateId);
-                            if (template) {
-                                setSelectedTemplate(template);
-                                clientTemplateSet = true;
-                                break;
-                            }
+                        if (invoice.template) {
+                            setSelectedTemplate(invoice.template);
+                            clientTemplateSet = true;
+                            break;
                         }
                     }
                 }
@@ -420,27 +411,18 @@ export const handleProjectSelection = (
                 const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
                 
                 // Only set business info if not already set from client history
-                if (!clientBusinessInfoSet && lastInvoice.businessInfoId) {
-                    const businessInfo = businessInfos.find(bi => bi.id === lastInvoice.businessInfoId);
-                    if (businessInfo) {
-                        setSelectedBusinessInfo(businessInfo);
-                    }
+                if (!clientBusinessInfoSet && lastInvoice.businessInfo) {
+                    setSelectedBusinessInfo(lastInvoice.businessInfo);
                 }
                 
                 // Only set payment method if not already set from client history
-                if (!clientPaymentMethodSet && lastInvoice.paymentMethodId) {
-                    const paymentMethod = paymentMethods.find(pm => pm.id === lastInvoice.paymentMethodId);
-                    if (paymentMethod) {
-                        setSelectedPaymentMethod(paymentMethod);
-                    }
+                if (!clientPaymentMethodSet && lastInvoice.paymentMethod) {
+                    setSelectedPaymentMethod(lastInvoice.paymentMethod);
                 }
                 
                 // Only set template if not already set from client history
-                if (!clientTemplateSet && lastInvoice.templateId && setSelectedTemplate && invoiceTemplates) {
-                    const template = invoiceTemplates.find(t => t.id === lastInvoice.templateId);
-                    if (template) {
-                        setSelectedTemplate(template);
-                    }
+                if (!clientTemplateSet && lastInvoice.template && setSelectedTemplate) {
+                    setSelectedTemplate(lastInvoice.template);
                 }
             }
             

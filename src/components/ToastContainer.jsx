@@ -26,23 +26,8 @@ export const ToastProvider = ({ children }) => {
         toast.warning(message, { duration });
     };
 
-    // Legacy addToast for backwards compatibility
-    const addToast = (message, type = 'success', duration = TOAST_DURATION_DEFAULT_MS) => {
-        const toastFn = {
-            success: toast.success,
-            error: toast.error,
-            info: toast.info,
-            warning: toast.warning,
-        }[type] || toast;
-        
-        toastFn(message, { duration });
-    };
-
-    // removeToast is no longer needed with sonner (it handles dismissal automatically)
-    const removeToast = () => {};
-
     return (
-        <ToastContext.Provider value={{ addToast, removeToast, showSuccess, showError, showInfo, showWarning }}>
+        <ToastContext.Provider value={{ showSuccess, showError, showInfo, showWarning }}>
             {children}
             <Toaster position="bottom-right" />
         </ToastContext.Provider>

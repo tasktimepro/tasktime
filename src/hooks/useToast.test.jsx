@@ -14,8 +14,6 @@ describe('useToast', () => {
     it('returns context methods when inside provider', () => {
 
         const contextValue = {
-            addToast: vi.fn(),
-            removeToast: vi.fn(),
             showSuccess: vi.fn(),
             showError: vi.fn(),
             showInfo: vi.fn(),

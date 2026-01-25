@@ -707,8 +707,7 @@ const InvoiceModal = ({
                                                             case 'none':
                                                                 return 'Not shown';
                                                             default:
-                                                                // Backward compatibility
-                                                                return `${selectedTemplate.dueDateDays} days from invoice date`;
+                                                                return 'Not shown';
                                                         }
                                                     })()}
                                                 </div>

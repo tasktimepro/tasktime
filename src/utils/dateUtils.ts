@@ -243,8 +243,7 @@ export const toDisplayDate = (
 /**
  * Parse a stored date string back to a Date object
  * Handles YYYY-MM-DD format as LOCAL time (not UTC) to avoid timezone issues
- * Also handles legacy locale-dependent formats with fallback
- * @param {string|number} dateValue - ISO date string, locale string, or timestamp
+ * @param {string|number} dateValue - ISO date string or timestamp
  * @param {number} fallbackTimestamp - Fallback timestamp if parsing fails
  * @returns {Date|null} Parsed Date object or null if invalid
  */
@@ -266,14 +265,6 @@ export const parseStoredDate = (
     if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
         const [year, month, day] = dateValue.split('-').map(Number);
         return new Date(year, month - 1, day); // Local time, not UTC
-    }
-
-    // Try parsing other string formats
-    const parsed = new Date(dateValue);
-
-    // If parsing succeeded, return the date
-    if (!isNaN(parsed.getTime())) {
-        return parsed;
     }
 
     // If parsing failed and we have a fallback, use it

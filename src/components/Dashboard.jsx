@@ -316,13 +316,6 @@ const Dashboard = ({
      * Toggle task completion status
      */
     const handleCompleteTask = useCallback((task) => {
-        // If called directly with a task (for compatibility), toggle its completion status
-        // If called from CustomCheckbox, task will be the checked boolean, so we need to handle this differently
-        if (typeof task === 'boolean') {
-            // This shouldn't happen with the current usage pattern, but handle gracefully
-            return;
-        }
-
         const newCompletedStatus = !task.completed;
         const now = Date.now();
 

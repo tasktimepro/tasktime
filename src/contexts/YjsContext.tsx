@@ -183,12 +183,12 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
-                forceSyncDrive().catch(console.error);
+                store.forceDriveSync().catch(console.error);
             }
         };
 
         const handleOnline = () => {
-            forceSyncDrive().catch(console.error);
+            store.forceDriveSync().catch(console.error);
         };
 
         document.addEventListener('visibilitychange', handleVisibility);
@@ -199,7 +199,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             window.removeEventListener('online', handleOnline);
         };
 
-    }, [isDriveConnected, forceSyncDrive]);
+    }, [isDriveConnected, store]);
 
     const disconnectDrive = useCallback(() => {
         store.disconnectDrive();

@@ -126,10 +126,7 @@ const InvoiceTemplates = ({
             }
             
             default: {
-                // Backward compatibility with old 'fixed' type
-                const defaultDate = new Date(today);
-                defaultDate.setDate(defaultDate.getDate() + (template.dueDateDays || 30));
-                return `Due date: ${toDisplayDate(defaultDate)} (${template.dueDateDays || 30} days from invoice date)`;
+                return 'Due date will not be shown';
             }
         }
     }, [staticDate]);

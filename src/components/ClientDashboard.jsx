@@ -14,31 +14,22 @@ import { millisecondsToHours, formatDuration } from '../utils/dateUtils.ts';
 const ClientDashboard = ({
     client,
     projects,
-    setProjects,
     tasks,
-    setTasks,
     timeEntries,
-    currentTimer,
-    isPaused,
     onBackToClients,
     paymentMethods,
     businessInfos,
     clients,
-    navigateToProject,
     invoices,
-    setInvoices,
     invoiceTemplates,
-    setInvoiceTemplates,
-    // Modal functions
+    navigateToProject,
     openClientModal,
     openProjectModal,
     openBusinessModal,
     openPaymentMethodModal,
     openTemplateModal
 }) => {
-    // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
-
     // Get client's currency
     const clientCurrency = useMemo(() => {
         return client.defaultCurrency || getPreferredCurrency();
@@ -299,8 +290,6 @@ const ClientDashboard = ({
                 <InvoiceGenerator
                     client={client}
                     timeEntries={clientTimeEntries}
-                    currentTimer={currentTimer}
-                    isPaused={isPaused}
                     editingInvoice={editingInvoice}
                     onInvoiceSaved={() => setEditingInvoice(null)}
                     paymentMethods={paymentMethods}

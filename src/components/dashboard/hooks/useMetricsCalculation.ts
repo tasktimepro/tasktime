@@ -121,9 +121,8 @@ const useMetricsCalculation = ({
 
         // Calculate invoice amounts in the given date range
         const invoicesInRange = invoices.filter(invoice => {
-            // Use invoice date for accurate reporting, with createdAt as fallback
-            // parseStoredDate handles both ISO format and legacy locale-dependent formats
-            const parsedDate = parseStoredDate(invoice.date, invoice.createdAt || null);
+            // Use invoice date for accurate reporting
+            const parsedDate = parseStoredDate(invoice.date);
             const invoiceDate = parsedDate ? parsedDate.getTime() : null;
             if (!invoiceDate) return false;
             return invoiceDate >= startTime && invoiceDate <= endTime;
@@ -188,7 +187,7 @@ const useMetricsCalculation = ({
         const outstanding = invoices.filter(invoice => !invoice.paymentProcessed);
         const pastDue = outstanding.filter(invoice => {
             if (!invoice.dueDate) return false;
-            // parseStoredDate handles both ISO format and legacy locale-dependent formats
+            // parseStoredDate handles ISO date strings and timestamps
             const dueDate = parseStoredDate(invoice.dueDate);
             if (!dueDate) return false;
             return dueDate < new Date();

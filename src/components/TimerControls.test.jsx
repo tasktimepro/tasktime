@@ -67,8 +67,6 @@ describe('TimerControls', () => {
 
     const baseTask = { id: 'task-1', projectId: 'project-1' }
     const toastContextValue = {
-        addToast: vi.fn(),
-        removeToast: vi.fn(),
         showSuccess: vi.fn(),
         showError: vi.fn(),
         showInfo: vi.fn(),

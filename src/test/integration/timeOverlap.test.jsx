@@ -43,9 +43,7 @@ describe('Time Overlap Detection', () => {
         showSuccess: vi.fn(),
         showError: vi.fn(),
         showWarning: vi.fn(),
-        showInfo: vi.fn(),
-        toasts: [],
-        removeToast: vi.fn()
+        showInfo: vi.fn()
     };
 
     const mockTask = {

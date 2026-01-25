@@ -87,6 +87,14 @@ vi.mock('../hooks/useInvoiceTemplates.ts', () => ({
     })
 }))
 
+vi.mock('../hooks/useTimer.ts', () => ({
+
+    useTimer: () => ({
+        isActive: false,
+        isPaused: false
+    })
+}))
+
 vi.mock('../hooks/useToast.ts', () => ({
 
     useToast: () => ({
@@ -148,8 +156,6 @@ describe('InvoiceGenerator', () => {
                 project={baseProject}
                 client={baseClient}
                 timeEntries={[baseEntry]}
-                currentTimer={null}
-                isPaused={false}
                 editingInvoice={null}
                 onInvoiceSaved={vi.fn()}
                 paymentMethods={[]}
@@ -207,7 +213,7 @@ describe('InvoiceGenerator', () => {
             date: '2026-01-05',
             createdAt: 111,
             paymentProcessed: false,
-            templateId: 'tpl-1'
+            template: { id: 'tpl-1', name: 'Template One' }
         }
 
         renderGenerator({

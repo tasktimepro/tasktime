@@ -340,8 +340,16 @@ const ClientList = ({
 
                 <div className="flex items-center space-x-3">
                     <Select value={clientSort} onValueChange={handleSortChange}>
-                        <SelectTrigger className="w-[152px]" aria-label="Sort clients" leadingIcon={SortIcon}>
-                            <SelectValue placeholder="Sort by" />
+                        <SelectTrigger
+                            className="h-9 w-9"
+                            aria-label="Sort clients"
+                            leadingIcon={SortIcon}
+                            hideCaret
+                            iconOnly
+                        >
+                            <span className="sr-only">
+                                <SelectValue placeholder="Sort by" />
+                            </span>
                         </SelectTrigger>
                         <SelectContent>
                             {SORT_OPTIONS.map(option => (

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { CreditCardIcon, BuildingOfficeIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { useTimer } from '../hooks/useTimer.ts';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaymentMethods from './PaymentMethods';
@@ -15,21 +16,13 @@ import InvoiceTemplates from './InvoiceTemplates';
  */
 const Invoices = ({ 
     projects, 
-    setProjects,
     tasks,
-    setTasks,
     timeEntries,
-    currentTimer,
-    isPaused,
     invoices,
-    setInvoices,
     paymentMethods,
-    setPaymentMethods,
     businessInfos,
-    setBusinessInfos,
     clients,
     invoiceTemplates,
-    setInvoiceTemplates,
     updateUrl,
     navigateToProjects,
     navigateToClients,
@@ -45,6 +38,7 @@ const Invoices = ({
 }) => {
     const { urlParams } = useUrlState();
     const { showError } = useToast();
+    const { isActive: isTimerActive, isPaused } = useTimer();
     
     // State for the invoice modal
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -53,7 +47,7 @@ const Invoices = ({
     // Handle creating a new invoice with timer check
     const handleCreateNewInvoice = () => {
         // Check if a timer is currently active (running, not paused)
-        if (currentTimer && !isPaused) {
+        if (isTimerActive && !isPaused) {
             showError('Cannot generate an invoice while a timer is active. Please pause the timer first.');
             return;
         }
@@ -64,7 +58,7 @@ const Invoices = ({
     // Handle editing an invoice with timer check
     const handleEditInvoice = (invoice) => {
         // Check if a timer is currently active (running, not paused)
-        if (currentTimer && !isPaused) {
+        if (isTimerActive && !isPaused) {
             showError('Cannot update an invoice while a timer is active. Please pause the timer first.');
             return;
         }
@@ -225,8 +219,6 @@ const Invoices = ({
                 <InvoiceGenerator
                     project={null} // No project context for standalone invoices
                     timeEntries={timeEntries}
-                    currentTimer={currentTimer}
-                    isPaused={isPaused}
                     editingInvoice={editingInvoice}
                     paymentMethods={paymentMethods}
                     businessInfos={businessInfos}

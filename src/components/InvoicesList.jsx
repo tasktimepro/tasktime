@@ -23,7 +23,7 @@ const isInvoiceOverdue = (invoice) => {
     }
     
     const today = new Date();
-    // parseStoredDate handles both ISO format and legacy locale-dependent formats
+    // parseStoredDate handles ISO date strings and timestamps
     const dueDate = parseStoredDate(invoice.dueDate);
     
     if (!dueDate) return false;
@@ -175,16 +175,8 @@ const InvoicesList = ({
             let htmlContent = invoice.htmlContent;
             if (!htmlContent) {
                 
-                // Use stored objects first, fall back to finding by ID
-                let paymentMethod = invoice.paymentMethod;
-                if (!paymentMethod && invoice.paymentMethodId) {
-                    paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                }
-                
-                let businessInfo = invoice.businessInfo;
-                if (!businessInfo && invoice.businessInfoId) {
-                    businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
-                }
+                const paymentMethod = invoice.paymentMethod;
+                const businessInfo = invoice.businessInfo;
                 
                 // Find the client if one is associated with this invoice
                 const foundClient = invoice.clientId ? 
@@ -214,7 +206,6 @@ const InvoicesList = ({
                     dueDate: invoice.dueDate,
                     paymentMethod: paymentMethod,
                     businessInfo: businessInfo,
-                    // Include pricing breakdown if available (for backward compatibility)
                     subtotal: invoice.subtotal,
                     discount: invoice.discount,
                     shipping: invoice.shipping,
@@ -439,22 +430,13 @@ const InvoicesList = ({
                                                     {invoice.project?.title || 'Unknown Project'}
                                                 </span>
                                             </p>
-                                            {(invoice.template || (invoice.templateId && invoiceTemplates.length > 0)) && (() => {
-                                                // First try to use stored template object
-                                                let template = invoice.template;
-                                                let isDeleted = false;
+                                            {invoice.template && (() => {
+                                                const template = invoice.template;
+                                                const isDeleted = template?.id
+                                                    ? !invoiceTemplates.find(t => t.id === template.id)
+                                                    : false;
                                                 
-                                                // If no stored template, try to find by ID (backward compatibility)
-                                                if (!template && invoice.templateId) {
-                                                    template = invoiceTemplates.find(t => t.id === invoice.templateId);
-                                                }
-                                                
-                                                // If we have a stored template but can't find it by ID anymore, it's deleted
-                                                if (invoice.template && invoice.templateId && !invoiceTemplates.find(t => t.id === invoice.templateId)) {
-                                                    isDeleted = true;
-                                                }
-                                                
-                                                return template ? (
+                                                return (
                                                     <p>
                                                         Template: <span className="font-medium text-muted-foreground">{template.name}</span>
                                                         {isDeleted && (
@@ -463,24 +445,15 @@ const InvoicesList = ({
                                                             </span>
                                                         )}
                                                     </p>
-                                                ) : null;
+                                                );
                                             })()}
-                                            {(invoice.businessInfo || invoice.businessInfoId) && (() => {
-                                                // First try to use stored business info object
-                                                let businessInfo = invoice.businessInfo;
-                                                let isDeleted = false;
+                                            {invoice.businessInfo && (() => {
+                                                const businessInfo = invoice.businessInfo;
+                                                const isDeleted = businessInfo?.id
+                                                    ? !businessInfos.find(bi => bi.id === businessInfo.id)
+                                                    : false;
                                                 
-                                                // If no stored business info, try to find by ID (backward compatibility)
-                                                if (!businessInfo && invoice.businessInfoId) {
-                                                    businessInfo = businessInfos.find(bi => bi.id === invoice.businessInfoId);
-                                                }
-                                                
-                                                // If we have a stored business info but can't find it by ID anymore, it's deleted
-                                                if (invoice.businessInfo && invoice.businessInfoId && !businessInfos.find(bi => bi.id === invoice.businessInfoId)) {
-                                                    isDeleted = true;
-                                                }
-                                                
-                                                return businessInfo ? (
+                                                return (
                                                     <p>
                                                         Business: <span className="font-medium text-muted-foreground">{businessInfo.title}</span>
                                                         {isDeleted && (
@@ -489,34 +462,24 @@ const InvoicesList = ({
                                                             </span>
                                                         )}
                                                     </p>
-                                                ) : null;
+                                                );
                                             })()}
-                                            {(invoice.paymentMethod || invoice.paymentMethodId) && (() => {
-                                                // Check if we have a stored payment method object first
-                                                let paymentMethod = invoice.paymentMethod;
-                                                let isDeleted = false;
+                                            {invoice.paymentMethod && (() => {
+                                                const paymentMethod = invoice.paymentMethod;
+                                                const isDeleted = paymentMethod?.id
+                                                    ? !paymentMethods.find(pm => pm.id === paymentMethod.id)
+                                                    : false;
                                                 
-                                                if (!paymentMethod && invoice.paymentMethodId) {
-                                                    // Fall back to finding by ID in current payment methods
-                                                    paymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                                                } else if (paymentMethod && invoice.paymentMethodId) {
-                                                    // Check if the stored payment method still exists in current collection
-                                                    const currentPaymentMethod = paymentMethods.find(pm => pm.id === invoice.paymentMethodId);
-                                                    if (!currentPaymentMethod) {
-                                                        isDeleted = true;
-                                                    }
-                                                }
-                                                
-                                                return paymentMethod ? (
+                                                return (
                                                     <p>
-                                                        Payment Method: <span className="font-medium text-muted-foreground">{paymentMethod.title}</span>
+                                                        Payment Method: <span className="font-medium text-muted-foreground">{paymentMethod.title || paymentMethod.name}</span>
                                                         {isDeleted && (
                                                             <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                                                 deleted
                                                             </span>
                                                         )}
                                                     </p>
-                                                ) : null;
+                                                );
                                             })()}
                                         </div>
                                     </div>
