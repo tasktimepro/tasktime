@@ -227,7 +227,18 @@ export function YjsProvider({ children }: YjsProviderProps) {
     }, [store]);
 
     const clearAllData = useCallback(async () => {
+        setIsReady(false);
+        setHasSynced(false);
+        setManualSyncInProgress(false);
+        setLastSyncedAt(null);
+
         await store.clearAllData();
+        await store.initialize();
+
+        setIsReady(true);
+        setIsDriveConnected(store.isDriveConnected());
+        setSyncState(store.getSyncState());
+        setLastSyncedAt(store.getLastSyncedAt());
     }, [store]);
 
     const hasPendingSyncChanges = useCallback(() => {

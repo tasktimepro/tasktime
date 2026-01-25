@@ -194,6 +194,7 @@ function AppContent() {
     const [activeModal, setActiveModal] = useState(null);
     const [editingItem, setEditingItem] = useState(null);
     const [modalOptions, setModalOptions] = useState(null);
+    const [pendingImport, setPendingImport] = useState(null);
 
     const openClientModal = (client = null) => {
         setActiveModal('client');
@@ -338,19 +339,38 @@ function AppContent() {
     // === Import Handler ===
     const handleImport = async (importData) => {
         await clearAllData();
-
-        (importData.projects || []).forEach((project) => createProject(project));
-        (importData.tasks || []).forEach((task) => createTask(task));
-        (importData.timeEntries || []).forEach((entry) => createTimeEntry(entry));
-        (importData.invoices || []).forEach((invoice) => createInvoice(invoice));
-        (importData.paymentMethods || []).forEach((method) => createPaymentMethod(method));
-        (importData.businessInfos || []).forEach((info) => createBusinessInfo(info));
-        (importData.clients || []).forEach((client) => createClient(client));
-        (importData.invoiceTemplates || []).forEach((template) => createInvoiceTemplate(template));
-
-        updatePreferences(importData.preferences || {});
-        clearTimer();
+        setPendingImport(importData);
     };
+
+    useEffect(() => {
+        if (!pendingImport || !isReady) return;
+
+        (pendingImport.projects || []).forEach((project) => createProject(project));
+        (pendingImport.tasks || []).forEach((task) => createTask(task));
+        (pendingImport.timeEntries || []).forEach((entry) => createTimeEntry(entry));
+        (pendingImport.invoices || []).forEach((invoice) => createInvoice(invoice));
+        (pendingImport.paymentMethods || []).forEach((method) => createPaymentMethod(method));
+        (pendingImport.businessInfos || []).forEach((info) => createBusinessInfo(info));
+        (pendingImport.clients || []).forEach((client) => createClient(client));
+        (pendingImport.invoiceTemplates || []).forEach((template) => createInvoiceTemplate(template));
+
+        updatePreferences(pendingImport.preferences || {});
+        clearTimer();
+        setPendingImport(null);
+    }, [
+        pendingImport,
+        isReady,
+        createProject,
+        createTask,
+        createTimeEntry,
+        createInvoice,
+        createPaymentMethod,
+        createBusinessInfo,
+        createClient,
+        createInvoiceTemplate,
+        updatePreferences,
+        clearTimer,
+    ]);
 
     // === Loading Screen ===
     if (isLoading) {
