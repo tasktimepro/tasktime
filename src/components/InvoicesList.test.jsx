@@ -77,7 +77,11 @@ describe('InvoicesList', () => {
             />
         )
 
-        expect(screen.getByText('Overdue • $100.00')).toBeInTheDocument()
+        // Text is split across elements due to sensitive-data wrapper, matches parent + child
+        const matches = screen.getAllByText((content, element) => {
+            return element?.textContent === 'Overdue • $100.00'
+        })
+        expect(matches.length).toBeGreaterThan(0)
     })
 
     it('shows outstanding badge for unpaid invoices', () => {
@@ -101,7 +105,11 @@ describe('InvoicesList', () => {
             />
         )
 
-        expect(screen.getByText('Outstanding • $100.00')).toBeInTheDocument()
+        // Text is split across elements due to sensitive-data wrapper, matches parent + child
+        const matches = screen.getAllByText((content, element) => {
+            return element?.textContent === 'Outstanding • $100.00'
+        })
+        expect(matches.length).toBeGreaterThan(0)
     })
 
     it('shows paid badge for processed invoices', () => {
@@ -126,7 +134,11 @@ describe('InvoicesList', () => {
             />
         )
 
-        expect(screen.getByText('Paid • $100.00')).toBeInTheDocument()
+        // Text is split across elements due to sensitive-data wrapper, matches parent + child
+        const matches = screen.getAllByText((content, element) => {
+            return element?.textContent === 'Paid • $100.00'
+        })
+        expect(matches.length).toBeGreaterThan(0)
     })
 
     it('toggles paid status without corrupting list', async () => {
