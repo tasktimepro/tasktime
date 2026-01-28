@@ -23,7 +23,9 @@ const InvoiceGeneratorButton = ({
                 {currentProject ? 'Generate Invoice' : 'Create Invoice'}
                 {currentProject && unbilledHours > 0 && currentProject.hourlyRate && (
                     <span className="ml-2 px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full">
-                        {getCurrencySymbol(getProjectCurrency(currentProject, clients))}{unbilledAmount.toFixed(2)}
+                        <span className="sensitive-data">
+                            {getCurrencySymbol(getProjectCurrency(currentProject, clients))}{unbilledAmount.toFixed(2)}
+                        </span>
                     </span>
                 )}
                 {currentProject && unbilledHours > 0 && !currentProject.hourlyRate && (

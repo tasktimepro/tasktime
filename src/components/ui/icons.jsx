@@ -30,6 +30,7 @@ export {
     CreditCard as CreditCardIcon,
     DollarSign as CurrencyDollarIcon,
     Eye as EyeIcon,
+    EyeOff as EyeOffIcon,
     FileCheck as DocumentCheckIcon,
     FileText as DocumentTextIcon,
     Info as InformationCircleIcon,

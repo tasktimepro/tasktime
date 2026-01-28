@@ -499,7 +499,9 @@ const ProjectList = ({
 
                                 {project.hourlyRate && !project.flatRate && (
                                     <p className="mt-2 text-sm text-muted-foreground">
-                                        {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                        <span className="sensitive-data">
+                                            {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                        </span>
                                     </p>
                                 )}
 
@@ -520,7 +522,9 @@ const ProjectList = ({
                                             className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
                                             title="Click to generate invoice"
                                         >
-                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                            <span className="sensitive-data">
+                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                            </span>
                                         </button>
                                     </div>
                                 ) : !project.isPersonal && !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
@@ -602,7 +606,9 @@ const ProjectList = ({
 
                                                 {project.hourlyRate && !project.flatRate && (
                                                     <p className="mt-2 text-sm text-muted-foreground">
-                                                        {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                                        <span className="sensitive-data">
+                                                            {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                                        </span>
                                                     </p>
                                                 )}
 
@@ -623,7 +629,9 @@ const ProjectList = ({
                                                             className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
                                                             title="Click to generate invoice"
                                                         >
-                                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                                            <span className="sensitive-data">
+                                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                                            </span>
                                                         </button>
                                                     </div>
                                                 ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (

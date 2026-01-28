@@ -349,7 +349,9 @@ const ClientDashboard = ({
                                 <dl>
                                     <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
                                     <dd className="text-lg font-semibold text-foreground">
-                                        {getCurrencySymbol(clientCurrency)}{clientMetrics.totalRevenue.toFixed(2)}
+                                        <span className="sensitive-data">
+                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.totalRevenue.toFixed(2)}
+                                        </span>
                                     </dd>
                                 </dl>
                             </div>
@@ -367,7 +369,9 @@ const ClientDashboard = ({
                                 <dl>
                                     <dt className="text-sm font-medium text-muted-foreground truncate">Pending</dt>
                                     <dd className="text-lg font-semibold text-foreground">
-                                        {getCurrencySymbol(clientCurrency)}{clientMetrics.pendingAmount.toFixed(2)}
+                                        <span className="sensitive-data">
+                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.pendingAmount.toFixed(2)}
+                                        </span>
                                     </dd>
                                 </dl>
                             </div>
@@ -385,7 +389,9 @@ const ClientDashboard = ({
                                 <dl>
                                     <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
                                     <dd className="text-lg font-semibold text-foreground">
-                                        {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
+                                        <span className="sensitive-data">
+                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
+                                        </span>
                                     </dd>
                                 </dl>
                             </div>
@@ -442,8 +448,10 @@ const ClientDashboard = ({
                                         <h3 className="font-medium text-foreground truncate">{project.title}</h3>
                                         {project.hourlyRate && (
                                             <p className="text-sm text-muted-foreground mt-1">
-                                                {getCurrencySymbol(getProjectCurrency(project, clients))}
-                                                {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
+                                                <span className="sensitive-data">
+                                                    {getCurrencySymbol(getProjectCurrency(project, clients))}
+                                                    {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
+                                                </span>
                                             </p>
                                         )}
                                         <div className="mt-2 text-sm text-muted-foreground">
@@ -459,7 +467,9 @@ const ClientDashboard = ({
                                                     className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
                                                     title="Click to generate invoice"
                                                 >
-                                                    {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                                    <span className="sensitive-data">
+                                                        {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                                    </span>
                                                 </button>
                                             </div>
                                         ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (

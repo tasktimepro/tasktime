@@ -557,6 +557,7 @@ const ClientModal = ({
                                     step="0.01"
                                     required={!formData.flatRate}
                                     placeholder="0.00"
+                                    className="sensitive-data"
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     Default hourly rate for projects with this client. Can be overridden per project.

@@ -71,11 +71,11 @@ const ProjectsOverview = ({
                                             {/* Pending Bills */}
                                             <div className="text-sm font-medium text-foreground">
                                                 {project.pendingAmount > 0 ? (
-                                                    <>
+                                                    <span className="sensitive-data">
                                                         {formatCurrency(project.pendingAmount, getProjectCurrency(project, clients))}
-                                                    </>
+                                                    </span>
                                                 ) : (
-                                                    <span className="text-muted-foreground">{formatCurrency(0, getProjectCurrency(project, clients))}</span>
+                                                    <span className="text-muted-foreground sensitive-data">{formatCurrency(0, getProjectCurrency(project, clients))}</span>
                                                 )}
                                             </div>
                                             <div className="text-xs text-muted-foreground">

@@ -241,7 +241,7 @@ const InvoiceTaskSelector = ({
                                                             min="0"
                                                             value={currentFlatRate}
                                                             onChange={(e) => handleFlatRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground sensitive-data"
                                                             placeholder="0.00"
                                                         />
                                                     </div>
@@ -309,7 +309,7 @@ const InvoiceTaskSelector = ({
                                                             min="0"
                                                             value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                             onChange={(e) => handleTaskHourlyRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground sensitive-data"
                                                             placeholder="0.00"
                                                         />
                                                     </div>
@@ -389,7 +389,7 @@ const InvoiceTaskSelector = ({
                                                             min="0"
                                                             value={currentFlatRate}
                                                             onChange={(e) => handleAdditionalTaskFlatRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground sensitive-data"
                                                             placeholder="0.00"
                                                         />
                                                     </div>
@@ -416,7 +416,7 @@ const InvoiceTaskSelector = ({
                                                             min="0"
                                                             value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                             onChange={(e) => handleAdditionalTaskHourlyRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground sensitive-data"
                                                             placeholder="0.00"
                                                         />
                                                     </div>
@@ -496,7 +496,7 @@ const InvoiceTaskSelector = ({
                                                     value={newTaskHours}
                                                     onChange={(e) => setNewTaskHours(e.target.value)}
                                                     placeholder={newTaskUseFlatRate ? "0.00" : "Hours"}
-                                                    className="w-24 h-9"
+                                                    className={`w-24 h-9 ${newTaskUseFlatRate ? 'sensitive-data' : ''}`}
                                                     onKeyDown={(e) => {
                                                         if (e.key === 'Enter') {
                                                             e.preventDefault();
@@ -517,7 +517,7 @@ const InvoiceTaskSelector = ({
                                                         value={newTaskHourlyRate !== '' ? newTaskHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                         onChange={(e) => setNewTaskHourlyRate(e.target.value)}
                                                         placeholder="0.00"
-                                                        className="w-20 h-9"
+                                                        className="w-20 h-9 sensitive-data"
                                                         onKeyDown={(e) => {
                                                             if (e.key === 'Enter') {
                                                                 e.preventDefault();

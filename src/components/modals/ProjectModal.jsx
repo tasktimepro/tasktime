@@ -434,7 +434,7 @@ const ProjectModal = ({
                             selectedClientRate.flatRate
                                 ? "This client uses flat rate pricing (non-hourly basis)"
                                 : selectedClientRate.hourlyRate
-                                    ? `Hourly Rate: ${selectedClientRate.hourlyRate}/hour`
+                                    ? <span className="sensitive-data">Hourly Rate: {selectedClientRate.hourlyRate}/hour</span>
                                     : "No default rate set for this client"
                         }
                     />
@@ -481,7 +481,7 @@ const ProjectModal = ({
                                 onChange={handleInputChange}
                                 min="0"
                                 step="0.01"
-                                className="mt-1"
+                                className="mt-1 sensitive-data"
                                 placeholder="0.00"
                                 required={!formData.flatRate && formData.overrideRate}
                             />

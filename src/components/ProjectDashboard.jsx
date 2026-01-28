@@ -169,7 +169,9 @@ const ProjectDashboard = ({
 
                         {project.hourlyRate && (
                             <p className="text-sm text-muted-foreground">
-                                {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                <span className="sensitive-data">
+                                    {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                </span>
                             </p>
                         )}
                     </div>
@@ -238,7 +240,9 @@ const ProjectDashboard = ({
                                     <dl>
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
                                         <dd className="text-lg font-semibold text-foreground">
-                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.totalRevenue.toFixed(2)}
+                                            <span className="sensitive-data">
+                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.totalRevenue.toFixed(2)}
+                                            </span>
                                         </dd>
                                     </dl>
                                 </div>
@@ -256,7 +260,9 @@ const ProjectDashboard = ({
                                     <dl>
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Pending</dt>
                                         <dd className="text-lg font-semibold text-foreground">
-                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.pendingAmount.toFixed(2)}
+                                            <span className="sensitive-data">
+                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.pendingAmount.toFixed(2)}
+                                            </span>
                                         </dd>
                                     </dl>
                                 </div>
@@ -274,7 +280,9 @@ const ProjectDashboard = ({
                                     <dl>
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
                                         <dd className="text-lg font-semibold text-foreground">
-                                            {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.potentialRevenue.toFixed(2)}
+                                            <span className="sensitive-data">
+                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.potentialRevenue.toFixed(2)}
+                                            </span>
                                         </dd>
                                     </dl>
                                 </div>

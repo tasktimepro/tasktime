@@ -47,7 +47,7 @@ const InvoicePreview = ({
                 <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium text-foreground">Pricing & Totals</h4>
                     <div className="flex items-center space-x-3">
-                        <span className="text-sm font-medium text-blue-600">
+                        <span className="text-sm font-medium text-blue-600 sensitive-data">
                             {getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.total.toFixed(2)}
                         </span>
                         <svg
@@ -92,7 +92,7 @@ const InvoicePreview = ({
                                         setDiscountValue(parseFloat(newValue) || 0);
                                     }
                                 }}
-                                className="flex-1 text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
+                                className="flex-1 text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground sensitive-data"
                                 placeholder={discountType === 'percentage' ? '0.00' : '0.00'}
                             />
                         </div>
@@ -114,7 +114,7 @@ const InvoicePreview = ({
                                     setShippingAmount(parseFloat(newValue) || 0);
                                 }
                             }}
-                            className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
+                            className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground sensitive-data"
                             placeholder="0.00"
                         />
                     </div>
@@ -155,7 +155,7 @@ const InvoicePreview = ({
                                         type="text"
                                         value={taxOverride.label}
                                         onChange={(e) => setTaxOverride(prev => ({ ...prev, label: e.target.value }))}
-                                        className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
+                                        className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground sensitive-data"
                                         placeholder="Tax label"
                                     />
                                 </div>
@@ -186,33 +186,33 @@ const InvoicePreview = ({
                     <div className="border-t pt-3 space-y-2">
                         <div className="flex justify-between text-sm">
                             <span>Subtotal:</span>
-                            <span>{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.subtotal.toFixed(2)}</span>
+                            <span className="sensitive-data">{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.subtotal.toFixed(2)}</span>
                         </div>
 
                         {calculatePricing.discount > 0 && (
                             <div className="flex justify-between text-sm text-red-600">
                                 <span>Discount ({discountType === 'percentage' ? `${discountValue}%` : getCurrencySymbol(getInvoiceCurrency()) + discountValue}):</span>
-                                <span>-{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.discount.toFixed(2)}</span>
+                                <span className="sensitive-data">-{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.discount.toFixed(2)}</span>
                             </div>
                         )}
 
                         {calculatePricing.shipping > 0 && (
                             <div className="flex justify-between text-sm">
                                 <span>Shipping:</span>
-                                <span>{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.shipping.toFixed(2)}</span>
+                                <span className="sensitive-data">{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.shipping.toFixed(2)}</span>
                             </div>
                         )}
 
                         {calculatePricing.tax > 0 && (
                             <div className="flex justify-between text-sm">
                                 <span>{calculatePricing.taxLabel} ({calculatePricing.taxRate}%):</span>
-                                <span>{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.tax.toFixed(2)}</span>
+                                <span className="sensitive-data">{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.tax.toFixed(2)}</span>
                             </div>
                         )}
 
                         <div className="flex justify-between text-base font-medium border-t pt-2">
                             <span>Total:</span>
-                            <span>{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.total.toFixed(2)}</span>
+                            <span className="sensitive-data">{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.total.toFixed(2)}</span>
                         </div>
                     </div>
                 </div>

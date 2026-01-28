@@ -140,7 +140,7 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
                                         {project && project.hourlyRate && (
                                             <dd className="flex items-center mt-1">
                                                 <CurrencyDollarIcon className="h-4 w-4 text-muted-foreground mr-2 flex-shrink-0" />
-                                                <span className="font-medium">
+                                                <span className="font-medium sensitive-data">
                                                     {`${getCurrencySymbol(displayCurrency)}${metric.earnings.toFixed(2)}`}
                                                 </span>
                                             </dd>

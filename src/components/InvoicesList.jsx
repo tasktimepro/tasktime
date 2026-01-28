@@ -372,15 +372,15 @@ const InvoicesList = ({
                                             {invoice.paymentProcessed ? (
                                                 <Badge variant="success">
                                                     <CheckIcon className="h-3 w-3 mr-1" />
-                                                    Paid • {invoiceTotal}
+                                                    Paid • <span className="sensitive-data">{invoiceTotal}</span>
                                                 </Badge>
                                             ) : isInvoiceOverdue(invoice) ? (
                                                 <Badge variant="error">
-                                                    Overdue • {invoiceTotal}
+                                                    Overdue • <span className="sensitive-data">{invoiceTotal}</span>
                                                 </Badge>
                                             ) : (
                                                 <Badge variant="warning">
-                                                    Outstanding • {invoiceTotal}
+                                                    Outstanding • <span className="sensitive-data">{invoiceTotal}</span>
                                                 </Badge>
                                             )}
                                         </div>
@@ -398,7 +398,9 @@ const InvoicesList = ({
                                                 </>
                                             )}
                                             <span className="mx-1">•</span>
-                                            {getCurrencySymbol(invoice.currency || getPreferredCurrency())}{invoice.totalAmount.toFixed(2)}
+                                            <span className="sensitive-data">
+                                                {getCurrencySymbol(invoice.currency || getPreferredCurrency())}{invoice.totalAmount.toFixed(2)}
+                                            </span>
                                         </p>
                                         {invoice.dueDate && (
                                             <p className={`text-sm mt-1 ${
@@ -606,7 +608,7 @@ const InvoicesList = ({
                                     <p>{selectedInvoice.project?.title || 'Unknown Project'}</p>
                                     {selectedInvoice.project?.hourlyRate && (
                                         <p>
-                                            Rate: {getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}{selectedInvoice.project.hourlyRate}/{selectedInvoice.currency || getPreferredCurrency()} per hour
+                                            <span className="sensitive-data">Rate: {getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}{selectedInvoice.project.hourlyRate}/{selectedInvoice.currency || getPreferredCurrency()} per hour</span>
                                         </p>
                                     )}
                                 </div>
@@ -628,7 +630,7 @@ const InvoicesList = ({
                         <div className="border-t pt-2">
                             <div className="flex justify-between text-sm font-medium">
                                 <span>Total: {selectedInvoice.totalHours?.toFixed(2) || 0} hours</span>
-                                <span>{getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}{selectedInvoice.totalAmount?.toFixed(2) || 0}</span>
+                                <span className="sensitive-data">{getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}{selectedInvoice.totalAmount?.toFixed(2) || 0}</span>
                             </div>
                         </div>
                     </div>

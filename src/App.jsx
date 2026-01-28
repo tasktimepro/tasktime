@@ -29,7 +29,7 @@ import YjsSyncStatus from './components/sync/YjsSyncStatus';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
-import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon } from '@/components/ui/icons';
+import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon } from '@/components/ui/icons';
 import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
 /** Original browser tab title */
@@ -120,6 +120,8 @@ function AppContent() {
         clearTimer,
         isLoading: timerLoading 
     } = useTimer();
+
+    const totalsHidden = Boolean(preferences.hideTotals);
 
     // === Loading State ===
     const isLoading = !isReady || projectsLoading || tasksLoading || entriesLoading || 
@@ -387,7 +389,7 @@ function AppContent() {
 
     // === Main Render ===
     return (
-        <div className="min-h-screen bg-background">
+        <div className={`min-h-screen bg-background ${totalsHidden ? 'totals-hidden' : ''}`}>
             <div className="mx-auto w-full max-w-[100rem] px-6">
             <div className="flex gap-6">
             {/* Sidebar Navigation */}
@@ -469,6 +471,18 @@ function AppContent() {
                 
                 {/* Theme Toggle */}
                 <div className="px-4 py-4 border-t border-border space-y-2">
+                    <button
+                        onClick={() => updatePreferences({ hideTotals: !totalsHidden })}
+                        className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        title={totalsHidden ? 'Show totals' : 'Hide totals'}
+                    >
+                        {totalsHidden ? (
+                            <EyeIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                        ) : (
+                            <EyeOffIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                        )}
+                        {totalsHidden ? 'Show Totals' : 'Hide Totals'}
+                    </button>
                     <button
                         onClick={() => setDarkMode(!darkMode)}
                         className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"

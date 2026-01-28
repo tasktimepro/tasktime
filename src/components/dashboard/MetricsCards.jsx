@@ -40,7 +40,7 @@ const MetricsCards = ({
 
         // If no earnings at all, show zero
         if (billableTotal === 0 && paidTotal === 0 && outstandingTotal === 0) {
-            return <span className="text-muted-foreground">{formatCurrency(0, preferredCurrency)}</span>;
+            return <span className="text-muted-foreground sensitive-data">{formatCurrency(0, preferredCurrency)}</span>;
         }
 
         const components = [];
@@ -78,7 +78,7 @@ const MetricsCards = ({
             const renderLine = (key, amount, currency) => (
                 <div key={key} className="flex items-center">
                     <Icon className={`h-4 w-4 ${iconClassName} mr-1`} />
-                    <span className={`font-semibold ${colors.text}`}>
+                    <span className={`font-semibold ${colors.text} sensitive-data`}>
                         {formatCurrency(amount, currency)}
                     </span>
                     <span className={`text-xs ${colors.bg} ${colors.badge} px-1.5 py-0.5 rounded ml-1`}>
@@ -222,7 +222,7 @@ const MetricsCards = ({
                                     </div>
                                     <div className="flex items-center mt-1">
                                         <CurrencyDollarIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-2" />
-                                        <span className="text-sm text-amber-700 dark:text-amber-300">
+                                        <span className="text-sm text-amber-700 dark:text-amber-300 sensitive-data">
                                             {formatCurrency(invoiceMetrics.outstandingTotal, preferredCurrency)} total
                                         </span>
                                     </div>
@@ -269,7 +269,7 @@ const MetricsCards = ({
                                     </div>
                                     <div className="flex items-center mt-1">
                                         <CurrencyDollarIcon className="h-4 w-4 text-red-600 dark:text-red-400 mr-2" />
-                                        <span className="text-sm text-red-700 dark:text-red-300">
+                                        <span className="text-sm text-red-700 dark:text-red-300 sensitive-data">
                                             {formatCurrency(invoiceMetrics.pastDueTotal, preferredCurrency)} overdue
                                         </span>
                                     </div>
@@ -310,7 +310,7 @@ const MetricsCards = ({
                                 </div>
                                 <div className="flex items-center mt-1">
                                     <CurrencyDollarIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-2" />
-                                    <span className="text-sm text-blue-700 dark:text-blue-300">
+                                    <span className="text-sm text-blue-700 dark:text-blue-300 sensitive-data">
                                         {thisMonthUnbilledDisplay} unbilled
                                     </span>
                                 </div>
