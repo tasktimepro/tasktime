@@ -20,6 +20,8 @@ const DEFAULT_PREFERENCES: Preferences = {
     hideTotals: false,
     projectSort: 'createdAt',
     clientSort: 'createdAt',
+    autoSyncEnabled: false,
+    autoSyncMode: 'backup',
 };
 
 export function usePreferences() {

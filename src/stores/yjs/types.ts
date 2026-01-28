@@ -125,6 +125,8 @@ export interface Preferences {
     hideTotals?: boolean;
     projectSort?: 'createdAt' | 'lastActive' | 'name';
     clientSort?: 'createdAt' | 'lastActive' | 'name';
+    autoSyncEnabled?: boolean;
+    autoSyncMode?: 'backup' | 'sync';
 }
 
 export interface TimerState {
@@ -141,6 +143,9 @@ export interface TimerState {
 // ============================================================================
 
 export type SyncState = 'idle' | 'syncing' | 'error' | 'offline';
+export type AutoSyncMode = 'backup' | 'sync';
+export type DriveSyncMode = 'manual' | AutoSyncMode;
+export type SyncPhase = 'idle' | 'checking' | 'downloading' | 'uploading' | 'error';
 
 /**
  * Document names for multi-document architecture

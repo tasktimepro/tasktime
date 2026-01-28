@@ -7,10 +7,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { usePreferences } from '@/hooks/usePreferences';
 import { useToast } from '@/hooks/useToast';
-import { ArrowPathIcon, CheckIcon, CloudIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
+import { ArrowPathIcon, CheckIcon, CloudIcon, CloudSyncIcon, CloudDownloadIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Modal from '@/components/Modal';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -22,9 +26,15 @@ export default function YjsSyncSettings() {
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogType>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const { isReady, isSyncing, syncState, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive } = useYjs();
+    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive } = useYjs();
     const { isSignedIn, isLoading: authLoading, user, signIn, signOut } = useGoogleAuth();
+    const { preferences, updatePreferences } = usePreferences();
     const { showSuccess, showError } = useToast();
+
+    const showAuthActions = isReady && !authLoading;
+
+    const autoSyncEnabled = preferences.autoSyncEnabled ?? false;
+    const autoSyncMode = preferences.autoSyncMode ?? 'backup';
 
     // Update "time ago" display
     useEffect(() => {
@@ -74,18 +84,36 @@ export default function YjsSyncSettings() {
             };
         }
 
-        const showSyncingText = manualSyncInProgress || (isSyncing && !hasSynced);
-
-        if (showSyncingText) {
+        if (syncPhase === 'checking') {
             return {
-                text: 'Syncing...',
+                text: 'Checking for updates...',
                 tone: 'text-green-700 dark:text-green-300',
                 icon: ArrowPathIcon,
                 spinning: true
             };
         }
 
-        if (isSyncing) {
+        if (syncPhase === 'downloading') {
+            return {
+                text: 'Downloading updates...',
+                tone: 'text-green-700 dark:text-green-300',
+                icon: ArrowPathIcon,
+                spinning: true
+            };
+        }
+
+        if (syncPhase === 'uploading') {
+            return {
+                text: 'Syncing changes...',
+                tone: 'text-green-700 dark:text-green-300',
+                icon: ArrowPathIcon,
+                spinning: true
+            };
+        }
+
+        const showSyncingText = manualSyncInProgress || (isSyncing && !hasSynced);
+
+        if (showSyncingText || isSyncing) {
             return {
                 text: 'Syncing...',
                 tone: 'text-green-700 dark:text-green-300',
@@ -101,7 +129,7 @@ export default function YjsSyncSettings() {
             tone: 'text-green-700 dark:text-green-300',
             icon: CheckIcon
         };
-    }, [isReady, authLoading, isDriveConnected, isConnecting, syncState, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now]);
+    }, [isReady, authLoading, isDriveConnected, isConnecting, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now]);
 
     const handleConnect = async () => {
         try {
@@ -151,6 +179,39 @@ export default function YjsSyncSettings() {
         }
     };
 
+    const handleAutoSyncToggle = async (checked: boolean | 'indeterminate') => {
+        const nextEnabled = checked === true;
+        const nextMode = autoSyncMode === 'sync' ? 'sync' : 'backup';
+
+        updatePreferences({ autoSyncEnabled: nextEnabled });
+        store.setDriveSyncPreferences(nextEnabled, nextMode);
+
+        if (isDriveConnected) {
+            try {
+                await forceSyncDrive();
+            } catch (error) {
+                console.error('[YjsSyncSettings] Sync failed after auto-sync toggle:', error);
+                showError('Sync failed. Please try again.');
+            }
+        }
+    };
+
+    const handleAutoSyncModeChange = async (value: string) => {
+        const nextMode = value === 'backup' ? 'backup' : 'sync';
+
+        updatePreferences({ autoSyncMode: nextMode });
+        store.setDriveSyncPreferences(autoSyncEnabled, nextMode);
+
+        if (isDriveConnected) {
+            try {
+                await forceSyncDrive();
+            } catch (error) {
+                console.error('[YjsSyncSettings] Sync failed after auto-sync mode change:', error);
+                showError('Sync failed. Please try again.');
+            }
+        }
+    };
+
     const StatusIcon = status.icon;
 
     return (
@@ -158,7 +219,7 @@ export default function YjsSyncSettings() {
             <div className="mb-6">
                 <h2 className="text-2xl font-bold text-foreground">Cloud Sync</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Connect Google Drive to sync your data across devices automatically.
+                    Connect Google Drive to back up your data. Auto-sync between devices is optional.
                 </p>
             </div>
 
@@ -178,30 +239,68 @@ export default function YjsSyncSettings() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            {isSignedIn ? (
-                                <>
-                                    <Button
-                                        variant="ghost"
-                                        onClick={handleDisconnect}
-                                    >
-                                        Disconnect
+                            {showAuthActions && (
+                                isSignedIn ? (
+                                    <>
+                                        <Button
+                                            variant="ghost"
+                                            onClick={handleDisconnect}
+                                        >
+                                            Disconnect
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            onClick={handleForceSync}
+                                            disabled={!isDriveConnected || isSyncing}
+                                            leadingIcon={ArrowPathIcon}
+                                        >
+                                            Sync Now
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <Button onClick={handleConnect} leadingIcon={CloudIcon}>
+                                        Connect Google Drive
                                     </Button>
-                                    <Button
-                                        variant="outline"
-                                        onClick={handleForceSync}
-                                        disabled={!isDriveConnected || isSyncing}
-                                        leadingIcon={ArrowPathIcon}
-                                    >
-                                        Sync Now
-                                    </Button>
-                                </>
-                            ) : (
-                                <Button onClick={handleConnect} leadingIcon={CloudIcon}>
-                                    Connect Google Drive
-                                </Button>
+                                )
                             )}
                         </div>
                     </div>
+                    {showAuthActions && isSignedIn && (
+                        <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3">
+                            <div className="flex items-center gap-3">
+                                <Checkbox
+                                    id="auto-sync-enabled"
+                                    checked={autoSyncEnabled}
+                                    onCheckedChange={handleAutoSyncToggle}
+                                />
+                                <div>
+                                    <Label htmlFor="auto-sync-enabled" className="text-sm font-medium">
+                                        Enable auto-sync
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        When disabled, you control when changes are synced with Drive.
+                                    </p>
+                                </div>
+                            </div>
+                            {autoSyncEnabled && (
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Auto-sync mode</Label>
+                                    <Select value={autoSyncMode} onValueChange={handleAutoSyncModeChange}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="backup">Sync with cloud (backup mode)</SelectItem>
+                                            <SelectItem value="sync">Sync between devices (backup + sync)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground">
+                                        Backup mode auto-uploads when local changes are detected. Backup + sync also does periodic checks for changes.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

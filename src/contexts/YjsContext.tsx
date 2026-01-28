@@ -8,7 +8,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { YjsStore, getYjsStore, SyncState } from '@/stores/yjs';
+import { YjsStore, getYjsStore, SyncState, SyncPhase, AutoSyncMode } from '@/stores/yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 
 export interface YjsContextValue {
@@ -20,6 +20,8 @@ export interface YjsContextValue {
     isSyncing: boolean;
     /** Current sync state */
     syncState: SyncState;
+    /** Current sync phase */
+    syncPhase: SyncPhase;
     /** Whether connected to Google Drive */
     isDriveConnected: boolean;
     /** Whether a Drive connection is in progress */
@@ -32,6 +34,12 @@ export interface YjsContextValue {
     lastSyncedAt: number | null;
     /** Whether there are local changes pending upload */
     hasPendingSyncChanges: () => boolean;
+    /** Whether there are local changes pending upload (reactive) */
+    pendingSyncChanges: boolean;
+    /** Whether auto-sync is enabled */
+    autoSyncEnabled: boolean;
+    /** Auto-sync mode */
+    autoSyncMode: AutoSyncMode;
     /** Manually trigger Drive sync */
     forceSyncDrive: () => Promise<void>;
     /** Disconnect Drive sync */
@@ -62,11 +70,15 @@ export function YjsProvider({ children }: YjsProviderProps) {
     // State
     const [isReady, setIsReady] = useState(false);
     const [syncState, setSyncState] = useState<SyncState>('idle');
+    const [syncPhase, setSyncPhase] = useState<SyncPhase>('idle');
     const [isDriveConnected, setIsDriveConnected] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
     const [hasSynced, setHasSynced] = useState(false);
     const [manualSyncInProgress, setManualSyncInProgress] = useState(false);
     const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+    const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
+    const [autoSyncMode, setAutoSyncMode] = useState<AutoSyncMode>('sync');
+    const [pendingSyncChanges, setPendingSyncChanges] = useState(false);
     
     // Auth hook for Google Drive connection
     const { isSignedIn, accessToken, sessionId, isLoading: authLoading } = useGoogleAuth();
@@ -94,7 +106,31 @@ export function YjsProvider({ children }: YjsProviderProps) {
         };
     }, [store]);
 
+    // Sync auto-sync preferences from Yjs
+    useEffect(() => {
+        if (!isReady) return;
+
+        const syncPreferences = () => {
+            const enabled = store.preferences.get('autoSyncEnabled') === true;
+            const modeValue = store.preferences.get('autoSyncMode');
+            const mode: AutoSyncMode = modeValue === 'sync' ? 'sync' : 'backup';
+
+            setAutoSyncEnabled(enabled);
+            setAutoSyncMode(mode);
+            store.setDriveSyncPreferences(enabled, mode);
+        };
+
+        syncPreferences();
+
+        const handler = () => syncPreferences();
+        store.preferences.observe(handler);
+
+        return () => store.preferences.unobserve(handler);
+    }, [isReady, store]);
+
     // Connect/disconnect Drive based on auth state
+    // NOTE: Do NOT include autoSyncEnabled/autoSyncMode in deps - those are handled
+    // by the preference sync effect calling store.setDriveSyncPreferences()
     useEffect(() => {
         if (!isReady || authLoading) return;
 
@@ -104,7 +140,6 @@ export function YjsProvider({ children }: YjsProviderProps) {
         if (isSignedIn && (hasDirectAuth || hasWorkerAuth)) {
             setHasSynced(false);
             setIsConnecting(true);
-            setSyncState('syncing');
 
             // In worker mode we don't have a client-side access token; pass a placeholder
             const tokenForConnect = accessToken || 'worker-placeholder';
@@ -113,13 +148,19 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 .then(async () => {
                     setIsDriveConnected(true);
                     setSyncState(store.getSyncState());
+                    setSyncPhase(store.getSyncPhase());
                     setLastSyncedAt(store.getLastSyncedAt());
                     console.log('[YjsContext] Connected to Drive');
-                    await store.forceDriveSync();
+                    // Sync if auto-sync is enabled and mode is 'sync'
+                    const currentMode = store.getDriveSyncMode();
+                    if (currentMode === 'sync') {
+                        await store.forceDriveSync();
+                    }
                 })
                 .catch((error) => {
                     setIsDriveConnected(false);
                     setSyncState('error');
+                    setSyncPhase('error');
                     console.error('[YjsContext] Failed to connect Drive:', error);
                 })
                 .finally(() => {
@@ -130,6 +171,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             setIsDriveConnected(false);
             setIsConnecting(false);
             setSyncState('idle');
+            setSyncPhase('idle');
             setHasSynced(false);
             setLastSyncedAt(null);
             setManualSyncInProgress(false);
@@ -156,15 +198,37 @@ export function YjsProvider({ children }: YjsProviderProps) {
             setHasSynced(true);
             setLastSyncedAt(store.getLastSyncedAt());
         }
-    }, [syncState, isDriveConnected]);
+    }, [syncState, isDriveConnected, store]);
 
-    // Subscribe to sync state changes after connection
+    // Subscribe to sync state/phase/pending changes
+    // Re-subscribe when isDriveConnected changes because that's when provider is created
     useEffect(() => {
-        if (!isDriveConnected) return;
+        if (!isReady) return;
 
-        const unsubscribe = store.onSyncStateChange(setSyncState);
-        return () => unsubscribe();
-    }, [store, isDriveConnected]);
+        // If not connected, reset to idle and don't subscribe
+        if (!isDriveConnected) {
+            setSyncState('idle');
+            setSyncPhase('idle');
+            setPendingSyncChanges(false);
+            return;
+        }
+
+        // Subscribe to all sync events from the provider
+        const unsubState = store.onSyncStateChange(setSyncState);
+        const unsubPhase = store.onSyncPhaseChange(setSyncPhase);
+        const unsubPending = store.onPendingSyncChange(setPendingSyncChanges);
+
+        // Fetch current state to ensure we're in sync (in case we missed updates)
+        setSyncState(store.getSyncState());
+        setSyncPhase(store.getSyncPhase());
+        setPendingSyncChanges(store.hasPendingSyncChanges());
+
+        return () => {
+            unsubState();
+            unsubPhase();
+            unsubPending();
+        };
+    }, [store, isReady, isDriveConnected]);
 
     // --- Callbacks ---
 
@@ -179,7 +243,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
     // Trigger a sync when tab becomes visible or when network reconnects
     useEffect(() => {
-        if (!isDriveConnected) return;
+        if (!isDriveConnected || !autoSyncEnabled || autoSyncMode !== 'sync') return;
 
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
@@ -199,13 +263,14 @@ export function YjsProvider({ children }: YjsProviderProps) {
             window.removeEventListener('online', handleOnline);
         };
 
-    }, [isDriveConnected, store]);
+    }, [isDriveConnected, autoSyncEnabled, autoSyncMode, store]);
 
     const disconnectDrive = useCallback(() => {
         store.disconnectDrive();
         setIsDriveConnected(false);
         setIsConnecting(false);
         setSyncState('idle');
+        setSyncPhase('idle');
         setHasSynced(false);
         setManualSyncInProgress(false);
     }, [store]);
@@ -231,6 +296,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         setHasSynced(false);
         setManualSyncInProgress(false);
         setLastSyncedAt(null);
+        setSyncPhase('idle');
 
         await store.clearAllData();
         await store.initialize();
@@ -238,6 +304,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         setIsReady(true);
         setIsDriveConnected(store.isDriveConnected());
         setSyncState(store.getSyncState());
+        setSyncPhase(store.getSyncPhase());
         setLastSyncedAt(store.getLastSyncedAt());
     }, [store]);
 
@@ -252,12 +319,16 @@ export function YjsProvider({ children }: YjsProviderProps) {
         isReady,
         isSyncing: syncState === 'syncing',
         syncState,
+        syncPhase,
         isDriveConnected,
         isConnecting,
         hasSynced,
         manualSyncInProgress,
         lastSyncedAt,
         hasPendingSyncChanges,
+        pendingSyncChanges,
+        autoSyncEnabled,
+        autoSyncMode,
         forceSyncDrive,
         disconnectDrive,
         loadEntriesForYear,
@@ -269,12 +340,16 @@ export function YjsProvider({ children }: YjsProviderProps) {
         store,
         isReady,
         syncState,
+        syncPhase,
         isDriveConnected,
         isConnecting,
         hasSynced,
         manualSyncInProgress,
         lastSyncedAt,
         hasPendingSyncChanges,
+        pendingSyncChanges,
+        autoSyncEnabled,
+        autoSyncMode,
         forceSyncDrive,
         disconnectDrive,
         loadEntriesForYear,

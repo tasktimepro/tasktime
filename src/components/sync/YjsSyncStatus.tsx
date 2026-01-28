@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useUrlState } from '@/hooks/useUrlState';
-import { CloudIcon, CloudSyncIcon, CloudCheckIcon, CloudCogIcon, ExclamationTriangleIcon, WifiOffIcon } from '@/components/ui/icons';
+import { CloudIcon, CloudSyncIcon, CloudCheckIcon, CloudCogIcon, CloudDownloadIcon, CloudUploadIcon, ExclamationTriangleIcon, WifiOffIcon } from '@/components/ui/icons';
 
 interface YjsSyncStatusProps {
     className?: string;
@@ -16,7 +16,7 @@ interface YjsSyncStatusProps {
 
 export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
 
-    const { isReady, isSyncing, syncState, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress } = useYjs();
+    const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled } = useYjs();
     const { isSignedIn, signIn, isLoading: authLoading } = useGoogleAuth();
     const { navigateToAccount } = useUrlState();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -46,6 +46,15 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
     const handleCloudOptions = useCallback(() => {
         navigateToAccount({ section: 'sync' });
     }, [navigateToAccount]);
+
+    const handleManualSync = useCallback(async () => {
+        await forceSyncDrive();
+    }, [forceSyncDrive]);
+
+    // NOTE: Sidebar cloud icon should never spin.
+
+    const isManualMode = !autoSyncEnabled;
+    const hasPendingChanges = pendingSyncChanges;
 
     const status = useMemo(() => {
         // Loading state (store not ready or auth loading)
@@ -83,8 +92,45 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
                 icon: WifiOffIcon,
                 tone: 'text-yellow-700 dark:text-yellow-200',
                 onClick: handleCloudOptions,
+            };
+        }
+
+        // Error state
+        if (syncState === 'error') {
+            return {
+                text: 'Sync Error',
+                icon: ExclamationTriangleIcon,
+                tone: 'text-red-600 dark:text-red-400',
+                onClick: handleCloudOptions,
                 hoverIcon: CloudCogIcon,
                 hoverText: 'Cloud Options',
+            };
+        }
+
+        if (syncPhase === 'checking') {
+            return {
+                text: 'Checking for updates...',
+                icon: CloudSyncIcon,
+                tone: 'text-green-700 dark:text-green-300',
+                onClick: handleCloudOptions,
+            };
+        }
+
+        if (syncPhase === 'downloading') {
+            return {
+                text: 'Downloading updates...',
+                icon: CloudDownloadIcon,
+                tone: 'text-green-700 dark:text-green-300',
+                onClick: handleCloudOptions,
+            };
+        }
+
+        if (syncPhase === 'uploading') {
+            return {
+                text: 'Syncing changes...',
+                icon: CloudUploadIcon,
+                tone: 'text-green-700 dark:text-green-300',
+                onClick: handleCloudOptions,
             };
         }
 
@@ -97,46 +143,41 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
                 icon: CloudSyncIcon,
                 tone: 'text-green-700 dark:text-green-300',
                 onClick: handleCloudOptions,
-                hoverIcon: CloudCogIcon,
-                hoverText: 'Cloud Options',
+            };
+        }
+
+        // Manual sync mode with pending changes
+        if (isManualMode && hasPendingChanges) {
+            return {
+                text: 'Sync changes',
+                icon: CloudUploadIcon,
+                tone: 'text-green-700 dark:text-green-300',
+                onClick: handleManualSync,
             };
         }
 
         // Actively syncing (auto sync) - icon change only
         if (isSyncing) {
             return {
-                text: 'Connected',
+                text: 'In sync',
                 icon: CloudSyncIcon,
                 tone: 'text-green-700 dark:text-green-300',
-                onClick: handleCloudOptions,
-                hoverIcon: CloudCogIcon,
-                hoverText: 'Cloud Options',
-            };
-        }
-
-        // Error state
-        if (syncState === 'error') {
-            return {
-                text: 'Sync Error',
-                icon: ExclamationTriangleIcon,
-                tone: 'text-red-600 dark:text-red-400',
                 onClick: handleCloudOptions,
             };
         }
 
         // Connected and synced
         return {
-            text: 'Connected',
+            text: 'In sync',
             icon: CloudCheckIcon,
             tone: 'text-green-700 dark:text-green-300',
             onClick: handleCloudOptions,
             hoverIcon: CloudCogIcon,
             hoverText: 'Cloud Options',
         };
-    }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, isSyncing, hasSynced, manualSyncInProgress, syncState, handleConnect, handleCloudOptions]);
+    }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, isSyncing, hasSynced, manualSyncInProgress, syncPhase, syncState, isManualMode, hasPendingChanges, handleConnect, handleCloudOptions, handleManualSync]);
 
     const IconComponent = (isHovered && status.hoverIcon) ? status.hoverIcon : status.icon;
-    const iconSpinClass = (status as { spinning?: boolean }).spinning ? 'animate-spin' : '';
     const displayText = (isHovered && status.hoverText) ? status.hoverText : status.text;
 
     return (
@@ -148,7 +189,7 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
             className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${status.onClick ? 'hover:bg-accent hover:text-accent-foreground cursor-pointer' : 'cursor-default'} ${status.tone} ${className}`}
             title={status.text}
         >
-            <IconComponent className={`h-5 w-5 mr-3 flex-shrink-0 ${iconSpinClass}`} />
+            <IconComponent className="h-5 w-5 mr-3 flex-shrink-0" />
             <span className="truncate">{displayText}</span>
         </button>
     );

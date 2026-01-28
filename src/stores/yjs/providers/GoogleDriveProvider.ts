@@ -13,7 +13,7 @@ import * as Y from 'yjs';
 import { encodeStateAsUpdate, applyUpdate, mergeUpdates } from 'yjs';
 import { YjsDocManager } from '../YjsDocManager';
 import { ManifestManager, AuthorizationError } from './ManifestManager';
-import type { DocName, SyncState } from '../types';
+import type { DocName, SyncState, DriveSyncMode, SyncPhase } from '../types';
 
 export { AuthorizationError };
 
@@ -32,6 +32,11 @@ export class YjsDriveProvider {
     private connected: boolean = false;
     private syncState: SyncState = 'idle';
     private stateListeners: Set<(state: SyncState) => void> = new Set();
+    private syncPhase: SyncPhase = 'idle';
+    private phaseListeners: Set<(phase: SyncPhase) => void> = new Set();
+    private syncMode: DriveSyncMode = 'sync';
+    private pendingChanges: boolean = false;
+    private pendingChangeListeners: Set<(hasPending: boolean) => void> = new Set();
 
     private pendingDeltas: Map<DocName, Uint8Array[]> = new Map();
     private docUpdateHandlers: Map<DocName, (update: Uint8Array, origin: unknown) => void> = new Map();
@@ -57,6 +62,18 @@ export class YjsDriveProvider {
         }
     }
 
+    private updatePendingState(): void {
+        const hasPending = this.hasLocalChangesToPush();
+        if (hasPending === this.pendingChanges) {
+            return;
+        }
+
+        this.pendingChanges = hasPending;
+        for (const callback of this.pendingChangeListeners) {
+            callback(hasPending);
+        }
+    }
+
     constructor(docManager: YjsDocManager, accessToken: string, sessionId?: string | null) {
         this.docManager = docManager;
         this.accessToken = accessToken;
@@ -75,7 +92,24 @@ export class YjsDriveProvider {
         if (this.connected) return;
 
         try {
+            if (this.syncMode !== 'sync') {
+                this.log('connect: manual/backup mode, skipping initial sync');
+
+                for (const docName of this.docManager.getLoadedDocs()) {
+                    this.subscribeToDoc(docName);
+                }
+
+                this.connected = true;
+                this.updateSyncInterval();
+                this.setState('idle');
+                this.setPhase('idle');
+                this.updatePendingState();
+                this.log('connect: connected');
+                return;
+            }
+
             this.setState('syncing');
+            this.setPhase('checking');
             this.log('connect: starting');
 
             // Load manifest from Drive
@@ -96,18 +130,17 @@ export class YjsDriveProvider {
             await this.manifest.save();
             this.log('connect: manifest saved');
 
-            // Start periodic sync
-            this.syncInterval = setInterval(() => {
-                this.sync().catch(console.error);
-            }, SYNC_INTERVAL_MS);
-
             this.connected = true;
+            this.updateSyncInterval();
             this.setState('idle');
+            this.setPhase('idle');
+            this.updatePendingState();
             this.log('connect: connected');
 
         } catch (error) {
             console.error('[YjsDriveProvider] Connection failed:', error);
             this.setState('error');
+            this.setPhase('error');
             throw error;
         }
     }
@@ -143,6 +176,8 @@ export class YjsDriveProvider {
         this.appliedStateVersions.clear();
         this.appliedDeltaIds.clear();
         this.setState('idle');
+        this.setPhase('idle');
+        this.updatePendingState();
         console.log('[YjsDriveProvider] Disconnected from Google Drive');
     }
 
@@ -151,6 +186,30 @@ export class YjsDriveProvider {
      */
     isConnected(): boolean {
         return this.connected;
+    }
+
+    /**
+     * Update sync mode (manual, backup, or sync)
+     */
+    setSyncMode(mode: DriveSyncMode): void {
+        this.syncMode = mode;
+        this.updateSyncInterval();
+        this.log('sync mode updated', { mode });
+    }
+
+    private updateSyncInterval(): void {
+        if (this.syncInterval) {
+            clearInterval(this.syncInterval);
+            this.syncInterval = null;
+        }
+
+        if (!this.connected || this.syncMode !== 'sync') {
+            return;
+        }
+
+        this.syncInterval = setInterval(() => {
+            this.sync(false, { allowPull: true }).catch(console.error);
+        }, SYNC_INTERVAL_MS);
     }
 
     /**
@@ -171,9 +230,14 @@ export class YjsDriveProvider {
      * Perform a full sync of all loaded documents
      * @param force - If true, bypasses the isSyncing guard and throttle (for manual Sync Now / visibility change)
      */
-    async sync(force: boolean = false): Promise<void> {
+    async sync(force: boolean = false, options: { allowPull?: boolean } = {}): Promise<void> {
         if (!this.connected) {
             console.warn('[YjsDriveProvider] Cannot sync: not connected');
+            return;
+        }
+
+        if (!force && this.syncMode === 'manual') {
+            this.log('sync: manual mode, skipping');
             return;
         }
 
@@ -194,8 +258,7 @@ export class YjsDriveProvider {
             }
         }
 
-        const hasPendingLocal = this.hasPendingDeltas();
-        const timeSinceLastPull = Date.now() - this.lastPullAt;
+        const allowPull = options.allowPull ?? true;
 
         // On a forced sync, ensure every loaded doc does a full-state push to heal any missed deltas
         if (force) {
@@ -204,36 +267,60 @@ export class YjsDriveProvider {
             }
         }
 
+        this.updatePendingState();
+
+        const hasPendingLocal = this.hasLocalChangesToPush();
+        const timeSinceLastPull = Date.now() - this.lastPullAt;
+
+        if (!allowPull && !hasPendingLocal && !force) {
+            this.log('sync: no local changes to push (push-only mode)');
+            this.setPhase('idle');
+            return;
+        }
+
         // Pull throttle: skip manifest reload if no local changes and last pull was recent
         // Unless force=true (manual sync, visibility change, online event)
-        const shouldThrottlePull = !force && !hasPendingLocal && timeSinceLastPull < PULL_THROTTLE_MS;
+        const shouldThrottlePull = allowPull && !force && !hasPendingLocal && timeSinceLastPull < PULL_THROTTLE_MS;
 
         if (shouldThrottlePull) {
             this.log('sync: throttled (no local changes, recent pull)', { timeSinceLastPull });
+            this.setPhase('idle');
             return;
         }
 
         this.isSyncing = true;
         this.setState('syncing');
         const loadedDocs = this.docManager.getLoadedDocs();
-        this.log('sync: started', { docs: loadedDocs, force, hasPendingLocal });
+        this.log('sync: started', { docs: loadedDocs, force, hasPendingLocal, allowPull });
 
         try {
             // Check if manifest has changed before doing full reload
-            const manifestChanged = await this.manifest.hasManifestChanged();
-            
-            if (manifestChanged || force || hasPendingLocal) {
-                // Reload manifest from Drive to get latest changes from other devices
-                await this.manifest.load();
-                this.lastPullAt = Date.now();
-                this.log('sync: manifest reloaded (changed or forced)');
-            } else {
-                this.log('sync: manifest unchanged, skipping pull');
+            let manifestChanged = false;
+            if (allowPull) {
+                this.setPhase('checking');
+                manifestChanged = await this.manifest.hasManifestChanged();
+                
+                if (manifestChanged || force || hasPendingLocal) {
+                    // Reload manifest from Drive to get latest changes from other devices
+                    this.setPhase('downloading');
+                    await this.manifest.load();
+                    this.lastPullAt = Date.now();
+                    this.log('sync: manifest reloaded (changed or forced)');
+                } else {
+                    this.log('sync: manifest unchanged, skipping pull');
+                }
             }
+
+            if (!allowPull && !this.manifest.getManifest()) {
+                await this.manifest.load();
+                this.log('sync: manifest loaded (push-only)');
+            }
+
+            const shouldPull = allowPull && (manifestChanged || force);
 
             // Sync each loaded document (pull if manifest changed, always push pending)
             for (const docName of loadedDocs) {
-                await this.syncDoc(docName, manifestChanged || force);
+                await this.syncDoc(docName, shouldPull);
             }
 
             // Save updated manifest
@@ -246,10 +333,12 @@ export class YjsDriveProvider {
             console.error('[YjsDriveProvider] Sync failed:', error);
             if (error instanceof AuthorizationError) {
                 this.setState('error');
+                this.setPhase('error');
                 throw error; // Auth errors should propagate
             } else {
                 // For network errors, stay connected but mark as error temporarily
                 this.setState('error');
+                this.setPhase('error');
                 // Don't throw - pending deltas are preserved and will retry on next interval
                 // Throwing here could cause the app to lose track of the sync state
             }
@@ -258,9 +347,16 @@ export class YjsDriveProvider {
             const hasPending = this.hasPendingDeltas();
             this.log('sync: finished', { pending: hasPending });
 
+            if (this.syncState !== 'error') {
+                this.setPhase('idle');
+            }
+
+            this.updatePendingState();
+
             // If changes arrived during sync, run another pass immediately
             if (this.hasPendingDeltas()) {
-                this.sync().catch(console.error);
+                const followUpAllowPull = this.syncMode === 'sync';
+                this.sync(false, { allowPull: followUpAllowPull }).catch(console.error);
             }
         }
     }
@@ -300,10 +396,19 @@ export class YjsDriveProvider {
 
         // 1. Pull remote state and deltas (only if manifest changed)
         if (shouldPull) {
+            this.setPhase('downloading');
             await this.pullDoc(docName, doc);
         }
 
         // 2. Push local changes
+        const pendingCount = this.pendingDeltas.get(docName)?.length ?? 0;
+        const needsInitialState = docManifest.stateVersion === 0;
+        const shouldUpload = this.forceFullStateDocs.has(docName) || pendingCount > 0 || needsInitialState;
+
+        if (shouldUpload) {
+            this.setPhase('uploading');
+        }
+
         if (this.forceFullStateDocs.has(docName)) {
             // Push full state after reconnect to capture offline changes
             // Note: pushFullState handles its own error recovery and will re-add to forceFullStateDocs on failure
@@ -465,6 +570,8 @@ export class YjsDriveProvider {
             // Only clear pending after manifest is persisted to Drive
             this.pendingDeltas.set(docName, []);
 
+            this.updatePendingState();
+
             this.log(`push: delta ${deltaId} for ${docName}`, { bytes: mergedDelta.length });
         } catch (error) {
             // Preserve pending deltas so they retry on next sync
@@ -522,6 +629,8 @@ export class YjsDriveProvider {
             this.appliedStateVersions.set(docName, nextStateVersion);
             this.appliedDeltaIds.set(docName, new Set());
             this.log(`push: full state for ${docName}`, { bytes: fullState.length, version: nextStateVersion });
+
+            this.updatePendingState();
         } catch (error) {
             // Keep doc in forceFullStateDocs so it retries on next sync
             this.forceFullStateDocs.add(docName);
@@ -600,6 +709,8 @@ export class YjsDriveProvider {
 
             this.log('doc update queued', { docName, pending: this.pendingDeltas.get(docName)?.length });
 
+            this.updatePendingState();
+
             // Debounce sync
             this.scheduleSync();
         };
@@ -627,12 +738,29 @@ export class YjsDriveProvider {
      * Schedule a debounced sync
      */
     private scheduleSync(): void {
+        if (this.syncMode === 'manual') {
+            this.log('scheduleSync: manual mode, skipping');
+            return;
+        }
+
+        if (this.syncMode === 'backup') {
+            if (this.syncDebounceTimer) {
+                clearTimeout(this.syncDebounceTimer);
+                this.syncDebounceTimer = null;
+            }
+
+            this.log('scheduleSync: backup mode, syncing immediately');
+            this.sync(false, { allowPull: false }).catch(console.error);
+            return;
+        }
+
         if (this.syncDebounceTimer) {
             clearTimeout(this.syncDebounceTimer);
         }
 
         this.syncDebounceTimer = setTimeout(() => {
-            this.sync().catch(console.error);
+            const allowPull = this.syncMode === 'sync';
+            this.sync(false, { allowPull }).catch(console.error);
         }, SYNC_DEBOUNCE_MS);
 
         this.log('scheduleSync: debounced');
@@ -650,12 +778,32 @@ export class YjsDriveProvider {
     }
 
     /**
+     * Get current sync phase
+     */
+    getPhase(): SyncPhase {
+        return this.syncPhase;
+    }
+
+    /**
      * Set sync state and notify listeners
      */
     private setState(state: SyncState): void {
         this.syncState = state;
+        if (state === 'error') {
+            this.setPhase('error');
+        }
         for (const callback of this.stateListeners) {
             callback(state);
+        }
+    }
+
+    /**
+     * Set sync phase and notify listeners
+     */
+    private setPhase(phase: SyncPhase): void {
+        this.syncPhase = phase;
+        for (const callback of this.phaseListeners) {
+            callback(phase);
         }
     }
 
@@ -665,6 +813,22 @@ export class YjsDriveProvider {
     onStateChange(callback: (state: SyncState) => void): () => void {
         this.stateListeners.add(callback);
         return () => this.stateListeners.delete(callback);
+    }
+
+    /**
+     * Subscribe to sync phase changes
+     */
+    onPhaseChange(callback: (phase: SyncPhase) => void): () => void {
+        this.phaseListeners.add(callback);
+        return () => this.phaseListeners.delete(callback);
+    }
+
+    /**
+     * Subscribe to pending change updates
+     */
+    onPendingChange(callback: (hasPending: boolean) => void): () => void {
+        this.pendingChangeListeners.add(callback);
+        return () => this.pendingChangeListeners.delete(callback);
     }
 
     /**
@@ -696,8 +860,14 @@ export class YjsDriveProvider {
     async syncAndSubscribeDoc(docName: DocName): Promise<void> {
         if (!this.connected) return;
 
+        if (this.syncMode === 'manual') {
+            this.subscribeToDoc(docName);
+            return;
+        }
+
         // Sync the document
-        await this.syncDoc(docName);
+        const shouldPull = this.syncMode === 'sync';
+        await this.syncDoc(docName, shouldPull);
 
         // Subscribe to future updates
         this.subscribeToDoc(docName);

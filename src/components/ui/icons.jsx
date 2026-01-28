@@ -17,6 +17,7 @@ export {
     Check as CheckIcon,
     Cloud as CloudIcon,
     CloudCheck as CloudCheckIcon,
+    CloudDownload as CloudDownloadIcon,
     CloudUpload as CloudUploadIcon,
     CloudSync as CloudSyncIcon,
     CloudCog as CloudCogIcon,

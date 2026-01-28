@@ -31,6 +31,9 @@ export type { Manifest, DocManifest, DeltaInfo } from './providers';
 export type {
     DocName,
     SyncState,
+    SyncPhase,
+    AutoSyncMode,
+    DriveSyncMode,
     Project,
     Task,
     TimeEntry,

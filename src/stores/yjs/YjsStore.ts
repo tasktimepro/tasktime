@@ -15,6 +15,9 @@ import { YjsDriveProvider } from './providers/GoogleDriveProvider';
 import type {
     DocName,
     SyncState,
+    SyncPhase,
+    DriveSyncMode,
+    AutoSyncMode,
     Project,
     Task,
     TimeEntry,
@@ -34,6 +37,7 @@ export class YjsStore {
     private docManager: YjsDocManager;
     private driveProvider: YjsDriveProvider | null = null;
     private _isReady: boolean = false;
+    private driveSyncMode: DriveSyncMode = 'manual';
 
     // Core docs (always loaded after init)
     private _coreDoc: Y.Doc | null = null;
@@ -498,6 +502,7 @@ export class YjsStore {
         }
 
         this.driveProvider = new YjsDriveProvider(this.docManager, accessToken, sessionId);
+        this.driveProvider.setSyncMode(this.driveSyncMode);
         await this.driveProvider.connect();
     }
 
@@ -524,6 +529,25 @@ export class YjsStore {
     }
 
     /**
+     * Set Drive auto-sync preferences (manual/backup/sync)
+     */
+    setDriveSyncPreferences(autoSyncEnabled: boolean, autoSyncMode: AutoSyncMode): void {
+        const resolvedMode: DriveSyncMode = autoSyncEnabled
+            ? (autoSyncMode === 'backup' ? 'backup' : 'sync')
+            : 'manual';
+
+        this.driveSyncMode = resolvedMode;
+        this.driveProvider?.setSyncMode(resolvedMode);
+    }
+
+    /**
+     * Get current Drive sync mode
+     */
+    getDriveSyncMode(): DriveSyncMode {
+        return this.driveSyncMode;
+    }
+
+    /**
      * Subscribe to sync state changes
      */
     onSyncStateChange(callback: (state: SyncState) => void): () => void {
@@ -532,10 +556,33 @@ export class YjsStore {
     }
 
     /**
+     * Subscribe to sync phase changes
+     */
+    onSyncPhaseChange(callback: (phase: SyncPhase) => void): () => void {
+        if (!this.driveProvider) return () => {};
+        return this.driveProvider.onPhaseChange(callback);
+    }
+
+    /**
+     * Subscribe to pending sync change updates
+     */
+    onPendingSyncChange(callback: (hasPending: boolean) => void): () => void {
+        if (!this.driveProvider) return () => {};
+        return this.driveProvider.onPendingChange(callback);
+    }
+
+    /**
      * Get current sync state
      */
     getSyncState(): SyncState {
         return this.driveProvider?.getState() ?? 'idle';
+    }
+
+    /**
+     * Get current sync phase
+     */
+    getSyncPhase(): SyncPhase {
+        return this.driveProvider?.getPhase() ?? 'idle';
     }
 
     /**
