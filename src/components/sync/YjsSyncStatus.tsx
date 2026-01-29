@@ -17,21 +17,37 @@ interface YjsSyncStatusProps {
 export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
 
     const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled } = useYjs();
-    const { isSignedIn, signIn, isLoading: authLoading } = useGoogleAuth();
+    const { signIn, isLoading: authLoading, hadPreviousSession } = useGoogleAuth();
     const { navigateToAccount } = useUrlState();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [isHovered, setIsHovered] = useState(false);
 
     useEffect(() => {
-        const handleOnline = () => setIsOffline(false);
-        const handleOffline = () => setIsOffline(true);
+        const updateOfflineState = () => {
+            setIsOffline(!navigator.onLine);
+        };
 
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                updateOfflineState();
+            }
+        };
+
+        updateOfflineState();
+
+        window.addEventListener('online', updateOfflineState);
+        window.addEventListener('offline', updateOfflineState);
+        window.addEventListener('focus', updateOfflineState);
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        const interval = setInterval(updateOfflineState, 5000);
 
         return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('online', updateOfflineState);
+            window.removeEventListener('offline', updateOfflineState);
+            window.removeEventListener('focus', updateOfflineState);
+            document.removeEventListener('visibilitychange', handleVisibility);
+            clearInterval(interval);
         };
     }, []);
 
@@ -78,7 +94,7 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
         // Not connected (or signed out) - show connect button
         if (!isDriveConnected && !isConnecting) {
             return {
-                text: 'Connect Google Drive',
+                text: hadPreviousSession ? 'Reconnect to Drive' : 'Connect Google Drive',
                 icon: CloudIcon,
                 tone: 'text-muted-foreground',
                 onClick: handleConnect,
@@ -174,10 +190,14 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
             hoverIcon: CloudCogIcon,
             hoverText: 'Cloud Options',
         };
-    }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, isSyncing, hasSynced, manualSyncInProgress, syncPhase, syncState, isManualMode, hasPendingChanges, handleConnect, handleCloudOptions, handleManualSync]);
+    }, [isReady, authLoading, isDriveConnected, isConnecting, isSyncing, hasSynced, manualSyncInProgress, syncPhase, syncState, isManualMode, hasPendingChanges, hadPreviousSession, handleConnect, handleCloudOptions, handleManualSync]);
 
     const IconComponent = (isHovered && status.hoverIcon) ? status.hoverIcon : status.icon;
     const displayText = (isHovered && status.hoverText) ? status.hoverText : status.text;
+
+    if (isOffline) {
+        return null;
+    }
 
     return (
         <button

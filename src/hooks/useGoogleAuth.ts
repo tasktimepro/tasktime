@@ -27,6 +27,7 @@ interface AuthState {
     accessToken: string | null;
     sessionId: string | null;
     error: string | null;
+    hadPreviousSession: boolean;
 }
 
 // Verify Worker mode is enabled
@@ -58,6 +59,7 @@ export const useGoogleAuth = () => {
         accessToken: null,
         sessionId: null,
         error: null,
+        hadPreviousSession: false,
     });
 
     // ============================================
@@ -149,6 +151,7 @@ export const useGoogleAuth = () => {
                 accessToken: null, // Worker mode doesn't expose access token
                 sessionId,
                 error: null,
+                hadPreviousSession: true,
             });
 
             notifyAuthSubscribers();
@@ -186,6 +189,7 @@ export const useGoogleAuth = () => {
             accessToken: null,
             sessionId: null,
             error: null,
+            hadPreviousSession: false,
         });
 
         notifyAuthSubscribers();
@@ -205,6 +209,19 @@ export const useGoogleAuth = () => {
 
         const session = await getStoredSession();
         if (session) {
+            if (!isOnline()) {
+                setState({
+                    isSignedIn: true,
+                    isLoading: false,
+                    user: { id: session.userId, email: session.email },
+                    accessToken: null,
+                    sessionId: session.sessionId,
+                    error: null,
+                    hadPreviousSession: true,
+                });
+                return;
+            }
+
             const isValid = await validateWorkerSession(session);
             if (isValid) {
                 setState({
@@ -214,13 +231,25 @@ export const useGoogleAuth = () => {
                     accessToken: null,
                     sessionId: session.sessionId,
                     error: null,
+                    hadPreviousSession: true,
                 });
                 return;
             }
             await clearStoredSession();
+            setState(prev => ({
+                ...prev,
+                isSignedIn: false,
+                isLoading: false,
+                user: null,
+                accessToken: null,
+                sessionId: null,
+                error: null,
+                hadPreviousSession: true,
+            }));
+            return;
         }
-        setState(prev => ({ ...prev, isLoading: false }));
-    }, [validateWorkerSession]);
+        setState(prev => ({ ...prev, isLoading: false, hadPreviousSession: false }));
+    }, [validateWorkerSession, isOnline]);
 
     // ============================================
     // INITIALIZATION
@@ -240,6 +269,18 @@ export const useGoogleAuth = () => {
             authSubscribers.delete(handleExternalAuthChange);
         };
 
+    }, [syncFromStorage]);
+
+    useEffect(() => {
+        const handleOnline = () => {
+            syncFromStorage();
+        };
+
+        window.addEventListener('online', handleOnline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+        };
     }, [syncFromStorage]);
 
     return {

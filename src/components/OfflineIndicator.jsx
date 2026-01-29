@@ -11,16 +11,32 @@ const OfflineIndicator = ({ className = '' }) => {
     
     useEffect(() => {
 
-        const handleOnline = () => setIsOffline(false);
-        const handleOffline = () => setIsOffline(true);
+        const updateOfflineState = () => {
+            setIsOffline(!navigator.onLine);
+        };
+
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                updateOfflineState();
+            }
+        };
+
+        updateOfflineState();
         
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
+        window.addEventListener('online', updateOfflineState);
+        window.addEventListener('offline', updateOfflineState);
+        window.addEventListener('focus', updateOfflineState);
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        const interval = setInterval(updateOfflineState, 5000);
         
         return () => {
 
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('online', updateOfflineState);
+            window.removeEventListener('offline', updateOfflineState);
+            window.removeEventListener('focus', updateOfflineState);
+            document.removeEventListener('visibilitychange', handleVisibility);
+            clearInterval(interval);
         };
     }, []);
     

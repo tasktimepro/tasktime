@@ -243,16 +243,29 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
     // Trigger a sync when tab becomes visible or when network reconnects
     useEffect(() => {
-        if (!isDriveConnected || !autoSyncEnabled || autoSyncMode !== 'sync') return;
+        if (!isDriveConnected) return;
 
         const handleVisibility = () => {
-            if (document.visibilityState === 'visible') {
+            if (document.visibilityState !== 'visible') return;
+
+            if (autoSyncEnabled && autoSyncMode === 'sync') {
                 store.forceDriveSync().catch(console.error);
             }
         };
 
         const handleOnline = () => {
-            store.forceDriveSync().catch(console.error);
+            if (!autoSyncEnabled) {
+                return;
+            }
+
+            if (autoSyncMode === 'sync') {
+                store.forceDriveSync().catch(console.error);
+                return;
+            }
+
+            if (autoSyncMode === 'backup' && store.hasPendingSyncChanges()) {
+                store.forceDriveSync().catch(console.error);
+            }
         };
 
         document.addEventListener('visibilitychange', handleVisibility);
