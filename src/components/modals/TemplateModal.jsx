@@ -465,7 +465,7 @@ const TemplateModal = ({
 
                         {/* Preview - show for all types */}
                         <div className="bg-muted border border-border rounded-md p-3">
-                            <p className="text-sm text-blue-800">
+                            <p className="text-sm text-foreground">
                                 <strong>Preview:</strong> {formPreviewDueDate}
                             </p>
                         </div>

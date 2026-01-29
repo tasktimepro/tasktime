@@ -455,7 +455,7 @@ const ProjectModal = ({
 
                 {/* Rate Override Section */}
                 {formData.overrideRate && (
-                    <div className="border border-border rounded-lg p-4 bg-muted">
+                    <div className="border border-border rounded-lg p-4 bg-card">
                         <h4 className="text-sm font-medium text-foreground mb-3">Project Rate Override</h4>
                         
                         <div className="flex items-center space-x-3 mb-4">

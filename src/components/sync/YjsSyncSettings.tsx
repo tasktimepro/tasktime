@@ -95,7 +95,7 @@ export default function YjsSyncSettings() {
         if (isConnecting || !isDriveConnected) {
             return {
                 text: 'Syncing...',
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 icon: ArrowPathIcon,
                 spinning: true
             };
@@ -112,7 +112,7 @@ export default function YjsSyncSettings() {
         if (syncPhase === 'checking') {
             return {
                 text: 'Checking for updates...',
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 icon: ArrowPathIcon,
                 spinning: true
             };
@@ -121,7 +121,7 @@ export default function YjsSyncSettings() {
         if (syncPhase === 'downloading') {
             return {
                 text: 'Downloading updates...',
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 icon: ArrowPathIcon,
                 spinning: true
             };
@@ -130,7 +130,7 @@ export default function YjsSyncSettings() {
         if (syncPhase === 'uploading') {
             return {
                 text: 'Syncing changes...',
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 icon: ArrowPathIcon,
                 spinning: true
             };
@@ -141,7 +141,7 @@ export default function YjsSyncSettings() {
         if (showSyncingText || isSyncing) {
             return {
                 text: 'Syncing...',
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 icon: ArrowPathIcon,
                 spinning: true
             };

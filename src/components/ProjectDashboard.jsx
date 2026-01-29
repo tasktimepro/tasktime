@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon } from '@/components/ui/icons';
+import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +33,7 @@ const ProjectDashboard = ({
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
+    const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
     const { showError } = useToast();
     const { getTimerForProject } = useTimers();
     const projectTimer = getTimerForProject(project.id);
@@ -53,6 +54,13 @@ const ProjectDashboard = ({
         }
         
         setEditingInvoice(invoice);
+    };
+
+    /**
+     * Toggle invoices section visibility
+     */
+    const toggleInvoicesExpanded = () => {
+        setIsInvoicesExpanded((prev) => !prev);
     };
     
     // Get tasks for this project
@@ -307,9 +315,20 @@ const ProjectDashboard = ({
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">
-                                Invoices ({projectInvoices.length})
-                            </CardTitle>
+                            <button
+                                type="button"
+                                onClick={toggleInvoicesExpanded}
+                                aria-expanded={isInvoicesExpanded}
+                                aria-controls="project-invoices-list"
+                                className="flex items-center gap-2 rounded-md text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <CardTitle className="text-lg">
+                                    Invoices ({projectInvoices.length})
+                                </CardTitle>
+                                <ChevronDownIcon
+                                    className={`h-4 w-4 text-muted-foreground transition-transform cursor-pointer ${isInvoicesExpanded ? 'rotate-180' : ''}`}
+                                />
+                            </button>
                             
                             <InvoiceGenerator
                                 project={project}
@@ -329,17 +348,19 @@ const ProjectDashboard = ({
                         </div>
                     </CardHeader>
 
-                    <CardContent>
-                        <InvoicesList
-                            projectInvoices={projectInvoices}
-                            onEditInvoice={handleEditInvoice}
-                            paymentMethods={paymentMethods}
-                            businessInfos={businessInfos}
-                            clients={clients}
-                            hideNewInvoiceButton={true}
-                            invoiceTemplates={invoiceTemplates}
-                        />
-                    </CardContent>
+                    {isInvoicesExpanded && (
+                        <CardContent id="project-invoices-list">
+                            <InvoicesList
+                                projectInvoices={projectInvoices}
+                                onEditInvoice={handleEditInvoice}
+                                paymentMethods={paymentMethods}
+                                businessInfos={businessInfos}
+                                clients={clients}
+                                hideNewInvoiceButton={true}
+                                invoiceTemplates={invoiceTemplates}
+                            />
+                        </CardContent>
+                    )}
                 </Card>
             )}
 

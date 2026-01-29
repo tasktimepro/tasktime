@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon } from '@/components/ui/icons';
+import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon } from '@/components/ui/icons';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ const ClientDashboard = ({
     openTemplateModal
 }) => {
     const [editingInvoice, setEditingInvoice] = useState(null);
+    const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
     // Get client's currency
     const clientCurrency = useMemo(() => {
         return client.defaultCurrency || getPreferredCurrency();
@@ -248,6 +249,13 @@ const ClientDashboard = ({
      */
     const handleEditInvoice = (invoice) => {
         setEditingInvoice(invoice);
+    };
+
+    /**
+     * Toggle invoices section visibility
+     */
+    const toggleInvoicesExpanded = () => {
+        setIsInvoicesExpanded((prev) => !prev);
     };
 
     /**
@@ -496,23 +504,36 @@ const ClientDashboard = ({
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">
-                            Invoices ({clientInvoices.length})
-                        </CardTitle>
+                        <button
+                            type="button"
+                            onClick={toggleInvoicesExpanded}
+                            aria-expanded={isInvoicesExpanded}
+                            aria-controls="client-invoices-list"
+                            className="flex items-center gap-2 rounded-md text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <CardTitle className="text-lg">
+                                Invoices ({clientInvoices.length})
+                            </CardTitle>
+                            <ChevronDownIcon
+                                className={`h-4 w-4 text-muted-foreground transition-transform cursor-pointer ${isInvoicesExpanded ? 'rotate-180' : ''}`}
+                            />
+                        </button>
                     </div>
                 </CardHeader>
 
-                <CardContent>
-                    <InvoicesList
-                        projectInvoices={clientInvoices}
-                        onEditInvoice={handleEditInvoice}
-                        paymentMethods={paymentMethods}
-                        businessInfos={businessInfos}
-                        clients={clients}
-                        hideNewInvoiceButton={true}
-                        invoiceTemplates={invoiceTemplates}
-                    />
-                </CardContent>
+                {isInvoicesExpanded && (
+                    <CardContent id="client-invoices-list">
+                        <InvoicesList
+                            projectInvoices={clientInvoices}
+                            onEditInvoice={handleEditInvoice}
+                            paymentMethods={paymentMethods}
+                            businessInfos={businessInfos}
+                            clients={clients}
+                            hideNewInvoiceButton={true}
+                            invoiceTemplates={invoiceTemplates}
+                        />
+                    </CardContent>
+                )}
             </Card>
 
             {/* Client Time Metrics */}

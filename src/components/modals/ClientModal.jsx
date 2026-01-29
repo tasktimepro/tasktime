@@ -43,6 +43,11 @@ const ClientModal = ({
         flatRate: false
     });
 
+    const [expandedSections, setExpandedSections] = useState({
+        companyInfo: false,
+        pricingTaxes: false
+    });
+
     // Initialize form data when editing
     useEffect(() => {
         if (editingClient) {
@@ -101,6 +106,22 @@ const ClientModal = ({
             [name]: value
         }));
     };
+
+    const toggleSection = (section) => {
+        setExpandedSections(prev => ({
+            ...prev,
+            [section]: !prev[section]
+        }));
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            setExpandedSections({
+                companyInfo: false,
+                pricingTaxes: false
+            });
+        }
+    }, [isOpen, editingClient]);
 
     /**
      * Add a new custom field
@@ -266,7 +287,7 @@ const ClientModal = ({
                             value={formData.title}
                             onChange={handleInputChange}
                             required
-                            placeholder="Enter title for this client"
+                            placeholder="Enter a title for this client"
                         />
                     </div>
 
@@ -301,76 +322,6 @@ const ClientModal = ({
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="address">
-                            Address
-                        </Label>
-                        <Input
-                            type="text"
-                            id="address"
-                            name="address"
-                            value={formData.address}
-                            onChange={handleInputChange}
-                            placeholder="Street address"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="city">
-                                City
-                            </Label>
-                            <Input
-                                type="text"
-                                id="city"
-                                name="city"
-                                value={formData.city}
-                                onChange={handleInputChange}
-                                placeholder="City"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>
-                                State/ZIP
-                            </Label>
-                            <div className="flex space-x-2 w-full">
-                                <Input
-                                    type="text"
-                                    id="state"
-                                    name="state"
-                                    value={formData.state}
-                                    onChange={handleInputChange}
-                                    className="flex-1 min-w-0"
-                                    placeholder="State"
-                                />
-                                <Input
-                                    type="text"
-                                    id="zip"
-                                    name="zip"
-                                    value={formData.zip}
-                                    onChange={handleInputChange}
-                                    className="w-20 flex-shrink-0"
-                                    placeholder="ZIP"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="country">
-                                Country
-                            </Label>
-                            <Input
-                                type="text"
-                                id="country"
-                                name="country"
-                                value={formData.country}
-                                onChange={handleInputChange}
-                                placeholder="Country"
-                            />
-                        </div>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="email">
@@ -401,48 +352,141 @@ const ClientModal = ({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="registrationNumber">
-                                Reg. Number
-                            </Label>
-                            <Input
-                                type="text"
-                                id="registrationNumber"
-                                name="registrationNumber"
-                                value={formData.registrationNumber}
-                                onChange={handleInputChange}
-                                placeholder="Company registration"
-                            />
-                        </div>
+                    <div className="border border-border rounded-lg">
+                        <button
+                            type="button"
+                            onClick={() => toggleSection('companyInfo')}
+                            className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${expandedSections.companyInfo ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-medium text-foreground">Client Company Info</h4>
+                                <svg
+                                    className={`w-5 h-5 text-muted-foreground transform transition-transform ${expandedSections.companyInfo ? 'rotate-180' : ''}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+                        </button>
+                        {expandedSections.companyInfo && (
+                            <div className="p-4 space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="address">
+                                        Address
+                                    </Label>
+                                    <Input
+                                        type="text"
+                                        id="address"
+                                        name="address"
+                                        value={formData.address}
+                                        onChange={handleInputChange}
+                                        placeholder="Street address"
+                                    />
+                                </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="vat">
-                                VAT
-                            </Label>
-                            <Input
-                                type="text"
-                                id="vat"
-                                name="vat"
-                                value={formData.vat}
-                                onChange={handleInputChange}
-                                placeholder="VAT number"
-                            />
-                        </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="city">
+                                            City
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="city"
+                                            name="city"
+                                            value={formData.city}
+                                            onChange={handleInputChange}
+                                            placeholder="City"
+                                        />
+                                    </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="taxNumber">
-                                Tax Number
-                            </Label>
-                            <Input
-                                type="text"
-                                id="taxNumber"
-                                name="taxNumber"
-                                value={formData.taxNumber}
-                                onChange={handleInputChange}
-                                placeholder="Tax ID"
-                            />
-                        </div>
+                                    <div className="space-y-2">
+                                        <Label>
+                                            State/ZIP
+                                        </Label>
+                                        <div className="flex space-x-2 w-full">
+                                            <Input
+                                                type="text"
+                                                id="state"
+                                                name="state"
+                                                value={formData.state}
+                                                onChange={handleInputChange}
+                                                className="flex-1 min-w-0"
+                                                placeholder="State"
+                                            />
+                                            <Input
+                                                type="text"
+                                                id="zip"
+                                                name="zip"
+                                                value={formData.zip}
+                                                onChange={handleInputChange}
+                                                className="w-20 flex-shrink-0"
+                                                placeholder="ZIP"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="country">
+                                            Country
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="country"
+                                            name="country"
+                                            value={formData.country}
+                                            onChange={handleInputChange}
+                                            placeholder="Country"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="registrationNumber">
+                                            Reg. Number
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="registrationNumber"
+                                            name="registrationNumber"
+                                            value={formData.registrationNumber}
+                                            onChange={handleInputChange}
+                                            placeholder="Company registration"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="vat">
+                                            VAT
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="vat"
+                                            name="vat"
+                                            value={formData.vat}
+                                            onChange={handleInputChange}
+                                            placeholder="VAT number"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="taxNumber">
+                                            Tax Number
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="taxNumber"
+                                            name="taxNumber"
+                                            value={formData.taxNumber}
+                                            onChange={handleInputChange}
+                                            placeholder="Tax ID"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Custom Fields */}
@@ -499,41 +543,28 @@ const ClientModal = ({
                     </div>
                 </div>
 
-                {/* Default Currency */}
-                <div className="space-y-4">
-                    <div className="border-t pt-6">
-                        <Label htmlFor="defaultCurrency" className="mb-2">
-                            Default Currency
-                        </Label>
-                        <Select
-                            value={formData.defaultCurrency}
-                            onValueChange={(value) => handleInputChange({ target: { name: 'defaultCurrency', value } })}
-                        >
-                            <SelectTrigger id="defaultCurrency">
-                                <SelectValue placeholder="Select a currency" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {getCurrencyOptions().map(option => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                            This currency will be used as the default for new projects and invoices for this client.
-                        </p>
-                    </div>
-                </div>
-
                 {/* Pricing & Taxes */}
-                <div className="space-y-4">
-                    <div className="border-t pt-6">
-                        <h4 className="text-sm font-medium text-foreground mb-3">Pricing & Taxes</h4>
-
-                        {/* Rate Section */}
-                        <div className="space-y-4 mb-4">
-                            <div className="flex items-center space-x-3 mb-4">
+                <div className="border border-border rounded-lg">
+                    <button
+                        type="button"
+                        onClick={() => toggleSection('pricingTaxes')}
+                        className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${expandedSections.pricingTaxes ? 'rounded-t-lg' : 'rounded-lg'}`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-medium text-foreground">Pricing & Taxes</h4>
+                            <svg
+                                className={`w-5 h-5 text-muted-foreground transform transition-transform ${expandedSections.pricingTaxes ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </button>
+                    {expandedSections.pricingTaxes && (
+                        <div className="p-4 space-y-4">
+                            <div className="flex items-center space-x-3">
                                 <CustomCheckbox
                                     checked={formData.flatRate}
                                     onChange={(checked) => setFormData(prev => ({ ...prev, flatRate: checked }))}
@@ -563,22 +594,48 @@ const ClientModal = ({
                                     Default hourly rate for projects with this client. Can be overridden per project.
                                 </p>
                             </div>
-                        </div>
 
-                        {/* Tax Settings */}
-                        <div className="flex items-center space-x-3">
-                            <CustomCheckbox
-                                checked={formData.disableTax}
-                                onChange={(checked) => setFormData(prev => ({ ...prev, disableTax: checked }))}
-                                label="Disable tax for this client"
-                                labelClassName="text-sm font-medium text-foreground"
-                                id="disableTax"
-                            />
+                            <div>
+                                <div className="flex items-center space-x-3">
+                                    <CustomCheckbox
+                                        checked={formData.disableTax}
+                                        onChange={(checked) => setFormData(prev => ({ ...prev, disableTax: checked }))}
+                                        label="Disable tax for this client"
+                                        labelClassName="text-sm font-medium text-foreground"
+                                        id="disableTax"
+                                    />
+                                </div>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    When enabled, this client will not have tax applied to their invoices, regardless of business tax settings.
+                                </p>
+                            </div>
+
+                            {/* Default Currency */}
+                            <div className="space-y-2">
+                                <Label htmlFor="defaultCurrency" className="mb-2">
+                                    Default Currency
+                                </Label>
+                                <Select
+                                    value={formData.defaultCurrency}
+                                    onValueChange={(value) => handleInputChange({ target: { name: 'defaultCurrency', value } })}
+                                >
+                                    <SelectTrigger id="defaultCurrency">
+                                        <SelectValue placeholder="Select a currency" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {getCurrencyOptions().map(option => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    This currency will be used as the default for new projects and invoices for this client.
+                                </p>
+                            </div>
                         </div>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                            When enabled, this client will not have tax applied to their invoices, regardless of business tax settings.
-                        </p>
-                    </div>
+                    )}
                 </div>
             </form>
         </Modal>

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { WifiOffIcon } from '@/components/ui/icons';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 /**
  * Displays a notification when the user goes offline
  * Automatically appears/disappears based on network status
  */
-const OfflineIndicator = ({ className = '' }) => {
+const OfflineIndicator = ({ className = '', isCompact = false }) => {
 
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     
@@ -42,13 +43,30 @@ const OfflineIndicator = ({ className = '' }) => {
     
     if (!isOffline) return null;
     
-    return (
+    const content = (
         <div
-            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md bg-yellow-50 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 ${className}`}
+            className={`${isCompact ? 'w-10 mx-auto justify-center px-2 py-2' : 'w-full px-3 py-2'} flex items-center text-sm font-medium rounded-md bg-yellow-50 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 ${className}`}
+            title={isCompact ? undefined : 'You\'re offline'}
+            aria-label={isCompact ? 'You\'re offline' : undefined}
         >
-            <WifiOffIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-            <span>You&apos;re offline</span>
+            <WifiOffIcon className={`h-5 w-5 ${isCompact ? '' : 'mr-3'} flex-shrink-0`} />
+            {!isCompact && <span>You&apos;re offline</span>}
         </div>
+    );
+
+    if (!isCompact) {
+        return content;
+    }
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                {content}
+            </TooltipTrigger>
+            <TooltipContent side="right" align="center">
+                You&apos;re offline
+            </TooltipContent>
+        </Tooltip>
     );
 };
 

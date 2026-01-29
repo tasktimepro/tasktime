@@ -22,6 +22,7 @@ const MetricsCards = ({
     invoiceMetrics,
     thisMonthBillableHours,
     thisMonthUnbilledDisplay,
+    hasClients,
     preferredCurrency,
     formatDuration,
     needsExchangeRates,
@@ -29,6 +30,9 @@ const MetricsCards = ({
     navigateToInvoices
 }) => {
     const renderEarningsByCurrency = (metrics, colorScheme = 'blue') => {
+        if (!hasClients) {
+            return null;
+        }
         // Show loading indicator if we need exchange rates and they're still loading
         if (needsExchangeRates && exchangeRatesLoading) {
             return <span className="text-muted-foreground text-sm italic">Loading rates...</span>;
@@ -138,11 +142,13 @@ const MetricsCards = ({
                             <div>
                                 <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">This Month</h3>
                                 <div className="mt-2">
-                                    <div className="flex items-center">
-                                        <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-                                            {renderEarningsByCurrency(thisMonthMetrics, 'blue')}
+                                    {hasClients && (
+                                        <div className="flex items-center">
+                                            <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                                                {renderEarningsByCurrency(thisMonthMetrics, 'blue')}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                     <div className="flex items-center mt-1">
                                         <ClockIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-1" />
                                         <span className="text-sm text-blue-700 dark:text-blue-300">
@@ -161,12 +167,14 @@ const MetricsCards = ({
                             <div>
                                 <h3 className="text-sm font-medium text-foreground">Last Month</h3>
                                 <div className="mt-2">
-                                    <div className="flex items-center">
-                                        <BanknotesIcon className="h-4 w-4 text-muted-foreground mr-1" />
-                                        <div className="text-lg font-semibold text-foreground">
-                                            {renderEarningsByCurrency(lastMonthMetrics, 'gray')}
+                                    {hasClients && (
+                                        <div className="flex items-center">
+                                            <BanknotesIcon className="h-4 w-4 text-muted-foreground mr-1" />
+                                            <div className="text-lg font-semibold text-foreground">
+                                                {renderEarningsByCurrency(lastMonthMetrics, 'gray')}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                     <div className="flex items-center mt-1">
                                         <ClockIcon className="h-4 w-4 text-muted-foreground mr-1" />
                                         <span className="text-sm text-foreground">
@@ -185,11 +193,13 @@ const MetricsCards = ({
                             <div>
                                 <h3 className="text-sm font-medium text-green-900 dark:text-green-100">This Year</h3>
                                 <div className="mt-2">
-                                    <div className="flex items-center">
-                                        <div className="text-lg font-semibold text-green-900 dark:text-green-100">
-                                            {renderEarningsByCurrency(thisYearMetrics, 'green')}
+                                    {hasClients && (
+                                        <div className="flex items-center">
+                                            <div className="text-lg font-semibold text-green-900 dark:text-green-100">
+                                                {renderEarningsByCurrency(thisYearMetrics, 'green')}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                     <div className="flex items-center mt-1">
                                         <ClockIcon className="h-4 w-4 text-green-600 dark:text-green-400 mr-1" />
                                         <span className="text-sm text-green-700 dark:text-green-300">
@@ -204,7 +214,8 @@ const MetricsCards = ({
                 </div>
 
                 {/* Invoice Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                {hasClients && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                     {/* Outstanding Invoices */}
                     {invoiceMetrics.outstanding > 0 ? (
                         <button
@@ -318,7 +329,8 @@ const MetricsCards = ({
                             <ClockIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                         </div>
                     </div>
-                </div>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

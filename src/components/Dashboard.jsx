@@ -26,6 +26,7 @@ const Dashboard = ({
     navigateToClient,
     navigateToInvoices
 }) => {
+    const hasClients = clients.length > 0;
     const { showWarning } = useToast();
     
     // Use Yjs hooks directly
@@ -436,6 +437,7 @@ const Dashboard = ({
                 invoiceMetrics={invoiceMetrics}
                 thisMonthBillableHours={thisMonthBillableHours}
                 thisMonthUnbilledDisplay={thisMonthUnbilledDisplay}
+                hasClients={hasClients}
                 preferredCurrency={preferredCurrency}
                 formatDuration={formatDuration}
                 needsExchangeRates={needsExchangeRates}

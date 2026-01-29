@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-type ViewName = 'dashboard' | 'projects' | 'clients' | 'invoices' | 'account' | 'auth-callback';
+type ViewName = 'dashboard' | 'task-planner' | 'projects' | 'clients' | 'invoices' | 'expenses' | 'account' | 'auth-callback';
 
 type UrlParams = {
     view: ViewName;
@@ -24,7 +24,7 @@ type UrlUpdateParams = Partial<{
 
 /**
  * Parse URL path and search params into state object
- * Supports paths like: /, /projects, /projects/abc123, /clients, /clients/xyz789, /invoices, /account
+ * Supports paths like: /, /projects, /projects/abc123, /clients, /clients/xyz789, /invoices, /expenses, /account
  */
 function getParamsFromUrl(): UrlParams {
     const pathname = window.location.pathname;
@@ -43,6 +43,9 @@ function getParamsFromUrl(): UrlParams {
         const firstPart = pathParts[0];
 
         switch (firstPart) {
+            case 'task-planner':
+                view = 'task-planner';
+                break;
             case 'projects':
                 view = 'projects';
                 if (pathParts[1]) {
@@ -57,6 +60,9 @@ function getParamsFromUrl(): UrlParams {
                 break;
             case 'invoices':
                 view = 'invoices';
+                break;
+            case 'expenses':
+                view = 'expenses';
                 break;
             case 'account':
                 view = 'account';
@@ -157,6 +163,9 @@ export const useUrlState = () => {
         const view = mergedParams.view || 'dashboard';
 
         switch (view) {
+            case 'task-planner':
+                path = '/task-planner';
+                break;
             case 'projects':
                 if (mergedParams.project) {
                     path = `/projects/${mergedParams.project}`;
@@ -173,6 +182,9 @@ export const useUrlState = () => {
                 break;
             case 'invoices':
                 path = '/invoices';
+                break;
+            case 'expenses':
+                path = '/expenses';
                 break;
             case 'account':
                 path = '/account';
@@ -231,6 +243,13 @@ export const useUrlState = () => {
     }, [updateUrl]);
 
     /**
+     * Navigate to expenses view
+     */
+    const navigateToExpenses = useCallback((params: UrlUpdateParams = {}) => {
+        updateUrl({ view: 'expenses', client: null, project: null, section: null, create: null, tab: null, ...params });
+    }, [updateUrl]);
+
+    /**
      * Navigate to account view with optional parameters
      */
     const navigateToAccount = useCallback((params: UrlUpdateParams = {}) => {
@@ -242,6 +261,13 @@ export const useUrlState = () => {
      */
     const navigateToDashboard = useCallback((params: UrlUpdateParams = {}) => {
         updateUrl({ view: 'dashboard', client: null, project: null, section: null, create: null, tab: null, ...params });
+    }, [updateUrl]);
+
+    /**
+     * Navigate to task planner view
+     */
+    const navigateToTaskPlanner = useCallback((params: UrlUpdateParams = {}) => {
+        updateUrl({ view: 'task-planner', client: null, project: null, section: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
@@ -265,8 +291,10 @@ export const useUrlState = () => {
         navigateToClients,
         navigateToClient,
         navigateToInvoices,
+        navigateToExpenses,
         navigateToAccount,
         navigateToDashboard,
+        navigateToTaskPlanner,
         updateUrl
     };
 };

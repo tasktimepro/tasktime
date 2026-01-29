@@ -221,7 +221,7 @@ const PaymentMethodModal = ({
                             value={formData.title}
                             onChange={handleInputChange}
                             required
-                            placeholder="Enter title for this payment method"
+                            placeholder="Enter a title for this payment method"
                         />
                     </div>
 

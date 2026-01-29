@@ -9,12 +9,14 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useUrlState } from '@/hooks/useUrlState';
 import { CloudIcon, CloudSyncIcon, CloudCheckIcon, CloudCogIcon, CloudDownloadIcon, CloudOffIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface YjsSyncStatusProps {
     className?: string;
+    isCompact?: boolean;
 }
 
-export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
+export default function YjsSyncStatus({ className = '', isCompact = false }: YjsSyncStatusProps) {
 
     const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled } = useYjs();
     const { signIn, isLoading: authLoading, hadPreviousSession } = useGoogleAuth();
@@ -106,7 +108,7 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
             return {
                 text: 'Syncing...',
                 icon: CloudSyncIcon,
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
             };
         }
 
@@ -126,7 +128,7 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
             return {
                 text: 'Checking for updates...',
                 icon: CloudSyncIcon,
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 onClick: handleCloudOptions,
             };
         }
@@ -135,7 +137,7 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
             return {
                 text: 'Downloading updates...',
                 icon: CloudDownloadIcon,
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 onClick: handleCloudOptions,
             };
         }
@@ -143,8 +145,8 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
         if (syncPhase === 'uploading') {
             return {
                 text: 'Syncing changes...',
-                icon: CloudUploadIcon,
-                tone: 'text-green-700 dark:text-green-300',
+                icon: CloudSyncIcon,
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 onClick: handleCloudOptions,
             };
         }
@@ -156,7 +158,7 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
             return {
                 text: 'Syncing...',
                 icon: CloudSyncIcon,
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 onClick: handleCloudOptions,
             };
         }
@@ -166,7 +168,7 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
             return {
                 text: 'Sync changes',
                 icon: CloudUploadIcon,
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 onClick: handleManualSync,
             };
         }
@@ -176,7 +178,7 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
             return {
                 text: 'In sync',
                 icon: CloudSyncIcon,
-                tone: 'text-green-700 dark:text-green-300',
+                tone: 'text-yellow-700 dark:text-yellow-300',
                 onClick: handleCloudOptions,
             };
         }
@@ -199,17 +201,35 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
         return null;
     }
 
-    return (
+    const content = (
         <button
             onClick={status.onClick}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             disabled={!status.onClick}
-            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${status.onClick ? 'hover:bg-accent hover:text-accent-foreground cursor-pointer' : 'cursor-default'} ${status.tone} ${className}`}
-            title={status.text}
+            className={`${isCompact ? 'w-10 mx-auto justify-center px-2 py-2' : 'w-full px-3 py-2'} flex items-center text-sm font-medium rounded-md transition-colors ${status.onClick ? 'hover:bg-accent hover:text-accent-foreground cursor-pointer' : 'cursor-default'} ${status.tone} ${className}`}
+            title={isCompact ? undefined : status.text}
+            aria-label={isCompact ? displayText : undefined}
         >
-            <IconComponent className="h-5 w-5 mr-3 flex-shrink-0" />
-            <span className="truncate">{displayText}</span>
+            <IconComponent className={`h-5 w-5 ${isCompact ? '' : 'mr-3'} flex-shrink-0`} />
+            {!isCompact && (
+                <span className="truncate">{displayText}</span>
+            )}
         </button>
+    );
+
+    if (!isCompact) {
+        return content;
+    }
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                {content}
+            </TooltipTrigger>
+            <TooltipContent side="right" align="center">
+                {displayText}
+            </TooltipContent>
+        </Tooltip>
     );
 }

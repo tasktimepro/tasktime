@@ -33,10 +33,10 @@ const TaskTimeDisplay = ({
                         <button
                             onClick={onShowTimeEntries}
                             className="hover:bg-muted rounded-md transition-colors"
-                            title="Click to edit main task time (excluding subtasks)"
+                            title="Click to edit time entries"
                             disabled={isCompleted}
                         >
-                            <span className="text-muted-foreground">
+                            <span className="text-muted-foreground p-2 cursor-pointer">
                                 {formatDurationWithSeconds(mainTaskTime)}
                             </span>
                         </button>

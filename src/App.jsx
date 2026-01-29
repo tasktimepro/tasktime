@@ -17,6 +17,8 @@ import ProjectDashboard from './components/ProjectDashboard';
 import ClientList from './components/ClientList';
 import ClientDashboard from './components/ClientDashboard';
 import Dashboard from './components/Dashboard';
+import TaskPlanner from './components/TaskPlanner';
+import Expenses from './components/Expenses';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
 import AuthCallback from './components/AuthCallback';
@@ -29,7 +31,8 @@ import YjsSyncStatus from './components/sync/YjsSyncStatus';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
-import { ChartBarIcon, ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon } from '@/components/ui/icons';
+import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon } from '@/components/ui/icons';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
 /** Original browser tab title */
@@ -180,6 +183,14 @@ function AppContent() {
         }
         return false;
     });
+
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('tasktime-sidebar-collapsed');
+            if (saved !== null) return saved === 'true';
+        }
+        return false;
+    });
     
     useEffect(() => {
         if (darkMode) {
@@ -189,6 +200,13 @@ function AppContent() {
         }
         localStorage.setItem('tasktime-dark-mode', String(darkMode));
     }, [darkMode]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        localStorage.setItem('tasktime-sidebar-collapsed', String(isSidebarCollapsed));
+    }, [isSidebarCollapsed]);
 
     // === Modal State ===
     const [activeModal, setActiveModal] = useState(null);
@@ -307,7 +325,7 @@ function AppContent() {
     }, [timerTaskId, timerStartTime, timerIsActive, isPaused, timerElapsedTime, currentTaskName]);
 
     // === URL State ===
-    const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToAccount, navigateToDashboard, updateUrl } = useUrlState();
+    const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToTaskPlanner, updateUrl } = useUrlState();
     
     const activeView = urlParams.view;
     const selectedProject = urlParams.projectId 
@@ -388,133 +406,389 @@ function AppContent() {
         );
     }
 
+    const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'task-planner', 'account'].includes(activeView);
+
     // === Main Render ===
     return (
         <div className={`min-h-screen bg-background ${totalsHidden ? 'totals-hidden' : ''}`}>
-            <div className="mx-auto w-full max-w-[100rem] px-6">
+            <div className="mx-auto w-full max-w-[100rem] px-6 pr-2">
             <div className="flex gap-6">
             {/* Sidebar Navigation */}
-            <aside className="w-64 bg-card shadow-sm border border-border rounded-xl flex flex-col h-[calc(100vh-3rem)] sidebar my-6">
+            <aside className={`${isSidebarCollapsed ? 'w-18' : 'w-64'} bg-card shadow-sm border border-border rounded-xl flex flex-col h-[calc(100vh-3rem)] sidebar my-6 transition-[width] duration-200`}>
+            <TooltipProvider>
                 {/* Sidebar Header */}
-                <div className="p-6 flex-shrink-0">
-                    <div 
-                        className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity group"
-                        onClick={() => navigateToDashboard()}
-                    >
-                        <div className="relative">
-                            <ClockIcon className="h-6 w-6 text-foreground" />
-                        </div>
-                        <div>
-                            <h1 className="text-lg font-bold text-foreground leading-none">
-                                TaskTime
-                            </h1>
-                        </div>
+                <div className={`${isSidebarCollapsed ? 'p-4' : 'p-6'} flex-shrink-0`}>
+                    <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3`}>
+                        {isSidebarCollapsed ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity group"
+                                        onClick={() => {
+                                            setIsSidebarCollapsed(false);
+                                        }}
+                                        aria-label="Expand sidebar"
+                                    >
+                                        <div className="relative">
+                                            <ClockIcon className="h-6 w-6 text-foreground" />
+                                        </div>
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" align="center">
+                                    Expand sidebar
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : (
+                            <button
+                                type="button"
+                                className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity group"
+                                onClick={() => navigateToDashboard()}
+                                aria-label="Go to Dashboard"
+                            >
+                                <div className="relative">
+                                    <ClockIcon className="h-6 w-6 text-foreground" />
+                                </div>
+                                <div>
+                                    <h1 className="text-lg font-bold text-foreground leading-none">
+                                        TaskTime
+                                    </h1>
+                                </div>
+                            </button>
+                        )}
+                        {!isSidebarCollapsed && (
+                            <button
+                                type="button"
+                                onClick={() => setIsSidebarCollapsed(true)}
+                                className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+                                title="Collapse sidebar"
+                                aria-label="Collapse sidebar"
+                            >
+                                <PanelLeftCloseIcon className="h-5 w-5" />
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 {/* Navigation Items */}
-                <nav className="flex-1 px-4 py-6 overflow-y-auto">
-                    <ul className="space-y-2">
+                <nav className={`flex-1 ${isSidebarCollapsed ? 'px-2 py-4' : 'px-4 py-6'} overflow-y-auto`}>
+                    <ul className={`${isSidebarCollapsed ? 'space-y-1' : 'space-y-2'}`}>
                         <li>
-                            <button
-                                onClick={() => navigateToDashboard()}
-                                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                                    activeView === 'dashboard'
-                                        ? 'bg-accent text-accent-foreground font-semibold'
-                                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                                }`}
-                            >
-                                <ChartBarIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                                Dashboard
-                            </button>
+                            {isSidebarCollapsed ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            onClick={() => navigateToDashboard()}
+                                            className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                                activeView === 'dashboard'
+                                                    ? 'bg-accent text-accent-foreground font-semibold'
+                                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                            }`}
+                                            aria-label="Dashboard"
+                                        >
+                                            <LayoutDashboardIcon className="h-5 w-5 flex-shrink-0" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" align="center">
+                                        Dashboard
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <button
+                                    onClick={() => navigateToDashboard()}
+                                    className={`w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                        activeView === 'dashboard'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    }`}
+                                >
+                                    <LayoutDashboardIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Dashboard
+                                </button>
+                            )}
                         </li>
                         <li>
-                            <button
-                                onClick={() => navigateToClients()}
-                                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                                    activeView === 'clients'
-                                        ? 'bg-accent text-accent-foreground font-semibold'
-                                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                                }`}
-                            >
-                                <UserGroupIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                                Clients
-                            </button>
+                            {isSidebarCollapsed ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            onClick={() => navigateToTaskPlanner()}
+                                            className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                                activeView === 'task-planner'
+                                                    ? 'bg-accent text-accent-foreground font-semibold'
+                                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                            }`}
+                                            aria-label="Task Planner"
+                                        >
+                                            <KanbanIcon className="h-5 w-5 flex-shrink-0" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" align="center">
+                                        Task Planner
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <button
+                                    onClick={() => navigateToTaskPlanner()}
+                                    className={`w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                        activeView === 'task-planner'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    }`}
+                                >
+                                    <KanbanIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Task Planner
+                                </button>
+                            )}
                         </li>
                         <li>
-                            <button
-                                onClick={() => navigateToProjects()}
-                                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                                    activeView === 'projects'
-                                        ? 'bg-accent text-accent-foreground font-semibold'
-                                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                                }`}
-                            >
-                                <ClipboardDocumentCheckIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                                Projects
-                            </button>
+                            {isSidebarCollapsed ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            onClick={() => navigateToClients()}
+                                            className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                                activeView === 'clients'
+                                                    ? 'bg-accent text-accent-foreground font-semibold'
+                                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                            }`}
+                                            aria-label="Clients"
+                                        >
+                                            <UserGroupIcon className="h-5 w-5 flex-shrink-0" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" align="center">
+                                        Clients
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <button
+                                    onClick={() => navigateToClients()}
+                                    className={`w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                        activeView === 'clients'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    }`}
+                                >
+                                    <UserGroupIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Clients
+                                </button>
+                            )}
                         </li>
                         <li>
-                            <button
-                                onClick={() => navigateToInvoices()}
-                                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                                    activeView === 'invoices'
-                                        ? 'bg-accent text-accent-foreground font-semibold'
-                                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                                }`}
-                            >
-                                <DocumentTextIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                                Invoices
-                            </button>
+                            {isSidebarCollapsed ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            onClick={() => navigateToProjects()}
+                                            className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                                activeView === 'projects'
+                                                    ? 'bg-accent text-accent-foreground font-semibold'
+                                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                            }`}
+                                            aria-label="Projects"
+                                        >
+                                            <ClipboardDocumentCheckIcon className="h-5 w-5 flex-shrink-0" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" align="center">
+                                        Projects
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <button
+                                    onClick={() => navigateToProjects()}
+                                    className={`w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                        activeView === 'projects'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    }`}
+                                >
+                                    <ClipboardDocumentCheckIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Projects
+                                </button>
+                            )}
+                        </li>
+                        <li>
+                            {isSidebarCollapsed ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            onClick={() => navigateToInvoices()}
+                                            className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                                activeView === 'invoices'
+                                                    ? 'bg-accent text-accent-foreground font-semibold'
+                                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                            }`}
+                                            aria-label="Invoices"
+                                        >
+                                            <DocumentTextIcon className="h-5 w-5 flex-shrink-0" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" align="center">
+                                        Invoices
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <button
+                                    onClick={() => navigateToInvoices()}
+                                    className={`w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                        activeView === 'invoices'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    }`}
+                                >
+                                    <DocumentTextIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Invoices
+                                </button>
+                            )}
+                        </li>
+                        <li>
+                            {isSidebarCollapsed ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            onClick={() => navigateToExpenses()}
+                                            className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                                activeView === 'expenses'
+                                                    ? 'bg-accent text-accent-foreground font-semibold'
+                                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                            }`}
+                                            aria-label="Expenses"
+                                        >
+                                            <HandCoinsIcon className="h-5 w-5 flex-shrink-0" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" align="center">
+                                        Expenses
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <button
+                                    onClick={() => navigateToExpenses()}
+                                    className={`w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                        activeView === 'expenses'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    }`}
+                                >
+                                    <HandCoinsIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Expenses
+                                </button>
+                            )}
                         </li>
                     </ul>
                 </nav>
                 
                 {/* Theme Toggle */}
-                <div className="px-4 py-4 border-t border-border space-y-2">
-                    <button
-                        onClick={() => updatePreferences({ hideTotals: !totalsHidden })}
-                        className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                        title={totalsHidden ? 'Show totals' : 'Hide totals'}
-                    >
-                        {totalsHidden ? (
-                            <EyeIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                        ) : (
-                            <EyeOffIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                        )}
-                        {totalsHidden ? 'Show Totals' : 'Hide Totals'}
-                    </button>
-                    <button
-                        onClick={() => setDarkMode(!darkMode)}
-                        className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                        title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                    >
-                        {darkMode ? (
-                            <SunIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                        ) : (
-                            <MoonIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                        )}
-                        {darkMode ? 'Light Mode' : 'Dark Mode'}
-                    </button>
-                    <button
-                        onClick={() => navigateToAccount()}
-                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                            activeView === 'account'
-                                ? 'bg-accent text-accent-foreground font-semibold'
-                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                        }`}
-                    >
-                        <UserCircleIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                        Account
-                    </button>
-                    <YjsSyncStatus className="mt-2" />
-                    <OfflineIndicator className="mt-2" />
+                <div className={`${isSidebarCollapsed ? 'px-2 py-3' : 'px-4 py-4'} border-t border-border ${isSidebarCollapsed ? 'space-y-1' : 'space-y-2'}`}>
+                    {isSidebarCollapsed ? (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    onClick={() => updatePreferences({ hideTotals: !totalsHidden })}
+                                    className="w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                                    aria-label={totalsHidden ? 'Show totals' : 'Hide totals'}
+                                >
+                                    {totalsHidden ? (
+                                        <EyeIcon className="h-5 w-5 flex-shrink-0" />
+                                    ) : (
+                                        <EyeOffIcon className="h-5 w-5 flex-shrink-0" />
+                                    )}
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center">
+                                {totalsHidden ? 'Show Totals' : 'Hide Totals'}
+                            </TooltipContent>
+                        </Tooltip>
+                    ) : (
+                        <button
+                            onClick={() => updatePreferences({ hideTotals: !totalsHidden })}
+                            className="w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground whitespace-nowrap"
+                        >
+                            {totalsHidden ? (
+                                <EyeIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                            ) : (
+                                <EyeOffIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                            )}
+                            {totalsHidden ? 'Show Totals' : 'Hide Totals'}
+                        </button>
+                    )}
+                    {isSidebarCollapsed ? (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    onClick={() => setDarkMode(!darkMode)}
+                                    className="w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                                    aria-label={darkMode ? 'Light mode' : 'Dark mode'}
+                                >
+                                    {darkMode ? (
+                                        <SunIcon className="h-5 w-5 flex-shrink-0" />
+                                    ) : (
+                                        <MoonIcon className="h-5 w-5 flex-shrink-0" />
+                                    )}
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center">
+                                {darkMode ? 'Light Mode' : 'Dark Mode'}
+                            </TooltipContent>
+                        </Tooltip>
+                    ) : (
+                        <button
+                            onClick={() => setDarkMode(!darkMode)}
+                            className="w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground whitespace-nowrap"
+                        >
+                            {darkMode ? (
+                                <SunIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                            ) : (
+                                <MoonIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                            )}
+                            {darkMode ? 'Light Mode' : 'Dark Mode'}
+                        </button>
+                    )}
+                    {isSidebarCollapsed ? (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    onClick={() => navigateToAccount()}
+                                    className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                        activeView === 'account'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    }`}
+                                    aria-label="Account"
+                                >
+                                    <UserCircleIcon className="h-5 w-5 flex-shrink-0" />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center">
+                                Account
+                            </TooltipContent>
+                        </Tooltip>
+                    ) : (
+                        <button
+                            onClick={() => navigateToAccount()}
+                            className={`w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                activeView === 'account'
+                                    ? 'bg-accent text-accent-foreground font-semibold'
+                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            }`}
+                        >
+                            <UserCircleIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                            Account
+                        </button>
+                    )}
+                    <div className={`${isSidebarCollapsed ? 'flex flex-col items-center' : ''}`}>
+                        <YjsSyncStatus isCompact={isSidebarCollapsed} />
+                        <OfflineIndicator isCompact={isSidebarCollapsed} />
+                    </div>
                 </div>
+            </TooltipProvider>
             </aside>
 
             {/* Main Content */}
             <main className="flex-1 main-content relative">
-                <div className={`pr-4 pb-6 ${showGlobalTimer && timerIsActive ? 'pt-20' : 'pt-6'}`}>
+                <div className={`pr-4 pb-6 ${showGlobalTimer && timerIsActive ? 'pt-20' : needsExtraTopPadding ? 'pt-8' : 'pt-6'}`}>
                     {activeView === 'dashboard' && (
                             <ErrorBoundary>
                             <Dashboard
@@ -530,6 +804,12 @@ function AppContent() {
 
                     {activeView === 'auth-callback' && (
                             <AuthCallback />
+                        )}
+
+                    {activeView === 'task-planner' && (
+                            <ErrorBoundary>
+                            <TaskPlanner />
+                            </ErrorBoundary>
                         )}
 
                     {activeView === 'projects' && !selectedProject && (
@@ -628,6 +908,12 @@ function AppContent() {
                             </ErrorBoundary>
                         )}
 
+                    {activeView === 'expenses' && (
+                            <ErrorBoundary>
+                            <Expenses />
+                            </ErrorBoundary>
+                        )}
+
                     {activeView === 'account' && (
                             <ErrorBoundary>
                             <Account
@@ -657,7 +943,7 @@ function AppContent() {
                 
                 {/* Global Timer Display - Fixed at top */}
                 {showGlobalTimer && timerIsActive && (
-                    <div className="fixed top-4 left-[calc(1.5rem+16rem+1.5rem)] right-6 z-50 flex justify-center global-timer-mobile">
+                    <div className={`fixed top-4 ${isSidebarCollapsed ? 'left-[calc(1.5rem+5rem+1.5rem)]' : 'left-[calc(1.5rem+16rem+1.5rem)]'} right-6 z-50 flex justify-center global-timer-mobile`}>
                         <div className="w-auto max-w-2xl">
                             <GlobalTimerStack
                                 navigateToProject={navigateToProject}

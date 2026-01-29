@@ -40,6 +40,10 @@ const BusinessModal = ({
         taxRate: 0
     });
 
+    const [expandedSections, setExpandedSections] = useState({
+        businessInfo: false
+    });
+
     // Initialize form data when editing
     useEffect(() => {
         if (editingBusinessInfo) {
@@ -85,6 +89,14 @@ const BusinessModal = ({
         }
     }, [editingBusinessInfo, isOpen]);
 
+    useEffect(() => {
+        if (isOpen) {
+            setExpandedSections({
+                businessInfo: false
+            });
+        }
+    }, [isOpen, editingBusinessInfo]);
+
     /**
      * Handle form input changes
      */
@@ -93,6 +105,13 @@ const BusinessModal = ({
         setFormData(prev => ({
             ...prev,
             [name]: value
+        }));
+    };
+
+    const toggleSection = (section) => {
+        setExpandedSections(prev => ({
+            ...prev,
+            [section]: !prev[section]
         }));
     };
 
@@ -281,7 +300,7 @@ const BusinessModal = ({
                             value={formData.title}
                             onChange={handleInputChange}
                             required
-                            placeholder="Enter title for this business info"
+                            placeholder="Enter a title for this business"
                         />
                     </div>
 
@@ -298,120 +317,6 @@ const BusinessModal = ({
                             required
                             placeholder="Business name or personal name"
                         />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="address">
-                            Address
-                        </Label>
-                        <Input
-                            type="text"
-                            id="address"
-                            name="address"
-                            value={formData.address}
-                            onChange={handleInputChange}
-                            placeholder="Street address"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="city">
-                                City
-                            </Label>
-                            <Input
-                                type="text"
-                                id="city"
-                                name="city"
-                                value={formData.city}
-                                onChange={handleInputChange}
-                                placeholder="City"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>
-                                State/ZIP
-                            </Label>
-                            <div className="flex space-x-2 w-full">
-                                <Input
-                                    type="text"
-                                    id="state"
-                                    name="state"
-                                    value={formData.state}
-                                    onChange={handleInputChange}
-                                    className="flex-1 min-w-0"
-                                    placeholder="State"
-                                />
-                                <Input
-                                    type="text"
-                                    id="zip"
-                                    name="zip"
-                                    value={formData.zip}
-                                    onChange={handleInputChange}
-                                    className="w-20 flex-shrink-0"
-                                    placeholder="ZIP"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="country">
-                                Country
-                            </Label>
-                            <Input
-                                type="text"
-                                id="country"
-                                name="country"
-                                value={formData.country}
-                                onChange={handleInputChange}
-                                placeholder="Country"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="registrationNumber">
-                                Reg. Number
-                            </Label>
-                            <Input
-                                type="text"
-                                id="registrationNumber"
-                                name="registrationNumber"
-                                value={formData.registrationNumber}
-                                onChange={handleInputChange}
-                                placeholder="Company registration"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="vat">
-                                VAT
-                            </Label>
-                            <Input
-                                type="text"
-                                id="vat"
-                                name="vat"
-                                value={formData.vat}
-                                onChange={handleInputChange}
-                                placeholder="VAT number"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="taxNumber">
-                                Tax Number
-                            </Label>
-                            <Input
-                                type="text"
-                                id="taxNumber"
-                                name="taxNumber"
-                                value={formData.taxNumber}
-                                onChange={handleInputChange}
-                                placeholder="Tax ID"
-                            />
-                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -442,6 +347,143 @@ const BusinessModal = ({
                                 placeholder="+1 (555) 123-4567"
                             />
                         </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg">
+                        <button
+                            type="button"
+                            onClick={() => toggleSection('businessInfo')}
+                            className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${expandedSections.businessInfo ? 'rounded-t-lg' : 'rounded-lg'}`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-medium text-foreground">Business Info</h4>
+                                <svg
+                                    className={`w-5 h-5 text-muted-foreground transform transition-transform ${expandedSections.businessInfo ? 'rotate-180' : ''}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+                        </button>
+                        {expandedSections.businessInfo && (
+                            <div className="p-4 space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="address">
+                                        Address
+                                    </Label>
+                                    <Input
+                                        type="text"
+                                        id="address"
+                                        name="address"
+                                        value={formData.address}
+                                        onChange={handleInputChange}
+                                        placeholder="Street address"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="city">
+                                            City
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="city"
+                                            name="city"
+                                            value={formData.city}
+                                            onChange={handleInputChange}
+                                            placeholder="City"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>
+                                            State/ZIP
+                                        </Label>
+                                        <div className="flex space-x-2 w-full">
+                                            <Input
+                                                type="text"
+                                                id="state"
+                                                name="state"
+                                                value={formData.state}
+                                                onChange={handleInputChange}
+                                                className="flex-1 min-w-0"
+                                                placeholder="State"
+                                            />
+                                            <Input
+                                                type="text"
+                                                id="zip"
+                                                name="zip"
+                                                value={formData.zip}
+                                                onChange={handleInputChange}
+                                                className="w-20 flex-shrink-0"
+                                                placeholder="ZIP"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="country">
+                                            Country
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="country"
+                                            name="country"
+                                            value={formData.country}
+                                            onChange={handleInputChange}
+                                            placeholder="Country"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="registrationNumber">
+                                            Reg. Number
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="registrationNumber"
+                                            name="registrationNumber"
+                                            value={formData.registrationNumber}
+                                            onChange={handleInputChange}
+                                            placeholder="Company registration"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="vat">
+                                            VAT
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="vat"
+                                            name="vat"
+                                            value={formData.vat}
+                                            onChange={handleInputChange}
+                                            placeholder="VAT number"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="taxNumber">
+                                            Tax Number
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="taxNumber"
+                                            name="taxNumber"
+                                            value={formData.taxNumber}
+                                            onChange={handleInputChange}
+                                            placeholder="Tax ID"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
