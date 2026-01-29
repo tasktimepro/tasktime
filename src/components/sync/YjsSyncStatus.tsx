@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useUrlState } from '@/hooks/useUrlState';
-import { CloudIcon, CloudSyncIcon, CloudCheckIcon, CloudCogIcon, CloudDownloadIcon, CloudUploadIcon, ExclamationTriangleIcon, WifiOffIcon } from '@/components/ui/icons';
+import { CloudIcon, CloudSyncIcon, CloudCheckIcon, CloudCogIcon, CloudDownloadIcon, CloudOffIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 
 interface YjsSyncStatusProps {
     className?: string;
@@ -66,6 +66,15 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
             };
         }
 
+        // Offline
+        if (isOffline) {
+            return {
+                text: 'Currently offline',
+                icon: CloudOffIcon,
+                tone: 'text-yellow-700 dark:text-yellow-200',
+            };
+        }
+
         // Not connected (or signed out) - show connect button
         if (!isDriveConnected && !isConnecting) {
             return {
@@ -82,16 +91,6 @@ export default function YjsSyncStatus({ className = '' }: YjsSyncStatusProps) {
                 text: 'Syncing...',
                 icon: CloudSyncIcon,
                 tone: 'text-green-700 dark:text-green-300',
-            };
-        }
-
-        // Offline
-        if (isOffline) {
-            return {
-                text: 'Offline',
-                icon: WifiOffIcon,
-                tone: 'text-yellow-700 dark:text-yellow-200',
-                onClick: handleCloudOptions,
             };
         }
 

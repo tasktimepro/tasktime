@@ -12,6 +12,7 @@ import { buildInvoiceTaskData } from './invoice/InvoiceCalculations.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
+import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 import { useTimer } from '../hooks/useTimer.ts';
 
@@ -39,6 +40,7 @@ const InvoiceGenerator = ({
     const { invoices, createInvoice, updateInvoice } = useInvoices();
     const { projects, updateProject } = useProjects();
     const { tasks, updateTask } = useTasks();
+    const { updateEntry } = useTimeEntries();
     const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
     const { isActive: isTimerActive, isPaused: isTimerPaused } = useTimer();
     
@@ -919,6 +921,42 @@ const InvoiceGenerator = ({
                     }
                 }
             });
+
+            const billedRateByTaskId = new Map();
+            (invoiceData.tasks || []).forEach(task => {
+                const rate = Number.isFinite(task.hourlyRate) ? task.hourlyRate : 0;
+                billedRateByTaskId.set(task.id, rate);
+
+                if (task.isMerged && Array.isArray(task.mergedSubtasks)) {
+                    task.mergedSubtasks.forEach(subtask => {
+                        const subtaskRate = Number.isFinite(subtask.hourlyRate) ? subtask.hourlyRate : rate;
+                        billedRateByTaskId.set(subtask.id, subtaskRate);
+                    });
+                }
+            });
+
+            const previousBillingCutoffs = new Map();
+            billedTaskIds.forEach(taskId => {
+                const task = tasks.find(t => t.id === taskId);
+                previousBillingCutoffs.set(taskId, task?.lastBilledAt || 0);
+            });
+
+            if (Array.isArray(timeEntries) && timeEntries.length > 0) {
+                timeEntries.forEach(entry => {
+                    if (!billedRateByTaskId.has(entry.taskId)) return;
+
+                    const cutoff = previousBillingCutoffs.get(entry.taskId) || 0;
+                    if (entry.start <= cutoff) return;
+                    if (!entry.end || entry.end <= entry.start) return;
+                    if (entry.start > currentTime) return;
+
+                    updateEntry(entry.id, {
+                        billedHourlyRate: billedRateByTaskId.get(entry.taskId),
+                        billedAt: currentTime,
+                        billedInvoiceId: invoiceId
+                    });
+                });
+            }
             
             // Update lastBilledAt for all tasks that were included in this invoice
             billedTaskIds.forEach(taskId => {

@@ -11,9 +11,60 @@ import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import type { DocName } from './types';
 
+class BroadcastChannelSync {
+    private channel: BroadcastChannel | null;
+    private doc: Y.Doc;
+    private readonly channelName: string;
+    private readonly updateHandler: (update: Uint8Array, origin: unknown) => void;
+
+    constructor(name: string, doc: Y.Doc) {
+        this.doc = doc;
+        this.channelName = `tasktime-yjs-${name}`;
+
+        if (typeof BroadcastChannel === 'undefined') {
+            this.channel = null;
+            this.updateHandler = () => {};
+            return;
+        }
+
+        this.channel = new BroadcastChannel(this.channelName);
+        this.updateHandler = (update: Uint8Array, origin: unknown) => {
+            if (!this.channel || origin === this || origin === 'remote') {
+                return;
+            }
+
+            this.channel.postMessage(update);
+        };
+
+        this.doc.on('update', this.updateHandler);
+        this.channel.onmessage = (event) => {
+            const data = event.data;
+            if (!data) return;
+
+            if (data instanceof Uint8Array) {
+                Y.applyUpdate(this.doc, data, 'remote');
+                return;
+            }
+
+            if (data instanceof ArrayBuffer) {
+                Y.applyUpdate(this.doc, new Uint8Array(data), 'remote');
+            }
+        };
+    }
+
+    destroy(): void {
+        if (this.channel) {
+            this.channel.close();
+        }
+
+        this.doc.off('update', this.updateHandler);
+    }
+}
+
 interface ManagedDoc {
     doc: Y.Doc;
     persistence: IndexeddbPersistence;
+    broadcast: BroadcastChannelSync | null;
     loaded: boolean;
 }
 
@@ -89,6 +140,7 @@ export class YjsDocManager {
     destroy(): void {
         for (const [name, managed] of this.docs) {
             console.log(`[YjsDocManager] Destroying: ${name}`);
+            managed.broadcast?.destroy();
             managed.persistence.destroy();
             managed.doc.destroy();
         }
@@ -121,6 +173,7 @@ export class YjsDocManager {
         const doc = new Y.Doc();
         const dbName = `tasktime-yjs-${name}`;
         const persistence = new IndexeddbPersistence(dbName, doc);
+        const broadcast = new BroadcastChannelSync(name, doc);
 
         // Wait for IndexedDB to sync
         await new Promise<void>((resolve, reject) => {
@@ -144,7 +197,7 @@ export class YjsDocManager {
             });
         });
 
-        this.docs.set(name, { doc, persistence, loaded: true });
+        this.docs.set(name, { doc, persistence, broadcast, loaded: true });
         return doc;
     }
 }

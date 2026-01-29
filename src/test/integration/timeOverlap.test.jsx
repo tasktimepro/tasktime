@@ -76,15 +76,19 @@ describe('Time Overlap Detection', () => {
 
         // Wait for form to appear
         await waitFor(() => {
-            expect(screen.getByLabelText('Start Time')).toBeInTheDocument();
+            expect(screen.getByLabelText('Start time')).toBeInTheDocument();
         });
 
         // Fill in overlapping times (10:30 - 10:45 overlaps with existing 10:00 - 11:00)
-        const startInput = screen.getByLabelText('Start Time');
-        const endInput = screen.getByLabelText('End Time');
+        fireEvent.change(screen.getByLabelText('Time spent'), { target: { value: '15m' } });
+        fireEvent.change(screen.getByLabelText('Date started'), { target: { value: '2026-01-19' } });
 
-        fireEvent.change(startInput, { target: { value: '10:30' } });
-        fireEvent.change(endInput, { target: { value: '10:45' } });
+        const startTimeInput = screen.getByLabelText('Start time');
+        fireEvent.click(startTimeInput);
+
+        const timeInputs = screen.getAllByRole('spinbutton');
+        fireEvent.change(timeInputs[0], { target: { value: '10' } });
+        fireEvent.change(timeInputs[1], { target: { value: '30' } });
 
         // Submit the form - the second "Add Entry" button submits the form
         const saveButtons = screen.getAllByText('Add Entry');

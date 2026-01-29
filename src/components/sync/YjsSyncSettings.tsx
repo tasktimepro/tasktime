@@ -9,7 +9,7 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { usePreferences } from '@/hooks/usePreferences';
 import { useToast } from '@/hooks/useToast';
-import { ArrowPathIcon, CheckIcon, CloudIcon, CloudSyncIcon, CloudDownloadIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
+import { ArrowPathIcon, CheckIcon, CloudIcon, CloudOffIcon, CloudSyncIcon, CloudDownloadIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +25,7 @@ export default function YjsSyncSettings() {
     const [now, setNow] = useState(Date.now());
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogType>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
     const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive } = useYjs();
     const { isSignedIn, isLoading: authLoading, user, signIn, signOut } = useGoogleAuth();
@@ -49,6 +50,19 @@ export default function YjsSyncSettings() {
         return () => clearInterval(interval);
     }, [isDriveConnected, lastSyncedAt]);
 
+    useEffect(() => {
+        const handleOnline = () => setIsOffline(false);
+        const handleOffline = () => setIsOffline(true);
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
     const status = useMemo(() => {
         if (!isReady || authLoading) {
             return {
@@ -56,6 +70,14 @@ export default function YjsSyncSettings() {
                 tone: 'text-muted-foreground',
                 icon: ArrowPathIcon,
                 spinning: true
+            };
+        }
+
+        if (isOffline) {
+            return {
+                text: 'Currently offline',
+                tone: 'text-yellow-700 dark:text-yellow-200',
+                icon: CloudOffIcon
             };
         }
 
@@ -129,7 +151,7 @@ export default function YjsSyncSettings() {
             tone: 'text-green-700 dark:text-green-300',
             icon: CheckIcon
         };
-    }, [isReady, authLoading, isDriveConnected, isConnecting, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now]);
+    }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now]);
 
     const handleConnect = async () => {
         try {
@@ -239,7 +261,7 @@ export default function YjsSyncSettings() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            {showAuthActions && (
+                            {showAuthActions && !isOffline && (
                                 isSignedIn ? (
                                     <>
                                         <Button

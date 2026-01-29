@@ -42,6 +42,9 @@ export interface TimeEntry {
     start: number;
     end: number;
     note?: string;
+    billedHourlyRate?: number | null;
+    billedAt?: number | null;
+    billedInvoiceId?: string | null;
 }
 
 export interface Client {

@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TimeEntriesModal from './TimeEntriesModal'
 
@@ -92,14 +92,10 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[0])
 
-        await user.clear(screen.getByLabelText('Start Date'))
-        await user.type(screen.getByLabelText('Start Date'), '2026-01-19')
-        await user.clear(screen.getByLabelText('Start Time'))
-        await user.type(screen.getByLabelText('Start Time'), '10:00:00')
-        await user.clear(screen.getByLabelText('End Date'))
-        await user.type(screen.getByLabelText('End Date'), '2026-01-19')
-        await user.clear(screen.getByLabelText('End Time'))
-        await user.type(screen.getByLabelText('End Time'), '11:00:00')
+        await user.clear(screen.getByLabelText('Date started'))
+        await user.type(screen.getByLabelText('Date started'), '2026-01-19')
+        await user.clear(screen.getByLabelText('Time spent'))
+        await user.type(screen.getByLabelText('Time spent'), '1h')
         await user.type(screen.getByLabelText('Note (optional)'), 'Manual entry')
 
         await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[1])
@@ -128,19 +124,15 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[0])
 
-        await user.clear(screen.getByLabelText('Start Date'))
-        await user.type(screen.getByLabelText('Start Date'), '2026-01-19')
-        await user.clear(screen.getByLabelText('Start Time'))
-        await user.type(screen.getByLabelText('Start Time'), '11:00:00')
-        await user.clear(screen.getByLabelText('End Date'))
-        await user.type(screen.getByLabelText('End Date'), '2026-01-19')
-        await user.clear(screen.getByLabelText('End Time'))
-        await user.type(screen.getByLabelText('End Time'), '10:00:00')
+        await user.clear(screen.getByLabelText('Date started'))
+        await user.type(screen.getByLabelText('Date started'), '2026-01-19')
+        await user.clear(screen.getByLabelText('Time spent'))
+        await user.type(screen.getByLabelText('Time spent'), '0m')
 
         await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[1])
 
         expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
-        expect(toastMocks.showError).toHaveBeenCalledWith('End time must be after start time')
+        expect(toastMocks.showError).toHaveBeenCalledWith('Time spent must be greater than 0')
     })
 
     it('shows validation error when required fields are missing', async () => {
@@ -155,12 +147,12 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[0])
 
-        await user.clear(screen.getByLabelText('Start Date'))
+        await user.clear(screen.getByLabelText('Date started'))
 
         await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[1])
 
         expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
-        expect(toastMocks.showError).toHaveBeenCalledWith('Please fill in all date and time fields')
+        expect(toastMocks.showError).toHaveBeenCalledWith('Please fill in date started and start time')
     })
 
     it('edits an existing time entry', async () => {
@@ -185,8 +177,8 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getByTitle('Edit entry'))
 
-        await user.clear(screen.getByLabelText('End Time'))
-        await user.type(screen.getByLabelText('End Time'), '12:00:00')
+        await user.clear(screen.getByLabelText('Time spent'))
+        await user.type(screen.getByLabelText('Time spent'), '2h')
 
         await user.click(screen.getByRole('button', { name: 'Save Changes' }))
 

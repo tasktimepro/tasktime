@@ -51,6 +51,21 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
             taskTimeMap[entry.taskId] += (entry.end - entry.start);
         });
 
+        const taskRateTimeMap = {};
+        entriesInRange.forEach(entry => {
+            const rate = entry.billedHourlyRate ?? (project?.hourlyRate ?? 0);
+            const key = `${entry.taskId}-${rate}`;
+
+            if (!taskRateTimeMap[key]) {
+                taskRateTimeMap[key] = {
+                    totalTime: 0,
+                    rate: rate
+                };
+            }
+
+            taskRateTimeMap[key].totalTime += (entry.end - entry.start);
+        });
+
         // Calculate total rounded hours (matching invoice calculation)
         const totalHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
             const taskHours = millisecondsToHours(taskTime);
@@ -58,7 +73,11 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
             return total + roundedTaskHours;
         }, 0);
 
-        const totalEarnings = (project && project.hourlyRate) ? totalHours * project.hourlyRate : 0;
+        const totalEarnings = Object.values(taskRateTimeMap).reduce((total, entryGroup) => {
+            const hours = millisecondsToHours(entryGroup.totalTime);
+            const roundedHours = Math.round(hours * 100) / 100; // Round to 2 decimal places
+            return total + (roundedHours * (entryGroup.rate || 0));
+        }, 0);
 
         return {
             time: totalTime,

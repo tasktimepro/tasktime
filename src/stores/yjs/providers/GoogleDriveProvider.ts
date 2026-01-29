@@ -53,6 +53,28 @@ export class YjsDriveProvider {
     private lastPullAt: number = 0;
     private lastManifestModifiedTime: string | null = null;
 
+    private isOnline(): boolean {
+        if (typeof navigator === 'undefined') {
+            return true;
+        }
+
+        return navigator.onLine;
+    }
+
+    private initializeOfflineConnection(reason: string): void {
+        for (const docName of this.docManager.getLoadedDocs()) {
+            this.subscribeToDoc(docName);
+        }
+
+        this.forceFullStateDocs = new Set(this.docManager.getLoadedDocs());
+        this.connected = true;
+        this.updateSyncInterval();
+        this.setState('offline');
+        this.setPhase('idle');
+        this.updatePendingState();
+        this.log(`connect: offline (${reason})`);
+    }
+
     private log(message: string, extra?: unknown): void {
         const ts = new Date().toISOString();
         if (extra !== undefined) {
@@ -92,6 +114,11 @@ export class YjsDriveProvider {
         if (this.connected) return;
 
         try {
+            if (!this.isOnline()) {
+                this.initializeOfflineConnection('navigator.offline');
+                return;
+            }
+
             if (this.syncMode !== 'sync') {
                 this.log('connect: manual/backup mode, skipping initial sync');
 
@@ -138,6 +165,11 @@ export class YjsDriveProvider {
             this.log('connect: connected');
 
         } catch (error) {
+            if (!this.isOnline()) {
+                this.initializeOfflineConnection('connect error while offline');
+                return;
+            }
+
             console.error('[YjsDriveProvider] Connection failed:', error);
             this.setState('error');
             this.setPhase('error');
@@ -233,6 +265,13 @@ export class YjsDriveProvider {
     async sync(force: boolean = false, options: { allowPull?: boolean } = {}): Promise<void> {
         if (!this.connected) {
             console.warn('[YjsDriveProvider] Cannot sync: not connected');
+            return;
+        }
+
+        if (!this.isOnline()) {
+            this.log('sync: offline, skipping');
+            this.setState('offline');
+            this.setPhase('idle');
             return;
         }
 

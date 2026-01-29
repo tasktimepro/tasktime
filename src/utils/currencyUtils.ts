@@ -178,6 +178,19 @@ export const fetchExchangeRates = async (): Promise<{ rates: Record<string, numb
         return { rates: cachedRates, error: null };
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        try {
+            const fallbackCache = JSON.parse(localStorage.getItem('exchangeRatesCache') || 'null') as ExchangeRateCache | null;
+            if (fallbackCache && fallbackCache.rates) {
+                return { rates: fallbackCache.rates, error: 'Using cached exchange rates (may be outdated).' };
+            }
+        } catch {
+            // Ignore cache parse errors when offline
+        }
+
+        return { rates: null, error: 'Currently offline. Exchange rates unavailable.' };
+    }
+
     // If no valid cache, fetch from API
     const API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
     try {

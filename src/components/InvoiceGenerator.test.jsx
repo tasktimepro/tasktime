@@ -27,6 +27,11 @@ const taskHookMocks = vi.hoisted(() => ({
     updateTask: vi.fn()
 }))
 
+const timeEntryHookMocks = vi.hoisted(() => ({
+
+    updateEntry: vi.fn()
+}))
+
 const templateHookMocks = vi.hoisted(() => ({
 
     updateInvoiceTemplate: vi.fn()
@@ -67,6 +72,13 @@ vi.mock('../hooks/useTasks.ts', () => ({
     useTasks: () => ({
         tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 }],
         updateTask: taskHookMocks.updateTask
+    })
+}))
+
+vi.mock('../hooks/useTimeEntries.ts', () => ({
+
+    useTimeEntries: () => ({
+        updateEntry: timeEntryHookMocks.updateEntry
     })
 }))
 
@@ -148,7 +160,7 @@ describe('InvoiceGenerator', () => {
 
     const baseProject = { id: 'project-1', title: 'Project', hourlyRate: 100, invoiceIds: [] }
     const baseClient = { id: 'client-1', clientName: 'Client', defaultCurrency: 'EUR' }
-    const baseEntry = { taskId: 'task-1', start: 0, end: 3600000 }
+    const baseEntry = { id: 'entry-1', taskId: 'task-1', start: 1000, end: 3601000 }
 
     const renderGenerator = (props = {}) => {
         return render(
@@ -172,6 +184,7 @@ describe('InvoiceGenerator', () => {
         toastMocks.showSuccess.mockClear()
         toastMocks.showError.mockClear()
         toastMocks.showWarning.mockClear()
+        timeEntryHookMocks.updateEntry.mockClear()
         modalConfig = { applyDateOverride: false }
     })
 
@@ -226,5 +239,33 @@ describe('InvoiceGenerator', () => {
         const [invoiceId, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
         expect(invoiceId).toBe('inv-1')
         expect(invoiceData.invoiceNumber).toBe('INV-OLD')
+    })
+
+    it('snapshots billed hourly rate on time entries', async () => {
+
+        const fixedDate = new Date('2026-01-11T10:00:00Z')
+        const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedDate.getTime())
+        try {
+            const user = userEvent.setup()
+            timeEntryHookMocks.updateEntry.mockClear()
+
+            renderGenerator()
+
+            await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+            const expectedInvoiceId = `INV-roject-1-${fixedDate.getTime()}`
+
+            expect(timeEntryHookMocks.updateEntry).toHaveBeenCalledTimes(1)
+            const [entryId, updates] = timeEntryHookMocks.updateEntry.mock.calls[0]
+            expect(entryId).toBe('entry-1')
+            expect(updates).toEqual(expect.objectContaining({
+                billedHourlyRate: 100,
+                billedAt: fixedDate.getTime(),
+                billedInvoiceId: expectedInvoiceId
+            }))
+        } finally {
+            dateNowSpy.mockRestore()
+        }
     })
 })

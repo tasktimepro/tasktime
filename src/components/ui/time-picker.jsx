@@ -20,8 +20,16 @@ const parseTime = (value) => {
 };
 
 const buildTimeValue = (hours, minutes, seconds) => `${padTime(hours)}:${padTime(minutes)}:${padTime(seconds)}`;
+const buildTimeValueNoSeconds = (hours, minutes) => `${padTime(hours)}:${padTime(minutes)}`;
 
-const TimePicker = React.forwardRef(({ className, value = "00:00:00", onChange, disabled, ...props }, ref) => {
+const TimePicker = React.forwardRef(({
+    className,
+    value = "00:00:00",
+    onChange,
+    disabled,
+    showSeconds = true,
+    ...props
+}, ref) => {
     const [isOpen, setIsOpen] = React.useState(false);
     const [localTime, setLocalTime] = React.useState(() => parseTime(value));
     const containerRef = React.useRef(null);
@@ -51,7 +59,9 @@ const TimePicker = React.forwardRef(({ className, value = "00:00:00", onChange, 
         };
         setLocalTime(nextTime);
 
-        const nextValue = buildTimeValue(nextTime.hours, nextTime.minutes, nextTime.seconds);
+        const nextValue = showSeconds
+            ? buildTimeValue(nextTime.hours, nextTime.minutes, nextTime.seconds)
+            : buildTimeValueNoSeconds(nextTime.hours, nextTime.minutes);
 
         if (onChange) {
             onChange({ target: { value: nextValue } });
@@ -70,7 +80,9 @@ const TimePicker = React.forwardRef(({ className, value = "00:00:00", onChange, 
                 ref={ref}
                 type="text"
                 readOnly
-                value={buildTimeValue(localTime.hours, localTime.minutes, localTime.seconds)}
+                value={showSeconds
+                    ? buildTimeValue(localTime.hours, localTime.minutes, localTime.seconds)
+                    : buildTimeValueNoSeconds(localTime.hours, localTime.minutes)}
                 onClick={handleToggle}
                 onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
@@ -84,8 +96,13 @@ const TimePicker = React.forwardRef(({ className, value = "00:00:00", onChange, 
             />
 
             {isOpen && !disabled && (
-                <div className="absolute z-50 mt-2 min-w-[18rem] rounded-md border border-border bg-popover p-3 shadow-md">
-                    <div className="grid grid-cols-3 gap-2">
+                <div
+                    className={cn(
+                        "absolute z-50 mt-2 rounded-md border border-border bg-popover p-3 shadow-md",
+                        showSeconds ? "min-w-[18rem]" : "min-w-[12.5rem]"
+                    )}
+                >
+                    <div className={cn("grid gap-2", showSeconds ? "grid-cols-3" : "grid-cols-2")}>
                         <div className="space-y-1">
                             <span className="text-xs font-medium text-muted-foreground">Hours</span>
                             <Input
@@ -108,17 +125,19 @@ const TimePicker = React.forwardRef(({ className, value = "00:00:00", onChange, 
                                 className="h-8 text-sm"
                             />
                         </div>
-                        <div className="space-y-1">
-                            <span className="text-xs font-medium text-muted-foreground">Seconds</span>
-                            <Input
-                                type="number"
-                                min={0}
-                                max={59}
-                                value={Number(localTime.seconds)}
-                                onChange={(event) => handleTimeChange({ seconds: padTime(Math.min(59, Math.max(0, Number(event.target.value) || 0))) })}
-                                className="h-8 text-sm"
-                            />
-                        </div>
+                        {showSeconds && (
+                            <div className="space-y-1">
+                                <span className="text-xs font-medium text-muted-foreground">Seconds</span>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    max={59}
+                                    value={Number(localTime.seconds)}
+                                    onChange={(event) => handleTimeChange({ seconds: padTime(Math.min(59, Math.max(0, Number(event.target.value) || 0))) })}
+                                    className="h-8 text-sm"
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

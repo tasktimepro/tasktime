@@ -1,6 +1,6 @@
 # TaskTime
 
-A local-first task time tracking and invoicing app for freelancers and small teams. Runs entirely in the browser with IndexedDB storage.
+A local-first task time tracking and invoicing app for freelancers. Runs entirely in the browser with IndexedDB storage.
 
 ## Features
 - Project and client management

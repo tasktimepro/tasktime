@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Notice } from '@/components/ui/notice';
+import { TimePicker } from '@/components/ui/time-picker';
 import { formatDurationWithSeconds, toDisplayDate, getTodayString, getCurrentTimeString, timestampToDateString, timestampToTimeString } from '../utils/dateUtils.ts';
 import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
@@ -23,6 +24,91 @@ import { useTasks } from '../hooks/useTasks.ts';
  */
 const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     const { showSuccess, showError } = useToast();
+
+    const MINUTES_PER_HOUR = 60;
+    const HOURS_PER_DAY = 24;
+    const DAYS_PER_WEEK = 7;
+    const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR;
+    const MINUTES_PER_WEEK = DAYS_PER_WEEK * MINUTES_PER_DAY;
+
+    const parseTimeSpentInput = (value) => {
+        if (!value || !value.trim()) {
+            return { isValid: false, error: 'Please enter time spent' };
+        }
+
+        const normalized = value.toLowerCase().replace(/,/g, ' ').trim();
+        const compact = normalized.replace(/\s+/g, '');
+        const matches = [...compact.matchAll(/(\d+)([wdhm])/g)];
+
+        if (matches.length === 0) {
+            return { isValid: false, error: 'Use format like 2w 4d 6h 45m' };
+        }
+
+        const reconstructed = matches.map(match => `${match[1]}${match[2]}`).join('');
+        if (reconstructed.length !== compact.length) {
+            return { isValid: false, error: 'Use format like 2w 4d 6h 45m' };
+        }
+
+        let totalMinutes = 0;
+
+        matches.forEach(match => {
+            const amount = parseInt(match[1], 10);
+            const unit = match[2];
+
+            if (Number.isNaN(amount) || amount <= 0) {
+                return;
+            }
+
+            switch (unit) {
+                case 'w':
+                    totalMinutes += amount * MINUTES_PER_WEEK;
+                    break;
+                case 'd':
+                    totalMinutes += amount * MINUTES_PER_DAY;
+                    break;
+                case 'h':
+                    totalMinutes += amount * MINUTES_PER_HOUR;
+                    break;
+                case 'm':
+                    totalMinutes += amount;
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        if (totalMinutes <= 0) {
+            return { isValid: false, error: 'Time spent must be greater than 0' };
+        }
+
+        return { isValid: true, durationMs: totalMinutes * 60 * 1000 };
+    };
+
+    const formatDurationForInput = (durationMs) => {
+        if (!durationMs || durationMs <= 0) return '';
+
+        let remainingMinutes = Math.round(durationMs / (1000 * 60));
+
+        const weeks = Math.floor(remainingMinutes / MINUTES_PER_WEEK);
+        remainingMinutes -= weeks * MINUTES_PER_WEEK;
+
+        const days = Math.floor(remainingMinutes / MINUTES_PER_DAY);
+        remainingMinutes -= days * MINUTES_PER_DAY;
+
+        const hours = Math.floor(remainingMinutes / MINUTES_PER_HOUR);
+        remainingMinutes -= hours * MINUTES_PER_HOUR;
+
+        const minutes = remainingMinutes;
+
+        const parts = [];
+
+        if (weeks) parts.push(`${weeks}w`);
+        if (days) parts.push(`${days}d`);
+        if (hours) parts.push(`${hours}h`);
+        if (minutes || parts.length === 0) parts.push(`${minutes}m`);
+
+        return parts.join(' ');
+    };
     
     // Yjs hooks for state
     const { entries: timeEntries, createEntry, updateEntry, deleteEntry } = useTimeEntries();
@@ -87,8 +173,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     const [editForm, setEditForm] = useState({
         startDate: '',
         startTime: '',
-        endDate: '',
-        endTime: '',
+        timeSpent: '',
         note: ''
     });
 
@@ -97,8 +182,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     const [addForm, setAddForm] = useState({
         startDate: '',
         startTime: '',
-        endDate: '',
-        endTime: '',
+        timeSpent: '',
         note: ''
     });
 
@@ -117,24 +201,62 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        if (!showAddForm) {
+            return;
+        }
+
+        setAddForm(prev => {
+            const todayDate = getTodayString();
+            const currentTime = getCurrentTimeString();
+
+            return {
+                ...prev,
+                startDate: prev.startDate || todayDate,
+                startTime: prev.startTime || currentTime
+            };
+        });
+    }, [showAddForm]);
+
+    const getShortTimeString = () => getCurrentTimeString().slice(0, 5);
+    const formatShortTime = (timestamp) => timestampToTimeString(timestamp).slice(0, 5);
+
     const resetForms = () => {
         const todayDate = getTodayString();
-        const currentTime = getCurrentTimeString();
+        const currentTime = getShortTimeString();
         
         setEditForm({
             startDate: '',
             startTime: '',
-            endDate: '',
-            endTime: '',
+            timeSpent: '',
             note: ''
         });
         
         setAddForm({
             startDate: todayDate,
             startTime: currentTime,
-            endDate: todayDate,
-            endTime: currentTime,
+            timeSpent: '',
             note: ''
+        });
+    };
+
+    const updateFormForTimeSpent = (setForm, value) => {
+        const durationResult = parseTimeSpentInput(value);
+        const now = Date.now();
+
+        setForm(prev => {
+            const nextForm = {
+                ...prev,
+                timeSpent: value
+            };
+
+            if (durationResult.isValid) {
+                const startTimestamp = now - durationResult.durationMs;
+                nextForm.startDate = timestampToDateString(startTimestamp);
+                nextForm.startTime = formatShortTime(startTimestamp);
+            }
+
+            return nextForm;
         });
     };
 
@@ -156,9 +278,8 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
 
         setEditForm({
             startDate: timestampToDateString(entry.start),
-            startTime: timestampToTimeString(entry.start),
-            endDate: timestampToDateString(entry.end),
-            endTime: timestampToTimeString(entry.end),
+            startTime: formatShortTime(entry.start),
+            timeSpent: formatDurationForInput(entry.end - entry.start),
             note: entry.note || ''
         });
         
@@ -167,18 +288,19 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
 
     // Handle saving edited entry
     const handleSaveEdit = () => {
-        if (!editForm.startDate || !editForm.startTime || !editForm.endDate || !editForm.endTime) {
-            showError('Please fill in all date and time fields');
+        if (!editForm.startDate || !editForm.startTime) {
+            showError('Please fill in date started and start time');
+            return;
+        }
+
+        const durationResult = parseTimeSpentInput(editForm.timeSpent);
+        if (!durationResult.isValid) {
+            showError(durationResult.error);
             return;
         }
 
         const startTimestamp = new Date(`${editForm.startDate}T${editForm.startTime}`).getTime();
-        const endTimestamp = new Date(`${editForm.endDate}T${editForm.endTime}`).getTime();
-
-        if (endTimestamp <= startTimestamp) {
-            showError('End time must be after start time');
-            return;
-        }
+        const endTimestamp = startTimestamp + durationResult.durationMs;
 
         // Check for overlaps with other time entries in the same project
         const overlapCheck = checkTimeOverlap(
@@ -238,18 +360,19 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
 
     // Handle adding new entry
     const handleAddEntry = () => {
-        if (!addForm.startDate || !addForm.startTime || !addForm.endDate || !addForm.endTime) {
-            showError('Please fill in all date and time fields');
+        if (!addForm.startDate || !addForm.startTime) {
+            showError('Please fill in date started and start time');
+            return;
+        }
+
+        const durationResult = parseTimeSpentInput(addForm.timeSpent);
+        if (!durationResult.isValid) {
+            showError(durationResult.error);
             return;
         }
 
         const startTimestamp = new Date(`${addForm.startDate}T${addForm.startTime}`).getTime();
-        const endTimestamp = new Date(`${addForm.endDate}T${addForm.endTime}`).getTime();
-
-        if (endTimestamp <= startTimestamp) {
-            showError('End time must be after start time');
-            return;
-        }
+        const endTimestamp = startTimestamp + durationResult.durationMs;
 
         // Check for billing cutoff date (same logic as task editing)
         // Allow creating entries before task created time
@@ -311,54 +434,45 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
             <div key={entry.id} className={`border border-border rounded-lg p-3 hover:shadow-md transition-shadow ${isBilled ? 'bg-muted opacity-75' : ''}`}>
                 {isEditing ? (
                     // Edit form
-                    <div className="border border-border rounded-lg p-3 bg-muted">
+                    <div className="border border-border rounded-lg p-3 bg-card">
                         <h4 className="text-sm font-medium text-foreground mb-3">Edit Time Entry</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <Label htmlFor={`edit-start-date-${entry.id}`} className="text-xs">Start Date</Label>
+                        <div className="space-y-3">
+                            <div className="space-y-2">
+                                <Label htmlFor={`edit-time-spent-${entry.id}`}>Time spent</Label>
                                 <Input
-                                    id={`edit-start-date-${entry.id}`}
-                                    type="date"
-                                    value={editForm.startDate}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, startDate: e.target.value }))}
-                                    className="text-sm"
+                                    id={`edit-time-spent-${entry.id}`}
+                                    type="text"
+                                    value={editForm.timeSpent}
+                                    onChange={(e) => updateFormForTimeSpent(setEditForm, e.target.value)}
+                                    className="text-sm bg-background text-foreground"
                                 />
+                                <p className="text-xs text-muted-foreground">Format: 2w 4d 6h 45m</p>
                             </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor={`edit-start-time-${entry.id}`} className="text-xs">Start Time</Label>
-                                <Input
-                                    id={`edit-start-time-${entry.id}`}
-                                    type="time"
-                                    step="1"
-                                    value={editForm.startTime}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, startTime: e.target.value }))}
-                                    className="text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor={`edit-end-date-${entry.id}`} className="text-xs">End Date</Label>
-                                <Input
-                                    id={`edit-end-date-${entry.id}`}
-                                    type="date"
-                                    value={editForm.endDate}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, endDate: e.target.value }))}
-                                    className="text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor={`edit-end-time-${entry.id}`} className="text-xs">End Time</Label>
-                                <Input
-                                    id={`edit-end-time-${entry.id}`}
-                                    type="time"
-                                    step="1"
-                                    value={editForm.endTime}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, endTime: e.target.value }))}
-                                    className="text-sm"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor={`edit-start-date-${entry.id}`}>Date started</Label>
+                                    <Input
+                                        id={`edit-start-date-${entry.id}`}
+                                        type="date"
+                                        value={editForm.startDate}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, startDate: e.target.value }))}
+                                        className="text-sm bg-background text-foreground dark:[color-scheme:dark]"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor={`edit-start-time-${entry.id}`}>Start time</Label>
+                                    <TimePicker
+                                        id={`edit-start-time-${entry.id}`}
+                                        value={editForm.startTime}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, startTime: e.target.value }))}
+                                        className="text-sm bg-background"
+                                        showSeconds={false}
+                                    />
+                                </div>
                             </div>
                         </div>
-                        <div className="mt-3 space-y-1.5">
-                            <Label htmlFor={`edit-note-${entry.id}`} className="text-xs">Note (optional)</Label>
+                        <div className="mt-3 space-y-2">
+                            <Label htmlFor={`edit-note-${entry.id}`}>Note (optional)</Label>
                             <Textarea
                                 id={`edit-note-${entry.id}`}
                                 value={editForm.note}
@@ -475,54 +589,45 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
 
                 {/* Add New Entry Form */}
                 {showAddForm && (
-                    <div className="border border-border rounded-lg p-4 bg-muted">
+                    <div className="border border-border rounded-lg p-4 bg-card">
                         <h4 className="text-sm font-medium text-foreground mb-3">Add New Time Entry</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <Label htmlFor="add-start-date" className="text-xs">Start Date</Label>
+                        <div className="space-y-3">
+                            <div className="space-y-2">
+                                <Label htmlFor="add-time-spent">Time spent</Label>
                                 <Input
-                                    id="add-start-date"
-                                    type="date"
-                                    value={addForm.startDate}
-                                    onChange={(e) => setAddForm(prev => ({ ...prev, startDate: e.target.value }))}
-                                    className="text-sm"
+                                    id="add-time-spent"
+                                    type="text"
+                                    value={addForm.timeSpent}
+                                    onChange={(e) => updateFormForTimeSpent(setAddForm, e.target.value)}
+                                    className="text-sm bg-background text-foreground"
                                 />
+                                <p className="text-xs text-muted-foreground">Format: 2w 4d 6h 45m</p>
                             </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor="add-start-time" className="text-xs">Start Time</Label>
-                                <Input
-                                    id="add-start-time"
-                                    type="time"
-                                    step="1"
-                                    value={addForm.startTime}
-                                    onChange={(e) => setAddForm(prev => ({ ...prev, startTime: e.target.value }))}
-                                    className="text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor="add-end-date" className="text-xs">End Date</Label>
-                                <Input
-                                    id="add-end-date"
-                                    type="date"
-                                    value={addForm.endDate}
-                                    onChange={(e) => setAddForm(prev => ({ ...prev, endDate: e.target.value }))}
-                                    className="text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor="add-end-time" className="text-xs">End Time</Label>
-                                <Input
-                                    id="add-end-time"
-                                    type="time"
-                                    step="1"
-                                    value={addForm.endTime}
-                                    onChange={(e) => setAddForm(prev => ({ ...prev, endTime: e.target.value }))}
-                                    className="text-sm"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="add-start-date">Date started</Label>
+                                    <Input
+                                        id="add-start-date"
+                                        type="date"
+                                        value={addForm.startDate}
+                                        onChange={(e) => setAddForm(prev => ({ ...prev, startDate: e.target.value }))}
+                                        className="text-sm bg-background text-foreground dark:[color-scheme:dark]"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="add-start-time">Start time</Label>
+                                    <TimePicker
+                                        id="add-start-time"
+                                        value={addForm.startTime}
+                                        onChange={(e) => setAddForm(prev => ({ ...prev, startTime: e.target.value }))}
+                                        className="text-sm bg-background"
+                                        showSeconds={false}
+                                    />
+                                </div>
                             </div>
                         </div>
-                        <div className="mt-3 space-y-1.5">
-                            <Label htmlFor="add-note" className="text-xs">Note (optional)</Label>
+                        <div className="mt-3 space-y-2">
+                            <Label htmlFor="add-note">Note (optional)</Label>
                             <Textarea
                                 id="add-note"
                                 value={addForm.note}

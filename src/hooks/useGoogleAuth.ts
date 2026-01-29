@@ -64,7 +64,19 @@ export const useGoogleAuth = () => {
     // WORKER MODE - Cloudflare Worker handles tokens
     // ============================================
 
+    const isOnline = useCallback(() => {
+        if (typeof navigator === 'undefined') {
+            return true;
+        }
+
+        return navigator.onLine;
+    }, []);
+
     const validateWorkerSession = useCallback(async (session: StoredSession): Promise<boolean> => {
+
+        if (!isOnline()) {
+            return false;
+        }
 
         try {
             const response = await fetch(SYNC_WORKER_CONFIG.endpoints.authStatus, {
@@ -77,7 +89,7 @@ export const useGoogleAuth = () => {
         } catch {
             return false;
         }
-    }, []);
+    }, [isOnline]);
 
 
     const signInWithWorker = useCallback(async (): Promise<void> => {
