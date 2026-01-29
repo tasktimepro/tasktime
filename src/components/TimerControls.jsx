@@ -3,7 +3,7 @@ import { PlayIcon, PauseIcon, StopIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { useTimer } from '../hooks/useTimer.ts';
+import { useTimers } from '../hooks/useTimers.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 
@@ -26,23 +26,20 @@ function TimerControls({
     
     // Use Yjs hooks directly
     const {
-        isActive,
-        isPaused,
-        taskId: activeTaskId,
-        startTime,
-        elapsedTime,
-        note,
+        getTimerForProject,
         startTimer: timerStart,
         pauseTimer: timerPause,
         resumeTimer: timerResume,
         clearTimer
-    } = useTimer();
+    } = useTimers();
     
     const { entries, createEntry } = useTimeEntries();
     const { activeTasks, updateTask } = useTasks();
     
-    const isTimerActive = isActive && activeTaskId === task.id;
-    const isTimerPaused = isTimerActive && isPaused;
+    const projectId = task.projectId;
+    const projectTimer = projectId ? getTimerForProject(projectId) : null;
+    const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
+    const isTimerPaused = isTimerActive && projectTimer.isPaused;
 
     /**
      * Validate time entry doesn't overlap with existing entries
@@ -89,58 +86,59 @@ function TimerControls({
             return;
         }
         
-        // If another timer is running, stop it first and create its entry
-        if (isActive && activeTaskId !== task.id) {
-            // Calculate end time for the existing timer
-            const existingStart = startTime;
-            const existingEnd = isPaused 
-                ? existingStart + elapsedTime 
+        if (!projectId) return;
+
+        // If another timer in this project is running, stop it first and create its entry
+        if (projectTimer && projectTimer.taskId !== task.id) {
+            const existingStart = projectTimer.startTime;
+            const existingEnd = projectTimer.isPaused
+                ? (existingStart + projectTimer.elapsedTime)
                 : Date.now();
-            
-            // Create entry for existing timer with validation
-            if (!createValidatedEntry(activeTaskId, existingStart, existingEnd, note)) {
-                return; // Don't start new timer if validation failed
+
+            if (!createValidatedEntry(projectTimer.taskId, existingStart, existingEnd, projectTimer.note)) {
+                return;
             }
-            clearTimer();
+            clearTimer(projectId);
         }
 
         // Start new timer
         timerStart(task.id);
-    }, [isTimerPaused, isActive, activeTaskId, task.id, startTime, isPaused, elapsedTime, note, 
-        timerResume, createValidatedEntry, clearTimer, timerStart]);
+    }, [isTimerPaused, projectId, projectTimer, task.id, timerResume, createValidatedEntry, clearTimer, timerStart]);
 
     /**
      * Pause the timer
      */
     const handlePause = useCallback(() => {
-        if (!isTimerActive) return;
+        if (!isTimerActive || !projectId) return;
         
-        timerPause();
+        timerPause(projectId);
         
         // Update task's lastActive
         updateTask(task.id, { lastActive: Date.now() });
-    }, [isTimerActive, timerPause, updateTask, task.id]);
+    }, [isTimerActive, projectId, timerPause, updateTask, task.id]);
 
     /**
      * Resume a paused timer
      */
     const handleResume = useCallback(() => {
-        if (!isTimerPaused) return;
-        timerResume();
-    }, [isTimerPaused, timerResume]);
+        if (!isTimerPaused || !projectId) return;
+        timerResume(projectId);
+    }, [isTimerPaused, projectId, timerResume]);
 
     /**
      * Stop timer and create time entry
      */
     const handleStop = useCallback(() => {
-        if (!isTimerActive) return;
+        if (!isTimerActive || !projectId || !projectTimer) return;
 
         const now = Date.now();
-        const entryStart = startTime;
-        const entryEnd = isPaused ? entryStart + elapsedTime : now;
+        const entryStart = projectTimer.startTime;
+        const entryEnd = projectTimer.isPaused
+            ? entryStart + projectTimer.elapsedTime
+            : now;
         
         // Validate and create entry
-        if (!createValidatedEntry(task.id, entryStart, entryEnd, note)) {
+        if (!createValidatedEntry(task.id, entryStart, entryEnd, projectTimer.note)) {
             return; // Don't clear timer if validation failed
         }
         
@@ -148,20 +146,20 @@ function TimerControls({
         updateTask(task.id, { lastActive: now });
         
         // Clear the timer
-        clearTimer();
+        clearTimer(projectId);
         
         // Call completion callback
         if (onComplete) {
             onComplete();
         }
-    }, [isTimerActive, startTime, isPaused, elapsedTime, task.id, note, 
+    }, [isTimerActive, projectId, projectTimer, task.id,
         createValidatedEntry, updateTask, clearTimer, onComplete]);
 
     // Determine icon size based on size prop
     const iconSize = size === 'sm' ? 'h-5 w-5' : 'h-5 w-5';
 
     return (
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center gap-2">
             {!isTimerActive ? (
                 // Start button - shown when no timer active for this task
                 <Button
@@ -175,7 +173,7 @@ function TimerControls({
                 </Button>
             ) : isTimerPaused ? (
                 // For paused state, show resume and stop buttons (icons only)
-                <div className="flex space-x-1">
+                <div className="flex gap-2">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -197,7 +195,7 @@ function TimerControls({
                 </div>
             ) : (
                 // For active (running) state, show pause and stop buttons
-                <div className="flex space-x-1">
+                <div className="flex gap-2">
                     <Button
                         variant="ghost"
                         size="icon"

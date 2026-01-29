@@ -1,15 +1,14 @@
-import { useState, useEffect } from 'react';
-import { formatActiveTimer } from '../utils/dateUtils';
+import { useMemo } from 'react';
+import { formatDurationWithSeconds } from '../utils/dateUtils';
 import TimerControls from './TimerControls';
-import { useTimer } from '../hooks/useTimer';
-import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
+import { useTimers } from '../hooks/useTimers';
 
 /**
  * TaskTimer component - Shows task timer and timer controls
  * 
  * This component consolidates timer logic for consistent display and behavior
  * across all places where timers are shown (Dashboard, ProjectDashboard, etc.)
- * Now uses Yjs hooks directly for timer state.
+ * Now uses Yjs hooks directly for timer state, with synchronized time via master clock.
  */
 const TaskTimer = ({
     task,
@@ -18,42 +17,22 @@ const TaskTimer = ({
     isGlobalTimer = false,
     onComplete = null
 }) => {
-    const [currentTime, setCurrentTime] = useState('');
+    // Use Yjs timer hook directly - elapsedTime is synchronized via master clock
+    const { timers } = useTimers();
     
-    // Use Yjs timer hook directly
-    const { isActive, isPaused, taskId, elapsedTime } = useTimer();
-    
-    const isTimerActive = isActive && taskId === task.id;
-    const isTimerPaused = isTimerActive && isPaused;
+    const activeTimer = timers.find(timer => timer.taskId === task.id) || null;
+    const isTimerActive = !!activeTimer;
+    const isTimerPaused = isTimerActive && activeTimer.isPaused;
+    const elapsedTime = activeTimer?.elapsedTime || 0;
 
-    // Update timer display every second
-    useEffect(() => {
-        if (!isTimerActive) return;
-        
-        // For paused timers, just show the elapsed time once
-        if (isTimerPaused) {
-            const formattedTime = formatActiveTimer(elapsedTime);
-            setCurrentTime(formattedTime);
-            return;
-        }
-        
-        // For active timers, update every second
-        const updateTimer = () => {
-            const formattedTime = formatActiveTimer(elapsedTime);
-            setCurrentTime(formattedTime);
-        };
-
-        // Update immediately
-        updateTimer();
-
-        // Then update every second
-        const interval = setInterval(updateTimer, TIMER_UPDATE_INTERVAL_MS);
-
-        return () => clearInterval(interval);
-    }, [isTimerActive, isTimerPaused, elapsedTime]);
+    // Display time computed from synchronized elapsedTime (no individual interval needed)
+    const currentTime = useMemo(() => {
+        if (!isTimerActive || elapsedTime === 0) return '0s';
+        return formatDurationWithSeconds(elapsedTime);
+    }, [isTimerActive, elapsedTime]);
 
     return (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
             {showTimeDisplay && isTimerActive && (
                 <span className={`text-xs font-mono ${
                     isTimerPaused 

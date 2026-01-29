@@ -2,7 +2,7 @@ import SubtaskItem from './SubtaskItem';
 import SubtaskCreateForm from './SubtaskCreateForm';
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
-import { useTimer } from '../../../hooks/useTimer';
+import { useTimers } from '../../../hooks/useTimers';
 import { getTaskIdsToDelete } from '../../../utils/taskUtils.ts';
 
 /**
@@ -29,7 +29,7 @@ const SubtaskSection = ({
     // Yjs hooks for state
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
-    const { isPaused, taskId: activeTimerTaskId, clearTimer } = useTimer();
+    const { timers, clearTimer } = useTimers();
     
     if (isArchived || (subtasks.length === 0 && !onCreateSubtask)) {
         return null;
@@ -45,8 +45,9 @@ const SubtaskSection = ({
             entriesToDelete.forEach(e => deleteEntry(e.id));
             
             // Clear timer if active on this subtask
-            if (activeTimerTaskId === subtaskId) {
-                clearTimer();
+            const activeTimer = timers.find(timer => timer.taskId === subtaskId);
+            if (activeTimer) {
+                clearTimer(activeTimer.projectId);
             }
             
             // Delete the subtask
@@ -78,7 +79,7 @@ const SubtaskSection = ({
                         />
                     ) : (
                         <div className={`${
-                            (anyTimerActive && !isPaused && isRelatedToActiveTimer)
+                            (anyTimerActive && isRelatedToActiveTimer)
                                 ? 'opacity-50 pointer-events-none'
                                 : ''
                         }`}>

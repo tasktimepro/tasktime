@@ -1,18 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDownIcon, ChevronUpIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TimePicker } from '@/components/ui/time-picker';
-import { formatActiveTimer, formatDurationWithSeconds } from '../utils/dateUtils';
+import { formatDurationWithSeconds } from '../utils/dateUtils';
 import { checkTimerStartOverlap } from '../utils/timeValidationUtils';
 import TaskTimer from './TaskTimer';
 import { useToast } from '../hooks/useToast';
-import { useTimer } from '../hooks/useTimer';
+import { useTimers } from '../hooks/useTimers';
 import { useTasks } from '../hooks/useTasks';
 import { useProjects } from '../hooks/useProjects';
 import { useTimeEntries } from '../hooks/useTimeEntries';
-import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
 
 /**
  * GlobalTimer component - Shows active timer in the header
@@ -23,18 +22,36 @@ import { TIMER_UPDATE_INTERVAL_MS } from '../constants/app';
  */
 const GlobalTimer = ({
     navigateToProject,
-    onClose
+    onClose,
+    timer = null,
+    isExpanded: isExpandedProp,
+    onToggleExpanded
 }) => {
     const { showSuccess, showError } = useToast();
     
     // Yjs hooks for state
-    const { isActive, isPaused, taskId, elapsedTime, startTime, note, updateTimer } = useTimer();
+    const { timers, updateTimer } = useTimers();
+    const focusedTimer = timers[0] || null;
+    const timerData = timer || focusedTimer;
+    const isActive = !!timerData;
+    const isPaused = timerData?.isPaused || false;
+    const taskId = timerData?.taskId || null;
+    const elapsedTime = timerData?.elapsedTime || 0;
+    const startTime = timerData?.startTime || null;
+    const note = timerData?.note || '';
+    const projectId = timerData?.projectId || null;
     const { tasks } = useTasks();
     const { projects } = useProjects();
     const { entries: timeEntries } = useTimeEntries();
     
-    const [displayTime, setDisplayTime] = useState('');
-    const [isExpanded, setIsExpanded] = useState(false);
+    // Display time is computed directly from the timer's elapsedTime (which is synced via master clock)
+    const displayTime = useMemo(() => {
+        if (!isActive || elapsedTime === 0) return '0s';
+        return formatDurationWithSeconds(elapsedTime);
+    }, [isActive, elapsedTime]);
+    
+    const [isExpandedInternal, setIsExpandedInternal] = useState(false);
+    const isExpanded = typeof isExpandedProp === 'boolean' ? isExpandedProp : isExpandedInternal;
     const [startTimeInput, setStartTimeInput] = useState('');
     const [noteInput, setNoteInput] = useState('');
 
@@ -71,7 +88,7 @@ const GlobalTimer = ({
      * Handle form submission (update both start time and note)
      */
     const handleSubmitChanges = () => {
-        if (!isActive || !startTime) return;
+        if (!isActive || !startTime || !projectId) return;
 
         try {
             // Parse and validate start time if it was changed
@@ -108,49 +125,24 @@ const GlobalTimer = ({
             }
 
             // Update the timer with both start time and note
-            updateTimer({
+            updateTimer(projectId, {
                 startTime: newStartTime.getTime(),
                 note: noteInput.trim() || undefined
             });
 
             showSuccess('Timer updated successfully');
-            setIsExpanded(false); // Collapse the expanded view
+            if (onToggleExpanded) {
+                onToggleExpanded(false);
+            } else {
+                setIsExpandedInternal(false);
+            }
         } catch {
             showError('Invalid time format. Please use HH:MM:SS format');
         }
     };
 
-    // Update timer display every second (only when not paused)
-    useEffect(() => {
-        if (!isActive || !startTime) return;
-        
-        // When paused, don't update - just keep the frozen display time
-        if (isPaused) return;
-
-        const updateTimerDisplay = () => {
-            // Calculate elapsed time in ms for active timer
-            const elapsedMs = Date.now() - startTime;
-            const formattedTime = formatActiveTimer(elapsedMs);
-            setDisplayTime(formattedTime);
-        };
-
-        // Update immediately
-        updateTimerDisplay();
-
-        // Then update every second
-        const interval = setInterval(updateTimerDisplay, TIMER_UPDATE_INTERVAL_MS);
-
-        return () => clearInterval(interval);
-    }, [isActive, startTime, isPaused]);
-
-    // Initialize display time when component mounts with a paused timer
-    // or when elapsedTime changes while paused
-    useEffect(() => {
-        if (isPaused && elapsedTime > 0) {
-            const formattedPausedTime = formatDurationWithSeconds(elapsedTime);
-            setDisplayTime(formattedPausedTime);
-        }
-    }, [isPaused, elapsedTime]);
+    // Display time is now computed via useMemo from elapsedTime (synced via master clock)
+    // No interval needed - useTimers already provides synchronized elapsedTime updates
 
     if (!isActive || !currentTask) {
         return null;
@@ -166,9 +158,9 @@ const GlobalTimer = ({
     return (
         <div className={`border ${borderColor} rounded-lg px-4 py-2 ${isExpanded ? 'space-y-3 min-w-[26rem] max-w-full' : ''}`}>
             {/* Main timer row */}
-            <div className="flex items-center justify-center space-x-3">
-                {/* Timer info */}
-                <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-between gap-4">
+                {/* Left column: dot + task title */}
+                <div className="flex items-center gap-2 min-w-0">
                     <div className={`w-3 h-3 ${dotColor} rounded-full ${dotAnimation}`}></div>
                     {currentProject ? (
                         <button
@@ -186,29 +178,35 @@ const GlobalTimer = ({
                             {currentTask.title}
                         </span>
                     )}
+                </div>
+
+                {/* Right column: time + controls + options toggle */}
+                <div className="flex items-center gap-2 justify-end">
                     <span className={`text-sm font-mono ${timeColor} px-2 py-1 rounded-md min-w-[32px] inline-block text-center`}>
                         {displayTime}
                     </span>
-                </div>
-
-                {/* Control buttons and options toggle */}
-                <div className="flex items-center space-x-3">
                     {/* Control buttons - using TaskTimer component */}
+                    {/* Note: We don't call onClose here because the timer stack 
+                        automatically handles visibility based on active timer count.
+                        onClose should only be used for explicit user actions to hide the stack. */}
                     <TaskTimer
                         task={currentTask}
                         isGlobalTimer={true}
                         showTimeDisplay={false}
-                        onComplete={() => {
-                            // Call onClose when timer is completely stopped
-                            if (onClose) onClose();
-                        }}
                     />
                     
                     {/* Options toggle button */}
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setIsExpanded(!isExpanded)}
+                        onClick={() => {
+                            const nextValue = !isExpanded;
+                            if (onToggleExpanded) {
+                                onToggleExpanded(nextValue);
+                            } else {
+                                setIsExpandedInternal(nextValue);
+                            }
+                        }}
                         className={`h-8 w-8 ${textColor} hover:bg-accent transition-colors`}
                         title={isExpanded ? "Hide options" : "Show timer options"}
                     >
@@ -260,7 +258,13 @@ const GlobalTimer = ({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => setIsExpanded(false)}
+                            onClick={() => {
+                                if (onToggleExpanded) {
+                                    onToggleExpanded(false);
+                                } else {
+                                    setIsExpandedInternal(false);
+                                }
+                            }}
                         >
                             Cancel
                         </Button>

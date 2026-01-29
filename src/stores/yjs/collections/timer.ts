@@ -1,63 +1,68 @@
 /**
  * Timer state helpers
  * 
- * Provides operations for the global timer state
+ * Provides operations for multi-timer state (one timer per project)
  */
 
 import * as Y from 'yjs';
-import type { TimerState } from '../types';
+import type { MultiTimerState } from '../types';
 
 export interface TimerHelpers {
 
     /**
      * Get current timer state
      */
-    get(): TimerState;
+    get(projectId: string): MultiTimerState | null;
+
+    /**
+     * Get all timers
+     */
+    getAll(): MultiTimerState[];
 
     /**
      * Check if timer is running
      */
-    isRunning(): boolean;
+    isRunning(projectId: string): boolean;
 
     /**
      * Check if timer is paused
      */
-    isPaused(): boolean;
+    isPaused(projectId: string): boolean;
 
     /**
      * Start timer for a task
      */
-    start(taskId: string, note?: string): void;
+    start(projectId: string, taskId: string, note?: string): void;
 
     /**
      * Pause the timer
      */
-    pause(): void;
+    pause(projectId: string): void;
 
     /**
      * Resume a paused timer
      */
-    resume(): void;
+    resume(projectId: string): void;
 
     /**
      * Stop and clear the timer (returns final state for creating time entry)
      */
-    stop(): TimerState | null;
+    stop(projectId: string): MultiTimerState | null;
 
     /**
      * Update the timer note
      */
-    setNote(note: string): void;
+    setNote(projectId: string, note: string): void;
 
     /**
      * Touch last active timestamp (heartbeat)
      */
-    touch(): void;
+    touch(projectId: string): void;
 
     /**
      * Get elapsed time in milliseconds
      */
-    getElapsedMs(): number;
+    getElapsedMs(projectId: string): number;
 
     /**
      * Subscribe to changes
@@ -68,105 +73,118 @@ export interface TimerHelpers {
 /**
  * Create timer helpers for a Y.Map
  */
-export function createTimerHelpers(timer: Y.Map<string, TimerState[keyof TimerState]>): TimerHelpers {
+export function createTimerHelpers(timers: Y.Map<string, MultiTimerState>): TimerHelpers {
 
     return {
 
-        get(): TimerState {
-            return {
-                taskId: timer.get('taskId') as string | null | undefined,
-                startTime: timer.get('startTime') as number | null | undefined,
-                paused: timer.get('paused') as boolean | undefined,
-                pausedElapsedTime: timer.get('pausedElapsedTime') as number | undefined,
-                note: timer.get('note') as string | undefined,
-                lastActive: timer.get('lastActive') as number | null | undefined,
-            };
+        get(projectId: string): MultiTimerState | null {
+            const timer = timers.get(projectId);
+            return timer || null;
         },
 
-        isRunning(): boolean {
-            const taskId = timer.get('taskId');
-            const paused = timer.get('paused');
-            return !!taskId && !paused;
+        getAll(): MultiTimerState[] {
+            const results: MultiTimerState[] = [];
+            timers.forEach((value) => {
+                if (value) {
+                    results.push(value);
+                }
+            });
+            return results;
         },
 
-        isPaused(): boolean {
-            const taskId = timer.get('taskId');
-            const paused = timer.get('paused');
-            return !!taskId && !!paused;
+        isRunning(projectId: string): boolean {
+            const timer = timers.get(projectId);
+            return !!timer && !timer.paused;
         },
 
-        start(taskId: string, note?: string): void {
-            timer.set('taskId', taskId);
-            timer.set('startTime', Date.now());
-            timer.set('paused', false);
-            timer.set('pausedElapsedTime', 0);
-            timer.set('note', note || '');
-            timer.set('lastActive', Date.now());
+        isPaused(projectId: string): boolean {
+            const timer = timers.get(projectId);
+            return !!timer && !!timer.paused;
         },
 
-        pause(): void {
-            const taskId = timer.get('taskId');
-            if (!taskId) return;
-
-            const startTime = timer.get('startTime') as number | undefined;
-            const pausedElapsedTime = timer.get('pausedElapsedTime') as number | undefined;
-            
-            const elapsed = (pausedElapsedTime || 0) + (Date.now() - (startTime || Date.now()));
-            
-            timer.set('paused', true);
-            timer.set('pausedElapsedTime', elapsed);
-            timer.set('lastActive', Date.now());
+        start(projectId: string, taskId: string, note?: string): void {
+            const now = Date.now();
+            timers.set(projectId, {
+                projectId,
+                taskId,
+                startTime: now,
+                paused: false,
+                pausedElapsedTime: 0,
+                note: note || '',
+                lastActive: now,
+            });
         },
 
-        resume(): void {
-            const taskId = timer.get('taskId');
-            if (!taskId) return;
+        pause(projectId: string): void {
+            const timer = timers.get(projectId);
+            if (!timer || timer.paused) return;
 
-            timer.set('startTime', Date.now());
-            timer.set('paused', false);
-            timer.set('lastActive', Date.now());
+            const elapsed = Date.now() - timer.startTime;
+            timers.set(projectId, {
+                ...timer,
+                paused: true,
+                pausedElapsedTime: elapsed,
+                lastActive: Date.now(),
+            });
         },
 
-        stop(): TimerState | null {
-            const state = this.get();
-            if (!state.taskId) return null;
+        resume(projectId: string): void {
+            const timer = timers.get(projectId);
+            if (!timer || !timer.paused) return;
 
-            // Clear timer
-            timer.delete('taskId');
-            timer.delete('startTime');
-            timer.delete('paused');
-            timer.delete('pausedElapsedTime');
-            timer.delete('note');
-            timer.delete('lastActive');
-
-            return state;
+            const pausedElapsed = timer.pausedElapsedTime || 0;
+            const now = Date.now();
+            timers.set(projectId, {
+                ...timer,
+                startTime: now - pausedElapsed,
+                paused: false,
+                pausedElapsedTime: 0,
+                lastActive: now,
+            });
         },
 
-        setNote(note: string): void {
-            timer.set('note', note);
+        stop(projectId: string): MultiTimerState | null {
+            const timer = timers.get(projectId);
+            if (!timer) return null;
+
+            timers.delete(projectId);
+            return timer;
         },
 
-        touch(): void {
-            timer.set('lastActive', Date.now());
+        setNote(projectId: string, note: string): void {
+            const timer = timers.get(projectId);
+            if (!timer) return;
+            timers.set(projectId, {
+                ...timer,
+                note,
+                lastActive: Date.now(),
+            });
         },
 
-        getElapsedMs(): number {
-            const state = this.get();
-            if (!state.taskId) return 0;
+        touch(projectId: string): void {
+            const timer = timers.get(projectId);
+            if (!timer) return;
+            timers.set(projectId, {
+                ...timer,
+                lastActive: Date.now(),
+            });
+        },
 
-            if (state.paused) {
-                return state.pausedElapsedTime || 0;
+        getElapsedMs(projectId: string): number {
+            const timer = timers.get(projectId);
+            if (!timer) return 0;
+
+            if (timer.paused) {
+                return timer.pausedElapsedTime || 0;
             }
 
-            const startTime = state.startTime || Date.now();
-            const pausedElapsed = state.pausedElapsedTime || 0;
-            return pausedElapsed + (Date.now() - startTime);
+            return Date.now() - timer.startTime;
         },
 
         observe(callback: () => void): () => void {
             const handler = () => callback();
-            timer.observe(handler);
-            return () => timer.unobserve(handler);
+            timers.observe(handler);
+            return () => timers.unobserve(handler);
         },
     };
 }

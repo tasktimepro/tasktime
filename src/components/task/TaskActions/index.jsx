@@ -2,7 +2,7 @@ import { ArchiveBoxIcon, ArchiveRestoreIcon, ClockIcon, CurrencyDollarIcon, Tras
 import { Button } from '@/components/ui/button';
 import TaskTimer from '../../TaskTimer';
 import TaskDropdown from './TaskDropdown';
-import { useTimer } from '../../../hooks/useTimer';
+import { useTimers } from '../../../hooks/useTimers';
 
 /**
  * TaskActions component - Right-side action buttons and timer controls.
@@ -24,8 +24,10 @@ const TaskActions = ({
     onEdit
 }) => {
     // Use Yjs timer hook directly
-    const { isActive, isPaused, taskId } = useTimer();
-    const isTimerActive = isActive && taskId === task.id;
+    const { getTimerForProject } = useTimers();
+    const projectTimer = task.projectId ? getTimerForProject(task.projectId) : null;
+    const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
+    const isPaused = projectTimer?.isPaused || false;
     
     if (isEditing) {
         return null;

@@ -7,9 +7,10 @@
  * - Sync state tracking
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { YjsStore, getYjsStore, SyncState, SyncPhase, AutoSyncMode } from '@/stores/yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { shouldSyncOnLoad, wasSyncInterrupted, hasPersistedPendingChanges } from '@/utils/syncPersistence';
 
 export interface YjsContextValue {
     /** The underlying YjsStore instance */
@@ -44,6 +45,8 @@ export interface YjsContextValue {
     forceSyncDrive: () => Promise<void>;
     /** Disconnect Drive sync */
     disconnectDrive: () => void;
+    /** Wipe all TaskTime files from Drive */
+    wipeDriveData: () => Promise<void>;
     /** Load time entries for a specific year */
     loadEntriesForYear: (year: number) => Promise<void>;
     /** Load archived tasks */
@@ -278,6 +281,35 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
     }, [isDriveConnected, autoSyncEnabled, autoSyncMode, store]);
 
+    // Handle persisted pending changes or interrupted syncs on load
+    // This runs once after Drive connects to recover from page refresh mid-sync
+    const hasCheckedPersistedState = useRef(false);
+    useEffect(() => {
+        // Only run once per connection, and only after first successful sync state
+        if (!isDriveConnected || hasCheckedPersistedState.current) return;
+        
+        const needsSync = shouldSyncOnLoad();
+        if (!needsSync) {
+            hasCheckedPersistedState.current = true;
+            return;
+        }
+
+        const wasInterrupted = wasSyncInterrupted();
+        const hasPending = hasPersistedPendingChanges();
+        console.log('[YjsContext] Detected persisted sync state:', { wasInterrupted, hasPending });
+
+        hasCheckedPersistedState.current = true;
+
+        // For auto-sync mode: trigger sync to complete what was interrupted
+        if (autoSyncEnabled) {
+            console.log('[YjsContext] Auto-triggering sync for persisted pending changes');
+            store.forceDriveSync().catch(console.error);
+        }
+        // For manual mode: pendingSyncChanges will show "Sync changes" in UI
+        // because GoogleDriveProvider.updatePendingState() now checks persisted state
+
+    }, [isDriveConnected, autoSyncEnabled, store]);
+
     const disconnectDrive = useCallback(() => {
         store.disconnectDrive();
         setIsDriveConnected(false);
@@ -286,6 +318,11 @@ export function YjsProvider({ children }: YjsProviderProps) {
         setSyncPhase('idle');
         setHasSynced(false);
         setManualSyncInProgress(false);
+        hasCheckedPersistedState.current = false; // Reset for next connection
+    }, [store]);
+
+    const wipeDriveData = useCallback(async () => {
+        await store.wipeDriveData();
     }, [store]);
 
     const loadEntriesForYear = useCallback(async (year: number) => {
@@ -344,6 +381,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         autoSyncMode,
         forceSyncDrive,
         disconnectDrive,
+        wipeDriveData,
         loadEntriesForYear,
         loadArchivedTasks,
         loadArchivedInvoices,
@@ -365,6 +403,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         autoSyncMode,
         forceSyncDrive,
         disconnectDrive,
+        wipeDriveData,
         loadEntriesForYear,
         loadArchivedTasks,
         loadArchivedInvoices,

@@ -14,7 +14,7 @@ import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
-import { useTimer } from '../hooks/useTimer.ts';
+import { useTimers } from '../hooks/useTimers.ts';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -42,7 +42,7 @@ const InvoiceGenerator = ({
     const { tasks, updateTask } = useTasks();
     const { updateEntry } = useTimeEntries();
     const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
-    const { isActive: isTimerActive, isPaused: isTimerPaused } = useTimer();
+    const { getTimerForProject } = useTimers();
     
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -57,6 +57,11 @@ const InvoiceGenerator = ({
     const { showSuccess, showError, showWarning } = useToast();
     const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
     const taskInputRef = useRef(null); // Ref for task description input field
+
+    const timerProjectId = selectedProject?.id || project?.id;
+    const projectTimer = timerProjectId ? getTimerForProject(timerProjectId) : null;
+    const isTimerActive = !!projectTimer;
+    const isTimerPaused = projectTimer?.isPaused || false;
 
     // Get project invoices from the new structure - memoized to prevent unnecessary re-renders
     const projectInvoices = useMemo(() => {

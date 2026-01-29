@@ -9,16 +9,18 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { usePreferences } from '@/hooks/usePreferences';
 import { useToast } from '@/hooks/useToast';
-import { ArrowPathIcon, CheckIcon, CloudIcon, CloudOffIcon, CloudSyncIcon, CloudDownloadIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
+import { ArrowPathIcon, CheckIcon, CloudIcon, CloudOffIcon, CloudSyncIcon, CloudDownloadIcon, CloudUploadIcon, ExclamationTriangleIcon, MoreHorizontalIcon, TrashIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import Modal from '@/components/Modal';
 import { formatDistanceToNow } from 'date-fns';
 
-type ConfirmDialogType = 'disconnect' | null;
+type ConfirmDialogType = 'disconnect' | 'wipe' | null;
 
 export default function YjsSyncSettings() {
 
@@ -26,8 +28,9 @@ export default function YjsSyncSettings() {
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogType>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
+    const [wipeConfirmText, setWipeConfirmText] = useState('');
 
-    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive } = useYjs();
+    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive, wipeDriveData } = useYjs();
     const { isSignedIn, isLoading: authLoading, user, signIn, signOut } = useGoogleAuth();
     const { preferences, updatePreferences } = usePreferences();
     const { showSuccess, showError } = useToast();
@@ -169,6 +172,11 @@ export default function YjsSyncSettings() {
         setConfirmDialog('disconnect');
     };
 
+    const handleWipeAndDisconnect = () => {
+        setWipeConfirmText('');
+        setConfirmDialog('wipe');
+    };
+
     const confirmDisconnect = async () => {
         setIsProcessing(true);
         try {
@@ -184,6 +192,28 @@ export default function YjsSyncSettings() {
             console.error('[YjsSyncSettings] Sync failed before disconnect:', error);
             showError('Sync failed. Please try again before disconnecting.');
             // DO NOT disconnect if sync failed - data could be lost
+            return;
+        } finally {
+            setIsProcessing(false);
+            setConfirmDialog(null);
+        }
+    };
+
+    const confirmWipeAndDisconnect = async () => {
+        if (wipeConfirmText.trim().toLowerCase() !== 'wipe drive') {
+            showError('Please type "wipe drive" to confirm.');
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            await wipeDriveData();
+            disconnectDrive();
+            await signOut();
+            showSuccess('Google Drive wiped and disconnected');
+        } catch (error) {
+            console.error('[YjsSyncSettings] Wipe & disconnect failed:', error);
+            showError('Wipe failed. Please try again.');
             return;
         } finally {
             setIsProcessing(false);
@@ -278,6 +308,28 @@ export default function YjsSyncSettings() {
                                         >
                                             Sync Now
                                         </Button>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-muted-foreground hover:bg-muted rounded-full"
+                                                    title="More actions"
+                                                    aria-label="More actions"
+                                                >
+                                                    <MoreHorizontalIcon className="h-5 w-5" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                                                <DropdownMenuItem
+                                                    onClick={handleWipeAndDisconnect}
+                                                    className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                    <span>Wipe & Disconnect</span>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </>
                                 ) : (
                                     <Button onClick={handleConnect} leadingIcon={CloudIcon}>
@@ -354,6 +406,51 @@ export default function YjsSyncSettings() {
                     Your data will be synced to Google Drive before disconnecting.
                     Your local data will remain on this device.
                 </p>
+            </Modal>
+
+            {/* Wipe & Disconnect Confirmation Modal */}
+            <Modal
+                isOpen={confirmDialog === 'wipe'}
+                onClose={() => !isProcessing && setConfirmDialog(null)}
+                title="Wipe Google Drive and disconnect?"
+                size="md"
+                footer={
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirmDialog(null)}
+                            disabled={isProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmWipeAndDisconnect}
+                            disabled={isProcessing || wipeConfirmText.trim().toLowerCase() !== 'wipe drive'}
+                        >
+                            {isProcessing ? 'Wiping...' : 'Wipe & Disconnect'}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                        This will permanently delete all TaskTime files from Google Drive and disconnect this device.
+                        Your local data will remain on this device, but we recommend that you <strong>export your data before this action</strong>.
+                    </p>
+                    <div>
+                        <Label htmlFor="wipe-drive-confirm" className="text-sm font-medium">
+                            Type <span className="font-semibold">wipe drive</span> to confirm
+                        </Label>
+                        <Input
+                            id="wipe-drive-confirm"
+                            value={wipeConfirmText}
+                            onChange={(event) => setWipeConfirmText(event.target.value)}
+                            placeholder="wipe drive"
+                            className="mt-2"
+                        />
+                    </div>
+                </div>
             </Modal>
 
         </div>

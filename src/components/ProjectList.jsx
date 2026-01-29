@@ -21,7 +21,7 @@ import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
-import { useTimer } from '../hooks/useTimer.ts';
+import { useTimers } from '../hooks/useTimers.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 
@@ -44,7 +44,7 @@ const ProjectList = ({
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { deleteInvoice } = useInvoices();
-    const { timerState, clearTimer } = useTimer();
+    const { timers, clearTimer } = useTimers();
     const { preferences, updatePreferences } = usePreferences();
 
     const projectSort = preferences.projectSort || 'createdAt';
@@ -183,9 +183,9 @@ const ProjectList = ({
 
         const taskIdsArray = Array.from(allTaskIdsToDelete);
 
-        // Check if current timer is running on any task that will be deleted
-        if (timerState.taskId && allTaskIdsToDelete.has(timerState.taskId)) {
-            clearTimer();
+        const projectTimer = timers.find(timer => timer.projectId === projectId);
+        if (projectTimer) {
+            clearTimer(projectId);
         }
 
         // If shouldDeleteInvoices is true, delete associated invoices

@@ -14,6 +14,16 @@ import { encodeStateAsUpdate, applyUpdate, mergeUpdates } from 'yjs';
 import { YjsDocManager } from '../YjsDocManager';
 import { ManifestManager, AuthorizationError } from './ManifestManager';
 import type { DocName, SyncState, DriveSyncMode, SyncPhase } from '../types';
+import {
+    markPendingChanges,
+    clearPendingChanges,
+    markSyncStarted,
+    markSyncCompleted,
+    markSyncFailed,
+    hasPersistedPendingChanges,
+    wasSyncInterrupted,
+    clearSyncPersistence,
+} from '@/utils/syncPersistence';
 
 export { AuthorizationError };
 
@@ -85,7 +95,11 @@ export class YjsDriveProvider {
     }
 
     private updatePendingState(): void {
-        const hasPending = this.hasLocalChangesToPush();
+        const hasPendingInMemory = this.hasLocalChangesToPush();
+        // Also check persisted state for changes from previous sessions
+        const hasPersisted = hasPersistedPendingChanges() || wasSyncInterrupted();
+        const hasPending = hasPendingInMemory || hasPersisted;
+        
         if (hasPending === this.pendingChanges) {
             return;
         }
@@ -210,7 +224,48 @@ export class YjsDriveProvider {
         this.setState('idle');
         this.setPhase('idle');
         this.updatePendingState();
+        // Clear persisted sync state on disconnect
+        clearSyncPersistence();
         console.log('[YjsDriveProvider] Disconnected from Google Drive');
+    }
+
+    /**
+     * Wipe all TaskTime files from Drive appDataFolder
+     * This deletes the manifest and all document/delta files.
+     */
+    async wipeDriveData(): Promise<void> {
+        if (!this.connected) {
+            throw new Error('Drive not connected');
+        }
+
+        if (!this.isOnline()) {
+            throw new Error('Cannot wipe Drive while offline');
+        }
+
+        this.setState('syncing');
+        this.setPhase('uploading');
+        this.log('wipe: started');
+
+        const files = await this.manifest.listAppDataFiles();
+        for (const file of files) {
+            await this.manifest.deleteFileById(file.id);
+        }
+
+        // Reset local manifest caches
+        this.manifest.reset();
+
+        // Reset local sync tracking
+        this.pendingDeltas.clear();
+        this.forceFullStateDocs = new Set(this.docManager.getLoadedDocs());
+        this.appliedStateVersions.clear();
+        this.appliedDeltaIds.clear();
+        this.updatePendingState();
+        // Clear persisted sync state on wipe
+        clearSyncPersistence();
+
+        this.setState('idle');
+        this.setPhase('idle');
+        this.log('wipe: complete');
     }
 
     /**
@@ -329,6 +384,7 @@ export class YjsDriveProvider {
 
         this.isSyncing = true;
         this.setState('syncing');
+        markSyncStarted(); // Persist that sync is in progress
         const loadedDocs = this.docManager.getLoadedDocs();
         this.log('sync: started', { docs: loadedDocs, force, hasPendingLocal, allowPull });
 
@@ -367,9 +423,11 @@ export class YjsDriveProvider {
             this.log('sync: manifest saved, lastSync', this.manifest.getLastSync());
 
             this.setState('idle');
+            markSyncCompleted(); // Persist successful sync completion
 
         } catch (error) {
             console.error('[YjsDriveProvider] Sync failed:', error);
+            markSyncFailed(); // Persist that sync failed (pending changes remain)
             if (error instanceof AuthorizationError) {
                 this.setState('error');
                 this.setPhase('error');
@@ -412,13 +470,19 @@ export class YjsDriveProvider {
 
     /**
      * Check if there are local changes that need to be pushed
+     * This includes in-memory pending deltas and persisted state from previous sessions
      */
     hasLocalChangesToPush(): boolean {
         if (this.forceFullStateDocs.size > 0) {
             return true;
         }
 
-        return this.hasPendingDeltas();
+        if (this.hasPendingDeltas()) {
+            return true;
+        }
+
+        // Also check persisted state for changes from previous sessions
+        return hasPersistedPendingChanges() || wasSyncInterrupted();
     }
 
     /**
@@ -747,6 +811,9 @@ export class YjsDriveProvider {
             this.pendingDeltas.get(docName)!.push(update);
 
             this.log('doc update queued', { docName, pending: this.pendingDeltas.get(docName)?.length });
+
+            // Persist that we have pending changes (survives page refresh)
+            markPendingChanges();
 
             this.updatePendingState();
 

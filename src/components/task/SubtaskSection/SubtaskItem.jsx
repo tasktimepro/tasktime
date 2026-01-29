@@ -4,7 +4,7 @@ import TaskHeader from '../TaskHeader';
 import TaskActions from '../TaskActions';
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
-import { useTimer } from '../../../hooks/useTimer';
+import { useTimers } from '../../../hooks/useTimers';
 
 /**
  * SubtaskItem component - Displays individual subtask.
@@ -23,10 +23,12 @@ const SubtaskItem = ({
     // Yjs hooks for state
     const { updateTask } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
-    const { isActive: isAnyTimerActive, isPaused, taskId: activeTimerTaskId, startTime: timerStartTime, note: timerNote, clearTimer } = useTimer();
+    const { getTimerForProject, clearTimer } = useTimers();
 
     // Compute state
-    const isTimerActive = isAnyTimerActive && activeTimerTaskId === task.id;
+    const projectTimer = task.projectId ? getTimerForProject(task.projectId) : null;
+    const isAnyTimerActive = !!projectTimer;
+    const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
     const isCompleted = task.completed || false;
     const isArchived = task.archived || false;
     
@@ -34,7 +36,7 @@ const SubtaskItem = ({
     const isRelatedToActiveTimer = isTimerActive;
     
     // Should dim if another task has active timer
-    const shouldDimTask = isAnyTimerActive && !isRelatedToActiveTimer;
+    const shouldDimTask = isAnyTimerActive && !projectTimer?.isPaused && !isRelatedToActiveTimer;
 
     // Calculate time for this subtask
     const mainTaskTime = useMemo(() => {
@@ -50,18 +52,18 @@ const SubtaskItem = ({
         const now = Date.now();
 
         // If timer is active for this task, stop it and create entry
-        if (isTimerActive && timerStartTime) {
+        if (isTimerActive && projectTimer?.startTime && task.projectId) {
             createEntry({
                 taskId: task.id,
-                start: timerStartTime,
+                start: projectTimer.startTime,
                 end: now,
-                note: timerNote
+                note: projectTimer.note
             });
-            clearTimer();
+            clearTimer(task.projectId);
         }
 
         updateTask(task.id, { completed: checked, lastActive: now });
-    }, [isTimerActive, timerStartTime, timerNote, task.id, createEntry, clearTimer, updateTask]);
+    }, [isTimerActive, projectTimer, task.id, task.projectId, createEntry, clearTimer, updateTask]);
 
     /**
      * Update subtask title

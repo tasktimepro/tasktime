@@ -10,7 +10,7 @@ import { useBusinessInfos } from './hooks/useBusinessInfos.ts';
 import { useInvoiceTemplates } from './hooks/useInvoiceTemplates.ts';
 import { usePaymentMethods } from './hooks/usePaymentMethods.ts';
 import { usePreferences } from './hooks/usePreferences.ts';
-import { useTimer } from './hooks/useTimer.ts';
+import { useTimers } from './hooks/useTimers.ts';
 import { useUrlState } from './hooks/useUrlState.ts';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
@@ -20,7 +20,7 @@ import Dashboard from './components/Dashboard';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
 import AuthCallback from './components/AuthCallback';
-import GlobalTimer from './components/GlobalTimer';
+import GlobalTimerStack from './components/timer/GlobalTimerStack';
 import ModalManager from './components/modals/ModalManager';
 import ErrorBoundary from './components/ErrorBoundary';
 import OfflineIndicator from './components/OfflineIndicator';
@@ -111,15 +111,13 @@ function AppContent() {
         isLoading: preferencesLoading 
     } = usePreferences();
 
-    const { 
-        isActive: timerIsActive,
-        isPaused,
-        taskId: timerTaskId,
-        elapsedTime: timerElapsedTime,
-        startTime: timerStartTime,
-        clearTimer,
-        isLoading: timerLoading 
-    } = useTimer();
+    const { timers, clearTimer, isLoading: timerLoading } = useTimers();
+    const focusedTimer = timers[0] || null;
+    const timerIsActive = !!focusedTimer;
+    const isPaused = focusedTimer?.isPaused || false;
+    const timerTaskId = focusedTimer?.taskId || null;
+    const timerElapsedTime = focusedTimer?.elapsedTime || 0;
+    const timerStartTime = focusedTimer?.startTime || null;
 
     const totalsHidden = Boolean(preferences.hideTotals);
 
@@ -357,7 +355,9 @@ function AppContent() {
         (pendingImport.invoiceTemplates || []).forEach((template) => createInvoiceTemplate(template));
 
         updatePreferences(pendingImport.preferences || {});
-        clearTimer();
+        timers.forEach(timer => {
+            clearTimer(timer.projectId);
+        });
         setPendingImport(null);
     }, [
         pendingImport,
@@ -372,6 +372,7 @@ function AppContent() {
         createInvoiceTemplate,
         updatePreferences,
         clearTimer,
+        timers,
     ]);
 
     // === Loading Screen ===
@@ -657,8 +658,8 @@ function AppContent() {
                 {/* Global Timer Display - Fixed at top */}
                 {showGlobalTimer && timerIsActive && (
                     <div className="fixed top-4 left-[calc(1.5rem+16rem+1.5rem)] right-6 z-50 flex justify-center global-timer-mobile">
-                        <div className="bg-card shadow-lg rounded-lg w-auto max-w-2xl shadow-md">
-                            <GlobalTimer
+                        <div className="w-auto max-w-2xl">
+                            <GlobalTimerStack
                                 navigateToProject={navigateToProject}
                                 onClose={() => {
                                     setShowGlobalTimer(false);

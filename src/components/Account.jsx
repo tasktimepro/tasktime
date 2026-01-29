@@ -32,7 +32,7 @@ const Account = ({
 }) => {
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
-    const { clearAllData, isDriveConnected, forceSyncDrive, disconnectDrive } = useYjs();
+    const { clearAllData, isDriveConnected, forceSyncDrive, disconnectDrive, wipeDriveData } = useYjs();
     const { signOut } = useGoogleAuth();
     const { preferences, updatePreferences } = usePreferences();
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
@@ -85,17 +85,20 @@ const Account = ({
     };
 
     // Delete all account data function
-    // Note: This only clears local data, does NOT sync or disconnect from Drive
-    // This is useful for testing resync behavior
+    // Note: When connected, this also wipes Drive to avoid reintroducing old data
     const handleDeleteAllData = async () => {
-        if (deleteConfirmationText !== 'Delete') {
-            showError('Please type "Delete" to confirm');
+        if (deleteConfirmationText.trim().toLowerCase() !== 'delete all data') {
+            showError('Please type "delete all data" to confirm');
             return;
         }
 
         setIsDeleting(true);
         try {
-            // Clear all data via Yjs store (does NOT disconnect from Drive)
+            if (isDriveConnected) {
+                await wipeDriveData();
+            }
+
+            // Clear all data via Yjs store (disconnects Drive locally)
             await clearAllData();
             
             // Close modal and reset state
@@ -198,52 +201,6 @@ const Account = ({
                                     </Button>
                                 </CardContent>
                             </Card>
-
-                            {/* Temporary Delete All Projects & Related Data - Uncommented for demonstration */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Delete All Projects & Related Data</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <Notice
-                                        title="Temporary Feature"
-                                        description="This will delete all projects, tasks, time entries, and invoices. Business info, clients, templates, and payment methods will remain intact."
-                                        icon={TrashIcon}
-                                        className="mb-4"
-                                    />
-                                    
-                                    <Button
-                                        variant="destructive"
-                                        onClick={() => _setShowDeleteProjectsModal(true)}
-                                        leadingIcon={TrashIcon}
-                                    >
-                                        Delete All Projects & Related Data
-                                    </Button>
-                                </CardContent>
-                            </Card>
-
-                            {/* Temporary Delete All Invoices - Uncommented for demonstration */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Delete All Invoices</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <Notice
-                                        title="Temporary Feature"
-                                        description="This will delete all invoices from your account. Projects and other data will remain intact."
-                                        icon={TrashIcon}
-                                        className="mb-4"
-                                    />
-                                    
-                                    <Button
-                                        variant="destructive"
-                                        onClick={() => _setShowDeleteInvoicesModal(true)}
-                                        leadingIcon={TrashIcon}
-                                    >
-                                        Delete All Invoices
-                                    </Button>
-                                </CardContent>
-                            </Card>
                         </div>
                     </div>
                 );
@@ -320,7 +277,7 @@ const Account = ({
                             variant="destructive"
                             onClick={handleDeleteAllData}
                             leadingIcon={TrashIcon}
-                            disabled={deleteConfirmationText !== 'Delete' || isDeleting}
+                            disabled={deleteConfirmationText.trim().toLowerCase() !== 'delete all data' || isDeleting}
                         >
                             {isDeleting ? 'Deleting...' : 'Delete All Data'}
                         </Button>
@@ -358,14 +315,14 @@ const Account = ({
 
                     <div className="space-y-2">
                         <Label htmlFor="confirmDelete" className="block">
-                            Type <strong>"Delete"</strong> to confirm:
+                            Type <strong>"delete all data"</strong> to confirm:
                         </Label>
                         <Input
                             id="confirmDelete"
                             type="text"
                             value={deleteConfirmationText}
                             onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                            placeholder="Type 'Delete' here"
+                            placeholder="Type 'delete all data' here"
                         />
                     </div>
                 </div>

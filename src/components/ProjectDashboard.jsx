@@ -9,7 +9,7 @@ import InvoicesList from './InvoicesList';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { useTimer } from '../hooks/useTimer.ts';
+import { useTimers } from '../hooks/useTimers.ts';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -34,7 +34,8 @@ const ProjectDashboard = ({
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
     const { showError } = useToast();
-    const { isActive: isTimerActive, isPaused } = useTimer();
+    const { getTimerForProject } = useTimers();
+    const projectTimer = getTimerForProject(project.id);
     
     // Get invoices for this project
     const projectInvoices = invoices.filter(invoice => 
@@ -46,7 +47,7 @@ const ProjectDashboard = ({
      */
     const handleEditInvoice = (invoice) => {
         // Check if a timer is currently active (running, not paused)
-        if (isTimerActive && !isPaused) {
+        if (projectTimer && !projectTimer.isPaused) {
             showError('Cannot update an invoice while a timer is active. Please pause the timer first.');
             return;
         }

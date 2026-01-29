@@ -15,14 +15,14 @@ export function useClients() {
 
     // Sorted by name
     const sortedClients = useMemo(
-        () => [...items].sort((a, b) => a.name.localeCompare(b.name)),
+        () => [...items].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
         [items]
     );
 
     // Find by name (case insensitive)
     const findByName = useCallback((name: string) => {
         const lower = name.toLowerCase();
-        return items.find(c => c.name.toLowerCase() === lower);
+        return items.find(c => (c.name || '').toLowerCase() === lower);
     }, [items]);
 
     return {

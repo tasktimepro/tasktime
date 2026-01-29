@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
-import { useTimer } from '../hooks/useTimer.ts';
+import { useTimers } from '../hooks/useTimers.ts';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -29,7 +29,8 @@ function ExportImport({
     preferences = {},
     onImport 
 }) {
-    const { isActive: isTimerActive } = useTimer();
+    const { timers } = useTimers();
+    const isTimerActive = timers.length > 0;
     const [showImportModal, setShowImportModal] = useState(false);
     const [importData, setImportData] = useState('');
     const [importError, setImportError] = useState('');

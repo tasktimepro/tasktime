@@ -163,21 +163,11 @@ vi.mock('./hooks/usePreferences.ts', () => ({
     }),
 }))
 
-vi.mock('./hooks/useTimer.ts', () => ({
-    useTimer: () => ({
-        isActive: false,
-        isPaused: false,
-        taskId: null,
-        elapsedTime: 0,
-        note: '',
-        startTime: null,
-        isLoading: false,
-        startTimer: vi.fn(),
-        pauseTimer: vi.fn(),
-        resumeTimer: vi.fn(),
-        stopTimer: vi.fn(),
-        setNote: vi.fn(),
+vi.mock('./hooks/useTimers.ts', () => ({
+    useTimers: () => ({
+        timers: [],
         clearTimer: vi.fn(),
+        isLoading: false,
     }),
 }))
 
@@ -213,7 +203,7 @@ vi.mock('./components/ClientDashboard', () => ({ default: () => <div data-testid
 vi.mock('./components/Dashboard', () => ({ default: () => <div data-testid="dashboard" /> }))
 vi.mock('./components/Account', () => ({ default: () => <div data-testid="account" /> }))
 vi.mock('./components/Invoices', () => ({ default: () => <div data-testid="invoices" /> }))
-vi.mock('./components/GlobalTimer', () => ({ default: () => <div data-testid="global-timer" /> }))
+vi.mock('./components/timer/GlobalTimerStack', () => ({ default: () => <div data-testid="global-timer" /> }))
 vi.mock('./components/modals/ModalManager', () => ({ default: () => <div data-testid="modal-manager" /> }))
 vi.mock('./components/ErrorBoundary', () => ({ default: ({ children }) => children }))
 vi.mock('./components/OfflineIndicator', () => ({ default: () => <div data-testid="offline-indicator" /> }))

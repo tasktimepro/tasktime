@@ -37,6 +37,9 @@ make build
 
 TaskTime stores all data locally in IndexedDB (`tasktime-db`). Clearing browser data will remove all projects and time entries. Use Export/Import for backups.
 
+### Sync & Schema Changes (Pre‑Production)
+If you change data structures during development, ensure Drive data is cleared or isolated before testing. Old cloud state can reintroduce incompatible records after a local wipe. For production, plan explicit schema/versioning and migration safeguards.
+
 ## Project Structure (high level)
 
 ```

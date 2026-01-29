@@ -44,7 +44,7 @@ export type {
     InvoiceTemplate,
     PaymentMethod,
     Preferences,
-    TimerState,
+    MultiTimerState,
 } from './types';
 
 // Collection helpers

@@ -4,13 +4,18 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExportImport from '../../components/ExportImport'
 
-// Mock useTimer hook
-const mockTimerState = { isActive: false };
-vi.mock('../../hooks/useTimer.ts', () => ({
-    useTimer: () => mockTimerState
+// Mock useTimers hook
+const mockTimers = [];
+vi.mock('../../hooks/useTimers.ts', () => ({
+    useTimers: () => ({ timers: mockTimers })
 }));
 
 describe('Import/Export integration', () => {
+
+    beforeEach(() => {
+
+        mockTimers.length = 0
+    })
 
     const baseProps = {
         projects: [{ id: 'project-1', title: 'Project One' }],
@@ -178,7 +183,7 @@ describe('Import/Export integration', () => {
         const user = userEvent.setup()
         
         // Set timer as active
-        mockTimerState.isActive = true;
+        mockTimers.push({ projectId: 'project-1', taskId: 'task-1' })
 
         render(
             <ExportImport
@@ -192,6 +197,6 @@ describe('Import/Export integration', () => {
         expect(screen.getByText('Active Timer Detected!')).toBeInTheDocument()
         
         // Reset for other tests
-        mockTimerState.isActive = false;
+        mockTimers.length = 0
     })
 })

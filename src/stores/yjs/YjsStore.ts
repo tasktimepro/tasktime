@@ -27,7 +27,7 @@ import type {
     InvoiceTemplate,
     PaymentMethod,
     Preferences,
-    TimerState,
+    MultiTimerState,
 } from './types';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -121,9 +121,9 @@ export class YjsStore {
         return this._coreDoc!.getMap('preferences');
     }
 
-    get timer(): Y.Map<string, TimerState[keyof TimerState]> {
+    get timers(): Y.Map<string, MultiTimerState> {
         this.assertReady();
-        return this._coreDoc!.getMap('timer');
+        return this._coreDoc!.getMap('timers');
     }
 
     /**
@@ -611,6 +611,17 @@ export class YjsStore {
      */
     updateDriveSessionId(sessionId: string | null): void {
         this.driveProvider?.updateSessionId(sessionId);
+    }
+
+    /**
+     * Wipe all TaskTime files from Google Drive (appDataFolder)
+     */
+    async wipeDriveData(): Promise<void> {
+        if (!this.driveProvider) {
+            throw new Error('Drive not connected');
+        }
+
+        await this.driveProvider.wipeDriveData();
     }
 
     /**

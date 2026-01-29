@@ -7,7 +7,7 @@ import {
 import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
-import { useTimer } from '../hooks/useTimer';
+import { useTimers } from '../hooks/useTimers';
 import { THIRTY_DAYS_MS, ONE_HOUR_MS, ONE_MINUTE_MS } from '../constants/app';
 import useCurrencyConversion from './dashboard/hooks/useCurrencyConversion';
 import useMetricsCalculation from './dashboard/hooks/useMetricsCalculation';
@@ -31,7 +31,7 @@ const Dashboard = ({
     // Use Yjs hooks directly
     const { tasks, updateTask } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
-    const { isActive: isTimerActive, taskId: timerTaskId, isPaused, elapsedTime, startTime: timerStartTime, note: timerNote, stop: stopTimer } = useTimer();
+    const { timers, clearTimer } = useTimers();
     
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
@@ -151,21 +151,19 @@ const Dashboard = ({
             taskActivity[entry.taskId].totalTime += (entry.end - entry.start);
         });
 
-        // For currently running timer, calculate display time
-        if (isTimerActive) {
-            if (!taskActivity[timerTaskId]) {
-                taskActivity[timerTaskId] = {
-                    totalTime: 0
-                };
-            }
+        // For currently running timers, calculate display time
+        // Note: timer.elapsedTime is already synchronized via master clock from useTimers
+        if (timers.length > 0) {
+            timers.forEach(timer => {
+                if (!taskActivity[timer.taskId]) {
+                    taskActivity[timer.taskId] = {
+                        totalTime: 0
+                    };
+                }
 
-            // Add current session time to total time (for display only)
-            const currentSessionTime = Date.now() - timerStartTime;
-            if (!isPaused) {
-                taskActivity[timerTaskId].totalTime += currentSessionTime;
-            } else {
-                taskActivity[timerTaskId].totalTime += elapsedTime;
-            }
+                // Use the pre-computed elapsedTime from useTimers (synchronized via master clock)
+                taskActivity[timer.taskId].totalTime += timer.elapsedTime;
+            });
         }
 
         // Enhance tasks with project information and activity data
@@ -202,10 +200,13 @@ const Dashboard = ({
         });
 
         // If a task has a running timer, make it appear at the top
-        if (isTimerActive) {
+        if (timers.length > 0) {
             const currentTime = Date.now();
             enhancedTasks.forEach(task => {
-                if (task.id === timerTaskId) {
+                const hasRunningTimer = timers.some(timer =>
+                    timer.taskId === task.id && !timer.isPaused
+                );
+                if (hasRunningTimer) {
                     task.lastActive = currentTime;
                 }
             });
@@ -227,7 +228,7 @@ const Dashboard = ({
         }
 
         return sortedTasks;
-    }, [tasks, timeEntries, projects, taskSearchQuery, completedInCurrentSession, isTimerActive, timerTaskId, isPaused, elapsedTime]);
+    }, [tasks, timeEntries, projects, taskSearchQuery, completedInCurrentSession, timers]);
 
     /**
      * Get recent projects with total time and pending billable amount
@@ -332,25 +333,25 @@ const Dashboard = ({
         }
 
         // If timer is active for this task and we're completing it, stop the timer
-        if (newCompletedStatus && timerTaskId === task.id && isTimerActive) {
-            // Create time entry with proper duration based on pause state
-            const endTime = isPaused && elapsedTime > 0
-                ? timerStartTime + elapsedTime
+        const activeTimer = timers.find(timer => timer.taskId === task.id);
+        if (newCompletedStatus && activeTimer && task.projectId) {
+            const endTime = activeTimer.isPaused && activeTimer.elapsedTime > 0
+                ? activeTimer.startTime + activeTimer.elapsedTime
                 : now;
 
             createEntry({
                 taskId: task.id,
-                start: timerStartTime,
+                start: activeTimer.startTime,
                 end: endTime,
-                note: timerNote
+                note: activeTimer.note
             });
 
-            stopTimer();
+            clearTimer(task.projectId);
         }
 
         // Update task completion status and lastActive timestamp
         updateTask(task.id, { completed: newCompletedStatus, lastActive: now });
-    }, [isTimerActive, timerTaskId, isPaused, elapsedTime, timerStartTime, timerNote, createEntry, stopTimer, updateTask, setCompletedInCurrentSession]);
+    }, [timers, createEntry, clearTimer, updateTask, setCompletedInCurrentSession]);
 
     /**
      * Handle clicking on task title to navigate to project
@@ -377,7 +378,7 @@ const Dashboard = ({
         if (task.completed) return null;
 
         // If timer is active for another task and this task should be disabled, don't render controls
-        if (shouldDisable && isTimerActive && timerTaskId !== task.id) {
+        if (shouldDisable) {
             return null;
         }
 
@@ -389,7 +390,7 @@ const Dashboard = ({
                 size="sm"
             />
         );
-    }, [isTimerActive, timerTaskId]);
+    }, []);
 
     /**
      * Render task title with navigation

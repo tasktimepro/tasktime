@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { CreditCardIcon, BuildingOfficeIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { useTimer } from '../hooks/useTimer.ts';
+import { useTimers } from '../hooks/useTimers.ts';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaymentMethods from './PaymentMethods';
@@ -38,7 +38,8 @@ const Invoices = ({
 }) => {
     const { urlParams } = useUrlState();
     const { showError } = useToast();
-    const { isActive: isTimerActive, isPaused } = useTimer();
+    const { timers } = useTimers();
+    const hasRunningTimer = timers.some(timer => !timer.isPaused);
     
     // State for the invoice modal
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -47,7 +48,7 @@ const Invoices = ({
     // Handle creating a new invoice with timer check
     const handleCreateNewInvoice = () => {
         // Check if a timer is currently active (running, not paused)
-        if (isTimerActive && !isPaused) {
+        if (hasRunningTimer) {
             showError('Cannot generate an invoice while a timer is active. Please pause the timer first.');
             return;
         }
@@ -58,7 +59,7 @@ const Invoices = ({
     // Handle editing an invoice with timer check
     const handleEditInvoice = (invoice) => {
         // Check if a timer is currently active (running, not paused)
-        if (isTimerActive && !isPaused) {
+        if (hasRunningTimer) {
             showError('Cannot update an invoice while a timer is active. Please pause the timer first.');
             return;
         }

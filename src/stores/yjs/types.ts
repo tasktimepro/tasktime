@@ -132,13 +132,14 @@ export interface Preferences {
     autoSyncMode?: 'backup' | 'sync';
 }
 
-export interface TimerState {
-    taskId?: string | null;
-    startTime?: number | null;
+export interface MultiTimerState {
+    projectId: string;
+    taskId: string;
+    startTime: number;
     paused?: boolean;
     pausedElapsedTime?: number;
     note?: string;
-    lastActive?: number | null;
+    lastActive?: number;
 }
 
 // ============================================================================

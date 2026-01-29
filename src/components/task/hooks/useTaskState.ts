@@ -1,10 +1,11 @@
 import { useEffect, useMemo } from 'react';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../../../constants/app';
 import { useTasks } from '../../../hooks/useTasks';
-import { useTimer } from '../../../hooks/useTimer';
+import { useTimers } from '../../../hooks/useTimers';
 
 type TaskItem = {
     id: string;
+    projectId?: string;
     completed?: boolean;
     archived?: boolean;
     billable?: boolean;
@@ -36,7 +37,8 @@ const useTaskState = ({
     subtasks = []
 }: UseTaskStateParams) => {
     const { updateTask } = useTasks();
-    const { isActive: anyTimerActive, taskId: timerTaskId, isPaused } = useTimer();
+    const { getTimerForProject } = useTimers();
+    const projectTimer = task.projectId ? getTimerForProject(task.projectId) : null;
     
     const taskTimeEntries = useMemo(() => {
         return timeEntries.filter(entry => entry.taskId === task.id);
@@ -75,16 +77,17 @@ const useTaskState = ({
     const mainTaskTime = taskTime;
     const totalTimeWithSubtasks = totalTime;
 
-    const isTimerActive = anyTimerActive && timerTaskId === task.id;
-    const subtaskTimerActive = subtasks.some(subtask =>
-        anyTimerActive && timerTaskId === subtask.id
+    const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
+    const subtaskTimerActive = !!projectTimer && subtasks.some(subtask =>
+        projectTimer.taskId === subtask.id
     );
 
     const isCompleted = task.completed || false;
     const isArchived = task.archived || false;
 
     const isRelatedToActiveTimer = !!(isTimerActive || subtaskTimerActive);
-    const shouldDimTask = anyTimerActive && !isPaused && !isRelatedToActiveTimer && !isArchived;
+    const anyTimerActive = !!projectTimer;
+    const shouldDimTask = anyTimerActive && !projectTimer?.isPaused && !isRelatedToActiveTimer && !isArchived;
 
     const hasSignificantBillableTime = useMemo(() => {
         const taskBillableEntries = taskTimeEntries.filter(entry => {

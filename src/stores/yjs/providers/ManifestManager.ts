@@ -65,6 +65,16 @@ export class ManifestManager {
     }
 
     /**
+     * Reset cached manifest state (used after a full Drive wipe)
+     */
+    reset(): void {
+        this.manifestFileId = null;
+        this.manifest = null;
+        this.fileIdCache.clear();
+        this.lastManifestModifiedTime = null;
+    }
+
+    /**
      * Check if using Worker proxy mode
      */
     private get useWorker(): boolean {

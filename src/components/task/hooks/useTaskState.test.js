@@ -11,11 +11,9 @@ vi.mock('../../../hooks/useTasks', () => ({
     })
 }))
 
-vi.mock('../../../hooks/useTimer', () => ({
-    useTimer: () => ({
-        isActive: false,
-        taskId: null,
-        isPaused: false
+vi.mock('../../../hooks/useTimers', () => ({
+    useTimers: () => ({
+        getTimerForProject: () => null
     })
 }))
 
@@ -23,6 +21,7 @@ describe('useTaskState', () => {
 
     const baseTask = {
         id: 'task-1',
+        projectId: 'project-1',
         billable: false,
         billableSetByUser: false,
         createdAt: 0

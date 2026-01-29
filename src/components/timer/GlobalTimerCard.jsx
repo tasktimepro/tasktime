@@ -1,0 +1,58 @@
+import React from 'react';
+import GlobalTimer from '../GlobalTimer';
+
+/**
+ * GlobalTimerCard component - Single timer card for the stack
+ * @param {Object} props
+ * @param {Object} props.timer - Timer data
+ * @param {boolean} props.isFocused - Whether this is the focused timer
+ * @param {Function} props.onFocus - Focus handler
+ * @param {Function} props.navigateToProject - Navigate to project handler
+ * @param {Function} props.onClose - Close handler
+ */
+const GlobalTimerCard = ({
+    timer,
+    isFocused = false,
+    onFocus,
+    isExpanded = false,
+    onToggleExpanded,
+    navigateToProject,
+    onClose
+}) => {
+    const handleFocus = () => {
+        if (onFocus && timer?.projectId) {
+            onFocus(timer.projectId);
+        }
+    };
+
+    const handleToggleExpanded = (nextValue) => {
+        if (onToggleExpanded) {
+            onToggleExpanded(nextValue);
+        }
+    };
+
+    return (
+        <div
+            className="transition-all bg-card shadow-md cursor-pointer rounded-lg"
+            onClick={handleFocus}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleFocus();
+                }
+            }}
+        >
+            <GlobalTimer
+                timer={timer}
+                navigateToProject={navigateToProject}
+                onClose={onClose}
+                isExpanded={isExpanded}
+                onToggleExpanded={handleToggleExpanded}
+            />
+        </div>
+    );
+};
+
+export default GlobalTimerCard;

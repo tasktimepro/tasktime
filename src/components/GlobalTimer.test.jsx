@@ -5,28 +5,24 @@ import GlobalTimer from './GlobalTimer'
 import { ToastContext } from '../contexts/ToastContext'
 
 // Mock timer hook state
-let mockTimerState = {
-    isActive: false,
-    isPaused: false,
-    taskId: null,
-    startTime: null,
-    elapsedTime: 0,
-    note: ''
-}
+let mockTimers = []
 
 // Hoisted mocks
 const timerHookMocks = vi.hoisted(() => ({
 
+    updateTimer: vi.fn(),
     startTimer: vi.fn(),
     pauseTimer: vi.fn(),
     resumeTimer: vi.fn(),
     clearTimer: vi.fn()
 }))
 
-vi.mock('../hooks/useTimer.ts', () => ({
+vi.mock('../hooks/useTimers.ts', () => ({
 
-    useTimer: () => ({
-        ...mockTimerState,
+    useTimers: () => ({
+        timers: mockTimers,
+        updateTimer: timerHookMocks.updateTimer,
+        getTimerForProject: (projectId) => mockTimers.find(timer => timer.projectId === projectId) || null,
         startTimer: timerHookMocks.startTimer,
         pauseTimer: timerHookMocks.pauseTimer,
         resumeTimer: timerHookMocks.resumeTimer,
@@ -80,14 +76,7 @@ describe('GlobalTimer', () => {
 
         vi.clearAllMocks()
         // Reset timer state
-        mockTimerState = {
-            isActive: false,
-            isPaused: false,
-            taskId: null,
-            startTime: null,
-            elapsedTime: 0,
-            note: ''
-        }
+        mockTimers = []
     })
 
     afterEach(() => {
@@ -98,14 +87,14 @@ describe('GlobalTimer', () => {
     it('shows paused elapsed time when timer is paused', async () => {
 
         // Set timer as paused with elapsed time
-        mockTimerState = {
-            isActive: true,
-            isPaused: true,
+        mockTimers = [{
+            projectId: 'project-1',
             taskId: 'task-1',
             startTime: Date.now() - 10000,
             elapsedTime: 65000,
+            isPaused: true,
             note: ''
-        }
+        }]
 
         renderWithToast(
             <GlobalTimer

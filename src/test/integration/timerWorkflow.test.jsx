@@ -6,14 +6,7 @@ import TaskTimer from '../../components/TaskTimer'
 import { ToastContext } from '../../contexts/ToastContext'
 
 // Mutable state for controlling test scenarios
-let mockTimerState = {
-    isActive: false,
-    isPaused: false,
-    taskId: null,
-    startTime: null,
-    elapsedTime: 0,
-    note: ''
-}
+let mockTimers = []
 
 let mockEntries = []
 
@@ -34,10 +27,11 @@ const entriesHookMocks = vi.hoisted(() => ({
     })
 }))
 
-vi.mock('../../hooks/useTimer.ts', () => ({
+vi.mock('../../hooks/useTimers.ts', () => ({
 
-    useTimer: () => ({
-        ...mockTimerState,
+    useTimers: () => ({
+        timers: mockTimers,
+        getTimerForProject: (projectId) => mockTimers.find(timer => timer.projectId === projectId) || null,
         startTimer: timerHookMocks.startTimer,
         pauseTimer: timerHookMocks.pauseTimer,
         resumeTimer: timerHookMocks.resumeTimer,
@@ -78,14 +72,7 @@ describe('Timer workflow integration', () => {
 
         vi.clearAllMocks()
         mockEntries = []
-        mockTimerState = {
-            isActive: false,
-            isPaused: false,
-            taskId: null,
-            startTime: null,
-            elapsedTime: 0,
-            note: ''
-        }
+        mockTimers = []
         user = userEvent.setup()
     })
 
@@ -108,14 +95,14 @@ describe('Timer workflow integration', () => {
         expect(timerHookMocks.startTimer).toHaveBeenCalledWith('task-1')
 
         // Now set timer as active
-        mockTimerState = {
-            isActive: true,
-            isPaused: false,
+        mockTimers = [{
+            projectId: 'project-1',
             taskId: 'task-1',
             startTime: 0,
             elapsedTime: 1000,
+            isPaused: false,
             note: ''
-        }
+        }]
 
         // Re-render with active timer state
         cleanup()
@@ -128,20 +115,20 @@ describe('Timer workflow integration', () => {
         // Click stop
         await user.click(screen.getByTitle('Save & Stop Timer'))
         expect(entriesHookMocks.createEntry).toHaveBeenCalled()
-        expect(timerHookMocks.clearTimer).toHaveBeenCalled()
+        expect(timerHookMocks.clearTimer).toHaveBeenCalledWith('project-1')
     })
 
     it('pause then stop uses paused elapsed time', async () => {
 
         // Set timer as paused
-        mockTimerState = {
-            isActive: true,
-            isPaused: true,
+        mockTimers = [{
+            projectId: 'project-1',
             taskId: 'task-1',
             startTime: 0,
             elapsedTime: 5000,
+            isPaused: true,
             note: ''
-        }
+        }]
 
         render(
             <ToastContext.Provider value={toastContextValue}>
@@ -161,14 +148,14 @@ describe('Timer workflow integration', () => {
     it('pause then resume continues from paused time', async () => {
 
         // Set timer as paused
-        mockTimerState = {
-            isActive: true,
-            isPaused: true,
+        mockTimers = [{
+            projectId: 'project-1',
             taskId: 'task-1',
             startTime: 0,
             elapsedTime: 5000,
+            isPaused: true,
             note: ''
-        }
+        }]
 
         render(
             <ToastContext.Provider value={toastContextValue}>

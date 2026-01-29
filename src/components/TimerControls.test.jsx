@@ -6,14 +6,7 @@ import TimerControls from './TimerControls'
 import { ToastContext } from '../contexts/ToastContext'
 
 // Mutable state for controlling test scenarios
-let mockTimerState = {
-    isActive: false,
-    isPaused: false,
-    taskId: null,
-    startTime: null,
-    elapsedTime: 0,
-    note: ''
-}
+let mockProjectTimer = null
 
 // Hoisted mocks for timer hook functions
 const timerHookMocks = vi.hoisted(() => ({
@@ -21,7 +14,11 @@ const timerHookMocks = vi.hoisted(() => ({
     startTimer: vi.fn(),
     pauseTimer: vi.fn(),
     resumeTimer: vi.fn(),
-    clearTimer: vi.fn()
+    clearTimer: vi.fn(),
+    getTimerForProject: vi.fn((projectId) => {
+        if (!mockProjectTimer) return null
+        return mockProjectTimer.projectId === projectId ? mockProjectTimer : null
+    })
 }))
 
 // Hoisted mocks for time entries hook
@@ -36,10 +33,10 @@ const tasksHookMocks = vi.hoisted(() => ({
     updateTask: vi.fn()
 }))
 
-vi.mock('../hooks/useTimer.ts', () => ({
+vi.mock('../hooks/useTimers.ts', () => ({
 
-    useTimer: () => ({
-        ...mockTimerState,
+    useTimers: () => ({
+        getTimerForProject: timerHookMocks.getTimerForProject,
         startTimer: timerHookMocks.startTimer,
         pauseTimer: timerHookMocks.pauseTimer,
         resumeTimer: timerHookMocks.resumeTimer,
@@ -85,14 +82,7 @@ describe('TimerControls', () => {
 
         vi.clearAllMocks()
         // Reset timer state
-        mockTimerState = {
-            isActive: false,
-            isPaused: false,
-            taskId: null,
-            startTime: null,
-            elapsedTime: 0,
-            note: ''
-        }
+        mockProjectTimer = null
     })
 
     afterEach(() => {
@@ -123,12 +113,12 @@ describe('TimerControls', () => {
     it('shows pause and stop buttons when running', () => {
 
         // Set timer as active for this task
-        mockTimerState = {
-            isActive: true,
-            isPaused: false,
+        mockProjectTimer = {
+            projectId: 'project-1',
             taskId: 'task-1',
             startTime: Date.now() - 10000,
             elapsedTime: 10000,
+            isPaused: false,
             note: ''
         }
 
@@ -143,12 +133,12 @@ describe('TimerControls', () => {
     it('stops timer and creates entry', async () => {
 
         // Set timer as active for this task
-        mockTimerState = {
-            isActive: true,
-            isPaused: false,
+        mockProjectTimer = {
+            projectId: 'project-1',
             taskId: 'task-1',
             startTime: Date.now() - 10000,
             elapsedTime: 10000,
+            isPaused: false,
             note: ''
         }
 
@@ -159,18 +149,18 @@ describe('TimerControls', () => {
         await userEvent.click(screen.getByTitle('Save & Stop Timer'))
 
         expect(entriesHookMocks.createEntry).toHaveBeenCalled()
-        expect(timerHookMocks.clearTimer).toHaveBeenCalled()
+        expect(timerHookMocks.clearTimer).toHaveBeenCalledWith('project-1')
     })
 
     it('stops a paused timer using paused elapsed time', async () => {
 
         // Set timer as paused with elapsed time
-        mockTimerState = {
-            isActive: true,
-            isPaused: true,
+        mockProjectTimer = {
+            projectId: 'project-1',
             taskId: 'task-1',
             startTime: 1000,
             elapsedTime: 5000,
+            isPaused: true,
             note: ''
         }
 
@@ -189,18 +179,18 @@ describe('TimerControls', () => {
                 taskId: 'task-1'
             })
         )
-        expect(timerHookMocks.clearTimer).toHaveBeenCalled()
+        expect(timerHookMocks.clearTimer).toHaveBeenCalledWith('project-1')
     })
 
     it('stops existing timer when starting a new one', async () => {
 
         // Set timer as active for a different task
-        mockTimerState = {
-            isActive: true,
-            isPaused: false,
+        mockProjectTimer = {
+            projectId: 'project-1',
             taskId: 'task-other',
             startTime: 1000,
             elapsedTime: 4000,
+            isPaused: false,
             note: ''
         }
 

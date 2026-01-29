@@ -6,7 +6,7 @@ import TimeEntriesModal from './TimeEntriesModal';
 import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
-import { useTimer } from '../hooks/useTimer';
+import { useTimers } from '../hooks/useTimers';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app';
 
 /**
@@ -33,25 +33,27 @@ const TaskItem = ({
     // Yjs hooks for state
     const { tasks, updateTask } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
-    const { isActive: isAnyTimerActive, isPaused, taskId: activeTimerTaskId, startTime: timerStartTime, note: timerNote, stopTimer, clearTimer } = useTimer();
+    const { getTimerForProject, clearTimer } = useTimers();
 
     const subtasks = useMemo(() => {
         return tasks.filter((t) => t.parentTaskId === task.id);
     }, [tasks, task.id]);
 
     // Compute task state
-    const isTimerActive = isAnyTimerActive && activeTimerTaskId === task.id;
+    const projectTimer = task.projectId ? getTimerForProject(task.projectId) : null;
+    const isAnyTimerActive = !!projectTimer;
+    const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
     const isCompleted = task.completed || false;
     const isArchived = task.archived || false;
     
     // Check if this task or any subtask has active timer
     const subtaskIds = useMemo(() => subtasks.map(s => s.id), [subtasks]);
-    const isRelatedToActiveTimer = isAnyTimerActive && (
-        activeTimerTaskId === task.id || subtaskIds.includes(activeTimerTaskId)
+    const isRelatedToActiveTimer = isAnyTimerActive && projectTimer && (
+        projectTimer.taskId === task.id || subtaskIds.includes(projectTimer.taskId)
     );
     
     // Should dim if another task (not related) has an active timer
-    const shouldDimTask = isAnyTimerActive && !isRelatedToActiveTimer;
+    const shouldDimTask = isAnyTimerActive && !projectTimer?.isPaused && !isRelatedToActiveTimer;
 
     // Calculate total time for this task
     const mainTaskTime = useMemo(() => {
@@ -99,18 +101,18 @@ const TaskItem = ({
         const now = Date.now();
 
         // If timer is active for this task, stop it and create entry
-        if (isTimerActive && timerStartTime) {
+        if (isTimerActive && projectTimer?.startTime && task.projectId) {
             createEntry({
                 taskId: task.id,
-                start: timerStartTime,
+                start: projectTimer.startTime,
                 end: now,
-                note: timerNote
+                note: projectTimer.note
             });
-            clearTimer();
+            clearTimer(task.projectId);
         }
 
         updateTask(task.id, { completed: checked, lastActive: now });
-    }, [isTimerActive, timerStartTime, timerNote, task.id, createEntry, clearTimer, updateTask]);
+    }, [isTimerActive, projectTimer, task.id, task.projectId, createEntry, clearTimer, updateTask]);
 
     /**
      * Update task title.

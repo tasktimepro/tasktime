@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import { usePreferences } from './usePreferences'
 import { useTimeEntries } from './useTimeEntries'
-import { useTimer } from './useTimer'
+import { useTimers } from './useTimers'
 import { useYjs } from '@/contexts/YjsContext'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
@@ -106,10 +106,14 @@ describe('stateful hooks', () => {
     })
 
     it('runs timer lifecycle', async () => {
-        const timerMap = createObservableMap()
+        const timersMap = createObservableMap()
+        const tasksMap = createObservableMap({
+            'task-1': { id: 'task-1', projectId: 'project-1' }
+        })
         const entriesMap = createObservableMap()
         const store = {
-            timer: timerMap,
+            timers: timersMap,
+            tasks: tasksMap,
             activeTimeEntries: entriesMap,
             coreDoc: { transact: (fn) => fn() },
             activeEntriesDoc: { transact: (fn) => fn() },
@@ -117,33 +121,33 @@ describe('stateful hooks', () => {
 
         mockUseYjs.mockReturnValue({ store, isReady: true })
 
-        const { result } = renderHook(() => useTimer())
+        const { result } = renderHook(() => useTimers())
         await act(async () => {})
         expect(result.current.isLoading).toBe(false)
 
         await act(async () => {
             result.current.startTimer('task-1', 'Note')
         })
-        expect(result.current.isActive).toBe(true)
-        expect(timerMap.get('note')).toBe('Note')
+        expect(result.current.timers.length).toBe(1)
+        expect(timersMap.get('project-1')?.note).toBe('Note')
 
         await act(async () => {
-            result.current.pauseTimer()
+            result.current.pauseTimer('project-1')
         })
-        expect(timerMap.get('paused')).toBe(true)
+        expect(timersMap.get('project-1')?.paused).toBe(true)
 
         await act(async () => {
-            result.current.resumeTimer()
+            result.current.resumeTimer('project-1')
         })
-        expect(timerMap.get('paused')).toBe(false)
+        expect(timersMap.get('project-1')?.paused).toBe(false)
 
         let entry
         await act(async () => {
-            entry = result.current.stopTimer()
+            entry = result.current.stopTimer('project-1')
         })
         expect(entry?.taskId).toBe('task-1')
         expect(entriesMap.get(entry.id)?.taskId).toBe('task-1')
         await act(async () => {})
-        expect(result.current.isActive).toBe(false)
+        expect(result.current.timers.length).toBe(0)
     })
 })

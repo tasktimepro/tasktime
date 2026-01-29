@@ -10,7 +10,7 @@ import Modal from './Modal';
 import { useToast } from '../hooks/useToast.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
-import { useTimer } from '../hooks/useTimer.ts';
+import { useTimers } from '../hooks/useTimers.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 
@@ -31,7 +31,7 @@ const TaskTree = ({
     // Yjs hooks for state
     const { tasks, createTask, updateTask, deleteTask } = useTasks({ projectId: project.id });
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
-    const { taskId: activeTimerTaskId, clearTimer } = useTimer();
+    const { getTimerForProject, clearTimer } = useTimers();
 
     const allowBillableToggle = !project.isPersonal;
 
@@ -176,8 +176,9 @@ const TaskTree = ({
         entriesToDelete.forEach(entry => deleteEntry(entry.id));
 
         // Clear timer if it's for one of these tasks
-        if (activeTimerTaskId && taskIdsToDelete.includes(activeTimerTaskId)) {
-            clearTimer();
+        const projectTimer = getTimerForProject(project.id);
+        if (projectTimer && taskIdsToDelete.includes(projectTimer.taskId)) {
+            clearTimer(project.id);
         }
 
         // Delete tasks
@@ -190,7 +191,7 @@ const TaskTree = ({
         
         showSuccess(message);
         setPendingDeleteTaskId(null);
-    }, [pendingDeleteTaskId, tasks, timeEntries, activeTimerTaskId, deleteEntry, clearTimer, deleteTask, showSuccess]);
+    }, [pendingDeleteTaskId, tasks, timeEntries, project.id, getTimerForProject, deleteEntry, clearTimer, deleteTask, showSuccess]);
 
     /**
      * Start creating a subtask for a parent task

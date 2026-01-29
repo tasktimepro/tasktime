@@ -18,7 +18,7 @@ export { useBusinessInfos } from './useBusinessInfos';
 export { useInvoiceTemplates } from './useInvoiceTemplates';
 export { usePaymentMethods } from './usePaymentMethods';
 export { usePreferences } from './usePreferences';
-export { useTimer } from './useTimer';
+export { useTimers } from '../useTimers';
 
 // Re-export context hooks
 export { useYjs, useYjsStore } from '../contexts/YjsContext';

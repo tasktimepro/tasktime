@@ -99,11 +99,10 @@ vi.mock('../hooks/useInvoiceTemplates.ts', () => ({
     })
 }))
 
-vi.mock('../hooks/useTimer.ts', () => ({
+vi.mock('../hooks/useTimers.ts', () => ({
 
-    useTimer: () => ({
-        isActive: false,
-        isPaused: false
+    useTimers: () => ({
+        getTimerForProject: () => null
     })
 }))
 

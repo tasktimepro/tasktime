@@ -51,6 +51,11 @@
 - **Multi-doc architecture:** Data split by type/time period
 - **Sync provider:** Google Drive (delta uploads)
 
+### ⚠️ Schema Changes & Cloud Sync (Pre‑Production)
+- When changing document structure, ensure Drive data is cleared or isolated before testing.
+- Old cloud state can reintroduce incompatible records after a local wipe.
+- For production, plan explicit schema/versioning and server-side migration safeguards.
+
 **Document structure:**
 | Document | Contents | Loading |
 |----------|----------|---------|
@@ -62,7 +67,7 @@
 
 ### State Management
 - All app state powered by Yjs hooks
-- Entity hooks: `useProjects()`, `useTasks()`, `useTimeEntries()`, `useTimer()`, etc.
+- Entity hooks: `useProjects()`, `useTasks()`, `useTimeEntries()`, `useTimers()`, etc.
 - **All components now use hooks directly** - no prop drilling for mutations
 - Timer/task components fully migrated to hooks (TimerControls, GlobalTimer, TaskTree, TaskItem, etc.)
 - Invoice components fully migrated (InvoiceGenerator, InvoicesList use Yjs hooks)
@@ -111,8 +116,8 @@ src/
 ## ⚠️ Known Patterns to Follow
 
 ### Timer System
-- Single active timer only (enforced)
-- Timer state managed by `useTimer()` hook
+- Multiple active timers across projects (one per project)
+- Timer state managed by `useTimers()` hook
 - Pause preserves elapsed time, doesn't create entry
 - Stop creates the time entry automatically
 
@@ -141,7 +146,7 @@ src/
 const { projects, createProject, updateProject, deleteProject } = useProjects();
 const { tasks, createTask, updateTask, archiveTask } = useTasks();
 const { entries, createEntry, loadYear } = useTimeEntries();
-const { isActive, startTimer, stopTimer, pauseTimer } = useTimer();
+const { timers, startTimer, stopTimer, pauseTimer } = useTimers();
 const { clients, createClient } = useClients();
 const { invoices, createInvoice } = useInvoices();
 const { preferences, updatePreferences } = usePreferences();
@@ -254,7 +259,7 @@ docker compose run --rm app npm run <script>
 - [x] ProjectList/ClientList cascade deletes migrated to Yjs hooks
 - [x] Account clear data migrated to use Yjs store clearAllData()
 - [x] Preferences migrated to usePreferences() hook
-- [x] ExportImport migrated to useTimer() hook
+- [x] ExportImport migrated to useTimers() hook
 - [x] PaymentMethods, BusinessInfo, InvoiceTemplates migrated to Yjs hooks
 - [x] Dashboard and RecentTasks migrated to Yjs hooks
 - [x] useTaskState migrated to Yjs hooks
