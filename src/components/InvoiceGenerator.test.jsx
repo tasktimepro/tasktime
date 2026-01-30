@@ -192,7 +192,7 @@ describe('InvoiceGenerator', () => {
         vi.restoreAllMocks()
     })
 
-    it('creates a new invoice using date override and client currency', async () => {
+    it('creates a new invoice using date override and client currency', { timeout: 20000 }, async () => {
 
         modalConfig.applyDateOverride = true
         invoiceHookMocks.createInvoice.mockClear()

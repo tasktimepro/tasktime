@@ -664,33 +664,33 @@ const ProjectList = ({
                     <Modal
                         isOpen={showDeleteModal}
                         onClose={handleCancelDelete}
-                        title={hasInvoices ? "⚠️ Project Has Invoices" : "Confirm Deletion"}
+                        title={hasInvoices ? "Project Has Invoices" : "Confirm Deletion"}
                         size="md"
                         footer={
                             hasInvoices ? (
                                 <div className="flex justify-end space-x-3">
-                                    <button
+                                    <Button
                                         onClick={handleCancelDelete}
-                                        className="px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                        variant="outline"
                                     >
                                         Cancel
-                                    </button>
+                                    </Button>
                                 </div>
                             ) : (
                                 <div className="flex justify-end space-x-3">
-                                    <button
+                                    <Button
                                         onClick={handleCancelDelete}
-                                        className="px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                        variant="outline"
                                     >
                                         Cancel
-                                    </button>
+                                    </Button>
 
-                                    <button
+                                    <Button
                                         onClick={confirmDeleteProject}
-                                        className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-destructive-foreground bg-destructive hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                        variant="destructive"
                                     >
                                         Delete Project
-                                    </button>
+                                    </Button>
                                 </div>
                             )
                         }
@@ -706,24 +706,25 @@ const ProjectList = ({
                                 </p>
 
                                 <div className="flex flex-col space-y-3">
-                                    <button
+                                    <Button
                                         onClick={handleArchiveFromModal}
-                                        className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                        className="w-full"
                                     >
                                         Archive Project (Recommended)
-                                    </button>
+                                    </Button>
 
-                                    <button
+                                    <Button
                                         onClick={handleForceDelete}
-                                        className="w-full px-4 py-2 border border-red-300 dark:border-red-700 rounded-md shadow-sm text-sm font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                        variant="outline"
+                                        className="w-full border-red-300 text-red-700 bg-red-50 hover:bg-red-100 focus:ring-ring dark:border-red-700 dark:text-red-300 dark:bg-red-950 dark:hover:bg-red-900"
                                     >
                                         Force Delete Project & All Invoices
-                                    </button>
+                                    </Button>
                                 </div>
                             </>
                         ) : (
                             <p className="text-sm text-foreground">
-                                Are you sure you want to delete the project "<span className="font-semibold">{projectToDelete.title}</span>"? This action cannot be undone.
+                                Are you sure you want to delete the project "<span className="font-semibold">{projectToDelete.title}</span>"? This action cannot be undone and will delete all related tasks and time entries.
                             </p>
                         )}
                     </Modal>

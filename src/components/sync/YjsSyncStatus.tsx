@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useUrlState } from '@/hooks/useUrlState';
-import { CloudIcon, CloudSyncIcon, CloudCheckIcon, CloudCogIcon, CloudDownloadIcon, CloudOffIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
+import { CloudIcon, CloudSyncIcon, CloudCheckIcon, CloudCogIcon, CloudOffIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface YjsSyncStatusProps {
@@ -136,7 +136,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
         if (syncPhase === 'downloading') {
             return {
                 text: 'Downloading updates...',
-                icon: CloudDownloadIcon,
+                icon: CloudSyncIcon,
                 tone: 'text-yellow-700 dark:text-yellow-300',
                 onClick: handleCloudOptions,
             };

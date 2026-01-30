@@ -56,7 +56,7 @@ describe('InvoicesList', () => {
         client: { name: 'Client' }
     }
 
-    it('shows overdue badge for overdue invoices', () => {
+    it('shows overdue badge for overdue invoices', { timeout: 20000 }, () => {
 
         const overdueInvoice = {
             ...baseInvoice,

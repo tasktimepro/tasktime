@@ -30,6 +30,8 @@ const ProjectModal = ({
     const { showSuccess } = useToast();
     const { projects, createProject, updateProject } = useProjects();
     const { clients } = useClients();
+    const activeClients = clients.filter(client => !client.archived);
+    const isClientSelectDisabled = !!modalOptions?.preselectedClientId || activeClients.length === 0;
 
     const [formData, setFormData] = useState({
         title: '',
@@ -376,7 +378,7 @@ const ProjectModal = ({
                             <Label htmlFor="preferredClientId">
                                 Client <span className="text-red-500">*</span>
                             </Label>
-                            {openClientModal && !editingProject && !modalOptions?.preselectedClientId && (
+                            {openClientModal && !modalOptions?.preselectedClientId && (
                                 <Button
                                     type="button"
                                     variant="link"
@@ -402,16 +404,16 @@ const ProjectModal = ({
                             onValueChange={(value) => {
                                 handleInputChange({ target: { name: 'preferredClientId', value } });
                             }}
-                            disabled={!!modalOptions?.preselectedClientId}
+                            disabled={isClientSelectDisabled}
                         >
                             <SelectTrigger
                                 id="preferredClientId"
-                                className={modalOptions?.preselectedClientId ? 'bg-muted opacity-50' : ''}
+                                className={isClientSelectDisabled ? 'bg-muted opacity-50' : ''}
                             >
                                 <SelectValue placeholder="Select a client" />
                             </SelectTrigger>
                             <SelectContent>
-                                {clients.filter(c => !c.archived).map(client => (
+                                {activeClients.map(client => (
                                     <SelectItem key={client.id} value={client.id}>
                                         {client.title}
                                     </SelectItem>
@@ -420,7 +422,9 @@ const ProjectModal = ({
                         </Select>
                         {!modalOptions?.preselectedClientId && (
                             <p className="text-xs text-muted-foreground mt-2">
-                                Every project must be associated with a client.
+                                {activeClients.length === 0
+                                    ? 'Create a client to associate with this project.'
+                                    : 'Every project must be associated with a client.'}
                             </p>
                         )}
                     </div>

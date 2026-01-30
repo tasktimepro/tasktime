@@ -41,7 +41,7 @@ const EmptyState = ({
             )}
 
             {description && (
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className={cn("text-sm text-muted-foreground", title ? "mt-1" : "mt-2")}>
                     {description}
                 </p>
             )}

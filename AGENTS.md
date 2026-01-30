@@ -51,7 +51,7 @@
 - **Multi-doc architecture:** Data split by type/time period
 - **Sync provider:** Google Drive (delta uploads)
 
-### ⚠️ Schema Changes & Cloud Sync (Pre‑Production)
+### Schema Changes & Cloud Sync (Pre‑Production)
 - When changing document structure, ensure Drive data is cleared or isolated before testing.
 - Old cloud state can reintroduce incompatible records after a local wipe.
 - For production, plan explicit schema/versioning and server-side migration safeguards.
@@ -113,7 +113,7 @@ src/
 
 ---
 
-## ⚠️ Known Patterns to Follow
+## Known Patterns to Follow
 
 ### Timer System
 - Multiple active timers across projects (one per project)

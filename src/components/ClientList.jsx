@@ -226,9 +226,15 @@ const ClientList = ({
             relatedInvoiceIds.forEach(id => deleteInvoice(id));
         } else {
             // Remove client reference from projects (update, not delete)
+            // Also clear rates and mark as personal since client-linked projects should not remain billable.
             projects
                 .filter(project => project.preferredClientId === clientId)
-                .forEach(project => updateProject(project.id, { preferredClientId: null }));
+                .forEach(project => updateProject(project.id, {
+                    preferredClientId: null,
+                    hourlyRate: null,
+                    flatRate: false,
+                    isPersonal: true
+                }));
         }
 
         // Delete the client
@@ -569,16 +575,16 @@ const ClientList = ({
                 <Modal
                     isOpen={showDeleteModal}
                     onClose={handleCancelDelete}
-                    title="⚠️ Client Has Related Projects"
+                    title="Client Has Related Projects"
                     size="md"
                     footer={
                         <div className="flex justify-end">
-                            <button
+                            <Button
                                 onClick={handleCancelDelete}
-                                className="px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                variant="outline"
                             >
                                 Cancel
-                            </button>
+                            </Button>
                         </div>
                     }
                 >
@@ -600,31 +606,33 @@ const ClientList = ({
                         </p>
 
                         <div className="flex flex-col space-y-3">
-                            <button
+                            <Button
                                 onClick={() => {
                                     handleArchiveClient(clientToDelete.id);
                                     setShowDeleteModal(false);
                                     setClientToDelete(null);
                                     setRelatedProjects([]);
                                 }}
-                                className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                className="w-full"
                             >
                                 Archive Client (Recommended)
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
                                 onClick={confirmDeleteClient}
-                                className="w-full px-4 py-2 border border-yellow-300 dark:border-yellow-700 rounded-md shadow-sm text-sm font-medium text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-950 hover:bg-yellow-100 dark:hover:bg-yellow-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                                variant="outline"
+                                className="w-full border-yellow-300 text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:ring-yellow-500 dark:border-yellow-700 dark:text-yellow-300 dark:bg-yellow-950 dark:hover:bg-yellow-900"
                             >
                                 Delete & Remove Client Reference
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
                                 onClick={handleForceDelete}
-                                className="w-full px-4 py-2 border border-red-300 dark:border-red-700 rounded-md shadow-sm text-sm font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                variant="outline"
+                                className="w-full border-red-300 text-red-700 bg-red-50 hover:bg-red-100 focus:ring-ring dark:border-red-700 dark:text-red-300 dark:bg-red-950 dark:hover:bg-red-900"
                             >
                                 Delete Client & All Projects
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </Modal>
@@ -639,12 +647,12 @@ const ClientList = ({
                     size="md"
                     footer={
                         <div className="flex justify-end">
-                            <button
+                            <Button
                                 onClick={handleCancelDelete}
-                                className="px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                variant="outline"
                             >
                                 Cancel
-                            </button>
+                            </Button>
                         </div>
                     }
                 >
@@ -666,19 +674,20 @@ const ClientList = ({
                         </p>
 
                         <div className="flex flex-col space-y-3">
-                            <button
+                            <Button
                                 onClick={handleArchiveWithProjects}
-                                className="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                className="w-full"
                             >
                                 Archive Client & Projects
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
                                 onClick={handleArchiveFromModal}
-                                className="w-full px-4 py-2 border border-blue-300 dark:border-blue-700 rounded-md shadow-sm text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+                                variant="outline"
+                                className="w-full border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-ring dark:border-blue-700 dark:text-blue-300 dark:bg-blue-950 dark:hover:bg-blue-900"
                             >
                                 Archive Client Only
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </Modal>

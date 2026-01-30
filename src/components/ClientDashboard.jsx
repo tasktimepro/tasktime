@@ -2,6 +2,7 @@ import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, Clo
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
@@ -548,9 +549,11 @@ const ClientDashboard = ({
                         <CardTitle className="text-lg">Time Analytics</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-center py-8">
-                            <p className="text-muted-foreground">No time entries for this client yet.</p>
-                        </div>
+                        <EmptyState
+                            icon={ClockIcon}
+                            description="No time entries for this client yet."
+                            className="py-8"
+                        />
                     </CardContent>
                 </Card>
             )}
