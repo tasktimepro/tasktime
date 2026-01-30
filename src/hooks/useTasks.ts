@@ -5,9 +5,12 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { addDays } from 'date-fns';
 import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
 import type { Task } from '@/stores/yjs/types';
+import { getTodayString, toStorageDate } from '@/utils/dateUtils.ts';
+import { isRecurringTaskDueOnDate } from '@/utils/recurringUtils.ts';
 
 export interface UseTasksOptions {
     /** Filter to a specific project */
@@ -129,6 +132,48 @@ export function useTasks(options: UseTasksOptions = {}) {
         return projectActiveTasks.filter(t => t.parentTaskId === parentTaskId);
     }, [projectActiveTasks]);
 
+    const getStandaloneTasks = useCallback(() => {
+        return projectActiveTasks.filter(task => !task.projectId);
+    }, [projectActiveTasks]);
+
+    const getOverdueTasks = useCallback(() => {
+        const today = getTodayString();
+        if (!today) return [] as Task[];
+
+        return projectActiveTasks.filter(task => {
+            if (task.completed) return false;
+            if (task.recurring) return false;
+            if (!task.startDate) return false;
+            return task.startDate < today;
+        });
+    }, [projectActiveTasks]);
+
+    const getTasksForToday = useCallback(() => {
+        const today = getTodayString();
+        if (!today) return [] as Task[];
+
+        return projectActiveTasks.filter(task => {
+            if (task.completed) return false;
+            if (task.recurring) {
+                return isRecurringTaskDueOnDate(new Date(), task.recurring);
+            }
+            return task.startDate === today;
+        });
+    }, [projectActiveTasks]);
+
+    const getUpcomingTasks = useCallback((days = 7) => {
+        const today = getTodayString();
+        const endDate = toStorageDate(addDays(new Date(), days));
+        if (!today || !endDate) return [] as Task[];
+
+        return projectActiveTasks.filter(task => {
+            if (task.completed) return false;
+            if (task.recurring) return false;
+            if (!task.startDate) return false;
+            return task.startDate > today && task.startDate <= endDate;
+        });
+    }, [projectActiveTasks]);
+
     return {
         // Data
         tasks: filteredTasks,
@@ -150,5 +195,11 @@ export function useTasks(options: UseTasksOptions = {}) {
         // Hierarchy
         getRootTasks,
         getChildTasks,
+
+        // Standalone and date helpers
+        getStandaloneTasks,
+        getOverdueTasks,
+        getTasksForToday,
+        getUpcomingTasks,
     };
 }

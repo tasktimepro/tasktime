@@ -9,7 +9,8 @@ const focusTimerMock = vi.fn();
 vi.mock('../../hooks/useTimers', () => ({
     useTimers: () => ({
         timers: mockTimers,
-        focusTimer: focusTimerMock
+        focusTimer: focusTimerMock,
+        getTimerForTask: () => null
     })
 }));
 

@@ -197,13 +197,22 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
     const IconComponent = (isHovered && status.hoverIcon) ? status.hoverIcon : status.icon;
     const displayText = (isHovered && status.hoverText) ? status.hoverText : status.text;
 
+    const handleStatusClick = (event) => {
+        if (!status.onClick) {
+            return;
+        }
+
+        event.currentTarget.blur();
+        status.onClick();
+    };
+
     if (isOffline) {
         return null;
     }
 
     const content = (
         <button
-            onClick={status.onClick}
+            onClick={status.onClick ? handleStatusClick : undefined}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             disabled={!status.onClick}

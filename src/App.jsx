@@ -24,6 +24,7 @@ import Invoices from './components/Invoices';
 import AuthCallback from './components/AuthCallback';
 import GlobalTimerStack from './components/timer/GlobalTimerStack';
 import ModalManager from './components/modals/ModalManager';
+import FloatingActionButton from './components/FloatingActionButton';
 import ErrorBoundary from './components/ErrorBoundary';
 import OfflineIndicator from './components/OfflineIndicator';
 import InstallPrompt from './components/InstallPrompt';
@@ -265,6 +266,11 @@ function AppContent() {
         setEditingItem(businessInfo);
     };
 
+    const openTaskModal = (task = null) => {
+        setActiveModal('task');
+        setEditingItem(task);
+    };
+
     // === Global Timer UI State ===
     const [showGlobalTimer, setShowGlobalTimer] = useState(false);
 
@@ -396,7 +402,7 @@ function AppContent() {
     // === Loading Screen ===
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
                     <ClockIcon className="h-12 w-12 text-foreground mx-auto mb-4 animate-pulse" />
                     <h1 className="text-xl font-semibold text-foreground">Task<span>Time</span></h1>
@@ -408,9 +414,14 @@ function AppContent() {
 
     const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'task-planner', 'account'].includes(activeView);
 
+    const handleSidebarCollapsedAction = (action) => (event) => {
+        event.currentTarget.blur();
+        action();
+    };
+
     // === Main Render ===
     return (
-        <div className={`min-h-screen bg-background ${totalsHidden ? 'totals-hidden' : ''}`}>
+        <div className={`min-h-screen ${totalsHidden ? 'totals-hidden' : ''}`}>
             <div className="mx-auto w-full max-w-[100rem] px-6 pr-2">
             <div className="flex gap-6">
             {/* Sidebar Navigation */}
@@ -425,9 +436,9 @@ function AppContent() {
                                     <button
                                         type="button"
                                         className="flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity group"
-                                        onClick={() => {
+                                        onClick={handleSidebarCollapsedAction(() => {
                                             setIsSidebarCollapsed(false);
-                                        }}
+                                        })}
                                         aria-label="Expand sidebar"
                                     >
                                         <div className="relative">
@@ -460,7 +471,7 @@ function AppContent() {
                             <button
                                 type="button"
                                 onClick={() => setIsSidebarCollapsed(true)}
-                                className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+                                className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground opacity-70 hover:opacity-100 hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
                                 title="Collapse sidebar"
                                 aria-label="Collapse sidebar"
                             >
@@ -478,7 +489,7 @@ function AppContent() {
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <button
-                                            onClick={() => navigateToDashboard()}
+                                            onClick={handleSidebarCollapsedAction(() => navigateToDashboard())}
                                             className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                                 activeView === 'dashboard'
                                                     ? 'bg-accent text-accent-foreground font-semibold'
@@ -512,7 +523,7 @@ function AppContent() {
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <button
-                                            onClick={() => navigateToTaskPlanner()}
+                                            onClick={handleSidebarCollapsedAction(() => navigateToTaskPlanner())}
                                             className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                                 activeView === 'task-planner'
                                                     ? 'bg-accent text-accent-foreground font-semibold'
@@ -546,7 +557,7 @@ function AppContent() {
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <button
-                                            onClick={() => navigateToClients()}
+                                            onClick={handleSidebarCollapsedAction(() => navigateToClients())}
                                             className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                                 activeView === 'clients'
                                                     ? 'bg-accent text-accent-foreground font-semibold'
@@ -580,7 +591,7 @@ function AppContent() {
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <button
-                                            onClick={() => navigateToProjects()}
+                                            onClick={handleSidebarCollapsedAction(() => navigateToProjects())}
                                             className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                                 activeView === 'projects'
                                                     ? 'bg-accent text-accent-foreground font-semibold'
@@ -614,7 +625,7 @@ function AppContent() {
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <button
-                                            onClick={() => navigateToInvoices()}
+                                            onClick={handleSidebarCollapsedAction(() => navigateToInvoices())}
                                             className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                                 activeView === 'invoices'
                                                     ? 'bg-accent text-accent-foreground font-semibold'
@@ -648,7 +659,7 @@ function AppContent() {
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <button
-                                            onClick={() => navigateToExpenses()}
+                                            onClick={handleSidebarCollapsedAction(() => navigateToExpenses())}
                                             className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                                 activeView === 'expenses'
                                                     ? 'bg-accent text-accent-foreground font-semibold'
@@ -686,7 +697,7 @@ function AppContent() {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <button
-                                    onClick={() => updatePreferences({ hideTotals: !totalsHidden })}
+                                    onClick={handleSidebarCollapsedAction(() => updatePreferences({ hideTotals: !totalsHidden }))}
                                     className="w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                     aria-label={totalsHidden ? 'Show totals' : 'Hide totals'}
                                 >
@@ -718,7 +729,7 @@ function AppContent() {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <button
-                                    onClick={() => setDarkMode(!darkMode)}
+                                    onClick={handleSidebarCollapsedAction(() => setDarkMode(!darkMode))}
                                     className="w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                     aria-label={darkMode ? 'Light mode' : 'Dark mode'}
                                 >
@@ -750,7 +761,7 @@ function AppContent() {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <button
-                                    onClick={() => navigateToAccount()}
+                                    onClick={handleSidebarCollapsedAction(() => navigateToAccount())}
                                     className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                         activeView === 'account'
                                             ? 'bg-accent text-accent-foreground font-semibold'
@@ -788,7 +799,7 @@ function AppContent() {
 
             {/* Main Content */}
             <main className="flex-1 main-content relative">
-                <div className={`pr-4 pb-6 ${showGlobalTimer && timerIsActive ? 'pt-20' : needsExtraTopPadding ? 'pt-8' : 'pt-6'}`}>
+                <div className={`pr-4 pb-6 ${showGlobalTimer && timerIsActive ? 'pt-21' : needsExtraTopPadding ? 'pt-8' : 'pt-6'}`}>
                     {activeView === 'dashboard' && (
                             <ErrorBoundary>
                             <Dashboard
@@ -798,6 +809,7 @@ function AppContent() {
                                 navigateToProject={navigateToProject}
                                 navigateToClient={navigateToClient}
                                 navigateToInvoices={navigateToInvoices}
+                                onEditTask={openTaskModal}
                             />
                             </ErrorBoundary>
                         )}
@@ -843,6 +855,7 @@ function AppContent() {
                                 openBusinessModal={openBusinessModal}
                                 openPaymentMethodModal={openPaymentMethodModal}
                                 openTemplateModal={openTemplateModal}
+                                openTaskModal={openTaskModal}
                             />
                             </ErrorBoundary>
                         )}
@@ -939,6 +952,8 @@ function AppContent() {
                         modalOptions={modalOptions}
                         setModalOptions={setModalOptions}
                     />
+
+                    <FloatingActionButton onClick={() => openTaskModal(null)} />
                 </div>
                 
                 {/* Global Timer Display - Fixed at top */}

@@ -19,7 +19,8 @@ const TaskHeader = ({
     onShowTimeEntries,
     mainTaskTime,
     totalTimeWithSubtasks,
-    isSubtask = false
+    isSubtask = false,
+    showTimeDisplay = true
 }) => {
     return (
         <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -49,14 +50,16 @@ const TaskHeader = ({
                             {task.title}
                         </h3>
 
-                        <TaskTimeDisplay
-                            task={task}
-                            mainTaskTime={mainTaskTime}
-                            totalTimeWithSubtasks={totalTimeWithSubtasks}
-                            onShowTimeEntries={onShowTimeEntries}
-                            isCompleted={isCompleted}
-                            isSubtask={isSubtask}
-                        />
+                        {showTimeDisplay && (
+                            <TaskTimeDisplay
+                                task={task}
+                                mainTaskTime={mainTaskTime}
+                                totalTimeWithSubtasks={totalTimeWithSubtasks}
+                                onShowTimeEntries={onShowTimeEntries}
+                                isCompleted={isCompleted}
+                                isSubtask={isSubtask}
+                            />
+                        )}
                     </div>
                 )}
             </div>

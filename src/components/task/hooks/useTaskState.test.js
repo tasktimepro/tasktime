@@ -13,7 +13,8 @@ vi.mock('../../../hooks/useTasks', () => ({
 
 vi.mock('../../../hooks/useTimers', () => ({
     useTimers: () => ({
-        getTimerForProject: () => null
+        getTimerForProject: () => null,
+        getTimerForTask: () => null
     })
 }))
 

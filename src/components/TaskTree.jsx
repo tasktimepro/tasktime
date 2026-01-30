@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Notice } from '@/components/ui/notice';
 import Modal from './Modal';
+import RecurringPicker from './task/RecurringPicker';
 import { useToast } from '../hooks/useToast.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
@@ -19,10 +20,13 @@ import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
  * Uses Yjs hooks directly for state management
  */
 const TaskTree = ({
-    project
+    project,
+    onEditTask
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskStartDate, setNewTaskStartDate] = useState('');
+    const [newTaskRecurring, setNewTaskRecurring] = useState(null);
     const [showArchivedTasks, setShowArchivedTasks] = useState(false);
     const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState(null);
     const [taskSort, setTaskSort] = useState('lastActive');
@@ -83,6 +87,8 @@ const TaskTree = ({
             projectId: project.id,
             parentTaskId: taskData.parentTaskId || null,
             title: taskData.title.trim(),
+            startDate: taskData.recurring ? null : (taskData.startDate || null),
+            recurring: taskData.recurring || null,
             lastActive: Date.now(),
             lastBilledAt: null,
             billable: false,
@@ -107,10 +113,14 @@ const TaskTree = ({
 
         handleCreateTask({
             parentTaskId: null,
-            title: newTaskTitle
+            title: newTaskTitle,
+            startDate: newTaskStartDate,
+            recurring: newTaskRecurring
         });
 
         setNewTaskTitle('');
+        setNewTaskStartDate('');
+        setNewTaskRecurring(null);
         setShowCreateForm(false);
     };
 
@@ -207,6 +217,8 @@ const TaskTree = ({
     const cancelCreate = () => {
         setShowCreateForm(false);
         setNewTaskTitle('');
+        setNewTaskStartDate('');
+        setNewTaskRecurring(null);
     };
 
     return (
@@ -252,12 +264,12 @@ const TaskTree = ({
 
             {/* Create Task Form */}
             {showCreateForm && (
-                <div className="bg-muted border border-border rounded-lg p-4">
+                <div className="bg-card border border-border rounded-lg p-4">
                     <h3 className="text-sm font-medium text-foreground mb-3">
                         Create New Task
                     </h3>
 
-                    <form onSubmit={handleCreateMainTask} className="flex space-x-3">
+                    <form onSubmit={handleCreateMainTask} className="flex items-center space-x-3">
                         <Input
                             type="text"
                             value={newTaskTitle}
@@ -265,6 +277,28 @@ const TaskTree = ({
                             placeholder="Enter task title"
                             className="flex-1"
                             autoFocus
+                        />
+
+                        <Input
+                            type="date"
+                            value={newTaskStartDate}
+                            onChange={(e) => {
+                                setNewTaskStartDate(e.target.value);
+                                if (e.target.value) {
+                                    setNewTaskRecurring(null);
+                                }
+                            }}
+                            className="w-40"
+                            disabled={Boolean(newTaskRecurring)}
+                        />
+
+                        <RecurringPicker
+                            value={newTaskRecurring}
+                            onChange={(config) => {
+                                setNewTaskRecurring(config);
+                                setNewTaskStartDate('');
+                            }}
+                            onClear={() => setNewTaskRecurring(null)}
                         />
 
                         <Button type="submit">
@@ -304,6 +338,7 @@ const TaskTree = ({
                                     onArchive={() => handleArchiveTask(task.id)}
                                     onUnarchive={() => handleUnarchiveTask(task.id)}
                                     onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
+                                    onEditTask={onEditTask}
                                 />
                             ))}
                         </div>
@@ -334,6 +369,7 @@ const TaskTree = ({
                                             onCreateSubtask={handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
                                             onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
+                                            onEditTask={onEditTask}
                                         />
                                     ))}
                                 </div>

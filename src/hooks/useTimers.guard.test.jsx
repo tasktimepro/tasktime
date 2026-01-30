@@ -92,7 +92,11 @@ describe('useTimers guard paths', () => {
             result.current.startTimer('task-no-project');
         });
 
-        expect(timersMap.values().length).toBe(0);
+        expect(timersMap.values().length).toBe(1);
+        expect(timersMap.get('task-no-project')).toEqual(expect.objectContaining({
+            taskId: 'task-no-project',
+            projectId: 'task-no-project'
+        }));
 
         expect(result.current.stopTimer('project-1')).toBeNull();
 
@@ -104,7 +108,7 @@ describe('useTimers guard paths', () => {
             result.current.clearTimer('project-1');
         });
 
-        expect(timersMap.values().length).toBe(0);
+        expect(timersMap.values().length).toBe(1);
 
         act(() => {
             timersMap.set('project-1', {

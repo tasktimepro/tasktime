@@ -70,7 +70,7 @@ main, .content-area {
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 0 0% 99.5%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;

@@ -26,7 +26,7 @@ function TimerControls({
     
     // Use Yjs hooks directly
     const {
-        getTimerForProject,
+        getTimerForTask,
         startTimer: timerStart,
         pauseTimer: timerPause,
         resumeTimer: timerResume,
@@ -37,7 +37,8 @@ function TimerControls({
     const { activeTasks, updateTask } = useTasks();
     
     const projectId = task.projectId;
-    const projectTimer = projectId ? getTimerForProject(projectId) : null;
+    const timerKey = projectId || task.id;
+    const projectTimer = getTimerForTask(task.id, projectId);
     const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
     const isTimerPaused = isTimerActive && projectTimer.isPaused;
 
@@ -82,12 +83,10 @@ function TimerControls({
     const handleStart = useCallback(() => {
         // If this task's timer is paused, resume it
         if (isTimerPaused) {
-            timerResume();
+            timerResume(timerKey);
             return;
         }
         
-        if (!projectId) return;
-
         // If another timer in this project is running, stop it first and create its entry
         if (projectTimer && projectTimer.taskId !== task.id) {
             const existingStart = projectTimer.startTime;
@@ -98,38 +97,38 @@ function TimerControls({
             if (!createValidatedEntry(projectTimer.taskId, existingStart, existingEnd, projectTimer.note)) {
                 return;
             }
-            clearTimer(projectId);
+            clearTimer(timerKey);
         }
 
         // Start new timer
         timerStart(task.id);
-    }, [isTimerPaused, projectId, projectTimer, task.id, timerResume, createValidatedEntry, clearTimer, timerStart]);
+    }, [isTimerPaused, projectTimer, task.id, timerKey, timerResume, createValidatedEntry, clearTimer, timerStart]);
 
     /**
      * Pause the timer
      */
     const handlePause = useCallback(() => {
-        if (!isTimerActive || !projectId) return;
+        if (!isTimerActive) return;
         
-        timerPause(projectId);
+        timerPause(timerKey);
         
         // Update task's lastActive
         updateTask(task.id, { lastActive: Date.now() });
-    }, [isTimerActive, projectId, timerPause, updateTask, task.id]);
+    }, [isTimerActive, timerPause, updateTask, task.id, timerKey]);
 
     /**
      * Resume a paused timer
      */
     const handleResume = useCallback(() => {
-        if (!isTimerPaused || !projectId) return;
-        timerResume(projectId);
-    }, [isTimerPaused, projectId, timerResume]);
+        if (!isTimerPaused) return;
+        timerResume(timerKey);
+    }, [isTimerPaused, timerResume, timerKey]);
 
     /**
      * Stop timer and create time entry
      */
     const handleStop = useCallback(() => {
-        if (!isTimerActive || !projectId || !projectTimer) return;
+        if (!isTimerActive || !projectTimer) return;
 
         const now = Date.now();
         const entryStart = projectTimer.startTime;
@@ -146,14 +145,14 @@ function TimerControls({
         updateTask(task.id, { lastActive: now });
         
         // Clear the timer
-        clearTimer(projectId);
+        clearTimer(timerKey);
         
         // Call completion callback
         if (onComplete) {
             onComplete();
         }
-    }, [isTimerActive, projectId, projectTimer, task.id,
-        createValidatedEntry, updateTask, clearTimer, onComplete]);
+    }, [isTimerActive, projectTimer, task.id,
+        createValidatedEntry, updateTask, clearTimer, onComplete, timerKey]);
 
     // Determine icon size based on size prop
     const iconSize = size === 'sm' ? 'h-5 w-5' : 'h-5 w-5';

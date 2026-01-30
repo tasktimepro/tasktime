@@ -14,6 +14,9 @@ import useMetricsCalculation from './dashboard/hooks/useMetricsCalculation';
 import MetricsCards from './dashboard/MetricsCards';
 import RecentTasks from './dashboard/RecentTasks';
 import ProjectsOverview from './dashboard/ProjectsOverview';
+import ToDoToday from './dashboard/ToDoToday';
+import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import { CornerDownRightIcon } from '@/components/ui/icons';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -24,14 +27,15 @@ const Dashboard = ({
     clients = [],
     navigateToProject,
     navigateToClient,
-    navigateToInvoices
+    navigateToInvoices,
+    onEditTask
 }) => {
     const hasClients = clients.length > 0;
-    const { showWarning } = useToast();
+    const { showWarning, showSuccess } = useToast();
     
     // Use Yjs hooks directly
-    const { tasks, updateTask } = useTasks();
-    const { entries: timeEntries, createEntry } = useTimeEntries();
+    const { tasks, updateTask, deleteTask, getOverdueTasks, getTasksForToday, getUpcomingTasks } = useTasks();
+    const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
     
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
@@ -314,6 +318,26 @@ const Dashboard = ({
         return projectsWithActivity;
     }, [projects, tasks, timeEntries, projectSearchQuery, clients]);
 
+    const taskTimeTotals = useMemo(() => {
+        const totals = {};
+
+        timeEntries.forEach((entry) => {
+            if (!entry || typeof entry.end !== 'number') return;
+            if (entry.end <= entry.start) return;
+
+            totals[entry.taskId] = (totals[entry.taskId] || 0) + (entry.end - entry.start);
+        });
+
+        if (timers.length > 0) {
+            timers.forEach((timer) => {
+                if (!timer || !timer.taskId) return;
+                totals[timer.taskId] = (totals[timer.taskId] || 0) + (timer.elapsedTime || 0);
+            });
+        }
+
+        return totals;
+    }, [timeEntries, timers]);
+
     /**
      * Toggle task completion status
      */
@@ -335,7 +359,7 @@ const Dashboard = ({
 
         // If timer is active for this task and we're completing it, stop the timer
         const activeTimer = timers.find(timer => timer.taskId === task.id);
-        if (newCompletedStatus && activeTimer && task.projectId) {
+        if (newCompletedStatus && activeTimer) {
             const endTime = activeTimer.isPaused && activeTimer.elapsedTime > 0
                 ? activeTimer.startTime + activeTimer.elapsedTime
                 : now;
@@ -347,7 +371,7 @@ const Dashboard = ({
                 note: activeTimer.note
             });
 
-            clearTimer(task.projectId);
+            clearTimer(task.projectId || task.id);
         }
 
         // Update task completion status and lastActive timestamp
@@ -362,6 +386,12 @@ const Dashboard = ({
             navigateToProject(task.project.id);
         }
     }, [navigateToProject]);
+
+    const handleEditTask = useCallback((task) => {
+        if (onEditTask) {
+            onEditTask(task);
+        }
+    }, [onEditTask]);
 
     /**
      * Handle clicking on client title to navigate to client dashboard
@@ -402,8 +432,8 @@ const Dashboard = ({
         }`;
 
         const title = task.parentTaskId ? (
-            <span>
-                <span className="text-muted-foreground text-xs">↳ </span>
+            <span className="inline-flex items-center">
+                <CornerDownRightIcon className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
                 {task.title}
                 {!task.parentTask && <span className="text-red-500 text-xs"> [Parent missing]</span>}
             </span>
@@ -415,7 +445,7 @@ const Dashboard = ({
             return (
                 <button
                     onClick={() => handleTaskTitleClick(task)}
-                    className={`${baseClasses} hover:underline cursor-pointer ${
+                    className={`${baseClasses} cursor-pointer ${
                         isCompleted ? 'hover:text-muted-foreground' : 'hover:text-blue-600 dark:hover:text-blue-400'
                     }`}
                     title={`Click to open ${task.project.title} project`}
@@ -428,8 +458,68 @@ const Dashboard = ({
         return <p className={baseClasses}>{title}</p>;
     }, [handleTaskTitleClick]);
 
+    const enhanceTaskList = useCallback((list) => {
+        return list.map((task) => {
+            const project = task.projectId ? projects.find(p => p.id === task.projectId) : null;
+            const parentTask = task.parentTaskId ? tasks.find(t => t.id === task.parentTaskId) : null;
+
+            return {
+                ...task,
+                project,
+                parentTask,
+                recentTime: taskTimeTotals[task.id] || 0
+            };
+        });
+    }, [projects, tasks, taskTimeTotals]);
+
+    const overdueTasks = useMemo(() => {
+        return enhanceTaskList(getOverdueTasks());
+    }, [getOverdueTasks, enhanceTaskList]);
+
+    const tasksForToday = useMemo(() => {
+        return enhanceTaskList(getTasksForToday());
+    }, [getTasksForToday, enhanceTaskList]);
+
+    const upcomingTasks = useMemo(() => {
+        return enhanceTaskList(getUpcomingTasks(7));
+    }, [getUpcomingTasks, enhanceTaskList]);
+
+    const handleDeleteTask = useCallback((task) => {
+        if (!task) return;
+
+        const taskIdsToDelete = task.parentTaskId
+            ? [task.id]
+            : getTaskIdsToDelete(task.id, tasks);
+
+        const entriesToDelete = timeEntries.filter(entry => taskIdsToDelete.includes(entry.taskId));
+        entriesToDelete.forEach(entry => deleteEntry(entry.id));
+
+        timers.forEach(timer => {
+            if (taskIdsToDelete.includes(timer.taskId)) {
+                clearTimer(timer.projectId);
+            }
+        });
+
+        taskIdsToDelete.forEach(id => deleteTask(id));
+        showSuccess('Task deleted');
+    }, [tasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);
+
     return (
         <div className="space-y-6">
+            {(overdueTasks.length > 0 || tasksForToday.length > 0) && (
+                <ToDoToday
+                    overdueTasks={overdueTasks}
+                    tasksForToday={tasksForToday}
+                    upcomingTasks={upcomingTasks}
+                    handleCompleteTask={handleCompleteTask}
+                    renderTaskTitle={renderTaskTitle}
+                    renderTaskControls={renderTaskControls}
+                    handleTaskTitleClick={handleTaskTitleClick}
+                    onEditTask={handleEditTask}
+                    onDeleteTask={handleDeleteTask}
+                />
+            )}
+
             <MetricsCards
                 thisMonthMetrics={thisMonthMetrics}
                 lastMonthMetrics={lastMonthMetrics}
@@ -455,6 +545,8 @@ const Dashboard = ({
                     renderTaskTitle={renderTaskTitle}
                     handleTaskTitleClick={handleTaskTitleClick}
                     renderTaskControls={renderTaskControls}
+                    onEditTask={handleEditTask}
+                    onDeleteTask={handleDeleteTask}
                 />
 
                 <ProjectsOverview

@@ -24,6 +24,8 @@ export interface UseTimersResult {
     isTaskTimerActive: (taskId: string) => boolean;
     /** Get timer for a specific project */
     getTimerForProject: (projectId: string) => ActiveTimer | null;
+    /** Get timer for a specific task (uses taskId when no projectId) */
+    getTimerForTask: (taskId: string, projectId?: string | null) => ActiveTimer | null;
     /** Start timer for a task */
     startTimer: (taskId: string, note?: string) => void;
     /** Pause a project's timer */
@@ -103,6 +105,11 @@ export function useTimers(): UseTimersResult {
         return timers.find(timer => timer.projectId === projectId) || null;
     }, [timers]);
 
+    const getTimerForTask = useCallback((taskId: string, projectId?: string | null) => {
+        const key = projectId || taskId;
+        return timers.find(timer => timer.projectId === key) || null;
+    }, [timers]);
+
     const hasTimerForProject = useCallback((projectId: string) => {
         return timers.some(timer => timer.projectId === projectId);
     }, [timers]);
@@ -115,7 +122,9 @@ export function useTimers(): UseTimersResult {
         if (!isReady) return;
 
         const task = store.tasks.get(taskId);
-        if (!task || !task.projectId) return;
+        if (!task) return;
+
+        const timerKey = task.projectId || task.id;
 
         const now = Date.now();
         // Align start time to the next second boundary
@@ -124,7 +133,7 @@ export function useTimers(): UseTimersResult {
         const alignedStartTime = Math.ceil(now / 1000) * 1000;
         
         const timer: MultiTimerState = {
-            projectId: task.projectId,
+            projectId: timerKey,
             taskId,
             startTime: alignedStartTime,
             paused: false,
@@ -134,7 +143,7 @@ export function useTimers(): UseTimersResult {
         };
 
         store.coreDoc.transact(() => {
-            store.timers.set(task.projectId, timer);
+            store.timers.set(timerKey, timer);
         });
     }, [isReady, store]);
 
@@ -256,6 +265,7 @@ export function useTimers(): UseTimersResult {
         hasTimerForProject,
         isTaskTimerActive,
         getTimerForProject,
+        getTimerForTask,
         startTimer,
         pauseTimer,
         resumeTimer,

@@ -19,12 +19,17 @@ const SubtaskSection = ({
     setShowCreateSubtaskForm,
     newSubtaskTitle,
     setNewSubtaskTitle,
+    newSubtaskStartDate,
+    setNewSubtaskStartDate,
+    newSubtaskRecurring,
+    setNewSubtaskRecurring,
     handleCreateSubtask,
     cancelCreateSubtask,
     isArchived,
     anyTimerActive,
     isRelatedToActiveTimer,
-    showSuccess
+    showSuccess,
+    onEditTask
 }) => {
     // Yjs hooks for state
     const { tasks, deleteTask } = useTasks();
@@ -66,6 +71,7 @@ const SubtaskSection = ({
                         task={subtask}
                         onToggleBillable={onToggleBillable}
                         onDelete={() => handleDeleteSubtask(subtask.id, subtask.title)}
+                        onEditTask={onEditTask}
                     />
                 ))}
 
@@ -74,6 +80,10 @@ const SubtaskSection = ({
                         <SubtaskCreateForm
                             newSubtaskTitle={newSubtaskTitle}
                             setNewSubtaskTitle={setNewSubtaskTitle}
+                            newSubtaskStartDate={newSubtaskStartDate}
+                            setNewSubtaskStartDate={setNewSubtaskStartDate}
+                            newSubtaskRecurring={newSubtaskRecurring}
+                            setNewSubtaskRecurring={setNewSubtaskRecurring}
                             onCreateSubtask={handleCreateSubtask}
                             onCancel={cancelCreateSubtask}
                         />

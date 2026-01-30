@@ -247,7 +247,6 @@ const InvoiceModal = ({
                                     <Notice
                                         title="No client information found"
                                         description="Create one to include client details in the invoice."
-                                        showIcon={false}
                                     />
                                 ) : (
                                     <div className="space-y-2">
@@ -315,7 +314,6 @@ const InvoiceModal = ({
                                     <Notice
                                         title="No projects found"
                                         description="You can create a project or continue without one."
-                                        showIcon={false}
                                     />
                                 ) : (() => {
                                     // Filter projects based on selected client
@@ -337,7 +335,6 @@ const InvoiceModal = ({
                                             <Notice
                                                 title={`No projects found for ${selectedClient.title}`}
                                                 description="You can create a project for this client or continue without one."
-                                                showIcon={false}
                                             />
                                         );
                                     } else if (availableProjects.length === 0) {
@@ -345,7 +342,6 @@ const InvoiceModal = ({
                                             <Notice
                                                 title="No projects available"
                                                 description="Select a client first to see their projects, or create a new project."
-                                                showIcon={false}
                                             />
                                         );
                                     }
@@ -667,7 +663,6 @@ const InvoiceModal = ({
                                     <Notice
                                         title="No invoice templates found"
                                         description="Create a template to continue with invoice generation."
-                                        showIcon={false}
                                     />
                                 ) : (
                                     <div className="space-y-2">

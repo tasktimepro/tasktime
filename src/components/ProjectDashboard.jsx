@@ -29,7 +29,8 @@ const ProjectDashboard = ({
     openProjectModal,
     openBusinessModal,
     openPaymentMethodModal,
-    openTemplateModal
+    openTemplateModal,
+    openTaskModal
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -306,6 +307,7 @@ const ProjectDashboard = ({
                 <CardContent className="pt-6">
                     <TaskTree
                         project={project}
+                        onEditTask={openTaskModal}
                     />
                 </CardContent>
             </Card>

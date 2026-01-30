@@ -37,8 +37,8 @@ const useTaskState = ({
     subtasks = []
 }: UseTaskStateParams) => {
     const { updateTask } = useTasks();
-    const { getTimerForProject } = useTimers();
-    const projectTimer = task.projectId ? getTimerForProject(task.projectId) : null;
+    const { getTimerForTask } = useTimers();
+    const projectTimer = getTimerForTask(task.id, task.projectId);
     
     const taskTimeEntries = useMemo(() => {
         return timeEntries.filter(entry => entry.taskId === task.id);

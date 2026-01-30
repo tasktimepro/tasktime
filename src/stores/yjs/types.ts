@@ -25,7 +25,7 @@ export interface Project {
 
 export interface Task {
     id: string;
-    projectId: string;
+    projectId?: string | null;
     parentTaskId?: string | null;
     title: string;
     completed?: boolean;
@@ -34,6 +34,15 @@ export interface Task {
     billableSetByUser?: boolean;
     lastActive?: number;
     lastBilledAt?: number | null;
+    startDate?: string | null;
+    recurring?: RecurringConfig | null;
+}
+
+export interface RecurringConfig {
+    type: 'weekly' | 'monthly';
+    weeklyDays?: number[];
+    monthlyType?: 'first' | 'last' | 'specific';
+    monthlyDay?: number;
 }
 
 export interface TimeEntry {

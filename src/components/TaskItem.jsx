@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import TaskHeader from './task/TaskHeader';
 import TaskActions from './task/TaskActions';
+import StartDateBadge from './task/StartDateBadge';
 import SubtaskSection from './task/SubtaskSection';
 import TimeEntriesModal from './TimeEntriesModal';
 import { useToast } from '../hooks/useToast';
@@ -8,6 +9,7 @@ import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
 import { useTimers } from '../hooks/useTimers';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app';
+import { formatDurationWithSeconds } from '../utils/dateUtils.ts';
 
 /**
  * TaskItem component - Displays individual task with timer controls and subtasks.
@@ -20,7 +22,8 @@ const TaskItem = ({
     onCreateSubtask,
     onArchive,
     onUnarchive,
-    onToggleBillable
+    onToggleBillable,
+    onEditTask
 }) => {
 
     const [isEditing, setIsEditing] = useState(false);
@@ -28,19 +31,22 @@ const TaskItem = ({
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+    const [newSubtaskStartDate, setNewSubtaskStartDate] = useState('');
+    const [newSubtaskRecurring, setNewSubtaskRecurring] = useState(null);
     const { showSuccess } = useToast();
     
     // Yjs hooks for state
     const { tasks, updateTask } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
-    const { getTimerForProject, clearTimer } = useTimers();
+    const { getTimerForTask, clearTimer } = useTimers();
 
     const subtasks = useMemo(() => {
         return tasks.filter((t) => t.parentTaskId === task.id);
     }, [tasks, task.id]);
 
     // Compute task state
-    const projectTimer = task.projectId ? getTimerForProject(task.projectId) : null;
+    const timerKey = task.projectId || task.id;
+    const projectTimer = getTimerForTask(task.id, task.projectId);
     const isAnyTimerActive = !!projectTimer;
     const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
     const isCompleted = task.completed || false;
@@ -61,6 +67,11 @@ const TaskItem = ({
             .filter(e => e.taskId === task.id && typeof e.end === 'number')
             .reduce((sum, e) => sum + (e.end - e.start), 0);
     }, [timeEntries, task.id]);
+
+    const liveTaskTime = useMemo(() => {
+        const timerTime = isTimerActive ? (projectTimer?.elapsedTime || 0) : 0;
+        return mainTaskTime + timerTime;
+    }, [mainTaskTime, isTimerActive, projectTimer]);
 
     // Calculate total time including subtasks
     const totalTimeWithSubtasks = useMemo(() => {
@@ -101,18 +112,18 @@ const TaskItem = ({
         const now = Date.now();
 
         // If timer is active for this task, stop it and create entry
-        if (isTimerActive && projectTimer?.startTime && task.projectId) {
+        if (isTimerActive && projectTimer?.startTime) {
             createEntry({
                 taskId: task.id,
                 start: projectTimer.startTime,
                 end: now,
                 note: projectTimer.note
             });
-            clearTimer(task.projectId);
+            clearTimer(timerKey);
         }
 
         updateTask(task.id, { completed: checked, lastActive: now });
-    }, [isTimerActive, projectTimer, task.id, task.projectId, createEntry, clearTimer, updateTask]);
+    }, [isTimerActive, projectTimer, task.id, createEntry, clearTimer, updateTask, timerKey]);
 
     /**
      * Update task title.
@@ -135,6 +146,14 @@ const TaskItem = ({
         setIsEditing(false);
     }, [task.title]);
 
+    const handleEditTask = useCallback(() => {
+        if (onEditTask) {
+            onEditTask(task);
+            return;
+        }
+        setIsEditing(true);
+    }, [onEditTask, task]);
+
     /**
      * Create a new subtask.
      * @param {Event} e
@@ -147,19 +166,25 @@ const TaskItem = ({
         if (onCreateSubtask) {
             onCreateSubtask({
                 parentTaskId: task.id,
-                title: newSubtaskTitle
+                title: newSubtaskTitle,
+                startDate: newSubtaskRecurring ? null : (newSubtaskStartDate || null),
+                recurring: newSubtaskRecurring || null
             });
 
             setNewSubtaskTitle('');
+            setNewSubtaskStartDate('');
+            setNewSubtaskRecurring(null);
             setShowCreateSubtaskForm(false);
         }
-    }, [newSubtaskTitle, task.id, onCreateSubtask]);
+    }, [newSubtaskTitle, newSubtaskStartDate, newSubtaskRecurring, task.id, onCreateSubtask]);
 
     /**
      * Cancel subtask creation.
      */
     const cancelCreateSubtask = useCallback(() => {
         setNewSubtaskTitle('');
+        setNewSubtaskStartDate('');
+        setNewSubtaskRecurring(null);
         setShowCreateSubtaskForm(false);
     }, []);
 
@@ -181,7 +206,20 @@ const TaskItem = ({
                         mainTaskTime={mainTaskTime}
                         totalTimeWithSubtasks={totalTimeWithSubtasks}
                         isSubtask={false}
+                        showTimeDisplay={false}
                     />
+
+                    {(task.startDate || task.recurring) && (
+                        <StartDateBadge
+                            startDate={task.startDate}
+                            recurring={task.recurring}
+                            completed={isCompleted}
+                        />
+                    )}
+
+                    <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                        {formatDurationWithSeconds(liveTaskTime)}
+                    </div>
 
                     <TaskActions
                         task={task}
@@ -196,7 +234,7 @@ const TaskItem = ({
                         onDelete={onDelete}
                         onToggleBillable={onToggleBillable}
                         onShowTimeEntries={() => setShowTimeEntriesModal(true)}
-                        onEdit={() => setIsEditing(true)}
+                        onEdit={handleEditTask}
                     />
                 </div>
             </div>
@@ -216,12 +254,17 @@ const TaskItem = ({
                 setShowCreateSubtaskForm={setShowCreateSubtaskForm}
                 newSubtaskTitle={newSubtaskTitle}
                 setNewSubtaskTitle={setNewSubtaskTitle}
+                newSubtaskStartDate={newSubtaskStartDate}
+                setNewSubtaskStartDate={setNewSubtaskStartDate}
+                newSubtaskRecurring={newSubtaskRecurring}
+                setNewSubtaskRecurring={setNewSubtaskRecurring}
                 handleCreateSubtask={handleCreateSubtask}
                 cancelCreateSubtask={cancelCreateSubtask}
                 isArchived={isArchived}
                 anyTimerActive={isAnyTimerActive}
                 isRelatedToActiveTimer={isRelatedToActiveTimer}
                 showSuccess={showSuccess}
+                onEditTask={onEditTask}
             />
         </div>
     );

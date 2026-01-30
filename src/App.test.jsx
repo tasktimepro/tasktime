@@ -167,6 +167,7 @@ vi.mock('./hooks/useTimers.ts', () => ({
     useTimers: () => ({
         timers: [],
         clearTimer: vi.fn(),
+        getTimerForTask: () => null,
         isLoading: false,
     }),
 }))

@@ -2,6 +2,8 @@ import React, { useState, useCallback, useMemo } from 'react';
 import TimeEntriesModal from '../../TimeEntriesModal';
 import TaskHeader from '../TaskHeader';
 import TaskActions from '../TaskActions';
+import StartDateBadge from '../StartDateBadge';
+import { formatDurationWithSeconds } from '../../../utils/dateUtils.ts';
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
@@ -14,7 +16,8 @@ import { useTimers } from '../../../hooks/useTimers';
 const SubtaskItem = ({
     task,
     onToggleBillable,
-    onDelete
+    onDelete,
+    onEditTask
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
@@ -23,10 +26,11 @@ const SubtaskItem = ({
     // Yjs hooks for state
     const { updateTask } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
-    const { getTimerForProject, clearTimer } = useTimers();
+    const { getTimerForTask, clearTimer } = useTimers();
 
     // Compute state
-    const projectTimer = task.projectId ? getTimerForProject(task.projectId) : null;
+    const timerKey = task.projectId || task.id;
+    const projectTimer = getTimerForTask(task.id, task.projectId);
     const isAnyTimerActive = !!projectTimer;
     const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
     const isCompleted = task.completed || false;
@@ -45,6 +49,11 @@ const SubtaskItem = ({
             .reduce((sum, e) => sum + (e.end - e.start), 0);
     }, [timeEntries, task.id]);
 
+    const liveTaskTime = useMemo(() => {
+        const timerTime = isTimerActive ? (projectTimer?.elapsedTime || 0) : 0;
+        return mainTaskTime + timerTime;
+    }, [mainTaskTime, isTimerActive, projectTimer]);
+
     /**
      * Toggle subtask completion status
      */
@@ -52,18 +61,18 @@ const SubtaskItem = ({
         const now = Date.now();
 
         // If timer is active for this task, stop it and create entry
-        if (isTimerActive && projectTimer?.startTime && task.projectId) {
+        if (isTimerActive && projectTimer?.startTime) {
             createEntry({
                 taskId: task.id,
                 start: projectTimer.startTime,
                 end: now,
                 note: projectTimer.note
             });
-            clearTimer(task.projectId);
+            clearTimer(timerKey);
         }
 
         updateTask(task.id, { completed: checked, lastActive: now });
-    }, [isTimerActive, projectTimer, task.id, task.projectId, createEntry, clearTimer, updateTask]);
+    }, [isTimerActive, projectTimer, task.id, createEntry, clearTimer, updateTask, timerKey]);
 
     /**
      * Update subtask title
@@ -85,8 +94,16 @@ const SubtaskItem = ({
         setIsEditing(false);
     }, [task.title]);
 
+    const handleEditTask = useCallback(() => {
+        if (onEditTask) {
+            onEditTask(task);
+            return;
+        }
+        setIsEditing(true);
+    }, [onEditTask, task]);
+
     return (
-        <div className={`flex items-center justify-between py-2 rounded-md hover:bg-muted transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
+        <div className={`flex items-center justify-between gap-3 py-2 rounded-md hover:bg-muted transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
             <TaskHeader
                 task={task}
                 isEditing={isEditing}
@@ -101,7 +118,20 @@ const SubtaskItem = ({
                 mainTaskTime={mainTaskTime}
                 totalTimeWithSubtasks={mainTaskTime}
                 isSubtask={true}
+                showTimeDisplay={false}
             />
+
+            {(task.startDate || task.recurring) && (
+                <StartDateBadge
+                    startDate={task.startDate}
+                    recurring={task.recurring}
+                    completed={isCompleted}
+                />
+            )}
+
+            <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                {formatDurationWithSeconds(liveTaskTime)}
+            </div>
 
             <TaskActions
                 task={task}
@@ -114,7 +144,7 @@ const SubtaskItem = ({
                 onDelete={onDelete}
                 onToggleBillable={onToggleBillable}
                 onShowTimeEntries={() => setShowTimeEntriesModal(true)}
-                onEdit={() => setIsEditing(true)}
+                onEdit={handleEditTask}
             />
 
             <TimeEntriesModal

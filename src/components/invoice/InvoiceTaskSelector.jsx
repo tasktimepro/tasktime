@@ -73,7 +73,7 @@ const InvoiceTaskSelector = ({
                                 </svg>
                             </div>
                             <div className="absolute left-0 top-6 w-64 p-2 bg-popover text-popover-foreground border border-border text-xs rounded shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10">
-                                ✓ Select or create the tasks you want to bill. Unchecked tasks will remain unbilled and appear in future invoices.
+                                Select or create the tasks you want to bill. Unchecked tasks will remain unbilled and appear in future invoices.
                             </div>
                         </div>
                     </div>
@@ -565,11 +565,9 @@ const InvoiceTaskSelector = ({
 
                             if (totalAvailableTasks === 0) {
                                 return (
-                                    <div className="bg-muted border border-border rounded-md p-3">
-                                        <p className="text-sm text-foreground">
-                                            Please add a task to continue.
-                                        </p>
-                                    </div>
+                                    <Notice
+                                        title="Please add a task to continue."
+                                    />
                                 );
                             } else if (selectedTasksCount === 0 && additionalTasks.length === 0) {
                                 return (

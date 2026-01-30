@@ -66,7 +66,7 @@
   --app-primary: #2563eb;
   --app-primary-light: #60a5fa;
   --app-primary-lighter: #93c5fd;
-  --app-background: #f9fafb;
+  --app-background: hsl(var(--background));
   --app-surface: #f3f4f6;
   
   /* Scrollbar specific variables */

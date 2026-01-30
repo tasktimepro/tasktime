@@ -44,7 +44,7 @@ const ProjectsOverview = ({
                                     <div className="flex-1 min-w-0 space-y-1">
                                         <button
                                             onClick={() => navigateToProject(project.id)}
-                                            className="text-sm font-medium text-foreground truncate hover:underline cursor-pointer hover:text-blue-600 dark:text-blue-400 text-left block"
+                                                    className="text-sm font-medium text-foreground truncate cursor-pointer hover:text-blue-600 dark:text-blue-400 text-left block"
                                             title={`Click to open ${project.title} project`}
                                         >
                                             {project.title}

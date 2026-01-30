@@ -24,10 +24,11 @@ const TaskActions = ({
     onEdit
 }) => {
     // Use Yjs timer hook directly
-    const { getTimerForProject } = useTimers();
-    const projectTimer = task.projectId ? getTimerForProject(task.projectId) : null;
+    const { getTimerForTask } = useTimers();
+    const projectTimer = getTimerForTask(task.id, task.projectId);
     const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
     const isPaused = projectTimer?.isPaused || false;
+    const hideNonTimerActions = Boolean(projectTimer);
     
     if (isEditing) {
         return null;
@@ -88,15 +89,17 @@ const TaskActions = ({
                         showTimeDisplay={false}
                     />
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onShowTimeEntries}
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
-                        title="View Time Entries"
-                    >
-                        <ClockIcon className="h-5 w-5" />
-                    </Button>
+                    {!hideNonTimerActions && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onShowTimeEntries}
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
+                            title="View Time Entries"
+                        >
+                            <ClockIcon className="h-5 w-5" />
+                        </Button>
+                    )}
 
                     {onToggleBillable && (
                         <Button
@@ -118,7 +121,7 @@ const TaskActions = ({
                         </Button>
                     )}
 
-                    {onDelete && (
+                    {onDelete && !hideNonTimerActions && (
                         <TaskDropdown
                             onEdit={onEdit}
                             onDelete={onDelete}

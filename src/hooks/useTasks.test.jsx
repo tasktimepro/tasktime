@@ -37,6 +37,10 @@ describe('useTasks', () => {
         vi.clearAllMocks()
     })
 
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
     it('loads archived tasks, filters by project, and exposes helpers', async () => {
         const archivedMap = createObservableMap({
             t3: { id: 't3', projectId: 'p1', archived: true, parentTaskId: null },
@@ -103,5 +107,42 @@ describe('useTasks', () => {
         renderHook(() => useTasks({ includeArchived: true }))
 
         await waitFor(() => expect(loadArchivedTasks).toHaveBeenCalled())
+    })
+
+    it('filters standalone, overdue, today, and upcoming tasks', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2025-01-06T09:00:00Z'))
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        const activeTasks = [
+            { id: 'overdue', projectId: 'p1', archived: false, completed: false, recurring: null, startDate: '2025-01-04' },
+            { id: 'today', projectId: 'p1', archived: false, completed: false, recurring: null, startDate: '2025-01-06' },
+            { id: 'upcoming', projectId: 'p1', archived: false, completed: false, recurring: null, startDate: '2025-01-10' },
+            { id: 'completed', projectId: 'p1', archived: false, completed: true, recurring: null, startDate: '2025-01-04' },
+            { id: 'recurring-weekly', projectId: 'p1', archived: false, completed: false, recurring: { type: 'weekly', weeklyDays: [1] } },
+            { id: 'standalone', projectId: null, archived: false, completed: false, recurring: null, startDate: null },
+            { id: 'archived', projectId: 'p1', archived: true, completed: false, recurring: null, startDate: '2025-01-03' },
+        ]
+
+        mockUseYjsCollection.mockReturnValue({
+            items: activeTasks,
+            isLoading: false,
+            get: vi.fn((id) => activeTasks.find((t) => t.id === id)),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        expect(result.current.getStandaloneTasks().map((t) => t.id)).toEqual(['standalone'])
+        expect(result.current.getOverdueTasks().map((t) => t.id)).toEqual(['overdue'])
+        expect(result.current.getTasksForToday().map((t) => t.id).sort()).toEqual(['recurring-weekly', 'today'])
+        expect(result.current.getUpcomingTasks(7).map((t) => t.id)).toEqual(['upcoming'])
     })
 })

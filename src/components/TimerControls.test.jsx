@@ -40,7 +40,12 @@ vi.mock('../hooks/useTimers.ts', () => ({
         startTimer: timerHookMocks.startTimer,
         pauseTimer: timerHookMocks.pauseTimer,
         resumeTimer: timerHookMocks.resumeTimer,
-        clearTimer: timerHookMocks.clearTimer
+        clearTimer: timerHookMocks.clearTimer,
+        getTimerForTask: (taskId, projectId) => {
+            if (!mockProjectTimer) return null;
+            const key = projectId || taskId;
+            return mockProjectTimer.projectId === key ? mockProjectTimer : null;
+        }
     })
 }))
 

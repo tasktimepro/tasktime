@@ -5,6 +5,7 @@ import TemplateModal from './TemplateModal';
 import PaymentMethodModal from './PaymentMethodModal';
 import BusinessModal from './BusinessModal';
 import InvoiceModal from '../invoice/InvoiceModal';
+import TaskModal from './TaskModal';
 
 /**
  * ModalManager - Central manager for all form modals
@@ -128,6 +129,15 @@ const ModalManager = ({
                     isOpen={true}
                     onClose={closeModal}
                     editingBusinessInfo={editingItem}
+                />
+            )}
+
+            {/* Task Modal */}
+            {activeModal === 'task' && (
+                <TaskModal
+                    isOpen={true}
+                    onClose={closeModal}
+                    editingTask={editingItem}
                 />
             )}
         </>

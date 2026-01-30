@@ -102,7 +102,8 @@ vi.mock('../hooks/useInvoiceTemplates.ts', () => ({
 vi.mock('../hooks/useTimers.ts', () => ({
 
     useTimers: () => ({
-        getTimerForProject: () => null
+        getTimerForProject: () => null,
+        getTimerForTask: () => null
     })
 }))
 
