@@ -215,7 +215,7 @@ const RecentTasks = ({
                     </div>
                 ) : (
                     <div className="px-6 py-8 text-center text-muted-foreground">
-                        <DocumentCheckIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                        <LayoutListIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm">
                             {taskSearchQuery ? 'No tasks found matching your search' : 'No recent tasks found'}
                         </p>
