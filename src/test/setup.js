@@ -12,5 +12,6 @@ const localStorageMock = {
 global.localStorage = localStorageMock
 
 beforeEach(() => {
+    vi.useRealTimers()
     vi.clearAllMocks()
 })

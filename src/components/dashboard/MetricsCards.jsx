@@ -215,7 +215,38 @@ const MetricsCards = ({
 
                 {/* Invoice Metrics */}
                 {hasClients && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    {/* Pending Bills This Month Notice */}
+                    <div className="bg-muted/40 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">Pending Bills This Month</h3>
+                                <div className="mt-2">
+                                    <div className="flex items-center">
+                                        <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                                            <div className="flex items-center">
+                                                <CurrencyDollarIcon className="h-4 w-4 text-muted-foreground mr-1" />
+                                                <span className="font-semibold text-foreground sensitive-data">
+                                                    {thisMonthUnbilledDisplay}
+                                                </span>
+                                                <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
+                                                    unbilled
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center mt-1">
+                                        <ClockIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-1" />
+                                        <span className="text-sm text-blue-700 dark:text-blue-300">
+                                            {formatDuration(thisMonthBillableHours * 3600000)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <ClockIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                        </div>
+                    </div>
+
                     {/* Outstanding Invoices */}
                     {invoiceMetrics.outstanding > 0 ? (
                         <button
@@ -307,29 +338,7 @@ const MetricsCards = ({
                             </div>
                         </div>
                     )}
-
-                    {/* Pending Bills This Month Notice */}
-                    <div className="bg-muted/40 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">Pending Bills This Month</h3>
-                                <div className="flex items-center mt-2">
-                                    <ClockIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-2" />
-                                    <span className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-                                        {thisMonthBillableHours.toFixed(1)}h
-                                    </span>
-                                </div>
-                                <div className="flex items-center mt-1">
-                                    <CurrencyDollarIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-2" />
-                                    <span className="text-sm text-blue-700 dark:text-blue-300 sensitive-data">
-                                        {thisMonthUnbilledDisplay} unbilled
-                                    </span>
-                                </div>
-                            </div>
-                            <ClockIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                        </div>
-                    </div>
-                    </div>
+                </div>
                 )}
             </CardContent>
         </Card>
