@@ -971,6 +971,16 @@ export class YjsDriveProvider {
             return;
         }
 
+        if (!this.manifest.getManifest()) {
+            if (!this.isOnline()) {
+                this.subscribeToDoc(docName);
+                return;
+            }
+
+            await this.manifest.load();
+            this.log('syncAndSubscribeDoc: manifest loaded');
+        }
+
         // Sync the document
         const shouldPull = this.syncMode === 'sync';
         await this.syncDoc(docName, shouldPull);

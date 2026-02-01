@@ -46,6 +46,13 @@ const ToDoToday = ({
     const [selectedTask, setSelectedTask] = useState(null);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
     const combinedTasks = [...overdueTasks, ...tasksForToday];
+    const sortedTasks = combinedTasks.sort((a, b) => {
+        const aCompleted = getTaskCompletedStatus(a);
+        const bCompleted = getTaskCompletedStatus(b);
+
+        if (aCompleted === bCompleted) return 0;
+        return aCompleted ? 1 : -1;
+    });
     const incompleteCount = combinedTasks.filter((task) => !getTaskCompletedStatus(task)).length;
 
     const handleOpenTimeEntries = (task) => {
@@ -123,7 +130,7 @@ const ToDoToday = ({
                 <div className="divide-y divide-border">
                     {combinedTasks.length > 0 ? (
                         <div className="py-2">
-                            {combinedTasks.map(renderTaskRow)}
+                            {sortedTasks.map(renderTaskRow)}
                         </div>
                     ) : (
                         <EmptyState

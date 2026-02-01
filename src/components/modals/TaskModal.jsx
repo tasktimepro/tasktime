@@ -23,11 +23,19 @@ const NO_PROJECT_VALUE = 'no-project';
  * @param {boolean} props.isOpen
  * @param {Function} props.onClose
  * @param {Object|null} props.editingTask
+ * @param {Function} props.openProjectModal
+ * @param {Function} props.saveFormState
+ * @param {Function} props.getSavedState
+ * @param {Function} props.clearSavedState
  */
 const TaskModal = ({
     isOpen,
     onClose,
-    editingTask = null
+    editingTask = null,
+    openProjectModal,
+    saveFormState,
+    getSavedState,
+    clearSavedState
 }) => {
     const { showSuccess, showError } = useToast();
     const { projects } = useProjects();
@@ -61,6 +69,21 @@ const TaskModal = ({
             return;
         }
 
+        const savedState = getSavedState ? getSavedState() : null;
+        const savedEditingTaskId = savedState?.editingTaskId || null;
+        const currentEditingTaskId = editingTask?.id || null;
+
+        if (savedState && savedEditingTaskId === currentEditingTaskId) {
+            setFormData({
+                title: savedState.title || '',
+                projectId: savedState.projectId || NO_PROJECT_VALUE,
+                startDate: savedState.startDate || '',
+                recurring: savedState.recurring || null,
+                note: savedState.note || ''
+            });
+            return;
+        }
+
         if (editingTask) {
             setFormData({
                 title: editingTask.title || '',
@@ -79,7 +102,22 @@ const TaskModal = ({
             recurring: null,
             note: ''
         });
-    }, [isOpen, editingTask]);
+    }, [isOpen, editingTask, getSavedState]);
+
+    useEffect(() => {
+        if (!saveFormState || !isOpen) {
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            saveFormState({
+                ...formData,
+                editingTaskId: editingTask?.id || null
+            });
+        }, 400);
+
+        return () => clearTimeout(timeoutId);
+    }, [formData, saveFormState, editingTask, isOpen]);
 
     const handleProjectChange = (value) => {
         handleChange('projectId', value === NO_PROJECT_VALUE ? NO_PROJECT_VALUE : value);
@@ -148,6 +186,18 @@ const TaskModal = ({
             showSuccess('Task created');
         }
 
+        if (clearSavedState) {
+            clearSavedState();
+        }
+
+        onClose();
+    };
+
+    const handleClose = () => {
+        if (clearSavedState) {
+            clearSavedState();
+        }
+
         onClose();
     };
 
@@ -155,7 +205,7 @@ const TaskModal = ({
         <div className="flex justify-end space-x-3">
             <Button
                 variant="outline"
-                onClick={onClose}
+                onClick={handleClose}
                 type="button"
             >
                 Cancel
@@ -172,7 +222,7 @@ const TaskModal = ({
     return (
         <Modal
             isOpen={isOpen}
-            onClose={onClose}
+            onClose={handleClose}
             size='lg'
             title={editingTask ? 'Edit Task' : 'New Task'}
             footer={modalFooter}
@@ -189,7 +239,28 @@ const TaskModal = ({
                 </div>
 
                 <div className="space-y-2">
-                    <Label>Project</Label>
+                    <div className="flex items-center justify-between">
+                        <Label>Project</Label>
+                        {openProjectModal && (
+                            <Button
+                                type="button"
+                                variant="link"
+                                size="sm"
+                                className="h-auto p-0"
+                                onClick={() => {
+                                    if (saveFormState) {
+                                        saveFormState({
+                                            ...formData,
+                                            editingTaskId: editingTask?.id || null
+                                        });
+                                    }
+                                    openProjectModal();
+                                }}
+                            >
+                                + New Project
+                            </Button>
+                        )}
+                    </div>
                     <Select
                         value={formData.projectId}
                         onValueChange={handleProjectChange}

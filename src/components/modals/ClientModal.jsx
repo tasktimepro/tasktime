@@ -174,6 +174,10 @@ const ClientModal = ({
         }
 
         if (!formData.flatRate && (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0)) {
+            setExpandedSections(prev => ({
+                ...prev,
+                pricingTaxes: true
+            }));
             return; // Hourly rate is required when not using flat rate
         }
 
@@ -220,6 +224,10 @@ const ClientModal = ({
         }
 
         if (!formData.flatRate && (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0)) {
+            setExpandedSections(prev => ({
+                ...prev,
+                pricingTaxes: true
+            }));
             return; // Hourly rate is required when not using flat rate
         }
 
@@ -557,7 +565,9 @@ const ClientModal = ({
                         className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${expandedSections.pricingTaxes ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-foreground">Pricing & Taxes</h4>
+                            <h4 className="text-sm font-medium text-foreground">
+                                Pricing & Taxes <span className="text-red-500">*</span>
+                            </h4>
                             <svg
                                 className={`w-5 h-5 text-muted-foreground transform transition-transform ${expandedSections.pricingTaxes ? 'rotate-180' : ''}`}
                                 fill="none"

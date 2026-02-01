@@ -18,6 +18,7 @@ import ProjectsOverview from './dashboard/ProjectsOverview';
 import ToDoToday from './dashboard/ToDoToday';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { CornerDownRightIcon } from '@/components/ui/icons';
+import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -39,6 +40,7 @@ const Dashboard = ({
     const { tasks, updateTask, deleteTask, archiveTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate } = useTasks();
     const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
+    const { getForDate } = usePlannerAttachments();
     
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
@@ -494,9 +496,27 @@ const Dashboard = ({
         return enhanceTaskList(getOverdueTasks());
     }, [getOverdueTasks, enhanceTaskList]);
 
+    const attachedTasksForToday = useMemo(() => {
+        if (!todayStr) return [];
+
+        const attachments = getForDate(todayStr).filter((attachment) => attachment.type === 'task');
+        const tasksById = new Map(tasks.map((task) => [task.id, task]));
+
+        return attachments
+            .map((attachment) => tasksById.get(attachment.referenceId))
+            .filter(Boolean);
+    }, [getForDate, todayStr, tasks]);
+
     const tasksForToday = useMemo(() => {
-        return enhanceTaskList(getTasksForToday());
-    }, [getTasksForToday, enhanceTaskList]);
+        const baseTasks = getTasksForToday();
+        const baseTaskIds = new Set(baseTasks.map((task) => task.id));
+        const combined = [
+            ...baseTasks,
+            ...attachedTasksForToday.filter((task) => !baseTaskIds.has(task.id))
+        ];
+
+        return enhanceTaskList(combined);
+    }, [getTasksForToday, enhanceTaskList, attachedTasksForToday]);
 
     const upcomingTasks = useMemo(() => {
         return enhanceTaskList(getUpcomingTasks(7));
