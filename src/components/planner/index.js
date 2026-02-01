@@ -8,7 +8,6 @@ export { default as DayColumnHeader } from './DayColumnHeader';
 export { default as PlannerItem } from './PlannerItem';
 export { default as AddItemPopover } from './AddItemPopover';
 export { default as EntityPickerModal } from './EntityPickerModal';
-export { default as TaskPreviewModal } from './TaskPreviewModal';
 export { default as MobileDaySelector } from './MobileDaySelector';
 export { default as MobileDayCard } from './MobileDayCard';
 export { useTimeProgress, getProgressGradientStyle } from './hooks/useTimeProgress';

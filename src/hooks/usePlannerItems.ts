@@ -17,8 +17,9 @@ import { useClients } from './useClients';
 import { useTimers } from './useTimers';
 import { useTimeEntries } from './useTimeEntries';
 import { isRecurringTaskDueOnDate } from '@/utils/recurringUtils';
+import { toStorageDate } from '@/utils/dateUtils';
 import { isRecurringCompletedOnDate } from '@/utils/recurringCompletionUtils';
-import type { Task, Project, Client, PlannerAttachment } from '@/stores/yjs/types';
+import type { Task, Project, Client, PlannerAttachment, TimeEntry } from '@/stores/yjs/types';
 
 // ============================================================================
 // Types
@@ -37,6 +38,8 @@ export interface PlannerItemBase {
     estimatedHours?: number | null;
     /** Actual time worked in milliseconds (calculated from time entries) */
     actualTimeMs?: number;
+    /** Whether this item has an active timer (tasks only) */
+    isTimerActive?: boolean;
 }
 
 export interface PlannerClientItem extends PlannerItemBase {
@@ -53,7 +56,7 @@ export interface PlannerProjectItem extends PlannerItemBase {
 
 export interface PlannerTaskItem extends PlannerItemBase {
     type: 'task';
-    subtype: 'recurring' | 'due' | 'attached' | 'timer';
+    subtype: 'recurring' | 'due' | 'attached' | 'timer' | 'worked';
     entity: Task;
     attachment?: PlannerAttachment;
 }
@@ -97,7 +100,7 @@ export interface UsePlannerItemsResult {
  */
 export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     const { getForDate, isLoading: attachmentsLoading } = usePlannerAttachments();
-    const { tasks, isLoading: tasksLoading } = useTasks();
+    const { tasks, isLoading: tasksLoading } = useTasks({ includeArchived: true });
     const { projects, isLoading: projectsLoading } = useProjects();
     const { clients, isLoading: clientsLoading } = useClients();
     const { timers } = useTimers();
@@ -153,6 +156,37 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         return task.completed ?? false;
     }, []);
 
+    const isTaskVisibleOnDate = useCallback((task: Task, dateStr: string): boolean => {
+        const createdDate = typeof task.createdAt === 'number'
+            ? toStorageDate(task.createdAt)
+            : null;
+
+        if (createdDate && dateStr < createdDate) {
+            return false;
+        }
+
+        if (task.archived) {
+            if (!task.archivedOnDate) return false;
+            return dateStr <= task.archivedOnDate;
+        }
+
+        return true;
+    }, []);
+
+    const isClientVisibleOnDate = useCallback((client: Client, dateStr: string): boolean => {
+        if (!client.archived) return true;
+
+        const archivedOnDate = client.archivedOnDate || todayStr;
+        return dateStr <= archivedOnDate;
+    }, [todayStr]);
+
+    const isProjectVisibleOnDate = useCallback((project: Project, dateStr: string): boolean => {
+        if (!project.archived) return true;
+
+        const archivedOnDate = project.archivedOnDate || todayStr;
+        return dateStr <= archivedOnDate;
+    }, [todayStr]);
+
     // Get color for a project (project color or inherited from client)
     const getProjectColor = useCallback((project: Project): string | null => {
         if (project.color) return project.color;
@@ -181,6 +215,13 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         return map;
     }, [tasks]);
 
+    // Build lookup of taskId → task
+    const tasksById = useMemo(() => {
+        const map = new Map<string, Task>();
+        tasks.forEach((t) => map.set(t.id, t));
+        return map;
+    }, [tasks]);
+
     // Build lookup of projectId → clientId
     const projectClientMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -190,57 +231,79 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         return map;
     }, [projects]);
 
-    // Get time entries for a specific date
-    const getEntriesForDate = useCallback((dateStr: string) => {
-        const dayStart = startOfDay(new Date(dateStr)).getTime();
-        const dayEnd = endOfDay(new Date(dateStr)).getTime();
-        return entries.filter((e) => e.start >= dayStart && e.start <= dayEnd);
-    }, [entries]);
+    const getEntryOverlapMs = useCallback((entry: TimeEntry, dayStart: number, dayEnd: number): number => {
+        if (!entry || typeof entry.end !== 'number') return 0;
+        if (entry.end <= entry.start) return 0;
+
+        const overlapStart = Math.max(entry.start, dayStart);
+        const overlapEnd = Math.min(entry.end, dayEnd);
+
+        if (overlapEnd <= overlapStart) return 0;
+        return overlapEnd - overlapStart;
+    }, []);
 
     // Calculate total time for a specific task on a date
     const getTaskTimeOnDate = useCallback((taskId: string, dateStr: string): number => {
-        const dayEntries = getEntriesForDate(dateStr);
-        return dayEntries
+        const dayStart = startOfDay(new Date(dateStr)).getTime();
+        const dayEnd = endOfDay(new Date(dateStr)).getTime();
+        return entries
             .filter((e) => e.taskId === taskId)
-            .reduce((sum, e) => sum + (e.end - e.start), 0);
-    }, [getEntriesForDate]);
+            .reduce((sum, e) => sum + getEntryOverlapMs(e, dayStart, dayEnd), 0);
+    }, [entries, getEntryOverlapMs]);
 
     // Calculate total time for a project on a date (all its tasks)
     const getProjectTimeOnDate = useCallback((projectId: string, dateStr: string): number => {
-        const dayEntries = getEntriesForDate(dateStr);
-        return dayEntries
+        const dayStart = startOfDay(new Date(dateStr)).getTime();
+        const dayEnd = endOfDay(new Date(dateStr)).getTime();
+        return entries
             .filter((e) => taskProjectMap.get(e.taskId) === projectId)
-            .reduce((sum, e) => sum + (e.end - e.start), 0);
-    }, [getEntriesForDate, taskProjectMap]);
+            .reduce((sum, e) => sum + getEntryOverlapMs(e, dayStart, dayEnd), 0);
+    }, [entries, taskProjectMap, getEntryOverlapMs]);
 
     // Calculate total time for a client on a date (all its projects' tasks)
     const getClientTimeOnDate = useCallback((clientId: string, dateStr: string): number => {
-        const dayEntries = getEntriesForDate(dateStr);
-        return dayEntries
+        const dayStart = startOfDay(new Date(dateStr)).getTime();
+        const dayEnd = endOfDay(new Date(dateStr)).getTime();
+        return entries
             .filter((e) => {
                 const projectId = taskProjectMap.get(e.taskId);
                 if (!projectId) return false;
                 return projectClientMap.get(projectId) === clientId;
             })
-            .reduce((sum, e) => sum + (e.end - e.start), 0);
-    }, [getEntriesForDate, taskProjectMap, projectClientMap]);
+            .reduce((sum, e) => sum + getEntryOverlapMs(e, dayStart, dayEnd), 0);
+    }, [entries, taskProjectMap, projectClientMap, getEntryOverlapMs]);
 
     // Calculate total time for a date (all entries)
     const getTotalTimeOnDate = useCallback((dateStr: string): number => {
-        const dayEntries = getEntriesForDate(dateStr);
-        return dayEntries.reduce((sum, e) => sum + (e.end - e.start), 0);
-    }, [getEntriesForDate]);
+        const dayStart = startOfDay(new Date(dateStr)).getTime();
+        const dayEnd = endOfDay(new Date(dateStr)).getTime();
+        return entries.reduce((sum, e) => sum + getEntryOverlapMs(e, dayStart, dayEnd), 0);
+    }, [entries, getEntryOverlapMs]);
 
     // Build items for a single day
     const buildDayItems = useCallback((date: Date, dateStr: string): PlannerItem[] => {
         const attachments = getForDate(dateStr);
         const items: PlannerItem[] = [];
+        const dayStart = startOfDay(date).getTime();
+        const dayEnd = endOfDay(date).getTime();
+
+        const taskTimeMap = new Map<string, number>();
+        entries.forEach((entry) => {
+            if (!entry || typeof entry.end !== 'number') return;
+            const overlap = getEntryOverlapMs(entry, dayStart, dayEnd);
+            if (overlap <= 0) return;
+            const current = taskTimeMap.get(entry.taskId) || 0;
+            taskTimeMap.set(entry.taskId, current + overlap);
+        });
 
         // 1. Attached clients (sorted alphabetically)
         const clientAttachments = attachments
             .filter((a) => a.type === 'client')
             .map((a) => ({ attachment: a, entity: clientsById.get(a.referenceId) }))
-            .filter((item): item is { attachment: PlannerAttachment; entity: Client } => !!item.entity)
+            .filter((item): item is { attachment: PlannerAttachment; entity: Client } => {
+                if (!item.entity) return false;
+                return isClientVisibleOnDate(item.entity, dateStr);
+            })
             .sort((a, b) => (a.entity.title || '').localeCompare(b.entity.title || ''));
 
         clientAttachments.forEach(({ attachment, entity }) => {
@@ -261,7 +324,10 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         const projectAttachments = attachments
             .filter((a) => a.type === 'project')
             .map((a) => ({ attachment: a, entity: projectsById.get(a.referenceId) }))
-            .filter((item): item is { attachment: PlannerAttachment; entity: Project } => !!item.entity)
+            .filter((item): item is { attachment: PlannerAttachment; entity: Project } => {
+                if (!item.entity) return false;
+                return isProjectVisibleOnDate(item.entity, dateStr);
+            })
             .sort((a, b) => a.entity.title.localeCompare(b.entity.title));
 
         projectAttachments.forEach(({ attachment, entity }) => {
@@ -285,9 +351,11 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         const taskAttachments = attachments
             .filter((a) => a.type === 'task')
             .map((a) => ({ attachment: a, entity: tasks.find((t) => t.id === a.referenceId) }))
-            .filter((item): item is { attachment: PlannerAttachment; entity: Task } => 
-                !!item.entity && !item.entity.archived
-            )
+            .filter((item): item is { attachment: PlannerAttachment; entity: Task } => {
+                if (!item.entity) return false;
+                if (isTaskVisibleOnDate(item.entity, dateStr)) return true;
+                return item.attachment.mode === 'date' && item.attachment.date === dateStr;
+            })
             .sort((a, b) => a.entity.title.localeCompare(b.entity.title));
 
         taskAttachments.forEach(({ attachment, entity }) => {
@@ -297,12 +365,13 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             items.push({
                 key: `task-attached-${attachment.id}`,
                 type: 'task',
-                subtype: hasActiveTimer ? 'timer' : 'attached',
+                subtype: 'attached',
                 title: entity.title,
                 isCompleted: isTaskCompletedOnDate(entity, dateStr),
                 color: getTaskColor(entity),
                 estimatedHours: attachment.estimatedHours || null,
                 actualTimeMs: getTaskTimeOnDate(entity.id, dateStr),
+                isTimerActive: hasActiveTimer,
                 entity,
                 attachment,
             });
@@ -310,12 +379,13 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
 
         // 4. Recurring tasks matching this day (sorted alphabetically)
         const recurringTasks = tasks
-            .filter((t) => !t.archived && t.recurring && !addedTaskIds.has(t.id))
-            .filter((t) => dateStr >= todayStr && isRecurringTaskDueOnDate(date, t.recurring))
+            .filter((t) => t.recurring && !addedTaskIds.has(t.id))
+            .filter((t) => isTaskVisibleOnDate(t, dateStr) && isRecurringTaskDueOnDate(date, t.recurring))
             .sort((a, b) => a.title.localeCompare(b.title));
 
         recurringTasks.forEach((task) => {
             addedTaskIds.add(task.id);
+            const hasActiveTimer = dateStr === todayStr && activeTimerTaskIds.has(task.id);
             items.push({
                 key: `task-recurring-${task.id}-${dateStr}`,
                 type: 'task',
@@ -324,17 +394,20 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
                 isCompleted: isTaskCompletedOnDate(task, dateStr),
                 color: getTaskColor(task),
                 actualTimeMs: getTaskTimeOnDate(task.id, dateStr),
+                isTimerActive: hasActiveTimer,
                 entity: task,
             });
         });
 
         // 5. Tasks with startDate matching this day (sorted alphabetically)
         const dueTasks = tasks
-            .filter((t) => !t.archived && t.startDate === dateStr && !t.recurring && !addedTaskIds.has(t.id))
+            .filter((t) => t.startDate === dateStr && !t.recurring && !addedTaskIds.has(t.id))
+            .filter((t) => isTaskVisibleOnDate(t, dateStr))
             .sort((a, b) => a.title.localeCompare(b.title));
 
         dueTasks.forEach((task) => {
             addedTaskIds.add(task.id);
+            const hasActiveTimer = dateStr === todayStr && activeTimerTaskIds.has(task.id);
             items.push({
                 key: `task-due-${task.id}`,
                 type: 'task',
@@ -343,14 +416,40 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
                 isCompleted: isTaskCompletedOnDate(task, dateStr),
                 color: getTaskColor(task),
                 actualTimeMs: getTaskTimeOnDate(task.id, dateStr),
+                isTimerActive: hasActiveTimer,
                 entity: task,
             });
         });
 
-        // 6. Tasks with active timers (only for today, sorted alphabetically)
+        // 6. Tasks with time entries on this day (sorted alphabetically)
+        const workedTasks = Array.from(taskTimeMap.entries())
+            .map(([taskId, timeMs]) => ({ task: tasksById.get(taskId), timeMs }))
+            .filter((item): item is { task: Task; timeMs: number } => Boolean(item.task))
+            .filter((item) => !addedTaskIds.has(item.task.id))
+            .filter((item) => isTaskVisibleOnDate(item.task, dateStr))
+            .sort((a, b) => a.task.title.localeCompare(b.task.title));
+
+        workedTasks.forEach(({ task, timeMs }) => {
+            addedTaskIds.add(task.id);
+            const hasActiveTimer = dateStr === todayStr && activeTimerTaskIds.has(task.id);
+            items.push({
+                key: `task-worked-${task.id}-${dateStr}`,
+                type: 'task',
+                subtype: 'worked',
+                title: task.title,
+                isCompleted: isTaskCompletedOnDate(task, dateStr),
+                color: getTaskColor(task),
+                actualTimeMs: timeMs,
+                isTimerActive: hasActiveTimer,
+                entity: task,
+            });
+        });
+
+        // 7. Tasks with active timers (only for today, sorted alphabetically)
         if (dateStr === todayStr) {
             const timerTasks = tasks
-                .filter((t) => !t.archived && activeTimerTaskIds.has(t.id) && !addedTaskIds.has(t.id))
+                .filter((t) => activeTimerTaskIds.has(t.id) && !addedTaskIds.has(t.id))
+                .filter((t) => isTaskVisibleOnDate(t, dateStr))
                 .sort((a, b) => a.title.localeCompare(b.title));
 
             timerTasks.forEach((task) => {
@@ -362,13 +461,14 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
                     isCompleted: false, // Active timer tasks are not completed
                     color: getTaskColor(task),
                     actualTimeMs: getTaskTimeOnDate(task.id, dateStr),
+                    isTimerActive: true,
                     entity: task,
                 });
             });
         }
 
         return items;
-    }, [getForDate, clientsById, projectsById, tasks, isTaskCompletedOnDate, getTaskColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, todayStr]);
+    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, todayStr, getEntryOverlapMs]);
 
     // Build the full week
     const weekDays = useMemo((): PlannerDay[] => {

@@ -21,10 +21,11 @@ const RecentTasks = ({
     handleCompleteTask,
     getTaskCompletedStatus,
     renderTaskTitle,
-    handleTaskTitleClick,
+    handleProjectTitleClick,
     renderTaskControls,
     onEditTask,
-    onDeleteTask
+    onDeleteTask,
+    onArchiveTask
 }) => {
     const { getTimerForTask } = useTimers();
     const [selectedTask, setSelectedTask] = useState(null);
@@ -71,7 +72,7 @@ const RecentTasks = ({
                             const isCompleted = getTaskCompletedStatus(task);
 
                             return (
-                                <div key={task.id} className={`px-3 py-3 hover:bg-muted ${isCompleted ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
+                                <div key={task.id} className={`px-3 py-3 hover:bg-muted ${shouldDisable ? 'opacity-50' : ''}`}>
                                     <div className="flex items-center gap-3">
                                         {!task.recurring && (
                                             <CustomCheckbox
@@ -82,37 +83,6 @@ const RecentTasks = ({
                                         )}
                                         <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
                                             {renderTaskTitle(task, isCompleted)}
-                                            {(task.project || task.parentTaskId) && (
-                                                <p className={`text-xs truncate ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                                                    {task.parentTaskId ? (
-                                                        <span>
-                                                            Subtask of: {task.parentTask ? task.parentTask.title : 'Unknown Parent'}
-                                                            {task.project && (
-                                                                <>
-                                                                    <span className="mx-1">•</span>
-                                                                    <button
-                                                                        onClick={() => handleTaskTitleClick(task)}
-                                                                        className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
-                                                                        title={`Click to open ${task.project.title} project`}
-                                                                    >
-                                                                        {task.project.title}
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </span>
-                                                    ) : (
-                                                        task.project && (
-                                                            <button
-                                                                onClick={() => handleTaskTitleClick(task)}
-                                                                        className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
-                                                                title={`Click to open ${task.project.title} project`}
-                                                            >
-                                                                {task.project.title}
-                                                            </button>
-                                                        )
-                                                    )}
-                                                </p>
-                                            )}
                                         </div>
                                         {(task.startDate || task.recurring) && (
                                             <StartDateBadge
@@ -141,6 +111,7 @@ const RecentTasks = ({
                                                         task={task}
                                                         onEdit={onEditTask}
                                                         onDelete={onDeleteTask}
+                                                        onArchive={onArchiveTask}
                                                     />
                                                 </>
                                             )}
@@ -168,17 +139,6 @@ const RecentTasks = ({
                                                         )}
                                                         <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
                                                             {renderTaskTitle(subtaskWithProject, subtaskCompleted)}
-                                                            {task.project && (
-                                                                <p className={`text-xs truncate ${subtaskCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                                                                    <button
-                                                                        onClick={() => handleTaskTitleClick(subtaskWithProject)}
-                                                                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline cursor-pointer"
-                                                                        title={`Click to open ${task.project.title} project`}
-                                                                    >
-                                                                        {task.project.title}
-                                                                    </button>
-                                                                </p>
-                                                            )}
                                                         </div>
                                                         {(subtask.startDate || subtask.recurring) && (
                                                             <StartDateBadge
@@ -207,6 +167,7 @@ const RecentTasks = ({
                                                                         task={subtaskWithProject}
                                                                         onEdit={onEditTask}
                                                                         onDelete={onDeleteTask}
+                                                                        onArchive={onArchiveTask}
                                                                     />
                                                                 </>
                                                             )}

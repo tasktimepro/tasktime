@@ -27,7 +27,8 @@ const SubtaskSection = ({
     anyTimerActive,
     isRelatedToActiveTimer,
     showSuccess,
-    onEditTask
+    onEditTask,
+    onViewTask
 }) => {
     // Yjs hooks for state
     const { tasks, deleteTask } = useTasks();
@@ -62,7 +63,7 @@ const SubtaskSection = ({
 
     return (
         <div className="border-t border-border bg-muted/40 rounded-b-lg">
-            <div className="pl-8 pr-4 py-2 space-y-2">
+            <div className="pl-8 pr-2 py-2 space-y-2">
                 {subtasks.map((subtask) => (
                     <SubtaskItem
                         key={subtask.id}
@@ -70,6 +71,7 @@ const SubtaskSection = ({
                         onToggleBillable={onToggleBillable}
                         onDelete={() => handleDeleteSubtask(subtask.id, subtask.title)}
                         onEditTask={onEditTask}
+                        onViewTask={onViewTask}
                     />
                 ))}
 

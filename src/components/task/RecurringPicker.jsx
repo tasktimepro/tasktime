@@ -163,7 +163,7 @@ const RecurringPicker = ({
                         </div>
 
                         {draftConfig.type === 'weekly' && (
-                            <div className="flex flex-wrap gap-2">
+                            <div className="grid grid-cols-7 gap-2">
                                 {WEEKDAY_OPTIONS.map((option) => {
                                     const isSelected = draftConfig.weeklyDays?.includes(option.value);
 
@@ -172,7 +172,7 @@ const RecurringPicker = ({
                                             key={option.value}
                                             type="button"
                                             variant={isSelected ? 'secondary' : 'outline'}
-                                            className="h-8 w-10 p-0"
+                                            className="h-8 w-full p-0"
                                             onClick={() => handleToggleDay(option.value)}
                                         >
                                             {option.label}

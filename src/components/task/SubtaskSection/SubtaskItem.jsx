@@ -3,7 +3,7 @@ import TimeEntriesModal from '../../TimeEntriesModal';
 import TaskHeader from '../TaskHeader';
 import TaskActions from '../TaskActions';
 import StartDateBadge from '../StartDateBadge';
-import { formatDurationWithSeconds } from '../../../utils/dateUtils.ts';
+import { formatDurationWithSeconds, getTodayString } from '../../../utils/dateUtils.ts';
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
@@ -17,7 +17,8 @@ const SubtaskItem = ({
     task,
     onToggleBillable,
     onDelete,
-    onEditTask
+    onEditTask,
+    onViewTask
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
@@ -74,7 +75,12 @@ const SubtaskItem = ({
             clearTimer(timerKey);
         }
 
-        updateTask(task.id, { completed: checked, lastActive: now });
+        const todayStr = getTodayString();
+        updateTask(task.id, {
+            completed: checked,
+            completedOnDate: checked ? todayStr : null,
+            lastActive: now
+        });
     }, [isTimerActive, projectTimer, task.id, task.recurring, createEntry, clearTimer, updateTask, timerKey]);
 
     /**
@@ -105,8 +111,13 @@ const SubtaskItem = ({
         setIsEditing(true);
     }, [onEditTask, task]);
 
+    const handleViewTask = useCallback(() => {
+        if (!onViewTask) return;
+        onViewTask(task, { dateStr: null });
+    }, [onViewTask, task]);
+
     return (
-        <div className={`flex items-center justify-between gap-3 py-2 rounded-md hover:bg-muted transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
+        <div className={`flex items-center justify-between gap-3 px-3 py-2 rounded-md hover:bg-muted transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
             <TaskHeader
                 task={task}
                 isEditing={isEditing}
@@ -122,6 +133,7 @@ const SubtaskItem = ({
                 totalTimeWithSubtasks={mainTaskTime}
                 isSubtask={true}
                 showTimeDisplay={false}
+                onTitleClick={handleViewTask}
             />
 
             {(task.startDate || task.recurring) && (

@@ -6,10 +6,12 @@ import GlobalTimerCard from './GlobalTimerCard';
  * GlobalTimerStack component - Shows active timers in a stacked layout
  * @param {Object} props - Component props
  * @param {Function} props.navigateToProject - Function to navigate to project page
+ * @param {(task: Object) => void} props.onOpenTaskView - Open task view modal
  * @param {Function} props.onClose - Function called when timer stack is closed
  */
 const GlobalTimerStack = ({
     navigateToProject,
+    onOpenTaskView,
     onClose
 }) => {
     const { timers, focusTimer } = useTimers();
@@ -45,6 +47,7 @@ const GlobalTimerStack = ({
                                 setExpandedTimerId(nextValue ? timer.projectId : null);
                             }}
                             navigateToProject={navigateToProject}
+                            onOpenTaskView={onOpenTaskView}
                             onClose={onClose}
                         />
                     </div>

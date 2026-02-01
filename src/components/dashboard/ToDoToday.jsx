@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { ChevronDownIcon, ChevronRightIcon, ClockIcon, ListTodoIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import CustomCheckbox from '../CustomCheckbox';
 import StartDateBadge from '../task/StartDateBadge';
 import TaskActionsMenu from '../task/TaskActionsMenu';
@@ -22,9 +23,10 @@ import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
  * @param {Function} props.getTaskCompletedStatus
  * @param {Function} props.renderTaskTitle
  * @param {Function} props.renderTaskControls
- * @param {Function} props.handleTaskTitleClick
+ * @param {Function} props.handleProjectTitleClick
  * @param {Function} props.onEditTask
  * @param {Function} props.onDeleteTask
+ * @param {Function} props.onArchiveTask
  */
 const ToDoToday = ({
     overdueTasks,
@@ -34,9 +36,10 @@ const ToDoToday = ({
     getTaskCompletedStatus,
     renderTaskTitle,
     renderTaskControls,
-    handleTaskTitleClick,
+    handleProjectTitleClick,
     onEditTask,
-    onDeleteTask
+    onDeleteTask,
+    onArchiveTask
 }) => {
     const { getTimerForTask } = useTimers();
     const [showUpcoming, setShowUpcoming] = useState(false);
@@ -63,7 +66,7 @@ const ToDoToday = ({
         const isCompleted = getTaskCompletedStatus(task);
 
         return (
-            <div key={task.id} className={`px-3 py-3 hover:bg-muted ${isCompleted ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
+            <div key={task.id} className={`px-3 py-3 hover:bg-muted ${shouldDisable ? 'opacity-50' : ''}`}>
                 <div className="flex items-center gap-3">
                     <CustomCheckbox
                         checked={isCompleted}
@@ -72,37 +75,6 @@ const ToDoToday = ({
                     />
                     <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
                         {renderTaskTitle(task, isCompleted)}
-                        {(task.project || task.parentTaskId) && (
-                            <p className="text-xs truncate text-muted-foreground">
-                                {task.parentTaskId ? (
-                                    <span>
-                                        Subtask of: {task.parentTask ? task.parentTask.title : 'Unknown Parent'}
-                                        {task.project && (
-                                            <>
-                                                <span className="mx-1">•</span>
-                                                <button
-                                                    onClick={() => handleTaskTitleClick(task)}
-                                                    className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
-                                                    title={`Click to open ${task.project.title} project`}
-                                                >
-                                                    {task.project.title}
-                                                </button>
-                                            </>
-                                        )}
-                                    </span>
-                                ) : (
-                                    task.project && (
-                                        <button
-                                            onClick={() => handleTaskTitleClick(task)}
-                                            className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
-                                            title={`Click to open ${task.project.title} project`}
-                                        >
-                                            {task.project.title}
-                                        </button>
-                                    )
-                                )}
-                            </p>
-                        )}
                     </div>
                     <StartDateBadge
                         startDate={task.startDate}
@@ -129,6 +101,7 @@ const ToDoToday = ({
                                     task={task}
                                     onEdit={onEditTask}
                                     onDelete={onDeleteTask}
+                                    onArchive={onArchiveTask}
                                 />
                             </>
                         )}
@@ -148,24 +121,31 @@ const ToDoToday = ({
             </CardHeader>
             <CardContent className="pt-0">
                 <div className="divide-y divide-border">
-                    {combinedTasks.length > 0 && (
+                    {combinedTasks.length > 0 ? (
                         <div className="py-2">
                             {combinedTasks.map(renderTaskRow)}
                         </div>
+                    ) : (
+                        <EmptyState
+                            icon={ListTodoIcon}
+                            title="Nothing due today"
+                            description="You're all caught up."
+                            className="pt-0 pb-6"
+                        />
                     )}
 
                     {upcomingTasks.length > 0 && (
                         <div className="py-2">
                             <button
                                 onClick={() => setShowUpcoming(!showUpcoming)}
-                                className="flex items-center justify-between w-full text-left text-sm font-medium text-foreground hover:text-foreground transition-colors px-3 cursor-pointer"
+                                className="flex items-center w-full text-left text-sm font-medium text-foreground hover:text-foreground transition-colors pt-2 cursor-pointer"
                             >
-                                <span>Upcoming ({upcomingTasks.length})</span>
                                 {showUpcoming ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />
                                 ) : (
                                     <ChevronRightIcon className="h-4 w-4 mr-1" />
                                 )}
+                                <span>Upcoming ({upcomingTasks.length})</span>
                             </button>
 
                             {showUpcoming && (

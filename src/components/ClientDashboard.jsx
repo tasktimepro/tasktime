@@ -1,5 +1,5 @@
-import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon } from '@/components/ui/icons';
-import { useState, useMemo } from 'react';
+import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, ArchiveBoxIcon, TrashIcon } from '@/components/ui/icons';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -7,7 +7,22 @@ import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import { getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
-import { millisecondsToHours, formatDuration } from '../utils/dateUtils.ts';
+import { millisecondsToHours, formatDuration, toStorageDate } from '../utils/dateUtils.ts';
+import { useClients } from '../hooks/useClients.ts';
+import { useToast } from '../hooks/useToast.ts';
+import { useProjects } from '../hooks/useProjects.ts';
+import { useTasks } from '../hooks/useTasks.ts';
+import { useTimeEntries } from '../hooks/useTimeEntries.ts';
+import { useInvoices } from '../hooks/useInvoices.ts';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { MoreHorizontal } from 'lucide-react';
+import ClientDeleteDialog from './modals/ClientDeleteDialog';
+import ClientArchiveDialog from './modals/ClientArchiveDialog';
 
 /**
  * ClientDashboard component - Main dashboard view for a selected client
@@ -32,6 +47,15 @@ const ClientDashboard = ({
 }) => {
     const [editingInvoice, setEditingInvoice] = useState(null);
     const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showArchiveModal, setShowArchiveModal] = useState(false);
+    const [showArchivedProjects, setShowArchivedProjects] = useState(false);
+    const { updateClient, deleteClient } = useClients();
+    const { deleteProject, updateProject } = useProjects();
+    const { deleteTask } = useTasks();
+    const { deleteEntry } = useTimeEntries();
+    const { deleteInvoice } = useInvoices();
+    const { showSuccess } = useToast();
     // Get client's currency
     const clientCurrency = useMemo(() => {
         return client.defaultCurrency || getPreferredCurrency();
@@ -41,6 +65,14 @@ const ClientDashboard = ({
     const clientProjects = useMemo(() => {
         return projects.filter(project => project.preferredClientId === client.id);
     }, [projects, client.id]);
+
+    const activeClientProjects = useMemo(() => {
+        return clientProjects.filter(project => !project.archived);
+    }, [clientProjects]);
+
+    const archivedClientProjects = useMemo(() => {
+        return clientProjects.filter(project => project.archived);
+    }, [clientProjects]);
 
     // Get tasks for client projects
     const clientTasks = useMemo(() => {
@@ -68,7 +100,7 @@ const ClientDashboard = ({
         const totalTime = clientTimeEntries.reduce((total, entry) => {
             return total + (entry.end - entry.start);
         }, 0);
-
+    
         // Total revenue from paid invoices only
         const totalRevenue = clientInvoices.reduce((total, invoice) => {
             // Only include invoices that have been marked as paid
@@ -267,6 +299,100 @@ const ClientDashboard = ({
         openProjectModal(null, { preselectedClientId: client.id });
     };
 
+    const performClientDeletion = useCallback((clientId, alsoDeleteProjects) => {
+        const related = projects.filter(project => project.preferredClientId === clientId);
+
+        if (alsoDeleteProjects) {
+            const relatedProjectIds = related.map(p => p.id);
+
+            relatedProjectIds.forEach(id => deleteProject(id));
+
+            const relatedTaskIds = tasks
+                .filter(task => relatedProjectIds.includes(task.projectId))
+                .map(t => t.id);
+            relatedTaskIds.forEach(id => deleteTask(id));
+
+            const relatedTimeEntryIds = timeEntries
+                .filter(entry => relatedTaskIds.includes(entry.taskId))
+                .map(e => e.id);
+            relatedTimeEntryIds.forEach(id => deleteEntry(id));
+
+            const relatedInvoiceIds = invoices
+                .filter(invoice => relatedProjectIds.includes(invoice.projectId))
+                .map(i => i.id);
+            relatedInvoiceIds.forEach(id => deleteInvoice(id));
+        } else {
+            projects
+                .filter(project => project.preferredClientId === clientId)
+                .forEach(project => updateProject(project.id, {
+                    preferredClientId: null,
+                    hourlyRate: null,
+                    flatRate: false,
+                    isPersonal: true
+                }));
+        }
+
+        deleteClient(clientId);
+
+        const message = alsoDeleteProjects
+            ? `Client and ${related.length} related project(s) deleted successfully.`
+            : 'Client deleted successfully.';
+        showSuccess(message);
+    }, [projects, tasks, timeEntries, invoices, deleteProject, deleteTask, deleteEntry, deleteInvoice, updateProject, deleteClient, showSuccess]);
+
+    const handleEditClient = () => {
+        openClientModal?.(client);
+    };
+
+    const handleArchiveClient = () => {
+        setShowArchiveModal(true);
+    };
+
+    const handleUnarchiveClient = () => {
+        updateClient(client.id, { archived: false, archivedOnDate: null });
+        showSuccess('Client unarchived');
+    };
+
+    const handleDeleteClient = () => {
+        setShowDeleteModal(true);
+    };
+
+    const handleConfirmDelete = () => {
+        performClientDeletion(client.id, false);
+        setShowDeleteModal(false);
+        onBackToClients();
+    };
+
+    const handleForceDelete = () => {
+        performClientDeletion(client.id, true);
+        setShowDeleteModal(false);
+        onBackToClients();
+    };
+
+    const handleCloseDeleteModal = () => {
+        setShowDeleteModal(false);
+    };
+
+    const handleCloseArchiveModal = () => {
+        setShowArchiveModal(false);
+    };
+
+    const handleArchiveOnly = () => {
+        const archivedOnDate = toStorageDate(new Date());
+        updateClient(client.id, { archived: true, archivedOnDate });
+        showSuccess('Client archived');
+        setShowArchiveModal(false);
+    };
+
+    const handleArchiveWithProjects = () => {
+        const archivedOnDate = toStorageDate(new Date());
+        const relatedProjectIds = clientProjects.map(project => project.id);
+        relatedProjectIds.forEach(id => updateProject(id, { archived: true, archivedOnDate }));
+        updateClient(client.id, { archived: true, archivedOnDate });
+        showSuccess(`Client and ${clientProjects.length} related project(s) archived successfully.`);
+        setShowArchiveModal(false);
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -285,7 +411,14 @@ const ClientDashboard = ({
                     </Button>
 
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">{client.title}</h1>
+                        <div className="flex items-center flex-wrap gap-2">
+                            <h1 className="text-2xl font-bold text-foreground">{client.title}</h1>
+                            {client.archived && (
+                                <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                    Archived
+                                </span>
+                            )}
+                        </div>
                         {client.clientName && (
                             <p className="text-sm text-muted-foreground">{client.clientName}</p>
                         )}
@@ -295,24 +428,95 @@ const ClientDashboard = ({
                     </div>
                 </div>
 
-                {/* Create Invoice Button */}
-                <InvoiceGenerator
-                    client={client}
-                    timeEntries={clientTimeEntries}
-                    editingInvoice={editingInvoice}
-                    onInvoiceSaved={() => setEditingInvoice(null)}
-                    paymentMethods={paymentMethods}
-                    businessInfos={businessInfos}
-                    clients={clients}
-                    showButton={true}
-                    // Modal functions
-                    openClientModal={openClientModal}
-                    openProjectModal={openProjectModal}
-                    openBusinessModal={openBusinessModal}
-                    openPaymentMethodModal={openPaymentMethodModal}
-                    openTemplateModal={openTemplateModal}
-                />
+                <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground hover:bg-muted rounded-full"
+                                title="More actions"
+                                aria-label="More actions"
+                            >
+                                <MoreHorizontal className="h-5 w-5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onClick={handleEditClient}
+                                className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
+                            >
+                                <PencilIcon className="h-4 w-4" />
+                                <span>Edit</span>
+                            </DropdownMenuItem>
+                            {client.archived ? (
+                                <DropdownMenuItem
+                                    onClick={handleUnarchiveClient}
+                                    className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                >
+                                    <ArchiveBoxIcon className="h-4 w-4" />
+                                    <span>Unarchive</span>
+                                </DropdownMenuItem>
+                            ) : (
+                                <DropdownMenuItem
+                                    onClick={handleArchiveClient}
+                                    className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                >
+                                    <ArchiveBoxIcon className="h-4 w-4" />
+                                    <span>Archive</span>
+                                </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                                onClick={handleDeleteClient}
+                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                            >
+                                <TrashIcon className="h-4 w-4" />
+                                <span>Delete</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Create Invoice Button */}
+                    <InvoiceGenerator
+                        client={client}
+                        timeEntries={clientTimeEntries}
+                        editingInvoice={editingInvoice}
+                        onInvoiceSaved={() => setEditingInvoice(null)}
+                        paymentMethods={paymentMethods}
+                        businessInfos={businessInfos}
+                        clients={clients}
+                        showButton={true}
+                        // Modal functions
+                        openClientModal={openClientModal}
+                        openProjectModal={openProjectModal}
+                        openBusinessModal={openBusinessModal}
+                        openPaymentMethodModal={openPaymentMethodModal}
+                        openTemplateModal={openTemplateModal}
+                    />
+                </div>
             </div>
+
+            <ClientDeleteDialog
+                isOpen={showDeleteModal}
+                onClose={handleCloseDeleteModal}
+                client={client}
+                relatedProjects={clientProjects}
+                onArchiveRecommended={() => {
+                    handleArchiveOnly();
+                    handleCloseDeleteModal();
+                }}
+                onDeleteOnly={handleConfirmDelete}
+                onDeleteAll={handleForceDelete}
+            />
+
+            <ClientArchiveDialog
+                isOpen={showArchiveModal}
+                onClose={handleCloseArchiveModal}
+                client={client}
+                relatedProjects={clientProjects}
+                onArchiveWithProjects={handleArchiveWithProjects}
+                onArchiveOnly={handleArchiveOnly}
+            />
 
             {/* Client Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -426,7 +630,7 @@ const ClientDashboard = ({
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {clientProjects.length === 0 ? (
+                    {activeClientProjects.length === 0 && archivedClientProjects.length === 0 ? (
                         <div className="text-center py-8">
                             <ClipboardDocumentCheckIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                             <p className="text-muted-foreground mb-4">No projects for this client yet.</p>
@@ -438,65 +642,153 @@ const ClientDashboard = ({
                             </Button>
                         </div>
                     ) : (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {clientProjects.map((project) => {
-                                const projectTasks = clientTasks.filter(task => task.projectId === project.id);
-                                const projectTimeEntries = clientTimeEntries.filter(entry => 
-                                    projectTasks.some(task => task.id === entry.taskId)
-                                );
-                                const totalTime = projectTimeEntries.reduce((total, entry) => 
-                                    total + (entry.end - entry.start), 0
-                                );
+                        <>
+                            {activeClientProjects.length > 0 && (
+                                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    {activeClientProjects.map((project) => {
+                                        const projectTasks = clientTasks.filter(task => task.projectId === project.id);
+                                        const projectTimeEntries = clientTimeEntries.filter(entry => 
+                                            projectTasks.some(task => task.id === entry.taskId)
+                                        );
+                                        const totalTime = projectTimeEntries.reduce((total, entry) => 
+                                            total + (entry.end - entry.start), 0
+                                        );
 
-                                return (
-                                    <div
-                                        key={project.id}
-                                        className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer relative"
-                                        onClick={() => navigateToProject(project.id)}
+                                        return (
+                                            <div
+                                                key={project.id}
+                                                className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer relative"
+                                                onClick={() => navigateToProject(project.id)}
+                                            >
+                                                <h3 className="font-medium text-foreground truncate">{project.title}</h3>
+                                                {project.hourlyRate && (
+                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                        <span className="sensitive-data">
+                                                            {getCurrencySymbol(getProjectCurrency(project, clients))}
+                                                            {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
+                                                        </span>
+                                                    </p>
+                                                )}
+                                                <div className="mt-2 text-sm text-muted-foreground">
+                                                    <p>{projectTasks.filter(t => !t.completed && !t.archived).length} active tasks</p>
+                                                    <p>{formatDuration(totalTime)} total time</p>
+                                                </div>
+
+                                                {/* Billable Amount Tag or Clock Icon for missing rate */}
+                                                {calculateUnbilledAmount(project) > 0 ? (
+                                                    <div className="absolute bottom-4 right-4">
+                                                        <button
+                                                            onClick={(e) => handleGenerateInvoice(e)}
+                                                            className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
+                                                            title="Click to generate invoice"
+                                                        >
+                                                            <span className="sensitive-data">
+                                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                                            </span>
+                                                        </button>
+                                                    </div>
+                                                ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
+                                                    <div className="absolute bottom-4 right-4">
+                                                        <button
+                                                            onClick={(e) => handleGenerateInvoice(e)}
+                                                            className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
+                                                            title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
+                                                        >
+                                                            <ClockIcon className="h-3 w-3 mr-1" />
+                                                            {calculateUnbilledHours(project).toFixed(2)}h
+                                                        </button>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {archivedClientProjects.length > 0 && (
+                                <div className={`${activeClientProjects.length > 0 ? 'mt-6' : ''} border-t border-border pt-6`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowArchivedProjects(!showArchivedProjects)}
+                                        className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 cursor-pointer"
                                     >
-                                        <h3 className="font-medium text-foreground truncate">{project.title}</h3>
-                                        {project.hourlyRate && (
-                                            <p className="text-sm text-muted-foreground mt-1">
-                                                <span className="sensitive-data">
-                                                    {getCurrencySymbol(getProjectCurrency(project, clients))}
-                                                    {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
-                                                </span>
-                                            </p>
+                                        {showArchivedProjects ? (
+                                            <ChevronDownIcon className="h-4 w-4 mr-1" />
+                                        ) : (
+                                            <ChevronRightIcon className="h-4 w-4 mr-1" />
                                         )}
-                                        <div className="mt-2 text-sm text-muted-foreground">
-                                            <p>{projectTasks.filter(t => !t.completed && !t.archived).length} active tasks</p>
-                                            <p>{formatDuration(totalTime)} total time</p>
-                                        </div>
+                                        Archived Projects ({archivedClientProjects.length})
+                                    </button>
 
-                                        {/* Billable Amount Tag or Clock Icon for missing rate */}
-                                        {calculateUnbilledAmount(project) > 0 ? (
-                                            <div className="absolute bottom-4 right-4">
-                                                <button
-                                                    onClick={(e) => handleGenerateInvoice(e)}
-                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
-                                                    title="Click to generate invoice"
-                                                >
-                                                    <span className="sensitive-data">
-                                                        {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
-                                                    </span>
-                                                </button>
-                                            </div>
-                                        ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
-                                            <div className="absolute bottom-4 right-4">
-                                                <button
-                                                    onClick={(e) => handleGenerateInvoice(e)}
-                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
-                                                    title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
-                                                >
-                                                    <ClockIcon className="h-3 w-3 mr-1" />
-                                                    {calculateUnbilledHours(project).toFixed(2)}h
-                                                </button>
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                    {showArchivedProjects && (
+                                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                            {archivedClientProjects.map((project) => {
+                                                const projectTasks = clientTasks.filter(task => task.projectId === project.id);
+                                                const projectTimeEntries = clientTimeEntries.filter(entry => 
+                                                    projectTasks.some(task => task.id === entry.taskId)
+                                                );
+                                                const totalTime = projectTimeEntries.reduce((total, entry) => 
+                                                    total + (entry.end - entry.start), 0
+                                                );
+
+                                                return (
+                                                    <div
+                                                        key={project.id}
+                                                        className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer relative"
+                                                        onClick={() => navigateToProject(project.id)}
+                                                    >
+                                                        <div className="flex items-center min-w-0">
+                                                            <h3 className="font-medium text-foreground truncate">{project.title}</h3>
+                                                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground whitespace-nowrap">
+                                                                Archived
+                                                            </span>
+                                                        </div>
+                                                        {project.hourlyRate && (
+                                                            <p className="text-sm text-muted-foreground mt-1">
+                                                                <span className="sensitive-data">
+                                                                    {getCurrencySymbol(getProjectCurrency(project, clients))}
+                                                                    {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
+                                                                </span>
+                                                            </p>
+                                                        )}
+                                                        <div className="mt-2 text-sm text-muted-foreground">
+                                                            <p>{projectTasks.filter(t => !t.completed && !t.archived).length} active tasks</p>
+                                                            <p>{formatDuration(totalTime)} total time</p>
+                                                        </div>
+
+                                                        {/* Billable Amount Tag or Clock Icon for missing rate */}
+                                                        {calculateUnbilledAmount(project) > 0 ? (
+                                                            <div className="absolute bottom-4 right-4">
+                                                                <button
+                                                                    onClick={(e) => handleGenerateInvoice(e)}
+                                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
+                                                                    title="Click to generate invoice"
+                                                                >
+                                                                    <span className="sensitive-data">
+                                                                        {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                                                    </span>
+                                                                </button>
+                                                            </div>
+                                                        ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
+                                                            <div className="absolute bottom-4 right-4">
+                                                                <button
+                                                                    onClick={(e) => handleGenerateInvoice(e)}
+                                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
+                                                                    title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
+                                                                >
+                                                                    <ClockIcon className="h-3 w-3 mr-1" />
+                                                                    {calculateUnbilledHours(project).toFixed(2)}h
+                                                                </button>
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </>
                     )}
                 </CardContent>
             </Card>

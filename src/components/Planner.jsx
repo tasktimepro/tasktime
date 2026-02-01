@@ -9,17 +9,17 @@
  * Responsive: Shows day tabs + single day on mobile, full grid on desktop.
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { addDays, differenceInCalendarWeeks, getISOWeekYear, getWeek, setWeek, startOfWeek } from 'date-fns';
 import { useUrlState } from '@/hooks/useUrlState';
 import { usePlannerItems } from '@/hooks/usePlannerItems';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTasks } from '@/hooks/useTasks';
+import { useTimers } from '@/hooks/useTimers';
 import { 
     WeekHeader, 
     DayColumn, 
     EntityPickerModal, 
-    TaskPreviewModal,
     MobileDaySelector,
     MobileDayCard,
 } from '@/components/planner/index.js';
@@ -33,16 +33,18 @@ import { useToast } from '@/hooks/useToast';
  * @param {Function} props.openProjectModal - Opens the project creation modal
  * @param {Function} props.openTaskModal - Opens the task creation/edit modal
  * @param {string | null} props.activeModal - Active global modal key
+ * @param {(task: Object, options?: Object) => void} props.onViewTask - Opens the task view modal
  */
 const Planner = ({
     openClientModal,
     openProjectModal,
     openTaskModal,
-    activeModal,
+    activeModal = null,
+    onViewTask
 }) => {
 
     const { urlParams, updateUrl, navigateToProject, navigateToClient } = useUrlState();
-    const { showSuccess, showError } = useToast();
+    const { showSuccess } = useToast();
 
     const today = useMemo(() => new Date(), []);
     const currentIsoYear = useMemo(() => getISOWeekYear(today), [today]);
@@ -91,10 +93,11 @@ const Planner = ({
     const { weekDays, weekStart } = usePlannerItems(weekOffset);
 
     // Planner attachment operations
-    const { createAttachment, updateAttachment, deleteAttachment, isAttached } = usePlannerAttachments();
+    const { createAttachment, deleteAttachment, isAttached } = usePlannerAttachments();
 
     // Task operations for toggling completion and deletion
-    const { deleteTask } = useTasks();
+    const { deleteTask, archiveTask } = useTasks();
+    const { timers, clearTimer } = useTimers();
 
     // Calculate week end (Sunday)
     const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
@@ -131,13 +134,7 @@ const Planner = ({
 
     const [pendingPickerReopen, setPendingPickerReopen] = useState(null);
 
-    // State for task preview modal
-    const [previewState, setPreviewState] = useState({
-        isOpen: false,
-        task: null,
-        dateStr: null,
-        attachment: null,  // PlannerAttachment if attached
-    });
+    const prevActiveModalRef = useRef(activeModal);
 
     // Navigation handlers
     const navigateWeek = useCallback((direction) => {
@@ -220,25 +217,13 @@ const Planner = ({
             case 'task':
                 // Open task preview modal
                 const dateMatch = item.key.match(/\d{4}-\d{2}-\d{2}/);
-                setPreviewState({
-                    isOpen: true,
-                    task: item.entity,
+                onViewTask?.(item.entity, {
                     dateStr: dateMatch ? dateMatch[0] : null,
-                    attachment: item.attachment || null,
+                    attachment: item.attachment || null
                 });
                 break;
         }
-    }, [navigateToClient, navigateToProject]);
-
-    // Close task preview
-    const closeTaskPreview = useCallback(() => {
-        setPreviewState(prev => ({ ...prev, isOpen: false }));
-    }, []);
-
-    // Edit task from preview
-    const handleEditTask = useCallback((task) => {
-        openTaskModal?.(task);
-    }, [openTaskModal]);
+    }, [navigateToClient, navigateToProject, onViewTask]);
 
     // Delete task from preview
     const handleDeleteTask = useCallback((task) => {
@@ -247,6 +232,19 @@ const Planner = ({
             showSuccess('Task deleted');
         }
     }, [deleteTask, showSuccess]);
+
+    const handleArchiveTask = useCallback((task) => {
+        if (!task || task.projectId) return;
+
+        timers.forEach((timer) => {
+            if (timer.taskId === task.id) {
+                clearTimer(timer.projectId || task.id);
+            }
+        });
+
+        archiveTask(task.id);
+        showSuccess('Task archived');
+    }, [archiveTask, timers, clearTimer, showSuccess]);
 
     // Remove item from planner (delete attachment)
     const handleRemoveItem = useCallback((item) => {
@@ -257,26 +255,6 @@ const Planner = ({
     }, [deleteAttachment, showSuccess]);
 
     // Set estimated hours for an item - opens the item for editing
-    const handleSetEstimatedHours = useCallback((item) => {
-        if (!item.attachment) return;
-        
-        const hoursStr = window.prompt(
-            `Enter estimated hours for "${item.title}":`,
-            item.estimatedHours?.toString() || ''
-        );
-        
-        if (hoursStr === null) return; // Cancelled
-        
-        const hours = hoursStr === '' ? null : parseFloat(hoursStr);
-        if (hoursStr !== '' && (isNaN(hours) || hours < 0)) {
-            showError('Please enter a valid number of hours');
-            return;
-        }
-        
-        updateAttachment(item.attachment.id, { estimatedHours: hours });
-        showSuccess('Estimated hours updated');
-    }, [updateAttachment, showSuccess, showError]);
-
     // Add item handler - opens entity picker
     const handleAddClick = useCallback((dateStr, type) => {
         setPendingPickerReopen(null);
@@ -369,7 +347,12 @@ const Planner = ({
     }, [pendingPickerReopen, activeModal]);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-3rem)] gap-4">
+        <div
+            className="flex flex-col gap-4"
+            style={{
+                height: 'calc(100vh - var(--app-content-padding-top, 1.5rem) - var(--app-content-padding-bottom, 1.5rem))'
+            }}
+        >
             {/* Page header */}
             <div className="flex-shrink-0">
                 <h1 className="text-2xl font-bold text-foreground">
@@ -418,7 +401,6 @@ const Planner = ({
                         onAddClick={handleAddClick}
                         onItemClick={handleItemClick}
                         onRemoveItem={handleRemoveItem}
-                        onSetEstimatedHours={handleSetEstimatedHours}
                     />
                 </div>
             )}
@@ -436,7 +418,6 @@ const Planner = ({
                         onAddClick={handleAddClick}
                         onItemClick={handleItemClick}
                         onRemoveItem={handleRemoveItem}
-                        onSetEstimatedHours={handleSetEstimatedHours}
                     />
                 ))}
             </div>
@@ -451,16 +432,6 @@ const Planner = ({
                 onCreateNew={handleCreateNew}
             />
 
-            {/* Task Preview Modal */}
-            <TaskPreviewModal
-                isOpen={previewState.isOpen}
-                onClose={closeTaskPreview}
-                task={previewState.task}
-                dateStr={previewState.dateStr}
-                attachment={previewState.attachment}
-                onEdit={handleEditTask}
-                onDelete={handleDeleteTask}
-            />
         </div>
     );
 };

@@ -6,11 +6,17 @@
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { PlusIcon } from '@/components/ui/icons';
+import { CheckIcon, DocumentTextIcon, PlusIcon, UserIcon } from '@/components/ui/icons';
 import { format } from 'date-fns';
 import PlannerItem from './PlannerItem';
 import AddItemPopover from './AddItemPopover';
 import { useTimeProgress, getProgressGradientStyle } from './hooks/useTimeProgress';
+import {
+    ContextMenu,
+    ContextMenuTrigger,
+    ContextMenuContent,
+    ContextMenuItem,
+} from '@/components/ui/context-menu';
 
 /**
  * @param {Object} props
@@ -22,7 +28,6 @@ import { useTimeProgress, getProgressGradientStyle } from './hooks/useTimeProgre
  * @param {(dateStr: string, type: string, mode: string) => void} props.onAddClick - Handler for add button
  * @param {(item: any) => void} props.onItemClick - Handler for item clicks
  * @param {(item: any) => void} props.onRemoveItem - Handler for removing item from planner
- * @param {(item: any) => void} props.onSetEstimatedHours - Handler for setting estimated hours
  */
 const DayColumn = ({
     date,
@@ -33,7 +38,6 @@ const DayColumn = ({
     onAddClick,
     onItemClick,
     onRemoveItem,
-    onSetEstimatedHours,
 }) => {
 
     // Time progress for today's column
@@ -66,86 +70,106 @@ const DayColumn = ({
     const formattedTime = formatTotalTime(totalTimeMs);
 
     return (
-        <div
-            className={cn(
-                "group flex flex-col h-full rounded-lg border bg-card",
-                "transition-shadow"
-            )}
-            style={progressStyle}
-        >
-            {/* Header */}
-            <div className="flex items-center justify-between px-2 py-2 border-b border-border">
-                <div className="flex items-center gap-2">
-                    <span className={cn(
-                        "text-xs font-medium uppercase",
-                        isToday ? "text-foreground" : "text-muted-foreground"
-                    )}>
-                        {dayName}
-                    </span>
-                    <span className={cn(
-                        "flex items-center justify-center w-7 h-7 text-sm font-semibold rounded-full",
-                        isToday 
-                            ? "bg-muted text-foreground" 
-                            : "text-foreground"
-                    )}>
-                        {dayNumber}
-                    </span>
-                </div>
+        <ContextMenu>
+            <ContextMenuTrigger asChild>
+                <div
+                    className={cn(
+                        "group flex flex-col h-full rounded-lg border bg-card",
+                        "transition-shadow",
+                        isToday && "border-t-2 border-t-orange-400"
+                    )}
+                    style={progressStyle}
+                >
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-2 py-2 border-b border-border">
+                        <div className="flex items-center gap-2">
+                            <span className={cn(
+                                "text-xs font-medium uppercase",
+                                isToday ? "text-foreground" : "text-muted-foreground"
+                            )}>
+                                {dayName}
+                            </span>
+                            <span className={cn(
+                                "flex items-center justify-center w-7 h-7 text-sm font-semibold rounded-full",
+                                isToday 
+                                    ? "bg-muted text-foreground border border-border dark:border-transparent dark:bg-muted/40" 
+                                    : "text-foreground"
+                            )}>
+                                {dayNumber}
+                            </span>
+                        </div>
 
-                <AddItemPopover onSelectType={handleAddSelect}>
-                    <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`Add item to ${format(date, 'EEEE')}`}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                        <PlusIcon className="h-4 w-4" />
-                    </Button>
-                </AddItemPopover>
-            </div>
-
-            {/* Items */}
-            <div className="flex-1 p-2 space-y-2 overflow-y-auto">
-                {items.map((item) => (
-                    <PlannerItem
-                        key={item.key}
-                        type={item.type}
-                        title={item.title}
-                        isCompleted={item.isCompleted}
-                        isStatic={item.attachment?.mode === 'static' || item.attachment?.mode === 'weekday'}
-                        subtype={item.subtype}
-                        color={item.color}
-                        estimatedHours={item.estimatedHours}
-                        actualTimeMs={item.actualTimeMs}
-                        hasAttachment={!!item.attachment}
-                        onClick={() => onItemClick?.(item)}
-                        onRemove={() => onRemoveItem?.(item)}
-                        onSetEstimatedHours={() => onSetEstimatedHours?.(item)}
-                    />
-                ))}
-            </div>
-
-            {/* Footer - Daily total time */}
-            {formattedTime && (
-                <div className="px-2 py-1.5 border-t border-border">
-                    <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            className="w-3.5 h-3.5"
-                        >
-                            <path
-                                fillRule="evenodd"
-                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z"
-                                clipRule="evenodd"
-                            />
-                        </svg>
-                        <span className="font-medium">{formattedTime}</span>
+                        <AddItemPopover onSelectType={handleAddSelect}>
+                            <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label={`Add item to ${format(date, 'EEEE')}`}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <PlusIcon className="h-4 w-4" />
+                            </Button>
+                        </AddItemPopover>
                     </div>
+
+                    {/* Items */}
+                    <div className="flex-1 p-2 space-y-2 overflow-y-auto">
+                        {items.map((item) => (
+                            <PlannerItem
+                                key={item.key}
+                                type={item.type}
+                                title={item.title}
+                                isCompleted={item.isCompleted}
+                                isStatic={item.attachment?.mode === 'static' || item.attachment?.mode === 'weekday'}
+                                subtype={item.subtype}
+                                color={item.color}
+                                estimatedHours={item.estimatedHours}
+                                actualTimeMs={item.actualTimeMs}
+                                isTimerActive={item.isTimerActive}
+                                hasAttachment={!!item.attachment}
+                                onClick={() => onItemClick?.(item)}
+                                onRemove={() => onRemoveItem?.(item)}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Footer - Daily total time */}
+                    {formattedTime && (
+                        <div className="px-2 py-1.5 border-t border-border">
+                            <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    className="w-3.5 h-3.5"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                                <span className="font-medium">{formattedTime}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            )}
-        </div>
+            </ContextMenuTrigger>
+
+            <ContextMenuContent>
+                <ContextMenuItem onSelect={() => handleAddSelect('client')}>
+                    <UserIcon className="h-4 w-4" />
+                    Add client
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => handleAddSelect('project')}>
+                    <DocumentTextIcon className="h-4 w-4" />
+                    Add project
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => handleAddSelect('task')}>
+                    <CheckIcon className="h-4 w-4" />
+                    Add task
+                </ContextMenuItem>
+            </ContextMenuContent>
+        </ContextMenu>
     );
 };
 

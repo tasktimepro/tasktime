@@ -576,7 +576,9 @@ const InvoicesList = ({
                 footer={previewModalFooter}
             >
                 {selectedInvoice.htmlContent ? (
-                    <div dangerouslySetInnerHTML={{ __html: selectedInvoice.htmlContent }} />
+                    <div className="bg-white text-black rounded-lg border border-border p-6 overflow-auto">
+                        <div dangerouslySetInnerHTML={{ __html: selectedInvoice.htmlContent }} />
+                    </div>
                 ) : (
                     <div className="space-y-4">
                         <div className="text-center border-b pb-4">

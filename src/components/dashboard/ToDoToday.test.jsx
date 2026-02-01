@@ -59,6 +59,7 @@ describe('ToDoToday', () => {
     it('renders tasks and toggles upcoming section', async () => {
 
         const handleCompleteTask = vi.fn()
+        const getTaskCompletedStatus = vi.fn(() => false)
         const onEditTask = vi.fn()
         const onDeleteTask = vi.fn()
         const user = userEvent.setup()
@@ -69,6 +70,7 @@ describe('ToDoToday', () => {
                 tasksForToday={[todayTask]}
                 upcomingTasks={[upcomingTask]}
                 handleCompleteTask={handleCompleteTask}
+                getTaskCompletedStatus={getTaskCompletedStatus}
                 renderTaskTitle={(task) => <span>{task.title}</span>}
                 renderTaskControls={() => null}
                 onEditTask={onEditTask}
@@ -88,6 +90,7 @@ describe('ToDoToday', () => {
     it('handles completion and actions', async () => {
 
         const handleCompleteTask = vi.fn()
+        const getTaskCompletedStatus = vi.fn(() => false)
         const onEditTask = vi.fn()
         const onDeleteTask = vi.fn()
         const user = userEvent.setup()
@@ -98,6 +101,7 @@ describe('ToDoToday', () => {
                 tasksForToday={[todayTask]}
                 upcomingTasks={[]}
                 handleCompleteTask={handleCompleteTask}
+                getTaskCompletedStatus={getTaskCompletedStatus}
                 renderTaskTitle={(task) => <span>{task.title}</span>}
                 renderTaskControls={() => null}
                 onEditTask={onEditTask}

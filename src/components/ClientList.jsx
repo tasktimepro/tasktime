@@ -14,7 +14,7 @@ import {
 import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, UserGroupIcon, SortIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
-import { toDisplayDate } from '../utils/dateUtils.ts';
+import { toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
@@ -22,6 +22,8 @@ import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
+import ClientDeleteDialog from './modals/ClientDeleteDialog';
+import ClientArchiveDialog from './modals/ClientArchiveDialog';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -59,12 +61,10 @@ const ClientList = ({
     }, [clients]);
 
     const archivedClients = useMemo(() => {
-
         return clients.filter(client => client.archived);
     }, [clients]);
 
     const taskProjectMap = useMemo(() => {
-
         const map = new Map();
         tasks.forEach(task => {
             if (task.projectId) {
@@ -75,7 +75,6 @@ const ClientList = ({
     }, [tasks]);
 
     const projectTaskActiveMap = useMemo(() => {
-
         const map = new Map();
         tasks.forEach(task => {
             if (!task.projectId) return;
@@ -87,12 +86,10 @@ const ClientList = ({
                 map.set(task.projectId, lastActive);
             }
         });
-
         return map;
     }, [tasks]);
 
     const projectLastActiveMap = useMemo(() => {
-
         const map = new Map();
         timeEntries.forEach(entry => {
             const projectId = taskProjectMap.get(entry.taskId);
@@ -118,7 +115,6 @@ const ClientList = ({
     }, [timeEntries, taskProjectMap, projectTaskActiveMap]);
 
     const clientLastActiveMap = useMemo(() => {
-
         const map = new Map();
         projects.forEach(project => {
             const clientId = project.preferredClientId;
@@ -251,14 +247,15 @@ const ClientList = ({
      * Perform actual client archive
      */
     const performClientArchive = (clientId, alsoArchiveProjects) => {
+        const archivedOnDate = toStorageDate(new Date());
         if (alsoArchiveProjects) {
             // Archive related projects
             const relatedProjectIds = getRelatedProjects(clientId).map(p => p.id);
-            relatedProjectIds.forEach(id => updateProject(id, { archived: true }));
+            relatedProjectIds.forEach(id => updateProject(id, { archived: true, archivedOnDate }));
         }
 
         // Archive the client
-        updateClient(clientId, { archived: true });
+        updateClient(clientId, { archived: true, archivedOnDate });
 
         // Show appropriate success message
         const message = alsoArchiveProjects 
@@ -271,7 +268,7 @@ const ClientList = ({
      * Unarchive a client
      */
     const handleUnarchiveClient = (clientId) => {
-        updateClient(clientId, { archived: false });
+        updateClient(clientId, { archived: false, archivedOnDate: null });
         showSuccess('Client unarchived successfully!');
     };
 
@@ -479,7 +476,7 @@ const ClientList = ({
                         <div className="border-t pt-6">
                             <button
                                 onClick={() => setShowArchivedClients(!showArchivedClients)}
-                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4"
+                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 cursor-pointer"
                             >
                                 {showArchivedClients ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />
@@ -499,9 +496,14 @@ const ClientList = ({
                                         >
                                             <CardContent className="pt-5">
                                                 <div className="flex items-center justify-between">
-                                                    <h3 className="text-lg font-medium text-foreground truncate">
-                                                        {client.title}
-                                                    </h3>
+                                                    <div className="flex items-center min-w-0">
+                                                        <h3 className="text-lg font-medium text-foreground truncate">
+                                                            {client.title}
+                                                        </h3>
+                                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground whitespace-nowrap">
+                                                            Archived
+                                                        </span>
+                                                    </div>
 
                                                     {/* Three-dot dropdown menu for Unarchive and Delete */}
                                                     <DropdownMenu>
@@ -570,128 +572,30 @@ const ClientList = ({
                 </>
             )}
 
-            {/* Delete Confirmation Modal */}
-            {showDeleteModal && clientToDelete && (
-                <Modal
-                    isOpen={showDeleteModal}
-                    onClose={handleCancelDelete}
-                    title="Client Has Related Projects"
-                    size="md"
-                    footer={
-                        <div className="flex justify-end">
-                            <Button
-                                onClick={handleCancelDelete}
-                                variant="outline"
-                            >
-                                Cancel
-                            </Button>
-                        </div>
-                    }
-                >
-                    <div>
-                        <p className="text-sm text-foreground mb-4">
-                            The client "<span className="font-semibold">{clientToDelete.title}</span>" has {relatedProjects.length} related project(s):
-                        </p>
-                        <ul className="text-sm text-muted-foreground mb-4 list-disc list-inside">
-                            {relatedProjects.slice(0, 5).map(project => (
-                                <li key={project.id}>{project.title}</li>
-                            ))}
-                            {relatedProjects.length > 5 && (
-                                <li>...and {relatedProjects.length - 5} more</li>
-                            )}
-                        </ul>
-                        
-                        <p className="text-sm text-foreground mb-6">
-                            <strong>Recommended:</strong> Archive this client to preserve project relationships for record-keeping purposes.
-                        </p>
+            <ClientDeleteDialog
+                isOpen={showDeleteModal}
+                onClose={handleCancelDelete}
+                client={clientToDelete}
+                relatedProjects={relatedProjects}
+                onArchiveRecommended={() => {
+                    if (!clientToDelete) return;
+                    handleArchiveClient(clientToDelete.id);
+                    setShowDeleteModal(false);
+                    setClientToDelete(null);
+                    setRelatedProjects([]);
+                }}
+                onDeleteOnly={confirmDeleteClient}
+                onDeleteAll={handleForceDelete}
+            />
 
-                        <div className="flex flex-col space-y-3">
-                            <Button
-                                onClick={() => {
-                                    handleArchiveClient(clientToDelete.id);
-                                    setShowDeleteModal(false);
-                                    setClientToDelete(null);
-                                    setRelatedProjects([]);
-                                }}
-                                className="w-full"
-                            >
-                                Archive Client (Recommended)
-                            </Button>
-
-                            <Button
-                                onClick={confirmDeleteClient}
-                                variant="outline"
-                                className="w-full border-yellow-300 text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:ring-yellow-500 dark:border-yellow-700 dark:text-yellow-300 dark:bg-yellow-950 dark:hover:bg-yellow-900"
-                            >
-                                Delete & Remove Client Reference
-                            </Button>
-
-                            <Button
-                                onClick={handleForceDelete}
-                                variant="outline"
-                                className="w-full border-red-300 text-red-700 bg-red-50 hover:bg-red-100 focus:ring-ring dark:border-red-700 dark:text-red-300 dark:bg-red-950 dark:hover:bg-red-900"
-                            >
-                                Delete Client & All Projects
-                            </Button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-
-            {/* Archive with Projects Modal */}
-            {showArchiveProjectsModal && clientToDelete && (
-                <Modal
-                    isOpen={showArchiveProjectsModal}
-                    onClose={handleCancelDelete}
-                    title="Archive Client with Related Projects?"
-                    size="md"
-                    footer={
-                        <div className="flex justify-end">
-                            <Button
-                                onClick={handleCancelDelete}
-                                variant="outline"
-                            >
-                                Cancel
-                            </Button>
-                        </div>
-                    }
-                >
-                    <div>
-                        <p className="text-sm text-foreground mb-4">
-                            The client "<span className="font-semibold">{clientToDelete.title}</span>" has {relatedProjects.length} related project(s):
-                        </p>
-                        <ul className="text-sm text-muted-foreground mb-4 list-disc list-inside">
-                            {relatedProjects.slice(0, 5).map(project => (
-                                <li key={project.id}>{project.title}</li>
-                            ))}
-                            {relatedProjects.length > 5 && (
-                                <li>...and {relatedProjects.length - 5} more</li>
-                            )}
-                        </ul>
-                        
-                        <p className="text-sm text-foreground mb-6">
-                            Would you like to archive the related projects as well?
-                        </p>
-
-                        <div className="flex flex-col space-y-3">
-                            <Button
-                                onClick={handleArchiveWithProjects}
-                                className="w-full"
-                            >
-                                Archive Client & Projects
-                            </Button>
-
-                            <Button
-                                onClick={handleArchiveFromModal}
-                                variant="outline"
-                                className="w-full border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-ring dark:border-blue-700 dark:text-blue-300 dark:bg-blue-950 dark:hover:bg-blue-900"
-                            >
-                                Archive Client Only
-                            </Button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
+            <ClientArchiveDialog
+                isOpen={showArchiveProjectsModal}
+                onClose={handleCancelDelete}
+                client={clientToDelete}
+                relatedProjects={relatedProjects}
+                onArchiveWithProjects={handleArchiveWithProjects}
+                onArchiveOnly={handleArchiveFromModal}
+            />
         </div>
     );
 };

@@ -15,12 +15,14 @@ import { useTasks } from '../hooks/useTasks.ts';
  * @param {string} props.size - Size variant ('sm' or normal)
  * @param {boolean} props.isGlobalTimer - Whether this is being used in global timer (affects styling)
  * @param {Function} props.onComplete - Function called when timer is completely stopped
+ * @param {Function} props.onStart - Function called when timer is started or resumed
  */
 function TimerControls({
     task,
     size = 'normal',
     isGlobalTimer = false,
-    onComplete = null
+    onComplete = null,
+    onStart = null
 }) {
     const { showError } = useToast();
     
@@ -84,6 +86,9 @@ function TimerControls({
         // If this task's timer is paused, resume it
         if (isTimerPaused) {
             timerResume(timerKey);
+            if (onStart) {
+                onStart();
+            }
             return;
         }
         
@@ -102,7 +107,10 @@ function TimerControls({
 
         // Start new timer
         timerStart(task.id);
-    }, [isTimerPaused, projectTimer, task.id, timerKey, timerResume, createValidatedEntry, clearTimer, timerStart]);
+        if (onStart) {
+            onStart();
+        }
+    }, [isTimerPaused, projectTimer, task.id, timerKey, timerResume, createValidatedEntry, clearTimer, timerStart, onStart]);
 
     /**
      * Pause the timer
@@ -122,7 +130,10 @@ function TimerControls({
     const handleResume = useCallback(() => {
         if (!isTimerPaused) return;
         timerResume(timerKey);
-    }, [isTimerPaused, timerResume, timerKey]);
+        if (onStart) {
+            onStart();
+        }
+    }, [isTimerPaused, timerResume, timerKey, onStart]);
 
     /**
      * Stop timer and create time entry

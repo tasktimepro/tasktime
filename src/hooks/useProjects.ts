@@ -7,6 +7,7 @@
 import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
 import { createProjectHelpers } from '@/stores/yjs/collections/projects';
+import { toStorageDate } from '@/utils/dateUtils';
 import type { Project } from '@/stores/yjs/types';
 
 export function useProjects() {
@@ -27,11 +28,11 @@ export function useProjects() {
 
     // Helper methods
     const archiveProject = useCallback((id: string) => {
-        return update(id, { archived: true });
+        return update(id, { archived: true, archivedOnDate: toStorageDate(new Date()) });
     }, [update]);
 
     const unarchiveProject = useCallback((id: string) => {
-        return update(id, { archived: false });
+        return update(id, { archived: false, archivedOnDate: null });
     }, [update]);
 
     const getProjectsByClient = useCallback((clientId: string) => {

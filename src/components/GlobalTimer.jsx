@@ -18,10 +18,12 @@ import { useTimeEntries } from '../hooks/useTimeEntries';
  * Uses Yjs hooks for all state management
  * @param {Object} props - Component props
  * @param {Function} props.navigateToProject - Function to navigate to project page
+ * @param {(task: Object) => void} props.onOpenTaskView - Open task view modal
  * @param {Function} props.onClose - Function called when timer is closed
  */
 const GlobalTimer = ({
     navigateToProject,
+     onOpenTaskView,
     onClose,
     timer = null,
     isExpanded: isExpandedProp,
@@ -62,9 +64,14 @@ const GlobalTimer = ({
     const currentProject = currentTask ? projects.find(project => project.id === currentTask.projectId) : null;
 
     /**
-     * Handle clicking on task title to navigate to project
+     * Handle clicking on task title
      */
     const handleTaskTitleClick = () => {
+        if (currentTask && onOpenTaskView) {
+            onOpenTaskView(currentTask);
+            return;
+        }
+
         if (currentProject && navigateToProject) {
             navigateToProject(currentProject.id);
         }
@@ -162,22 +169,13 @@ const GlobalTimer = ({
                 {/* Left column: dot + task title */}
                 <div className="flex items-center gap-2 min-w-0">
                     <div className={`w-3 h-3 ${dotColor} rounded-full ${dotAnimation}`}></div>
-                    {currentProject ? (
-                        <button
-                            onClick={handleTaskTitleClick}
-                            className={`text-sm font-medium ${textColor} max-w-[150px] truncate hover:underline cursor-pointer transition-colors`}
-                            title={`${currentTask.title} - Click to open ${currentProject.title}`}
-                        >
-                            {currentTask.title}
-                        </button>
-                    ) : (
-                        <span 
-                            className={`text-sm font-medium ${textColor} max-w-[150px] truncate`} 
-                            title={currentTask.title}
-                        >
-                            {currentTask.title}
-                        </span>
-                    )}
+                    <button
+                        onClick={handleTaskTitleClick}
+                        className={`text-sm font-medium ${textColor} max-w-[150px] truncate hover:underline cursor-pointer transition-colors`}
+                        title={currentProject ? `${currentTask.title} - Click to open ${currentProject.title}` : currentTask.title}
+                    >
+                        {currentTask.title}
+                    </button>
                 </div>
 
                 {/* Right column: time + controls + options toggle */}

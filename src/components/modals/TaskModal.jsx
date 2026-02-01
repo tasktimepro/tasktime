@@ -173,6 +173,7 @@ const TaskModal = ({
         <Modal
             isOpen={isOpen}
             onClose={onClose}
+            size='lg'
             title={editingTask ? 'Edit Task' : 'New Task'}
             footer={modalFooter}
         >
@@ -221,8 +222,26 @@ const TaskModal = ({
                         type="date"
                         value={formData.startDate}
                         onChange={(event) => handleStartDateChange(event.target.value)}
-                        className="dark:[color-scheme:dark]"
+                        className="w-48 dark:[color-scheme:dark]"
                         disabled={Boolean(formData.recurring)}
+                    />
+                    {formData.recurring && (
+                        <Notice
+                            title="Start date disabled"
+                            description="Recurring tasks cannot have a start date."
+                            className="py-2"
+                        />
+                    )}
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Recurring</Label>
+                    <RecurringPicker
+                        value={formData.recurring}
+                        onChange={handleRecurringChange}
+                        onClear={handleRecurringClear}
+                        disabled={false}
+                        buttonClassName="w-full"
                     />
                 </div>
 
@@ -235,20 +254,6 @@ const TaskModal = ({
                         placeholder="Add details for this task..."
                         rows={3}
                         className="text-sm"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <Label>Recurring</Label>
-                    <p className="text-xs text-muted-foreground">
-                        Recurring tasks cannot have a start date.
-                    </p>
-                    <RecurringPicker
-                        value={formData.recurring}
-                        onChange={handleRecurringChange}
-                        onClear={handleRecurringClear}
-                        disabled={false}
-                        buttonClassName="w-full"
                     />
                 </div>
             </form>

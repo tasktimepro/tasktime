@@ -118,7 +118,19 @@ describe('collection-backed hooks', () => {
             result.current.unarchiveProject('p2')
         })
 
-        expect(collection.update).toHaveBeenCalledWith('p1', { archived: true })
-        expect(collection.update).toHaveBeenCalledWith('p2', { archived: false })
+        expect(collection.update).toHaveBeenCalledWith(
+            'p1',
+            expect.objectContaining({
+                archived: true,
+                archivedOnDate: expect.any(String)
+            })
+        )
+        expect(collection.update).toHaveBeenCalledWith(
+            'p2',
+            expect.objectContaining({
+                archived: false,
+                archivedOnDate: null
+            })
+        )
     })
 })

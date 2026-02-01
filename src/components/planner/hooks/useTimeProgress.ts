@@ -56,7 +56,7 @@ export function useTimeProgress(updateIntervalMs: number = 60000): number {
  */
 export function getProgressGradientStyle(
     progress: number,
-    fillColor: string = 'rgba(0, 0, 0, 0.04)'
+    fillColor: string = 'hsl(var(--foreground) / 0.04)'
 ): { background: string } {
     const percentage = Math.round(progress * 100);
     

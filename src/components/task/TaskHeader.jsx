@@ -21,7 +21,8 @@ const TaskHeader = ({
     totalTimeWithSubtasks,
     isSubtask = false,
     showTimeDisplay = true,
-    showCheckbox = true
+    showCheckbox = true,
+    onTitleClick
 }) => {
     return (
         <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -47,11 +48,31 @@ const TaskHeader = ({
                     />
                 ) : (
                     <div className="flex items-center space-x-3">
-                        <h3 className={`text-sm font-medium truncate ${
-                            isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
-                        }`}>
-                            {task.title}
-                        </h3>
+                        {onTitleClick ? (
+                            <button
+                                type="button"
+                                onClick={onTitleClick}
+                                className={`text-left text-sm font-medium transition-colors cursor-pointer flex flex-col items-start min-w-0 gap-0.5 ${
+                                    isCompleted
+                                        ? 'line-through text-muted-foreground hover:text-muted-foreground'
+                                        : 'text-foreground hover:text-blue-600 dark:hover:text-blue-400'
+                                }`}
+                            >
+                                <span className="truncate w-full">{task.title}</span>
+                                {task.note && (
+                                    <span className="text-xs text-muted-foreground truncate w-full">{task.note}</span>
+                                )}
+                            </button>
+                        ) : (
+                            <div className={`text-sm font-medium flex flex-col items-start min-w-0 gap-0.5 ${
+                                isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
+                            }`}>
+                                <span className="truncate w-full">{task.title}</span>
+                                {task.note && (
+                                    <span className="text-xs text-muted-foreground truncate w-full">{task.note}</span>
+                                )}
+                            </div>
+                        )}
 
                         {showTimeDisplay && (
                             <TaskTimeDisplay

@@ -1,6 +1,6 @@
-import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon } from '@/components/ui/icons';
+import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
@@ -10,6 +10,19 @@ import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useTimers } from '../hooks/useTimers.ts';
+import { useProjects } from '../hooks/useProjects.ts';
+import { useTasks } from '../hooks/useTasks.ts';
+import { useTimeEntries } from '../hooks/useTimeEntries.ts';
+import { useInvoices } from '../hooks/useInvoices.ts';
+import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { MoreHorizontal } from 'lucide-react';
+import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -31,13 +44,19 @@ const ProjectDashboard = ({
     openPaymentMethodModal,
     openTemplateModal,
     openTaskModal,
+    onViewTask,
     navigateToClient
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
     const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
-    const { showError } = useToast();
-    const { getTimerForProject } = useTimers();
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const { showError, showSuccess } = useToast();
+    const { getTimerForProject, clearTimer } = useTimers();
+    const { deleteProject, archiveProject, unarchiveProject } = useProjects();
+    const { deleteTask } = useTasks();
+    const { deleteEntry } = useTimeEntries();
+    const { deleteInvoice } = useInvoices();
     const projectTimer = getTimerForProject(project.id);
     
     // Get invoices for this project
@@ -63,6 +82,76 @@ const ProjectDashboard = ({
      */
     const toggleInvoicesExpanded = () => {
         setIsInvoicesExpanded((prev) => !prev);
+    };
+
+    const performProjectDeletion = useCallback((projectId, shouldDeleteInvoices = false) => {
+        const projectTasks = tasks.filter(task => task.projectId === projectId && !task.deletedAt);
+        const allTaskIdsToDelete = new Set();
+
+        projectTasks.forEach(task => {
+            const taskIds = getTaskIdsToDelete(task.id, tasks);
+            taskIds.forEach(id => allTaskIdsToDelete.add(id));
+        });
+
+        const taskIdsArray = Array.from(allTaskIdsToDelete);
+
+        const timerForProject = getTimerForProject(projectId);
+        if (timerForProject) {
+            clearTimer(projectId);
+        }
+
+        if (shouldDeleteInvoices) {
+            const invoiceIds = project.invoiceIds || [];
+            invoiceIds.forEach(invoiceId => deleteInvoice(invoiceId));
+        }
+
+        deleteProject(projectId);
+        taskIdsArray.forEach(taskId => deleteTask(taskId));
+
+        const timeEntryIdsToDelete = timeEntries
+            .filter(entry => allTaskIdsToDelete.has(entry.taskId))
+            .map(entry => entry.id);
+        timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
+
+        const deletedTaskCount = allTaskIdsToDelete.size;
+        const deletedTimeEntriesCount = timeEntryIdsToDelete.length;
+        const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
+        const invoiceMessage = shouldDeleteInvoices ? ' Associated invoices were also deleted.' : '';
+        showSuccess(baseMessage + invoiceMessage);
+    }, [tasks, timeEntries, getTimerForProject, clearTimer, project.invoiceIds, deleteInvoice, deleteProject, deleteTask, deleteEntry, showSuccess]);
+
+    const handleEditProject = () => {
+        openProjectModal?.(project);
+    };
+
+    const handleArchiveProject = () => {
+        archiveProject(project.id);
+        showSuccess('Project archived');
+    };
+
+    const handleUnarchiveProject = () => {
+        unarchiveProject(project.id);
+        showSuccess('Project unarchived');
+    };
+
+    const handleDeleteProject = () => {
+        setShowDeleteModal(true);
+    };
+
+    const handleConfirmDelete = () => {
+        performProjectDeletion(project.id, false);
+        setShowDeleteModal(false);
+        onBackToProjects();
+    };
+
+    const handleForceDelete = () => {
+        performProjectDeletion(project.id, true);
+        setShowDeleteModal(false);
+        onBackToProjects();
+    };
+
+    const handleCloseDeleteModal = () => {
+        setShowDeleteModal(false);
     };
     
     // Get tasks for this project
@@ -181,7 +270,14 @@ const ProjectDashboard = ({
                     </Button>
 
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
+                        <div className="flex items-center flex-wrap gap-2">
+                            <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
+                            {project.archived && (
+                                <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                    Archived
+                                </span>
+                            )}
+                        </div>
 
                         {project.hourlyRate && (
                             <p className="text-sm text-muted-foreground">
@@ -205,23 +301,85 @@ const ProjectDashboard = ({
                     </div>
                 </div>
 
-                {/* Invoice Generator - Only show for non-personal projects */}
-                {!project.isPersonal && (
-                    <InvoiceGenerator
-                        project={project}
-                        timeEntries={projectTimeEntries}
-                        paymentMethods={paymentMethods}
-                        businessInfos={businessInfos}
-                        clients={clients}
-                        // Modal functions
-                        openClientModal={openClientModal}
-                        openProjectModal={openProjectModal}
-                        openBusinessModal={openBusinessModal}
-                        openPaymentMethodModal={openPaymentMethodModal}
-                        openTemplateModal={openTemplateModal}
-                    />
-                )}
+                <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground hover:bg-muted rounded-full"
+                                title="More actions"
+                                aria-label="More actions"
+                            >
+                                <MoreHorizontal className="h-5 w-5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onClick={handleEditProject}
+                                className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
+                            >
+                                <PencilIcon className="h-4 w-4" />
+                                <span>Edit</span>
+                            </DropdownMenuItem>
+                            {project.archived ? (
+                                <DropdownMenuItem
+                                    onClick={handleUnarchiveProject}
+                                    className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                >
+                                    <ArchiveBoxIcon className="h-4 w-4" />
+                                    <span>Unarchive</span>
+                                </DropdownMenuItem>
+                            ) : (
+                                <DropdownMenuItem
+                                    onClick={handleArchiveProject}
+                                    className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                >
+                                    <ArchiveBoxIcon className="h-4 w-4" />
+                                    <span>Archive</span>
+                                </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                                onClick={handleDeleteProject}
+                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                            >
+                                <TrashIcon className="h-4 w-4" />
+                                <span>Delete</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Invoice Generator - Only show for non-personal projects */}
+                    {!project.isPersonal && (
+                        <InvoiceGenerator
+                            project={project}
+                            timeEntries={projectTimeEntries}
+                            paymentMethods={paymentMethods}
+                            businessInfos={businessInfos}
+                            clients={clients}
+                            // Modal functions
+                            openClientModal={openClientModal}
+                            openProjectModal={openProjectModal}
+                            openBusinessModal={openBusinessModal}
+                            openPaymentMethodModal={openPaymentMethodModal}
+                            openTemplateModal={openTemplateModal}
+                        />
+                    )}
+                </div>
             </div>
+
+            <ProjectDeleteDialog
+                isOpen={showDeleteModal}
+                onClose={handleCloseDeleteModal}
+                project={project}
+                hasInvoices={Boolean(project.invoiceIds && project.invoiceIds.length > 0)}
+                onConfirmDelete={handleConfirmDelete}
+                onArchive={() => {
+                    handleArchiveProject();
+                    handleCloseDeleteModal();
+                }}
+                onForceDelete={handleForceDelete}
+            />
 
             {/* Project Metrics - Only show for non-personal projects */}
             {!project.isPersonal && (
@@ -326,6 +484,7 @@ const ProjectDashboard = ({
                     <TaskTree
                         project={project}
                         onEditTask={openTaskModal}
+                        onViewTask={onViewTask}
                     />
                 </CardContent>
             </Card>

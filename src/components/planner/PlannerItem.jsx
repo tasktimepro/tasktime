@@ -15,6 +15,7 @@ import {
     CheckIcon,
     PlayIcon,
     ArrowPathIcon,
+    CalendarDaysIcon,
 } from '@/components/ui/icons';
 import {
     DropdownMenu,
@@ -23,7 +24,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Trash2, ExternalLink, Clock } from 'lucide-react';
+import { MoreHorizontal, Trash2, ExternalLink } from 'lucide-react';
 
 /**
  * @param {Object} props
@@ -31,14 +32,14 @@ import { MoreHorizontal, Trash2, ExternalLink, Clock } from 'lucide-react';
  * @param {string} props.title - Display title
  * @param {boolean} props.isCompleted - Whether item is completed (tasks only)
  * @param {boolean} props.isStatic - Whether item is pinned (static/weekday mode)
- * @param {'recurring' | 'due' | 'attached' | 'timer'} props.subtype - Task subtype (tasks only)
+ * @param {'recurring' | 'due' | 'attached' | 'timer' | 'worked'} props.subtype - Task subtype (tasks only)
  * @param {string | null} props.color - Color tag (hex color)
  * @param {number | null} props.estimatedHours - Estimated hours for this item
  * @param {number} props.actualTimeMs - Actual time worked in milliseconds
+ * @param {boolean} props.isTimerActive - Whether this item has an active timer (tasks only)
  * @param {boolean} props.hasAttachment - Whether item has a planner attachment (can be removed)
  * @param {() => void} props.onClick - Click handler
  * @param {() => void} props.onRemove - Called when user wants to remove from planner
- * @param {() => void} props.onSetEstimatedHours - Called when user wants to set estimated hours
  */
 const PlannerItem = ({
     type,
@@ -49,10 +50,10 @@ const PlannerItem = ({
     color,
     estimatedHours,
     actualTimeMs = 0,
+    isTimerActive = false,
     hasAttachment = false,
     onClick,
     onRemove,
-    onSetEstimatedHours,
 }) => {
     const [menuOpen, setMenuOpen] = useState(false);
 
@@ -63,6 +64,9 @@ const PlannerItem = ({
         }
         if (type === 'task' && subtype === 'recurring') {
             return ArrowPathIcon;
+        }
+        if (type === 'task' && subtype === 'due') {
+            return CalendarDaysIcon;
         }
         return {
             client: UserIcon,
@@ -116,12 +120,6 @@ const PlannerItem = ({
         onRemove?.();
     };
 
-    const handleSetEstimatedHours = (e) => {
-        e.stopPropagation();
-        setMenuOpen(false);
-        onSetEstimatedHours?.();
-    };
-
     const handleOpenItem = (e) => {
         e.stopPropagation();
         setMenuOpen(false);
@@ -129,7 +127,7 @@ const PlannerItem = ({
     };
 
     const typeLabel = type === 'client' ? 'Client' : type === 'project' ? 'Project' : 'Task';
-    const canShowMenu = hasAttachment;
+    const canShowMenu = hasAttachment && type !== 'task';
 
     return (
         <div
@@ -180,7 +178,7 @@ const PlannerItem = ({
                     </span>
                 )}
 
-                {subtype === 'timer' && (
+                {type === 'task' && isTimerActive && (
                     <span className="text-xs text-green-600 dark:text-green-400 animate-pulse flex-shrink-0">●</span>
                 )}
 
@@ -192,9 +190,9 @@ const PlannerItem = ({
                                 type="button"
                                 onClick={(e) => e.stopPropagation()}
                                 className={cn(
-                                    "absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded",
+                                    "absolute right-0.5 top-1/2 -translate-y-1/2 p-1 rounded",
                                     "opacity-0 group-hover/item:opacity-100 transition-opacity",
-                                    "hover:bg-muted focus:outline-none focus:opacity-100",
+                                    "hover:bg-muted focus:outline-none focus:opacity-100 cursor-pointer",
                                     menuOpen && "opacity-100"
                                 )}
                                 aria-label="Item options"
@@ -204,23 +202,16 @@ const PlannerItem = ({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuItem onClick={handleOpenItem}>
-                                <ExternalLink className="h-4 w-4 mr-2" />
+                                <ExternalLink className="h-4 w-4" />
                                 Open {typeLabel}
                             </DropdownMenuItem>
-                            
-                            {onSetEstimatedHours && (
-                                <DropdownMenuItem onClick={handleSetEstimatedHours}>
-                                    <Clock className="h-4 w-4 mr-2" />
-                                    Set Estimated Hours
-                                </DropdownMenuItem>
-                            )}
-                            
+
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                                 onClick={handleRemove}
-                                className="text-destructive focus:text-destructive"
+                                className="text-destructive-strong focus-text-destructive-strong"
                             >
-                                <Trash2 className="h-4 w-4 mr-2" />
+                                <Trash2 className="h-4 w-4" />
                                 Remove from Planner
                             </DropdownMenuItem>
                         </DropdownMenuContent>

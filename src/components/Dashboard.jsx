@@ -29,13 +29,14 @@ const Dashboard = ({
     navigateToProject,
     navigateToClient,
     navigateToInvoices,
-    onEditTask
+    onEditTask,
+    onViewTask
 }) => {
     const hasClients = clients.length > 0;
     const { showWarning, showSuccess } = useToast();
     
     // Use Yjs hooks directly
-    const { tasks, updateTask, deleteTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate } = useTasks();
+    const { tasks, updateTask, deleteTask, archiveTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate } = useTasks();
     const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
     
@@ -389,7 +390,12 @@ const Dashboard = ({
      * Handle clicking on task title to navigate to project
      */
     const handleTaskTitleClick = useCallback((task) => {
-        if (task.project?.id && navigateToProject) {
+        if (!task) return;
+        onViewTask?.(task, { dateStr: todayStr });
+    }, [onViewTask, todayStr]);
+
+    const handleProjectTitleClick = useCallback((task) => {
+        if (task?.project?.id && navigateToProject) {
             navigateToProject(task.project.id);
         }
     }, [navigateToProject]);
@@ -399,6 +405,7 @@ const Dashboard = ({
             onEditTask(task);
         }
     }, [onEditTask]);
+
 
     /**
      * Handle clicking on client title to navigate to client dashboard
@@ -438,31 +445,35 @@ const Dashboard = ({
             isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
         }`;
 
+        const titleClass = isCompleted ? 'line-through' : '';
         const title = task.parentTaskId ? (
-            <span className="inline-flex items-center">
+            <span className={`inline-flex items-center ${titleClass}`}>
                 <CornerDownRightIcon className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
                 {task.title}
                 {!task.parentTask && <span className="text-red-500 text-xs"> [Parent missing]</span>}
             </span>
         ) : (
-            task.title
+            <span className={titleClass}>{task.title}</span>
         );
 
-        if (task.project?.id) {
-            return (
+        return (
+            <div className="space-y-1">
                 <button
                     onClick={() => handleTaskTitleClick(task)}
                     className={`${baseClasses} cursor-pointer ${
                         isCompleted ? 'hover:text-muted-foreground' : 'hover:text-blue-600 dark:hover:text-blue-400'
                     }`}
-                    title={`Click to open ${task.project.title} project`}
+                    title="Open task details"
                 >
                     {title}
                 </button>
-            );
-        }
-
-        return <p className={baseClasses}>{title}</p>;
+                {task.note && (
+                    <p className={`text-xs text-muted-foreground truncate ${isCompleted ? 'line-through' : ''}`}>
+                        {task.note}
+                    </p>
+                )}
+            </div>
+        );
     }, [handleTaskTitleClick]);
 
     const enhanceTaskList = useCallback((list) => {
@@ -511,22 +522,35 @@ const Dashboard = ({
         showSuccess('Task deleted');
     }, [tasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);
 
+    const handleArchiveTask = useCallback((task) => {
+        if (!task || task.projectId) return;
+
+        timers.forEach(timer => {
+            if (timer.taskId === task.id) {
+                clearTimer(timer.projectId || task.id);
+            }
+        });
+
+        archiveTask(task.id);
+        showSuccess('Task archived');
+    }, [archiveTask, timers, clearTimer, showSuccess]);
+
+
     return (
         <div className="space-y-6">
-            {(overdueTasks.length > 0 || tasksForToday.length > 0) && (
-                <ToDoToday
-                    overdueTasks={overdueTasks}
-                    tasksForToday={tasksForToday}
-                    upcomingTasks={upcomingTasks}
-                    handleCompleteTask={handleCompleteTask}
-                    getTaskCompletedStatus={getTaskCompletedStatus}
-                    renderTaskTitle={renderTaskTitle}
-                    renderTaskControls={renderTaskControls}
-                    handleTaskTitleClick={handleTaskTitleClick}
-                    onEditTask={handleEditTask}
-                    onDeleteTask={handleDeleteTask}
-                />
-            )}
+            <ToDoToday
+                overdueTasks={overdueTasks}
+                tasksForToday={tasksForToday}
+                upcomingTasks={upcomingTasks}
+                handleCompleteTask={handleCompleteTask}
+                getTaskCompletedStatus={getTaskCompletedStatus}
+                renderTaskTitle={renderTaskTitle}
+                renderTaskControls={renderTaskControls}
+                handleProjectTitleClick={handleProjectTitleClick}
+                onEditTask={handleEditTask}
+                onDeleteTask={handleDeleteTask}
+                onArchiveTask={handleArchiveTask}
+            />
 
             <MetricsCards
                 thisMonthMetrics={thisMonthMetrics}
@@ -552,10 +576,11 @@ const Dashboard = ({
                     handleCompleteTask={handleCompleteTask}
                     getTaskCompletedStatus={getTaskCompletedStatus}
                     renderTaskTitle={renderTaskTitle}
-                    handleTaskTitleClick={handleTaskTitleClick}
+                    handleProjectTitleClick={handleProjectTitleClick}
                     renderTaskControls={renderTaskControls}
                     onEditTask={handleEditTask}
                     onDeleteTask={handleDeleteTask}
+                    onArchiveTask={handleArchiveTask}
                 />
 
                 <ProjectsOverview
@@ -567,6 +592,7 @@ const Dashboard = ({
                     clients={clients}
                 />
             </div>
+
         </div>
     );
 };

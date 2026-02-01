@@ -9,7 +9,8 @@ import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
 import { useTimers } from '../hooks/useTimers';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app';
-import { formatDurationWithSeconds } from '../utils/dateUtils.ts';
+import { formatDurationWithSeconds, getTodayString } from '../utils/dateUtils.ts';
+import { startOfDay, endOfDay } from 'date-fns';
 
 /**
  * TaskItem component - Displays individual task with timer controls and subtasks.
@@ -24,7 +25,8 @@ const TaskItem = ({
     onArchive,
     onUnarchive,
     onToggleBillable,
-    onEditTask
+    onEditTask,
+    onViewTask
 }) => {
 
     const [isEditing, setIsEditing] = useState(false);
@@ -63,12 +65,39 @@ const TaskItem = ({
     // Should dim if another task (not related) has an active timer
     const shouldDimTask = isAnyTimerActive && !projectTimer?.isPaused && !isRelatedToActiveTimer;
 
+    const effectiveDateStr = useMemo(() => {
+        if (!task.recurring) return null;
+        return recurringCompletionDate || getTodayString();
+    }, [task.recurring, recurringCompletionDate]);
+
+    const getEntryOverlapMs = useCallback((entry, dayStart, dayEnd) => {
+        if (!entry || typeof entry.end !== 'number') return 0;
+        if (entry.end <= entry.start) return 0;
+
+        const overlapStart = Math.max(entry.start, dayStart);
+        const overlapEnd = Math.min(entry.end, dayEnd);
+
+        if (overlapEnd <= overlapStart) return 0;
+        return overlapEnd - overlapStart;
+    }, []);
+
     // Calculate total time for this task
     const mainTaskTime = useMemo(() => {
+        if (task.recurring && effectiveDateStr) {
+            const [year, month, day] = effectiveDateStr.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            const dayStart = startOfDay(date).getTime();
+            const dayEnd = endOfDay(date).getTime();
+
+            return timeEntries
+                .filter(e => e.taskId === task.id)
+                .reduce((sum, e) => sum + getEntryOverlapMs(e, dayStart, dayEnd), 0);
+        }
+
         return timeEntries
             .filter(e => e.taskId === task.id && typeof e.end === 'number')
             .reduce((sum, e) => sum + (e.end - e.start), 0);
-    }, [timeEntries, task.id]);
+    }, [timeEntries, task.id, task.recurring, effectiveDateStr, getEntryOverlapMs]);
 
     const liveTaskTime = useMemo(() => {
         const timerTime = isTimerActive ? (projectTimer?.elapsedTime || 0) : 0;
@@ -78,10 +107,22 @@ const TaskItem = ({
     // Calculate total time including subtasks
     const totalTimeWithSubtasks = useMemo(() => {
         const allTaskIds = [task.id, ...subtaskIds];
+
+        if (task.recurring && effectiveDateStr) {
+            const [year, month, day] = effectiveDateStr.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            const dayStart = startOfDay(date).getTime();
+            const dayEnd = endOfDay(date).getTime();
+
+            return timeEntries
+                .filter(e => allTaskIds.includes(e.taskId))
+                .reduce((sum, e) => sum + getEntryOverlapMs(e, dayStart, dayEnd), 0);
+        }
+
         return timeEntries
             .filter(e => allTaskIds.includes(e.taskId) && typeof e.end === 'number')
             .reduce((sum, e) => sum + (e.end - e.start), 0);
-    }, [timeEntries, task.id, subtaskIds]);
+    }, [timeEntries, task.id, subtaskIds, task.recurring, effectiveDateStr, getEntryOverlapMs]);
 
     // Auto-mark billable when significant time logged (post last billed) and user hasn't set it
     const hasSignificantBillableTime = useMemo(() => {
@@ -129,7 +170,12 @@ const TaskItem = ({
             return;
         }
 
-        updateTask(task.id, { completed: checked, lastActive: now });
+        const todayStr = getTodayString();
+        updateTask(task.id, {
+            completed: checked,
+            completedOnDate: checked ? todayStr : null,
+            lastActive: now
+        });
     }, [isTimerActive, projectTimer, task.id, task.recurring, recurringCompletionDate, createEntry, clearTimer, updateTask, toggleRecurringCompletion, timerKey]);
 
     /**
@@ -160,6 +206,11 @@ const TaskItem = ({
         }
         setIsEditing(true);
     }, [onEditTask, task]);
+
+    const handleViewTask = useCallback(() => {
+        if (!onViewTask) return;
+        onViewTask(task, { dateStr: recurringCompletionDate || null });
+    }, [onViewTask, task, recurringCompletionDate]);
 
     /**
      * Create a new subtask.
@@ -213,6 +264,7 @@ const TaskItem = ({
                         isSubtask={false}
                         showTimeDisplay={false}
                         showCheckbox={!task.recurring || Boolean(recurringCompletionDate)}
+                        onTitleClick={handleViewTask}
                     />
 
                     {(task.startDate || task.recurring) && (
@@ -270,6 +322,7 @@ const TaskItem = ({
                     isRelatedToActiveTimer={isRelatedToActiveTimer}
                     showSuccess={showSuccess}
                     onEditTask={onEditTask}
+                    onViewTask={onViewTask}
                 />
             )}
         </div>

@@ -19,6 +19,7 @@ export interface Project {
     preferredClientId?: string | null;
     isPersonal?: boolean;
     archived?: boolean;
+    archivedOnDate?: string | null;
     lastBilledAt?: number | null;
     invoiceIds?: string[];
     /** Color tag for visual identification (hex, e.g., "#3B82F6") */
@@ -94,6 +95,7 @@ export interface Client {
     flatRate?: boolean;
     defaultCurrency?: string;
     archived?: boolean;
+    archivedOnDate?: string | null;
     /** Color tag for visual identification (hex, e.g., "#3B82F6") */
     color?: string | null;
 }

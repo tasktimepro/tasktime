@@ -8,6 +8,7 @@ import GlobalTimer from '../GlobalTimer';
  * @param {boolean} props.isFocused - Whether this is the focused timer
  * @param {Function} props.onFocus - Focus handler
  * @param {Function} props.navigateToProject - Navigate to project handler
+ * @param {(task: Object) => void} props.onOpenTaskView - Open task view modal
  * @param {Function} props.onClose - Close handler
  */
 const GlobalTimerCard = ({
@@ -17,6 +18,7 @@ const GlobalTimerCard = ({
     isExpanded = false,
     onToggleExpanded,
     navigateToProject,
+    onOpenTaskView,
     onClose
 }) => {
     const handleFocus = () => {
@@ -47,6 +49,7 @@ const GlobalTimerCard = ({
             <GlobalTimer
                 timer={timer}
                 navigateToProject={navigateToProject}
+                onOpenTaskView={onOpenTaskView}
                 onClose={onClose}
                 isExpanded={isExpanded}
                 onToggleExpanded={handleToggleExpanded}

@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +13,7 @@ import {
 import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon, SortIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
-import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
+import { millisecondsToHours, toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { useProjects } from '../hooks/useProjects.ts';
@@ -25,6 +24,7 @@ import { useTimers } from '../hooks/useTimers.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 
+import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
 /**
  * ProjectList component - Displays and manages the list of projects
  */
@@ -154,9 +154,12 @@ const ProjectList = ({
      * Handle project deletion - check for invoices first
      */
     const handleDeleteProject = (projectId) => {
+        const project = projects.find(p => p.id === projectId);
+        if (!project) return;
+
         // Check if project has invoices before proceeding
         if (projectHasInvoices(projectId)) {
-            setProjectToDelete(projectId);
+            setProjectToDelete(project);
             setShowDeleteModal(true);
             return;
         }
@@ -220,53 +223,26 @@ const ProjectList = ({
     };
 
     /**
-     * Archive a project
-     */
-    const handleArchiveProject = (projectId) => {
-        updateProject(projectId, { archived: true });
-        showSuccess('Project archived successfully!');
-    };
-
-    /**
-     * Unarchive a project
-     */
-    const handleUnarchiveProject = (projectId) => {
-        updateProject(projectId, { archived: false });
-        showSuccess('Project unarchived successfully!');
-    };
-
-    /**
-     * Calculate unbilled amount for a project
+     * Calculate unbilled amount for a project (requires hourly rate)
      */
     const calculateUnbilledAmount = (project) => {
-        // If it's a flat rate project or no hourly rate is set, return 0 for the amount
         if (project.flatRate || !project.hourlyRate) return 0;
-        
-        // Get tasks for this project
+
         const projectTasks = tasks.filter(task => task.projectId === project.id);
-        
-        // Get explicitly billable tasks (tasks with billable === true)
         const billableTasks = projectTasks.filter(task => task.billable === true);
         const billableTaskIds = billableTasks.map(task => task.id);
-        
-        // Get time entries for this project's tasks with task-level billing filtering
+
         const unbilledEntries = timeEntries.filter(entry => {
-            // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
-            
-            // Find the task for this entry
+
             const task = projectTasks.find(t => t.id === entry.taskId);
             if (!task) return false;
             if (!entry.end || entry.end <= entry.start) return false;
-            
-            // Use task-specific lastBilledAt - if never billed, all entries are pending
+
             const taskLastBilledAt = task.lastBilledAt || 0;
-            
-            // Only include entries created after this task's last billing date
             return entry.start > taskLastBilledAt;
         });
 
-        // Group unbilled entries by task and round each task's hours (same logic as invoice)
         const taskTimeMap = {};
         unbilledEntries.forEach(entry => {
             if (!taskTimeMap[entry.taskId]) {
@@ -275,7 +251,6 @@ const ProjectList = ({
             taskTimeMap[entry.taskId] += (entry.end - entry.start);
         });
 
-        // Calculate total rounded hours (matching invoice calculation)
         const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
             const taskHours = millisecondsToHours(taskTime);
             const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
@@ -289,31 +264,21 @@ const ProjectList = ({
      * Calculate unbilled hours for a project (without rate requirement)
      */
     const calculateUnbilledHours = (project) => {
-        // Get tasks for this project
         const projectTasks = tasks.filter(task => task.projectId === project.id);
-        
-        // Get explicitly billable tasks (tasks with billable === true)
         const billableTasks = projectTasks.filter(task => task.billable === true);
         const billableTaskIds = billableTasks.map(task => task.id);
-        
-        // Get time entries for this project's tasks with task-level billing filtering
+
         const unbilledEntries = timeEntries.filter(entry => {
-            // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
-            
-            // Find the task for this entry
+
             const task = projectTasks.find(t => t.id === entry.taskId);
             if (!task) return false;
             if (!entry.end || entry.end <= entry.start) return false;
-            
-            // Use task-specific lastBilledAt - if never billed, all entries are pending
+
             const taskLastBilledAt = task.lastBilledAt || 0;
-            
-            // Only include entries created after this task's last billing date
             return entry.start > taskLastBilledAt;
         });
 
-        // Group unbilled entries by task and round each task's hours (same logic as invoice)
         const taskTimeMap = {};
         unbilledEntries.forEach(entry => {
             if (!taskTimeMap[entry.taskId]) {
@@ -322,14 +287,11 @@ const ProjectList = ({
             taskTimeMap[entry.taskId] += (entry.end - entry.start);
         });
 
-        // Calculate total rounded hours (matching invoice calculation)
-        const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
+        return Object.values(taskTimeMap).reduce((total, taskTime) => {
             const taskHours = millisecondsToHours(taskTime);
             const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
             return total + roundedTaskHours;
         }, 0);
-
-        return unbilledHours;
     };
 
     /**
@@ -339,6 +301,22 @@ const ProjectList = ({
         e.stopPropagation();
         // Select the project and navigate to dashboard where invoice generation is available
         onSelectProject(project);
+    };
+
+    /**
+     * Handle archiving a project
+     */
+    const handleArchiveProject = (projectId) => {
+        updateProject(projectId, { archived: true, archivedOnDate: toStorageDate(new Date()) });
+        showSuccess('Project archived successfully.');
+    };
+
+    /**
+     * Handle unarchiving a project
+     */
+    const handleUnarchiveProject = (projectId) => {
+        updateProject(projectId, { archived: false, archivedOnDate: null });
+        showSuccess('Project unarchived successfully.');
     };
 
     /**
@@ -443,105 +421,105 @@ const ProjectList = ({
                     {sortedActiveProjects.length > 0 && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {sortedActiveProjects.map((project) => (
-                        <Card
-                            key={project.id}
-                            className="hover:shadow-md transition-shadow cursor-pointer relative"
-                            onClick={() => onSelectProject(project)}
-                        >
-                            <CardContent className="pt-5">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-lg font-medium text-foreground truncate">
-                                        {project.title}
-                                    </h3>
+                                <Card
+                                    key={project.id}
+                                    className="hover:shadow-md transition-shadow cursor-pointer relative"
+                                    onClick={() => onSelectProject(project)}
+                                >
+                                    <CardContent className="pt-5">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-lg font-medium text-foreground truncate">
+                                                {project.title}
+                                            </h3>
 
-                                    {/* Three-dot dropdown menu for Edit and Delete */}
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                onClick={(e) => e.stopPropagation()}
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-muted-foreground hover:bg-muted rounded-full"
-                                                title="More actions"
-                                                aria-label="More actions"
-                                            >
-                                                <MoreHorizontal className="h-5 w-5" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                            <DropdownMenuItem
-                                                onClick={() => editProjectModal(project)}
-                                                className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
-                                            >
-                                                <PencilIcon className="h-4 w-4" />
-                                                <span>Edit</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => handleArchiveProject(project.id)}
-                                                className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
-                                            >
-                                                <ArchiveBoxIcon className="h-4 w-4" />
-                                                <span>Archive</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => {
-                                                    setProjectToDelete(project);
-                                                    setShowDeleteModal(true);
-                                                }}
-                                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
-                                            >
-                                                <TrashIcon className="h-4 w-4" />
-                                                <span>Delete</span>
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
+                                            {/* Three-dot dropdown menu for Edit and Delete */}
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-muted-foreground hover:bg-muted rounded-full"
+                                                        title="More actions"
+                                                        aria-label="More actions"
+                                                    >
+                                                        <MoreHorizontal className="h-5 w-5" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                    <DropdownMenuItem
+                                                        onClick={() => editProjectModal(project)}
+                                                        className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
+                                                    >
+                                                        <PencilIcon className="h-4 w-4" />
+                                                        <span>Edit</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleArchiveProject(project.id)}
+                                                        className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                                    >
+                                                        <ArchiveBoxIcon className="h-4 w-4" />
+                                                        <span>Archive</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => {
+                                                            setProjectToDelete(project);
+                                                            setShowDeleteModal(true);
+                                                        }}
+                                                        className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                                    >
+                                                        <TrashIcon className="h-4 w-4" />
+                                                        <span>Delete</span>
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
 
-                                {project.hourlyRate && !project.flatRate && (
-                                    <p className="mt-2 text-sm text-muted-foreground">
-                                        <span className="sensitive-data">
-                                            {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
-                                        </span>
-                                    </p>
-                                )}
+                                        {project.hourlyRate && !project.flatRate && (
+                                            <p className="mt-2 text-sm text-muted-foreground">
+                                                <span className="sensitive-data">
+                                                    {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                                </span>
+                                            </p>
+                                        )}
 
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    Created {toDisplayDate(project.createdAt)}
-                                    {project.isPersonal && (
-                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground">
-                                            Personal
-                                        </span>
-                                    )}
-                                </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Created {toDisplayDate(project.createdAt)}
+                                            {project.isPersonal && (
+                                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground">
+                                                    Personal
+                                                </span>
+                                            )}
+                                        </p>
 
-                                {/* Billable Amount Tag or Clock Icon for missing rate - Only show for non-personal projects */}
-                                {!project.isPersonal && calculateUnbilledAmount(project) > 0 ? (
-                                    <div className="absolute bottom-4 right-4">
-                                        <button
-                                            onClick={(e) => handleGenerateInvoice(e, project)}
-                                            className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
-                                            title="Click to generate invoice"
-                                        >
-                                            <span className="sensitive-data">
-                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
-                                            </span>
-                                        </button>
-                                    </div>
-                                ) : !project.isPersonal && !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
-                                    <div className="absolute bottom-4 right-4">
-                                        <button
-                                            onClick={(e) => handleGenerateInvoice(e, project)}
-                                            className="inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground text-xs font-medium rounded-full hover:bg-secondary/80 transition-colors"
-                                            title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
-                                        >
-                                            <ClockIcon className="h-3 w-3 mr-1" />
-                                            {calculateUnbilledHours(project).toFixed(2)}h
-                                        </button>
-                                    </div>
-                                ) : null}
-                            </CardContent>
-                        </Card>
-                    ))}
+                                        {/* Billable Amount Tag or Clock Icon for missing rate - Only show for non-personal projects */}
+                                        {!project.isPersonal && calculateUnbilledAmount(project) > 0 ? (
+                                            <div className="absolute bottom-4 right-4">
+                                                <button
+                                                    onClick={(e) => handleGenerateInvoice(e, project)}
+                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
+                                                    title="Click to generate invoice"
+                                                >
+                                                    <span className="sensitive-data">
+                                                        {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        ) : !project.isPersonal && !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
+                                            <div className="absolute bottom-4 right-4">
+                                                <button
+                                                    onClick={(e) => handleGenerateInvoice(e, project)}
+                                                    className="inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground text-xs font-medium rounded-full hover:bg-secondary/80 transition-colors"
+                                                    title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
+                                                >
+                                                    <ClockIcon className="h-3 w-3 mr-1" />
+                                                    {calculateUnbilledHours(project).toFixed(2)}h
+                                                </button>
+                                            </div>
+                                        ) : null}
+                                    </CardContent>
+                                </Card>
+                            ))}
                 </div>
                     )}
 
@@ -550,7 +528,7 @@ const ProjectList = ({
                         <div className="border-t pt-6">
                             <button
                                 onClick={() => setShowArchivedProjects(!showArchivedProjects)}
-                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4"
+                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 cursor-pointer"
                             >
                                 {showArchivedProjects ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />
@@ -570,9 +548,14 @@ const ProjectList = ({
                                         >
                                             <CardContent className="pt-5">
                                                 <div className="flex items-center justify-between">
-                                                    <h3 className="text-lg font-medium text-foreground truncate">
-                                                        {project.title}
-                                                    </h3>
+                                                    <div className="flex items-center min-w-0">
+                                                        <h3 className="text-lg font-medium text-foreground truncate">
+                                                            {project.title}
+                                                        </h3>
+                                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground whitespace-nowrap">
+                                                            Archived
+                                                        </span>
+                                                    </div>
 
                                                     {/* Three-dot dropdown menu for Unarchive and Delete */}
                                                     <DropdownMenu>
@@ -656,80 +639,15 @@ const ProjectList = ({
                 </>
             )}
 
-            {/* Delete Confirmation Modal */}
-            {showDeleteModal && projectToDelete && (() => {
-                const hasInvoices = projectHasInvoices(projectToDelete.id);
-                
-                return (
-                    <Modal
-                        isOpen={showDeleteModal}
-                        onClose={handleCancelDelete}
-                        title={hasInvoices ? "Project Has Invoices" : "Confirm Deletion"}
-                        size="md"
-                        footer={
-                            hasInvoices ? (
-                                <div className="flex justify-end space-x-3">
-                                    <Button
-                                        onClick={handleCancelDelete}
-                                        variant="outline"
-                                    >
-                                        Cancel
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="flex justify-end space-x-3">
-                                    <Button
-                                        onClick={handleCancelDelete}
-                                        variant="outline"
-                                    >
-                                        Cancel
-                                    </Button>
-
-                                    <Button
-                                        onClick={confirmDeleteProject}
-                                        variant="destructive"
-                                    >
-                                        Delete Project
-                                    </Button>
-                                </div>
-                            )
-                        }
-                    >
-                        {hasInvoices ? (
-                            <>
-                                <p className="text-sm text-foreground mb-4">
-                                    The project "<span className="font-semibold">{projectToDelete.title}</span>" has invoices attached to it.
-                                </p>
-
-                                <p className="text-sm text-foreground mb-6">
-                                    <strong>Recommended:</strong> Archive this project to preserve the invoices for record-keeping purposes.
-                                </p>
-
-                                <div className="flex flex-col space-y-3">
-                                    <Button
-                                        onClick={handleArchiveFromModal}
-                                        className="w-full"
-                                    >
-                                        Archive Project (Recommended)
-                                    </Button>
-
-                                    <Button
-                                        onClick={handleForceDelete}
-                                        variant="outline"
-                                        className="w-full border-red-300 text-red-700 bg-red-50 hover:bg-red-100 focus:ring-ring dark:border-red-700 dark:text-red-300 dark:bg-red-950 dark:hover:bg-red-900"
-                                    >
-                                        Force Delete Project & All Invoices
-                                    </Button>
-                                </div>
-                            </>
-                        ) : (
-                            <p className="text-sm text-foreground">
-                                Are you sure you want to delete the project "<span className="font-semibold">{projectToDelete.title}</span>"? This action cannot be undone and will delete all related tasks and time entries.
-                            </p>
-                        )}
-                    </Modal>
-                );
-            })()}
+            <ProjectDeleteDialog
+                isOpen={showDeleteModal}
+                onClose={handleCancelDelete}
+                project={projectToDelete}
+                hasInvoices={Boolean(projectToDelete && projectHasInvoices(projectToDelete.id))}
+                onConfirmDelete={confirmDeleteProject}
+                onArchive={handleArchiveFromModal}
+                onForceDelete={handleForceDelete}
+            />
         </div>
     );
 };

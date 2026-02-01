@@ -12,7 +12,6 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { UserIcon, DocumentTextIcon, CheckIcon } from '@/components/ui/icons';
@@ -43,24 +42,20 @@ const AddItemPopover = ({ children, onSelectType }) => {
             <DropdownMenuTrigger asChild>
                 {trigger}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-38">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                    Add to planner
-                </DropdownMenuLabel>
-                
+            <DropdownMenuContent align="start" className="w-32">
                 <DropdownMenuItem onClick={() => handleSelect('client')}>
-                    <UserIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-                    Client
+                    <UserIcon className="h-4 w-4 text-muted-foreground" />
+                    Add client
                 </DropdownMenuItem>
                 
                 <DropdownMenuItem onClick={() => handleSelect('project')}>
-                    <DocumentTextIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-                    Project
+                    <DocumentTextIcon className="h-4 w-4 text-muted-foreground" />
+                    Add project
                 </DropdownMenuItem>
                 
                 <DropdownMenuItem onClick={() => handleSelect('task')}>
-                    <CheckIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-                    Task
+                    <CheckIcon className="h-4 w-4 text-muted-foreground" />
+                    Add task
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

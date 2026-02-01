@@ -293,6 +293,7 @@ docker compose run --rm app npm run <script>
 4. **Keep tests updated** — Add or adjust tests whenever behavior changes
 5. **Use Yjs hooks directly** — `useProjects()`, `useTasks()`, etc. from `src/hooks/`
 6. **Review `docs/yjs-sync-implementation-plan.md`** — Understand the CRDT-based sync system
+7. **Subtasks cannot be recurring** — The project UI disallows recurring subtasks; avoid adding recurring-specific logic to subtask components.
 
 ---
 

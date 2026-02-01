@@ -123,7 +123,11 @@ const EntityPickerModal = ({
                             entity: t,
                         };
                     })
-                    .sort((a, b) => a.name.localeCompare(b.name));
+                    .sort((a, b) => {
+                        const createdDiff = (b.entity.createdAt || 0) - (a.entity.createdAt || 0);
+                        if (createdDiff !== 0) return createdDiff;
+                        return a.name.localeCompare(b.name);
+                    });
             default:
                 return [];
         }

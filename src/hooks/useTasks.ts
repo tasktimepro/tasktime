@@ -154,7 +154,6 @@ export function useTasks(options: UseTasksOptions = {}) {
         if (!today) return [] as Task[];
 
         return projectActiveTasks.filter(task => {
-            if (task.completed) return false;
             if (task.recurring) {
                 return isRecurringTaskDueOnDate(new Date(), task.recurring);
             }

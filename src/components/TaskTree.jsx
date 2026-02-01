@@ -23,10 +23,12 @@ import { getTodayString } from '../utils/dateUtils.ts';
  */
 const TaskTree = ({
     project,
-    onEditTask
+    onEditTask,
+    onViewTask
 }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskNote, setNewTaskNote] = useState('');
     const [newTaskStartDate, setNewTaskStartDate] = useState('');
     const [newTaskRecurring, setNewTaskRecurring] = useState(null);
     const [showRecurringTasks, setShowRecurringTasks] = useState(false);
@@ -135,6 +137,7 @@ const TaskTree = ({
             projectId: project.id,
             parentTaskId: taskData.parentTaskId || null,
             title: taskData.title.trim(),
+            note: taskData.note ? taskData.note.trim() : null,
             startDate: taskData.recurring ? null : (taskData.startDate || null),
             recurring: taskData.recurring || null,
             lastActive: Date.now(),
@@ -162,6 +165,7 @@ const TaskTree = ({
         handleCreateTask({
             parentTaskId: null,
             title: newTaskTitle,
+            note: newTaskNote,
             startDate: newTaskStartDate,
             recurring: newTaskRecurring
         });
@@ -171,6 +175,7 @@ const TaskTree = ({
         }
 
         setNewTaskTitle('');
+        setNewTaskNote('');
         setNewTaskStartDate('');
         setNewTaskRecurring(null);
         setShowCreateForm(false);
@@ -269,6 +274,7 @@ const TaskTree = ({
     const cancelCreate = () => {
         setShowCreateForm(false);
         setNewTaskTitle('');
+        setNewTaskNote('');
         setNewTaskStartDate('');
         setNewTaskRecurring(null);
     };
@@ -332,6 +338,14 @@ const TaskTree = ({
                         />
 
                         <Input
+                            type="text"
+                            value={newTaskNote}
+                            onChange={(e) => setNewTaskNote(e.target.value)}
+                            placeholder="Note"
+                            className="flex-1"
+                        />
+
+                        <Input
                             type="date"
                             value={newTaskStartDate}
                             onChange={(e) => {
@@ -392,6 +406,7 @@ const TaskTree = ({
                                     onUnarchive={() => handleUnarchiveTask(task.id)}
                                     onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
                                     onEditTask={onEditTask}
+                                    onViewTask={onViewTask}
                                 />
                             ))}
                         </div>
@@ -409,6 +424,7 @@ const TaskTree = ({
                                     onUnarchive={() => handleUnarchiveTask(task.id)}
                                     onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
                                     onEditTask={onEditTask}
+                                    onViewTask={onViewTask}
                                 />
                             ))}
                         </div>
@@ -441,6 +457,7 @@ const TaskTree = ({
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
                                             onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
                                             onEditTask={onEditTask}
+                                            onViewTask={onViewTask}
                                         />
                                     ))}
                                 </div>
@@ -474,6 +491,7 @@ const TaskTree = ({
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
                                             onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
                                             onEditTask={onEditTask}
+                                            onViewTask={onViewTask}
                                         />
                                     ))}
                                 </div>

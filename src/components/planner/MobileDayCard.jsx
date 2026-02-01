@@ -27,7 +27,6 @@ import { cn } from '@/lib/utils';
  * @param {(dateStr: string, type: string) => void} props.onAddClick
  * @param {(item: any) => void} props.onItemClick
  * @param {(item: any) => void} props.onRemoveItem - Handler for removing item from planner
- * @param {(item: any) => void} props.onSetEstimatedHours - Handler for setting estimated hours
  */
 const MobileDayCard = ({
     date,
@@ -42,7 +41,6 @@ const MobileDayCard = ({
     onAddClick,
     onItemClick,
     onRemoveItem,
-    onSetEstimatedHours,
 }) => {
 
     // Time progress for today
@@ -132,10 +130,10 @@ const MobileDayCard = ({
                             color={item.color}
                             estimatedHours={item.estimatedHours}
                             actualTimeMs={item.actualTimeMs}
+                            isTimerActive={item.isTimerActive}
                             hasAttachment={!!item.attachment}
                             onClick={() => onItemClick?.(item)}
                             onRemove={() => onRemoveItem?.(item)}
-                            onSetEstimatedHours={() => onSetEstimatedHours?.(item)}
                         />
                     ))
                 )}

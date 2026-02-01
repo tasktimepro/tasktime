@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useContext } from 'react';
+import { useEffect, useState, useMemo, useRef, useContext, useCallback } from 'react';
 import './App.css';
 import { YjsProvider, useYjs } from './contexts/YjsContext.tsx';
 import { useProjects } from './hooks/useProjects.ts';
@@ -22,6 +22,7 @@ import Expenses from './components/Expenses';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
 import AuthCallback from './components/AuthCallback';
+import TaskViewModal from './components/modals/TaskViewModal';
 import GlobalTimerStack from './components/timer/GlobalTimerStack';
 import ModalManager from './components/modals/ModalManager';
 import FloatingActionButton from './components/FloatingActionButton';
@@ -31,7 +32,8 @@ import InstallPrompt from './components/InstallPrompt';
 import YjsSyncStatus from './components/sync/YjsSyncStatus';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
-import { formatDurationWithSeconds } from './utils/dateUtils.ts';
+import { formatDurationWithSeconds, getTodayString } from './utils/dateUtils.ts';
+import { getTaskIdsToDelete } from './utils/taskUtils.ts';
 import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
@@ -70,12 +72,15 @@ function AppContent() {
     const { 
         tasks: activeTasks, 
         createTask,
+        deleteTask,
+        archiveTask,
         isLoading: tasksLoading 
     } = useTasks();
 
     const { 
         entries: timeEntries, 
         createEntry: createTimeEntry,
+        deleteEntry,
         isLoading: entriesLoading 
     } = useTimeEntries();
 
@@ -118,6 +123,8 @@ function AppContent() {
     const { timers, clearTimer, isLoading: timerLoading } = useTimers();
     const focusedTimer = timers[0] || null;
     const timerIsActive = !!focusedTimer;
+    const todayStr = useMemo(() => getTodayString(), []);
+
     const isPaused = focusedTimer?.isPaused || false;
     const timerTaskId = focusedTimer?.taskId || null;
     const timerElapsedTime = focusedTimer?.elapsedTime || 0;
@@ -214,6 +221,14 @@ function AppContent() {
     const [editingItem, setEditingItem] = useState(null);
     const [modalOptions, setModalOptions] = useState(null);
     const [pendingImport, setPendingImport] = useState(null);
+    const [taskViewState, setTaskViewState] = useState({
+        isOpen: false,
+        task: null,
+        dateStr: null,
+        attachment: null
+    });
+    const [pendingTaskViewReturn, setPendingTaskViewReturn] = useState(null);
+    const prevActiveModalRef = useRef(activeModal);
 
     const openClientModal = (client = null) => {
         setActiveModal('client');
@@ -270,6 +285,84 @@ function AppContent() {
         setActiveModal('task');
         setEditingItem(task);
     };
+
+    const openTaskView = useCallback((task, options = {}) => {
+        if (!task) return;
+        const { dateStr = todayStr, attachment = null } = options;
+        setTaskViewState({
+            isOpen: true,
+            task,
+            dateStr,
+            attachment
+        });
+    }, [todayStr]);
+
+    const closeTaskView = useCallback(() => {
+        setTaskViewState({
+            isOpen: false,
+            task: null,
+            dateStr: null,
+            attachment: null
+        });
+    }, []);
+
+    const handleEditTaskFromView = useCallback((task) => {
+        if (!task) return;
+        setPendingTaskViewReturn({
+            task,
+            dateStr: taskViewState.dateStr || todayStr,
+            attachment: taskViewState.attachment || null
+        });
+        openTaskModal(task);
+    }, [openTaskModal, taskViewState.dateStr, taskViewState.attachment, todayStr]);
+
+    useEffect(() => {
+        if (prevActiveModalRef.current === 'task' && !activeModal && pendingTaskViewReturn) {
+            setTaskViewState({
+                isOpen: true,
+                task: pendingTaskViewReturn.task,
+                dateStr: pendingTaskViewReturn.dateStr,
+                attachment: pendingTaskViewReturn.attachment || null
+            });
+            setPendingTaskViewReturn(null);
+        }
+        prevActiveModalRef.current = activeModal;
+    }, [activeModal, pendingTaskViewReturn]);
+
+    const handleDeleteTask = useCallback((task) => {
+        if (!task) return;
+
+        const taskIdsToDelete = task.parentTaskId
+            ? [task.id]
+            : getTaskIdsToDelete(task.id, activeTasks);
+
+        const entriesToDelete = timeEntries.filter(entry => taskIdsToDelete.includes(entry.taskId));
+        entriesToDelete.forEach(entry => deleteEntry(entry.id));
+
+        timers.forEach(timer => {
+            if (taskIdsToDelete.includes(timer.taskId)) {
+                clearTimer(timer.projectId);
+            }
+        });
+
+        taskIdsToDelete.forEach(id => deleteTask(id));
+        toast?.showSuccess('Task deleted');
+        closeTaskView();
+    }, [activeTasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, toast, closeTaskView]);
+
+    const handleArchiveTask = useCallback((task) => {
+        if (!task || task.projectId) return;
+
+        timers.forEach(timer => {
+            if (timer.taskId === task.id) {
+                clearTimer(timer.projectId || task.id);
+            }
+        });
+
+        archiveTask(task.id);
+        toast?.showSuccess('Task archived');
+        closeTaskView();
+    }, [archiveTask, timers, clearTimer, toast, closeTaskView]);
 
     // === Global Timer UI State ===
     const [showGlobalTimer, setShowGlobalTimer] = useState(false);
@@ -799,7 +892,15 @@ function AppContent() {
 
             {/* Main Content */}
             <main className="flex-1 main-content relative">
-                <div className={`pr-4 pb-6 ${showGlobalTimer && timerIsActive ? 'pt-21' : needsExtraTopPadding ? 'pt-8' : 'pt-6'}`}>
+                <div
+                    className="pr-4"
+                    style={{
+                        paddingTop: showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem',
+                        paddingBottom: '1.5rem',
+                        '--app-content-padding-top': showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem',
+                        '--app-content-padding-bottom': '1.5rem',
+                    }}
+                >
                     {activeView === 'dashboard' && (
                             <ErrorBoundary>
                             <Dashboard
@@ -810,6 +911,7 @@ function AppContent() {
                                 navigateToClient={navigateToClient}
                                 navigateToInvoices={navigateToInvoices}
                                 onEditTask={openTaskModal}
+                                onViewTask={openTaskView}
                             />
                             </ErrorBoundary>
                         )}
@@ -825,6 +927,7 @@ function AppContent() {
                                 openProjectModal={openProjectModal}
                                 openTaskModal={openTaskModal}
                                 activeModal={activeModal}
+                                onViewTask={openTaskView}
                             />
                             </ErrorBoundary>
                         )}
@@ -861,6 +964,7 @@ function AppContent() {
                                 openPaymentMethodModal={openPaymentMethodModal}
                                 openTemplateModal={openTemplateModal}
                                 openTaskModal={openTaskModal}
+                                onViewTask={openTaskView}
                                 navigateToClient={navigateToClient}
                             />
                             </ErrorBoundary>
@@ -964,10 +1068,17 @@ function AppContent() {
                 
                 {/* Global Timer Display - Fixed at top */}
                 {showGlobalTimer && timerIsActive && (
-                    <div className={`fixed top-4 ${isSidebarCollapsed ? 'left-[calc(1.5rem+5rem+1.5rem)]' : 'left-[calc(1.5rem+16rem+1.5rem)]'} right-6 z-50 flex justify-center global-timer-mobile`}>
-                        <div className="w-auto max-w-2xl">
+                    <div
+                        className="fixed top-4 left-1/2 -translate-x-1/2 w-full max-w-[100rem] z-50 flex justify-center global-timer-mobile pointer-events-none"
+                        style={{
+                            paddingLeft: isSidebarCollapsed ? '7.5rem' : '19rem',
+                            paddingRight: '0.5rem',
+                        }}
+                    >
+                        <div className="w-auto max-w-2xl pointer-events-auto">
                             <GlobalTimerStack
                                 navigateToProject={navigateToProject}
+                                onOpenTaskView={openTaskView}
                                 onClose={() => {
                                     setShowGlobalTimer(false);
                                 }}
@@ -978,6 +1089,20 @@ function AppContent() {
             </main>
         </div>
         </div>
+
+        {taskViewState.task && (
+            <TaskViewModal
+                isOpen={taskViewState.isOpen}
+                onClose={closeTaskView}
+                task={taskViewState.task}
+                dateStr={taskViewState.dateStr || todayStr}
+                attachment={taskViewState.attachment}
+                onEdit={handleEditTaskFromView}
+                onDelete={handleDeleteTask}
+                onArchive={handleArchiveTask}
+                onNavigateToProject={navigateToProject}
+            />
+        )}
         
         {/* PWA Components */}
         <InstallPrompt />
