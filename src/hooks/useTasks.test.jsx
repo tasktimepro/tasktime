@@ -123,7 +123,8 @@ describe('useTasks', () => {
             { id: 'overdue', projectId: 'p1', archived: false, completed: false, recurring: null, startDate: '2025-01-04' },
             { id: 'today', projectId: 'p1', archived: false, completed: false, recurring: null, startDate: '2025-01-06' },
             { id: 'upcoming', projectId: 'p1', archived: false, completed: false, recurring: null, startDate: '2025-01-10' },
-            { id: 'completed', projectId: 'p1', archived: false, completed: true, recurring: null, startDate: '2025-01-04' },
+            { id: 'completed-today', projectId: 'p1', archived: false, completed: true, completedOnDate: '2025-01-06', recurring: null, startDate: '2025-01-04' },
+            { id: 'completed-earlier', projectId: 'p1', archived: false, completed: true, completedOnDate: '2025-01-05', recurring: null, startDate: '2025-01-04' },
             { id: 'recurring-weekly', projectId: 'p1', archived: false, completed: false, recurring: { type: 'weekly', weeklyDays: [1] } },
             { id: 'standalone', projectId: null, archived: false, completed: false, recurring: null, startDate: null },
             { id: 'archived', projectId: 'p1', archived: true, completed: false, recurring: null, startDate: '2025-01-03' },
@@ -141,7 +142,7 @@ describe('useTasks', () => {
         const { result } = renderHook(() => useTasks())
 
         expect(result.current.getStandaloneTasks().map((t) => t.id)).toEqual(['standalone'])
-        expect(result.current.getOverdueTasks().map((t) => t.id)).toEqual(['overdue'])
+        expect(result.current.getOverdueTasks().map((t) => t.id).sort()).toEqual(['completed-today', 'overdue'])
         expect(result.current.getTasksForToday().map((t) => t.id).sort()).toEqual(['recurring-weekly', 'today'])
         expect(result.current.getUpcomingTasks(7).map((t) => t.id)).toEqual(['upcoming'])
     })

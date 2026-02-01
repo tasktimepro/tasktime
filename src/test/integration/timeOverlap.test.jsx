@@ -71,7 +71,7 @@ describe('Time Overlap Detection', () => {
         );
 
         // Click the Add Entry button to show the form
-        const addButton = screen.getByText('Add Entry');
+        const addButton = screen.getByRole('button', { name: 'Add Entry' });
         fireEvent.click(addButton);
 
         // Wait for form to appear
@@ -91,8 +91,8 @@ describe('Time Overlap Detection', () => {
         fireEvent.change(timeInputs[1], { target: { value: '30' } });
 
         // Submit the form - the second "Add Entry" button submits the form
-        const saveButtons = screen.getAllByText('Add Entry');
-        fireEvent.click(saveButtons[1]); // The form submit button
+        const saveButton = screen.getByRole('button', { name: 'Add Entry' });
+        fireEvent.click(saveButton);
 
         // Should show error toast and NOT call createEntry
         await waitFor(() => {

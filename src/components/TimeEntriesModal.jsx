@@ -579,12 +579,14 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                     <h3 className="text-sm font-medium text-foreground">
                         {taskTimeEntries.length} {taskTimeEntries.length === 1 ? 'Entry' : 'Entries'}
                     </h3>
-                    <Button
-                        onClick={() => setShowAddForm(true)}
-                        leadingIcon={PlusIcon}
-                    >
-                        Add Entry
-                    </Button>
+                    {!showAddForm && (
+                        <Button
+                            onClick={() => setShowAddForm(true)}
+                            leadingIcon={PlusIcon}
+                        >
+                            Add Entry
+                        </Button>
+                    )}
                 </div>
 
                 {/* Add New Entry Form */}

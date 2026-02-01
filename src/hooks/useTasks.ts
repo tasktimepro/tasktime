@@ -142,9 +142,11 @@ export function useTasks(options: UseTasksOptions = {}) {
         if (!today) return [] as Task[];
 
         return projectActiveTasks.filter(task => {
-            if (task.completed) return false;
             if (task.recurring) return false;
             if (!task.startDate) return false;
+            if (task.completed) {
+                return task.completedOnDate === today;
+            }
             return task.startDate < today;
         });
     }, [projectActiveTasks]);

@@ -90,7 +90,7 @@ describe('TimeEntriesModal', () => {
             />
         )
 
-        await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[0])
+        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
 
         await user.clear(screen.getByLabelText('Date started'))
         await user.type(screen.getByLabelText('Date started'), '2026-01-19')
@@ -98,7 +98,7 @@ describe('TimeEntriesModal', () => {
         await user.type(screen.getByLabelText('Time spent'), '1h')
         await user.type(screen.getByLabelText('Note (optional)'), 'Manual entry')
 
-        await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[1])
+        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
 
         expect(timeEntriesHookMocks.createEntry).toHaveBeenCalledTimes(1)
 
@@ -122,14 +122,14 @@ describe('TimeEntriesModal', () => {
             />
         )
 
-        await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[0])
+        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
 
         await user.clear(screen.getByLabelText('Date started'))
         await user.type(screen.getByLabelText('Date started'), '2026-01-19')
         await user.clear(screen.getByLabelText('Time spent'))
         await user.type(screen.getByLabelText('Time spent'), '0m')
 
-        await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[1])
+        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
 
         expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
         expect(toastMocks.showError).toHaveBeenCalledWith('Time spent must be greater than 0')
@@ -145,11 +145,11 @@ describe('TimeEntriesModal', () => {
             />
         )
 
-        await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[0])
+        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
 
         await user.clear(screen.getByLabelText('Date started'))
 
-        await user.click(screen.getAllByRole('button', { name: 'Add Entry' })[1])
+        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
 
         expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
         expect(toastMocks.showError).toHaveBeenCalledWith('Please fill in date started and start time')

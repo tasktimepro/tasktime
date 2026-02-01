@@ -46,7 +46,7 @@ const ToDoToday = ({
     const [selectedTask, setSelectedTask] = useState(null);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
     const combinedTasks = [...overdueTasks, ...tasksForToday];
-    const allVisibleCount = combinedTasks.length;
+    const incompleteCount = combinedTasks.filter((task) => !getTaskCompletedStatus(task)).length;
 
     const handleOpenTimeEntries = (task) => {
         setSelectedTask(task);
@@ -116,7 +116,7 @@ const ToDoToday = ({
             <CardHeader className="pb-4">
                 <CardTitle className="flex items-center text-lg">
                     <ListTodoIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
-                    To Do Today ({allVisibleCount})
+                    To Do Today ({incompleteCount})
                 </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
