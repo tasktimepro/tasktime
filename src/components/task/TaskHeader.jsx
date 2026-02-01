@@ -20,18 +20,21 @@ const TaskHeader = ({
     mainTaskTime,
     totalTimeWithSubtasks,
     isSubtask = false,
-    showTimeDisplay = true
+    showTimeDisplay = true,
+    showCheckbox = true
 }) => {
     return (
         <div className="flex items-center space-x-3 flex-1 min-w-0">
             {/* Completion Checkbox */}
-            <div className="flex-shrink-0">
-                <CustomCheckbox
-                    checked={isCompleted}
-                    onChange={onToggleComplete}
-                    disabled={isEditing || isArchived}
-                />
-            </div>
+            {showCheckbox && (
+                <div className="flex-shrink-0">
+                    <CustomCheckbox
+                        checked={isCompleted}
+                        onChange={onToggleComplete}
+                        disabled={isEditing || isArchived}
+                    />
+                </div>
+            )}
 
             <div className="flex-1 min-w-0">
                 {isEditing ? (

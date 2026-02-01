@@ -30,7 +30,8 @@ const ProjectDashboard = ({
     openBusinessModal,
     openPaymentMethodModal,
     openTemplateModal,
-    openTaskModal
+    openTaskModal,
+    navigateToClient
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -157,6 +158,11 @@ const ProjectDashboard = ({
         };
     }, [projectTimeEntries, projectInvoices, project, projectTasks, visibleTasksCount]);
 
+    const projectClient = useMemo(() => {
+        if (!project.preferredClientId) return null;
+        return clients.find(client => client.id === project.preferredClientId) || null;
+    }, [clients, project.preferredClientId]);
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -179,6 +185,18 @@ const ProjectDashboard = ({
 
                         {project.hourlyRate && (
                             <p className="text-sm text-muted-foreground">
+                                {projectClient && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigateToClient?.(projectClient.id)}
+                                            className="hover:text-foreground hover:underline cursor-pointer"
+                                        >
+                                            {projectClient.title}
+                                        </button>
+                                        <span className="mx-1">•</span>
+                                    </>
+                                )}
                                 <span className="sensitive-data">
                                     {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
                                 </span>

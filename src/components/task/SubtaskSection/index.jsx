@@ -21,8 +21,6 @@ const SubtaskSection = ({
     setNewSubtaskTitle,
     newSubtaskStartDate,
     setNewSubtaskStartDate,
-    newSubtaskRecurring,
-    setNewSubtaskRecurring,
     handleCreateSubtask,
     cancelCreateSubtask,
     isArchived,
@@ -82,8 +80,6 @@ const SubtaskSection = ({
                             setNewSubtaskTitle={setNewSubtaskTitle}
                             newSubtaskStartDate={newSubtaskStartDate}
                             setNewSubtaskStartDate={setNewSubtaskStartDate}
-                            newSubtaskRecurring={newSubtaskRecurring}
-                            setNewSubtaskRecurring={setNewSubtaskRecurring}
                             onCreateSubtask={handleCreateSubtask}
                             onCancel={cancelCreateSubtask}
                         />

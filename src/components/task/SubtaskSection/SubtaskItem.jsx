@@ -58,6 +58,9 @@ const SubtaskItem = ({
      * Toggle subtask completion status
      */
     const handleToggleComplete = useCallback((checked) => {
+        if (task.recurring) {
+            return;
+        }
         const now = Date.now();
 
         // If timer is active for this task, stop it and create entry
@@ -72,7 +75,7 @@ const SubtaskItem = ({
         }
 
         updateTask(task.id, { completed: checked, lastActive: now });
-    }, [isTimerActive, projectTimer, task.id, createEntry, clearTimer, updateTask, timerKey]);
+    }, [isTimerActive, projectTimer, task.id, task.recurring, createEntry, clearTimer, updateTask, timerKey]);
 
     /**
      * Update subtask title

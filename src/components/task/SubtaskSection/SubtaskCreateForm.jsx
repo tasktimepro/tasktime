@@ -1,6 +1,5 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import RecurringPicker from '../RecurringPicker';
 
 /**
  * SubtaskCreateForm component - Form for creating subtasks.
@@ -11,8 +10,6 @@ const SubtaskCreateForm = ({
     setNewSubtaskTitle,
     newSubtaskStartDate,
     setNewSubtaskStartDate,
-    newSubtaskRecurring,
-    setNewSubtaskRecurring,
     onCreateSubtask,
     onCancel,
     isDisabled
@@ -37,20 +34,8 @@ const SubtaskCreateForm = ({
                     value={newSubtaskStartDate}
                     onChange={(e) => {
                         setNewSubtaskStartDate(e.target.value);
-                        if (e.target.value) {
-                            setNewSubtaskRecurring(null);
-                        }
                     }}
-                    className="w-36"
-                    disabled={Boolean(newSubtaskRecurring)}
-                />
-                <RecurringPicker
-                    value={newSubtaskRecurring}
-                    onChange={(config) => {
-                        setNewSubtaskRecurring(config);
-                        setNewSubtaskStartDate('');
-                    }}
-                    onClear={() => setNewSubtaskRecurring(null)}
+                    className="w-40 text-sm dark:[color-scheme:dark]"
                 />
                 <Button type="submit" size="sm">
                     Add

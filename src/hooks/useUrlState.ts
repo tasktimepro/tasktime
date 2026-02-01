@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 
-type ViewName = 'dashboard' | 'task-planner' | 'projects' | 'clients' | 'invoices' | 'expenses' | 'account' | 'auth-callback';
+type ViewName = 'dashboard' | 'planner' | 'projects' | 'clients' | 'invoices' | 'expenses' | 'account' | 'auth-callback';
 
 type UrlParams = {
     view: ViewName;
     projectId: string | null;
     clientId: string | null;
     section: string | null;
+    year: string | null;
+    week: string | null;
     create: string | null;
     tab: string | null;
     preselectedClientId: string | null;
@@ -17,6 +19,8 @@ type UrlUpdateParams = Partial<{
     project: string | null;
     client: string | null;
     section: string | null;
+    year: string | null;
+    week: string | null;
     create: string | null;
     tab: string | null;
     preselectedClientId: string | null;
@@ -36,6 +40,8 @@ function getParamsFromUrl(): UrlParams {
     let view: ViewName = 'dashboard';
     let projectId: string | null = null;
     let clientId: string | null = null;
+    let year: string | null = null;
+    let week: string | null = null;
 
     if (pathParts.length === 0 || pathname === '/') {
         view = 'dashboard';
@@ -43,8 +49,12 @@ function getParamsFromUrl(): UrlParams {
         const firstPart = pathParts[0];
 
         switch (firstPart) {
-            case 'task-planner':
-                view = 'task-planner';
+            case 'planner':
+                view = 'planner';
+                if (pathParts[1] && pathParts[2]) {
+                    year = pathParts[1];
+                    week = pathParts[2];
+                }
                 break;
             case 'projects':
                 view = 'projects';
@@ -83,6 +93,8 @@ function getParamsFromUrl(): UrlParams {
         projectId,
         clientId,
         section: params.get('section') || null,
+        year,
+        week,
         create: params.get('create') || null,
         tab: params.get('tab') || null,
         preselectedClientId: params.get('preselectedClientId') || null
@@ -150,6 +162,8 @@ export const useUrlState = () => {
             project: currentState.projectId,
             client: currentState.clientId,
             section: currentState.section,
+            year: currentState.year,
+            week: currentState.week,
             create: currentState.create,
             tab: currentState.tab,
             preselectedClientId: currentState.preselectedClientId,
@@ -163,8 +177,12 @@ export const useUrlState = () => {
         const view = mergedParams.view || 'dashboard';
 
         switch (view) {
-            case 'task-planner':
-                path = '/task-planner';
+            case 'planner':
+                if (mergedParams.year && mergedParams.week) {
+                    path = `/planner/${mergedParams.year}/${mergedParams.week}`;
+                } else {
+                    path = '/planner';
+                }
                 break;
             case 'projects':
                 if (mergedParams.project) {
@@ -215,14 +233,14 @@ export const useUrlState = () => {
      * @param {Object} params - Optional parameters to include in URL
      */
     const navigateToProjects = useCallback((params: UrlUpdateParams = {}) => {
-        updateUrl({ view: 'projects', client: null, project: null, section: null, create: null, tab: null, ...params });
+        updateUrl({ view: 'projects', client: null, project: null, section: null, year: null, week: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to project dashboard
      */
     const navigateToProject = useCallback((projectId: string) => {
-        updateUrl({ view: 'projects', client: null, project: projectId, section: null, create: null, tab: null });
+        updateUrl({ view: 'projects', client: null, project: projectId, section: null, year: null, week: null, create: null, tab: null });
     }, [updateUrl]);
 
     /**
@@ -230,7 +248,7 @@ export const useUrlState = () => {
      */
     const navigateToInvoices = useCallback((params: UrlUpdateParams = {}) => {
         // Ensure we clear section if not specified
-        const finalParams: UrlUpdateParams = { view: 'invoices', client: null, project: null, ...params };
+        const finalParams: UrlUpdateParams = { view: 'invoices', client: null, project: null, year: null, week: null, ...params };
         // If no section is specified, set it to the default (invoices)
         if (!('section' in params)) {
             finalParams.section = 'invoices';
@@ -246,42 +264,42 @@ export const useUrlState = () => {
      * Navigate to expenses view
      */
     const navigateToExpenses = useCallback((params: UrlUpdateParams = {}) => {
-        updateUrl({ view: 'expenses', client: null, project: null, section: null, create: null, tab: null, ...params });
+        updateUrl({ view: 'expenses', client: null, project: null, section: null, year: null, week: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to account view with optional parameters
      */
     const navigateToAccount = useCallback((params: UrlUpdateParams = {}) => {
-        updateUrl({ view: 'account', client: null, project: null, tab: null, section: 'preferences', ...params });
+        updateUrl({ view: 'account', client: null, project: null, tab: null, section: 'preferences', year: null, week: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to main dashboard view
      */
     const navigateToDashboard = useCallback((params: UrlUpdateParams = {}) => {
-        updateUrl({ view: 'dashboard', client: null, project: null, section: null, create: null, tab: null, ...params });
+        updateUrl({ view: 'dashboard', client: null, project: null, section: null, year: null, week: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
-     * Navigate to task planner view
+     * Navigate to planner view
      */
-    const navigateToTaskPlanner = useCallback((params: UrlUpdateParams = {}) => {
-        updateUrl({ view: 'task-planner', client: null, project: null, section: null, create: null, tab: null, ...params });
+    const navigateToPlanner = useCallback((params: UrlUpdateParams = {}) => {
+        updateUrl({ view: 'planner', client: null, project: null, section: null, year: null, week: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to clients view with optional parameters
      */
     const navigateToClients = useCallback((params: UrlUpdateParams = {}) => {
-        updateUrl({ view: 'clients', client: null, project: null, section: null, create: null, tab: null, ...params });
+        updateUrl({ view: 'clients', client: null, project: null, section: null, year: null, week: null, create: null, tab: null, ...params });
     }, [updateUrl]);
 
     /**
      * Navigate to client dashboard
      */
     const navigateToClient = useCallback((clientId: string) => {
-        updateUrl({ view: 'clients', client: clientId, project: null, section: null, create: null, tab: null });
+        updateUrl({ view: 'clients', client: clientId, project: null, section: null, year: null, week: null, create: null, tab: null });
     }, [updateUrl]);
 
     return {
@@ -294,7 +312,7 @@ export const useUrlState = () => {
         navigateToExpenses,
         navigateToAccount,
         navigateToDashboard,
-        navigateToTaskPlanner,
+        navigateToPlanner,
         updateUrl
     };
 };

@@ -269,15 +269,14 @@ const InvoiceModal = ({
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {selectedProject && selectedProject.preferredClientId && (
-                                            <Notice
-                                                title={`Client cannot be changed because this project is associated with ${clients.find(c => c.id === selectedProject.preferredClientId)?.title || 'a specific client'}.`}
-                                                className="py-2 px-3"
-                                            />
-                                        )}
                                         {selectedClient && (
                                             <Notice
                                                 title={`${selectedClient?.title || 'Selected client'} will be included as "Invoice To" in the invoice.`}
+                                                description={
+                                                    !isClientContextFixed && !isProjectContextFixed && selectedProject?.preferredClientId
+                                                        ? `Client cannot be changed because this project is associated with ${clients.find(c => c.id === selectedProject.preferredClientId)?.title || 'a specific client'}.`
+                                                        : undefined
+                                                }
                                                 className="py-2 px-3"
                                             />
                                         )}
@@ -291,7 +290,7 @@ const InvoiceModal = ({
                                     <h4 className="text-sm font-medium text-foreground">
                                         Project
                                     </h4>
-                                    {openProjectModal && !(isProjectContextFixed && !isClientContextFixed) && !isClientContextFixed && !editingInvoice && (
+                                    {openProjectModal && !(isProjectContextFixed && !isClientContextFixed) && !editingInvoice && (
                                         <Button
                                             type="button"
                                             variant="link"
@@ -301,7 +300,11 @@ const InvoiceModal = ({
                                                 if (openProjectModal) {
                                                     // Save current form state before opening nested modal
                                                     saveCurrentFormState();
-                                                    openProjectModal();
+                                                    if (isClientContextFixed && selectedClient?.id) {
+                                                        openProjectModal(null, { preselectedClientId: selectedClient.id });
+                                                    } else {
+                                                        openProjectModal();
+                                                    }
                                                 }
                                             }}
                                         >

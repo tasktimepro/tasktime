@@ -13,16 +13,16 @@ export function useClients() {
         (store) => store.clients
     );
 
-    // Sorted by name
+    // Sorted by title
     const sortedClients = useMemo(
-        () => [...items].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+        () => [...items].sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' })),
         [items]
     );
 
-    // Find by name (case insensitive)
+    // Find by title (case insensitive)
     const findByName = useCallback((name: string) => {
         const lower = name.toLowerCase();
-        return items.find(c => (c.name || '').toLowerCase() === lower);
+        return items.find(c => (c.title || '').toLowerCase() === lower);
     }, [items]);
 
     return {

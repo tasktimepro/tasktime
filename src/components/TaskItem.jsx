@@ -18,6 +18,7 @@ import { formatDurationWithSeconds } from '../utils/dateUtils.ts';
  */
 const TaskItem = ({
     task,
+    recurringCompletionDate,
     onDelete,
     onCreateSubtask,
     onArchive,
@@ -32,11 +33,10 @@ const TaskItem = ({
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
     const [newSubtaskStartDate, setNewSubtaskStartDate] = useState('');
-    const [newSubtaskRecurring, setNewSubtaskRecurring] = useState(null);
     const { showSuccess } = useToast();
     
     // Yjs hooks for state
-    const { tasks, updateTask } = useTasks();
+    const { tasks, updateTask, toggleRecurringCompletion, isCompletedOnDate } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer } = useTimers();
 
@@ -49,7 +49,9 @@ const TaskItem = ({
     const projectTimer = getTimerForTask(task.id, task.projectId);
     const isAnyTimerActive = !!projectTimer;
     const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
-    const isCompleted = task.completed || false;
+    const isCompleted = task.recurring && recurringCompletionDate
+        ? isCompletedOnDate(task, recurringCompletionDate)
+        : (task.completed || false);
     const isArchived = task.archived || false;
     
     // Check if this task or any subtask has active timer
@@ -122,8 +124,13 @@ const TaskItem = ({
             clearTimer(timerKey);
         }
 
+        if (task.recurring && recurringCompletionDate) {
+            toggleRecurringCompletion(task.id, recurringCompletionDate);
+            return;
+        }
+
         updateTask(task.id, { completed: checked, lastActive: now });
-    }, [isTimerActive, projectTimer, task.id, createEntry, clearTimer, updateTask, timerKey]);
+    }, [isTimerActive, projectTimer, task.id, task.recurring, recurringCompletionDate, createEntry, clearTimer, updateTask, toggleRecurringCompletion, timerKey]);
 
     /**
      * Update task title.
@@ -167,16 +174,15 @@ const TaskItem = ({
             onCreateSubtask({
                 parentTaskId: task.id,
                 title: newSubtaskTitle,
-                startDate: newSubtaskRecurring ? null : (newSubtaskStartDate || null),
-                recurring: newSubtaskRecurring || null
+                startDate: newSubtaskStartDate || null,
+                recurring: null
             });
 
             setNewSubtaskTitle('');
             setNewSubtaskStartDate('');
-            setNewSubtaskRecurring(null);
             setShowCreateSubtaskForm(false);
         }
-    }, [newSubtaskTitle, newSubtaskStartDate, newSubtaskRecurring, task.id, onCreateSubtask]);
+    }, [newSubtaskTitle, newSubtaskStartDate, task.id, onCreateSubtask]);
 
     /**
      * Cancel subtask creation.
@@ -184,7 +190,6 @@ const TaskItem = ({
     const cancelCreateSubtask = useCallback(() => {
         setNewSubtaskTitle('');
         setNewSubtaskStartDate('');
-        setNewSubtaskRecurring(null);
         setShowCreateSubtaskForm(false);
     }, []);
 
@@ -207,6 +212,7 @@ const TaskItem = ({
                         totalTimeWithSubtasks={totalTimeWithSubtasks}
                         isSubtask={false}
                         showTimeDisplay={false}
+                        showCheckbox={!task.recurring || Boolean(recurringCompletionDate)}
                     />
 
                     {(task.startDate || task.recurring) && (
@@ -245,27 +251,27 @@ const TaskItem = ({
                 task={task}
             />
 
-            <SubtaskSection
-                subtasks={subtasks}
-                task={task}
-                onToggleBillable={onToggleBillable}
-                onCreateSubtask={onCreateSubtask}
-                showCreateSubtaskForm={showCreateSubtaskForm}
-                setShowCreateSubtaskForm={setShowCreateSubtaskForm}
-                newSubtaskTitle={newSubtaskTitle}
-                setNewSubtaskTitle={setNewSubtaskTitle}
-                newSubtaskStartDate={newSubtaskStartDate}
-                setNewSubtaskStartDate={setNewSubtaskStartDate}
-                newSubtaskRecurring={newSubtaskRecurring}
-                setNewSubtaskRecurring={setNewSubtaskRecurring}
-                handleCreateSubtask={handleCreateSubtask}
-                cancelCreateSubtask={cancelCreateSubtask}
-                isArchived={isArchived}
-                anyTimerActive={isAnyTimerActive}
-                isRelatedToActiveTimer={isRelatedToActiveTimer}
-                showSuccess={showSuccess}
-                onEditTask={onEditTask}
-            />
+            {!task.recurring && (
+                <SubtaskSection
+                    subtasks={subtasks}
+                    task={task}
+                    onToggleBillable={onToggleBillable}
+                    onCreateSubtask={onCreateSubtask}
+                    showCreateSubtaskForm={showCreateSubtaskForm}
+                    setShowCreateSubtaskForm={setShowCreateSubtaskForm}
+                    newSubtaskTitle={newSubtaskTitle}
+                    setNewSubtaskTitle={setNewSubtaskTitle}
+                    newSubtaskStartDate={newSubtaskStartDate}
+                    setNewSubtaskStartDate={setNewSubtaskStartDate}
+                    handleCreateSubtask={handleCreateSubtask}
+                    cancelCreateSubtask={cancelCreateSubtask}
+                    isArchived={isArchived}
+                    anyTimerActive={isAnyTimerActive}
+                    isRelatedToActiveTimer={isRelatedToActiveTimer}
+                    showSuccess={showSuccess}
+                    onEditTask={onEditTask}
+                />
+            )}
         </div>
     );
 };

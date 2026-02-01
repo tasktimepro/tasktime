@@ -28,6 +28,7 @@ import type {
     PaymentMethod,
     Preferences,
     MultiTimerState,
+    PlannerAttachment,
 } from './types';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -124,6 +125,11 @@ export class YjsStore {
     get timers(): Y.Map<string, MultiTimerState> {
         this.assertReady();
         return this._coreDoc!.getMap('timers');
+    }
+
+    get plannerAttachments(): Y.Map<string, PlannerAttachment> {
+        this.assertReady();
+        return this._coreDoc!.getMap('plannerAttachments');
     }
 
     /**
@@ -225,11 +231,13 @@ export class YjsStore {
         if (!task) return;
 
         const archivedMap = await this.loadArchivedTasks();
+        const archivedOnDate = new Date().toISOString().slice(0, 10);
 
         // Add to archived doc
         archivedMap.set(taskId, {
             ...task,
             archived: true,
+            archivedOnDate,
         });
 
         // Remove from active
@@ -250,6 +258,7 @@ export class YjsStore {
         this.tasks.set(taskId, {
             ...task,
             archived: false,
+            archivedOnDate: null,
         });
 
         // Remove from archived

@@ -1,0 +1,342 @@
+/**
+ * EntityPickerModal - Modal for selecting a client, project, or task
+ * 
+ * Shows a dropdown select for clients/projects (non-archived only),
+ * or a searchable list for tasks.
+ * Includes schedule selection: "This day only" or "Every {weekday}"
+ */
+
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { format, getDay } from 'date-fns';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { 
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { 
+    CheckIcon,
+    MagnifyingGlassIcon,
+    ArrowPathIcon
+} from '@/components/ui/icons';
+import { useClients } from '@/hooks/useClients';
+import { useProjects } from '@/hooks/useProjects';
+import { useTasks } from '@/hooks/useTasks';
+
+/**
+ * @typedef {'client' | 'project' | 'task'} EntityType
+ * @typedef {'date' | 'weekday'} ScheduleMode
+ */
+
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * @param {Object} props
+ * @param {boolean} props.isOpen
+ * @param {Function} props.onClose
+ * @param {EntityType} props.entityType - 'client', 'project', or 'task'
+ * @param {string} props.dateStr - Date string (YYYY-MM-DD) for the selected day
+ * @param {Function} props.onSelect - Called with (entity, scheduleMode, weekday) when selected
+ * @param {Function} props.onCreateNew - Called when user wants to create new entity
+ */
+const EntityPickerModal = ({
+    isOpen,
+    onClose,
+    entityType,
+    dateStr,
+    onSelect,
+    onCreateNew,
+}) => {
+
+    const [selectedEntityId, setSelectedEntityId] = useState('');
+    const [scheduleMode, setScheduleMode] = useState('date'); // 'date' or 'weekday'
+    const [taskSearch, setTaskSearch] = useState('');
+
+    const { clients } = useClients();
+    const { projects } = useProjects();
+    const { tasks } = useTasks();
+
+    // Calculate the weekday for the selected date
+    const weekday = useMemo(() => {
+        if (!dateStr) return 0;
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        return getDay(localDate);
+    }, [dateStr]);
+
+    const weekdayName = WEEKDAY_NAMES[weekday];
+
+    // Reset state when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedEntityId('');
+            setScheduleMode('date');
+            setTaskSearch('');
+        }
+    }, [isOpen, entityType]);
+
+    // Get entities based on type (filter out archived)
+    const entities = useMemo(() => {
+        switch (entityType) {
+            case 'client':
+                return clients
+                    .filter(c => !c.archived)
+                    .map(c => ({
+                        id: c.id,
+                        name: c.title,
+                        subtitle: c.email || null,
+                        entity: c,
+                    }))
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            case 'project':
+                return projects
+                    .filter(p => !p.archived)
+                    .map(p => {
+                        const client = clients.find(c => c.id === p.preferredClientId);
+                        return {
+                            id: p.id,
+                            name: p.title,
+                            subtitle: client?.title || null,
+                            entity: p,
+                        };
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name));
+            case 'task':
+                return tasks
+                    .filter(t => !t.archived && !t.completed)
+                    .map(t => {
+                        const project = projects.find(p => p.id === t.projectId);
+                        return {
+                            id: t.id,
+                            name: t.title,
+                            subtitle: project?.title || 'Standalone task',
+                            entity: t,
+                        };
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name));
+            default:
+                return [];
+        }
+    }, [entityType, clients, projects, tasks]);
+
+    // Filter tasks by search
+    const filteredTasks = useMemo(() => {
+        if (entityType !== 'task' || !taskSearch.trim()) return entities;
+        const query = taskSearch.toLowerCase();
+        return entities.filter(e => 
+            e.name.toLowerCase().includes(query) ||
+            (e.subtitle && e.subtitle.toLowerCase().includes(query))
+        );
+    }, [entityType, entities, taskSearch]);
+
+    // Selected entity
+    const selectedEntity = useMemo(() => {
+        return entities.find(e => e.id === selectedEntityId)?.entity || null;
+    }, [entities, selectedEntityId]);
+
+    const typeLabel = useMemo(() => {
+        switch (entityType) {
+            case 'client': return 'Client';
+            case 'project': return 'Project';
+            case 'task': return 'Task';
+            default: return 'Item';
+        }
+    }, [entityType]);
+
+    const handleConfirm = useCallback(() => {
+        if (!selectedEntity) return;
+        onSelect(selectedEntity, scheduleMode, weekday);
+        onClose();
+    }, [selectedEntity, scheduleMode, weekday, onSelect, onClose]);
+
+    const handleCreateNew = useCallback(() => {
+        onCreateNew();
+        onClose();
+    }, [onCreateNew, onClose]);
+
+    const handleTaskSelect = useCallback((entity) => {
+        setSelectedEntityId(entity.id);
+    }, []);
+
+    // For tasks, we need the scrollable list; for clients/projects, use dropdown
+    const showDropdown = entityType === 'client' || entityType === 'project';
+
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>
+                        Add {typeLabel} to Planner
+                    </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4 pt-4">
+                    {/* Entity Selection - Dropdown for clients/projects */}
+                    {showDropdown && (
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="entity-select">
+                                    {typeLabel} <span className="text-red-500">*</span>
+                                </Label>
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    onClick={handleCreateNew}
+                                    className="h-auto p-0"
+                                >
+                                    + New {typeLabel}
+                                </Button>
+                            </div>
+                            <Select
+                                value={selectedEntityId}
+                                onValueChange={setSelectedEntityId}
+                            >
+                                <SelectTrigger id="entity-select">
+                                    <SelectValue placeholder={`Select a ${typeLabel.toLowerCase()}...`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {entities.length === 0 ? (
+                                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                                            No {typeLabel.toLowerCase()}s found
+                                        </div>
+                                    ) : (
+                                        entities.map((item) => (
+                                            <SelectItem key={item.id} value={item.id}>
+                                                <div className="flex flex-col">
+                                                    <span>{item.name}</span>
+                                                    {item.subtitle && (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {item.subtitle}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
+                    {/* Task Selection - Searchable list */}
+                    {entityType === 'task' && (
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label>
+                                    Task <span className="text-red-500">*</span>
+                                </Label>
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    onClick={handleCreateNew}
+                                    className="h-auto p-0"
+                                >
+                                    + New Task
+                                </Button>
+                            </div>
+                            <div className="relative">
+                                <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
+                                <Input
+                                    placeholder="Search tasks"
+                                    value={taskSearch}
+                                    onChange={(e) => setTaskSearch(e.target.value)}
+                                    autoFocus
+                                    className="pl-9"
+                                />
+                            </div>
+                            <div className="max-h-48 overflow-y-auto border rounded-md">
+                                {filteredTasks.length === 0 ? (
+                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                        {taskSearch ? `No tasks matching "${taskSearch}"` : 'No tasks found'}
+                                    </div>
+                                ) : (
+                                    <ul className="divide-y">
+                                        {filteredTasks.map((item) => (
+                                            <li key={item.id}>
+                                                <button
+                                                    type="button"
+                                                    className={`w-full text-left px-3 py-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                                                        selectedEntityId === item.id 
+                                                            ? 'bg-primary/10 border-l-2 border-l-primary' 
+                                                            : 'hover:bg-accent'
+                                                    }`}
+                                                    onClick={() => handleTaskSelect(item.entity)}
+                                                >
+                                                    {item.entity.recurring ? (
+                                                        <ArrowPathIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    ) : (
+                                                        <CheckIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    )}
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-sm font-medium truncate">{item.name}</div>
+                                                        {item.subtitle && (
+                                                            <div className="text-xs text-muted-foreground truncate">
+                                                                {item.subtitle}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Schedule Selection */}
+                    <div className="space-y-2">
+                        <Label htmlFor="schedule-select">Schedule</Label>
+                        <Select
+                            value={scheduleMode}
+                            onValueChange={setScheduleMode}
+                        >
+                            <SelectTrigger id="schedule-select">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="date">
+                                    This day only ({dateStr ? format(new Date(dateStr), 'MMM d') : ''})
+                                </SelectItem>
+                                <SelectItem value="weekday">
+                                    Every {weekdayName}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                            {scheduleMode === 'date' 
+                                ? 'Item will appear only on this specific date.'
+                                : `Item will appear every ${weekdayName} going forward.`
+                            }
+                        </p>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="pt-2">
+                        <Button
+                            className="w-full"
+                            onClick={handleConfirm}
+                            disabled={!selectedEntity}
+                        >
+                            Add to Planner
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+export default EntityPickerModal;

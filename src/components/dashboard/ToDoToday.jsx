@@ -19,6 +19,7 @@ import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
  * @param {Array} props.tasksForToday
  * @param {Array} props.upcomingTasks
  * @param {Function} props.handleCompleteTask
+ * @param {Function} props.getTaskCompletedStatus
  * @param {Function} props.renderTaskTitle
  * @param {Function} props.renderTaskControls
  * @param {Function} props.handleTaskTitleClick
@@ -30,6 +31,7 @@ const ToDoToday = ({
     tasksForToday,
     upcomingTasks,
     handleCompleteTask,
+    getTaskCompletedStatus,
     renderTaskTitle,
     renderTaskControls,
     handleTaskTitleClick,
@@ -58,35 +60,56 @@ const ToDoToday = ({
         const isTimerActive = !!timer && timer.taskId === task.id;
         const shouldDisable = !!timer && !timer.isPaused && !isTimerActive;
         const hideActions = !!timer;
+        const isCompleted = getTaskCompletedStatus(task);
 
         return (
-            <div key={task.id} className={`px-3 py-3 hover:bg-muted ${task.completed ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
+            <div key={task.id} className={`px-3 py-3 hover:bg-muted ${isCompleted ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
                 <div className="flex items-center gap-3">
                     <CustomCheckbox
-                        checked={task.completed}
+                        checked={isCompleted}
                         onChange={(checked) => handleCompleteTask(task, checked)}
                         disabled={shouldDisable}
                     />
                     <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
-                        {renderTaskTitle(task, task.completed)}
-                        {task.project && (
+                        {renderTaskTitle(task, isCompleted)}
+                        {(task.project || task.parentTaskId) && (
                             <p className="text-xs truncate text-muted-foreground">
-                                <button
-                                    onClick={() => handleTaskTitleClick(task)}
-                                    className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
-                                    title={`Click to open ${task.project.title} project`}
-                                >
-                                    {task.project.title}
-                                </button>
+                                {task.parentTaskId ? (
+                                    <span>
+                                        Subtask of: {task.parentTask ? task.parentTask.title : 'Unknown Parent'}
+                                        {task.project && (
+                                            <>
+                                                <span className="mx-1">•</span>
+                                                <button
+                                                    onClick={() => handleTaskTitleClick(task)}
+                                                    className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+                                                    title={`Click to open ${task.project.title} project`}
+                                                >
+                                                    {task.project.title}
+                                                </button>
+                                            </>
+                                        )}
+                                    </span>
+                                ) : (
+                                    task.project && (
+                                        <button
+                                            onClick={() => handleTaskTitleClick(task)}
+                                            className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+                                            title={`Click to open ${task.project.title} project`}
+                                        >
+                                            {task.project.title}
+                                        </button>
+                                    )
+                                )}
                             </p>
                         )}
                     </div>
                     <StartDateBadge
                         startDate={task.startDate}
                         recurring={task.recurring}
-                        completed={task.completed}
+                        completed={isCompleted}
                     />
-                    <div className={`flex-shrink-0 text-xs ${task.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                    <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                         {formatDurationWithSeconds(task.recentTime || 0)}
                     </div>
                     <div className="flex flex-shrink-0 space-x-1">

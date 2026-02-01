@@ -17,7 +17,7 @@ import ProjectDashboard from './components/ProjectDashboard';
 import ClientList from './components/ClientList';
 import ClientDashboard from './components/ClientDashboard';
 import Dashboard from './components/Dashboard';
-import TaskPlanner from './components/TaskPlanner';
+import Planner from './components/Planner';
 import Expenses from './components/Expenses';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
@@ -309,7 +309,7 @@ function AppContent() {
         
         if (isPaused) {
             const pausedTime = formatDurationWithSeconds(timerElapsedTime);
-            document.title = `⏸ ${pausedTime} - ${currentTaskName} | TaskTime`;
+            document.title = `(Paused) ${pausedTime} - ${currentTaskName} | TaskTime`;
             return;
         }
         
@@ -331,7 +331,7 @@ function AppContent() {
     }, [timerTaskId, timerStartTime, timerIsActive, isPaused, timerElapsedTime, currentTaskName]);
 
     // === URL State ===
-    const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToTaskPlanner, updateUrl } = useUrlState();
+    const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToPlanner, updateUrl } = useUrlState();
     
     const activeView = urlParams.view;
     const selectedProject = urlParams.projectId 
@@ -412,7 +412,7 @@ function AppContent() {
         );
     }
 
-    const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'task-planner', 'account'].includes(activeView);
+    const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'account'].includes(activeView);
 
     const handleSidebarCollapsedAction = (action) => (event) => {
         event.currentTarget.blur();
@@ -523,32 +523,32 @@ function AppContent() {
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <button
-                                            onClick={handleSidebarCollapsedAction(() => navigateToTaskPlanner())}
+                                            onClick={handleSidebarCollapsedAction(() => navigateToPlanner())}
                                             className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                                                activeView === 'task-planner'
+                                                activeView === 'planner'
                                                     ? 'bg-accent text-accent-foreground font-semibold'
                                                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                             }`}
-                                            aria-label="Task Planner"
+                                            aria-label="Planner"
                                         >
                                             <KanbanIcon className="h-5 w-5 flex-shrink-0" />
                                         </button>
                                     </TooltipTrigger>
                                     <TooltipContent side="right" align="center">
-                                        Task Planner
+                                        Planner
                                     </TooltipContent>
                                 </Tooltip>
                             ) : (
                                 <button
-                                    onClick={() => navigateToTaskPlanner()}
+                                    onClick={() => navigateToPlanner()}
                                     className={`w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
-                                        activeView === 'task-planner'
+                                        activeView === 'planner'
                                             ? 'bg-accent text-accent-foreground font-semibold'
                                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                     }`}
                                 >
                                     <KanbanIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                                    Task Planner
+                                    Planner
                                 </button>
                             )}
                         </li>
@@ -818,9 +818,14 @@ function AppContent() {
                             <AuthCallback />
                         )}
 
-                    {activeView === 'task-planner' && (
+                    {activeView === 'planner' && (
                             <ErrorBoundary>
-                            <TaskPlanner />
+                            <Planner
+                                openClientModal={openClientModal}
+                                openProjectModal={openProjectModal}
+                                openTaskModal={openTaskModal}
+                                activeModal={activeModal}
+                            />
                             </ErrorBoundary>
                         )}
 
@@ -844,7 +849,7 @@ function AppContent() {
                                 projects={projects}
                                 tasks={activeTasks}
                                 timeEntries={timeEntries}
-                                onBackToProjects={() => navigateToProjects()}
+                                onBackToProjects={() => window.history.back()}
                                 paymentMethods={paymentMethods}
                                 businessInfos={businessInfos}
                                 clients={clients}
@@ -856,6 +861,7 @@ function AppContent() {
                                 openPaymentMethodModal={openPaymentMethodModal}
                                 openTemplateModal={openTemplateModal}
                                 openTaskModal={openTaskModal}
+                                navigateToClient={navigateToClient}
                             />
                             </ErrorBoundary>
                         )}
@@ -879,7 +885,7 @@ function AppContent() {
                                 projects={projects}
                                 tasks={activeTasks}
                                 timeEntries={timeEntries}
-                                onBackToClients={() => navigateToClients()}
+                                onBackToClients={() => window.history.back()}
                                 paymentMethods={paymentMethods}
                                 businessInfos={businessInfos}
                                 clients={clients}

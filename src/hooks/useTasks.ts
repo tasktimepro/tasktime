@@ -11,6 +11,7 @@ import { useYjsCollection } from './useYjsCollection';
 import type { Task } from '@/stores/yjs/types';
 import { getTodayString, toStorageDate } from '@/utils/dateUtils.ts';
 import { isRecurringTaskDueOnDate } from '@/utils/recurringUtils.ts';
+import { isRecurringCompletedOnDate, toggleRecurringCompletionDate } from '@/utils/recurringCompletionUtils.ts';
 
 export interface UseTasksOptions {
     /** Filter to a specific project */
@@ -174,6 +175,33 @@ export function useTasks(options: UseTasksOptions = {}) {
         });
     }, [projectActiveTasks]);
 
+    // =========================================================================
+    // Recurring Task Completion Helpers
+    // =========================================================================
+
+    /**
+     * Check if a recurring task is completed on a specific date
+     */
+    const isCompletedOnDate = useCallback((task: Task, dateStr: string): boolean => {
+        if (!task.recurring) {
+            // Non-recurring: use standard completed flag
+            return task.completed ?? false;
+        }
+        // Recurring: check completion map
+        return isRecurringCompletedOnDate(task.completedDatesByYear, dateStr);
+    }, []);
+
+    /**
+     * Toggle completion for a recurring task on a specific date
+     */
+    const toggleRecurringCompletion = useCallback((taskId: string, dateStr: string): Task | undefined => {
+        const task = get(taskId);
+        if (!task) return undefined;
+
+        const nextCompletedDates = toggleRecurringCompletionDate(task.completedDatesByYear, dateStr);
+        return update(taskId, { completedDatesByYear: nextCompletedDates });
+    }, [get, update]);
+
     return {
         // Data
         tasks: filteredTasks,
@@ -201,5 +229,9 @@ export function useTasks(options: UseTasksOptions = {}) {
         getOverdueTasks,
         getTasksForToday,
         getUpcomingTasks,
+
+        // Recurring task completion
+        isCompletedOnDate,
+        toggleRecurringCompletion,
     };
 }

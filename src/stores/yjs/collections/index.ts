@@ -33,3 +33,6 @@ export type { PreferencesHelpers } from './preferences';
 
 export { createTimerHelpers } from './timer';
 export type { TimerHelpers } from './timer';
+
+export { createPlannerAttachmentHelpers } from './plannerAttachments';
+export type { PlannerAttachmentHelpers } from './plannerAttachments';

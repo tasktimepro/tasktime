@@ -50,14 +50,14 @@ describe('collection-backed hooks', () => {
 
     it('clients are sorted and can be found case-insensitively', () => {
         const collection = makeCollection([
-            { id: '1', name: 'Zephyr' },
-            { id: '2', name: 'alpha' },
+            { id: '1', title: 'Zephyr' },
+            { id: '2', title: 'alpha' },
         ])
         mockUseYjsCollection.mockReturnValue(collection)
 
         const { result } = renderHook(() => useClients())
 
-        expect(result.current.sortedClients.map((c) => c.name)).toEqual(['alpha', 'Zephyr'])
+        expect(result.current.sortedClients.map((c) => c.title)).toEqual(['alpha', 'Zephyr'])
         expect(result.current.findByName('ALPHA')?.id).toBe('2')
     })
 

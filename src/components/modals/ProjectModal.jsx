@@ -11,6 +11,7 @@ import { useToast } from '../../hooks/useToast.ts';
 import { useProjects } from '../../hooks/useProjects.ts';
 import { useClients } from '../../hooks/useClients.ts';
 import CustomCheckbox from '../CustomCheckbox';
+import { ColorPicker } from '@/components/ui/color-picker';
 
 /**
  * ProjectModal component - Modal for creating and editing projects
@@ -39,7 +40,8 @@ const ProjectModal = ({
         flatRate: false,
         preferredClientId: '',
         overrideRate: false,
-        isPersonal: false
+        isPersonal: false,
+        color: ''
     });
 
     // Initialize form data when opening or changing context
@@ -76,7 +78,8 @@ const ProjectModal = ({
                 flatRate: editingProject.flatRate || false,
                 preferredClientId: editingProject.preferredClientId || '',
                 overrideRate: isOverriding,
-                isPersonal: editingProject.isPersonal || false
+                isPersonal: editingProject.isPersonal || false,
+                color: editingProject.color || ''
             });
         } else {
             // If modalOptions contains preselectedClientId, it takes priority
@@ -96,7 +99,8 @@ const ProjectModal = ({
                             flatRate: preselectedClient.flatRate || false,
                             preferredClientId: modalOptions.preselectedClientId,
                             overrideRate: false,
-                            isPersonal: false
+                            isPersonal: false,
+                            color: ''
                         };
                     });
                     setSelectedClientRate(preselectedClient);
@@ -111,7 +115,8 @@ const ProjectModal = ({
                         flatRate: savedState.flatRate || false,
                         preferredClientId: savedState.preferredClientId || '',
                         overrideRate: savedState.overrideRate || false,
-                        isPersonal: savedState.isPersonal || false
+                        isPersonal: savedState.isPersonal || false,
+                        color: savedState.color || ''
                     });
                     
                     // Restore client rate if needed
@@ -127,7 +132,8 @@ const ProjectModal = ({
                         flatRate: false,
                         preferredClientId: '',
                         overrideRate: false,
-                        isPersonal: false
+                        isPersonal: false,
+                        color: ''
                     });
                     setSelectedClientRate(null);
                 }
@@ -228,12 +234,13 @@ const ProjectModal = ({
             flatRate: formData.flatRate || false,
             preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
             isPersonal: formData.isPersonal || false,
+            color: formData.color || null,
             lastBilledAt: null,
             archived: false
         });
 
         // Reset form
-        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false });
+        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false, color: '' });
         setSelectedClientRate(null);
 
         // Clear saved state since project was successfully created
@@ -269,7 +276,8 @@ const ProjectModal = ({
             hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
             flatRate: formData.flatRate || false,
             preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
-            isPersonal: formData.isPersonal || false
+            isPersonal: formData.isPersonal || false,
+            color: formData.color || null
         });
 
         // Clear saved state since project was successfully updated  
@@ -286,7 +294,7 @@ const ProjectModal = ({
      */
     const handleClose = () => {
         // Reset form data
-        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false });
+        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false, color: '' });
         setSelectedClientRate(null);
         onClose();
     };
@@ -445,7 +453,7 @@ const ProjectModal = ({
                 )}
 
                 {/* Override Rate Checkbox */}
-                {selectedClientRate && (
+                {selectedClientRate && !formData.isPersonal && (
                     <div className="flex items-center space-x-3">
                         <CustomCheckbox
                             checked={formData.overrideRate}
@@ -458,7 +466,7 @@ const ProjectModal = ({
                 )}
 
                 {/* Rate Override Section */}
-                {formData.overrideRate && (
+                {formData.overrideRate && !formData.isPersonal && (
                     <div className="border border-border rounded-lg p-4 bg-card">
                         <h4 className="text-sm font-medium text-foreground mb-3">Project Rate Override</h4>
                         
@@ -492,6 +500,17 @@ const ProjectModal = ({
                         </div>
                     </div>
                 )}
+
+                <div>
+                    <Label>
+                        Color Tag
+                    </Label>
+                    <ColorPicker
+                        value={formData.color}
+                        onChange={(color) => setFormData(prev => ({ ...prev, color }))}
+                        className="mt-1"
+                    />
+                </div>
             </form>
         </Modal>
     );

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, SortIcon } from '@/components/ui/icons';
 import TaskItem from './TaskItem';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,8 @@ import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
+import { isRecurringTaskDueOnDate } from '../utils/recurringUtils.ts';
+import { getTodayString } from '../utils/dateUtils.ts';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -27,6 +29,7 @@ const TaskTree = ({
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newTaskStartDate, setNewTaskStartDate] = useState('');
     const [newTaskRecurring, setNewTaskRecurring] = useState(null);
+    const [showRecurringTasks, setShowRecurringTasks] = useState(false);
     const [showArchivedTasks, setShowArchivedTasks] = useState(false);
     const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState(null);
     const [taskSort, setTaskSort] = useState('lastActive');
@@ -36,14 +39,19 @@ const TaskTree = ({
     const { tasks, createTask, updateTask, deleteTask } = useTasks({ projectId: project.id });
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { getTimerForProject, clearTimer } = useTimers();
+    const todayStr = useMemo(() => getTodayString(), []);
+    const todayDate = useMemo(() => new Date(), []);
 
     const allowBillableToggle = !project.isPersonal;
 
     // Get tasks for this project
     const projectTasks = tasks.filter(task => task.projectId === project.id);
 
-    // Get parent tasks (tasks without parentTaskId) that are not archived
-    const parentTasks = projectTasks.filter(task => !task.parentTaskId && !task.archived);
+    // Get parent tasks (tasks without parentTaskId) that are not archived or recurring
+    const parentTasks = projectTasks.filter(task => !task.parentTaskId && !task.archived && !task.recurring);
+
+    // Get recurring parent tasks (non-archived)
+    const recurringTasks = projectTasks.filter(task => !task.parentTaskId && !task.archived && task.recurring);
 
     // Get archived parent tasks
     const archivedTasks = projectTasks.filter(task => !task.parentTaskId && task.archived);
@@ -74,6 +82,46 @@ const TaskTree = ({
             getLastActive: (task) => task.lastActive || task.createdAt,
         });
     }, [archivedTasks, taskSort]);
+
+    const sortedRecurringTasks = useMemo(() => {
+
+        return sortItems({
+            items: recurringTasks,
+            sortBy: taskSort,
+            getName: (task) => task.title || '',
+            getCreatedAt: (task) => task.createdAt,
+            getLastActive: (task) => task.lastActive || task.createdAt,
+        });
+    }, [recurringTasks, taskSort]);
+
+    const dueTodayRecurringTasks = useMemo(() => {
+        if (!todayStr) return [];
+
+        const due = recurringTasks.filter(task => isRecurringTaskDueOnDate(todayDate, task.recurring));
+        return sortItems({
+            items: due,
+            sortBy: taskSort,
+            getName: (task) => task.title || '',
+            getCreatedAt: (task) => task.createdAt,
+            getLastActive: (task) => task.lastActive || task.createdAt,
+        });
+    }, [recurringTasks, taskSort, todayDate, todayStr]);
+
+    const remainingRecurringTasks = useMemo(() => {
+        if (!todayStr) return sortedRecurringTasks;
+        const dueTodayIds = new Set(dueTodayRecurringTasks.map(task => task.id));
+        return sortedRecurringTasks.filter(task => !dueTodayIds.has(task.id));
+    }, [sortedRecurringTasks, dueTodayRecurringTasks, todayStr]);
+
+    const hasInitializedRecurringRef = useRef(false);
+
+    useEffect(() => {
+        if (hasInitializedRecurringRef.current) return;
+        if (recurringTasks.length > 0) {
+            setShowRecurringTasks(true);
+            hasInitializedRecurringRef.current = true;
+        }
+    }, [recurringTasks.length]);
 
     const pendingDeleteTask = pendingDeleteTaskId
         ? tasks.find(task => task.id === pendingDeleteTaskId)
@@ -117,6 +165,10 @@ const TaskTree = ({
             startDate: newTaskStartDate,
             recurring: newTaskRecurring
         });
+
+        if (newTaskRecurring) {
+            setShowRecurringTasks(true);
+        }
 
         setNewTaskTitle('');
         setNewTaskStartDate('');
@@ -288,7 +340,7 @@ const TaskTree = ({
                                     setNewTaskRecurring(null);
                                 }
                             }}
-                            className="w-40"
+                            className="w-40 dark:[color-scheme:dark]"
                             disabled={Boolean(newTaskRecurring)}
                         />
 
@@ -317,7 +369,7 @@ const TaskTree = ({
             )}
 
             {/* Tasks List */}
-            {parentTasks.length === 0 && archivedTasks.length === 0 ? (
+            {parentTasks.length === 0 && recurringTasks.length === 0 && archivedTasks.length === 0 ? (
                 <EmptyState
                     icon={DocumentCheckIcon}
                     title="No tasks yet"
@@ -327,6 +379,24 @@ const TaskTree = ({
             ) : (
                 <>
                     {/* Active Tasks */}
+                    {dueTodayRecurringTasks.length > 0 && (
+                        <div className="space-y-4">
+                            {dueTodayRecurringTasks.map((task) => (
+                                <TaskItem
+                                    key={task.id}
+                                    task={task}
+                                    recurringCompletionDate={todayStr}
+                                    onDelete={() => handleDeleteTask(task.id)}
+                                    onCreateSubtask={null}
+                                    onArchive={() => handleArchiveTask(task.id)}
+                                    onUnarchive={() => handleUnarchiveTask(task.id)}
+                                    onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
+                                    onEditTask={onEditTask}
+                                />
+                            ))}
+                        </div>
+                    )}
+
                     {sortedParentTasks.length > 0 && (
                         <div className="space-y-4">
                             {sortedParentTasks.map((task) => (
@@ -344,12 +414,46 @@ const TaskTree = ({
                         </div>
                     )}
 
+                    {/* Recurring Tasks Section */}
+                    {remainingRecurringTasks.length > 0 && (
+                        <div className="mt-8 border-t pt-6">
+                            <button
+                                onClick={() => setShowRecurringTasks(!showRecurringTasks)}
+                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 cursor-pointer"
+                            >
+                                {showRecurringTasks ? (
+                                    <ChevronDownIcon className="h-4 w-4 mr-1" />
+                                ) : (
+                                    <ChevronRightIcon className="h-4 w-4 mr-1" />
+                                )}
+                                Recurring Tasks ({remainingRecurringTasks.length})
+                            </button>
+
+                            {showRecurringTasks && (
+                                <div className="space-y-2 scrollable-container">
+                                    {remainingRecurringTasks.map((task) => (
+                                        <TaskItem
+                                            key={task.id}
+                                            task={task}
+                                            onDelete={() => handleDeleteTask(task.id)}
+                                            onCreateSubtask={null}
+                                            onArchive={() => handleArchiveTask(task.id)}
+                                            onUnarchive={() => handleUnarchiveTask(task.id)}
+                                            onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
+                                            onEditTask={onEditTask}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Archived Tasks Section */}
                     {sortedArchivedTasks.length > 0 && (
                         <div className="mt-8 border-t pt-6">
                             <button
                                 onClick={() => setShowArchivedTasks(!showArchivedTasks)}
-                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4"
+                                className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 cursor-pointer"
                             >
                                 {showArchivedTasks ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />
@@ -366,7 +470,7 @@ const TaskTree = ({
                                             key={task.id}
                                             task={task}
                                             onDelete={() => handleDeleteTask(task.id)}
-                                            onCreateSubtask={handleCreateTask}
+                                            onCreateSubtask={task.recurring ? null : handleCreateTask}
                                             onUnarchive={() => handleUnarchiveTask(task.id)}
                                             onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
                                             onEditTask={onEditTask}

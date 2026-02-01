@@ -5,9 +5,10 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { format } from 'date-fns';
 import { useYjs } from '@/contexts/YjsContext';
 import { useMasterClock } from '@/hooks/useMasterClock';
-import type { MultiTimerState, TimeEntry } from '@/stores/yjs/types';
+import type { MultiTimerState, TimeEntry, PlannerAttachment } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
 
 export interface ActiveTimer extends MultiTimerState {
@@ -144,6 +145,53 @@ export function useTimers(): UseTimersResult {
 
         store.coreDoc.transact(() => {
             store.timers.set(timerKey, timer);
+            
+            // Auto-attach task to today's planner if not already attached
+            const todayStr = format(new Date(), 'yyyy-MM-dd');
+            let hasAttachmentForToday = false;
+            
+            store.plannerAttachments?.forEach((attachment) => {
+                if (attachment.type === 'task' && attachment.referenceId === taskId) {
+                    // Check if this attachment covers today
+                    if (attachment.mode === 'static' && attachment.createdAt <= now + 86400000) {
+                        hasAttachmentForToday = true;
+                    } else if (attachment.mode === 'date' && attachment.date === todayStr) {
+                        hasAttachmentForToday = true;
+                    } else if (attachment.mode === 'weekday' && attachment.weekday === new Date().getDay()) {
+                        hasAttachmentForToday = true;
+                    }
+                }
+            });
+
+            // Create attachment if task isn't already in today's planner
+            if (!hasAttachmentForToday) {
+                // Also check if task has a startDate of today or is a recurring task for today
+                const taskStartsToday = task.startDate === todayStr;
+                const isRecurringToday = task.recurring !== undefined && task.recurring !== null;
+                
+                // Only auto-attach if not already scheduled by other means
+                if (!taskStartsToday && !isRecurringToday) {
+                    const attachmentId = generateId();
+                    // Calculate sortOrder
+                    let maxSortOrder = 0;
+                    store.plannerAttachments?.forEach((a) => {
+                        if (a.sortOrder > maxSortOrder) maxSortOrder = a.sortOrder;
+                    });
+                    
+                    const attachment: PlannerAttachment = {
+                        id: attachmentId,
+                        type: 'task',
+                        referenceId: taskId,
+                        mode: 'date',
+                        date: todayStr,
+                        weekday: null,
+                        sortOrder: maxSortOrder + 1,
+                        createdAt: now,
+                        estimatedHours: null,
+                    };
+                    store.plannerAttachments?.set(attachmentId, attachment);
+                }
+            }
         });
     }, [isReady, store]);
 

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import CustomCheckbox from '../CustomCheckbox';
 import { getPreferredCurrency, getCurrencyOptions } from '../../utils/currencyUtils.ts';
 import Modal from '../Modal';
+import { ColorPicker } from '@/components/ui/color-picker';
 
 /**
  * ClientModal component - Modal for creating and editing clients
@@ -40,7 +41,8 @@ const ClientModal = ({
         disableTax: false,
         defaultCurrency: getPreferredCurrency(),
         hourlyRate: '',
-        flatRate: false
+        flatRate: false,
+        color: ''
     });
 
     const [expandedSections, setExpandedSections] = useState({
@@ -69,7 +71,8 @@ const ClientModal = ({
                 disableTax: editingClient.disableTax || false,
                 defaultCurrency: editingClient.defaultCurrency || getPreferredCurrency(),
                 hourlyRate: editingClient.hourlyRate ? editingClient.hourlyRate.toString() : '',
-                flatRate: editingClient.flatRate || false
+                flatRate: editingClient.flatRate || false,
+                color: editingClient.color || ''
             });
         } else {
             // Reset form for new client
@@ -91,7 +94,8 @@ const ClientModal = ({
                 disableTax: false,
                 defaultCurrency: getPreferredCurrency(),
                 hourlyRate: '',
-                flatRate: false
+                flatRate: false,
+                color: ''
             });
         }
     }, [editingClient]);
@@ -193,6 +197,7 @@ const ClientModal = ({
             defaultCurrency: formData.defaultCurrency,
             hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
             flatRate: formData.flatRate || false,
+            color: formData.color || null,
             archived: false
         });
 
@@ -236,7 +241,8 @@ const ClientModal = ({
             disableTax: formData.disableTax,
             defaultCurrency: formData.defaultCurrency,
             hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-            flatRate: formData.flatRate || false
+            flatRate: formData.flatRate || false,
+            color: formData.color || null
         });
 
         showSuccess('Client updated successfully!');
@@ -636,6 +642,18 @@ const ClientModal = ({
                             </div>
                         </div>
                     )}
+
+                </div>
+
+                <div className="space-y-2">
+                    <Label>
+                        Color Tag
+                    </Label>
+                    <ColorPicker
+                        value={formData.color}
+                        onChange={(color) => setFormData(prev => ({ ...prev, color }))}
+                        className="mt-1"
+                    />
                 </div>
             </form>
         </Modal>

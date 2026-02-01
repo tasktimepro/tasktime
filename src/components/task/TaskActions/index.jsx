@@ -29,6 +29,7 @@ const TaskActions = ({
     const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
     const isPaused = projectTimer?.isPaused || false;
     const hideNonTimerActions = Boolean(projectTimer);
+    const hideTimerControls = isCompleted;
     
     if (isEditing) {
         return null;
@@ -36,12 +37,7 @@ const TaskActions = ({
 
     return (
         <div className="flex items-center space-x-1">
-            {isTimerActive && !isPaused ? (
-                <TaskTimer
-                    task={task}
-                    showTimeDisplay={false}
-                />
-            ) : isArchived ? (
+            {isArchived ? (
                 <div className="flex items-center space-x-2">
                     {onUnarchive && (
                         <Button
@@ -68,26 +64,16 @@ const TaskActions = ({
                         </Button>
                     )}
                 </div>
-            ) : isCompleted ? (
-                !task.parentTaskId && onArchive && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onArchive}
-                        className="h-8 w-8 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900"
-                        title="Archive Task"
-                    >
-                        <ArchiveBoxIcon className="h-5 w-5" />
-                    </Button>
-                )
             ) : anyTimerActive && !isPaused && !isTimerActive && !isRelatedToActiveTimer ? (
                 null
             ) : (
                 <>
-                    <TaskTimer
-                        task={task}
-                        showTimeDisplay={false}
-                    />
+                    {!hideTimerControls && (
+                        <TaskTimer
+                            task={task}
+                            showTimeDisplay={false}
+                        />
+                    )}
 
                     {!hideNonTimerActions && (
                         <Button
@@ -118,6 +104,18 @@ const TaskActions = ({
                             }
                         >
                             <CurrencyDollarIcon className="h-5 w-5" />
+                        </Button>
+                    )}
+
+                    {!task.recurring && isCompleted && !task.parentTaskId && onArchive && !hideNonTimerActions && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onArchive}
+                            className="h-8 w-8 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900"
+                            title="Archive Task"
+                        >
+                            <ArchiveBoxIcon className="h-5 w-5" />
                         </Button>
                     )}
 

@@ -114,6 +114,7 @@ export function createTaskHelpers(tasks: Y.Map<string, Task>): TaskHelpers {
                 archived: false,
                 billable: false,
                 billableSetByUser: false,
+                createdAt: Date.now(),
                 lastActive: Date.now(),
                 ...data,
             };

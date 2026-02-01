@@ -2,7 +2,8 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import TaskTimer from './TaskTimer';
 import {
     formatDuration,
-    millisecondsToHours
+    millisecondsToHours,
+    getTodayString
 } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
@@ -34,15 +35,22 @@ const Dashboard = ({
     const { showWarning, showSuccess } = useToast();
     
     // Use Yjs hooks directly
-    const { tasks, updateTask, deleteTask, getOverdueTasks, getTasksForToday, getUpcomingTasks } = useTasks();
+    const { tasks, updateTask, deleteTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate } = useTasks();
     const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
     
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
-    const [completedInCurrentSession, setCompletedInCurrentSession] = useState(new Set());
     const [conversionWarningShown, setConversionWarningShown] = useState(false);
     const lastWarningKeyRef = useRef(null);
+    const todayStr = useMemo(() => getTodayString(), []);
+
+    const getTaskCompletedStatus = useCallback((task) => {
+        if (task.recurring && todayStr) {
+            return isCompletedOnDate(task, todayStr);
+        }
+        return task.completed || false;
+    }, [isCompletedOnDate, todayStr]);
 
     const {
         preferredCurrency,
@@ -134,9 +142,11 @@ const Dashboard = ({
      * Tasks completed in current session remain visible until next render
      */
     const recentTasks = useMemo(() => {
-        const activeTasks = tasks.filter(task =>
-            ((!task.completed && !task.archived) || completedInCurrentSession.has(task.id))
-        );
+        const activeTasks = tasks.filter(task => {
+            if (task.archived) return false;
+            if (task.recurring) return true;
+            return !getTaskCompletedStatus(task) || task.completedOnDate === todayStr;
+        });
 
         const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
         const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
@@ -233,7 +243,7 @@ const Dashboard = ({
         }
 
         return sortedTasks;
-    }, [tasks, timeEntries, projects, taskSearchQuery, completedInCurrentSession, timers]);
+    }, [tasks, timeEntries, projects, taskSearchQuery, timers, getTaskCompletedStatus, todayStr]);
 
     /**
      * Get recent projects with total time and pending billable amount
@@ -342,20 +352,9 @@ const Dashboard = ({
      * Toggle task completion status
      */
     const handleCompleteTask = useCallback((task) => {
-        const newCompletedStatus = !task.completed;
+        const isCompleted = getTaskCompletedStatus(task);
+        const newCompletedStatus = !isCompleted;
         const now = Date.now();
-
-        // If completing a task, add to completed in current session to keep it visible
-        if (newCompletedStatus) {
-            setCompletedInCurrentSession(prev => new Set([...prev, task.id]));
-        } else {
-            // If unchecking a task, remove it from completed in current session
-            setCompletedInCurrentSession(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(task.id);
-                return newSet;
-            });
-        }
 
         // If timer is active for this task and we're completing it, stop the timer
         const activeTimer = timers.find(timer => timer.taskId === task.id);
@@ -375,8 +374,16 @@ const Dashboard = ({
         }
 
         // Update task completion status and lastActive timestamp
-        updateTask(task.id, { completed: newCompletedStatus, lastActive: now });
-    }, [timers, createEntry, clearTimer, updateTask, setCompletedInCurrentSession]);
+        if (task.recurring && todayStr) {
+            toggleRecurringCompletion(task.id, todayStr);
+        } else {
+            updateTask(task.id, {
+                completed: newCompletedStatus,
+                completedOnDate: newCompletedStatus ? todayStr : null,
+                lastActive: now
+            });
+        }
+    }, [timers, createEntry, clearTimer, updateTask, getTaskCompletedStatus, toggleRecurringCompletion, todayStr]);
 
     /**
      * Handle clicking on task title to navigate to project
@@ -406,7 +413,7 @@ const Dashboard = ({
      * Render task timer controls
      */
     const renderTaskControls = useCallback((task, shouldDisable) => {
-        if (task.completed) return null;
+        if (getTaskCompletedStatus(task)) return null;
 
         // If timer is active for another task and this task should be disabled, don't render controls
         if (shouldDisable) {
@@ -421,7 +428,7 @@ const Dashboard = ({
                 size="sm"
             />
         );
-    }, []);
+    }, [getTaskCompletedStatus]);
 
     /**
      * Render task title with navigation
@@ -512,6 +519,7 @@ const Dashboard = ({
                     tasksForToday={tasksForToday}
                     upcomingTasks={upcomingTasks}
                     handleCompleteTask={handleCompleteTask}
+                    getTaskCompletedStatus={getTaskCompletedStatus}
                     renderTaskTitle={renderTaskTitle}
                     renderTaskControls={renderTaskControls}
                     handleTaskTitleClick={handleTaskTitleClick}
@@ -542,6 +550,7 @@ const Dashboard = ({
                     taskSearchQuery={taskSearchQuery}
                     setTaskSearchQuery={setTaskSearchQuery}
                     handleCompleteTask={handleCompleteTask}
+                    getTaskCompletedStatus={getTaskCompletedStatus}
                     renderTaskTitle={renderTaskTitle}
                     handleTaskTitleClick={handleTaskTitleClick}
                     renderTaskControls={renderTaskControls}

@@ -21,6 +21,8 @@ export interface Project {
     archived?: boolean;
     lastBilledAt?: number | null;
     invoiceIds?: string[];
+    /** Color tag for visual identification (hex, e.g., "#3B82F6") */
+    color?: string | null;
 }
 
 export interface Task {
@@ -28,14 +30,21 @@ export interface Task {
     projectId?: string | null;
     parentTaskId?: string | null;
     title: string;
+    note?: string | null;
     completed?: boolean;
     archived?: boolean;
+    archivedOnDate?: string | null;
     billable?: boolean;
     billableSetByUser?: boolean;
     lastActive?: number;
+    createdAt?: number;
     lastBilledAt?: number | null;
     startDate?: string | null;
     recurring?: RecurringConfig | null;
+    /** Per-day completion tracking for recurring tasks by year/month/day */
+    completedDatesByYear?: Record<string, Record<string, number[]>>;
+    /** Completion date for non-recurring tasks (YYYY-MM-DD) */
+    completedOnDate?: string | null;
 }
 
 export interface RecurringConfig {
@@ -58,13 +67,35 @@ export interface TimeEntry {
 
 export interface Client {
     id: string;
-    name: string;
+    /** Display name / Company name shown in lists */
+    title: string;
+    /** Business legal name (for invoices) */
+    clientName?: string;
+    /** Contact person name */
+    contactPerson?: string;
     email?: string;
     phone?: string;
     address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+    registrationNumber?: string;
+    vat?: string;
+    taxNumber?: string;
     notes?: string;
+    /** Custom fields */
+    custom?: Array<{ label: string; value: string }>;
+    /** Whether tax is disabled for this client */
+    disableTax?: boolean;
     defaultHourlyRate?: number | null;
+    /** Alias for defaultHourlyRate (legacy) */
+    hourlyRate?: number | null;
+    flatRate?: boolean;
     defaultCurrency?: string;
+    archived?: boolean;
+    /** Color tag for visual identification (hex, e.g., "#3B82F6") */
+    color?: string | null;
 }
 
 export interface BusinessInfo {
@@ -123,6 +154,30 @@ export interface PaymentMethod {
     name: string;
     instructions?: string;
     isDefault?: boolean;
+}
+
+// ============================================================================
+// Planner
+// ============================================================================
+
+export interface PlannerAttachment {
+    id: string;
+    /** What type of entity is attached */
+    type: 'client' | 'project' | 'task';
+    /** ID of the client, project, or task */
+    referenceId: string;
+    /** How the attachment appears: 'static' = every day, 'date' = specific date, 'weekday' = every specific weekday */
+    mode: 'static' | 'date' | 'weekday';
+    /** Specific date for mode='date' (YYYY-MM-DD) */
+    date?: string | null;
+    /** Day of week for mode='weekday' (0=Sun, 1=Mon, ..., 6=Sat) */
+    weekday?: number | null;
+    /** Display order within a day column (for future drag-drop) */
+    sortOrder: number;
+    /** When the attachment was created (timestamp) */
+    createdAt: number;
+    /** Estimated hours for this attachment (for workload planning) */
+    estimatedHours?: number | null;
 }
 
 export interface Preferences {

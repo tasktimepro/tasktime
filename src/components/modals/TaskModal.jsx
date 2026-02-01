@@ -7,6 +7,7 @@ import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Notice } from '@/components/ui/notice';
 import { useToast } from '../../hooks/useToast.ts';
@@ -41,7 +42,8 @@ const TaskModal = ({
         title: '',
         projectId: NO_PROJECT_VALUE,
         startDate: '',
-        recurring: null
+        recurring: null,
+        note: ''
     });
 
     const hasBilledEntries = useMemo(() => {
@@ -64,7 +66,8 @@ const TaskModal = ({
                 title: editingTask.title || '',
                 projectId: editingTask.projectId || NO_PROJECT_VALUE,
                 startDate: editingTask.recurring ? '' : (editingTask.startDate || ''),
-                recurring: editingTask.recurring || null
+                recurring: editingTask.recurring || null,
+                note: editingTask.note || ''
             });
             return;
         }
@@ -73,7 +76,8 @@ const TaskModal = ({
             title: '',
             projectId: NO_PROJECT_VALUE,
             startDate: '',
-            recurring: null
+            recurring: null,
+            note: ''
         });
     }, [isOpen, editingTask]);
 
@@ -124,6 +128,7 @@ const TaskModal = ({
             projectId: formData.projectId === NO_PROJECT_VALUE ? null : formData.projectId,
             startDate: formData.recurring ? null : (formData.startDate || null),
             recurring: formData.recurring || null,
+            note: formData.note.trim() ? formData.note.trim() : null,
             lastActive: Date.now()
         };
 
@@ -216,7 +221,20 @@ const TaskModal = ({
                         type="date"
                         value={formData.startDate}
                         onChange={(event) => handleStartDateChange(event.target.value)}
+                        className="dark:[color-scheme:dark]"
                         disabled={Boolean(formData.recurring)}
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="task-note">Note</Label>
+                    <Textarea
+                        id="task-note"
+                        value={formData.note}
+                        onChange={(event) => handleChange('note', event.target.value)}
+                        placeholder="Add details for this task..."
+                        rows={3}
+                        className="text-sm"
                     />
                 </div>
 

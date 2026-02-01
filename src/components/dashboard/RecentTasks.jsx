@@ -19,6 +19,7 @@ const RecentTasks = ({
     taskSearchQuery,
     setTaskSearchQuery,
     handleCompleteTask,
+    getTaskCompletedStatus,
     renderTaskTitle,
     handleTaskTitleClick,
     renderTaskControls,
@@ -67,19 +68,22 @@ const RecentTasks = ({
                             const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
                             const shouldDisable = !!projectTimer && !projectTimer.isPaused && !isTimerActive;
                             const hideActions = !!projectTimer;
+                            const isCompleted = getTaskCompletedStatus(task);
 
                             return (
-                                <div key={task.id} className={`px-3 py-3 hover:bg-muted ${task.completed ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
+                                <div key={task.id} className={`px-3 py-3 hover:bg-muted ${isCompleted ? 'bg-muted' : ''} ${shouldDisable ? 'opacity-50' : ''}`}>
                                     <div className="flex items-center gap-3">
-                                        <CustomCheckbox
-                                            checked={task.completed}
-                                            onChange={(checked) => handleCompleteTask(task, checked)}
-                                            disabled={shouldDisable}
-                                        />
+                                        {!task.recurring && (
+                                            <CustomCheckbox
+                                                checked={isCompleted}
+                                                onChange={(checked) => handleCompleteTask(task, checked)}
+                                                disabled={shouldDisable}
+                                            />
+                                        )}
                                         <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
-                                            {renderTaskTitle(task, task.completed)}
+                                            {renderTaskTitle(task, isCompleted)}
                                             {(task.project || task.parentTaskId) && (
-                                                <p className={`text-xs truncate ${task.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                                <p className={`text-xs truncate ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                     {task.parentTaskId ? (
                                                         <span>
                                                             Subtask of: {task.parentTask ? task.parentTask.title : 'Unknown Parent'}
@@ -114,10 +118,10 @@ const RecentTasks = ({
                                             <StartDateBadge
                                                 startDate={task.startDate}
                                                 recurring={task.recurring}
-                                                completed={task.completed}
+                                                completed={isCompleted}
                                             />
                                         )}
-                                        <div className={`flex-shrink-0 text-xs ${task.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                        <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                             {formatDurationWithSeconds(task.recentTime)}
                                         </div>
                                         <div className="flex flex-shrink-0 space-x-1">
@@ -151,18 +155,21 @@ const RecentTasks = ({
                                                 const subtaskShouldDisable = !!projectTimer && !projectTimer.isPaused && !subtaskTimerActive;
                                                 const subtaskHideActions = !!projectTimer;
                                                 const subtaskWithProject = { ...subtask, project: task.project };
+                                                const subtaskCompleted = getTaskCompletedStatus(subtask);
 
                                                 return (
                                                     <div key={subtask.id} className={`flex items-center gap-3 py-2 ${subtaskShouldDisable ? 'opacity-50' : ''}`}>
-                                                        <CustomCheckbox
-                                                            checked={subtask.completed}
-                                                            onChange={(checked) => handleCompleteTask(subtask, checked)}
-                                                            disabled={subtaskShouldDisable}
-                                                        />
+                                                        {!subtask.recurring && (
+                                                            <CustomCheckbox
+                                                                checked={subtaskCompleted}
+                                                                onChange={(checked) => handleCompleteTask(subtask, checked)}
+                                                                disabled={subtaskShouldDisable}
+                                                            />
+                                                        )}
                                                         <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
-                                                            {renderTaskTitle(subtaskWithProject, subtask.completed)}
+                                                            {renderTaskTitle(subtaskWithProject, subtaskCompleted)}
                                                             {task.project && (
-                                                                <p className={`text-xs truncate ${subtask.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                                                <p className={`text-xs truncate ${subtaskCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                                     <button
                                                                         onClick={() => handleTaskTitleClick(subtaskWithProject)}
                                                                         className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline cursor-pointer"
@@ -177,10 +184,10 @@ const RecentTasks = ({
                                                             <StartDateBadge
                                                                 startDate={subtask.startDate}
                                                                 recurring={subtask.recurring}
-                                                                completed={subtask.completed}
+                                                                completed={subtaskCompleted}
                                                             />
                                                         )}
-                                                        <div className={`flex-shrink-0 text-xs ${subtask.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                                        <div className={`flex-shrink-0 text-xs ${subtaskCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                             {formatDurationWithSeconds(subtask.recentTime)}
                                                         </div>
                                                         <div className="flex flex-shrink-0 space-x-1">
