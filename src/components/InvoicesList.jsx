@@ -666,16 +666,16 @@ const InvoicesList = ({
                     {overdueInvoices.length > 0 && (
                         <TabsTrigger
                             value="overdue"
-                            className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-red-700 dark:data-[state=active]:text-red-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                            className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-red-700 dark:data-[state=active]:border-red-300 data-[state=active]:text-red-700 dark:data-[state=active]:text-red-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                         >
                             Overdue ({overdueInvoices.length})
                         </TabsTrigger>
                     )}
                     <TabsTrigger
                         value="outstanding"
-                        className={`px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border ${outstandingInvoices.length > 0
-                            ? 'data-[state=active]:text-yellow-700 dark:data-[state=active]:text-yellow-300'
-                            : 'data-[state=active]:text-foreground'
+                        className={`px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border ${outstandingInvoices.length > 0
+                            ? 'data-[state=active]:text-amber-700 dark:data-[state=active]:text-amber-300 data-[state=active]:border-amber-700 dark:data-[state=active]:border-amber-300'
+                            : 'data-[state=active]:text-foreground data-[state=active]:border-foreground'
                         }`}
                     >
                         Outstanding ({outstandingInvoices.length})

@@ -49,7 +49,7 @@ describe('usePreferences', () => {
 
     it('syncs and updates preferences when ready', async () => {
 
-        const preferences = createPreferencesMap({ currency: 'USD', hideTotals: true })
+        const preferences = createPreferencesMap({ currency: 'USD', showCompletedTasks: false })
         mockUseYjs.mockReturnValue({ store: { preferences }, isReady: true })
 
         const { result } = renderHook(() => usePreferences())
@@ -57,7 +57,7 @@ describe('usePreferences', () => {
         await waitFor(() => expect(result.current.isLoading).toBe(false))
 
         expect(result.current.preferences.currency).toBe('USD')
-        expect(result.current.preferences.hideTotals).toBe(true)
+        expect(result.current.preferences.showCompletedTasks).toBe(false)
 
         act(() => {
             result.current.updatePreferences({ currency: 'GBP', timeFormat: undefined })

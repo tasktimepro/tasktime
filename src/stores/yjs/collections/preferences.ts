@@ -48,7 +48,6 @@ const DEFAULT_PREFERENCES: Preferences = {
     weekStartsOn: 0,
     showCompletedTasks: true,
     defaultBillable: false,
-    hideTotals: false,
     projectSort: 'createdAt',
     clientSort: 'createdAt',
 };

@@ -22,7 +22,7 @@ const badgeVariants = cva(
         success:
           "border-border bg-muted text-foreground",
         warning:
-          "border-yellow-200 bg-yellow-100 text-yellow-900 dark:border-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-100",
+          "border-amber-700 text-amber-900 dark:border-amber-300 dark:text-amber-100",
         error:
           "border-border bg-muted text-foreground",
       },

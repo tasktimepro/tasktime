@@ -136,7 +136,13 @@ function AppContent() {
     const timerElapsedTime = focusedTimer?.elapsedTime || 0;
     const timerStartTime = focusedTimer?.startTime || null;
 
-    const totalsHidden = Boolean(preferences.hideTotals);
+    const [totalsHidden, setTotalsHidden] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('tasktime-totals-hidden');
+            if (saved !== null) return saved === 'true';
+        }
+        return false;
+    });
 
     // === Loading State ===
     const isLoading = !isReady || projectsLoading || tasksLoading || entriesLoading || 
@@ -221,6 +227,13 @@ function AppContent() {
         }
         localStorage.setItem('tasktime-sidebar-collapsed', String(isSidebarCollapsed));
     }, [isSidebarCollapsed]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        localStorage.setItem('tasktime-totals-hidden', String(totalsHidden));
+    }, [totalsHidden]);
 
     // === Modal State ===
     const [activeModal, setActiveModal] = useState(null);
@@ -857,7 +870,7 @@ function AppContent() {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <button
-                                    onClick={handleSidebarCollapsedAction(() => updatePreferences({ hideTotals: !totalsHidden }))}
+                                    onClick={handleSidebarCollapsedAction(() => setTotalsHidden(!totalsHidden))}
                                     className="w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                     aria-label={totalsHidden ? 'Show totals' : 'Hide totals'}
                                 >
@@ -874,7 +887,7 @@ function AppContent() {
                         </Tooltip>
                     ) : (
                         <button
-                            onClick={() => updatePreferences({ hideTotals: !totalsHidden })}
+                            onClick={() => setTotalsHidden(!totalsHidden)}
                             className="w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground whitespace-nowrap"
                         >
                             {totalsHidden ? (

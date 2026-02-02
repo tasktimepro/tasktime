@@ -205,7 +205,6 @@ export interface Preferences {
     weekStartsOn?: number;
     showCompletedTasks?: boolean;
     defaultBillable?: boolean;
-    hideTotals?: boolean;
     projectSort?: 'createdAt' | 'lastActive' | 'name';
     clientSort?: 'createdAt' | 'lastActive' | 'name';
     autoSyncEnabled?: boolean;
