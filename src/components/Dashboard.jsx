@@ -2,8 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import TaskTimer from './TaskTimer';
 import {
     formatDuration,
-    millisecondsToHours,
-    getTodayString
+    millisecondsToHours
 } from '../utils/dateUtils';
 import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
@@ -19,6 +18,7 @@ import ToDoToday from './dashboard/ToDoToday';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { CornerDownRightIcon } from '@/components/ui/icons';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
+import { useTodayString } from '@/hooks/useDayRollover';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -46,7 +46,7 @@ const Dashboard = ({
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
     const [conversionWarningShown, setConversionWarningShown] = useState(false);
     const lastWarningKeyRef = useRef(null);
-    const todayStr = useMemo(() => getTodayString(), []);
+    const todayStr = useTodayString();
 
     const getTaskCompletedStatus = useCallback((task) => {
         if (task.recurring && todayStr) {

@@ -188,7 +188,7 @@ const EntityPickerModal = ({
                     {/* Entity Selection - Dropdown for clients/projects */}
                     {showDropdown && (
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-1">
                                 <Label htmlFor="entity-select">
                                     {typeLabel} <span className="text-red-500">*</span>
                                 </Label>
@@ -236,7 +236,7 @@ const EntityPickerModal = ({
                     {/* Task Selection - Searchable list */}
                     {entityType === 'task' && (
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-1">
                                 <Label>
                                     Task <span className="text-red-500">*</span>
                                 </Label>
@@ -312,7 +312,7 @@ const EntityPickerModal = ({
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="date">
-                                    This day only ({dateStr ? format(new Date(dateStr), 'MMM d') : ''})
+                                    This day ({dateStr ? format(new Date(dateStr), 'MMM d') : ''})
                                 </SelectItem>
                                 <SelectItem value="weekday">
                                     Every {weekdayName}
@@ -321,7 +321,7 @@ const EntityPickerModal = ({
                         </Select>
                         <p className="text-xs text-muted-foreground">
                             {scheduleMode === 'date' 
-                                ? 'Item will appear only on this specific date.'
+                                ? 'Item will appear on this specific date.'
                                 : `Item will appear every ${weekdayName} going forward.`
                             }
                         </p>

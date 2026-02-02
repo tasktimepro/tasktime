@@ -32,8 +32,9 @@ import InstallPrompt from './components/InstallPrompt';
 import YjsSyncStatus from './components/sync/YjsSyncStatus';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
-import { formatDurationWithSeconds, getTodayString } from './utils/dateUtils.ts';
+import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { getTaskIdsToDelete } from './utils/taskUtils.ts';
+import { useTodayString } from './hooks/useDayRollover';
 import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
@@ -123,7 +124,7 @@ function AppContent() {
     const { timers, clearTimer, isLoading: timerLoading } = useTimers();
     const focusedTimer = timers[0] || null;
     const timerIsActive = !!focusedTimer;
-    const todayStr = useMemo(() => getTodayString(), []);
+    const todayStr = useTodayString();
 
     const isPaused = focusedTimer?.isPaused || false;
     const timerTaskId = focusedTimer?.taskId || null;

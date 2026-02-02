@@ -15,7 +15,7 @@ import { useTimers } from '../hooks/useTimers.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { isRecurringTaskDueOnDate } from '../utils/recurringUtils.ts';
-import { getTodayString } from '../utils/dateUtils.ts';
+import { useTodayDate, useTodayString } from '../hooks/useDayRollover';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -41,8 +41,8 @@ const TaskTree = ({
     const { tasks, createTask, updateTask, deleteTask } = useTasks({ projectId: project.id });
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { getTimerForProject, clearTimer } = useTimers();
-    const todayStr = useMemo(() => getTodayString(), []);
-    const todayDate = useMemo(() => new Date(), []);
+    const todayStr = useTodayString();
+    const todayDate = useTodayDate();
 
     const allowBillableToggle = !project.isPersonal;
 

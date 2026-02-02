@@ -49,6 +49,28 @@ const ProjectList = ({
 
     const projectSort = preferences.projectSort || 'createdAt';
 
+    const clientsById = useMemo(() => {
+
+        const map = new Map();
+        clients.forEach(client => {
+            map.set(client.id, client);
+        });
+
+        return map;
+    }, [clients]);
+
+    const getProjectColor = (project) => {
+        if (project.color) return project.color;
+        if (!project.preferredClientId) return null;
+
+        return clientsById.get(project.preferredClientId)?.color || null;
+    };
+
+    const getProjectBorderStyle = (project) => {
+        const color = getProjectColor(project);
+        return color ? { borderLeftColor: color } : undefined;
+    };
+
     const handleSortChange = (value) => {
 
         updatePreferences({ projectSort: value });
@@ -423,7 +445,8 @@ const ProjectList = ({
                             {sortedActiveProjects.map((project) => (
                                 <Card
                                     key={project.id}
-                                    className="hover:shadow-md transition-shadow cursor-pointer relative"
+                                    className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4 border-l-transparent"
+                                    style={getProjectBorderStyle(project)}
                                     onClick={() => onSelectProject(project)}
                                 >
                                     <CardContent className="pt-5">
@@ -543,7 +566,8 @@ const ProjectList = ({
                                     {sortedArchivedProjects.map((project) => (
                                         <Card
                                             key={project.id}
-                                            className="hover:shadow-md transition-shadow cursor-pointer relative"
+                                            className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4 border-l-transparent"
+                                            style={getProjectBorderStyle(project)}
                                             onClick={() => onSelectProject(project)}
                                         >
                                             <CardContent className="pt-5">

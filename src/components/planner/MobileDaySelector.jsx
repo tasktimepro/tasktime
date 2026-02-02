@@ -5,10 +5,10 @@
  * Highlights today and allows selecting a day to view.
  */
 
-import { useMemo } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useTodayDate } from '@/hooks/useDayRollover';
 
 /**
  * @param {Object} props
@@ -22,7 +22,7 @@ const MobileDaySelector = ({
     onSelectDay,
 }) => {
 
-    const today = useMemo(() => new Date(), []);
+    const today = useTodayDate();
 
     return (
         <div className="flex overflow-x-auto gap-1 pb-2 -mx-4 px-4 scrollbar-hide">

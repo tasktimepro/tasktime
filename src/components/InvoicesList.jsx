@@ -372,15 +372,18 @@ const InvoicesList = ({
                                             {invoice.paymentProcessed ? (
                                                 <Badge variant="success">
                                                     <CheckIcon className="h-3 w-3 mr-1" />
-                                                    Paid • <span className="sensitive-data">{invoiceTotal}</span>
+                                                    Paid <span className="mx-1">•</span>
+                                                    <span className="sensitive-data">{invoiceTotal}</span>
                                                 </Badge>
                                             ) : isInvoiceOverdue(invoice) ? (
                                                 <Badge variant="error">
-                                                    Overdue • <span className="sensitive-data">{invoiceTotal}</span>
+                                                    Overdue <span className="mx-1">•</span>
+                                                    <span className="sensitive-data">{invoiceTotal}</span>
                                                 </Badge>
                                             ) : (
                                                 <Badge variant="warning">
-                                                    Outstanding • <span className="sensitive-data">{invoiceTotal}</span>
+                                                    Outstanding <span className="mx-1">•</span>
+                                                    <span className="sensitive-data">{invoiceTotal}</span>
                                                 </Badge>
                                             )}
                                         </div>

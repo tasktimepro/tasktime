@@ -16,6 +16,7 @@ import { usePlannerItems } from '@/hooks/usePlannerItems';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTasks } from '@/hooks/useTasks';
 import { useTimers } from '@/hooks/useTimers';
+import { useTodayDate } from '@/hooks/useDayRollover';
 import { 
     WeekHeader, 
     DayColumn, 
@@ -46,7 +47,7 @@ const Planner = ({
     const { urlParams, updateUrl, navigateToProject, navigateToClient } = useUrlState();
     const { showSuccess } = useToast();
 
-    const today = useMemo(() => new Date(), []);
+    const today = useTodayDate();
     const currentIsoYear = useMemo(() => getISOWeekYear(today), [today]);
     const currentWeekNumber = useMemo(
         () => getWeek(today, { weekStartsOn: 1, firstWeekContainsDate: 4 }),

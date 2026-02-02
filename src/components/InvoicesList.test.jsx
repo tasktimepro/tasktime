@@ -79,7 +79,8 @@ describe('InvoicesList', () => {
 
         // Text is split across elements due to sensitive-data wrapper, matches parent + child
         const matches = screen.getAllByText((content, element) => {
-            return element?.textContent === 'Overdue • $100.00'
+            const text = element?.textContent?.replace(/\s+/g, ' ').trim() || '';
+            return text.includes('Overdue') && text.includes('•') && text.includes('$100.00');
         })
         expect(matches.length).toBeGreaterThan(0)
     })
@@ -107,7 +108,8 @@ describe('InvoicesList', () => {
 
         // Text is split across elements due to sensitive-data wrapper, matches parent + child
         const matches = screen.getAllByText((content, element) => {
-            return element?.textContent === 'Outstanding • $100.00'
+            const text = element?.textContent?.replace(/\s+/g, ' ').trim() || '';
+            return text.includes('Outstanding') && text.includes('•') && text.includes('$100.00');
         })
         expect(matches.length).toBeGreaterThan(0)
     })
@@ -136,7 +138,8 @@ describe('InvoicesList', () => {
 
         // Text is split across elements due to sensitive-data wrapper, matches parent + child
         const matches = screen.getAllByText((content, element) => {
-            return element?.textContent === 'Paid • $100.00'
+            const text = element?.textContent?.replace(/\s+/g, ' ').trim() || '';
+            return text.includes('Paid') && text.includes('•') && text.includes('$100.00');
         })
         expect(matches.length).toBeGreaterThan(0)
     })

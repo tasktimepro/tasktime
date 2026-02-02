@@ -12,6 +12,7 @@ import { InformationCircleIcon } from "@/components/ui/icons"
  * @param {React.ComponentType} [props.icon] - Optional icon component (defaults to InformationCircleIcon)
  * @param {boolean} [props.showIcon=true] - Whether to show the icon
  * @param {"default" | "warning" | "destructive" | "success"} [props.variant="default"] - Visual variant
+ * @param {boolean} [props.compact=false] - Reduce internal spacing
  * @param {string} [props.className] - Additional CSS classes
  */
 const Notice = React.forwardRef(({ 
@@ -21,6 +22,7 @@ const Notice = React.forwardRef(({
     icon: Icon = InformationCircleIcon,
     showIcon = true,
     variant = "default",
+    compact = false,
     className,
     ...props 
 }, ref) => {
@@ -50,7 +52,7 @@ const Notice = React.forwardRef(({
         <div 
             ref={ref}
             className={cn(
-                "rounded-md border p-4",
+                compact ? "rounded-md border p-2" : "rounded-md border p-4",
                 variantStyles[variant],
                 className
             )}
@@ -67,12 +69,12 @@ const Notice = React.forwardRef(({
                         {title}
                     </p>
                     {description && (
-                        <p className={cn("mt-1 text-sm", descriptionStyles[variant])}>
+                        <p className={cn(compact ? "text-sm" : "mt-1 text-sm", descriptionStyles[variant])}>
                             {description}
                         </p>
                     )}
                     {children && (
-                        <div className={cn("mt-2 text-sm", descriptionStyles[variant])}>
+                        <div className={cn(compact ? "mt-1 text-sm" : "mt-2 text-sm", descriptionStyles[variant])}>
                             {children}
                         </div>
                     )}

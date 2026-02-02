@@ -16,6 +16,7 @@ import { useProjects } from './useProjects';
 import { useClients } from './useClients';
 import { useTimers } from './useTimers';
 import { useTimeEntries } from './useTimeEntries';
+import { useTodayDate, useTodayString } from './useDayRollover';
 import { isRecurringTaskDueOnDate } from '@/utils/recurringUtils';
 import { toStorageDate } from '@/utils/dateUtils';
 import { isRecurringCompletedOnDate } from '@/utils/recurringCompletionUtils';
@@ -104,13 +105,14 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     const { projects, isLoading: projectsLoading } = useProjects();
     const { clients, isLoading: clientsLoading } = useClients();
     const { timers } = useTimers();
+    const today = useTodayDate();
+    const todayStr = useTodayString();
 
     // Calculate week boundaries for time entries query
     const weekStart = useMemo(() => {
-        const now = new Date();
-        const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+        const thisWeekStart = startOfWeek(today, { weekStartsOn: 1 });
         return addDays(thisWeekStart, weekOffset * 7);
-    }, [weekOffset]);
+    }, [today, weekOffset]);
 
     const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
 
@@ -130,7 +132,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     }, [timers]);
 
     // Today's date string for timer task filtering
-    const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+    const safeTodayStr = useMemo(() => todayStr || format(today, 'yyyy-MM-dd'), [todayStr, today]);
 
     // Build client lookup
     const clientsById = useMemo(() => {
@@ -176,16 +178,16 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     const isClientVisibleOnDate = useCallback((client: Client, dateStr: string): boolean => {
         if (!client.archived) return true;
 
-        const archivedOnDate = client.archivedOnDate || todayStr;
+        const archivedOnDate = client.archivedOnDate || safeTodayStr;
         return dateStr <= archivedOnDate;
-    }, [todayStr]);
+    }, [safeTodayStr]);
 
     const isProjectVisibleOnDate = useCallback((project: Project, dateStr: string): boolean => {
         if (!project.archived) return true;
 
-        const archivedOnDate = project.archivedOnDate || todayStr;
+        const archivedOnDate = project.archivedOnDate || safeTodayStr;
         return dateStr <= archivedOnDate;
-    }, [todayStr]);
+    }, [safeTodayStr]);
 
     // Get color for a project (project color or inherited from client)
     const getProjectColor = useCallback((project: Project): string | null => {
@@ -361,7 +363,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         taskAttachments.forEach(({ attachment, entity }) => {
             addedTaskIds.add(entity.id);
             // Check if this task has an active timer (only relevant for today)
-            const hasActiveTimer = dateStr === todayStr && activeTimerTaskIds.has(entity.id);
+            const hasActiveTimer = dateStr === safeTodayStr && activeTimerTaskIds.has(entity.id);
             items.push({
                 key: `task-attached-${attachment.id}`,
                 type: 'task',
@@ -385,7 +387,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
 
         recurringTasks.forEach((task) => {
             addedTaskIds.add(task.id);
-            const hasActiveTimer = dateStr === todayStr && activeTimerTaskIds.has(task.id);
+            const hasActiveTimer = dateStr === safeTodayStr && activeTimerTaskIds.has(task.id);
             items.push({
                 key: `task-recurring-${task.id}-${dateStr}`,
                 type: 'task',
@@ -407,7 +409,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
 
         dueTasks.forEach((task) => {
             addedTaskIds.add(task.id);
-            const hasActiveTimer = dateStr === todayStr && activeTimerTaskIds.has(task.id);
+            const hasActiveTimer = dateStr === safeTodayStr && activeTimerTaskIds.has(task.id);
             items.push({
                 key: `task-due-${task.id}`,
                 type: 'task',
@@ -431,7 +433,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
 
         workedTasks.forEach(({ task, timeMs }) => {
             addedTaskIds.add(task.id);
-            const hasActiveTimer = dateStr === todayStr && activeTimerTaskIds.has(task.id);
+            const hasActiveTimer = dateStr === safeTodayStr && activeTimerTaskIds.has(task.id);
             items.push({
                 key: `task-worked-${task.id}-${dateStr}`,
                 type: 'task',
@@ -446,7 +448,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         });
 
         // 7. Tasks with active timers (only for today, sorted alphabetically)
-        if (dateStr === todayStr) {
+        if (dateStr === safeTodayStr) {
             const timerTasks = tasks
                 .filter((t) => activeTimerTaskIds.has(t.id) && !addedTaskIds.has(t.id))
                 .filter((t) => isTaskVisibleOnDate(t, dateStr))
@@ -468,7 +470,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         }
 
         return items;
-    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, todayStr, getEntryOverlapMs]);
+    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs]);
 
     // Build the full week
     const weekDays = useMemo((): PlannerDay[] => {

@@ -239,7 +239,7 @@ const TaskModal = ({
                 </div>
 
                 <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-1">
                         <Label>Project</Label>
                         {openProjectModal && (
                             <Button
@@ -300,7 +300,7 @@ const TaskModal = ({
                         <Notice
                             title="Start date disabled"
                             description="Recurring tasks cannot have a start date."
-                            className="py-2"
+                            compact
                         />
                     )}
                 </div>

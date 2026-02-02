@@ -50,6 +50,10 @@ const ClientList = ({
 
     const clientSort = preferences.clientSort || 'createdAt';
 
+    const getClientBorderStyle = (client) => {
+        return client.color ? { borderLeftColor: client.color } : undefined;
+    };
+
     const handleSortChange = (value) => {
 
         updatePreferences({ clientSort: value });
@@ -389,7 +393,8 @@ const ClientList = ({
                             {sortedActiveClients.map((client) => (
                                 <Card
                                     key={client.id}
-                                    className="hover:shadow-md transition-shadow cursor-pointer relative"
+                                    className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4 border-l-transparent"
+                                    style={getClientBorderStyle(client)}
                                     onClick={() => onSelectClient(client)}
                                 >
                                     <CardContent className="pt-5">
@@ -491,7 +496,8 @@ const ClientList = ({
                                     {sortedArchivedClients.map((client) => (
                                         <Card
                                             key={client.id}
-                                            className="hover:shadow-md transition-shadow cursor-pointer relative"
+                                            className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4 border-l-transparent"
+                                            style={getClientBorderStyle(client)}
                                             onClick={() => onSelectClient(client)}
                                         >
                                             <CardContent className="pt-5">
