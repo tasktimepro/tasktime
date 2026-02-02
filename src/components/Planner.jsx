@@ -17,12 +17,15 @@ import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTasks } from '@/hooks/useTasks';
 import { useTimers } from '@/hooks/useTimers';
 import { useTodayDate } from '@/hooks/useDayRollover';
+import { usePreferences } from '@/hooks/usePreferences';
+import { normalizeCurrencyCode } from '@/utils/currencyUtils';
 import { 
     WeekHeader, 
     DayColumn, 
     EntityPickerModal, 
     MobileDaySelector,
     MobileDayCard,
+    DailyGoalModal,
 } from '@/components/planner/index.js';
 import { useToast } from '@/hooks/useToast';
 
@@ -46,6 +49,12 @@ const Planner = ({
 
     const { urlParams, updateUrl, navigateToProject, navigateToClient } = useUrlState();
     const { showSuccess } = useToast();
+    const { preferences } = usePreferences();
+
+    const defaultCurrency = useMemo(
+        () => normalizeCurrencyCode(preferences.currency || 'EUR'),
+        [preferences.currency]
+    );
 
     const today = useTodayDate();
     const currentIsoYear = useMemo(() => getISOWeekYear(today), [today]);
@@ -94,7 +103,7 @@ const Planner = ({
     const { weekDays, weekStart } = usePlannerItems(weekOffset);
 
     // Planner attachment operations
-    const { createAttachment, deleteAttachment, isAttached } = usePlannerAttachments();
+    const { createAttachment, updateAttachment, deleteAttachment, isAttached } = usePlannerAttachments();
 
     // Task operations for toggling completion and deletion
     const { deleteTask, archiveTask } = useTasks();
@@ -129,11 +138,18 @@ const Planner = ({
     // State for entity picker modal
     const [pickerState, setPickerState] = useState({
         isOpen: false,
+        mode: 'add',
         entityType: null,  // 'client' | 'project' | 'task'
         dateStr: null,
+        attachmentId: null,
+        lockedEntityId: null,
+        lockedScheduleMode: null,
+        lockedWeekday: null,
+        initialTargetHours: null,
     });
 
     const [pendingPickerReopen, setPendingPickerReopen] = useState(null);
+    const [dailyGoalDateStr, setDailyGoalDateStr] = useState(null);
 
     const prevActiveModalRef = useRef(activeModal);
 
@@ -195,6 +211,15 @@ const Planner = ({
             setSelectedDayIndex(6);
         }
     }, [selectedDayIndex, navigateWeek]);
+
+    const handleOpenDailyGoals = useCallback((dateStr) => {
+        if (!dateStr) return;
+        setDailyGoalDateStr(dateStr);
+    }, []);
+
+    const handleCloseDailyGoals = useCallback(() => {
+        setDailyGoalDateStr(null);
+    }, []);
 
     const handleNextDay = useCallback(() => {
         if (selectedDayIndex < 6) {
@@ -261,8 +286,32 @@ const Planner = ({
         setPendingPickerReopen(null);
         setPickerState({
             isOpen: true,
+            mode: 'add',
             entityType: type,
             dateStr: dateStr,
+            attachmentId: null,
+            lockedEntityId: null,
+            lockedScheduleMode: null,
+            lockedWeekday: null,
+            initialTargetHours: null,
+        });
+    }, []);
+
+    const handleEditPlannerOptions = useCallback((item, dateStr) => {
+        if (!item?.attachment) return;
+
+        const scheduleMode = item.attachment.mode === 'weekday' ? 'weekday' : 'date';
+
+        setPickerState({
+            isOpen: true,
+            mode: 'edit',
+            entityType: item.type,
+            dateStr: item.attachment.date || dateStr,
+            attachmentId: item.attachment.id,
+            lockedEntityId: item.entity.id,
+            lockedScheduleMode: scheduleMode,
+            lockedWeekday: item.attachment.weekday ?? null,
+            initialTargetHours: item.attachment.estimatedHours ?? null,
         });
     }, []);
 
@@ -272,8 +321,18 @@ const Planner = ({
     }, []);
 
     // Entity selected from picker - create attachment
-    const handleEntitySelect = useCallback((entity, scheduleMode, weekday) => {
+    const handleEntitySelect = useCallback((entity, scheduleMode, weekday, targetHours) => {
         const { entityType, dateStr } = pickerState;
+
+        if (pickerState.mode === 'edit') {
+            if (!pickerState.attachmentId) return;
+            updateAttachment(pickerState.attachmentId, {
+                estimatedHours: targetHours ?? null,
+            });
+            const typeLabel = entityType === 'client' ? 'Client' : entityType === 'project' ? 'Project' : 'Task';
+            showSuccess(`${typeLabel} planner options updated`);
+            return;
+        }
 
         // For weekday recurrence, anchor the start to the selected date so it shows immediately
         if (scheduleMode === 'weekday') {
@@ -288,6 +347,7 @@ const Planner = ({
                     date: null,
                     weekday,
                     createdAt,
+                    estimatedHours: targetHours ?? null,
                 });
             }
         } else {
@@ -299,6 +359,7 @@ const Planner = ({
                     mode: 'date',
                     date: dateStr,
                     weekday: null,
+                    estimatedHours: targetHours ?? null,
                 });
             }
         }
@@ -309,7 +370,7 @@ const Planner = ({
             ? `added for every ${WEEKDAY_NAMES[weekday]}` 
             : `added to ${dateStr}`;
         showSuccess(`${typeLabel} ${actionLabel}`);
-    }, [pickerState, createAttachment, isAttached, showSuccess]);
+    }, [pickerState, createAttachment, updateAttachment, isAttached, showSuccess]);
 
     // Create new entity from picker
     const handleCreateNew = useCallback(() => {
@@ -395,6 +456,9 @@ const Planner = ({
                         isToday={selectedDay.isToday}
                         items={selectedDay.items}
                         totalTimeMs={selectedDay.totalTimeMs}
+                        totalEarnings={selectedDay.totalEarnings}
+                        dailyGoal={selectedDay.dailyGoal}
+                        currency={defaultCurrency}
                         hasPrev={true}
                         hasNext={true}
                         onPrev={handlePrevDay}
@@ -402,6 +466,8 @@ const Planner = ({
                         onAddClick={handleAddClick}
                         onItemClick={handleItemClick}
                         onRemoveItem={handleRemoveItem}
+                        onEditItem={handleEditPlannerOptions}
+                        onSetDailyGoal={handleOpenDailyGoals}
                     />
                 </div>
             )}
@@ -416,9 +482,14 @@ const Planner = ({
                         isToday={day.isToday}
                         items={day.items}
                         totalTimeMs={day.totalTimeMs}
+                        totalEarnings={day.totalEarnings}
+                        dailyGoal={day.dailyGoal}
+                        currency={defaultCurrency}
                         onAddClick={handleAddClick}
                         onItemClick={handleItemClick}
                         onRemoveItem={handleRemoveItem}
+                        onEditItem={handleEditPlannerOptions}
+                        onSetDailyGoal={handleOpenDailyGoals}
                     />
                 ))}
             </div>
@@ -430,7 +501,18 @@ const Planner = ({
                 entityType={pickerState.entityType}
                 dateStr={pickerState.dateStr}
                 onSelect={handleEntitySelect}
-                onCreateNew={handleCreateNew}
+                onCreateNew={pickerState.mode === 'add' ? handleCreateNew : null}
+                mode={pickerState.mode}
+                lockedEntityId={pickerState.lockedEntityId}
+                lockedScheduleMode={pickerState.lockedScheduleMode}
+                lockedWeekday={pickerState.lockedWeekday}
+                initialTargetHours={pickerState.initialTargetHours}
+            />
+
+            <DailyGoalModal
+                isOpen={!!dailyGoalDateStr}
+                onClose={handleCloseDailyGoals}
+                dateStr={dailyGoalDateStr}
             />
 
         </div>

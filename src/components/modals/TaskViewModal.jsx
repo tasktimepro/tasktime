@@ -4,10 +4,11 @@
  * Shows task details, due/repeat info, quick actions, and planner attachment controls.
  */
 
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { ClockIcon } from '@/components/ui/icons';
+import { SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
@@ -17,7 +18,6 @@ import { formatDurationWithSeconds, getTodayString, toDisplayDate } from '@/util
 import { addDays, differenceInCalendarDays, endOfDay, startOfDay } from 'date-fns';
 import TimerControls from '../TimerControls';
 import TaskActionsMenu from '../task/TaskActionsMenu';
-import TimeEntriesModal from '../TimeEntriesModal';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useTimers } from '@/hooks/useTimers';
 
@@ -32,6 +32,8 @@ import { useTimers } from '@/hooks/useTimers';
  * @param {Function} props.onDelete
  * @param {Function} props.onArchive
  * @param {(projectId: string) => void} props.onNavigateToProject
+ * @param {(task: Object, dateStr: string | null, attachment: Object | null) => void} props.onOpenTimeEntries
+ * @param {(task: Object, dateStr: string | null, attachment: Object | null) => void} props.onOpenPlannerOptions
  */
 const TaskViewModal = ({
     isOpen,
@@ -42,7 +44,9 @@ const TaskViewModal = ({
     onEdit,
     onDelete,
     onArchive,
-    onNavigateToProject
+    onNavigateToProject,
+    onOpenTimeEntries,
+    onOpenPlannerOptions
 }) => {
     const { showSuccess } = useToast();
     const { projects } = useProjects();
@@ -50,7 +54,6 @@ const TaskViewModal = ({
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer, isTaskTimerActive } = useTimers();
     const { deleteAttachment } = usePlannerAttachments();
-    const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
 
     const currentTask = useMemo(() => {
         if (!task) return null;
@@ -224,12 +227,9 @@ const TaskViewModal = ({
     }, [currentTask, effectiveDateStr, isCompleted, isTimerActive, projectTimer, createEntry, clearTimer, toggleRecurringCompletion, updateTask, showSuccess]);
 
     const handleOpenTimeEntries = useCallback(() => {
-        setShowTimeEntriesModal(true);
-    }, []);
-
-    const handleCloseTimeEntries = useCallback(() => {
-        setShowTimeEntriesModal(false);
-    }, []);
+        if (!currentTask) return;
+        onOpenTimeEntries?.(currentTask, effectiveDateStr, attachment || null);
+    }, [currentTask, effectiveDateStr, attachment, onOpenTimeEntries]);
 
     const handleEdit = useCallback(() => {
         if (!currentTask) return;
@@ -255,6 +255,11 @@ const TaskViewModal = ({
         showSuccess('Removed from planner');
         onClose();
     }, [attachment, deleteAttachment, showSuccess, onClose]);
+
+    const handleOpenPlannerOptions = useCallback(() => {
+        if (!currentTask || !attachment) return;
+        onOpenPlannerOptions?.(currentTask, effectiveDateStr, attachment);
+    }, [currentTask, effectiveDateStr, attachment, onOpenPlannerOptions]);
 
     const handleNavigateToProject = useCallback(() => {
         if (!project) return;
@@ -416,25 +421,27 @@ const TaskViewModal = ({
 
                     {attachment && (
                         <div className="pt-2">
-                            <Button
-                                variant="secondary"
-                                onClick={handleRemoveFromPlanner}
-                                className="text-muted-foreground hover-text-destructive-strong"
-                            >
-                                Remove from planner
-                            </Button>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant="secondary"
+                                    onClick={handleOpenPlannerOptions}
+                                    leadingIcon={SlidersHorizontal}
+                                >
+                                    Edit planner options
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={handleRemoveFromPlanner}
+                                    leadingIcon={Trash2}
+                                >
+                                    Remove from planner
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </div>
             </Modal>
 
-            {showTimeEntriesModal && (
-                <TimeEntriesModal
-                    isOpen={showTimeEntriesModal}
-                    onClose={handleCloseTimeEntries}
-                    task={currentTask}
-                />
-            )}
         </>
     );
 };

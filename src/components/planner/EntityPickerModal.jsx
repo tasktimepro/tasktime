@@ -46,8 +46,13 @@ const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', '
  * @param {Function} props.onClose
  * @param {EntityType} props.entityType - 'client', 'project', or 'task'
  * @param {string} props.dateStr - Date string (YYYY-MM-DD) for the selected day
- * @param {Function} props.onSelect - Called with (entity, scheduleMode, weekday) when selected
+ * @param {Function} props.onSelect - Called with (entity, scheduleMode, weekday, targetHours) when selected
  * @param {Function} props.onCreateNew - Called when user wants to create new entity
+ * @param {'add' | 'edit'} props.mode
+ * @param {string | null} props.lockedEntityId
+ * @param {'date' | 'weekday' | null} props.lockedScheduleMode
+ * @param {number | null} props.lockedWeekday
+ * @param {number | null} props.initialTargetHours
  */
 const EntityPickerModal = ({
     isOpen,
@@ -56,15 +61,23 @@ const EntityPickerModal = ({
     dateStr,
     onSelect,
     onCreateNew,
+    mode = 'add',
+    lockedEntityId = null,
+    lockedScheduleMode = null,
+    lockedWeekday = null,
+    initialTargetHours = null,
 }) => {
 
     const [selectedEntityId, setSelectedEntityId] = useState('');
     const [scheduleMode, setScheduleMode] = useState('date'); // 'date' or 'weekday'
     const [taskSearch, setTaskSearch] = useState('');
+    const [targetHours, setTargetHours] = useState('');
 
     const { clients } = useClients();
     const { projects } = useProjects();
-    const { tasks } = useTasks();
+    const { tasks } = useTasks({ includeArchived: mode === 'edit' });
+
+    const isEditMode = mode === 'edit';
 
     // Calculate the weekday for the selected date
     const weekday = useMemo(() => {
@@ -74,23 +87,42 @@ const EntityPickerModal = ({
         return getDay(localDate);
     }, [dateStr]);
 
-    const weekdayName = WEEKDAY_NAMES[weekday];
+    const effectiveWeekday = useMemo(() => {
+        if (isEditMode && typeof lockedWeekday === 'number') {
+            return lockedWeekday;
+        }
+        return weekday;
+    }, [isEditMode, lockedWeekday, weekday]);
+
+    const weekdayName = WEEKDAY_NAMES[effectiveWeekday];
 
     // Reset state when modal opens
     useEffect(() => {
-        if (isOpen) {
-            setSelectedEntityId('');
-            setScheduleMode('date');
+        if (!isOpen) return;
+
+        if (isEditMode) {
+            setSelectedEntityId(lockedEntityId || '');
+            setScheduleMode(lockedScheduleMode || 'date');
             setTaskSearch('');
+            setTargetHours(initialTargetHours !== null && initialTargetHours !== undefined
+                ? String(initialTargetHours)
+                : ''
+            );
+            return;
         }
-    }, [isOpen, entityType]);
+
+        setSelectedEntityId('');
+        setScheduleMode('date');
+        setTaskSearch('');
+        setTargetHours('');
+    }, [isOpen, entityType, isEditMode, lockedEntityId, lockedScheduleMode, initialTargetHours]);
 
     // Get entities based on type (filter out archived)
     const entities = useMemo(() => {
         switch (entityType) {
             case 'client':
                 return clients
-                    .filter(c => !c.archived)
+                    .filter(c => !c.archived || c.id === lockedEntityId)
                     .map(c => ({
                         id: c.id,
                         name: c.title,
@@ -100,7 +132,7 @@ const EntityPickerModal = ({
                     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             case 'project':
                 return projects
-                    .filter(p => !p.archived)
+                    .filter(p => !p.archived || p.id === lockedEntityId)
                     .map(p => {
                         const client = clients.find(c => c.id === p.preferredClientId);
                         return {
@@ -113,7 +145,7 @@ const EntityPickerModal = ({
                     .sort((a, b) => a.name.localeCompare(b.name));
             case 'task':
                 return tasks
-                    .filter(t => !t.archived && !t.completed)
+                    .filter(t => (!t.archived && !t.completed) || t.id === lockedEntityId)
                     .map(t => {
                         const project = projects.find(p => p.id === t.projectId);
                         return {
@@ -131,7 +163,7 @@ const EntityPickerModal = ({
             default:
                 return [];
         }
-    }, [entityType, clients, projects, tasks]);
+    }, [entityType, clients, projects, tasks, lockedEntityId]);
 
     // Filter tasks by search
     const filteredTasks = useMemo(() => {
@@ -159,11 +191,16 @@ const EntityPickerModal = ({
 
     const handleConfirm = useCallback(() => {
         if (!selectedEntity) return;
-        onSelect(selectedEntity, scheduleMode, weekday);
+        const parsedTargetHours = targetHours === '' ? null : Number(targetHours);
+        const safeTargetHours = Number.isFinite(parsedTargetHours) ? parsedTargetHours : null;
+        const appliedScheduleMode = isEditMode && lockedScheduleMode ? lockedScheduleMode : scheduleMode;
+        const appliedWeekday = isEditMode && typeof lockedWeekday === 'number' ? lockedWeekday : weekday;
+        onSelect(selectedEntity, appliedScheduleMode, appliedWeekday, safeTargetHours);
         onClose();
-    }, [selectedEntity, scheduleMode, weekday, onSelect, onClose]);
+    }, [selectedEntity, scheduleMode, weekday, targetHours, onSelect, onClose, isEditMode, lockedScheduleMode, lockedWeekday]);
 
     const handleCreateNew = useCallback(() => {
+        if (!onCreateNew) return;
         onCreateNew();
         onClose();
     }, [onCreateNew, onClose]);
@@ -180,27 +217,29 @@ const EntityPickerModal = ({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        Add {typeLabel} to Planner
+                        {isEditMode ? 'Edit planner options' : `Add ${typeLabel} to Planner`}
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4 pt-4">
                     {/* Entity Selection - Dropdown for clients/projects */}
-                    {showDropdown && (
+                    {showDropdown && !isEditMode && (
                         <div className="space-y-2">
                             <div className="flex items-center justify-between mb-1">
                                 <Label htmlFor="entity-select">
                                     {typeLabel} <span className="text-red-500">*</span>
                                 </Label>
-                                <Button
-                                    type="button"
-                                    variant="link"
-                                    size="sm"
-                                    onClick={handleCreateNew}
-                                    className="h-auto p-0"
-                                >
-                                    + New {typeLabel}
-                                </Button>
+                                {onCreateNew && (
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        size="sm"
+                                        onClick={handleCreateNew}
+                                        className="h-auto p-0"
+                                    >
+                                        + New {typeLabel}
+                                    </Button>
+                                )}
                             </div>
                             <Select
                                 value={selectedEntityId}
@@ -234,21 +273,23 @@ const EntityPickerModal = ({
                     )}
 
                     {/* Task Selection - Searchable list */}
-                    {entityType === 'task' && (
+                    {entityType === 'task' && !isEditMode && (
                         <div className="space-y-2">
                             <div className="flex items-center justify-between mb-1">
                                 <Label>
                                     Task <span className="text-red-500">*</span>
                                 </Label>
-                                <Button
-                                    type="button"
-                                    variant="link"
-                                    size="sm"
-                                    onClick={handleCreateNew}
-                                    className="h-auto p-0"
-                                >
-                                    + New Task
-                                </Button>
+                                {onCreateNew && (
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        size="sm"
+                                        onClick={handleCreateNew}
+                                        className="h-auto p-0"
+                                    >
+                                        + New Task
+                                    </Button>
+                                )}
                             </div>
                             <div className="relative">
                                 <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
@@ -300,29 +341,96 @@ const EntityPickerModal = ({
                         </div>
                     )}
 
+                    {isEditMode && selectedEntity && (
+                        <div className="space-y-2">
+                            <Label>
+                                {typeLabel} <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                                value={selectedEntity.title}
+                                disabled
+                                readOnly
+                            />
+                            {(selectedEntity.email || selectedEntity.preferredClientId || selectedEntity.projectId) && (
+                                <p className="text-xs text-muted-foreground">
+                                    {entityType === 'client' && selectedEntity.email}
+                                    {entityType === 'project' && clients.find(c => c.id === selectedEntity.preferredClientId)?.title}
+                                    {entityType === 'task' && projects.find(p => p.id === selectedEntity.projectId)?.title}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     {/* Schedule Selection */}
                     <div className="space-y-2">
                         <Label htmlFor="schedule-select">Schedule</Label>
-                        <Select
-                            value={scheduleMode}
-                            onValueChange={setScheduleMode}
-                        >
-                            <SelectTrigger id="schedule-select">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="date">
-                                    This day ({dateStr ? format(new Date(dateStr), 'MMM d') : ''})
-                                </SelectItem>
-                                <SelectItem value="weekday">
-                                    Every {weekdayName}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                        {isEditMode ? (
+                            <Input
+                                value={lockedScheduleMode === 'weekday'
+                                    ? `Every ${weekdayName}`
+                                    : `This day (${dateStr ? format(new Date(dateStr), 'MMM d') : ''})`
+                                }
+                                disabled
+                                readOnly
+                            />
+                        ) : (
+                            <Select
+                                value={scheduleMode}
+                                onValueChange={setScheduleMode}
+                            >
+                                <SelectTrigger id="schedule-select">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="date">
+                                        This day ({dateStr ? format(new Date(dateStr), 'MMM d') : ''})
+                                    </SelectItem>
+                                    <SelectItem value="weekday">
+                                        Every {weekdayName}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
                         <p className="text-xs text-muted-foreground">
                             {scheduleMode === 'date' 
                                 ? 'Item will appear on this specific date.'
                                 : `Item will appear every ${weekdayName} going forward.`
+                            }
+                        </p>
+                    </div>
+
+                    {/* Target Hours for Selected Day */}
+                    <div className="space-y-2">
+                        <Label htmlFor="target-hours">
+                            Target hours for {scheduleMode === 'weekday' ? weekdayName : 'this day'}
+                            <span className="text-muted-foreground ml-1 text-xs">(optional)</span>
+                        </Label>
+                        <Input
+                            id="target-hours"
+                            type="number"
+                            min="0.5"
+                            max="24"
+                            step="0.5"
+                            placeholder="e.g., 2.5"
+                            value={targetHours}
+                            onChange={(e) => {
+                                const nextValue = e.target.value;
+                                if (nextValue === '') {
+                                    setTargetHours('');
+                                    return;
+                                }
+                                const parsedValue = Number(nextValue);
+                                if (!Number.isFinite(parsedValue)) {
+                                    return;
+                                }
+                                const clampedValue = Math.min(24, Math.max(0.5, parsedValue));
+                                setTargetHours(String(clampedValue));
+                            }}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            {scheduleMode === 'weekday'
+                                ? `How many hours you plan to work each ${weekdayName}.`
+                                : 'How many hours you plan to work on this date.'
                             }
                         </p>
                     </div>
@@ -334,7 +442,7 @@ const EntityPickerModal = ({
                             onClick={handleConfirm}
                             disabled={!selectedEntity}
                         >
-                            Add to Planner
+                            {isEditMode ? 'Save changes' : 'Add to Planner'}
                         </Button>
                     </div>
                 </div>

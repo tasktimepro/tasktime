@@ -182,6 +182,20 @@ export interface PlannerAttachment {
     estimatedHours?: number | null;
 }
 
+export interface DailyGoal {
+    id: string;
+    /** Day of week (0=Sun, 1=Mon, ..., 6=Sat) */
+    weekday: number;
+    /** Target working hours for this day (e.g., 8) */
+    targetHours?: number | null;
+    /** Target earnings for this day in default currency (e.g., 500) */
+    targetEarnings?: number | null;
+    /** Timestamp when the goal was created */
+    createdAt: number;
+    /** Timestamp when the goal was last updated */
+    updatedAt?: number | null;
+}
+
 export interface Preferences {
     currency?: string;
     dateFormat?: string;

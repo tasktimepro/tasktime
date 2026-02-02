@@ -41,7 +41,16 @@ vi.mock('../hooks/useTasks.ts', () => ({
 
     useTasks: () => ({
         tasks: [{ id: 'task-1', title: 'Task One', projectId: 'project-1' }],
-        activeTasks: [{ id: 'task-1', title: 'Task One', projectId: 'project-1' }]
+        activeTasks: [{ id: 'task-1', title: 'Task One', projectId: 'project-1' }],
+        updateTask: vi.fn()
+    })
+}))
+
+vi.mock('../hooks/useProjects.ts', () => ({
+
+    useProjects: () => ({
+        projects: [{ id: 'project-1', title: 'Project One', hourlyRate: 50 }],
+        isLoading: false
     })
 }))
 

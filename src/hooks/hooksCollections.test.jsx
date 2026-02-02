@@ -61,6 +61,21 @@ describe('collection-backed hooks', () => {
         expect(result.current.findByName('ALPHA')?.id).toBe('2')
     })
 
+    it('clients handle missing titles in sorting and lookup', () => {
+
+        const collection = makeCollection([
+            { id: '1' },
+            { id: '2', title: 'Beta' },
+        ])
+        mockUseYjsCollection.mockReturnValue(collection)
+
+        const { result } = renderHook(() => useClients())
+
+        expect(result.current.sortedClients[0]?.id).toBe('1')
+        expect(result.current.findByName('')?.id).toBe('1')
+        expect(result.current.findByName('beta')?.id).toBe('2')
+    })
+
     it('invoice templates expose numbering helpers and default toggle', () => {
         const collection = makeCollection([
             { id: 't1', name: 'Template 1', prefix: 'INV-', currentSequentialNumber: 7, useSequentialNumbers: true, isDefault: true },

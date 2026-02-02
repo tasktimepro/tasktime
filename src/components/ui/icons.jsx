@@ -38,6 +38,7 @@ export {
     FileCheck as DocumentCheckIcon,
     FileText as DocumentTextIcon,
     Folder as FolderIcon,
+    Target as GoalIcon,
     Info as InformationCircleIcon,
     HandCoins as HandCoinsIcon,
     Kanban as KanbanIcon,

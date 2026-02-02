@@ -10,4 +10,6 @@ export { default as AddItemPopover } from './AddItemPopover';
 export { default as EntityPickerModal } from './EntityPickerModal';
 export { default as MobileDaySelector } from './MobileDaySelector';
 export { default as MobileDayCard } from './MobileDayCard';
+export { default as DailyGoalModal } from './DailyGoalModal';
+export { default as DailyGoalProgress } from './DailyGoalProgress';
 export { useTimeProgress, getProgressGradientStyle } from './hooks/useTimeProgress';

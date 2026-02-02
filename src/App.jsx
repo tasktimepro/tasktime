@@ -12,6 +12,7 @@ import { usePaymentMethods } from './hooks/usePaymentMethods.ts';
 import { usePreferences } from './hooks/usePreferences.ts';
 import { useTimers } from './hooks/useTimers.ts';
 import { useUrlState } from './hooks/useUrlState.ts';
+import { usePlannerAttachments } from './hooks/usePlannerAttachments.ts';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
 import ClientList from './components/ClientList';
@@ -23,6 +24,8 @@ import Account from './components/Account';
 import Invoices from './components/Invoices';
 import AuthCallback from './components/AuthCallback';
 import TaskViewModal from './components/modals/TaskViewModal';
+import TimeEntriesModal from './components/TimeEntriesModal';
+import { EntityPickerModal } from './components/planner/index.js';
 import GlobalTimerStack from './components/timer/GlobalTimerStack';
 import ModalManager from './components/modals/ModalManager';
 import FloatingActionButton from './components/FloatingActionButton';
@@ -77,6 +80,8 @@ function AppContent() {
         archiveTask,
         isLoading: tasksLoading 
     } = useTasks();
+
+    const { updateAttachment } = usePlannerAttachments();
 
     const { 
         entries: timeEntries, 
@@ -228,7 +233,15 @@ function AppContent() {
         dateStr: null,
         attachment: null
     });
+    const [taskViewOverlay, setTaskViewOverlay] = useState({
+        isOpen: false,
+        type: null,
+        task: null,
+        dateStr: null,
+        attachment: null
+    });
     const [pendingTaskViewReturn, setPendingTaskViewReturn] = useState(null);
+    const [pendingTaskViewOverlayReturn, setPendingTaskViewOverlayReturn] = useState(null);
     const prevActiveModalRef = useRef(activeModal);
 
     const openClientModal = (client = null) => {
@@ -306,6 +319,59 @@ function AppContent() {
             attachment: null
         });
     }, []);
+
+    const openTaskViewOverlay = useCallback((type, task, dateStr, attachment) => {
+        if (!task) return;
+        setPendingTaskViewOverlayReturn({
+            task,
+            dateStr,
+            attachment: attachment || null
+        });
+        closeTaskView();
+        setTaskViewOverlay({
+            isOpen: true,
+            type,
+            task,
+            dateStr,
+            attachment: attachment || null
+        });
+    }, [closeTaskView]);
+
+    const closeTaskViewOverlay = useCallback(() => {
+        setTaskViewOverlay({
+            isOpen: false,
+            type: null,
+            task: null,
+            dateStr: null,
+            attachment: null
+        });
+        if (pendingTaskViewOverlayReturn) {
+            setTaskViewState({
+                isOpen: true,
+                task: pendingTaskViewOverlayReturn.task,
+                dateStr: pendingTaskViewOverlayReturn.dateStr,
+                attachment: pendingTaskViewOverlayReturn.attachment || null
+            });
+            setPendingTaskViewOverlayReturn(null);
+        }
+    }, [pendingTaskViewOverlayReturn]);
+
+    const handleOpenTaskTimeEntries = useCallback((task, dateStr, attachment) => {
+        openTaskViewOverlay('time-entries', task, dateStr, attachment);
+    }, [openTaskViewOverlay]);
+
+    const handleOpenTaskPlannerOptions = useCallback((task, dateStr, attachment) => {
+        openTaskViewOverlay('planner-options', task, dateStr, attachment);
+    }, [openTaskViewOverlay]);
+
+    const handleUpdateTaskPlannerOptions = useCallback((entity, scheduleMode, weekday, targetHours) => {
+        if (!taskViewOverlay.attachment) return;
+        updateAttachment(taskViewOverlay.attachment.id, {
+            estimatedHours: targetHours ?? null,
+        });
+        toast?.showSuccess('Planner options updated');
+        closeTaskViewOverlay();
+    }, [taskViewOverlay.attachment, updateAttachment, toast, closeTaskViewOverlay]);
 
     const handleEditTaskFromView = useCallback((task) => {
         if (!task) return;
@@ -1102,6 +1168,31 @@ function AppContent() {
                 onDelete={handleDeleteTask}
                 onArchive={handleArchiveTask}
                 onNavigateToProject={navigateToProject}
+                onOpenTimeEntries={handleOpenTaskTimeEntries}
+                onOpenPlannerOptions={handleOpenTaskPlannerOptions}
+            />
+        )}
+
+        {taskViewOverlay.isOpen && taskViewOverlay.type === 'time-entries' && taskViewOverlay.task && (
+            <TimeEntriesModal
+                isOpen={taskViewOverlay.isOpen}
+                onClose={closeTaskViewOverlay}
+                task={taskViewOverlay.task}
+            />
+        )}
+
+        {taskViewOverlay.isOpen && taskViewOverlay.type === 'planner-options' && taskViewOverlay.task && taskViewOverlay.attachment && (
+            <EntityPickerModal
+                isOpen={taskViewOverlay.isOpen}
+                onClose={closeTaskViewOverlay}
+                entityType="task"
+                dateStr={taskViewOverlay.attachment.date || taskViewOverlay.dateStr}
+                onSelect={handleUpdateTaskPlannerOptions}
+                mode="edit"
+                lockedEntityId={taskViewOverlay.task.id}
+                lockedScheduleMode={taskViewOverlay.attachment.mode === 'weekday' ? 'weekday' : 'date'}
+                lockedWeekday={taskViewOverlay.attachment.weekday ?? null}
+                initialTargetHours={taskViewOverlay.attachment.estimatedHours ?? null}
             />
         )}
         

@@ -8,7 +8,7 @@
  * Returns a week structure with items sorted by display priority.
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { addDays, format, isSameDay, startOfWeek, startOfDay, endOfDay } from 'date-fns';
 import { usePlannerAttachments } from './usePlannerAttachments';
 import { useTasks } from './useTasks';
@@ -17,10 +17,13 @@ import { useClients } from './useClients';
 import { useTimers } from './useTimers';
 import { useTimeEntries } from './useTimeEntries';
 import { useTodayDate, useTodayString } from './useDayRollover';
+import { useDailyGoals } from './useDailyGoals';
+import { usePreferences } from './usePreferences';
 import { isRecurringTaskDueOnDate } from '@/utils/recurringUtils';
 import { toStorageDate } from '@/utils/dateUtils';
 import { isRecurringCompletedOnDate } from '@/utils/recurringCompletionUtils';
-import type { Task, Project, Client, PlannerAttachment, TimeEntry } from '@/stores/yjs/types';
+import { convertCurrency, fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
+import type { Task, Project, Client, PlannerAttachment, TimeEntry, DailyGoal } from '@/stores/yjs/types';
 
 // ============================================================================
 // Types
@@ -41,6 +44,14 @@ export interface PlannerItemBase {
     actualTimeMs?: number;
     /** Whether this item has an active timer (tasks only) */
     isTimerActive?: boolean;
+    /** Raw hours before child subtraction */
+    rawHours?: number;
+    /** Effective hours after child subtraction */
+    effectiveHours?: number;
+    /** Calculated height percentage (0-1) relative to column */
+    heightPercent?: number;
+    /** Whether this item's height is derived from time entries */
+    isActualBased?: boolean;
 }
 
 export interface PlannerClientItem extends PlannerItemBase {
@@ -77,6 +88,10 @@ export interface PlannerDay {
     items: PlannerItem[];
     /** Total time worked on this day in milliseconds (from all time entries) */
     totalTimeMs: number;
+    /** Total earnings for this day in default currency */
+    totalEarnings: number;
+    /** Daily goal for this weekday (if set) */
+    dailyGoal: DailyGoal | null;
 }
 
 export interface UsePlannerItemsResult {
@@ -105,8 +120,25 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     const { projects, isLoading: projectsLoading } = useProjects();
     const { clients, isLoading: clientsLoading } = useClients();
     const { timers } = useTimers();
+    const { preferences } = usePreferences();
+    const { getGoalForDate } = useDailyGoals();
     const today = useTodayDate();
     const todayStr = useTodayString();
+
+    const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+    const [exchangeRatesLoaded, setExchangeRatesLoaded] = useState(false);
+
+    useEffect(() => {
+        if (exchangeRatesLoaded) return;
+
+        const loadRates = async () => {
+            const { rates } = await fetchExchangeRates();
+            setExchangeRates(rates);
+            setExchangeRatesLoaded(true);
+        };
+
+        loadRates();
+    }, [exchangeRatesLoaded]);
 
     // Calculate week boundaries for time entries query
     const weekStart = useMemo(() => {
@@ -133,6 +165,11 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
 
     // Today's date string for timer task filtering
     const safeTodayStr = useMemo(() => todayStr || format(today, 'yyyy-MM-dd'), [todayStr, today]);
+
+    const defaultCurrency = useMemo(
+        () => normalizeCurrencyCode(preferences.currency),
+        [preferences.currency]
+    );
 
     // Build client lookup
     const clientsById = useMemo(() => {
@@ -198,6 +235,20 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         }
         return null;
     }, [clientsById]);
+
+    const getClientCurrency = useCallback((clientId?: string | null): string => {
+        if (!clientId) return defaultCurrency;
+        const client = clientsById.get(clientId);
+        return normalizeCurrencyCode(client?.defaultCurrency || defaultCurrency);
+    }, [clientsById, defaultCurrency]);
+
+    const convertToDefaultCurrency = useCallback((amount: number, fromCurrency: string): number => {
+        const normalizedFrom = normalizeCurrencyCode(fromCurrency);
+        if (normalizedFrom === defaultCurrency) return amount;
+
+        const result = convertCurrency(amount, normalizedFrom, defaultCurrency, exchangeRates);
+        return result.success ? result.amount : amount;
+    }, [defaultCurrency, exchangeRates]);
 
     // Get color for a task (inherited from project → client)
     const getTaskColor = useCallback((task: Task): string | null => {
@@ -281,6 +332,49 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         const dayEnd = endOfDay(new Date(dateStr)).getTime();
         return entries.reduce((sum, e) => sum + getEntryOverlapMs(e, dayStart, dayEnd), 0);
     }, [entries, getEntryOverlapMs]);
+
+    const getHourlyRateForTask = useCallback((task: Task): { rate: number; currency: string } => {
+        const project = task.projectId ? projectsById.get(task.projectId) : null;
+        const clientId = project?.preferredClientId || null;
+        const client = clientId ? clientsById.get(clientId) : null;
+
+        const rate = project?.hourlyRate
+            ?? client?.defaultHourlyRate
+            ?? client?.hourlyRate
+            ?? 0;
+
+        const currency = getClientCurrency(clientId);
+
+        return { rate, currency };
+    }, [projectsById, clientsById, getClientCurrency]);
+
+    // Calculate total earnings for a date (billable entries only, converted to default currency)
+    const getTotalEarningsOnDate = useCallback((dateStr: string): number => {
+        const dayStart = startOfDay(new Date(dateStr)).getTime();
+        const dayEnd = endOfDay(new Date(dateStr)).getTime();
+
+        return entries.reduce((sum, entry) => {
+            if (!entry || typeof entry.end !== 'number') return sum;
+            const overlap = getEntryOverlapMs(entry, dayStart, dayEnd);
+            if (overlap <= 0) return sum;
+
+            const task = tasksById.get(entry.taskId);
+            if (!task || !task.billable) return sum;
+
+            const hours = overlap / 3600000;
+            const billedRate = typeof entry.billedHourlyRate === 'number'
+                ? entry.billedHourlyRate
+                : null;
+
+            const { rate, currency } = getHourlyRateForTask(task);
+            const hourlyRate = billedRate ?? rate;
+            if (!hourlyRate || hourlyRate <= 0) return sum;
+
+            const earnings = hours * hourlyRate;
+            const converted = convertToDefaultCurrency(earnings, currency);
+            return sum + converted;
+        }, 0);
+    }, [entries, getEntryOverlapMs, tasksById, getHourlyRateForTask, convertToDefaultCurrency]);
 
     // Build items for a single day
     const buildDayItems = useCallback((date: Date, dateStr: string): PlannerItem[] => {
@@ -469,8 +563,106 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         }
 
-        return items;
-    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs]);
+        const dailyGoal = getGoalForDate(dateStr);
+        const dayTargetHours = 24;
+
+        const projectItemsById = new Map<string, PlannerProjectItem>();
+        const clientItemsById = new Map<string, PlannerClientItem>();
+        const itemHours = new Map<string, {
+            rawHours: number;
+            effectiveHours: number;
+            actualHours: number;
+            isActualBased: boolean;
+        }>();
+
+        items.forEach((item) => {
+            const actualHours = (item.actualTimeMs || 0) / 3600000;
+            const hasEstimate = typeof item.estimatedHours === 'number' && item.estimatedHours >= 0;
+            const rawHours = hasEstimate
+                ? (item.estimatedHours || 0)
+                : (actualHours > 0 ? actualHours : 0);
+
+            let effectiveHours = rawHours;
+            let isActualBased = false;
+
+            if (actualHours > rawHours) {
+                effectiveHours = actualHours;
+                isActualBased = true;
+            }
+
+            itemHours.set(item.key, { rawHours, effectiveHours, actualHours, isActualBased });
+
+            if (item.type === 'project') {
+                projectItemsById.set(item.entity.id, item);
+            }
+
+            if (item.type === 'client') {
+                clientItemsById.set(item.entity.id, item);
+            }
+        });
+
+        const taskHoursByProject = new Map<string, number>();
+        const taskHoursByClient = new Map<string, number>();
+
+        items.forEach((item) => {
+            if (item.type !== 'task') return;
+            const hours = itemHours.get(item.key)?.effectiveHours || 0;
+            const projectId = item.entity.projectId || null;
+
+            if (projectId && projectItemsById.has(projectId)) {
+                taskHoursByProject.set(projectId, (taskHoursByProject.get(projectId) || 0) + hours);
+                return;
+            }
+
+            if (projectId) {
+                const clientId = projectClientMap.get(projectId) || null;
+                if (clientId && clientItemsById.has(clientId)) {
+                    taskHoursByClient.set(clientId, (taskHoursByClient.get(clientId) || 0) + hours);
+                }
+            }
+        });
+
+        const projectRawHoursById = new Map<string, number>();
+        items.forEach((item) => {
+            if (item.type !== 'project') return;
+            const rawHours = itemHours.get(item.key)?.rawHours || 0;
+            projectRawHoursById.set(item.entity.id, rawHours);
+        });
+
+        return items.map((item) => {
+            const base = itemHours.get(item.key);
+            if (!base) return item;
+
+            let effectiveHours = base.effectiveHours;
+
+            if (item.type === 'project') {
+                const childHours = taskHoursByProject.get(item.entity.id) || 0;
+                effectiveHours = Math.max(0, effectiveHours - childHours);
+            }
+
+            if (item.type === 'client') {
+                let childProjectHours = 0;
+                projectItemsById.forEach((projectItem) => {
+                    if (projectItem.entity.preferredClientId === item.entity.id) {
+                        childProjectHours += projectRawHoursById.get(projectItem.entity.id) || 0;
+                    }
+                });
+
+                const childTaskHours = taskHoursByClient.get(item.entity.id) || 0;
+                effectiveHours = Math.max(0, effectiveHours - childProjectHours - childTaskHours);
+            }
+
+            const heightPercent = dayTargetHours > 0 ? (effectiveHours / dayTargetHours) : 0;
+
+            return {
+                ...item,
+                rawHours: base.rawHours,
+                effectiveHours,
+                heightPercent,
+                isActualBased: base.isActualBased,
+            };
+        });
+    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs, getGoalForDate, projectClientMap]);
 
     // Build the full week
     const weekDays = useMemo((): PlannerDay[] => {
@@ -486,9 +678,11 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
                 isToday: isSameDay(date, today),
                 items: buildDayItems(date, dateStr),
                 totalTimeMs: getTotalTimeOnDate(dateStr),
+                totalEarnings: getTotalEarningsOnDate(dateStr),
+                dailyGoal: getGoalForDate(dateStr),
             };
         });
-    }, [weekStart, buildDayItems, getTotalTimeOnDate]);
+    }, [weekStart, buildDayItems, getTotalTimeOnDate, getTotalEarningsOnDate, getGoalForDate]);
 
     return {
         weekDays,

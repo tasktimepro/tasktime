@@ -11,17 +11,19 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { UserIcon, DocumentTextIcon, CheckIcon } from '@/components/ui/icons';
+import { UserIcon, DocumentTextIcon, CheckIcon, GoalIcon } from '@/components/ui/icons';
 
 /**
  * @param {Object} props
  * @param {React.ReactNode} props.children - Trigger element
  * @param {Function} props.onSelectType - Called with (type) when user selects an item type
+ * @param {Function} props.onSetDailyGoal - Called when user selects Daily goals
  */
-const AddItemPopover = ({ children, onSelectType }) => {
+const AddItemPopover = ({ children, onSelectType, onSetDailyGoal }) => {
 
     const [open, setOpen] = useState(false);
 
@@ -43,19 +45,27 @@ const AddItemPopover = ({ children, onSelectType }) => {
                 {trigger}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-32">
-                <DropdownMenuItem onClick={() => handleSelect('client')}>
-                    <UserIcon className="h-4 w-4 text-muted-foreground" />
-                    Add client
+                <DropdownMenuItem onClick={() => handleSelect('task')}>
+                    <CheckIcon className="h-4 w-4 text-muted-foreground" />
+                    Add task
                 </DropdownMenuItem>
-                
+
                 <DropdownMenuItem onClick={() => handleSelect('project')}>
                     <DocumentTextIcon className="h-4 w-4 text-muted-foreground" />
                     Add project
                 </DropdownMenuItem>
-                
-                <DropdownMenuItem onClick={() => handleSelect('task')}>
-                    <CheckIcon className="h-4 w-4 text-muted-foreground" />
-                    Add task
+
+                <DropdownMenuItem onClick={() => handleSelect('client')}>
+                    <UserIcon className="h-4 w-4 text-muted-foreground" />
+                    Add client
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                    setOpen(false);
+                    onSetDailyGoal?.();
+                }}>
+                    <GoalIcon className="h-4 w-4 text-muted-foreground" />
+                    Daily goals
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

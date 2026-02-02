@@ -29,6 +29,7 @@ import type {
     Preferences,
     MultiTimerState,
     PlannerAttachment,
+    DailyGoal,
 } from './types';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -130,6 +131,11 @@ export class YjsStore {
     get plannerAttachments(): Y.Map<string, PlannerAttachment> {
         this.assertReady();
         return this._coreDoc!.getMap('plannerAttachments');
+    }
+
+    get dailyGoals(): Y.Map<string, DailyGoal> {
+        this.assertReady();
+        return this._coreDoc!.getMap('dailyGoals');
     }
 
     /**

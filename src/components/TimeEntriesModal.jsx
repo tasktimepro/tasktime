@@ -13,6 +13,8 @@ import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTasks } from '../hooks/useTasks.ts';
+import { useProjects } from '../hooks/useProjects.ts';
+import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app.ts';
 
 /**
  * TimeEntriesModal component - Modal for viewing and managing time entries for a task
@@ -112,7 +114,35 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     
     // Yjs hooks for state
     const { entries: timeEntries, createEntry, updateEntry, deleteEntry } = useTimeEntries();
-    const { tasks: allTasks } = useTasks();
+    const { tasks: allTasks, updateTask } = useTasks();
+    const { projects } = useProjects();
+
+    // Check if task's project has an hourly rate (billable project)
+    const projectHasHourlyRate = useMemo(() => {
+        if (!task?.projectId) return false;
+        const project = projects.find(p => p.id === task.projectId);
+        return project && typeof project.hourlyRate === 'number' && project.hourlyRate > 0;
+    }, [task?.projectId, projects]);
+
+    // Calculate total billable time for this task
+    const taskBillableTimeMs = useMemo(() => {
+        if (!task) return 0;
+        const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
+        return timeEntries
+            .filter(entry => entry.taskId === task.id && entry.end && entry.start > taskLastBilledAt)
+            .reduce((sum, entry) => sum + (entry.end - entry.start), 0);
+    }, [task, timeEntries]);
+
+    // Auto-mark task as billable if it has significant time and project has hourly rate
+    const maybeMarkTaskBillable = useCallback((addedDurationMs) => {
+        if (!task || task.billable || task.billableSetByUser) return;
+        if (!projectHasHourlyRate) return;
+        
+        const newTotalTime = taskBillableTimeMs + addedDurationMs;
+        if (newTotalTime >= BILLABLE_TIME_THRESHOLD_MS) {
+            updateTask(task.id, { billable: true, lastActive: Date.now() });
+        }
+    }, [task, projectHasHourlyRate, taskBillableTimeMs, updateTask]);
 
     // Helper functions for billing protection
 
@@ -403,6 +433,9 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
             end: endTimestamp,
             note: addForm.note.trim() || undefined
         });
+
+        // Auto-mark task as billable if needed
+        maybeMarkTaskBillable(durationResult.durationMs);
 
         setShowAddForm(false);
         resetForms();

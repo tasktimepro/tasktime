@@ -9,6 +9,7 @@ const mockProjects = vi.hoisted(() => []);
 const mockClients = vi.hoisted(() => []);
 const mockTimers = vi.hoisted(() => []);
 const mockEntries = vi.hoisted(() => []);
+const mockGetGoalForDate = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock('./usePlannerAttachments', () => ({
     usePlannerAttachments: () => ({
@@ -55,6 +56,26 @@ vi.mock('./useTimeEntries', () => ({
     })
 }));
 
+vi.mock('./useDailyGoals', () => ({
+    useDailyGoals: () => ({
+        getGoalForDate: mockGetGoalForDate,
+    })
+}));
+
+vi.mock('./usePreferences', () => ({
+    usePreferences: () => ({
+        preferences: { currency: 'USD' },
+    })
+}));
+
+vi.mock('@/utils/currencyUtils', async () => {
+    const actual = await vi.importActual('@/utils/currencyUtils');
+    return {
+        ...actual,
+        fetchExchangeRates: vi.fn(async () => ({ rates: null, error: null })),
+    };
+});
+
 vi.mock('@/utils/recurringUtils', () => ({
     isRecurringTaskDueOnDate: vi.fn(() => false),
 }));
@@ -62,6 +83,7 @@ vi.mock('@/utils/recurringUtils', () => ({
 // Import after mocks are set up
 import { usePlannerItems } from './usePlannerItems';
 import { isRecurringTaskDueOnDate } from '@/utils/recurringUtils';
+import { fetchExchangeRates } from '@/utils/currencyUtils';
 
 describe('usePlannerItems', () => {
 
@@ -74,6 +96,8 @@ describe('usePlannerItems', () => {
         mockClients.length = 0;
         mockTimers.length = 0;
         mockEntries.length = 0;
+        mockGetGoalForDate.mockReset();
+        mockGetGoalForDate.mockReturnValue(null);
         vi.mocked(isRecurringTaskDueOnDate).mockReset();
         vi.mocked(isRecurringTaskDueOnDate).mockReturnValue(false);
     });
@@ -117,6 +141,8 @@ describe('usePlannerItems', () => {
             expect(day).toHaveProperty('dayOfWeek');
             expect(day).toHaveProperty('isToday');
             expect(day).toHaveProperty('items');
+            expect(day).toHaveProperty('totalEarnings');
+            expect(day).toHaveProperty('dailyGoal');
             expect(Array.isArray(day.items)).toBe(true);
         });
     });
@@ -241,5 +267,77 @@ describe('usePlannerItems', () => {
 
         expect(taskItem?.title).toBe('Timer Task');
         expect(taskItem?.isTimerActive).toBe(true);
+    });
+
+    it('includes archived client attachments for visible dates', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(weekStart, 'yyyy-MM-dd');
+
+        mockClients.push({ id: 'c-arch', title: 'Archived Client', color: '#123', archived: true });
+        mockAttachments.push({ id: 'a-arch', type: 'client', referenceId: 'c-arch', mode: 'date', date: dateStr });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        expect(day.items.find((i) => i.type === 'client')?.title).toBe('Archived Client');
+    });
+
+    it('keeps date-specific attached tasks even if task is not visible', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(weekStart, 'yyyy-MM-dd');
+
+        mockTasks.push({
+            id: 't-arch',
+            title: 'Legacy Task',
+            archived: true,
+            archivedOnDate: '2026-01-01',
+            completed: false,
+        });
+        mockAttachments.push({ id: 'a-legacy', type: 'task', referenceId: 't-arch', mode: 'date', date: dateStr });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        expect(day.items.find((i) => i.type === 'task' && i.subtype === 'attached')?.title).toBe('Legacy Task');
+    });
+
+    it('calculates earnings with billed rate and currency conversion', async () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(weekStart, 'yyyy-MM-dd');
+
+        vi.mocked(fetchExchangeRates).mockResolvedValueOnce({
+            rates: { USD: 1, EUR: 2 },
+            error: null,
+        });
+
+        mockGetGoalForDate.mockImplementation((value) => {
+            if (value !== dateStr) return null;
+            return { id: 'g1', weekday: 1, targetHours: 4, targetEarnings: 100, createdAt: 0 };
+        });
+
+        mockClients.push({ id: 'c1', title: 'Client A', defaultCurrency: 'EUR', defaultHourlyRate: 20 });
+        mockProjects.push({ id: 'p1', title: 'Project A', preferredClientId: 'c1' });
+        mockTasks.push({ id: 't1', title: 'Billable Task', projectId: 'p1', billable: true, completed: false });
+
+        const entryStart = new Date(`${dateStr}T09:00:00.000Z`).getTime();
+        const entryEnd = new Date(`${dateStr}T11:00:00.000Z`).getTime();
+        mockEntries.push({
+            id: 'e1',
+            taskId: 't1',
+            start: entryStart,
+            end: entryEnd,
+            billedHourlyRate: 30,
+        });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        expect(day.totalEarnings).toBeCloseTo(30, 5);
+        expect(day.dailyGoal).not.toBeNull();
     });
 });

@@ -24,7 +24,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Trash2, ExternalLink } from 'lucide-react';
+import { MoreHorizontal, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-react';
 
 /**
  * @param {Object} props
@@ -36,9 +36,11 @@ import { MoreHorizontal, Trash2, ExternalLink } from 'lucide-react';
  * @param {string | null} props.color - Color tag (hex color)
  * @param {number | null} props.estimatedHours - Estimated hours for this item
  * @param {number} props.actualTimeMs - Actual time worked in milliseconds
+ * @param {number | null} props.heightPercent - Height percentage (0-1) relative to column
  * @param {boolean} props.isTimerActive - Whether this item has an active timer (tasks only)
  * @param {boolean} props.hasAttachment - Whether item has a planner attachment (can be removed)
  * @param {() => void} props.onClick - Click handler
+ * @param {() => void} props.onEdit - Called when user wants to edit planner options
  * @param {() => void} props.onRemove - Called when user wants to remove from planner
  */
 const PlannerItem = ({
@@ -50,9 +52,11 @@ const PlannerItem = ({
     color,
     estimatedHours,
     actualTimeMs = 0,
+    heightPercent,
     isTimerActive = false,
     hasAttachment = false,
     onClick,
+    onEdit,
     onRemove,
 }) => {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -100,6 +104,12 @@ const PlannerItem = ({
         ? `${formatTime(actualTimeMs)} / ${estimatedHours}h (${progressPercent}%)`
         : undefined;
 
+    const safeHeightPercent = typeof heightPercent === 'number' && heightPercent > 0
+        ? heightPercent
+        : 0;
+
+    const dynamicHeight = `max(42px, ${Math.round(safeHeightPercent * 10000) / 100}% )`;
+
     const handleClick = (e) => {
         // Don't trigger click if menu is open
         if (menuOpen) return;
@@ -118,6 +128,12 @@ const PlannerItem = ({
         e.stopPropagation();
         setMenuOpen(false);
         onRemove?.();
+    };
+
+    const handleEdit = (e) => {
+        e.stopPropagation();
+        setMenuOpen(false);
+        onEdit?.();
     };
 
     const handleOpenItem = (e) => {
@@ -144,13 +160,18 @@ const PlannerItem = ({
             title={progressTooltip}
             className={cn(
                 "group/item p-2 rounded-md border cursor-pointer transition-all relative overflow-hidden",
+                "flex items-center",
                 "hover:shadow-sm",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
                 "bg-card border-border",
                 hasColor && "border-l-4",
                 isCompleted && "opacity-60"
             )}
-            style={hasColor ? { borderLeftColor: color } : undefined}
+            style={{
+                ...(hasColor ? { borderLeftColor: color } : {}),
+                height: dynamicHeight,
+                minHeight: '42px',
+            }}
         >
             {/* Progress fill background */}
             {hasProgress && (
@@ -162,7 +183,7 @@ const PlannerItem = ({
                 />
             )}
 
-            <div className="flex items-center gap-2 min-w-0 relative z-10">
+            <div className="flex items-center gap-2 min-w-0 relative z-10 w-full">
                 <Icon className={cn("h-4 w-4 flex-shrink-0", iconClasses)} />
                 
                 <span className={cn(
@@ -190,7 +211,7 @@ const PlannerItem = ({
                                 type="button"
                                 onClick={(e) => e.stopPropagation()}
                                 className={cn(
-                                    "absolute right-0.5 top-1/2 -translate-y-1/2 p-1 rounded",
+                                    "ml-auto p-1 rounded",
                                     "opacity-0 group-hover/item:opacity-100 transition-opacity",
                                     "hover:bg-muted focus:outline-none focus:opacity-100 cursor-pointer",
                                     menuOpen && "opacity-100"
@@ -200,10 +221,15 @@ const PlannerItem = ({
                                 <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuContent align="end" className="w-52">
                             <DropdownMenuItem onClick={handleOpenItem}>
                                 <ExternalLink className="h-4 w-4" />
                                 Open {typeLabel}
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem onClick={handleEdit}>
+                                <SlidersHorizontal className="h-4 w-4" />
+                                Edit planner options
                             </DropdownMenuItem>
 
                             <DropdownMenuSeparator />

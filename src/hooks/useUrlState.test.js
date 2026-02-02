@@ -22,6 +22,15 @@ describe('useUrlState', () => {
         expect(result.current.urlParams.view).toBe('projects')
     })
 
+    it('parses planner year and week from URL', () => {
+
+        window.history.pushState({}, '', '/planner/2026/05')
+        const { result } = renderHook(() => useUrlState())
+        expect(result.current.urlParams.view).toBe('planner')
+        expect(result.current.urlParams.year).toBe('2026')
+        expect(result.current.urlParams.week).toBe('05')
+    })
+
     it('parses project ID from URL', () => {
 
         window.history.pushState({}, '', '/projects/my-project-abc123')
@@ -161,12 +170,73 @@ describe('useUrlState', () => {
         expect(result.current.urlParams.clientId).toBe('client-123')
     })
 
+    it('parses expenses, account, and auth callback paths', () => {
+
+        window.history.pushState({}, '', '/expenses')
+        const { result: expensesResult } = renderHook(() => useUrlState())
+        expect(expensesResult.current.urlParams.view).toBe('expenses')
+
+        window.history.pushState({}, '', '/account')
+        const { result: accountResult } = renderHook(() => useUrlState())
+        expect(accountResult.current.urlParams.view).toBe('account')
+
+        window.history.pushState({}, '', '/auth/callback')
+        const { result: authResult } = renderHook(() => useUrlState())
+        expect(authResult.current.urlParams.view).toBe('auth-callback')
+    })
+
     it('falls back to dashboard path for unknown view', () => {
 
         const { result } = renderHook(() => useUrlState())
 
         act(() => {
             result.current.updateUrl({ view: 'unknown' })
+        })
+
+        expect(window.location.pathname).toBe('/')
+    })
+
+    it('navigates to planner with optional year and week', () => {
+
+        const { result } = renderHook(() => useUrlState())
+
+        act(() => {
+            result.current.navigateToPlanner()
+        })
+
+        expect(window.location.pathname).toBe('/planner')
+
+        act(() => {
+            result.current.navigateToPlanner({ year: '2026', week: '05' })
+        })
+
+        expect(window.location.pathname).toBe('/planner/2026/05')
+    })
+
+    it('navigates to clients, client, expenses, and dashboard', () => {
+
+        const { result } = renderHook(() => useUrlState())
+
+        act(() => {
+            result.current.navigateToClients()
+        })
+
+        expect(window.location.pathname).toBe('/clients')
+
+        act(() => {
+            result.current.navigateToClient('client-99')
+        })
+
+        expect(window.location.pathname).toBe('/clients/client-99')
+
+        act(() => {
+            result.current.navigateToExpenses()
+        })
+
+        expect(window.location.pathname).toBe('/expenses')
+
+        act(() => {
+            result.current.navigateToDashboard()
         })
 
         expect(window.location.pathname).toBe('/')
