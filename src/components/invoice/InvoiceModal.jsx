@@ -17,6 +17,7 @@ const InvoiceModal = ({
     editingInvoice,
     handleCancel,
     handleSaveInvoice,
+    handlePreviewInvoice,
     isProjectContextFixed,
     isClientContextFixed,
     projects,
@@ -185,6 +186,7 @@ const InvoiceModal = ({
         <InvoiceActions
             editingInvoice={editingInvoice}
             handleCancel={handleCancel}
+            onPreview={handlePreviewInvoice}
         />
     );
 

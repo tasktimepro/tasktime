@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ChevronDownIcon, ChevronRightIcon } from '@/components/ui/icons';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,8 @@ import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app.ts';
  */
 const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     const { showSuccess, showError } = useToast();
+
+    const addTimeSpentInputRef = useRef(null);
 
     const MINUTES_PER_HOUR = 60;
     const HOURS_PER_DAY = 24;
@@ -246,6 +248,12 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                 startTime: prev.startTime || currentTime
             };
         });
+    }, [showAddForm]);
+
+    useEffect(() => {
+        if (showAddForm && addTimeSpentInputRef.current) {
+            addTimeSpentInputRef.current.focus();
+        }
     }, [showAddForm]);
 
     const getShortTimeString = () => getCurrentTimeString().slice(0, 5);
@@ -563,7 +571,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => handleEditEntry(entry)}
-                                        className="h-7 w-7 text-muted-foreground hover:text-yellow-600 hover:bg-yellow-50"
+                                        className="h-7 w-7 text-muted-foreground hover:text-yellow-600 hover:bg-yellow-50 dark:hover:text-yellow-300 dark:hover:bg-yellow-500/20"
                                         title="Edit entry"
                                     >
                                         <PencilIcon className="h-4 w-4" />
@@ -572,7 +580,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => handleDeleteEntry(entry.id)}
-                                        className="h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                        className="h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:text-red-300 dark:hover:bg-red-500/20"
                                         title="Delete entry"
                                     >
                                         <TrashIcon className="h-4 w-4" />
@@ -635,6 +643,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                                     value={addForm.timeSpent}
                                     onChange={(e) => updateFormForTimeSpent(setAddForm, e.target.value)}
                                     className="text-sm bg-background text-foreground"
+                                    ref={addTimeSpentInputRef}
                                 />
                                 <p className="text-xs text-muted-foreground">Format: 2w 4d 6h 45m</p>
                             </div>

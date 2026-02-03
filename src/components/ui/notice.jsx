@@ -74,7 +74,7 @@ const Notice = React.forwardRef(({
                         </p>
                     )}
                     {children && (
-                        <div className={cn(compact ? "mt-1 text-sm" : "mt-2 text-sm", descriptionStyles[variant])}>
+                        <div className={cn(compact ? "mt-1 text-sm" : "mt-1 text-sm", descriptionStyles[variant])}>
                             {children}
                         </div>
                     )}

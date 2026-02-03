@@ -14,7 +14,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['tasktime-icon.png', 'icons/*.png'],
+      includeAssets: ['favicon.svg', 'favicon.ico', 'favicon-96x96.png', 'icons/*.png'],
       manifest: false, // Use our custom manifest.json in public/
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],

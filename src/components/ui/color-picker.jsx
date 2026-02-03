@@ -88,7 +88,12 @@ const ColorPicker = ({ value, onChange, className }) => {
                 aria-label="Clear color"
             >
                 <X
-                    className="w-4 h-4 text-black dark:text-white"
+                    className={cn(
+                        "w-4 h-4",
+                        !value 
+                            ? "text-black dark:text-white" 
+                            : "text-muted-foreground/60"
+                    )}
                     aria-hidden="true"
                 />
             </button>

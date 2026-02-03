@@ -84,9 +84,12 @@ const PlannerItem = ({
     const hasColor = !!color;
 
     // Calculate progress percentage if we have estimated hours
-    const hasProgress = estimatedHours && estimatedHours > 0 && actualTimeMs > 0;
+    // For tasks, progress is actual time vs estimated hours
+    // For projects/clients, progress comes from passed props (likely child tasks sum vs target)
+    // Note: User requested that items with target hours should show progress even if actualTimeMs is 0 (0% progress)
+    const hasTarget = estimatedHours && estimatedHours > 0;
     const estimatedMs = (estimatedHours || 0) * 60 * 60 * 1000;
-    const progressPercent = hasProgress 
+    const progressPercent = hasTarget && actualTimeMs > 0
         ? Math.min(100, Math.round((actualTimeMs / estimatedMs) * 100))
         : 0;
 
@@ -100,7 +103,7 @@ const PlannerItem = ({
         return `${minutes}m`;
     };
 
-    const progressTooltip = hasProgress 
+    const progressTooltip = hasTarget 
         ? `${formatTime(actualTimeMs)} / ${estimatedHours}h (${progressPercent}%)`
         : undefined;
 
@@ -109,19 +112,40 @@ const PlannerItem = ({
         : 0;
 
     const dynamicHeight = `max(42px, ${Math.round(safeHeightPercent * 10000) / 100}% )`;
+    
+    // Bottom border style logic
+    // - Should flow continuously from left border
+    // - Width equals progress percentage
+    // - Color matches left border color (or neutral/thick if no color)
+    const showBottomProgress = hasTarget;
+    const bottomProgressColor = hasColor ? color : 'currentColor';
+    const bottomProgressClass = hasColor ? '' : 'text-border'; // Use text-border for neutral color inheritance check
 
     const handleClick = (e) => {
         // Don't trigger click if menu is open
-        if (menuOpen) return;
+        if (menuOpen) {
+            if (!canShowMenu) {
+                setMenuOpen(false);
+            }
+            return;
+        }
         onClick?.();
     };
 
     const handleContextMenu = (e) => {
-        // Only show context menu if there are actions available
-        if (hasAttachment) {
+        if (type === 'task') {
             e.preventDefault();
-            setMenuOpen(true);
+            e.stopPropagation();
+            return;
         }
+
+        // Only show context menu if there are actions available
+        if (!canShowMenu) {
+            return;
+        }
+
+        e.preventDefault();
+        setMenuOpen(true);
     };
 
     const handleRemove = (e) => {
@@ -173,17 +197,34 @@ const PlannerItem = ({
                 minHeight: '42px',
             }}
         >
-            {/* Progress fill background */}
-            {hasProgress && (
+            {/* Progress fill background - Removed in favor of bottom border progress as requested */}
+            {/* {hasTarget && actualTimeMs > 0 && (
                 <div 
                     className="absolute inset-0 transition-all bg-primary/10 dark:bg-primary/20"
                     style={{ 
                         width: `${progressPercent}%`,
                     }}
                 />
+            )} */}
+
+            {/* Bottom border progress bar */}
+            {showBottomProgress && (
+                <div 
+                    className={cn(
+                        "absolute bottom-0 left-0 h-[3px] transition-all z-20",
+                        bottomProgressClass
+                    )}
+                    style={{ 
+                        width: `${progressPercent}%`,
+                        backgroundColor: bottomProgressColor,
+                        // Ensure it visually connects with left border if present
+                        marginLeft: hasColor ? '-4px' : '0', 
+                        paddingLeft: hasColor ? '4px' : '0',
+                    }}
+                />
             )}
 
-            <div className="flex items-center gap-2 min-w-0 relative z-10 w-full">
+            <div className="flex items-center gap-2 min-w-0 relative z-10 w-full mb-0.5">
                 <Icon className={cn("h-4 w-4 flex-shrink-0", iconClasses)} />
                 
                 <span className={cn(
@@ -192,12 +233,6 @@ const PlannerItem = ({
                 )}>
                     {title}
                 </span>
-
-                {hasProgress && (
-                    <span className="text-[10px] font-medium px-1 rounded text-muted-foreground flex-shrink-0">
-                        {progressPercent}%
-                    </span>
-                )}
 
                 {type === 'task' && isTimerActive && (
                     <span className="text-xs text-green-600 dark:text-green-400 animate-pulse flex-shrink-0">●</span>
@@ -212,9 +247,9 @@ const PlannerItem = ({
                                 onClick={(e) => e.stopPropagation()}
                                 className={cn(
                                     "ml-auto p-1 rounded",
-                                    "opacity-0 group-hover/item:opacity-100 transition-opacity",
+                                    "hidden group-hover/item:block",
                                     "hover:bg-muted focus:outline-none focus:opacity-100 cursor-pointer",
-                                    menuOpen && "opacity-100"
+                                    menuOpen && "block"
                                 )}
                                 aria-label="Item options"
                             >

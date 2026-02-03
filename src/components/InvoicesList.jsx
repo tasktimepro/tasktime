@@ -13,6 +13,7 @@ import { useUrlState } from '../hooks/useUrlState.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
+import InvoicePreviewModal from './invoice/InvoicePreviewModal';
 
 /**
  * Helper function to determine if an invoice is overdue
@@ -571,76 +572,13 @@ const InvoicesList = ({
         );
 
         return (
-            <Modal 
+            <InvoicePreviewModal
                 isOpen={showPreview && !!selectedInvoice}
                 onClose={() => setShowPreview(false)}
                 title={selectedInvoice ? `Invoice Preview - ${selectedInvoice.invoiceNumber}` : ''}
-                size="4xl"
+                invoice={selectedInvoice}
                 footer={previewModalFooter}
-            >
-                {selectedInvoice.htmlContent ? (
-                    <div className="bg-white text-black rounded-lg border border-border p-6 overflow-auto">
-                        <div dangerouslySetInnerHTML={{ __html: selectedInvoice.htmlContent }} />
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="text-center border-b pb-4">
-                            <h1 className="text-2xl font-bold text-foreground">INVOICE</h1>
-                            <p className="text-muted-foreground">Invoice #{selectedInvoice.invoiceNumber}</p>
-                            <p className="text-muted-foreground">Date: {toDisplayDate(selectedInvoice.date)}</p>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <h3 className="text-sm font-medium text-foreground mb-2">Invoice To:</h3>
-                                <div className="text-sm text-muted-foreground">
-                                    <p>{selectedInvoice.client?.name}</p>
-                                    {selectedInvoice.client?.email && (
-                                        <p>{selectedInvoice.client.email}</p>
-                                    )}
-                                    {selectedInvoice.client?.address && (
-                                        <p>{selectedInvoice.client.address}</p>
-                                    )}
-                                    {selectedInvoice.client?.city && (
-                                        <p>{selectedInvoice.client.city}, {selectedInvoice.client.state} {selectedInvoice.client.zip}</p>
-                                    )}
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <h3 className="text-sm font-medium text-foreground mb-2">Project:</h3>
-                                <div className="text-sm text-muted-foreground">
-                                    <p>{selectedInvoice.project?.title || 'Unknown Project'}</p>
-                                    {selectedInvoice.project?.hourlyRate && (
-                                        <p>
-                                            <span className="sensitive-data">Rate: {getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}{selectedInvoice.project.hourlyRate}/{selectedInvoice.currency || getPreferredCurrency()} per hour</span>
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-sm font-medium text-foreground mb-2">Tasks:</h3>
-                            <div className="space-y-1">
-                                {selectedInvoice.tasks?.map((task, index) => (
-                                    <div key={index} className="flex justify-between text-sm py-1 border-b border-border">
-                                        <span>{task.title}</span>
-                                        <span>{task.hours?.toFixed(2) || 0} hours</span>
-                                    </div>
-                                )) || <p className="text-muted-foreground">No tasks found</p>}
-                            </div>
-                        </div>
-
-                        <div className="border-t pt-2">
-                            <div className="flex justify-between text-sm font-medium">
-                                <span>Total: {selectedInvoice.totalHours?.toFixed(2) || 0} hours</span>
-                                <span className="sensitive-data">{getCurrencySymbol(selectedInvoice.currency || getPreferredCurrency())}{selectedInvoice.totalAmount?.toFixed(2) || 0}</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </Modal>
+            />
         );
     };
 

@@ -31,13 +31,15 @@ const DEFAULT_CONFIG = {
  * @param {() => void} props.onClear
  * @param {boolean} [props.disabled]
  * @param {string} [props.buttonClassName]
+ * @param {'outline' | 'ghost'} [props.inactiveVariant]
  */
 const RecurringPicker = ({
     value,
     onChange,
     onClear,
     disabled = false,
-    buttonClassName = ''
+    buttonClassName = '',
+    inactiveVariant = 'outline'
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [draftConfig, setDraftConfig] = useState(value || DEFAULT_CONFIG);
@@ -123,7 +125,7 @@ const RecurringPicker = ({
         <>
             <Button
                 type="button"
-                variant={value ? 'secondary' : 'outline'}
+                variant={value ? 'secondary' : inactiveVariant}
                 className={`h-9 ${buttonClassName}`}
                 onClick={() => setIsOpen(true)}
                 disabled={disabled}
@@ -146,7 +148,7 @@ const RecurringPicker = ({
                         <div className="flex gap-2">
                             <Button
                                 type="button"
-                                variant={draftConfig.type === 'weekly' ? 'secondary' : 'outline'}
+                                variant={draftConfig.type === 'weekly' ? 'secondary' : inactiveVariant}
                                 className="flex-1"
                                 onClick={() => handleTypeChange('weekly')}
                             >
@@ -154,7 +156,7 @@ const RecurringPicker = ({
                             </Button>
                             <Button
                                 type="button"
-                                variant={draftConfig.type === 'monthly' ? 'secondary' : 'outline'}
+                                variant={draftConfig.type === 'monthly' ? 'secondary' : inactiveVariant}
                                 className="flex-1"
                                 onClick={() => handleTypeChange('monthly')}
                             >
@@ -171,7 +173,7 @@ const RecurringPicker = ({
                                         <Button
                                             key={option.value}
                                             type="button"
-                                            variant={isSelected ? 'secondary' : 'outline'}
+                                            variant={isSelected ? 'secondary' : inactiveVariant}
                                             className="h-8 w-full p-0"
                                             onClick={() => handleToggleDay(option.value)}
                                         >
@@ -187,14 +189,14 @@ const RecurringPicker = ({
                                 <div className="flex flex-col gap-2">
                                     <Button
                                         type="button"
-                                        variant={draftConfig.monthlyType === 'first' ? 'secondary' : 'outline'}
+                                        variant={draftConfig.monthlyType === 'first' ? 'secondary' : inactiveVariant}
                                         onClick={() => handleMonthlyTypeChange('first')}
                                     >
                                         First day of month
                                     </Button>
                                     <Button
                                         type="button"
-                                        variant={draftConfig.monthlyType === 'last' ? 'secondary' : 'outline'}
+                                        variant={draftConfig.monthlyType === 'last' ? 'secondary' : inactiveVariant}
                                         onClick={() => handleMonthlyTypeChange('last')}
                                     >
                                         Last day of month
@@ -204,7 +206,7 @@ const RecurringPicker = ({
                                 <div className="space-y-2">
                                     <Button
                                         type="button"
-                                        variant={draftConfig.monthlyType === 'specific' ? 'secondary' : 'outline'}
+                                        variant={draftConfig.monthlyType === 'specific' ? 'secondary' : inactiveVariant}
                                         className="w-full"
                                         onClick={() => handleMonthlyTypeChange('specific')}
                                     >

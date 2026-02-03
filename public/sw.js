@@ -3,9 +3,12 @@ const APP_SHELL = [
     '/',
     '/index.html',
     '/manifest.json',
-    '/tasktime-icon.png',
-    '/icons/icon-192x192.png',
-    '/icons/icon-512x512.png'
+    '/favicon.svg',
+    '/favicon-96x96.png',
+    '/favicon.ico',
+    '/icons/apple-touch-icon.png',
+    '/icons/web-app-manifest-192x192.png',
+    '/icons/web-app-manifest-512x512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -24,6 +27,12 @@ self.addEventListener('activate', (event) => {
             ))
             .then(() => self.clients.claim())
     );
+});
+
+self.addEventListener('message', (event) => {
+    if (event?.data?.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
 
 self.addEventListener('fetch', (event) => {

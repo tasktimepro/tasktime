@@ -84,7 +84,18 @@ const DayColumn = ({
     };
 
     const formattedTime = formatTotalTime(totalTimeMs);
-    const shouldShowProgress = Boolean(dailyGoal?.targetHours)
+
+    // Calculate total estimated hours from items
+    const totalEstimatedHours = items.reduce((sum, item) => {
+        return sum + (item.estimatedHours || 0);
+    }, 0);
+
+    // Determine effective target hours (manual goal takes precedence, otherwise sum of items)
+    const effectiveTargetHours = (dailyGoal?.targetHours && dailyGoal.targetHours > 0) 
+        ? dailyGoal.targetHours 
+        : totalEstimatedHours;
+
+    const shouldShowProgress = Boolean(effectiveTargetHours > 0)
         || Boolean(dailyGoal?.targetEarnings)
         || totalEarnings > 0
         || totalTimeMs > 0;
@@ -94,9 +105,9 @@ const DayColumn = ({
             <ContextMenuTrigger asChild>
                 <div
                     className={cn(
-                        "group flex flex-col h-full rounded-lg border bg-card",
+                        "group flex flex-col h-full rounded-lg border bg-card relative",
                         "transition-shadow",
-                        isToday && "border-t-2 border-t-orange-400"
+                        isToday && "border-t-2 border-t-black dark:border-t-white"
                     )}
                     style={progressStyle}
                 >
@@ -158,13 +169,13 @@ const DayColumn = ({
                     {shouldShowProgress && (
                         <div
                             className={cn(
-                                "px-2 pb-2 transition-opacity",
+                                "px-2 pb-2 transition-opacity absolute bottom-0 left-0 w-full z-10",
                                 isToday ? "opacity-100" : "opacity-0 group-hover:opacity-100",
                                 !isToday && "pointer-events-none group-hover:pointer-events-auto"
                             )}
                         >
                             <DailyGoalProgress
-                                targetHours={dailyGoal?.targetHours ?? null}
+                                targetHours={effectiveTargetHours || null}
                                 actualHours={totalTimeMs / 3600000}
                                 targetEarnings={dailyGoal?.targetEarnings ?? null}
                                 actualEarnings={totalEarnings}
@@ -176,7 +187,7 @@ const DayColumn = ({
 
                     {/* Footer - Daily total time */}
                     {!shouldShowProgress && formattedTime && (
-                        <div className="px-2 py-1.5 border-t border-border">
+                        <div className="px-2 py-1.5 border-t border-border absolute bottom-0 left-0 w-full z-10 bg-card/80 backdrop-blur-sm rounded-b-lg">
                             <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"

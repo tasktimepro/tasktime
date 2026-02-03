@@ -365,6 +365,7 @@ const TaskTree = ({
                                 setNewTaskStartDate('');
                             }}
                             onClear={() => setNewTaskRecurring(null)}
+                            inactiveVariant="ghost"
                         />
 
                         <Button type="submit">

@@ -572,21 +572,6 @@ const Dashboard = ({
                 onArchiveTask={handleArchiveTask}
             />
 
-            <MetricsCards
-                thisMonthMetrics={thisMonthMetrics}
-                lastMonthMetrics={lastMonthMetrics}
-                thisYearMetrics={thisYearMetrics}
-                invoiceMetrics={invoiceMetrics}
-                thisMonthBillableHours={thisMonthBillableHours}
-                thisMonthUnbilledDisplay={thisMonthUnbilledDisplay}
-                hasClients={hasClients}
-                preferredCurrency={preferredCurrency}
-                formatDuration={formatDuration}
-                needsExchangeRates={needsExchangeRates}
-                exchangeRatesLoading={exchangeRatesLoading}
-                navigateToInvoices={navigateToInvoices}
-            />
-
             {/* Recent Tasks and Projects Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <RecentTasks
@@ -612,6 +597,21 @@ const Dashboard = ({
                     clients={clients}
                 />
             </div>
+
+            <MetricsCards
+                thisMonthMetrics={thisMonthMetrics}
+                lastMonthMetrics={lastMonthMetrics}
+                thisYearMetrics={thisYearMetrics}
+                invoiceMetrics={invoiceMetrics}
+                thisMonthBillableHours={thisMonthBillableHours}
+                thisMonthUnbilledDisplay={thisMonthUnbilledDisplay}
+                hasClients={hasClients}
+                preferredCurrency={preferredCurrency}
+                formatDuration={formatDuration}
+                needsExchangeRates={needsExchangeRates}
+                exchangeRatesLoading={exchangeRatesLoading}
+                navigateToInvoices={navigateToInvoices}
+            />
 
         </div>
     );

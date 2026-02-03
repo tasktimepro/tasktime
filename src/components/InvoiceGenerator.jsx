@@ -5,6 +5,7 @@ import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.
 import { useToast } from '../hooks/useToast.ts';
 import InvoiceModal from './invoice/InvoiceModal';
 import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
+import InvoicePreviewModal from './invoice/InvoicePreviewModal';
 import * as InvoiceHandler from './invoice/InvoiceHandler.ts';
 import useInvoicePricing from './invoice/hooks/useInvoicePricing.ts';
 import { calculateDueDate, generateInvoiceNumber } from './invoice/utils/invoiceDateUtils.ts';
@@ -45,6 +46,8 @@ const InvoiceGenerator = ({
     const { getTimerForProject } = useTimers();
     
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewInvoice, setPreviewInvoice] = useState(null);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
     const [selectedClient, setSelectedClient] = useState(client); // Initialize with client prop if provided
@@ -57,6 +60,13 @@ const InvoiceGenerator = ({
     const { showSuccess, showError, showWarning } = useToast();
     const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
     const taskInputRef = useRef(null); // Ref for task description input field
+
+    useEffect(() => {
+        if (!showInvoiceForm) {
+            setShowPreview(false);
+            setPreviewInvoice(null);
+        }
+    }, [showInvoiceForm]);
 
     const timerProjectId = selectedProject?.id || project?.id;
     const projectTimer = timerProjectId ? getTimerForProject(timerProjectId) : null;
@@ -691,21 +701,19 @@ const InvoiceGenerator = ({
     }, [updateInvoiceTemplate]);
 
     /**
-     * Save invoice (create new or update existing)
+     * Build invoice data for preview or save
      */
-    const handleSaveInvoice = (e) => {
-        e.preventDefault();
-
+    const buildInvoiceData = ({ applyTemplateSequentialUpdate = false } = {}) => {
         // Validate required information
         if (!selectedClient) {
             showError('Please select client information');
-            return;
+            return null;
         }
 
         // Template selection is required
         if (!selectedTemplate) {
             showError('Please select an invoice template');
-            return;
+            return null;
         }
 
         // Check if any tasks are selected for billing
@@ -714,7 +722,7 @@ const InvoiceGenerator = ({
         
         if (!hasSelectedTasks) {
             showError('Please select at least one task to bill or add additional tasks');
-            return;
+            return null;
         }
 
         // Validate invoice date override is not in the future
@@ -725,7 +733,7 @@ const InvoiceGenerator = ({
             
             if (overrideDate > today) {
                 showError('Invoice date cannot be set to a future date');
-                return;
+                return null;
             }
         }
 
@@ -754,11 +762,11 @@ const InvoiceGenerator = ({
         const dueDate = calculateDueDate(selectedTemplate, invoiceDate);
 
         // Update template sequential number if creating new invoice
-        if (!editingInvoice) {
+        if (applyTemplateSequentialUpdate && !editingInvoice) {
             updateTemplateSequentialNumber(selectedTemplate);
         }
 
-        const invoiceData = {
+        return {
             id: invoiceId,
             project: selectedProject,
             projectId: selectedProject?.id || null,
@@ -882,6 +890,19 @@ const InvoiceGenerator = ({
                 currency: selectedClient?.defaultCurrency || getPreferredCurrency()
             })
         };
+    };
+
+    /**
+     * Save invoice (create new or update existing)
+     */
+    const handleSaveInvoice = (e) => {
+        e.preventDefault();
+        const invoiceData = buildInvoiceData({ applyTemplateSequentialUpdate: true });
+        if (!invoiceData) {
+            return;
+        }
+
+        const invoiceId = invoiceData.id;
 
         // Store invoice in the new separate invoices structure
         let updatedProjectInvoiceIds = [];
@@ -1000,6 +1021,19 @@ const InvoiceGenerator = ({
         } else {
             showSuccess('Invoice saved successfully! You can view, edit, or download it from the Invoices tab.');
         }
+    };
+
+    /**
+     * Preview invoice in modal
+     */
+    const handlePreviewInvoice = () => {
+        const invoiceData = buildInvoiceData({ applyTemplateSequentialUpdate: false });
+        if (!invoiceData) {
+            return;
+        }
+
+        setPreviewInvoice(invoiceData);
+        setShowPreview(true);
     };
 
     /**
@@ -1238,6 +1272,7 @@ const InvoiceGenerator = ({
                     editingInvoice={editingInvoice}
                     handleCancel={handleCancel}
                     handleSaveInvoice={handleSaveInvoice}
+                    handlePreviewInvoice={handlePreviewInvoice}
                     isProjectContextFixed={isProjectContextFixed}
                     isClientContextFixed={isClientContextFixed}
                     projects={projects}
@@ -1316,6 +1351,13 @@ const InvoiceGenerator = ({
                     openTemplateModal={openTemplateModal}
                 />
             )}
+            <InvoicePreviewModal
+                isOpen={showPreview && !!previewInvoice}
+                onClose={() => setShowPreview(false)}
+                title={previewInvoice ? `Invoice Preview - ${previewInvoice.invoiceNumber}` : ''}
+                invoice={previewInvoice}
+                htmlContent={previewInvoice?.htmlContent}
+            />
         </div>
     );
 };

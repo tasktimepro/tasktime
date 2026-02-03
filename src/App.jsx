@@ -43,7 +43,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
 /** Original browser tab title */
-const ORIGINAL_TITLE = "TaskTime - Track your time by the task. Invoice without the mess.";
+const ORIGINAL_TITLE = "TaskTime";
 
 /**
  * Main App component - Entry point for TaskTime

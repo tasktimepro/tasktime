@@ -246,7 +246,9 @@ const EntityPickerModal = ({
                                 onValueChange={setSelectedEntityId}
                             >
                                 <SelectTrigger id="entity-select">
-                                    <SelectValue placeholder={`Select a ${typeLabel.toLowerCase()}...`} />
+                                    <SelectValue placeholder={`Select a ${typeLabel.toLowerCase()}...`}>
+                                        {selectedEntity ? selectedEntity.title : undefined}
+                                    </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                     {entities.length === 0 ? (
