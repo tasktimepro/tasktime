@@ -4,9 +4,17 @@ import { useUrlState } from './useUrlState'
 
 describe('useUrlState', () => {
 
+    let consoleErrorSpy;
+
     beforeEach(() => {
 
         window.history.pushState({}, '', '/')
+        consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+
+        consoleErrorSpy?.mockRestore()
     })
 
     it('parses root path as dashboard view', () => {

@@ -14,13 +14,17 @@ vi.mock('idb', () => ({
 
 describe('googleAuthStorage', () => {
 
+    let consoleErrorSpy;
+
     beforeEach(() => {
         vi.clearAllMocks();
         vi.useFakeTimers();
+        consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
     afterEach(() => {
         vi.useRealTimers();
+        consoleErrorSpy?.mockRestore();
     });
 
     describe('isTokenExpired', () => {

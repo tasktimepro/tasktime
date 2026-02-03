@@ -44,6 +44,29 @@ describe('buildInvoiceTaskData', () => {
         expect(result[0].originalTimeMs).toBe(600)
     })
 
+    it('excludes invoice adjustment entries from billable time', () => {
+
+        const tasks = [
+            { id: 'task-1', projectId: 'project-1', title: 'Billable', billable: true }
+        ]
+
+        const timeEntries = [
+            { taskId: 'task-1', start: 1, end: 3600001 },
+            { taskId: 'task-1', start: 3600001, end: 7200001, source: 'invoice-adjustment' }
+        ]
+
+        const result = buildInvoiceTaskData({
+            projectForData: project,
+            selectedProject: null,
+            tasks,
+            timeEntries,
+            editableHours: {}
+        })
+
+        expect(result).toHaveLength(1)
+        expect(result[0].originalTimeMs).toBe(3600000)
+    })
+
     it('includes manually billable tasks with zero time', () => {
 
         const tasks = [

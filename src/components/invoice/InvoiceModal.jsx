@@ -257,9 +257,7 @@ const InvoiceModal = ({
                                             onValueChange={(value) => handleClientSelection(value === "__none__" ? "" : value)}
                                             disabled={isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)}
                                         >
-                                            <SelectTrigger
-                                                className={(isClientContextFixed || editingInvoice || (selectedProject && selectedProject.preferredClientId)) ? 'bg-muted' : 'bg-background'}
-                                            >
+                                            <SelectTrigger>
                                                 <SelectValue placeholder="Select client info" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -358,9 +356,7 @@ const InvoiceModal = ({
                                                 onValueChange={(value) => handleProjectSelection(value === "__none__" ? "" : value)}
                                                 disabled={(isProjectContextFixed && !isClientContextFixed) || editingInvoice}
                                             >
-                                                <SelectTrigger
-                                                    className={((isProjectContextFixed && !isClientContextFixed) || editingInvoice) ? 'bg-muted' : 'bg-background'}
-                                                >
+                                                <SelectTrigger>
                                                     <SelectValue placeholder="Select project (optional)" />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -749,7 +745,7 @@ const InvoiceModal = ({
                                             value={invoiceDateOverride}
                                             onChange={(e) => setInvoiceDateOverride(e.target.value)}
                                             max={getTodayString()}
-                                            className="block w-full border border-border rounded-md shadow-sm bg-background text-foreground focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2"
+                                            className="block w-full border border-border rounded-md shadow-sm text-foreground focus:ring-ring focus:border-ring sm:text-sm px-2.5 py-2"
                                             required={useInvoiceDateOverride}
                                         />
                                         <p className="mt-1 text-xs text-muted-foreground">

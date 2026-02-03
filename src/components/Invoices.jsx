@@ -34,7 +34,8 @@ const Invoices = ({
     openBusinessModal,
     editBusinessModal,
     openClientModal,
-    openProjectModal
+    openProjectModal,
+    activeModal,
 }) => {
     const { urlParams } = useUrlState();
     const { showError } = useToast();
@@ -224,6 +225,7 @@ const Invoices = ({
                     paymentMethods={paymentMethods}
                     businessInfos={businessInfos}
                     clients={clients}
+                    activeModal={activeModal}
                     onInvoiceSaved={() => {
                         setShowInvoiceModal(false);
                         setEditingInvoice(null);

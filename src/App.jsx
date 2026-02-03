@@ -1038,6 +1038,7 @@ function AppContent() {
                                 clients={clients}
                                 invoices={invoices}
                                 invoiceTemplates={invoiceTemplates}
+                                activeModal={activeModal}
                                 openClientModal={openClientModal}
                                 openProjectModal={openProjectModal}
                                 openBusinessModal={openBusinessModal}
@@ -1076,6 +1077,7 @@ function AppContent() {
                                 navigateToProject={navigateToProject}
                                 invoices={invoices}
                                 invoiceTemplates={invoiceTemplates}
+                                activeModal={activeModal}
                                 openClientModal={openClientModal}
                                 openProjectModal={openProjectModal}
                                 openBusinessModal={openBusinessModal}
@@ -1096,6 +1098,7 @@ function AppContent() {
                                 businessInfos={businessInfos}
                                 clients={clients}
                                 invoiceTemplates={invoiceTemplates}
+                                activeModal={activeModal}
                                 updateUrl={updateUrl}
                                 navigateToProjects={handleNavigateToProjects}
                                 navigateToClients={navigateToClients}

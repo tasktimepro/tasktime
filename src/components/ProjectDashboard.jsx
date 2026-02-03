@@ -37,6 +37,7 @@ const ProjectDashboard = ({
     clients,
     invoices,
     invoiceTemplates,
+    activeModal,
     // Modal functions
     openClientModal,
     openProjectModal,
@@ -171,10 +172,12 @@ const ProjectDashboard = ({
 
     // Calculate project metrics
     const projectMetrics = useMemo(() => {
-        // Total time worked on this project
-        const totalTime = projectTimeEntries.reduce((total, entry) => {
-            return total + (entry.end - entry.start);
-        }, 0);
+        // Total time worked on this project (excluding invoice adjustments)
+        const totalTime = projectTimeEntries
+            .filter(entry => entry.source !== 'invoice-adjustment')
+            .reduce((total, entry) => {
+                return total + (entry.end - entry.start);
+            }, 0);
 
         // Total revenue from paid invoices only
         const totalRevenue = projectInvoices.reduce((total, invoice) => {
@@ -357,6 +360,7 @@ const ProjectDashboard = ({
                             paymentMethods={paymentMethods}
                             businessInfos={businessInfos}
                             clients={clients}
+                            activeModal={activeModal}
                             // Modal functions
                             openClientModal={openClientModal}
                             openProjectModal={openProjectModal}
@@ -517,6 +521,7 @@ const ProjectDashboard = ({
                                 paymentMethods={paymentMethods}
                                 businessInfos={businessInfos}
                                 clients={clients}
+                                activeModal={activeModal}
                                 // Modal functions
                                 openClientModal={openClientModal}
                                 openProjectModal={openProjectModal}

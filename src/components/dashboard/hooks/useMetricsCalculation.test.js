@@ -103,4 +103,28 @@ describe('useMetricsCalculation', () => {
 
         expect(result.current.thisMonthBillableHours).toBe(2.34)
     })
+
+    it('excludes invoice adjustments from unbilled earnings', () => {
+
+        const tasks = [
+            { id: 'task-1', projectId: 'project-1', billable: true }
+        ]
+        const projects = [{ id: 'project-1', hourlyRate: 100 }]
+        const timeEntries = [
+            { taskId: 'task-1', start: baseDate.getTime() - 3600000, end: baseDate.getTime() },
+            { taskId: 'task-1', start: baseDate.getTime() - 7200000, end: baseDate.getTime() - 3600000, source: 'invoice-adjustment' }
+        ]
+
+        const { result } = renderHook(() => useMetricsCalculation({
+            timeEntries,
+            tasks,
+            projects,
+            invoices: [],
+            clients: [],
+            preferredCurrency: 'USD',
+            convertToCurrency
+        }))
+
+        expect(result.current.thisMonthUnbilledTotal).toBe(100)
+    })
 })

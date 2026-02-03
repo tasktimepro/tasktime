@@ -267,6 +267,7 @@ const ProjectList = ({
 
         const unbilledEntries = timeEntries.filter(entry => {
             if (!billableTaskIds.includes(entry.taskId)) return false;
+            if (entry.source === 'invoice-adjustment') return false;
 
             const task = projectTasks.find(t => t.id === entry.taskId);
             if (!task) return false;
@@ -303,6 +304,7 @@ const ProjectList = ({
 
         const unbilledEntries = timeEntries.filter(entry => {
             if (!billableTaskIds.includes(entry.taskId)) return false;
+            if (entry.source === 'invoice-adjustment') return false;
 
             const task = projectTasks.find(t => t.id === entry.taskId);
             if (!task) return false;

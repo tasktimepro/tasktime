@@ -130,6 +130,7 @@ const TaskItem = ({
         const relevantEntries = timeEntries.filter((entry) => {
             if (!entry || typeof entry.end !== 'number') return false;
             if (entry.end <= entry.start) return false;
+            if (entry.source === 'invoice-adjustment') return false;
             const belongsToTask = entry.taskId === task.id || subtaskIds.includes(entry.taskId);
             return belongsToTask && entry.start > cutoff;
         });
@@ -275,9 +276,11 @@ const TaskItem = ({
                         />
                     )}
 
-                    <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                        {formatDurationWithSeconds(liveTaskTime)}
-                    </div>
+                    {liveTaskTime > 0 && (
+                        <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                            {formatDurationWithSeconds(liveTaskTime)}
+                        </div>
+                    )}
 
                     <TaskActions
                         task={task}

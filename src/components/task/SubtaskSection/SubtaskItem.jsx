@@ -47,7 +47,7 @@ const SubtaskItem = ({
     // Calculate time for this subtask
     const mainTaskTime = useMemo(() => {
         return timeEntries
-            .filter(e => e.taskId === task.id)
+            .filter(e => e.taskId === task.id && e.source !== 'invoice-adjustment')
             .reduce((sum, e) => sum + (e.end - e.start), 0);
     }, [timeEntries, task.id]);
 
@@ -62,6 +62,7 @@ const SubtaskItem = ({
         const relevantEntries = timeEntries.filter((entry) => {
             if (!entry || typeof entry.end !== 'number') return false;
             if (entry.end <= entry.start) return false;
+            if (entry.source === 'invoice-adjustment') return false;
             return entry.taskId === task.id && entry.start > cutoff;
         });
 
@@ -140,7 +141,7 @@ const SubtaskItem = ({
     }, [onViewTask, task]);
 
     return (
-        <div className={`flex items-center justify-between gap-3 px-3 py-2 rounded-md hover:bg-muted transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
+        <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md hover:bg-muted transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
             <TaskHeader
                 task={task}
                 isEditing={isEditing}
@@ -167,9 +168,11 @@ const SubtaskItem = ({
                 />
             )}
 
-            <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                {formatDurationWithSeconds(liveTaskTime)}
-            </div>
+            {liveTaskTime > 0 && (
+                <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                    {formatDurationWithSeconds(liveTaskTime)}
+                </div>
+            )}
 
             <TaskActions
                 task={task}

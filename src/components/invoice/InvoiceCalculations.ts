@@ -14,6 +14,7 @@ type TimeEntry = {
     taskId: string;
     start: number;
     end?: number;
+    source?: string;
 };
 
 type BuildInvoiceTaskParams = {
@@ -65,6 +66,7 @@ export const buildInvoiceTaskData = ({
         // Double check that this entry belongs to a task in the current project
         if (!projectTaskIds.includes(entry.taskId)) return false;
         if (!entry.end || entry.end <= entry.start) return false;
+        if (entry.source === 'invoice-adjustment') return false;
 
         // Find the task for this entry
         const task = projectTasks.find(t => t.id === entry.taskId);

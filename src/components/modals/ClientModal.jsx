@@ -538,10 +538,10 @@ const ClientModal = ({
                                     />
                                     <Button
                                         type="button"
-                                        variant="outline"
+                                        variant="ghost"
                                         size="icon"
                                         onClick={() => removeCustomField(index)}
-                                        className="hover:bg-accent hover:text-red-600 dark:hover:text-red-400 hover:border-red-300"
+                                        className="hover:bg-accent text-destructive-strong hover-text-destructive-strong"
                                     >
                                         <TrashIcon className="h-4 w-4" />
                                     </Button>

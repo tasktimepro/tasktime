@@ -87,9 +87,12 @@ import { fetchExchangeRates } from '@/utils/currencyUtils';
 
 describe('usePlannerItems', () => {
 
+    let consoleErrorSpy;
+
     beforeEach(() => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-04T12:00:00Z'));
+        consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         mockAttachments.length = 0;
         mockTasks.length = 0;
         mockProjects.length = 0;
@@ -104,6 +107,7 @@ describe('usePlannerItems', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+        consoleErrorSpy?.mockRestore();
     });
 
     it('returns 7 days for the week', () => {

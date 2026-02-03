@@ -91,9 +91,11 @@ const RecentTasks = ({
                                                 completed={isCompleted}
                                             />
                                         )}
-                                        <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                                            {formatDurationWithSeconds(task.recentTime)}
-                                        </div>
+                                        {task.recentTime > 0 && (
+                                            <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                                {formatDurationWithSeconds(task.recentTime)}
+                                            </div>
+                                        )}
                                         <div className="flex flex-shrink-0 space-x-1">
                                             {renderTaskControls(task, shouldDisable)}
                                             {!hideActions && (
@@ -147,9 +149,11 @@ const RecentTasks = ({
                                                                 completed={subtaskCompleted}
                                                             />
                                                         )}
-                                                        <div className={`flex-shrink-0 text-xs ${subtaskCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                                                            {formatDurationWithSeconds(subtask.recentTime)}
-                                                        </div>
+                                                        {subtask.recentTime > 0 && (
+                                                            <div className={`flex-shrink-0 text-xs ${subtaskCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                                                {formatDurationWithSeconds(subtask.recentTime)}
+                                                            </div>
+                                                        )}
                                                         <div className="flex flex-shrink-0 space-x-1">
                                                             {renderTaskControls(subtask, subtaskShouldDisable)}
                                                             {!subtaskHideActions && (

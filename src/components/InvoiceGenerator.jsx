@@ -35,13 +35,14 @@ const InvoiceGenerator = ({
     openProjectModal,
     openBusinessModal,
     openPaymentMethodModal,
-    openTemplateModal
+    openTemplateModal,
+    activeModal = null
 }) => {
     // Yjs hooks for data access
     const { invoices, createInvoice, updateInvoice } = useInvoices();
     const { projects, updateProject } = useProjects();
     const { tasks, updateTask } = useTasks();
-    const { updateEntry } = useTimeEntries();
+    const { createEntry, updateEntry, deleteEntry } = useTimeEntries();
     const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
     const { getTimerForProject } = useTimers();
     
@@ -60,6 +61,8 @@ const InvoiceGenerator = ({
     const { showSuccess, showError, showWarning } = useToast();
     const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
     const taskInputRef = useRef(null); // Ref for task description input field
+    const [isHiddenForNestedModal, setIsHiddenForNestedModal] = useState(false);
+    const [invoiceFormState, setInvoiceFormState] = useState(null);
 
     useEffect(() => {
         if (!showInvoiceForm) {
@@ -67,6 +70,13 @@ const InvoiceGenerator = ({
             setPreviewInvoice(null);
         }
     }, [showInvoiceForm]);
+
+    useEffect(() => {
+        if (isHiddenForNestedModal && !activeModal) {
+            setShowInvoiceForm(true);
+            setIsHiddenForNestedModal(false);
+        }
+    }, [isHiddenForNestedModal, activeModal]);
 
     const timerProjectId = selectedProject?.id || project?.id;
     const projectTimer = timerProjectId ? getTimerForProject(timerProjectId) : null;
@@ -120,10 +130,21 @@ const InvoiceGenerator = ({
             return; // User has already made a selection, keep it
         }
 
-        // If editing an invoice, use its payment method
-        if (editingInvoice && editingInvoice.paymentMethod) {
-            setSelectedPaymentMethod(editingInvoice.paymentMethod);
-            return;
+        // If editing an invoice, prefer the latest payment method data
+        if (editingInvoice) {
+            const invoicePaymentMethodId = editingInvoice.paymentMethodId || editingInvoice.paymentMethod?.id;
+            if (invoicePaymentMethodId) {
+                const latestPaymentMethod = paymentMethods.find(pm => pm.id === invoicePaymentMethodId);
+                if (latestPaymentMethod) {
+                    setSelectedPaymentMethod(latestPaymentMethod);
+                    return;
+                }
+            }
+
+            if (editingInvoice.paymentMethod) {
+                setSelectedPaymentMethod(editingInvoice.paymentMethod);
+                return;
+            }
         }
         
         // PRIORITY 1: Look for last used payment method for this client across all invoices
@@ -177,10 +198,21 @@ const InvoiceGenerator = ({
             return; // User has already made a selection, keep it
         }
 
-        // If editing an invoice, use its business info
-        if (editingInvoice && editingInvoice.businessInfo) {
-            setSelectedBusinessInfo(editingInvoice.businessInfo);
-            return;
+        // If editing an invoice, prefer the latest business info data
+        if (editingInvoice) {
+            const invoiceBusinessInfoId = editingInvoice.businessInfoId || editingInvoice.businessInfo?.id;
+            if (invoiceBusinessInfoId) {
+                const latestBusinessInfo = businessInfos.find(bi => bi.id === invoiceBusinessInfoId);
+                if (latestBusinessInfo) {
+                    setSelectedBusinessInfo(latestBusinessInfo);
+                    return;
+                }
+            }
+
+            if (editingInvoice.businessInfo) {
+                setSelectedBusinessInfo(editingInvoice.businessInfo);
+                return;
+            }
         }
         
         // PRIORITY 1: Look for last used business info for this client across all invoices
@@ -336,10 +368,21 @@ const InvoiceGenerator = ({
             return; // User has already made a manual selection, keep it
         }
 
-        // If editing an invoice and it has a template reference, use it
-        if (editingInvoice && editingInvoice.template) {
-            setSelectedTemplate(editingInvoice.template);
-            return;
+        // If editing an invoice and it has a template reference, use latest template data
+        if (editingInvoice) {
+            const invoiceTemplateId = editingInvoice.templateId || editingInvoice.template?.id;
+            if (invoiceTemplateId) {
+                const latestTemplate = invoiceTemplates.find(t => t.id === invoiceTemplateId);
+                if (latestTemplate) {
+                    setSelectedTemplate(latestTemplate);
+                    return;
+                }
+            }
+
+            if (editingInvoice.template) {
+                setSelectedTemplate(editingInvoice.template);
+                return;
+            }
         }
         
         // If not editing an invoice, we need to select a template
@@ -413,8 +456,8 @@ const InvoiceGenerator = ({
                 setHasInitialized(true);
                 setCurrentEditingInvoiceId(editingInvoice?.id || null);
             }
-        } else {
-            // Reset the initialized flag when form is closed
+        } else if (!isHiddenForNestedModal) {
+            // Reset the initialized flag when form is closed (skip if temporarily hidden)
             setHasInitialized(false);
             setCurrentEditingInvoiceId(null);
         }
@@ -430,7 +473,8 @@ const InvoiceGenerator = ({
         businessInfos.length,
         clients.length,
         hasInitialized,
-        currentEditingInvoiceId
+        currentEditingInvoiceId,
+        isHiddenForNestedModal
     ]);
 
     const [invoiceTasks, setInvoiceTasks] = useState([]);
@@ -471,6 +515,68 @@ const InvoiceGenerator = ({
         label: '',
         rate: 0
     });
+
+    const invoiceFormStateKey = useMemo(() => {
+        if (editingInvoice?.id) {
+            return `invoice:${editingInvoice.id}`;
+        }
+        if (project?.id) {
+            return `project:${project.id}`;
+        }
+        if (client?.id) {
+            return `client:${client.id}`;
+        }
+        return 'standalone';
+    }, [editingInvoice?.id, project?.id, client?.id]);
+
+    const saveInvoiceFormState = useCallback((formData) => {
+        setInvoiceFormState({
+            ...formData,
+            contextKey: invoiceFormStateKey
+        });
+    }, [invoiceFormStateKey]);
+
+    const getInvoiceFormState = useCallback(() => {
+        if (!invoiceFormState || invoiceFormState.contextKey !== invoiceFormStateKey) {
+            return null;
+        }
+        return invoiceFormState;
+    }, [invoiceFormState, invoiceFormStateKey]);
+
+    const clearInvoiceFormState = useCallback(() => {
+        setInvoiceFormState(null);
+    }, []);
+
+    const hideInvoiceFormForNestedModal = useCallback(() => {
+        if (!showInvoiceForm) return;
+        setIsHiddenForNestedModal(true);
+        setShowInvoiceForm(false);
+    }, [showInvoiceForm]);
+
+    const handleOpenClientModal = useCallback((...args) => {
+        hideInvoiceFormForNestedModal();
+        openClientModal?.(...args);
+    }, [hideInvoiceFormForNestedModal, openClientModal]);
+
+    const handleOpenProjectModal = useCallback((...args) => {
+        hideInvoiceFormForNestedModal();
+        openProjectModal?.(...args);
+    }, [hideInvoiceFormForNestedModal, openProjectModal]);
+
+    const handleOpenBusinessModal = useCallback((...args) => {
+        hideInvoiceFormForNestedModal();
+        openBusinessModal?.(...args);
+    }, [hideInvoiceFormForNestedModal, openBusinessModal]);
+
+    const handleOpenPaymentMethodModal = useCallback((...args) => {
+        hideInvoiceFormForNestedModal();
+        openPaymentMethodModal?.(...args);
+    }, [hideInvoiceFormForNestedModal, openPaymentMethodModal]);
+
+    const handleOpenTemplateModal = useCallback((...args) => {
+        hideInvoiceFormForNestedModal();
+        openTemplateModal?.(...args);
+    }, [hideInvoiceFormForNestedModal, openTemplateModal]);
 
     /**
      * Initialize pricing state when editing an invoice
@@ -766,6 +872,27 @@ const InvoiceGenerator = ({
             updateTemplateSequentialNumber(selectedTemplate);
         }
 
+        const resolvedPaymentMethod = selectedPaymentMethod || (() => {
+            if (!editingInvoice) return null;
+            const paymentMethodId = editingInvoice.paymentMethodId || editingInvoice.paymentMethod?.id;
+            if (!paymentMethodId) return editingInvoice.paymentMethod || null;
+            return paymentMethods.find(pm => pm.id === paymentMethodId) || editingInvoice.paymentMethod || null;
+        })();
+
+        const resolvedBusinessInfo = selectedBusinessInfo || (() => {
+            if (!editingInvoice) return null;
+            const businessInfoId = editingInvoice.businessInfoId || editingInvoice.businessInfo?.id;
+            if (!businessInfoId) return editingInvoice.businessInfo || null;
+            return businessInfos.find(bi => bi.id === businessInfoId) || editingInvoice.businessInfo || null;
+        })();
+
+        const resolvedTemplate = selectedTemplate || (() => {
+            if (!editingInvoice) return null;
+            const templateId = editingInvoice.templateId || editingInvoice.template?.id;
+            if (!templateId) return editingInvoice.template || null;
+            return invoiceTemplates.find(t => t.id === templateId) || editingInvoice.template || null;
+        })();
+
         return {
             id: invoiceId,
             project: selectedProject,
@@ -814,11 +941,14 @@ const InvoiceGenerator = ({
             taxRate: pricing.taxRate,
             taxLabel: pricing.taxLabel,
             taxOverride: taxOverride.enabled ? taxOverride : null,
-            paymentMethod: selectedPaymentMethod ? { ...selectedPaymentMethod } : null,
-            businessInfo: selectedBusinessInfo ? { ...selectedBusinessInfo } : null,
+            paymentMethod: resolvedPaymentMethod ? { ...resolvedPaymentMethod } : null,
+            paymentMethodId: resolvedPaymentMethod?.id || null,
+            businessInfo: resolvedBusinessInfo ? { ...resolvedBusinessInfo } : null,
+            businessInfoId: resolvedBusinessInfo?.id || null,
             clientId: selectedClient?.id || null,
             currency: selectedClient?.defaultCurrency || getPreferredCurrency(),
-            template: selectedTemplate ? { ...selectedTemplate } : null,
+            template: resolvedTemplate ? { ...resolvedTemplate } : null,
+            templateId: resolvedTemplate?.id || null,
             invoiceNumber: invoiceNumber,
             // Store dates in ISO format (YYYY-MM-DD) for portability
             date: useInvoiceDateOverride && invoiceDateOverride 
@@ -879,8 +1009,12 @@ const InvoiceGenerator = ({
                 tax: pricing.tax,
                 taxRate: pricing.taxRate,
                 taxLabel: pricing.taxLabel,
-                paymentMethod: selectedPaymentMethod,
-                businessInfo: selectedBusinessInfo,
+                paymentMethod: resolvedPaymentMethod,
+                paymentMethodId: resolvedPaymentMethod?.id || null,
+                businessInfo: resolvedBusinessInfo,
+                businessInfoId: resolvedBusinessInfo?.id || null,
+                template: resolvedTemplate,
+                templateId: resolvedTemplate?.id || null,
                 invoiceNumber: invoiceNumber,
                 // Display dates in locale format for PDF
                 date: useInvoiceDateOverride && invoiceDateOverride 
@@ -891,6 +1025,74 @@ const InvoiceGenerator = ({
             })
         };
     };
+
+    const syncInvoiceAdjustments = useCallback((invoiceData, adjustmentTimestamp) => {
+        if (!invoiceData || !Array.isArray(invoiceData.tasks)) return;
+
+        const invoiceId = invoiceData.id;
+        const existingAdjustments = timeEntries.filter(entry =>
+            entry.source === 'invoice-adjustment' && entry.invoiceId === invoiceId
+        );
+        const existingByTaskId = new Map(existingAdjustments.map(entry => [entry.taskId, entry]));
+
+        const tasksToAdjust = invoiceData.tasks.filter(task => task && task.id);
+        const taskIdsToAdjust = new Set(tasksToAdjust.map(task => task.id));
+
+        tasksToAdjust.forEach(task => {
+            if (task.useFlatRate) return;
+
+            const originalMs = Number.isFinite(task.originalTimeMs)
+                ? task.originalTimeMs
+                : (Number(task.originalHours) || 0) * 3600000;
+            const desiredMs = (Number(task.hours) || 0) * 3600000;
+            const deltaMs = desiredMs - originalMs;
+
+            const existingEntry = existingByTaskId.get(task.id);
+
+            if (deltaMs <= 0) {
+                if (existingEntry) {
+                    deleteEntry(existingEntry.id);
+                }
+                return;
+            }
+
+            const startTime = existingEntry?.start || (adjustmentTimestamp - deltaMs);
+            const endTime = startTime + deltaMs;
+            const hourlyRate = Number.isFinite(task.hourlyRate) ? task.hourlyRate : null;
+
+            if (existingEntry) {
+                updateEntry(existingEntry.id, {
+                    start: startTime,
+                    end: endTime,
+                    note: 'Invoice adjustment',
+                    source: 'invoice-adjustment',
+                    invoiceId,
+                    billedAt: adjustmentTimestamp,
+                    billedInvoiceId: invoiceId,
+                    billedHourlyRate: hourlyRate
+                });
+                return;
+            }
+
+            createEntry({
+                taskId: task.id,
+                start: startTime,
+                end: endTime,
+                note: 'Invoice adjustment',
+                source: 'invoice-adjustment',
+                invoiceId,
+                billedAt: adjustmentTimestamp,
+                billedInvoiceId: invoiceId,
+                billedHourlyRate: hourlyRate
+            });
+        });
+
+        existingAdjustments.forEach(entry => {
+            if (!taskIdsToAdjust.has(entry.taskId)) {
+                deleteEntry(entry.id);
+            }
+        });
+    }, [timeEntries, createEntry, updateEntry, deleteEntry]);
 
     /**
      * Save invoice (create new or update existing)
@@ -921,9 +1123,12 @@ const InvoiceGenerator = ({
             }
         }
 
+        const adjustmentTimestamp = Date.now();
+        syncInvoiceAdjustments(invoiceData, adjustmentTimestamp);
+
         // Update tasks to set lastBilledAt for billed tasks and projects
         if (selectedProject && !editingInvoice) {
-            const currentTime = Date.now();
+            const currentTime = adjustmentTimestamp;
             
             // Get all task IDs that should be marked as billed (including merged subtasks)
             // Make sure we only include tasks from the current project
@@ -970,6 +1175,7 @@ const InvoiceGenerator = ({
             if (Array.isArray(timeEntries) && timeEntries.length > 0) {
                 timeEntries.forEach(entry => {
                     if (!billedRateByTaskId.has(entry.taskId)) return;
+                    if (entry.source === 'invoice-adjustment') return;
 
                     const cutoff = previousBillingCutoffs.get(entry.taskId) || 0;
                     if (entry.start <= cutoff) return;
@@ -1221,6 +1427,7 @@ const InvoiceGenerator = ({
         const unbilledEntries = timeEntries.filter(entry => {
             // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
+            if (entry.source === 'invoice-adjustment') return false;
             
             // Find the task for this entry
             const task = projectTasks.find(t => t.id === entry.taskId);
@@ -1344,11 +1551,14 @@ const InvoiceGenerator = ({
                     useInvoiceDateOverride={useInvoiceDateOverride}
                     setUseInvoiceDateOverride={setUseInvoiceDateOverride}
                     // Modal stacking functions
-                    openClientModal={openClientModal}
-                    openProjectModal={openProjectModal}
-                    openBusinessModal={openBusinessModal}
-                    openPaymentMethodModal={openPaymentMethodModal}
-                    openTemplateModal={openTemplateModal}
+                    openClientModal={handleOpenClientModal}
+                    openProjectModal={handleOpenProjectModal}
+                    openBusinessModal={handleOpenBusinessModal}
+                    openPaymentMethodModal={handleOpenPaymentMethodModal}
+                    openTemplateModal={handleOpenTemplateModal}
+                    saveFormState={saveInvoiceFormState}
+                    getSavedState={getInvoiceFormState}
+                    clearSavedState={clearInvoiceFormState}
                 />
             )}
             <InvoicePreviewModal

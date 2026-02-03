@@ -38,6 +38,7 @@ const ClientDashboard = ({
     clients,
     invoices,
     invoiceTemplates,
+    activeModal,
     navigateToProject,
     openClientModal,
     openProjectModal,
@@ -123,6 +124,7 @@ const ClientDashboard = ({
                 const unbilledEntries = clientTimeEntries.filter(entry => {
                     const task = clientTasks.find(t => t.id === entry.taskId);
                     if (!task || !projectTaskIds.includes(entry.taskId)) return false;
+                    if (entry.source === 'invoice-adjustment') return false;
                     
                     // Use task.lastBilledAt only - if never billed, all entries are pending
                     const taskLastBilledAt = task.lastBilledAt || 0;
@@ -189,6 +191,7 @@ const ClientDashboard = ({
         const unbilledEntries = clientTimeEntries.filter(entry => {
             // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
+            if (entry.source === 'invoice-adjustment') return false;
             
             // Find the task for this entry
             const task = projectTasks.find(t => t.id === entry.taskId);
@@ -236,6 +239,7 @@ const ClientDashboard = ({
         const unbilledEntries = clientTimeEntries.filter(entry => {
             // Only include entries for tasks that are explicitly marked as billable
             if (!billableTaskIds.includes(entry.taskId)) return false;
+            if (entry.source === 'invoice-adjustment') return false;
             
             // Find the task for this entry
             const task = projectTasks.find(t => t.id === entry.taskId);
@@ -485,6 +489,7 @@ const ClientDashboard = ({
                         paymentMethods={paymentMethods}
                         businessInfos={businessInfos}
                         clients={clients}
+                        activeModal={activeModal}
                         showButton={true}
                         // Modal functions
                         openClientModal={openClientModal}

@@ -99,9 +99,11 @@ const ToDoToday = ({
                         completed={isCompleted}
                         recurringOverdue={Boolean(task.recurringStatus?.isOverdue)}
                     />
-                    <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                        {formatDurationWithSeconds(task.recentTime || 0)}
-                    </div>
+                    {(task.recentTime || 0) > 0 && (
+                        <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                            {formatDurationWithSeconds(task.recentTime || 0)}
+                        </div>
+                    )}
                     <div className="flex flex-shrink-0 space-x-1">
                         {renderTaskControls(task, shouldDisable)}
                         {!hideActions && (

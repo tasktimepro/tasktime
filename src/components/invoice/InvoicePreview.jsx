@@ -92,7 +92,7 @@ const InvoicePreview = ({
                                         setDiscountValue(parseFloat(newValue) || 0);
                                     }
                                 }}
-                                className="flex-1 text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground sensitive-data"
+                                className="flex-1 text-sm border border-border rounded-md px-2 py-1 text-foreground sensitive-data"
                                 placeholder={discountType === 'percentage' ? '0.00' : '0.00'}
                             />
                         </div>
@@ -114,7 +114,7 @@ const InvoicePreview = ({
                                     setShippingAmount(parseFloat(newValue) || 0);
                                 }
                             }}
-                            className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground sensitive-data"
+                            className="w-full text-sm border border-border rounded-md px-2 py-1 text-foreground sensitive-data"
                             placeholder="0.00"
                         />
                     </div>
@@ -155,7 +155,7 @@ const InvoicePreview = ({
                                         type="text"
                                         value={taxOverride.label}
                                         onChange={(e) => setTaxOverride(prev => ({ ...prev, label: e.target.value }))}
-                                        className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground sensitive-data"
+                                        className="w-full text-sm border border-border rounded-md px-2 py-1 text-foreground sensitive-data"
                                         placeholder="Tax label"
                                     />
                                 </div>
@@ -174,7 +174,7 @@ const InvoicePreview = ({
                                                 setTaxOverride(prev => ({ ...prev, rate: parseFloat(newValue) || 0 }));
                                             }
                                         }}
-                                        className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background text-foreground"
+                                        className="w-full text-sm border border-border rounded-md px-2 py-1 text-foreground"
                                         placeholder="Rate %"
                                     />
                                 </div>

@@ -281,7 +281,7 @@ const Dashboard = ({
             // Calculate pending billable time with task-by-task rounding (consistent with invoice calculation)
             // Use task.lastBilledAt only - if never billed, all entries are pending
             const taskLastBilledAt = task.lastBilledAt || 0;
-            if (entry.start > taskLastBilledAt && task.billable === true) {
+            if (entry.start > taskLastBilledAt && task.billable === true && entry.source !== 'invoice-adjustment') {
                 if (!projectActivity[task.projectId].taskPendingTime) {
                     projectActivity[task.projectId].taskPendingTime = {};
                 }

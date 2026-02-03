@@ -61,6 +61,8 @@ export interface TimeEntry {
     start: number;
     end: number;
     note?: string;
+    source?: string;
+    invoiceId?: string | null;
     billedHourlyRate?: number | null;
     billedAt?: number | null;
     billedInvoiceId?: string | null;

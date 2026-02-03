@@ -7,6 +7,7 @@ type TimeEntry = {
     start: number;
     end: number;
     deletedAt?: number;
+    source?: string;
 };
 
 type TaskItem = {
@@ -88,6 +89,7 @@ const useMetricsCalculation = ({
         entriesInRange.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
             if (!task || task.deletedAt || task.billable !== true) return; // Only include explicitly billable tasks, skip deleted tasks
+            if (entry.source === 'invoice-adjustment') return;
 
             // Only include unbilled entries (after last billing date)
             const billingCutoff = task.lastBilledAt || 0;
@@ -287,6 +289,7 @@ const useMetricsCalculation = ({
         entriesInRange.forEach(entry => {
             const task = tasks.find(t => t.id === entry.taskId);
             if (!task || task.billable !== true) return; // Only include explicitly billable tasks
+            if (entry.source === 'invoice-adjustment') return;
 
             const project = projects.find(p => p.id === task.projectId);
             if (!project || !project.hourlyRate) return;

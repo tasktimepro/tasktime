@@ -164,7 +164,7 @@ const InvoiceTaskSelector = ({
                                 }
 
                                 return (
-                                    <div key={task.id} className="flex items-center justify-between p-3 bg-muted rounded border">
+                                    <div key={task.id} className="flex items-center justify-between p-3 bg-card rounded border">
                                         <div className="flex items-center space-x-3 flex-1">
                                             {/* Task selection checkbox */}
                                             <CustomCheckbox
@@ -229,7 +229,7 @@ const InvoiceTaskSelector = ({
                                                             min="1"
                                                             value={taskQuantities[task.id] || 1}
                                                             onChange={(e) => handleQuantityChange(task.id, e.target.value)}
-                                                            className="w-16 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
+                                                            className="w-16 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground"
                                                             placeholder="1"
                                                         />
                                                     </div>
@@ -241,7 +241,7 @@ const InvoiceTaskSelector = ({
                                                             min="0"
                                                             value={currentFlatRate}
                                                             onChange={(e) => handleFlatRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground sensitive-data"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground sensitive-data"
                                                             placeholder="0.00"
                                                         />
                                                     </div>
@@ -276,28 +276,9 @@ const InvoiceTaskSelector = ({
                                                             type="number"
                                                             step="0.01"
                                                             min="0"
-                                                            value={(() => {
-                                                                if (currentHours === '') return '';
-
-                                                                // Ensure currentHours is a number
-                                                                const numericCurrentHours = parseFloat(currentHours) || 0;
-
-                                                                if (mergedSubtasks[task.id]) {
-                                                                    // Calculate combined hours for display purposes
-                                                                    const subtaskHours = invoiceTasks
-                                                                        .filter(subtask => subtask.parentTaskId === task.id)
-                                                                        .reduce((total, subtask) => {
-                                                                            const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
-                                                                            return total + (parseFloat(hours) || 0);
-                                                                        }, 0);
-                                                                    const totalHours = numericCurrentHours + subtaskHours;
-                                                                    return totalHours.toFixed(2);
-                                                                }
-
-                                                                return numericCurrentHours.toFixed(2);
-                                                            })()}
+                                                            value={currentHours === '' ? '' : currentHours}
                                                             onChange={(e) => handleHoursChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground"
                                                             title={mergedSubtasks[task.id] ? "This shows the combined hours of parent and subtasks. Editing changes the parent task hours." : ""}
                                                         />
                                                     </div>
@@ -309,7 +290,7 @@ const InvoiceTaskSelector = ({
                                                             min="0"
                                                             value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                             onChange={(e) => handleTaskHourlyRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground sensitive-data"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground sensitive-data"
                                                             placeholder="0.00"
                                                         />
                                                     </div>
@@ -329,7 +310,7 @@ const InvoiceTaskSelector = ({
                                 const isUsingFlatRate = task.useFlatRate || useFlatRate[task.id] || false;
 
                                 return (
-                                    <div key={task.id} className="flex items-center justify-between p-3 bg-muted rounded border">
+                                    <div key={task.id} className="flex items-center justify-between p-3 bg-card rounded border">
                                         <div className="flex items-center space-x-3 flex-1">
                                             {/* Task remove button */}
                                             <Button
@@ -337,7 +318,7 @@ const InvoiceTaskSelector = ({
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => handleRemoveAdditionalTask(task.id)}
-                                                className="text-red-600 hover:text-red-800"
+                                                className="text-destructive-strong hover-text-destructive-strong"
                                                 title="Remove task"
                                                 aria-label="Remove task"
                                             >
@@ -377,7 +358,7 @@ const InvoiceTaskSelector = ({
                                                             min="1"
                                                             value={task.quantity || 1}
                                                             onChange={(e) => handleAdditionalTaskQuantityChange(task.id, e.target.value)}
-                                                            className="w-16 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
+                                                            className="w-16 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground"
                                                             placeholder="1"
                                                         />
                                                     </div>
@@ -389,7 +370,7 @@ const InvoiceTaskSelector = ({
                                                             min="0"
                                                             value={currentFlatRate}
                                                             onChange={(e) => handleAdditionalTaskFlatRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground sensitive-data"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground sensitive-data"
                                                             placeholder="0.00"
                                                         />
                                                     </div>
@@ -405,7 +386,7 @@ const InvoiceTaskSelector = ({
                                                             min="0"
                                                             value={task.hours}
                                                             onChange={(e) => handleAdditionalTaskHoursChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground"
                                                         />
                                                     </div>
                                                     <div className="text-right">
@@ -416,7 +397,7 @@ const InvoiceTaskSelector = ({
                                                             min="0"
                                                             value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                             onChange={(e) => handleAdditionalTaskHourlyRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md bg-background text-foreground sensitive-data"
+                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground sensitive-data"
                                                             placeholder="0.00"
                                                         />
                                                     </div>
@@ -430,7 +411,7 @@ const InvoiceTaskSelector = ({
 
                         {/* Add Task Form */}
                         {showAddTaskForm && (
-                            <div className="mt-2 mb-2 p-3 bg-muted border border-border rounded-md">
+                            <div className="mt-2 mb-2 p-3 bg-card border border-border rounded-md">
                                 <div className="space-y-3">
                                     <div>
                                         <Input
@@ -453,7 +434,7 @@ const InvoiceTaskSelector = ({
                                     <div className="flex justify-between items-end">
                                         {/* Checkbox + Inputs */}
                                         <div className="flex items-center space-x-2">
-                                            <div className="flex items-center space-x-2 mr-1">
+                                            <div className="flex items-center space-x-2">
                                                 <CustomCheckbox
                                                     checked={newTaskUseFlatRate}
                                                     onChange={handleToggleNewTaskFlatRate}

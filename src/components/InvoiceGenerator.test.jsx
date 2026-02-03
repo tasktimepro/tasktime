@@ -29,16 +29,21 @@ const taskHookMocks = vi.hoisted(() => ({
 
 const timeEntryHookMocks = vi.hoisted(() => ({
 
-    updateEntry: vi.fn()
+    updateEntry: vi.fn(),
+    createEntry: vi.fn(),
+    deleteEntry: vi.fn()
 }))
 
 const templateHookMocks = vi.hoisted(() => ({
 
-    updateInvoiceTemplate: vi.fn()
+    updateInvoiceTemplate: vi.fn(),
+    invoiceTemplates: []
 }))
 
 let modalConfig = {
-    applyDateOverride: false
+    applyDateOverride: false,
+    skipTemplateSelection: false,
+    adjustTaskHours: null
 }
 
 vi.mock('../hooks/useToast.ts', () => ({
@@ -78,23 +83,16 @@ vi.mock('../hooks/useTasks.ts', () => ({
 vi.mock('../hooks/useTimeEntries.ts', () => ({
 
     useTimeEntries: () => ({
-        updateEntry: timeEntryHookMocks.updateEntry
+        updateEntry: timeEntryHookMocks.updateEntry,
+        createEntry: timeEntryHookMocks.createEntry,
+        deleteEntry: timeEntryHookMocks.deleteEntry
     })
 }))
 
 vi.mock('../hooks/useInvoiceTemplates.ts', () => ({
 
     useInvoiceTemplates: () => ({
-        invoiceTemplates: [
-            {
-                id: 'tpl-1',
-                isDefault: true,
-                invoiceNumberFormat: 'INV-{year}{month}{day}-{sequential}',
-                useSequentialNumbers: true,
-                currentSequentialNumber: 1,
-                dueDateType: 'none'
-            }
-        ],
+        invoiceTemplates: templateHookMocks.invoiceTemplates,
         updateInvoiceTemplate: templateHookMocks.updateInvoiceTemplate
     })
 }))
@@ -125,30 +123,55 @@ vi.mock('./invoice/InvoiceGeneratorButton', () => ({
 
 vi.mock('./invoice/InvoiceModal', () => ({
 
-    default: (props) => (
-        <div>
-            {modalConfig.applyDateOverride && (
+    default: (props) => {
+        const didApplyAdjustments = React.useRef(false)
+
+        React.useEffect(() => {
+            if (!props.showInvoiceForm) {
+                didApplyAdjustments.current = false
+                return
+            }
+
+            if (didApplyAdjustments.current || !modalConfig.adjustTaskHours) {
+                return
+            }
+
+            didApplyAdjustments.current = true
+            props.handleHoursChange(
+                modalConfig.adjustTaskHours.taskId,
+                modalConfig.adjustTaskHours.hours
+            )
+        }, [props.showInvoiceForm, props.handleHoursChange])
+
+        return (
+            props.showInvoiceForm ? (
+            <div>
+                {modalConfig.applyDateOverride && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            props.setUseInvoiceDateOverride(true)
+                            props.setInvoiceDateOverride('2026-01-10')
+                        }}
+                    >
+                        Set Override
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={() => {
-                        props.setUseInvoiceDateOverride(true)
-                        props.setInvoiceDateOverride('2026-01-10')
+                        if (!modalConfig.skipTemplateSelection) {
+                            props.handleTemplateSelection('tpl-1')
+                        }
+                        props.handleSaveInvoice({ preventDefault: () => {} })
                     }}
                 >
-                    Set Override
+                    Save Invoice
                 </button>
-            )}
-            <button
-                type="button"
-                onClick={() => {
-                    props.handleTemplateSelection('tpl-1')
-                    props.handleSaveInvoice({ preventDefault: () => {} })
-                }}
-            >
-                Save Invoice
-            </button>
-        </div>
-    )
+            </div>
+            ) : null
+        )
+    }
 }))
 
 vi.mock('../utils/pdfUtils.ts', () => ({
@@ -185,7 +208,19 @@ describe('InvoiceGenerator', () => {
         toastMocks.showError.mockClear()
         toastMocks.showWarning.mockClear()
         timeEntryHookMocks.updateEntry.mockClear()
-        modalConfig = { applyDateOverride: false }
+        timeEntryHookMocks.createEntry.mockClear()
+        timeEntryHookMocks.deleteEntry.mockClear()
+        modalConfig = { applyDateOverride: false, skipTemplateSelection: false, adjustTaskHours: null }
+        templateHookMocks.invoiceTemplates = [
+            {
+                id: 'tpl-1',
+                isDefault: true,
+                invoiceNumberFormat: 'INV-{year}{month}{day}-{sequential}',
+                useSequentialNumbers: true,
+                currentSequentialNumber: 1,
+                dueDateType: 'none'
+            }
+        ]
     })
 
     afterEach(() => {
@@ -213,6 +248,31 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.currency).toBe('EUR')
     })
 
+    it('creates invoice adjustment entries when hours increase', async () => {
+
+        const fixedNow = new Date('2026-01-19T12:00:00Z').getTime()
+        const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow)
+
+        modalConfig.adjustTaskHours = { taskId: 'task-1', hours: 2 }
+        timeEntryHookMocks.createEntry.mockClear()
+        const user = userEvent.setup()
+
+        renderGenerator()
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(timeEntryHookMocks.createEntry).toHaveBeenCalledTimes(1)
+        const entry = timeEntryHookMocks.createEntry.mock.calls[0][0]
+        expect(entry.taskId).toBe('task-1')
+        expect(entry.source).toBe('invoice-adjustment')
+        expect(entry.invoiceId).toEqual(expect.any(String))
+        expect(entry.billedInvoiceId).toEqual(expect.any(String))
+        expect(entry.end - entry.start).toBe(3600000)
+
+        dateNowSpy.mockRestore()
+    })
+
     it('updates an existing invoice without changing id or number', async () => {
 
         invoiceHookMocks.updateInvoice.mockClear()
@@ -233,12 +293,132 @@ describe('InvoiceGenerator', () => {
             editingInvoice
         })
 
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await new Promise((resolve) => setTimeout(resolve, 0))
         await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
 
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
         const [invoiceId, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
         expect(invoiceId).toBe('inv-1')
         expect(invoiceData.invoiceNumber).toBe('INV-OLD')
+    })
+
+    it('refreshes payment method data when updating an invoice', async () => {
+
+        invoiceHookMocks.updateInvoice.mockClear()
+        const user = userEvent.setup()
+
+        const editingInvoice = {
+            id: 'inv-2',
+            invoiceNumber: 'INV-002',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
+            date: '2026-01-05',
+            createdAt: 222,
+            paymentMethod: {
+                id: 'pm-1',
+                title: 'Old Method',
+                custom: [{ label: 'Tag', value: 'Old' }]
+            },
+            template: { id: 'tpl-1', name: 'Template One' }
+        }
+
+        renderGenerator({
+            editingInvoice,
+            paymentMethods: [
+                { id: 'pm-1', title: 'Updated Method', custom: [{ label: 'Tag', value: 'New' }] }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
+        const [, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
+        expect(invoiceData.paymentMethod?.title).toBe('Updated Method')
+        expect(invoiceData.paymentMethodId).toBe('pm-1')
+    })
+
+    it('refreshes business info data when updating an invoice', async () => {
+
+        invoiceHookMocks.updateInvoice.mockClear()
+        const user = userEvent.setup()
+
+        const editingInvoice = {
+            id: 'inv-3',
+            invoiceNumber: 'INV-003',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
+            date: '2026-01-05',
+            createdAt: 333,
+            businessInfo: {
+                id: 'bi-1',
+                name: 'Old Business'
+            },
+            template: { id: 'tpl-1', name: 'Template One' }
+        }
+
+        renderGenerator({
+            editingInvoice,
+            businessInfos: [
+                { id: 'bi-1', name: 'Updated Business' }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
+        const [, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
+        expect(invoiceData.businessInfo?.name).toBe('Updated Business')
+        expect(invoiceData.businessInfoId).toBe('bi-1')
+    })
+
+    it('refreshes template data when updating an invoice', async () => {
+
+        invoiceHookMocks.updateInvoice.mockClear()
+        modalConfig.skipTemplateSelection = true
+        const user = userEvent.setup()
+
+        templateHookMocks.invoiceTemplates = [
+            {
+                id: 'tpl-1',
+                name: 'Updated Template',
+                isDefault: true,
+                invoiceNumberFormat: 'INV-{year}{month}{day}-{sequential}',
+                useSequentialNumbers: true,
+                currentSequentialNumber: 1,
+                dueDateType: 'none'
+            }
+        ]
+
+        const editingInvoice = {
+            id: 'inv-4',
+            invoiceNumber: 'INV-004',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
+            date: '2026-01-05',
+            createdAt: 444,
+            template: { id: 'tpl-1', name: 'Old Template' }
+        }
+
+        renderGenerator({
+            editingInvoice
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
+        const [, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
+        expect(invoiceData.template?.name).toBe('Updated Template')
+        expect(invoiceData.templateId).toBe('tpl-1')
     })
 
     it('snapshots billed hourly rate on time entries', async () => {
