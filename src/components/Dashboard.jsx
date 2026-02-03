@@ -37,7 +37,7 @@ const Dashboard = ({
     const { showWarning, showSuccess } = useToast();
     
     // Use Yjs hooks directly
-    const { tasks, updateTask, deleteTask, archiveTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate } = useTasks();
+    const { tasks, updateTask, deleteTask, archiveTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus } = useTasks();
     const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
     const { getForDate } = usePlannerAttachments();
@@ -50,10 +50,14 @@ const Dashboard = ({
 
     const getTaskCompletedStatus = useCallback((task) => {
         if (task.recurring && todayStr) {
-            return isCompletedOnDate(task, todayStr);
+            const status = getRecurringStatus(task, todayStr);
+            if (status.effectiveDateStr) {
+                return isCompletedOnDate(task, status.effectiveDateStr);
+            }
+            return false;
         }
         return task.completed || false;
-    }, [isCompletedOnDate, todayStr]);
+    }, [getRecurringStatus, isCompletedOnDate, todayStr]);
 
     const {
         preferredCurrency,
@@ -378,7 +382,9 @@ const Dashboard = ({
 
         // Update task completion status and lastActive timestamp
         if (task.recurring && todayStr) {
-            toggleRecurringCompletion(task.id, todayStr);
+            const status = getRecurringStatus(task, todayStr);
+            const effectiveDateStr = status.effectiveDateStr || todayStr;
+            toggleRecurringCompletion(task.id, effectiveDateStr);
         } else {
             updateTask(task.id, {
                 completed: newCompletedStatus,
@@ -386,15 +392,22 @@ const Dashboard = ({
                 lastActive: now
             });
         }
-    }, [timers, createEntry, clearTimer, updateTask, getTaskCompletedStatus, toggleRecurringCompletion, todayStr]);
+    }, [timers, createEntry, clearTimer, updateTask, getTaskCompletedStatus, toggleRecurringCompletion, todayStr, getRecurringStatus]);
 
     /**
      * Handle clicking on task title to navigate to project
      */
     const handleTaskTitleClick = useCallback((task) => {
         if (!task) return;
+
+        if (task?.recurring && todayStr) {
+            const status = getRecurringStatus(task, todayStr);
+            onViewTask?.(task, { dateStr: status.effectiveDateStr || todayStr });
+            return;
+        }
+
         onViewTask?.(task, { dateStr: todayStr });
-    }, [onViewTask, todayStr]);
+    }, [onViewTask, todayStr, getRecurringStatus]);
 
     const handleProjectTitleClick = useCallback((task) => {
         if (task?.project?.id && navigateToProject) {
@@ -482,15 +495,17 @@ const Dashboard = ({
         return list.map((task) => {
             const project = task.projectId ? projects.find(p => p.id === task.projectId) : null;
             const parentTask = task.parentTaskId ? tasks.find(t => t.id === task.parentTaskId) : null;
+            const recurringStatus = task.recurring && todayStr ? getRecurringStatus(task, todayStr) : null;
 
             return {
                 ...task,
                 project,
                 parentTask,
-                recentTime: taskTimeTotals[task.id] || 0
+                recentTime: taskTimeTotals[task.id] || 0,
+                recurringStatus
             };
         });
-    }, [projects, tasks, taskTimeTotals]);
+    }, [projects, tasks, taskTimeTotals, getRecurringStatus, todayStr]);
 
     const overdueTasks = useMemo(() => {
         return enhanceTaskList(getOverdueTasks());

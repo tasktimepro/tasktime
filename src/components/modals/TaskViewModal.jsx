@@ -13,9 +13,9 @@ import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useToast } from '@/hooks/useToast';
-import { formatRecurringLabel, isRecurringTaskDueOnDate } from '@/utils/recurringUtils';
+import { formatRecurringLabel } from '@/utils/recurringUtils';
 import { formatDurationWithSeconds, getTodayString, toDisplayDate } from '@/utils/dateUtils';
-import { addDays, differenceInCalendarDays, endOfDay, startOfDay } from 'date-fns';
+import { differenceInCalendarDays, endOfDay, parseISO, startOfDay } from 'date-fns';
 import TimerControls from '../TimerControls';
 import TaskActionsMenu from '../task/TaskActionsMenu';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
@@ -50,7 +50,7 @@ const TaskViewModal = ({
 }) => {
     const { showSuccess } = useToast();
     const { projects } = useProjects();
-    const { tasks, updateTask, toggleRecurringCompletion, isCompletedOnDate } = useTasks();
+    const { tasks, updateTask, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer, isTaskTimerActive } = useTimers();
     const { deleteAttachment } = usePlannerAttachments();
@@ -70,19 +70,24 @@ const TaskViewModal = ({
         return tasks.find((item) => item.id === currentTask.parentTaskId) || null;
     }, [currentTask, tasks]);
 
+    const todayStr = useMemo(() => getTodayString(), []);
+
+    const recurringStatus = useMemo(() => {
+        if (!currentTask?.recurring) return null;
+        return getRecurringStatus(currentTask, todayStr || undefined);
+    }, [currentTask, getRecurringStatus, todayStr]);
+
     const effectiveDateStr = useMemo(() => {
         if (dateStr) return dateStr;
-        return getTodayString();
-    }, [dateStr]);
-
-    const todayDate = useMemo(() => startOfDay(new Date()), []);
+        if (recurringStatus?.effectiveDateStr) return recurringStatus.effectiveDateStr;
+        return todayStr || null;
+    }, [dateStr, recurringStatus, todayStr]);
 
     const dayTimeLabel = useMemo(() => {
         if (!effectiveDateStr) return 'Today';
-        const todayStr = getTodayString();
         if (todayStr && effectiveDateStr === todayStr) return 'Today';
         return toDisplayDate(effectiveDateStr, { month: 'short', day: 'numeric', year: 'numeric' }) || 'Today';
-    }, [effectiveDateStr]);
+    }, [effectiveDateStr, todayStr]);
 
     const isCompleted = useMemo(() => {
         if (!currentTask) return false;
@@ -93,23 +98,23 @@ const TaskViewModal = ({
     }, [currentTask, effectiveDateStr, isCompletedOnDate]);
 
     const isRecurringDueToday = useMemo(() => {
-        if (!currentTask?.recurring) return false;
-        return isRecurringTaskDueOnDate(todayDate, currentTask.recurring);
-    }, [currentTask, todayDate]);
+        return Boolean(recurringStatus?.isDueToday);
+    }, [recurringStatus]);
+
+    const isRecurringOverdue = useMemo(() => {
+        return Boolean(recurringStatus?.isOverdue);
+    }, [recurringStatus]);
 
     const nextRecurringDueInDays = useMemo(() => {
         if (!currentTask?.recurring) return null;
         if (isRecurringDueToday) return 0;
+        if (!recurringStatus?.nextDueDateStr || !todayStr) return null;
 
-        for (let offset = 1; offset <= 366; offset += 1) {
-            const checkDate = addDays(todayDate, offset);
-            if (isRecurringTaskDueOnDate(checkDate, currentTask.recurring)) {
-                return differenceInCalendarDays(checkDate, todayDate);
-            }
-        }
-
-        return null;
-    }, [currentTask, isRecurringDueToday, todayDate]);
+        return differenceInCalendarDays(
+            parseISO(recurringStatus.nextDueDateStr),
+            parseISO(todayStr)
+        );
+    }, [currentTask, isRecurringDueToday, recurringStatus, todayStr]);
 
     const subtasks = useMemo(() => {
         if (!currentTask) return [];
@@ -277,7 +282,7 @@ const TaskViewModal = ({
         ? (currentTask.recurring ? 'Undo for today' : 'Mark as not done')
         : (currentTask.recurring ? 'Done for today' : 'Mark as done');
 
-    const shouldShowCompleteAction = !currentTask.recurring || isRecurringDueToday;
+    const shouldShowCompleteAction = !currentTask.recurring || isRecurringDueToday || isRecurringOverdue || Boolean(dateStr);
     const dueInLabel = nextRecurringDueInDays === null
         ? 'Not due today'
         : `Due in ${nextRecurringDueInDays} ${nextRecurringDueInDays === 1 ? 'day' : 'days'}`;

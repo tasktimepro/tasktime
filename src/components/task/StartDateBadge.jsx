@@ -30,11 +30,20 @@ const getRelativeLabel = (dateString) => {
  * @param {string|null|undefined} props.startDate
  * @param {Object|null|undefined} props.recurring
  * @param {boolean} props.completed
+ * @param {boolean} props.recurringOverdue
  */
-const StartDateBadge = ({ startDate, recurring, completed }) => {
+const StartDateBadge = ({ startDate, recurring, completed, recurringOverdue = false }) => {
     const today = getTodayString();
 
     if (recurring) {
+        if (recurringOverdue && !completed) {
+            return (
+                <Badge variant="warning">
+                    Overdue
+                </Badge>
+            );
+        }
+
         return (
             <Badge variant="secondary" className="flex items-center">
                 <ArrowPathIcon className="h-3 w-3 mr-1" />

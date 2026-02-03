@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import TimeEntriesModal from '../../TimeEntriesModal';
 import TaskHeader from '../TaskHeader';
 import TaskActions from '../TaskActions';
 import StartDateBadge from '../StartDateBadge';
+import { BILLABLE_TIME_THRESHOLD_MS } from '../../../constants/app';
 import { formatDurationWithSeconds, getTodayString } from '../../../utils/dateUtils.ts';
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
@@ -54,6 +55,28 @@ const SubtaskItem = ({
         const timerTime = isTimerActive ? (projectTimer?.elapsedTime || 0) : 0;
         return mainTaskTime + timerTime;
     }, [mainTaskTime, isTimerActive, projectTimer]);
+
+    // Auto-mark billable when significant time logged (post last billed) and user hasn't set it
+    const hasSignificantBillableTime = useMemo(() => {
+        const cutoff = task.lastBilledAt || task.createdAt || 0;
+        const relevantEntries = timeEntries.filter((entry) => {
+            if (!entry || typeof entry.end !== 'number') return false;
+            if (entry.end <= entry.start) return false;
+            return entry.taskId === task.id && entry.start > cutoff;
+        });
+
+        const totalBillableMs = relevantEntries.reduce((total, entry) => {
+            return total + (entry.end - entry.start);
+        }, 0);
+
+        return totalBillableMs >= BILLABLE_TIME_THRESHOLD_MS;
+    }, [timeEntries, task.id, task.lastBilledAt, task.createdAt]);
+
+    useEffect(() => {
+        if (hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
+            updateTask(task.id, { billable: true, lastActive: Date.now() });
+        }
+    }, [hasSignificantBillableTime, task.billableSetByUser, task.billable, task.id, updateTask]);
 
     /**
      * Toggle subtask completion status

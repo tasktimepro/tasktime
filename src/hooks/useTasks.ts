@@ -10,7 +10,7 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
 import type { Task } from '@/stores/yjs/types';
 import { getTodayString, toStorageDate } from '@/utils/dateUtils.ts';
-import { isRecurringTaskDueOnDate } from '@/utils/recurringUtils.ts';
+import { findNextRecurringDueDate, findPreviousRecurringDueDate, isRecurringTaskDueOnDate } from '@/utils/recurringUtils.ts';
 import { isRecurringCompletedOnDate, toggleRecurringCompletionDate } from '@/utils/recurringCompletionUtils.ts';
 
 export interface UseTasksOptions {
@@ -137,45 +137,6 @@ export function useTasks(options: UseTasksOptions = {}) {
         return projectActiveTasks.filter(task => !task.projectId);
     }, [projectActiveTasks]);
 
-    const getOverdueTasks = useCallback(() => {
-        const today = getTodayString();
-        if (!today) return [] as Task[];
-
-        return projectActiveTasks.filter(task => {
-            if (task.recurring) return false;
-            if (!task.startDate) return false;
-            if (task.completed) {
-                return task.completedOnDate === today;
-            }
-            return task.startDate < today;
-        });
-    }, [projectActiveTasks]);
-
-    const getTasksForToday = useCallback(() => {
-        const today = getTodayString();
-        if (!today) return [] as Task[];
-
-        return projectActiveTasks.filter(task => {
-            if (task.recurring) {
-                return isRecurringTaskDueOnDate(new Date(), task.recurring);
-            }
-            return task.startDate === today;
-        });
-    }, [projectActiveTasks]);
-
-    const getUpcomingTasks = useCallback((days = 7) => {
-        const today = getTodayString();
-        const endDate = toStorageDate(addDays(new Date(), days));
-        if (!today || !endDate) return [] as Task[];
-
-        return projectActiveTasks.filter(task => {
-            if (task.completed) return false;
-            if (task.recurring) return false;
-            if (!task.startDate) return false;
-            return task.startDate > today && task.startDate <= endDate;
-        });
-    }, [projectActiveTasks]);
-
     // =========================================================================
     // Recurring Task Completion Helpers
     // =========================================================================
@@ -200,8 +161,121 @@ export function useTasks(options: UseTasksOptions = {}) {
         if (!task) return undefined;
 
         const nextCompletedDates = toggleRecurringCompletionDate(task.completedDatesByYear, dateStr);
-        return update(taskId, { completedDatesByYear: nextCompletedDates });
+        return update(taskId, { completedDatesByYear: nextCompletedDates, lastActive: Date.now() });
     }, [get, update]);
+
+    const getOverdueTasks = useCallback(() => {
+        const today = getTodayString();
+        if (!today) return [] as Task[];
+
+        return projectActiveTasks.filter(task => {
+            if (task.recurring) return false;
+            if (!task.startDate) return false;
+            if (task.completed) {
+                return task.completedOnDate === today;
+            }
+            return task.startDate < today;
+        });
+    }, [projectActiveTasks]);
+
+    const getTasksForToday = useCallback(() => {
+        const today = getTodayString();
+        if (!today) return [] as Task[];
+
+        const todayDate = new Date();
+
+        return projectActiveTasks.filter(task => {
+            if (task.recurring) {
+                if (isRecurringTaskDueOnDate(todayDate, task.recurring)) {
+                    return true;
+                }
+
+                const previousDueDate = findPreviousRecurringDueDate(todayDate, task.recurring);
+                const nextDueDate = findNextRecurringDueDate(todayDate, task.recurring);
+
+                if (!previousDueDate || !nextDueDate) return false;
+
+                const previousDueStr = toStorageDate(previousDueDate);
+                const nextDueStr = toStorageDate(nextDueDate);
+
+                if (!previousDueStr || !nextDueStr) return false;
+                if (today >= nextDueStr) return false;
+
+                const wasCompleted = isCompletedOnDate(task, previousDueStr);
+
+                if (!wasCompleted) return true;
+
+                if (!task.lastActive) return false;
+                const lastActiveStr = toStorageDate(new Date(task.lastActive));
+
+                return lastActiveStr === today;
+            }
+            return task.startDate === today;
+        });
+    }, [projectActiveTasks, isCompletedOnDate]);
+
+    const getUpcomingTasks = useCallback((days = 7) => {
+        const today = getTodayString();
+        const endDate = toStorageDate(addDays(new Date(), days));
+        if (!today || !endDate) return [] as Task[];
+
+        return projectActiveTasks.filter(task => {
+            if (task.completed) return false;
+            if (task.recurring) return false;
+            if (!task.startDate) return false;
+            return task.startDate > today && task.startDate <= endDate;
+        });
+    }, [projectActiveTasks]);
+
+    const getRecurringStatus = useCallback((task: Task, todayStr?: string) => {
+        if (!task.recurring) {
+            return {
+                isDueToday: false,
+                isOverdue: false,
+                lastDueDateStr: null as string | null,
+                nextDueDateStr: null as string | null,
+                effectiveDateStr: null as string | null,
+            };
+        }
+
+        const resolvedToday = todayStr || getTodayString();
+        if (!resolvedToday) {
+            return {
+                isDueToday: false,
+                isOverdue: false,
+                lastDueDateStr: null as string | null,
+                nextDueDateStr: null as string | null,
+                effectiveDateStr: null as string | null,
+            };
+        }
+
+        const todayDate = new Date();
+
+        if (isRecurringTaskDueOnDate(todayDate, task.recurring)) {
+            return {
+                isDueToday: true,
+                isOverdue: false,
+                lastDueDateStr: resolvedToday,
+                nextDueDateStr: null as string | null,
+                effectiveDateStr: resolvedToday,
+            };
+        }
+
+        const previousDueDate = findPreviousRecurringDueDate(todayDate, task.recurring);
+        const nextDueDate = findNextRecurringDueDate(todayDate, task.recurring);
+        const previousDueStr = previousDueDate ? toStorageDate(previousDueDate) : null;
+        const nextDueStr = nextDueDate ? toStorageDate(nextDueDate) : null;
+
+        const isOverdue = Boolean(previousDueStr && nextDueStr && resolvedToday < nextDueStr);
+
+        return {
+            isDueToday: false,
+            isOverdue,
+            lastDueDateStr: previousDueStr,
+            nextDueDateStr: nextDueStr,
+            effectiveDateStr: isOverdue ? previousDueStr : null,
+        };
+    }, []);
 
     return {
         // Data
@@ -234,5 +308,6 @@ export function useTasks(options: UseTasksOptions = {}) {
         // Recurring task completion
         isCompletedOnDate,
         toggleRecurringCompletion,
+        getRecurringStatus,
     };
 }

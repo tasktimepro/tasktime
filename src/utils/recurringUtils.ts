@@ -2,7 +2,7 @@
  * Recurring task utilities
  */
 
-import { endOfMonth } from 'date-fns';
+import { addDays, endOfMonth, startOfDay } from 'date-fns';
 import type { RecurringConfig } from '@/stores/yjs/types';
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -96,4 +96,56 @@ export const isRecurringTaskDueOnDate = (
     }
 
     return false;
+};
+
+/**
+ * Find the most recent recurring due date before the provided date.
+ * @param {Date} date
+ * @param {RecurringConfig | null | undefined} config
+ * @param {number} maxDays
+ * @returns {Date | null}
+ */
+export const findPreviousRecurringDueDate = (
+    date: Date,
+    config?: RecurringConfig | null,
+    maxDays = 366
+): Date | null => {
+    if (!config) return null;
+
+    const base = startOfDay(date);
+
+    for (let offset = 1; offset <= maxDays; offset += 1) {
+        const checkDate = addDays(base, -offset);
+        if (isRecurringTaskDueOnDate(checkDate, config)) {
+            return checkDate;
+        }
+    }
+
+    return null;
+};
+
+/**
+ * Find the next recurring due date after the provided date.
+ * @param {Date} date
+ * @param {RecurringConfig | null | undefined} config
+ * @param {number} maxDays
+ * @returns {Date | null}
+ */
+export const findNextRecurringDueDate = (
+    date: Date,
+    config?: RecurringConfig | null,
+    maxDays = 366
+): Date | null => {
+    if (!config) return null;
+
+    const base = startOfDay(date);
+
+    for (let offset = 1; offset <= maxDays; offset += 1) {
+        const checkDate = addDays(base, offset);
+        if (isRecurringTaskDueOnDate(checkDate, config)) {
+            return checkDate;
+        }
+    }
+
+    return null;
 };

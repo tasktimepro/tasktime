@@ -68,7 +68,7 @@ const TaskActions = ({
                 null
             ) : (
                 <>
-                    {!hideTimerControls && (
+                    {!hideTimerControls && (!anyTimerActive || isTimerActive) && (
                         <TaskTimer
                             task={task}
                             showTimeDisplay={false}

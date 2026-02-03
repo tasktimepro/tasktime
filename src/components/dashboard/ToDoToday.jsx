@@ -97,6 +97,7 @@ const ToDoToday = ({
                         startDate={task.startDate}
                         recurring={task.recurring}
                         completed={isCompleted}
+                        recurringOverdue={Boolean(task.recurringStatus?.isOverdue)}
                     />
                     <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                         {formatDurationWithSeconds(task.recentTime || 0)}

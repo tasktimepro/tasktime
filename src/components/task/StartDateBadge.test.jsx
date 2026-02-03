@@ -32,6 +32,32 @@ describe('StartDateBadge', () => {
         expect(getByText('Overdue')).toBeInTheDocument()
     })
 
+    it('renders overdue badge for recurring tasks when overdue', () => {
+
+        const { getByText } = render(
+            <StartDateBadge
+                recurring={{ type: 'weekly', weeklyDays: [1, 3, 5] }}
+                recurringOverdue={true}
+                completed={false}
+            />
+        )
+
+        expect(getByText('Overdue')).toBeInTheDocument()
+    })
+
+    it('renders recurring label when overdue recurring task is completed', () => {
+
+        const { getByText } = render(
+            <StartDateBadge
+                recurring={{ type: 'weekly', weeklyDays: [1, 3, 5] }}
+                recurringOverdue={true}
+                completed={true}
+            />
+        )
+
+        expect(getByText('Every Mo, We, Fr')).toBeInTheDocument()
+    })
+
     it('renders today and tomorrow labels', () => {
 
         const { getByText, rerender } = render(

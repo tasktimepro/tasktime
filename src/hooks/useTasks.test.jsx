@@ -146,4 +146,37 @@ describe('useTasks', () => {
         expect(result.current.getTasksForToday().map((t) => t.id).sort()).toEqual(['recurring-weekly', 'today'])
         expect(result.current.getUpcomingTasks(7).map((t) => t.id)).toEqual(['upcoming'])
     })
+
+    it('keeps recurring tasks in today list when overdue and hides after completion', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2025-01-07T09:00:00Z'))
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        const activeTasks = [
+            { id: 'recurring-overdue', projectId: 'p1', archived: false, completed: false, recurring: { type: 'weekly', weeklyDays: [1] } },
+            { id: 'recurring-completed', projectId: 'p1', archived: false, completed: false, recurring: { type: 'weekly', weeklyDays: [1] }, completedDatesByYear: { '2025': { '1': [6] } } },
+            { id: 'recurring-completed-today', projectId: 'p1', archived: false, completed: false, recurring: { type: 'weekly', weeklyDays: [1] }, completedDatesByYear: { '2025': { '1': [6] } }, lastActive: new Date('2025-01-07T08:00:00Z').getTime() },
+        ]
+
+        mockUseYjsCollection.mockReturnValue({
+            items: activeTasks,
+            isLoading: false,
+            get: vi.fn((id) => activeTasks.find((t) => t.id === id)),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        expect(result.current.getTasksForToday().map((t) => t.id).sort()).toEqual([
+            'recurring-completed-today',
+            'recurring-overdue'
+        ])
+    })
 })
