@@ -68,7 +68,7 @@ const Dashboard = ({
     const {
         thisMonthMetrics,
         lastMonthMetrics,
-        thisYearMetrics,
+        last90DaysMetrics,
         invoiceMetrics,
         thisMonthBillableHours,
         thisMonthUnbilledDisplay
@@ -117,7 +117,7 @@ const Dashboard = ({
         const hasConversionErrors =
             thisMonthMetrics.hadConversionError ||
             lastMonthMetrics.hadConversionError ||
-            thisYearMetrics.hadConversionError;
+            last90DaysMetrics.hadConversionError;
 
         if (hasConversionErrors) {
             const warningKey = 'conversion:generic';
@@ -130,7 +130,7 @@ const Dashboard = ({
     }, [
         thisMonthMetrics,
         lastMonthMetrics,
-        thisYearMetrics,
+        last90DaysMetrics,
         conversionWarningShown,
         needsExchangeRates,
         exchangeRatesLoading,
@@ -601,7 +601,7 @@ const Dashboard = ({
             <MetricsCards
                 thisMonthMetrics={thisMonthMetrics}
                 lastMonthMetrics={lastMonthMetrics}
-                thisYearMetrics={thisYearMetrics}
+                last90DaysMetrics={last90DaysMetrics}
                 invoiceMetrics={invoiceMetrics}
                 thisMonthBillableHours={thisMonthBillableHours}
                 thisMonthUnbilledDisplay={thisMonthUnbilledDisplay}

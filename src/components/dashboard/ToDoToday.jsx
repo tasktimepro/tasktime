@@ -45,7 +45,17 @@ const ToDoToday = ({
     const [showUpcoming, setShowUpcoming] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
-    const combinedTasks = [...overdueTasks, ...tasksForToday];
+
+    // Combine and deduplicate tasks (a task might be both overdue and planned for today)
+    const combinedTasks = [...overdueTasks, ...tasksForToday].reduce((acc, current) => {
+        const x = acc.find(item => item.id === current.id);
+        if (!x) {
+            return acc.concat([current]);
+        } else {
+            return acc;
+        }
+    }, []);
+
     const sortedTasks = combinedTasks.sort((a, b) => {
         const aCompleted = getTaskCompletedStatus(a);
         const bCompleted = getTaskCompletedStatus(b);

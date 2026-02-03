@@ -18,7 +18,7 @@ import { formatCurrency } from '../../utils/currencyUtils.ts';
 const MetricsCards = ({
     thisMonthMetrics,
     lastMonthMetrics,
-    thisYearMetrics,
+    last90DaysMetrics,
     invoiceMetrics,
     thisMonthBillableHours,
     thisMonthUnbilledDisplay,
@@ -187,23 +187,23 @@ const MetricsCards = ({
                         </div>
                     </div>
 
-                    {/* This Year */}
+                    {/* Last 90 Days */}
                     <div className="bg-muted/40 rounded-lg p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h3 className="text-sm font-medium text-green-900 dark:text-green-100">This Year</h3>
+                                <h3 className="text-sm font-medium text-green-900 dark:text-green-100">Last 90 Days</h3>
                                 <div className="mt-2">
                                     {hasClients && (
                                         <div className="flex items-center">
                                             <div className="text-lg font-semibold text-green-900 dark:text-green-100">
-                                                {renderEarningsByCurrency(thisYearMetrics, 'green')}
+                                                {renderEarningsByCurrency(last90DaysMetrics, 'green')}
                                             </div>
                                         </div>
                                     )}
                                     <div className="flex items-center mt-1">
                                         <ClockIcon className="h-4 w-4 text-green-600 dark:text-green-400 mr-1" />
                                         <span className="text-sm text-green-700 dark:text-green-300">
-                                            {formatDuration(thisYearMetrics.time)}
+                                            {formatDuration(last90DaysMetrics.time)}
                                         </span>
                                     </div>
                                 </div>

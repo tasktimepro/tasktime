@@ -162,10 +162,15 @@ const useMetricsCalculation = ({
         };
     }, [timeEntries, tasks, projects, invoices, convertToCurrency, preferredCurrency, clients]);
 
-    // Calculate date ranges statically (they don't change based on preferences)
+    // Calculate date ranges statically
     const thisMonthRange = useMemo(() => getThisMonthRange(), []);
     const lastMonthRange = useMemo(() => getLastMonthRange(), []);
-    const thisYearRange = useMemo(() => getThisYearRange(), []);
+    const last90DaysRange = useMemo(() => {
+        const now = new Date();
+        const end = now.getTime();
+        const start = new Date(now.setDate(now.getDate() - 90)).setHours(0, 0, 0, 0);
+        return { start, end };
+    }, []);
 
     // Calculate metrics with proper memoization
     const thisMonthMetrics = useMemo(() => {
@@ -176,9 +181,9 @@ const useMetricsCalculation = ({
         return calculateMetrics(lastMonthRange.start, lastMonthRange.end);
     }, [lastMonthRange, calculateMetrics]);
 
-    const thisYearMetrics = useMemo(() => {
-        return calculateMetrics(thisYearRange.start, thisYearRange.end);
-    }, [thisYearRange, calculateMetrics]);
+    const last90DaysMetrics = useMemo(() => {
+        return calculateMetrics(last90DaysRange.start, last90DaysRange.end);
+    }, [last90DaysRange, calculateMetrics]);
 
     /**
      * Calculate outstanding invoices metrics
@@ -304,7 +309,7 @@ const useMetricsCalculation = ({
     return {
         thisMonthMetrics,
         lastMonthMetrics,
-        thisYearMetrics,
+        last90DaysMetrics,
         invoiceMetrics,
         thisMonthBillableHours,
         thisMonthUnbilledTotal,

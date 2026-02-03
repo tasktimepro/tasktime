@@ -15,6 +15,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { useYjs } from '../contexts/YjsContext';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
@@ -38,6 +39,7 @@ const ProjectList = ({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState(null);
     const { showSuccess } = useToast();
+    const { store } = useYjs();
     
     // Yjs hooks for data access
     const { projects, updateProject, deleteProject } = useProjects();
@@ -213,25 +215,34 @@ const ProjectList = ({
             clearTimer(projectId);
         }
 
-        // If shouldDeleteInvoices is true, delete associated invoices
-        if (shouldDeleteInvoices) {
-            const project = projects.find(p => p.id === projectId);
-            if (project && project.invoiceIds && project.invoiceIds.length > 0) {
-                project.invoiceIds.forEach(invoiceId => deleteInvoice(invoiceId));
-            }
-        }
-
-        // Delete the project
-        deleteProject(projectId);
-        
-        // Delete all tasks for this project (including subtasks)
-        taskIdsArray.forEach(taskId => deleteTask(taskId));
-        
-        // Delete all time entries for deleted tasks
+        // Delete all time entries for deleted tasks (Separate document: entries-active)
         const timeEntryIdsToDelete = timeEntries
             .filter(entry => allTaskIdsToDelete.has(entry.taskId))
             .map(entry => entry.id);
-        timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
+            
+        if (timeEntryIdsToDelete.length > 0) {
+            // Group time entry deletions in their own transaction on the active-entries document
+            store.activeEntriesDoc.transact(() => {
+                timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
+            });
+        }
+
+        // Perform core updates in a single atomic transaction (projects, tasks, invoices)
+        store.projects.doc.transact(() => {
+            // Delete associated invoices if requested
+            if (shouldDeleteInvoices) {
+                const project = projects.find(p => p.id === projectId);
+                if (project && project.invoiceIds && project.invoiceIds.length > 0) {
+                    project.invoiceIds.forEach(invoiceId => deleteInvoice(invoiceId));
+                }
+            }
+
+            // Delete the project
+            deleteProject(projectId);
+            
+            // Delete all tasks for this project (including subtasks)
+            taskIdsArray.forEach(taskId => deleteTask(taskId));
+        });
         
         const deletedTaskCount = allTaskIdsToDelete.size;
         const deletedTimeEntriesCount = timeEntryIdsToDelete.length;

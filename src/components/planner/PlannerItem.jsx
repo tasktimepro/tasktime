@@ -113,14 +113,6 @@ const PlannerItem = ({
 
     const dynamicHeight = `max(42px, ${Math.round(safeHeightPercent * 10000) / 100}% )`;
     
-    // Bottom border style logic
-    // - Should flow continuously from left border
-    // - Width equals progress percentage
-    // - Color matches left border color (or neutral/thick if no color)
-    const showBottomProgress = hasTarget;
-    const bottomProgressColor = hasColor ? color : 'currentColor';
-    const bottomProgressClass = hasColor ? '' : 'text-border'; // Use text-border for neutral color inheritance check
-
     const handleClick = (e) => {
         // Don't trigger click if menu is open
         if (menuOpen) {
@@ -206,23 +198,6 @@ const PlannerItem = ({
                     }}
                 />
             )} */}
-
-            {/* Bottom border progress bar */}
-            {showBottomProgress && (
-                <div 
-                    className={cn(
-                        "absolute bottom-0 left-0 h-[3px] transition-all z-20",
-                        bottomProgressClass
-                    )}
-                    style={{ 
-                        width: `${progressPercent}%`,
-                        backgroundColor: bottomProgressColor,
-                        // Ensure it visually connects with left border if present
-                        marginLeft: hasColor ? '-4px' : '0', 
-                        paddingLeft: hasColor ? '4px' : '0',
-                    }}
-                />
-            )}
 
             <div className="flex items-center gap-2 min-w-0 relative z-10 w-full mb-0.5">
                 <Icon className={cn("h-4 w-4 flex-shrink-0", iconClasses)} />

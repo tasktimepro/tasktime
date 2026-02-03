@@ -14,6 +14,7 @@ import {
 import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, UserGroupIcon, SortIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
+import { useYjs } from '../contexts/YjsContext';
 import { toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useProjects } from '../hooks/useProjects.ts';
@@ -39,6 +40,7 @@ const ClientList = ({
     const [showArchiveProjectsModal, setShowArchiveProjectsModal] = useState(false);
     const [relatedProjects, setRelatedProjects] = useState([]);
     const { showSuccess } = useToast();
+    const { store } = useYjs();
     
     // Yjs hooks for data access
     const { clients, updateClient, deleteClient } = useClients();
@@ -204,41 +206,52 @@ const ClientList = ({
             // Get related projects and their task/time entry IDs
             const relatedProjectIds = clientRelatedProjects.map(p => p.id);
             
-            // Delete related projects
-            relatedProjectIds.forEach(id => deleteProject(id));
-            
             // Delete tasks for related projects
             const relatedTaskIds = tasks
                 .filter(task => relatedProjectIds.includes(task.projectId))
                 .map(t => t.id);
-            relatedTaskIds.forEach(id => deleteTask(id));
             
             // Delete time entries for related tasks
+            // Note: Time entries are in a separate Yjs document (active-entries), so they cannot be included
+            // in the core document transaction below. We delete them first, but grouped in their own transaction.
             const relatedTimeEntryIds = timeEntries
                 .filter(entry => relatedTaskIds.includes(entry.taskId))
                 .map(e => e.id);
-            relatedTimeEntryIds.forEach(id => deleteEntry(id));
             
-            // Delete invoices for related projects
+            if (relatedTimeEntryIds.length > 0) {
+                store.activeEntriesDoc.transact(() => {
+                    relatedTimeEntryIds.forEach(id => deleteEntry(id));
+                });
+            }
+            
+            // Delete invoices for related projects (Invoices are in core doc)
             const relatedInvoiceIds = invoices
                 .filter(invoice => relatedProjectIds.includes(invoice.projectId))
                 .map(i => i.id);
-            relatedInvoiceIds.forEach(id => deleteInvoice(id));
+            
+            // Execute all core document deletions in a single transaction
+            // This ensures they are synced as a single atomic update
+            store.projects.doc.transact(() => {
+                relatedProjectIds.forEach(id => deleteProject(id));
+                relatedTaskIds.forEach(id => deleteTask(id));
+                relatedInvoiceIds.forEach(id => deleteInvoice(id));
+                deleteClient(clientId);
+            });
         } else {
-            // Remove client reference from projects (update, not delete)
-            // Also clear rates and mark as personal since client-linked projects should not remain billable.
-            projects
-                .filter(project => project.preferredClientId === clientId)
-                .forEach(project => updateProject(project.id, {
-                    preferredClientId: null,
-                    hourlyRate: null,
-                    flatRate: false,
-                    isPersonal: true
-                }));
+            // Remove client reference from projects and delete client in one transaction
+            store.projects.doc.transact(() => {
+                projects
+                    .filter(project => project.preferredClientId === clientId)
+                    .forEach(project => updateProject(project.id, {
+                        preferredClientId: null,
+                        hourlyRate: null,
+                        flatRate: false,
+                        isPersonal: true
+                    }));
+                
+                deleteClient(clientId);
+            });
         }
-
-        // Delete the client
-        deleteClient(clientId);
 
         // Show appropriate success message
         const message = alsoDeleteProjects 
