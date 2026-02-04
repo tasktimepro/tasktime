@@ -135,7 +135,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
 
         if (syncPhase === 'downloading') {
             return {
-                text: 'Downloading updates...',
+                text: 'Fetching updates...',
                 icon: CloudSyncIcon,
                 tone: 'text-yellow-700 dark:text-yellow-300',
                 onClick: handleCloudOptions,

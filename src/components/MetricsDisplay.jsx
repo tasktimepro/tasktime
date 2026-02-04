@@ -2,8 +2,7 @@ import {
     getTodayRange, 
     getThisWeekRange, 
     getThisMonthRange, 
-    getLastMonthRange, 
-    getThisYearRange,
+    getLastMonthRange,
     formatDuration,
     millisecondsToHours
 } from '../utils/dateUtils.ts';
@@ -103,9 +102,22 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
 
     const lastMonthMetrics = calculateMetrics(lastMonthRange.start, lastMonthRange.end);
 
-    const yearRange = getThisYearRange();
+    // Calculate last 90 days range (matching dashboard reports)
+    const getLast90DaysRange = () => {
+        const now = new Date();
+        const end = now.getTime();
+        // Create new date for start calculation to avoid mutating the 'now' used for other things if any
+        // (though in this function scope it's local)
+        const start = new Date(now);
+        start.setDate(start.getDate() - 90);
+        start.setHours(0, 0, 0, 0);
+        
+        return { start: start.getTime(), end };
+    };
 
-    const yearMetrics = calculateMetrics(yearRange.start, yearRange.end);
+    const last90DaysRange = getLast90DaysRange();
+
+    const last90DaysMetrics = calculateMetrics(last90DaysRange.start, last90DaysRange.end);
 
     const metrics = [
         { 
@@ -125,8 +137,8 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
             ...lastMonthMetrics 
         },
         { 
-            label: 'This Year',
-            ...yearMetrics 
+            label: 'Last 90 Days',
+            ...last90DaysMetrics 
         }
     ];
 

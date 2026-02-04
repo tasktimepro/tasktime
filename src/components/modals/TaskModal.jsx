@@ -2,7 +2,7 @@
  * TaskModal component - Modal for creating and editing tasks
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,14 +64,33 @@ const TaskModal = ({
         ));
     }, [editingTask, timeEntries]);
 
+    // Track initialization to prevent overwriting user input on re-renders
+    // Using a specific object structure to distinguish "uninitialized" from "task id is null (create mode)"
+    const lastInitializedRef = useRef({ initialized: false, taskId: undefined });
+
+    // Reset initialization tracking when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            lastInitializedRef.current = { initialized: false, taskId: undefined };
+        }
+    }, [isOpen]);
+
     useEffect(() => {
         if (!isOpen) {
             return;
         }
 
+        const currentEditingTaskId = editingTask?.id || null;
+
+        // Skip if already initialized for this task session
+        if (lastInitializedRef.current.initialized && lastInitializedRef.current.taskId === currentEditingTaskId) {
+            return;
+        }
+        
+        lastInitializedRef.current = { initialized: true, taskId: currentEditingTaskId };
+
         const savedState = getSavedState ? getSavedState() : null;
         const savedEditingTaskId = savedState?.editingTaskId || null;
-        const currentEditingTaskId = editingTask?.id || null;
 
         if (savedState && savedEditingTaskId === currentEditingTaskId) {
             setFormData({

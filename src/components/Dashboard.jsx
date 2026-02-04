@@ -471,6 +471,9 @@ const Dashboard = ({
             <span className={titleClass}>{task.title}</span>
         );
 
+        const hasProject = !!task.project?.title;
+        const hasNote = !!task.note;
+
         return (
             <div className="space-y-1">
                 <button
@@ -482,14 +485,25 @@ const Dashboard = ({
                 >
                     {title}
                 </button>
-                {task.note && (
+                {(hasProject || hasNote) && (
                     <p className={`text-xs text-muted-foreground truncate ${isCompleted ? 'line-through' : ''}`}>
-                        {task.note}
+                        {hasProject && (
+                            <button
+                                type="button"
+                                onClick={() => handleProjectTitleClick(task)}
+                                className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+                                title={task.project?.title ? `Click to open ${task.project.title} project` : 'Open project'}
+                            >
+                                {task.project.title}
+                            </button>
+                        )}
+                        {hasProject && hasNote && <span className="mx-1">•</span>}
+                        {hasNote && <span>{task.note}</span>}
                     </p>
                 )}
             </div>
         );
-    }, [handleTaskTitleClick]);
+    }, [handleTaskTitleClick, handleProjectTitleClick]);
 
     const enhanceTaskList = useCallback((list) => {
         return list.map((task) => {

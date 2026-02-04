@@ -120,7 +120,7 @@ export default function YjsSyncSettings() {
 
         if (syncPhase === 'downloading') {
             return {
-                text: 'Downloading updates...',
+                text: 'Fetching updates...',
                 tone: 'text-yellow-700 dark:text-yellow-300',
                 icon: ArrowPathIcon,
                 spinning: true
