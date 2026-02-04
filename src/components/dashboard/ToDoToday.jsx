@@ -104,28 +104,30 @@ const ToDoToday = ({
                             {formatDurationWithSeconds(task.recentTime || 0)}
                         </div>
                     )}
-                    <div className="flex flex-shrink-0 space-x-1">
-                        {renderTaskControls(task, shouldDisable)}
-                        {!hideActions && (
-                            <>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                    title="Add time entry"
-                                    onClick={() => handleOpenTimeEntries(task)}
-                                >
-                                    <ClockIcon className="h-5 w-5" />
-                                </Button>
-                                <TaskActionsMenu
-                                    task={task}
-                                    onEdit={onEditTask}
-                                    onDelete={onDeleteTask}
-                                    onArchive={onArchiveTask}
-                                />
-                            </>
-                        )}
-                    </div>
+                    {(!shouldDisable || !hideActions) && (
+                        <div className="flex flex-shrink-0 space-x-1">
+                            {renderTaskControls(task, shouldDisable)}
+                            {!hideActions && (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                        title="Add time entry"
+                                        onClick={() => handleOpenTimeEntries(task)}
+                                    >
+                                        <ClockIcon className="h-5 w-5" />
+                                    </Button>
+                                    <TaskActionsMenu
+                                        task={task}
+                                        onEdit={onEditTask}
+                                        onDelete={onDeleteTask}
+                                        onArchive={onArchiveTask}
+                                    />
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         );

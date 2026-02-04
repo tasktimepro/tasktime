@@ -96,28 +96,30 @@ const RecentTasks = ({
                                                 {formatDurationWithSeconds(task.recentTime)}
                                             </div>
                                         )}
-                                        <div className="flex flex-shrink-0 space-x-1">
-                                            {renderTaskControls(task, shouldDisable)}
-                                            {!hideActions && (
-                                                <>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                        title="Add time entry"
-                                                        onClick={() => handleOpenTimeEntries(task)}
-                                                    >
-                                                        <ClockIcon className="h-5 w-5" />
-                                                    </Button>
-                                                    <TaskActionsMenu
-                                                        task={task}
-                                                        onEdit={onEditTask}
-                                                        onDelete={onDeleteTask}
-                                                        onArchive={onArchiveTask}
-                                                    />
-                                                </>
-                                            )}
-                                        </div>
+                                        {(!shouldDisable || !hideActions) && (
+                                            <div className="flex flex-shrink-0 space-x-1">
+                                                {renderTaskControls(task, shouldDisable)}
+                                                {!hideActions && (
+                                                    <>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                            title="Add time entry"
+                                                            onClick={() => handleOpenTimeEntries(task)}
+                                                        >
+                                                            <ClockIcon className="h-5 w-5" />
+                                                        </Button>
+                                                        <TaskActionsMenu
+                                                            task={task}
+                                                            onEdit={onEditTask}
+                                                            onDelete={onDeleteTask}
+                                                            onArchive={onArchiveTask}
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                     {/* Render subtasks if present */}
                                     {task.subtasks && task.subtasks.length > 0 && (
@@ -154,28 +156,30 @@ const RecentTasks = ({
                                                                 {formatDurationWithSeconds(subtask.recentTime)}
                                                             </div>
                                                         )}
-                                                        <div className="flex flex-shrink-0 space-x-1">
-                                                            {renderTaskControls(subtask, subtaskShouldDisable)}
-                                                            {!subtaskHideActions && (
-                                                                <>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                                        title="Add time entry"
-                                                                        onClick={() => handleOpenTimeEntries(subtaskWithProject)}
-                                                                    >
-                                                                        <ClockIcon className="h-5 w-5" />
-                                                                    </Button>
-                                                                    <TaskActionsMenu
-                                                                        task={subtaskWithProject}
-                                                                        onEdit={onEditTask}
-                                                                        onDelete={onDeleteTask}
-                                                                        onArchive={onArchiveTask}
-                                                                    />
-                                                                </>
-                                                            )}
-                                                        </div>
+                                                        {(!subtaskShouldDisable || !subtaskHideActions) && (
+                                                            <div className="flex flex-shrink-0 space-x-1">
+                                                                {renderTaskControls(subtask, subtaskShouldDisable)}
+                                                                {!subtaskHideActions && (
+                                                                    <>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                                            title="Add time entry"
+                                                                            onClick={() => handleOpenTimeEntries(subtaskWithProject)}
+                                                                        >
+                                                                            <ClockIcon className="h-5 w-5" />
+                                                                        </Button>
+                                                                        <TaskActionsMenu
+                                                                            task={subtaskWithProject}
+                                                                            onEdit={onEditTask}
+                                                                            onDelete={onDeleteTask}
+                                                                            onArchive={onArchiveTask}
+                                                                        />
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}

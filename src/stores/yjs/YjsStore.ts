@@ -666,18 +666,26 @@ export class YjsStore {
         this.driveProvider = null;
 
         // Destroy in-memory docs and remove IndexedDB persistence to avoid syncing deletions
-        const docNames = new Set<DocName>([
+        this.docManager.destroy();
+
+        // Collect all potential database names to delete
+        // 1. Standard docs
+        const docsToDelete: DocName[] = [
             'core',
             'entries-active',
             'tasks-archived',
             'invoices-archived'
-        ]);
-        for (const name of this.docManager.getLoadedDocs()) {
-            docNames.add(name);
+        ];
+        
+        // 2. Add loaded docs if any (though destroy() clears them, we kept the names in docNames set earlier if we wanted to use it, but let's just be explicit)
+        // 3. Year-based entry databases
+        const currentYear = new Date().getFullYear();
+        for (let year = 2020; year <= currentYear; year++) {
+            docsToDelete.push(`entries-${year}` as DocName);
         }
 
-        this.docManager.destroy();
-        await this.docManager.deleteDatabases(Array.from(docNames));
+        // Delete all databases using the correct prefix via DocManager
+        await this.docManager.deleteDatabases(docsToDelete);
 
         this._coreDoc = null;
         this._activeEntriesDoc = null;
@@ -686,40 +694,6 @@ export class YjsStore {
         this._archivedInvoicesDoc = null;
         this._archivedInvoicesLoading = null;
         this._isReady = false;
-
-        // Delete all IndexedDB databases
-        const dbNames = [
-            'yjs-tasktime-core',
-            'yjs-tasktime-entries-active',
-            'yjs-tasktime-tasks-archived',
-            'yjs-tasktime-invoices-archived',
-        ];
-        
-        // Add year-based entry dbs
-        const currentYear = new Date().getFullYear();
-        for (let year = 2020; year <= currentYear; year++) {
-            dbNames.push(`yjs-tasktime-entries-${year}`);
-        }
-
-        // Delete each database
-        for (const dbName of dbNames) {
-            try {
-                await new Promise<void>((resolve, reject) => {
-                    const request = indexedDB.deleteDatabase(dbName);
-                    request.onsuccess = () => {
-                        console.log(`[YjsStore] Deleted database: ${dbName}`);
-                        resolve();
-                    };
-                    request.onerror = () => reject(request.error);
-                    request.onblocked = () => {
-                        console.warn(`[YjsStore] Database deletion blocked: ${dbName}`);
-                        resolve(); // Continue anyway
-                    };
-                });
-            } catch (e) {
-                console.warn(`[YjsStore] Failed to delete database ${dbName}:`, e);
-            }
-        }
 
         console.log('[YjsStore] All data cleared');
     }

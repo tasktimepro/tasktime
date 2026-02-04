@@ -133,22 +133,8 @@ export class YjsDriveProvider {
                 return;
             }
 
-            if (this.syncMode !== 'sync') {
-                this.log('connect: manual/backup mode, skipping initial sync');
-
-                for (const docName of this.docManager.getLoadedDocs()) {
-                    this.subscribeToDoc(docName);
-                }
-
-                this.connected = true;
-                this.updateSyncInterval();
-                this.setState('idle');
-                this.setPhase('idle');
-                this.updatePendingState();
-                this.log('connect: connected');
-                return;
-            }
-
+            // Always perform an initial sync check on connection, regardless of mode
+            // This ensures we're up to date when the session starts
             this.setState('syncing');
             this.setPhase('checking');
             this.log('connect: starting');

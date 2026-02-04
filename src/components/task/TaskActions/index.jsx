@@ -35,6 +35,15 @@ const TaskActions = ({
         return null;
     }
 
+    // Determine if we should hide the component entirely to prevent empty flex container spacing
+    // This happens when a timer is active elsewhere (and not paused) and this task is not related
+    // AND it's not archived (archived tasks always show restore/delete buttons)
+    const shouldHideAll = !isArchived && anyTimerActive && !isPaused && !isTimerActive && !isRelatedToActiveTimer;
+
+    if (shouldHideAll) {
+        return null;
+    }
+
     return (
         <div className="flex items-center space-x-1">
             {isArchived ? (
@@ -64,8 +73,6 @@ const TaskActions = ({
                         </Button>
                     )}
                 </div>
-            ) : anyTimerActive && !isPaused && !isTimerActive && !isRelatedToActiveTimer ? (
-                null
             ) : (
                 <>
                     {!hideTimerControls && (!anyTimerActive || isTimerActive) && (
@@ -87,7 +94,7 @@ const TaskActions = ({
                         </Button>
                     )}
 
-                    {onToggleBillable && (
+                    {onToggleBillable && !hideNonTimerActions && (
                         <Button
                             variant="ghost"
                             size="icon"

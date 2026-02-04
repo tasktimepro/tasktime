@@ -272,6 +272,13 @@ const ProjectDashboard = ({
 
                     <div>
                         <div className="flex items-center flex-wrap gap-2">
+                            {(project.color || projectClient?.color) && (
+                                <div
+                                    className="w-4 h-4 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: project.color || projectClient?.color }}
+                                    title={project.color ? "Project color" : "Client inherited color"}
+                                />
+                            )}
                             <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
                             {project.archived && (
                                 <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
