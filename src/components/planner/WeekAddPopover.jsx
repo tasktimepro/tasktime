@@ -1,8 +1,5 @@
 /**
- * AddItemPopover - Dropdown menu for attaching items to a planner day
- * 
- * Shows options to attach a client, project, or task to a specific day.
- * Schedule selection (this day only / every weekday) is handled in EntityPickerModal.
+ * WeekAddPopover - Dropdown menu for attaching items to the current week
  */
 
 import { useState, isValidElement, cloneElement } from 'react';
@@ -14,18 +11,15 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
-import { UserIcon, DocumentTextIcon, CheckIcon, GoalIcon, PlusIcon } from '@/components/ui/icons';
+import { UserIcon, DocumentTextIcon, CheckIcon, GoalIcon } from '@/components/ui/icons';
 
 /**
  * @param {Object} props
  * @param {React.ReactNode} props.children - Trigger element
  * @param {Function} props.onSelectType - Called with (type) when user selects an item type
- * @param {Function} props.onSetDailyGoal - Called when user selects Daily goals
- * @param {Function} props.onCreateTask - Called when user selects New task
- * @param {'start' | 'end'} props.align - Dropdown alignment
+ * @param {Function} props.onSetWeeklyGoal - Called when user selects Weekly goals
  */
-const AddItemPopover = ({ children, onSelectType, onSetDailyGoal, onCreateTask, align = 'start' }) => {
+const WeekAddPopover = ({ children, onSelectType, onSetWeeklyGoal }) => {
 
     const [open, setOpen] = useState(false);
 
@@ -46,15 +40,7 @@ const AddItemPopover = ({ children, onSelectType, onSetDailyGoal, onCreateTask, 
             <DropdownMenuTrigger asChild>
                 {trigger}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align={align} className="w-44">
-                <DropdownMenuItem onClick={() => {
-                    setOpen(false);
-                    onCreateTask?.();
-                }}>
-                    <PlusIcon className="h-4 w-4 text-muted-foreground" />
-                    New task
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+            <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem onClick={() => handleSelect('task')}>
                     <CheckIcon className="h-4 w-4 text-muted-foreground" />
                     Attach task
@@ -72,14 +58,14 @@ const AddItemPopover = ({ children, onSelectType, onSetDailyGoal, onCreateTask, 
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => {
                     setOpen(false);
-                    onSetDailyGoal?.();
+                    onSetWeeklyGoal?.();
                 }}>
                     <GoalIcon className="h-4 w-4 text-muted-foreground" />
-                    Daily goals
+                    Weekly goals
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     );
 };
 
-export default AddItemPopover;
+export default WeekAddPopover;

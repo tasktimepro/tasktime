@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { format, getDay } from 'date-fns';
+import { addDays, format, getDay } from 'date-fns';
 import {
     Dialog,
     DialogContent,
@@ -32,10 +32,11 @@ import {
 import { useClients } from '@/hooks/useClients';
 import { useProjects } from '@/hooks/useProjects';
 import { useTasks } from '@/hooks/useTasks';
+import CustomCheckbox from '@/components/CustomCheckbox';
 
 /**
  * @typedef {'client' | 'project' | 'task'} EntityType
- * @typedef {'date' | 'weekday'} ScheduleMode
+ * @typedef {'date' | 'weekday' | 'week' | 'every-week'} ScheduleMode
  */
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -46,7 +47,10 @@ const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', '
  * @param {Function} props.onClose
  * @param {EntityType} props.entityType - 'client', 'project', or 'task'
  * @param {string} props.dateStr - Date string (YYYY-MM-DD) for the selected day
- * @param {Function} props.onSelect - Called with (entity, scheduleMode, weekday, targetHours) when selected
+ * @param {'day' | 'week'} props.scope
+ * @param {Date | null} props.weekStart
+ * @param {Date | null} props.weekEnd
+ * @param {Function} props.onSelect - Called with (entity, scheduleMode, weekday, targetHours, options) when selected
  * @param {Function} props.onCreateNew - Called when user wants to create new entity
  * @param {'add' | 'edit'} props.mode
  * @param {string | null} props.lockedEntityId
@@ -61,6 +65,9 @@ const EntityPickerModal = ({
     dateStr,
     onSelect,
     onCreateNew,
+    scope = 'day',
+    weekStart = null,
+    weekEnd = null,
     mode = 'add',
     lockedEntityId = null,
     lockedScheduleMode = null,
@@ -69,9 +76,10 @@ const EntityPickerModal = ({
 }) => {
 
     const [selectedEntityId, setSelectedEntityId] = useState('');
-    const [scheduleMode, setScheduleMode] = useState('date'); // 'date' or 'weekday'
+    const [scheduleMode, setScheduleMode] = useState('date'); // 'date' | 'weekday' | 'week' | 'every-week'
     const [taskSearch, setTaskSearch] = useState('');
     const [targetHours, setTargetHours] = useState('');
+    const [includeWeekends, setIncludeWeekends] = useState(true);
 
     const { clients } = useClients();
     const { projects } = useProjects();
@@ -112,10 +120,20 @@ const EntityPickerModal = ({
         }
 
         setSelectedEntityId('');
-        setScheduleMode('date');
+        setScheduleMode(scope === 'week' ? 'week' : 'date');
         setTaskSearch('');
         setTargetHours('');
-    }, [isOpen, entityType, isEditMode, lockedEntityId, lockedScheduleMode, initialTargetHours]);
+        setIncludeWeekends(true);
+    }, [isOpen, entityType, isEditMode, lockedEntityId, lockedScheduleMode, initialTargetHours, scope]);
+
+    const weekRangeLabel = useMemo(() => {
+        if (!weekStart) return '';
+        const start = weekStart;
+        const end = includeWeekends
+            ? addDays(weekStart, 6)
+            : addDays(weekStart, 4);
+        return `${format(start, 'MMM d')} - ${format(end, 'MMM d')}`;
+    }, [weekStart, includeWeekends]);
 
     // Get entities based on type (filter out archived)
     const entities = useMemo(() => {
@@ -195,9 +213,16 @@ const EntityPickerModal = ({
         const safeTargetHours = Number.isFinite(parsedTargetHours) ? parsedTargetHours : null;
         const appliedScheduleMode = isEditMode && lockedScheduleMode ? lockedScheduleMode : scheduleMode;
         const appliedWeekday = isEditMode && typeof lockedWeekday === 'number' ? lockedWeekday : weekday;
-        onSelect(selectedEntity, appliedScheduleMode, appliedWeekday, safeTargetHours);
+        const shouldClose = onSelect(selectedEntity, appliedScheduleMode, appliedWeekday, safeTargetHours, {
+            includeWeekends,
+            weekStart,
+            weekEnd,
+        });
+        if (shouldClose === false) {
+            return;
+        }
         onClose();
-    }, [selectedEntity, scheduleMode, weekday, targetHours, onSelect, onClose, isEditMode, lockedScheduleMode, lockedWeekday]);
+    }, [selectedEntity, scheduleMode, weekday, targetHours, onSelect, onClose, isEditMode, lockedScheduleMode, lockedWeekday, includeWeekends, weekStart, weekEnd]);
 
     const handleCreateNew = useCallback(() => {
         if (!onCreateNew) return;
@@ -384,36 +409,65 @@ const EntityPickerModal = ({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="date">
-                                        This day ({dateStr ? format(new Date(dateStr), 'MMM d') : ''})
-                                    </SelectItem>
-                                    <SelectItem value="weekday">
-                                        Every {weekdayName}
-                                    </SelectItem>
+                                    {scope === 'week' ? (
+                                        <>
+                                            <SelectItem value="week">
+                                                This week ({weekRangeLabel})
+                                            </SelectItem>
+                                            <SelectItem value="every-week">
+                                                Every week
+                                            </SelectItem>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <SelectItem value="date">
+                                                This day ({dateStr ? format(new Date(dateStr), 'MMM d') : ''})
+                                            </SelectItem>
+                                            <SelectItem value="weekday">
+                                                Every {weekdayName}
+                                            </SelectItem>
+                                        </>
+                                    )}
                                 </SelectContent>
                             </Select>
                         )}
                         <p className="text-xs text-muted-foreground">
-                            {scheduleMode === 'date' 
-                                ? 'Item will appear on this specific date.'
-                                : `Item will appear every ${weekdayName} going forward.`
+                            {scope === 'week'
+                                ? (scheduleMode === 'every-week'
+                                    ? 'Item will appear every week on the selected days.'
+                                    : 'Item will appear on each day in this week.')
+                                : (scheduleMode === 'date'
+                                    ? 'Item will appear on this specific date.'
+                                    : `Item will appear every ${weekdayName} going forward.`
+                                )
                             }
                         </p>
                     </div>
 
+                    {scope === 'week' && (
+                        <CustomCheckbox
+                            checked={includeWeekends}
+                            onChange={setIncludeWeekends}
+                            label="Include weekends"
+                        />
+                    )}
+
                     {/* Target Hours for Selected Day */}
                     <div className="space-y-2">
                         <Label htmlFor="target-hours">
-                            Target hours for {scheduleMode === 'weekday' ? weekdayName : 'this day'}
+                            {scope === 'week'
+                                ? `Target hours for ${scheduleMode === 'every-week' ? 'every week' : `this week (${weekRangeLabel})`}`
+                                : `Target hours for ${scheduleMode === 'weekday' ? weekdayName : 'this day'}`
+                            }
                             <span className="text-muted-foreground ml-1 text-xs">(optional)</span>
                         </Label>
                         <Input
                             id="target-hours"
                             type="number"
                             min="0.5"
-                            max="24"
+                            max={scope === 'week' ? 168 : 24}
                             step="0.5"
-                            placeholder="e.g., 2.5"
+                            placeholder={scope === 'week' ? 'e.g., 40' : 'e.g., 2.5'}
                             value={targetHours}
                             onChange={(e) => {
                                 const nextValue = e.target.value;
@@ -425,14 +479,18 @@ const EntityPickerModal = ({
                                 if (!Number.isFinite(parsedValue)) {
                                     return;
                                 }
-                                const clampedValue = Math.min(24, Math.max(0.5, parsedValue));
+                                const maxValue = scope === 'week' ? 168 : 24;
+                                const clampedValue = Math.min(maxValue, Math.max(0.5, parsedValue));
                                 setTargetHours(String(clampedValue));
                             }}
                         />
                         <p className="text-xs text-muted-foreground">
-                            {scheduleMode === 'weekday'
-                                ? `How many hours you plan to work each ${weekdayName}.`
-                                : 'How many hours you plan to work on this date.'
+                            {scope === 'week'
+                                ? 'How many hours you plan to work across the week.'
+                                : (scheduleMode === 'weekday'
+                                    ? `How many hours you plan to work each ${weekdayName}.`
+                                    : 'How many hours you plan to work on this date.'
+                                )
                             }
                         </p>
                     </div>

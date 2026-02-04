@@ -24,6 +24,8 @@ import {
  * @param {Object} props
  * @param {Date} props.date - The date for this column
  * @param {string} props.dateStr - ISO date string (YYYY-MM-DD)
+ * @param {number} props.dayOfWeek - Day of week (0=Sun, 6=Sat)
+ * @param {boolean} props.isLastColumn - Whether this is the last column in the week
  * @param {boolean} props.isToday - Whether this is today's column
  * @param {Array} props.items - Items to display in this column
  * @param {number} props.totalTimeMs - Total time worked on this day in milliseconds
@@ -40,6 +42,8 @@ import {
 const DayColumn = ({
     date,
     dateStr,
+    dayOfWeek,
+    isLastColumn = false,
     isToday = false,
     items = [],
     totalTimeMs = 0,
@@ -72,6 +76,8 @@ const DayColumn = ({
     const handleSetDailyGoal = () => {
         onSetDailyGoal?.(dateStr);
     };
+
+    const popoverAlign = isLastColumn ? 'end' : 'start';
 
     // Format total time as Xh Ym
     const formatTotalTime = (ms) => {
@@ -140,6 +146,7 @@ const DayColumn = ({
                             onSelectType={handleAddSelect}
                             onSetDailyGoal={handleSetDailyGoal}
                             onCreateTask={handleCreateTask}
+                            align={popoverAlign}
                         >
                             <Button
                                 variant="ghost"

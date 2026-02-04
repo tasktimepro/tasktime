@@ -209,6 +209,8 @@ export interface Preferences {
     clientSort?: 'createdAt' | 'lastActive' | 'name';
     autoSyncEnabled?: boolean;
     autoSyncMode?: 'backup' | 'sync';
+    weeklyGoalTargetHours?: number | null;
+    weeklyGoalTargetEarnings?: number | null;
 }
 
 export interface MultiTimerState {

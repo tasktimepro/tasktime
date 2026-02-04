@@ -7,6 +7,7 @@
 import { format, isSameMonth } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/ui/icons';
+import { cn } from '@/lib/utils';
 
 /**
  * @param {Object} props
@@ -17,6 +18,11 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@/components/ui/icons';
  * @param {() => void} props.onNext - Navigate to next week
  * @param {() => void} props.onToday - Jump to current week
  * @param {boolean} props.isCurrentWeek - Whether viewing the current week
+ * @param {Object | null} props.weekSummary
+ * @param {string} props.weekSummary.hoursText
+ * @param {string} props.weekSummary.earningsText
+ * @param {boolean} props.weekSummary.hasGoals
+ * @param {React.ReactNode} props.weekAddControl
  */
 const WeekHeader = ({
     weekStart,
@@ -26,6 +32,8 @@ const WeekHeader = ({
     onNext,
     onToday,
     isCurrentWeek = false,
+    weekSummary = null,
+    weekAddControl = null,
 }) => {
 
     // Format the month display
@@ -42,9 +50,24 @@ const WeekHeader = ({
 
     return (
         <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-foreground">
-                Week {weekNumber}, {formatMonthDisplay()}
-            </h2>
+            <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold text-foreground">
+                    Week {weekNumber}, {formatMonthDisplay()}
+                </h2>
+                {weekSummary && (
+                    <div
+                        className={cn(
+                            "flex items-center gap-2 px-2 py-1 rounded-md text-xs",
+                            "bg-muted text-muted-foreground",
+                            weekSummary.hasGoals && "text-foreground"
+                        )}
+                    >
+                        <span>{weekSummary.hoursText}</span>
+                        <span>•</span>
+                        <span className="sensitive-data">{weekSummary.earningsText}</span>
+                    </div>
+                )}
+            </div>
 
             <div className="flex items-center gap-2">
                 {!isCurrentWeek && (
@@ -57,7 +80,8 @@ const WeekHeader = ({
                     </Button>
                 )}
 
-                <div className="flex items-center">
+                <div className="flex items-center gap-1">
+                    {weekAddControl}
                     <Button
                         variant="ghost"
                         size="icon-sm"

@@ -18,16 +18,22 @@ import { useTasks } from '@/hooks/useTasks';
 import { useTimers } from '@/hooks/useTimers';
 import { useTodayDate } from '@/hooks/useDayRollover';
 import { usePreferences } from '@/hooks/usePreferences';
-import { normalizeCurrencyCode } from '@/utils/currencyUtils';
+import { useWeeklyGoals } from '@/hooks/useWeeklyGoals';
+import { formatCurrency, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import { 
     WeekHeader, 
+    WeekAddPopover,
     DayColumn, 
     EntityPickerModal, 
     MobileDaySelector,
     MobileDayCard,
     DailyGoalModal,
+    WeeklyGoalModal,
 } from '@/components/planner/index.js';
 import { useToast } from '@/hooks/useToast';
+import { PlusIcon } from '@/components/ui/icons';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 /**
  * Planner component
@@ -50,6 +56,7 @@ const Planner = ({
     const { urlParams, updateUrl, navigateToProject, navigateToClient } = useUrlState();
     const { showSuccess } = useToast();
     const { preferences } = usePreferences();
+    const { weeklyGoals, hasGoals: hasWeeklyGoals } = useWeeklyGoals();
 
     const defaultCurrency = useMemo(
         () => normalizeCurrencyCode(preferences.currency || 'EUR'),
@@ -103,7 +110,7 @@ const Planner = ({
     const { weekDays, weekStart } = usePlannerItems(weekOffset);
 
     // Planner attachment operations
-    const { createAttachment, updateAttachment, deleteAttachment, isAttached } = usePlannerAttachments();
+    const { attachments, createAttachment, updateAttachment, deleteAttachment, isAttached } = usePlannerAttachments();
 
     // Task operations for toggling completion and deletion
     const { deleteTask, archiveTask } = useTasks();
@@ -140,7 +147,10 @@ const Planner = ({
         isOpen: false,
         mode: 'add',
         entityType: null,  // 'client' | 'project' | 'task'
+        scope: 'day',
         dateStr: null,
+        weekStart: null,
+        weekEnd: null,
         attachmentId: null,
         lockedEntityId: null,
         lockedScheduleMode: null,
@@ -150,6 +160,8 @@ const Planner = ({
 
     const [pendingPickerReopen, setPendingPickerReopen] = useState(null);
     const [dailyGoalDateStr, setDailyGoalDateStr] = useState(null);
+    const [weeklyGoalsOpen, setWeeklyGoalsOpen] = useState(false);
+    const [weeklyAttachWarning, setWeeklyAttachWarning] = useState(null);
 
     const prevActiveModalRef = useRef(activeModal);
 
@@ -221,6 +233,108 @@ const Planner = ({
         setDailyGoalDateStr(null);
     }, []);
 
+    const handleOpenWeeklyGoals = useCallback(() => {
+        setWeeklyGoalsOpen(true);
+    }, []);
+
+    const handleCloseWeeklyGoals = useCallback(() => {
+        setWeeklyGoalsOpen(false);
+    }, []);
+
+    const findWeeklyAttachmentForDay = useCallback((entityType, entityId, scheduleMode, day) => {
+        if (scheduleMode === 'every-week') {
+            return attachments.find((attachment) => (
+                attachment.type === entityType
+                && attachment.referenceId === entityId
+                && attachment.mode === 'weekday'
+                && attachment.weekday === day.dayOfWeek
+            )) || null;
+        }
+
+        return attachments.find((attachment) => (
+            attachment.type === entityType
+            && attachment.referenceId === entityId
+            && attachment.mode === 'date'
+            && attachment.date === day.dateStr
+        )) || null;
+    }, [attachments]);
+
+    const applyWeeklyAttachment = useCallback(({
+        entity,
+        entityType,
+        scheduleMode,
+        includeWeekends,
+        targetHours,
+        mode,
+    }) => {
+        const activeDays = includeWeekends
+            ? weekDays
+            : weekDays.filter(day => day.dayOfWeek !== 0 && day.dayOfWeek !== 6);
+
+        const matches = activeDays.map((day) => ({
+            day,
+            attachment: findWeeklyAttachmentForDay(entityType, entity.id, scheduleMode, day),
+        }));
+
+        const daysToApply = mode === 'skip'
+            ? matches.filter((match) => !match.attachment)
+            : matches;
+
+        if (daysToApply.length === 0) {
+            showSuccess('All selected days already have this attached');
+            return;
+        }
+
+        const dayCount = daysToApply.length;
+        const totalHours = typeof targetHours === 'number' ? targetHours : null;
+        const baseHours = totalHours !== null && dayCount > 0
+            ? Number((totalHours / dayCount).toFixed(2))
+            : null;
+        const lastHours = totalHours !== null && dayCount > 0
+            ? Number((totalHours - (baseHours * (dayCount - 1))).toFixed(2))
+            : null;
+
+        daysToApply.forEach((match, index) => {
+            const estimatedHours = totalHours !== null
+                ? (index === dayCount - 1 ? lastHours : baseHours)
+                : null;
+
+            if (match.attachment) {
+                updateAttachment(match.attachment.id, {
+                    estimatedHours,
+                });
+                return;
+            }
+
+            if (scheduleMode === 'every-week') {
+                createAttachment({
+                    type: entityType,
+                    referenceId: entity.id,
+                    mode: 'weekday',
+                    date: null,
+                    weekday: match.day.dayOfWeek,
+                    createdAt: match.day.date.getTime(),
+                    estimatedHours,
+                });
+            } else {
+                createAttachment({
+                    type: entityType,
+                    referenceId: entity.id,
+                    mode: 'date',
+                    date: match.day.dateStr,
+                    weekday: null,
+                    estimatedHours,
+                });
+            }
+        });
+
+        const typeLabel = entityType === 'client' ? 'Client' : entityType === 'project' ? 'Project' : 'Task';
+        const actionLabel = scheduleMode === 'every-week'
+            ? 'added for every week'
+            : 'added to this week';
+        showSuccess(`${typeLabel} ${actionLabel}`);
+    }, [weekDays, findWeeklyAttachmentForDay, updateAttachment, createAttachment, showSuccess]);
+
     const handleNextDay = useCallback(() => {
         if (selectedDayIndex < 6) {
             setSelectedDayIndex(selectedDayIndex + 1);
@@ -288,7 +402,10 @@ const Planner = ({
             isOpen: true,
             mode: 'add',
             entityType: type,
+            scope: 'day',
             dateStr: dateStr,
+            weekStart: null,
+            weekEnd: null,
             attachmentId: null,
             lockedEntityId: null,
             lockedScheduleMode: null,
@@ -296,6 +413,24 @@ const Planner = ({
             initialTargetHours: null,
         });
     }, []);
+
+    const handleAddWeekClick = useCallback((type) => {
+        setPendingPickerReopen(null);
+        setPickerState({
+            isOpen: true,
+            mode: 'add',
+            entityType: type,
+            scope: 'week',
+            dateStr: null,
+            weekStart,
+            weekEnd,
+            attachmentId: null,
+            lockedEntityId: null,
+            lockedScheduleMode: null,
+            lockedWeekday: null,
+            initialTargetHours: null,
+        });
+    }, [weekStart, weekEnd]);
 
     const handleCreateTask = useCallback((dateStr) => {
         openTaskModal?.(null, { startDate: dateStr });
@@ -310,7 +445,10 @@ const Planner = ({
             isOpen: true,
             mode: 'edit',
             entityType: item.type,
+            scope: 'day',
             dateStr: item.attachment.date || dateStr,
+            weekStart: null,
+            weekEnd: null,
             attachmentId: item.attachment.id,
             lockedEntityId: item.entity.id,
             lockedScheduleMode: scheduleMode,
@@ -325,8 +463,40 @@ const Planner = ({
     }, []);
 
     // Entity selected from picker - create attachment
-    const handleEntitySelect = useCallback((entity, scheduleMode, weekday, targetHours) => {
-        const { entityType, dateStr } = pickerState;
+    const handleEntitySelect = useCallback((entity, scheduleMode, weekday, targetHours, options = {}) => {
+        const { entityType, dateStr, scope } = pickerState;
+
+        if (scope === 'week') {
+            const includeWeekends = options.includeWeekends !== false;
+            const activeDays = includeWeekends
+                ? weekDays
+                : weekDays.filter(day => day.dayOfWeek !== 0 && day.dayOfWeek !== 6);
+
+            const existingMatches = activeDays
+                .map((day) => findWeeklyAttachmentForDay(entityType, entity.id, scheduleMode, day))
+                .filter(Boolean);
+
+            if (existingMatches.length > 0) {
+                setWeeklyAttachWarning({
+                    entity,
+                    entityType,
+                    scheduleMode,
+                    includeWeekends,
+                    targetHours,
+                });
+                return false;
+            }
+
+            applyWeeklyAttachment({
+                entity,
+                entityType,
+                scheduleMode,
+                includeWeekends,
+                targetHours,
+                mode: 'overwrite',
+            });
+            return true;
+        }
 
         if (pickerState.mode === 'edit') {
             if (!pickerState.attachmentId) return;
@@ -374,15 +544,18 @@ const Planner = ({
             ? `added for every ${WEEKDAY_NAMES[weekday]}` 
             : `added to ${dateStr}`;
         showSuccess(`${typeLabel} ${actionLabel}`);
-    }, [pickerState, createAttachment, updateAttachment, isAttached, showSuccess]);
+    }, [pickerState, createAttachment, updateAttachment, isAttached, showSuccess, weekDays, findWeeklyAttachmentForDay, applyWeeklyAttachment]);
 
     // Create new entity from picker
     const handleCreateNew = useCallback(() => {
-        const { entityType, dateStr } = pickerState;
+        const { entityType, dateStr, scope, weekStart, weekEnd } = pickerState;
 
         setPendingPickerReopen({
             entityType,
             dateStr,
+            scope,
+            weekStart,
+            weekEnd,
         });
         setPickerState(prev => ({ ...prev, isOpen: false }));
         
@@ -408,7 +581,10 @@ const Planner = ({
             isOpen: true,
             mode: 'add',
             entityType: pendingPickerReopen.entityType,
+            scope: pendingPickerReopen.scope || 'day',
             dateStr: pendingPickerReopen.dateStr,
+            weekStart: pendingPickerReopen.weekStart || null,
+            weekEnd: pendingPickerReopen.weekEnd || null,
             attachmentId: null,
             lockedEntityId: null,
             lockedScheduleMode: null,
@@ -417,6 +593,40 @@ const Planner = ({
         });
         setPendingPickerReopen(null);
     }, [pendingPickerReopen, activeModal]);
+
+    const weekSummary = useMemo(() => {
+        const totalTimeMs = weekDays.reduce((sum, day) => sum + (day.totalTimeMs || 0), 0);
+        const totalEarnings = weekDays.reduce((sum, day) => sum + (day.totalEarnings || 0), 0);
+        const actualHours = totalTimeMs / 3600000;
+
+        const formatHours = (value, alwaysDecimal = false) => {
+            if (!Number.isFinite(value)) return '0h';
+            if (alwaysDecimal) return `${value.toFixed(1)}h`;
+            return `${Number.isInteger(value) ? value : value.toFixed(1)}h`;
+        };
+
+        const getCurrencyDecimals = (value) => {
+            if (typeof value !== 'number') return 2;
+            return Number.isInteger(value) ? 0 : 2;
+        };
+
+        const earningsDecimals = getCurrencyDecimals(totalEarnings);
+        const targetEarningsDecimals = getCurrencyDecimals(weeklyGoals.targetEarnings ?? null);
+
+        const hoursText = hasWeeklyGoals && typeof weeklyGoals.targetHours === 'number'
+            ? `${formatHours(actualHours, true)} / ${formatHours(weeklyGoals.targetHours, false)}`
+            : formatHours(actualHours, true);
+
+        const earningsText = hasWeeklyGoals && typeof weeklyGoals.targetEarnings === 'number'
+            ? `${formatCurrency(totalEarnings, defaultCurrency, earningsDecimals)} / ${formatCurrency(weeklyGoals.targetEarnings, defaultCurrency, targetEarningsDecimals)}`
+            : formatCurrency(totalEarnings, defaultCurrency, earningsDecimals);
+
+        return {
+            hoursText,
+            earningsText,
+            hasGoals: hasWeeklyGoals && (typeof weeklyGoals.targetHours === 'number' || typeof weeklyGoals.targetEarnings === 'number'),
+        };
+    }, [weekDays, weeklyGoals, defaultCurrency, hasWeeklyGoals]);
 
     return (
         <div
@@ -445,6 +655,21 @@ const Planner = ({
                     onNext={() => navigateWeek(1)}
                     onToday={navigateToToday}
                     isCurrentWeek={weekNumber === currentWeekNumber}
+                    weekSummary={weekSummary}
+                    weekAddControl={(
+                        <WeekAddPopover
+                            onSelectType={handleAddWeekClick}
+                            onSetWeeklyGoal={handleOpenWeeklyGoals}
+                        >
+                            <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Add items to this week"
+                            >
+                                <PlusIcon className="h-4 w-4" />
+                            </Button>
+                        </WeekAddPopover>
+                    )}
                 />
             </div>
 
@@ -485,11 +710,13 @@ const Planner = ({
 
             {/* Desktop: Week grid (hidden on mobile) */}
             <div className="hidden md:grid grid-cols-7 gap-2 flex-1 overflow-hidden">
-                {weekDays.map((day) => (
+                {weekDays.map((day, index) => (
                     <DayColumn
                         key={day.dateStr}
                         date={day.date}
                         dateStr={day.dateStr}
+                        dayOfWeek={day.dayOfWeek}
+                        isLastColumn={index === weekDays.length - 1}
                         isToday={day.isToday}
                         items={day.items}
                         totalTimeMs={day.totalTimeMs}
@@ -514,6 +741,9 @@ const Planner = ({
                 dateStr={pickerState.dateStr}
                 onSelect={handleEntitySelect}
                 onCreateNew={pickerState.mode === 'add' ? handleCreateNew : null}
+                scope={pickerState.scope}
+                weekStart={pickerState.weekStart}
+                weekEnd={pickerState.weekEnd}
                 mode={pickerState.mode}
                 lockedEntityId={pickerState.lockedEntityId}
                 lockedScheduleMode={pickerState.lockedScheduleMode}
@@ -526,6 +756,71 @@ const Planner = ({
                 onClose={handleCloseDailyGoals}
                 dateStr={dailyGoalDateStr}
             />
+
+            <WeeklyGoalModal
+                isOpen={weeklyGoalsOpen}
+                onClose={handleCloseWeeklyGoals}
+                weekStart={weekStart}
+            />
+
+            <Dialog
+                open={!!weeklyAttachWarning}
+                onOpenChange={(open) => !open && setWeeklyAttachWarning(null)}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Some days already have this attached</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 pt-2 text-sm text-muted-foreground">
+                        <p>
+                            Some of the selected days already include this item.
+                        </p>
+                        <ul className="list-disc pl-5 space-y-1">
+                            <li>
+                                Skip existing: only new days are added. Target hours are split across the new days.
+                            </li>
+                            <li>
+                                Overwrite existing: existing attachments are updated and target hours are split across all selected days.
+                            </li>
+                        </ul>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-4">
+                        <Button
+                            variant="secondary"
+                            onClick={() => setWeeklyAttachWarning(null)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                if (!weeklyAttachWarning) return;
+                                applyWeeklyAttachment({
+                                    ...weeklyAttachWarning,
+                                    mode: 'skip',
+                                });
+                                setWeeklyAttachWarning(null);
+                                setPickerState((prev) => ({ ...prev, isOpen: false }));
+                            }}
+                        >
+                            Skip existing
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                if (!weeklyAttachWarning) return;
+                                applyWeeklyAttachment({
+                                    ...weeklyAttachWarning,
+                                    mode: 'overwrite',
+                                });
+                                setWeeklyAttachWarning(null);
+                                setPickerState((prev) => ({ ...prev, isOpen: false }));
+                            }}
+                        >
+                            Overwrite existing
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
         </div>
     );

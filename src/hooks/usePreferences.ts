@@ -21,6 +21,8 @@ const DEFAULT_PREFERENCES: Preferences = {
     clientSort: 'createdAt',
     autoSyncEnabled: false,
     autoSyncMode: 'backup',
+    weeklyGoalTargetHours: null,
+    weeklyGoalTargetEarnings: null,
 };
 
 export function usePreferences() {
