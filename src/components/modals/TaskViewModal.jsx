@@ -4,7 +4,7 @@
  * Shows task details, due/repeat info, quick actions, and planner attachment controls.
  */
 
-import { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { ClockIcon } from '@/components/ui/icons';
@@ -20,6 +20,7 @@ import TimerControls from '../TimerControls';
 import TaskActionsMenu from '../task/TaskActionsMenu';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useTimers } from '@/hooks/useTimers';
+import { linkifyNodes } from '@/utils/linkifyUtils';
 
 /**
  * @param {Object} props
@@ -115,6 +116,11 @@ const TaskViewModal = ({
             parseISO(todayStr)
         );
     }, [currentTask, isRecurringDueToday, recurringStatus, todayStr]);
+
+    const noteContent = useMemo(() => {
+        if (!currentTask?.note) return null;
+        return linkifyNodes(currentTask.note, React.createElement);
+    }, [currentTask?.note]);
 
     const subtasks = useMemo(() => {
         if (!currentTask) return [];
@@ -419,7 +425,7 @@ const TaskViewModal = ({
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Note</p>
                             <p className="text-sm text-foreground whitespace-pre-wrap">
-                                {currentTask.note}
+                                {noteContent}
                             </p>
                         </div>
                     )}

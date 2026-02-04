@@ -297,6 +297,10 @@ const Planner = ({
         });
     }, []);
 
+    const handleCreateTask = useCallback((dateStr) => {
+        openTaskModal?.(null, { startDate: dateStr });
+    }, [openTaskModal]);
+
     const handleEditPlannerOptions = useCallback((item, dateStr) => {
         if (!item?.attachment) return;
 
@@ -402,8 +406,14 @@ const Planner = ({
 
         setPickerState({
             isOpen: true,
+            mode: 'add',
             entityType: pendingPickerReopen.entityType,
             dateStr: pendingPickerReopen.dateStr,
+            attachmentId: null,
+            lockedEntityId: null,
+            lockedScheduleMode: null,
+            lockedWeekday: null,
+            initialTargetHours: null,
         });
         setPendingPickerReopen(null);
     }, [pendingPickerReopen, activeModal]);
@@ -418,10 +428,10 @@ const Planner = ({
             {/* Page header */}
             <div className="flex-shrink-0">
                 <h1 className="text-2xl font-bold text-foreground">
-                    Planner
+                    Plan & Track
                 </h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Plan your week with clients, projects, tasks, and goals.
+                    Plan and track your week with clients, projects, tasks, and goals.
                 </p>
             </div>
 
@@ -464,6 +474,7 @@ const Planner = ({
                         onPrev={handlePrevDay}
                         onNext={handleNextDay}
                         onAddClick={handleAddClick}
+                        onCreateTask={handleCreateTask}
                         onItemClick={handleItemClick}
                         onRemoveItem={handleRemoveItem}
                         onEditItem={handleEditPlannerOptions}
@@ -486,6 +497,7 @@ const Planner = ({
                         dailyGoal={day.dailyGoal}
                         currency={defaultCurrency}
                         onAddClick={handleAddClick}
+                        onCreateTask={handleCreateTask}
                         onItemClick={handleItemClick}
                         onRemoveItem={handleRemoveItem}
                         onEditItem={handleEditPlannerOptions}

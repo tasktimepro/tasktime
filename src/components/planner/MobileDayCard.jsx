@@ -29,6 +29,7 @@ import DailyGoalProgress from './DailyGoalProgress';
  * @param {() => void} props.onPrev
  * @param {() => void} props.onNext
  * @param {(dateStr: string, type: string) => void} props.onAddClick
+ * @param {(dateStr: string) => void} props.onCreateTask
  * @param {(item: any) => void} props.onItemClick
  * @param {(item: any, dateStr: string) => void} props.onEditItem - Handler for editing planner options
  * @param {(item: any) => void} props.onRemoveItem - Handler for removing item from planner
@@ -48,6 +49,7 @@ const MobileDayCard = ({
     onPrev,
     onNext,
     onAddClick,
+    onCreateTask,
     onItemClick,
     onEditItem,
     onRemoveItem,
@@ -63,6 +65,10 @@ const MobileDayCard = ({
 
     const handleAddSelect = (type) => {
         onAddClick?.(dateStr, type);
+    };
+
+    const handleCreateTask = () => {
+        onCreateTask?.(dateStr);
     };
 
     const handleSetDailyGoal = () => {
@@ -191,10 +197,14 @@ const MobileDayCard = ({
                         <span className="font-medium">{formattedTime} worked</span>
                     </div>
                 )}
-                <AddItemPopover onSelectType={handleAddSelect} onSetDailyGoal={handleSetDailyGoal}>
+                <AddItemPopover
+                    onSelectType={handleAddSelect}
+                    onSetDailyGoal={handleSetDailyGoal}
+                    onCreateTask={handleCreateTask}
+                >
                     <Button variant="outline" className="w-full">
                         <PlusIcon className="h-4 w-4 mr-2" />
-                        Add Item
+                        Attach item
                     </Button>
                 </AddItemPopover>
             </div>

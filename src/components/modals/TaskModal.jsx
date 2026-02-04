@@ -24,6 +24,7 @@ const NO_PROJECT_VALUE = 'no-project';
  * @param {Function} props.onClose
  * @param {Object|null} props.editingTask
  * @param {Function} props.openProjectModal
+ * @param {Object|null} props.modalOptions
  * @param {Function} props.saveFormState
  * @param {Function} props.getSavedState
  * @param {Function} props.clearSavedState
@@ -33,6 +34,7 @@ const TaskModal = ({
     onClose,
     editingTask = null,
     openProjectModal,
+    modalOptions = null,
     saveFormState,
     getSavedState,
     clearSavedState
@@ -117,11 +119,11 @@ const TaskModal = ({
         setFormData({
             title: '',
             projectId: NO_PROJECT_VALUE,
-            startDate: '',
+            startDate: modalOptions?.startDate || '',
             recurring: null,
             note: ''
         });
-    }, [isOpen, editingTask, getSavedState]);
+    }, [isOpen, editingTask, getSavedState, modalOptions]);
 
     useEffect(() => {
         if (!saveFormState || !isOpen) {
@@ -258,6 +260,48 @@ const TaskModal = ({
                 </div>
 
                 <div className="space-y-2">
+                    <Label htmlFor="task-start-date">Start Date</Label>
+                    <Input
+                        id="task-start-date"
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(event) => handleStartDateChange(event.target.value)}
+                        className="w-48 dark:[color-scheme:dark]"
+                        disabled={Boolean(formData.recurring)}
+                    />
+                    {formData.recurring && (
+                        <Notice
+                            title="Start date disabled"
+                            description="Recurring tasks cannot have a start date."
+                            compact
+                        />
+                    )}
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Recurring</Label>
+                    <RecurringPicker
+                        value={formData.recurring}
+                        onChange={handleRecurringChange}
+                        onClear={handleRecurringClear}
+                        disabled={false}
+                        buttonClassName="w-full"
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="task-note">Note</Label>
+                    <Textarea
+                        id="task-note"
+                        value={formData.note}
+                        onChange={(event) => handleChange('note', event.target.value)}
+                        placeholder="Add details for this task..."
+                        rows={3}
+                        className="text-sm"
+                    />
+                </div>
+
+                <div className="space-y-2">
                     <div className="flex items-center justify-between mb-1">
                         <Label>Project</Label>
                         {openProjectModal && (
@@ -303,48 +347,6 @@ const TaskModal = ({
                             description="This task has billed time entries, so its project cannot be changed."
                         />
                     )}
-                </div>
-
-                <div className="space-y-2">
-                    <Label htmlFor="task-start-date">Start Date</Label>
-                    <Input
-                        id="task-start-date"
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(event) => handleStartDateChange(event.target.value)}
-                        className="w-48 dark:[color-scheme:dark]"
-                        disabled={Boolean(formData.recurring)}
-                    />
-                    {formData.recurring && (
-                        <Notice
-                            title="Start date disabled"
-                            description="Recurring tasks cannot have a start date."
-                            compact
-                        />
-                    )}
-                </div>
-
-                <div className="space-y-2">
-                    <Label>Recurring</Label>
-                    <RecurringPicker
-                        value={formData.recurring}
-                        onChange={handleRecurringChange}
-                        onClear={handleRecurringClear}
-                        disabled={false}
-                        buttonClassName="w-full"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <Label htmlFor="task-note">Note</Label>
-                    <Textarea
-                        id="task-note"
-                        value={formData.note}
-                        onChange={(event) => handleChange('note', event.target.value)}
-                        placeholder="Add details for this task..."
-                        rows={3}
-                        className="text-sm"
-                    />
                 </div>
             </form>
         </Modal>

@@ -217,7 +217,7 @@ const EntityPickerModal = ({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        {isEditMode ? 'Edit planner options' : `Add ${typeLabel} to Planner`}
+                        {isEditMode ? 'Edit planner options' : `Attach ${typeLabel} to Planner`}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -444,7 +444,7 @@ const EntityPickerModal = ({
                             onClick={handleConfirm}
                             disabled={!selectedEntity}
                         >
-                            {isEditMode ? 'Save changes' : 'Add to Planner'}
+                            {isEditMode ? 'Save changes' : 'Attach to Planner'}
                         </Button>
                     </div>
                 </div>

@@ -138,6 +138,7 @@ const ModalManager = ({
                     isOpen={true}
                     onClose={closeModal}
                     editingTask={editingItem}
+                    modalOptions={modalOptions}
                     openProjectModal={() => openNestedModal('project')}
                     saveFormState={(formData) => saveCurrentModalState('task', formData)}
                     getSavedState={() => getSavedModalState('task')}

@@ -308,9 +308,10 @@ function AppContent() {
         setEditingItem(businessInfo);
     };
 
-    const openTaskModal = (task = null) => {
+    const openTaskModal = (task = null, options = null) => {
         setActiveModal('task');
         setEditingItem(task);
+        setModalOptions(options || null);
     };
 
     const openTaskView = useCallback((task, options = {}) => {
@@ -702,13 +703,13 @@ function AppContent() {
                                                     ? 'bg-accent text-accent-foreground font-semibold'
                                                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                             }`}
-                                            aria-label="Planner"
+                                            aria-label="Plan & Track"
                                         >
                                             <KanbanIcon className="h-5 w-5 flex-shrink-0" />
                                         </button>
                                     </TooltipTrigger>
                                     <TooltipContent side="right" align="center">
-                                        Planner
+                                        Plan & Track
                                     </TooltipContent>
                                 </Tooltip>
                             ) : (
@@ -721,7 +722,7 @@ function AppContent() {
                                     }`}
                                 >
                                     <KanbanIcon className="h-5 w-5 mr-3 flex-shrink-0" />
-                                    Planner
+                                    Plan & Track
                                 </button>
                             )}
                         </li>

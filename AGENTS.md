@@ -239,6 +239,7 @@ docker compose run --rm app npm run <script>
 8. **Don't run npm directly** — Use `docker compose run --rm app npm ...`
 9. **Use Yjs hooks** — `useProjects()`, `useTasks()`, etc. for all data access
 10. **Don't create new useIndexedDB calls** — All new state should use Yjs
+11. **File deletions must be triggered via CLI** — Use a terminal delete command so you can approve it
 
 ---
 

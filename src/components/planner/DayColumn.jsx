@@ -30,7 +30,8 @@ import {
  * @param {number} props.totalEarnings - Total earnings for this day (in default currency)
  * @param {Object | null} props.dailyGoal - Daily goal for this weekday
  * @param {string} props.currency - Default currency code
- * @param {(dateStr: string, type: string, mode: string) => void} props.onAddClick - Handler for add button
+ * @param {(dateStr: string, type: string, mode: string) => void} props.onAddClick - Handler for attach button
+ * @param {(dateStr: string) => void} props.onCreateTask - Handler for creating a new task
  * @param {(item: any) => void} props.onItemClick - Handler for item clicks
  * @param {(item: any, dateStr: string) => void} props.onEditItem - Handler for editing planner options
  * @param {(item: any) => void} props.onRemoveItem - Handler for removing item from planner
@@ -46,6 +47,7 @@ const DayColumn = ({
     dailyGoal = null,
     currency,
     onAddClick,
+    onCreateTask,
     onItemClick,
     onEditItem,
     onRemoveItem,
@@ -61,6 +63,10 @@ const DayColumn = ({
 
     const handleAddSelect = (type) => {
         onAddClick?.(dateStr, type);
+    };
+
+    const handleCreateTask = () => {
+        onCreateTask?.(dateStr);
     };
 
     const handleSetDailyGoal = () => {
@@ -130,11 +136,15 @@ const DayColumn = ({
                             </span>
                         </div>
 
-                        <AddItemPopover onSelectType={handleAddSelect} onSetDailyGoal={handleSetDailyGoal}>
+                        <AddItemPopover
+                            onSelectType={handleAddSelect}
+                            onSetDailyGoal={handleSetDailyGoal}
+                            onCreateTask={handleCreateTask}
+                        >
                             <Button
                                 variant="ghost"
                                 size="icon-xs"
-                                aria-label={`Add item to ${format(date, 'EEEE')}`}
+                                aria-label={`Attach item to ${format(date, 'EEEE')}`}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                                 <PlusIcon className="h-4 w-4" />
@@ -209,17 +219,22 @@ const DayColumn = ({
             </ContextMenuTrigger>
 
             <ContextMenuContent>
+                <ContextMenuItem onSelect={handleCreateTask}>
+                    <PlusIcon className="h-4 w-4" />
+                    New task
+                </ContextMenuItem>
+                <ContextMenuSeparator />
                 <ContextMenuItem onSelect={() => handleAddSelect('task')}>
                     <CheckIcon className="h-4 w-4" />
-                    Add task
+                    Attach task
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => handleAddSelect('project')}>
                     <DocumentTextIcon className="h-4 w-4" />
-                    Add project
+                    Attach project
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => handleAddSelect('client')}>
                     <UserIcon className="h-4 w-4" />
-                    Add client
+                    Attach client
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem onSelect={handleSetDailyGoal}>
