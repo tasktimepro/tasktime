@@ -35,6 +35,7 @@ describe('recurringUtils', () => {
             expect(formatRecurringLabel({ type: 'weekly', weeklyDays: [0, 1, 2, 3, 4, 5, 6] })).toBe('Every day');
             expect(formatRecurringLabel({ type: 'weekly', weeklyDays: [] })).toBe('Every week');
             expect(formatRecurringLabel({ type: 'weekly', weeklyDays: [1, 3, 5] })).toBe('Every Mo, We, Fr');
+            expect(formatRecurringLabel({ type: 'weekly', weeklyDays: [1, 2, 3, 4, 5] })).toBe('Mo, Tu, We, Th, Fr');
         });
 
         it('formats monthly configs', () => {

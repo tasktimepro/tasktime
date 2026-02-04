@@ -14,7 +14,7 @@ describe('RecurringPicker', () => {
 
         render(<RecurringPicker value={null} onChange={onChange} onClear={onClear} />)
 
-        await user.click(screen.getByRole('button', { name: 'Repeat' }))
+        await user.click(screen.getByRole('button', { name: 'Set repeat' }))
         await user.click(screen.getByRole('button', { name: 'Tu' }))
         await user.click(screen.getByRole('button', { name: 'Apply' }))
 
@@ -32,7 +32,7 @@ describe('RecurringPicker', () => {
 
         render(<RecurringPicker value={null} onChange={onChange} onClear={onClear} />)
 
-        await user.click(screen.getByRole('button', { name: 'Repeat' }))
+        await user.click(screen.getByRole('button', { name: 'Set repeat' }))
         await user.click(screen.getByRole('button', { name: 'Clear' }))
 
         expect(onClear).toHaveBeenCalled()
@@ -46,7 +46,7 @@ describe('RecurringPicker', () => {
 
         render(<RecurringPicker value={null} onChange={onChange} onClear={onClear} />)
 
-        await user.click(screen.getByRole('button', { name: 'Repeat' }))
+        await user.click(screen.getByRole('button', { name: 'Set repeat' }))
         await user.click(screen.getByRole('button', { name: 'Every Month' }))
         await user.click(screen.getByRole('button', { name: 'On day' }))
 

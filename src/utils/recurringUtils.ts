@@ -47,6 +47,10 @@ export const formatRecurringLabel = (config?: RecurringConfig | null): string =>
             return 'Every week';
         }
 
+        if (days.length > 4) {
+            return days.join(', ');
+        }
+
         return `Every ${days.join(', ')}`;
     }
 

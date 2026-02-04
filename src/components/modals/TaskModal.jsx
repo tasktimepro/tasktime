@@ -260,33 +260,34 @@ const TaskModal = ({
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="task-start-date">Start Date</Label>
-                    <Input
-                        id="task-start-date"
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(event) => handleStartDateChange(event.target.value)}
-                        className="w-48 dark:[color-scheme:dark]"
-                        disabled={Boolean(formData.recurring)}
-                    />
-                    {formData.recurring && (
-                        <Notice
-                            title="Start date disabled"
-                            description="Recurring tasks cannot have a start date."
-                            compact
-                        />
-                    )}
-                </div>
-
-                <div className="space-y-2">
-                    <Label>Recurring</Label>
-                    <RecurringPicker
-                        value={formData.recurring}
-                        onChange={handleRecurringChange}
-                        onClear={handleRecurringClear}
-                        disabled={false}
-                        buttonClassName="w-full"
-                    />
+                    <div className="flex items-start gap-3">
+                        <div className="space-y-2">
+                            <Label htmlFor="task-start-date">Start Date</Label>
+                            <Input
+                                id="task-start-date"
+                                type="date"
+                                value={formData.startDate}
+                                onChange={(event) => handleStartDateChange(event.target.value)}
+                                className="w-48 dark:[color-scheme:dark]"
+                                disabled={Boolean(formData.recurring)}
+                            />
+                        </div>
+                        <div className="flex items-center justify-center text-sm text-muted-foreground px-2 pt-7">
+                            or
+                        </div>
+                        <div className="space-y-2 flex-1">
+                            <Label>Recurring</Label>
+                            <RecurringPicker
+                                value={formData.recurring}
+                                onChange={handleRecurringChange}
+                                onClear={handleRecurringClear}
+                                disabled={false}
+                                buttonClassName="w-full"
+                                inactiveVariant="ghost"
+                                inactiveClassName="border border-input bg-transparent"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <div className="space-y-2">

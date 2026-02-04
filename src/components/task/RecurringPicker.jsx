@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { formatRecurringLabel } from '@/utils/recurringUtils.ts';
+import { cn } from '@/lib/utils';
 
 const WEEKDAY_OPTIONS = [
     { label: 'Mo', value: 1 },
@@ -31,7 +32,8 @@ const DEFAULT_CONFIG = {
  * @param {() => void} props.onClear
  * @param {boolean} [props.disabled]
  * @param {string} [props.buttonClassName]
- * @param {'outline' | 'ghost'} [props.inactiveVariant]
+ * @param {'outline' | 'ghost' | 'secondary'} [props.inactiveVariant]
+ * @param {string} [props.inactiveClassName]
  */
 const RecurringPicker = ({
     value,
@@ -39,7 +41,8 @@ const RecurringPicker = ({
     onClear,
     disabled = false,
     buttonClassName = '',
-    inactiveVariant = 'outline'
+    inactiveVariant = 'outline',
+    inactiveClassName = ''
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [draftConfig, setDraftConfig] = useState(value || DEFAULT_CONFIG);
@@ -51,7 +54,7 @@ const RecurringPicker = ({
     }, [isOpen, value]);
 
     const displayLabel = useMemo(() => {
-        return value ? formatRecurringLabel(value) : 'Repeat';
+        return value ? formatRecurringLabel(value) : 'Set repeat';
     }, [value]);
 
     const handleToggleDay = (dayValue) => {
@@ -126,13 +129,15 @@ const RecurringPicker = ({
             <Button
                 type="button"
                 variant={value ? 'secondary' : inactiveVariant}
-                className={`h-9 ${buttonClassName}`}
+                className={cn(`h-9 overflow-hidden ${buttonClassName}`, !value && inactiveClassName)}
                 onClick={() => setIsOpen(true)}
                 disabled={disabled}
-                title="Set recurring schedule"
+                title="Set repeat schedule"
                 leadingIcon={ArrowPathIcon}
             >
-                {displayLabel}
+                <span className="truncate text-center flex-1 min-w-0">
+                    {displayLabel}
+                </span>
             </Button>
 
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -222,9 +227,11 @@ const RecurringPicker = ({
                                             onChange={handleMonthlyDayChange}
                                         />
                                     )}
-                                    <p className="text-xs text-muted-foreground">
-                                        Days 29-31 are not available to ensure consistency across all months.
-                                    </p>
+                                    {draftConfig.monthlyType === 'specific' && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Days 29-31 are not available to ensure consistency across all months.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         )}
