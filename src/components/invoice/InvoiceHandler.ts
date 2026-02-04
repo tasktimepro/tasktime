@@ -1,6 +1,7 @@
 // @ts-nocheck
 // InvoiceHandler.js
 // Extracted handler functions from InvoiceGenerator for use in InvoiceModal and related invoice logic
+import { getInvoicesForProject, getLatestInvoiceForProject } from '../../utils/invoiceUtils.ts';
 
 // Handles selecting/deselecting tasks for billing
 export const handleTaskSelectionForBilling = (setSelectedTasksForBilling) => (taskId, selected) => {
@@ -322,9 +323,7 @@ export const handleProjectSelection = (
             setSelectedPaymentMethod(null);
             
             // Pre-populate based on project's preferred client info first, then last invoice for this project
-            const projectInvoicesForSelection = invoices.filter(invoice => 
-                (selectedProj.invoiceIds || []).includes(invoice.id)
-            );
+            const projectInvoicesForSelection = getInvoicesForProject(invoices, selectedProj.id);
             
             // Check for project's preferred client info first
             if (selectedProj.preferredClientId) {
@@ -334,7 +333,7 @@ export const handleProjectSelection = (
                 } else {
                     // Preferred client no longer exists, fall back to last invoice
                     if (projectInvoicesForSelection.length > 0) {
-                        const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
+                        const lastInvoice = getLatestInvoiceForProject(invoices, selectedProj.id);
                         if (lastInvoice.clientId) {
                             const client = clients.find(ci => ci.id === lastInvoice.clientId);
                             if (client) {
@@ -345,7 +344,7 @@ export const handleProjectSelection = (
                 }
             } else if (projectInvoicesForSelection.length > 0) {
                 // No preferred client, use last invoice
-                const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
+                const lastInvoice = getLatestInvoiceForProject(invoices, selectedProj.id);
                 
                 if (lastInvoice.clientId) {
                     const client = clients.find(ci => ci.id === lastInvoice.clientId);
@@ -365,7 +364,7 @@ export const handleProjectSelection = (
             if (selectedProj.preferredClientId) {
                 selectedClientForHistory = clients.find(ci => ci.id === selectedProj.preferredClientId);
             } else if (projectInvoicesForSelection.length > 0) {
-                const lastInvoice = projectInvoicesForSelection[projectInvoicesForSelection.length - 1];
+                const lastInvoice = getLatestInvoiceForProject(invoices, selectedProj.id);
                 if (lastInvoice.clientId) {
                     selectedClientForHistory = clients.find(ci => ci.id === lastInvoice.clientId);
                 }

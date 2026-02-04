@@ -48,7 +48,7 @@ describe('useInvoicePricing', () => {
         }))
 
         expect(result.current.subtotal).toBe(150)
-        expect(result.current.totalHours).toBe(2)
+        expect(result.current.totalHours).toBe(0)
     })
 
     it('merges subtasks and applies hourly rates', () => {
@@ -67,6 +67,32 @@ describe('useInvoicePricing', () => {
         expect(result.current.totalHours).toBe(3)
     })
 
+    it('sums numeric hours without string concatenation', () => {
+
+        const { result } = renderHook(() => useInvoicePricing({
+            invoiceTasks: [
+                { id: 'hourly', hours: '2', hourlyRate: 50 },
+                { id: 'flat', hours: '1', flatRate: 40, useFlatRate: true }
+            ],
+            additionalTasks: [],
+            editableHours: {},
+            discountType: 'percentage',
+            discountValue: 0,
+            shippingAmount: 0,
+            taxOverride: { enabled: false, rate: 0, label: 'Tax' },
+            taskFlatRates: { flat: 40 },
+            useFlatRate: { flat: true },
+            taskHourlyRates: {},
+            taskQuantities: {},
+            selectedTasksForBilling: { hourly: true, flat: true },
+            mergedSubtasks: {},
+            selectedBusinessInfo: null,
+            selectedClient: null,
+            selectedProject: null
+        }))
+
+        expect(result.current.totalHours).toBe(2)
+    })
     it('applies discount, shipping, and tax override', () => {
 
         const { result } = renderHook(() => useInvoicePricing({
@@ -102,7 +128,7 @@ describe('useInvoicePricing', () => {
         }))
 
         expect(result.current.subtotal).toBe(350)
-        expect(result.current.totalHours).toBe(3)
+        expect(result.current.totalHours).toBe(2)
     })
 
     it('uses task-level hourly overrides when provided', () => {

@@ -21,7 +21,6 @@ export interface Project {
     archived?: boolean;
     archivedOnDate?: string | null;
     lastBilledAt?: number | null;
-    invoiceIds?: string[];
     /** Color tag for visual identification (hex, e.g., "#3B82F6") */
     color?: string | null;
 }
@@ -62,7 +61,6 @@ export interface TimeEntry {
     end: number;
     note?: string;
     source?: string;
-    invoiceId?: string | null;
     billedHourlyRate?: number | null;
     billedAt?: number | null;
     billedInvoiceId?: string | null;

@@ -74,6 +74,7 @@ type InvoiceData = {
     taxRate?: number;
     taxLabel?: string;
     taskFlatRates?: Record<string, number | string>;
+    taskHourlyRates?: Record<string, number | string>;
     currency?: string;
 };
 
@@ -149,6 +150,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         taxRate,
         taxLabel,
         taskFlatRates = {},
+        taskHourlyRates = {},
         currency = getPreferredCurrency()
     } = invoiceData;
 
@@ -208,23 +210,31 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             </div>
             
             ${(() => {
-                // Determine if we have any hourly tasks
+                // Determine if we have any hourly or flat-rate tasks
                 const allTasks = [...tasks, ...additionalTasks];
                 const invoiceCurrency = currency;
-                
-                // We'll show the hours and rate columns as long as any task has hours > 0
-                // This includes both hourly rate tasks and flat rate tasks with tracked hours
-                const hasHourlyTasks = allTasks.some(task => (parseFloat(String(task.hours)) || 0) > 0);
-                
-                // If we have hourly tasks, show all 4 columns, otherwise just Description and Total
-                if (hasHourlyTasks) {
+                const usesFlatRateForTask = (task) => {
+                    const hasExplicitFlatRate = task.flatRate !== undefined;
+                    return task.useFlatRate === true || (task.useFlatRate !== false && hasExplicitFlatRate);
+                };
+                const hasFlatTasks = allTasks.some(task => usesFlatRateForTask(task));
+                const hasHourlyTasks = allTasks.some(task => !usesFlatRateForTask(task));
+
+                // Column layout rules:
+                // - Hourly only: Description, Hours, Rate, Total
+                // - Flat only: Description, Qty, Total
+                // - Mixed: Description, Hours, Rate, Qty, Total
+                if (hasHourlyTasks || hasFlatTasks) {
+                    const showHoursAndRate = hasHourlyTasks;
+                    const showQuantity = hasFlatTasks;
                     return `
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                 <thead>
                     <tr style="background-color: #f8f9fa;">
                         <th style="padding: 12px; text-align: left; border-bottom: 1px solid #ddd;">Description</th>
-                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Hours</th>
-                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Rate</th>
+                        ${showHoursAndRate ? '<th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Hours</th>' : ''}
+                        ${showHoursAndRate ? '<th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Rate</th>' : ''}
+                        ${showQuantity ? '<th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Qty</th>' : ''}
                         <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Total</th>
                     </tr>
                 </thead>
@@ -234,9 +244,8 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
                         
                         // Check if this task uses flat rate
-                        const usesFlatRate = task.useFlatRate === true || 
-                                           (taskFlatRates && taskFlatRates[task.id] !== undefined) || 
-                                           task.flatRate !== undefined;
+                        const hasExplicitFlatRate = task.flatRate !== undefined;
+                        const usesFlatRate = task.useFlatRate === true || (task.useFlatRate !== false && hasExplicitFlatRate);
                         
                         // Calculate task amount and hours (including merged subtasks)
                         let displayHours = parseFloat(String(task.hours)) || 0;
@@ -249,58 +258,56 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                             // Don't add "including X subtasks" text to the title
                         }
                         
-                        // Determine if we should show hours and rate
-                        // Only use dash if it's a flat rate AND there are no tracked hours
-                        const hasTrackedHours = displayHours > 0;
-                        const showHoursAndRate = !usesFlatRate || hasTrackedHours;
-                        
                         // Calculate based on whether it's a flat rate task or hourly
                         let taskAmount;
                         if (usesFlatRate) {
-                            taskAmount = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
+                            const quantity = parseFloat(String(task.quantity)) || 1;
+                            const flatRateValue = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
                                 parseFloat(String(taskFlatRates[task.id])) || 0 : 
                                 (parseFloat(String(task.flatRate)) || 0);
+                            taskAmount = flatRateValue * quantity;
                         } else {
                             // For hourly tasks, calculate parent's amount
                             const parentHours = parseFloat(String(task.hours)) || 0;
-                            const parentHourlyRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0;
+                            const parentHourlyRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(taskHourlyRates[task.id])) || parseFloat(String(project?.hourlyRate)) || 0;
                             taskAmount = parentHours * parentHourlyRate;
                             
                             // For merged subtasks, calculate each subtask's amount with its own rate
                             if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                                 task.mergedSubtasks.forEach(subtask => {
                                     const subtaskHours = parseFloat(String(subtask.hours)) || 0;
-                                    const subtaskHourlyRate = parseFloat(String(subtask.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0;
+                                    const subtaskHourlyRate = parseFloat(String(subtask.hourlyRate)) || parseFloat(String(taskHourlyRates[subtask.id])) || parseFloat(String(project?.hourlyRate)) || 0;
                                     taskAmount += subtaskHours * subtaskHourlyRate;
                                 });
                             }
                         }
                         
-                        // Show hours if we have tracked time, even for flat rate tasks
-                        const hours = showHoursAndRate ? displayHours.toFixed(2) : '—';
+                        const hours = showHoursAndRate ? (usesFlatRate ? '—' : displayHours.toFixed(2)) : '—';
+                        const quantity = showQuantity ? (usesFlatRate ? (parseFloat(String(task.quantity)) || 1).toFixed(0) : '—') : '—';
                         // For merged tasks with different rates, show "Mixed" instead of a single rate
                         let rateDisplay;
-                        if (!showHoursAndRate) {
+                        if (!showHoursAndRate || usesFlatRate) {
                             rateDisplay = '—';
                         } else if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                             // Check if all rates are the same
-                            const parentRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0;
+                            const parentRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(taskHourlyRates[task.id])) || parseFloat(String(project?.hourlyRate)) || 0;
                             const allRatesSame = task.mergedSubtasks.every(subtask => {
-                                const subtaskRate = parseFloat(String(subtask.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0;
+                                const subtaskRate = parseFloat(String(subtask.hourlyRate)) || parseFloat(String(taskHourlyRates[subtask.id])) || parseFloat(String(project?.hourlyRate)) || 0;
                                 return subtaskRate === parentRate;
                             });
                             rateDisplay = allRatesSame 
                                 ? getCurrencySymbol(invoiceCurrency) + parentRate.toFixed(2)
                                 : 'Mixed';
                         } else {
-                            rateDisplay = getCurrencySymbol(invoiceCurrency) + (parseFloat(String(task.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0).toFixed(2);
+                            rateDisplay = getCurrencySymbol(invoiceCurrency) + (parseFloat(String(task.hourlyRate)) || parseFloat(String(taskHourlyRates[task.id])) || parseFloat(String(project?.hourlyRate)) || 0).toFixed(2);
                         }
                         
                         return `
                         <tr>
                             <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${hours}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${rateDisplay}</td>
+                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${hours}</td>` : ''}
+                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${rateDisplay}</td>` : ''}
+                            ${showQuantity ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${quantity}</td>` : ''}
                             <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
@@ -310,12 +317,8 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
                         
                         // Check if this additional task uses flat rate
-                        const usesFlatRate = task.useFlatRate === true || task.flatRate !== undefined;
+                        const usesFlatRate = task.useFlatRate === true || (task.useFlatRate !== false && task.flatRate !== undefined);
                         const displayHours = parseFloat(String(task.hours)) || 0;
-                        
-                        // Determine if we should show hours and rate
-                        const hasTrackedHours = displayHours > 0;
-                        const showHoursAndRate = !usesFlatRate || hasTrackedHours;
                         
                         // Calculate based on whether it's a flat rate task or hourly
                         let taskAmount;
@@ -328,16 +331,18 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         }
                         
                         // Show hours if we have tracked time, even for flat rate tasks
-                        const hours = showHoursAndRate ? displayHours.toFixed(2) : '—';
-                        const rate = showHoursAndRate ? getCurrencySymbol(invoiceCurrency) + (parseFloat(String(task.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0).toFixed(2) : '—';
+                        const hours = showHoursAndRate ? (usesFlatRate ? '—' : displayHours.toFixed(2)) : '—';
+                        const rate = showHoursAndRate && !usesFlatRate ? getCurrencySymbol(invoiceCurrency) + (parseFloat(String(task.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0).toFixed(2) : '—';
+                        const quantity = showQuantity ? (usesFlatRate ? (parseFloat(String(task.quantity)) || 1).toFixed(0) : '—') : '—';
                         // Don't show hours in title when we have Hours column
                         const taskTitle = task.title;
                         
                         return `
                         <tr>
                             <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${hours}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${rate}</td>
+                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${hours}</td>` : ''}
+                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${rate}</td>` : ''}
+                            ${showQuantity ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${quantity}</td>` : ''}
                             <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
@@ -345,7 +350,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                 </tbody>
             </table>`;
                 } else {
-                    // Only flat rate tasks, show simplified table with just Description and Total
+                    // No tasks
                     return `
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                 <thead>
@@ -360,9 +365,8 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         const borderStyle = isLastTask ? '' : 'border-bottom: 1px solid #eee;';
                         
                         // Check if this task uses flat rate
-                        const usesFlatRate = task.useFlatRate === true || 
-                                           (taskFlatRates && taskFlatRates[task.id] !== undefined) || 
-                                           task.flatRate !== undefined;
+                        const hasExplicitFlatRate = task.flatRate !== undefined;
+                        const usesFlatRate = task.useFlatRate === true || (task.useFlatRate !== false && hasExplicitFlatRate);
                                            
                         // Handle merged subtasks display
                         let displayHours = parseFloat(String(task.hours)) || 0;
@@ -379,20 +383,22 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         
                         // Calculate the task amount based on whether it's flat rate or hourly
                         if (usesFlatRate) {
-                            taskAmount = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
+                            const quantity = parseFloat(String(task.quantity)) || 1;
+                            const flatRateValue = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
                                 parseFloat(String(taskFlatRates[task.id])) || 0 : 
                                 (parseFloat(String(task.flatRate)) || 0);
+                            taskAmount = flatRateValue * quantity;
                         } else {
                             // For hourly tasks, calculate parent's amount
                             const parentHours = parseFloat(String(task.hours)) || 0;
-                            const parentHourlyRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0;
+                            const parentHourlyRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(taskHourlyRates[task.id])) || parseFloat(String(project?.hourlyRate)) || 0;
                             taskAmount = parentHours * parentHourlyRate;
                             
                             // For merged subtasks, calculate each subtask's amount with its own rate
                             if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                                 task.mergedSubtasks.forEach(subtask => {
                                     const subtaskHours = parseFloat(String(subtask.hours)) || 0;
-                                    const subtaskHourlyRate = parseFloat(String(subtask.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0;
+                                    const subtaskHourlyRate = parseFloat(String(subtask.hourlyRate)) || parseFloat(String(taskHourlyRates[subtask.id])) || parseFloat(String(project?.hourlyRate)) || 0;
                                     taskAmount += subtaskHours * subtaskHourlyRate;
                                 });
                             }

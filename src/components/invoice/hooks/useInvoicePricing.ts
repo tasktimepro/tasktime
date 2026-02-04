@@ -107,28 +107,27 @@ const useInvoicePricing = ({
             // Skip subtasks if their parent is merged (they're included in parent calculation)
             if (task.parentTaskId && mergedSubtasks[task?.parentTaskId]) return;
 
-            let taskHours = editableHours[task.id] || task.hours || 0;
+            let taskHours = parseFloat(String(editableHours[task.id] ?? task.hours ?? 0)) || 0;
 
             // If this task has merged subtasks, include their hours too
             if (task && task.id && mergedSubtasks[task.id]) {
                 const subtasks = invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task.id);
                 const subtaskHours = subtasks.reduce((total, subtask) => {
-                    const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours || 0;
+                    const hours = parseFloat(String(editableHours[subtask.id] ?? subtask.hours ?? 0)) || 0;
                     return total + hours;
                 }, 0);
                 taskHours += subtaskHours;
             }
-
-            // Always add task hours to total hours, even for flat rate tasks
-            totalHours += taskHours;
 
             if (useFlatRate[task.id]) {
                 // Use flat rate for this task with quantity
                 const quantity = taskQuantities[task.id] || 1;
                 projectSubtotal += (taskFlatRates[task.id] || 0) * quantity;
             } else {
+                // Only count hours for hourly tasks
+                totalHours += taskHours;
                 // Calculate parent task amount with its own rate
-                const parentHours = editableHours[task.id] || task.hours || 0;
+                const parentHours = parseFloat(String(editableHours[task.id] ?? task.hours ?? 0)) || 0;
                 const parentHourlyRate = taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0;
                 let taskAmount = parentHours * parentHourlyRate;
 
@@ -136,7 +135,7 @@ const useInvoicePricing = ({
                 if (task && task.id && mergedSubtasks[task.id]) {
                     const subtasks = invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task.id);
                     subtasks.forEach(subtask => {
-                        const subtaskHours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours || 0;
+                        const subtaskHours = parseFloat(String(editableHours[subtask.id] ?? subtask.hours ?? 0)) || 0;
                         // Use subtask's own hourly rate if set, otherwise fall back
                         const subtaskHourlyRate = taskHourlyRates[subtask.id] || subtask.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0;
                         taskAmount += subtaskHours * subtaskHourlyRate;
@@ -155,7 +154,7 @@ const useInvoicePricing = ({
                 additionalTaskAmount += (task.flatRate || 0) * quantity;
             } else {
                 const hourlyRate = task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0;
-                const taskHours = task.hours || 0;
+                const taskHours = parseFloat(String(task.hours ?? 0)) || 0;
                 additionalTaskAmount += taskHours * hourlyRate;
                 // Add hours to total for hourly tasks
                 totalHours += taskHours;

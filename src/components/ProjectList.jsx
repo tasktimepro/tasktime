@@ -24,6 +24,7 @@ import { useInvoices } from '../hooks/useInvoices.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
+import { getInvoicesForProject } from '../utils/invoiceUtils.ts';
 
 import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
 /**
@@ -70,7 +71,7 @@ const ProjectList = ({
 
     const getProjectBorderStyle = (project) => {
         const color = getProjectColor(project);
-        return color ? { borderLeftColor: color } : undefined;
+        return color ? { borderLeftColor: color } : {};
     };
 
     const handleSortChange = (value) => {
@@ -170,8 +171,7 @@ const ProjectList = ({
      * Check if a project has associated invoices
      */
     const projectHasInvoices = (projectId) => {
-        const project = projects.find(p => p.id === projectId);
-        return project && project.invoiceIds && project.invoiceIds.length > 0;
+        return getInvoicesForProject(invoices, projectId).length > 0;
     };
 
     /**
@@ -231,10 +231,8 @@ const ProjectList = ({
         store.projects.doc.transact(() => {
             // Delete associated invoices if requested
             if (shouldDeleteInvoices) {
-                const project = projects.find(p => p.id === projectId);
-                if (project && project.invoiceIds && project.invoiceIds.length > 0) {
-                    project.invoiceIds.forEach(invoiceId => deleteInvoice(invoiceId));
-                }
+                const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
+                projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
             }
 
             // Delete the project
@@ -458,7 +456,7 @@ const ProjectList = ({
                             {sortedActiveProjects.map((project) => (
                                 <Card
                                     key={project.id}
-                                    className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4 border-l-transparent"
+                                    className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4"
                                     style={getProjectBorderStyle(project)}
                                     onClick={() => onSelectProject(project)}
                                 >
@@ -579,7 +577,7 @@ const ProjectList = ({
                                     {sortedArchivedProjects.map((project) => (
                                         <Card
                                             key={project.id}
-                                            className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4 border-l-transparent"
+                                            className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4"
                                             style={getProjectBorderStyle(project)}
                                             onClick={() => onSelectProject(project)}
                                         >

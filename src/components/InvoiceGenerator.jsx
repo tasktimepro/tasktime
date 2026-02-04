@@ -16,6 +16,7 @@ import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 import { useTimers } from '../hooks/useTimers.ts';
+import { getInvoicesForProject, getLatestInvoiceForProject } from '../utils/invoiceUtils.ts';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -40,7 +41,7 @@ const InvoiceGenerator = ({
 }) => {
     // Yjs hooks for data access
     const { invoices, createInvoice, updateInvoice } = useInvoices();
-    const { projects, updateProject } = useProjects();
+    const { projects } = useProjects();
     const { tasks, updateTask } = useTasks();
     const { createEntry, updateEntry, deleteEntry } = useTimeEntries();
     const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
@@ -90,9 +91,7 @@ const InvoiceGenerator = ({
         if (!currentProject) {
             return []; // Return empty array if no project is available
         }
-        return invoices.filter(invoice => 
-            invoice && invoice.id && (currentProject?.invoiceIds || []).includes(invoice.id)
-        );
+        return getInvoicesForProject(invoices, currentProject.id);
     }, [invoices, selectedProject, project]);
 
     // Auto-open the form when showButton is false (modal mode)
@@ -402,18 +401,12 @@ const InvoiceGenerator = ({
             }
             
             // PRIORITY 2: Fall back to project-specific template history (only if no client-based history found)
-            if (selectedProject?.id && selectedProject.invoiceIds?.length > 0) {
-                const projectInvoices = invoices.filter(invoice => 
-                    selectedProject.invoiceIds.includes(invoice.id)
-                );
-                
-                if (projectInvoices.length > 0) {
-                    const lastInvoice = projectInvoices[projectInvoices.length - 1];
-                    
-                    if (lastInvoice.template) {
-                        setSelectedTemplate(lastInvoice.template);
-                        return;
-                    }
+            if (selectedProject?.id) {
+                const lastInvoice = getLatestInvoiceForProject(invoices, selectedProject.id);
+
+                if (lastInvoice?.template) {
+                    setSelectedTemplate(lastInvoice.template);
+                    return;
                 }
             }
             
@@ -432,7 +425,7 @@ const InvoiceGenerator = ({
         }
         
         // No need to reset to null as that's the initial state
-    }, [editingInvoice, invoiceTemplates, selectedTemplate, projectManuallyChanged, selectedProject?.id, selectedProject?.invoiceIds, invoices, selectedClient]);
+    }, [editingInvoice, invoiceTemplates, selectedTemplate, projectManuallyChanged, selectedProject?.id, invoices, selectedClient]);
 
     // Track when the form gets shown so we can initialize only then
     const [hasInitialized, setHasInitialized] = useState(false);
@@ -1031,7 +1024,7 @@ const InvoiceGenerator = ({
 
         const invoiceId = invoiceData.id;
         const existingAdjustments = timeEntries.filter(entry =>
-            entry.source === 'invoice-adjustment' && entry.invoiceId === invoiceId
+            entry.source === 'invoice-adjustment' && entry.billedInvoiceId === invoiceId
         );
         const existingByTaskId = new Map(existingAdjustments.map(entry => [entry.taskId, entry]));
 
@@ -1066,7 +1059,6 @@ const InvoiceGenerator = ({
                     end: endTime,
                     note: 'Invoice adjustment',
                     source: 'invoice-adjustment',
-                    invoiceId,
                     billedAt: adjustmentTimestamp,
                     billedInvoiceId: invoiceId,
                     billedHourlyRate: hourlyRate
@@ -1080,7 +1072,6 @@ const InvoiceGenerator = ({
                 end: endTime,
                 note: 'Invoice adjustment',
                 source: 'invoice-adjustment',
-                invoiceId,
                 billedAt: adjustmentTimestamp,
                 billedInvoiceId: invoiceId,
                 billedHourlyRate: hourlyRate
@@ -1106,21 +1097,13 @@ const InvoiceGenerator = ({
 
         const invoiceId = invoiceData.id;
 
-        // Store invoice in the new separate invoices structure
-        let updatedProjectInvoiceIds = [];
-        
+        // Store invoice in the invoices collection
         if (editingInvoice) {
             // Update existing invoice - preserving original createdAt
             updateInvoice(editingInvoice.id, { ...invoiceData, createdAt: editingInvoice.createdAt });
-            if (selectedProject) {
-                updatedProjectInvoiceIds = selectedProject.invoiceIds || [];
-            }
         } else {
             // Add new invoice - createInvoice auto-generates id and timestamps
-            const newInvoice = createInvoice(invoiceData);
-            if (selectedProject) {
-                updatedProjectInvoiceIds = [...(selectedProject.invoiceIds || []), newInvoice.id];
-            }
+            createInvoice(invoiceData);
         }
 
         const adjustmentTimestamp = Date.now();
@@ -1198,11 +1181,6 @@ const InvoiceGenerator = ({
                 }
             });
             
-            // Update project to include invoice ID (but don't update project lastBilledAt)
-            updateProject(selectedProject.id, { invoiceIds: updatedProjectInvoiceIds });
-        } else if (selectedProject) {
-            // For edited invoices, just update the project invoice IDs
-            updateProject(selectedProject.id, { invoiceIds: updatedProjectInvoiceIds });
         }
 
         // Reset form

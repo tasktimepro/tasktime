@@ -15,6 +15,7 @@ import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import { getInvoicesForProject } from '../utils/invoiceUtils.ts';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -61,9 +62,7 @@ const ProjectDashboard = ({
     const projectTimer = getTimerForProject(project.id);
     
     // Get invoices for this project
-    const projectInvoices = invoices.filter(invoice => 
-        (project.invoiceIds || []).includes(invoice.id)
-    );
+    const projectInvoices = getInvoicesForProject(invoices, project.id);
     
     /**
      * Handle editing an existing invoice
@@ -102,8 +101,8 @@ const ProjectDashboard = ({
         }
 
         if (shouldDeleteInvoices) {
-            const invoiceIds = project.invoiceIds || [];
-            invoiceIds.forEach(invoiceId => deleteInvoice(invoiceId));
+            const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
+            projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
         }
 
         deleteProject(projectId);
@@ -119,7 +118,7 @@ const ProjectDashboard = ({
         const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
         const invoiceMessage = shouldDeleteInvoices ? ' Associated invoices were also deleted.' : '';
         showSuccess(baseMessage + invoiceMessage);
-    }, [tasks, timeEntries, getTimerForProject, clearTimer, project.invoiceIds, deleteInvoice, deleteProject, deleteTask, deleteEntry, showSuccess]);
+    }, [tasks, timeEntries, getTimerForProject, clearTimer, invoices, deleteInvoice, deleteProject, deleteTask, deleteEntry, showSuccess]);
 
     const handleEditProject = () => {
         openProjectModal?.(project);
@@ -172,9 +171,8 @@ const ProjectDashboard = ({
 
     // Calculate project metrics
     const projectMetrics = useMemo(() => {
-        // Total time worked on this project (excluding invoice adjustments)
+        // Total time worked on this project (including invoice adjustments)
         const totalTime = projectTimeEntries
-            .filter(entry => entry.source !== 'invoice-adjustment')
             .reduce((total, entry) => {
                 return total + (entry.end - entry.start);
             }, 0);
@@ -376,7 +374,7 @@ const ProjectDashboard = ({
                 isOpen={showDeleteModal}
                 onClose={handleCloseDeleteModal}
                 project={project}
-                hasInvoices={Boolean(project.invoiceIds && project.invoiceIds.length > 0)}
+                hasInvoices={projectInvoices.length > 0}
                 onConfirmDelete={handleConfirmDelete}
                 onArchive={() => {
                     handleArchiveProject();

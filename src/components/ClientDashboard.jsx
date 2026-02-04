@@ -62,6 +62,18 @@ const ClientDashboard = ({
         return client.defaultCurrency || getPreferredCurrency();
     }, [client.defaultCurrency]);
 
+    const getProjectColor = (project) => {
+        if (project.color) return project.color;
+        if (!project.preferredClientId) return null;
+
+        return client?.color || null;
+    };
+
+    const getProjectBorderStyle = (project) => {
+        const color = getProjectColor(project);
+        return color ? { borderLeftColor: color } : {};
+    };
+
     // Get projects for this client
     const clientProjects = useMemo(() => {
         return projects.filter(project => project.preferredClientId === client.id);
@@ -660,11 +672,13 @@ const ClientDashboard = ({
                                         );
 
                                         return (
-                                            <div
+                                            <Card
                                                 key={project.id}
-                                                className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer relative"
+                                                className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4"
+                                                style={getProjectBorderStyle(project)}
                                                 onClick={() => navigateToProject(project.id)}
                                             >
+                                                <CardContent className="pt-5">
                                                 <h3 className="font-medium text-foreground truncate">{project.title}</h3>
                                                 {project.hourlyRate && (
                                                     <p className="text-sm text-muted-foreground mt-1">
@@ -704,7 +718,8 @@ const ClientDashboard = ({
                                                         </button>
                                                     </div>
                                                 ) : null}
-                                            </div>
+                                                </CardContent>
+                                            </Card>
                                         );
                                     })}
                                 </div>
@@ -737,11 +752,13 @@ const ClientDashboard = ({
                                                 );
 
                                                 return (
-                                                    <div
+                                                    <Card
                                                         key={project.id}
-                                                        className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer relative"
+                                                        className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4"
+                                                        style={getProjectBorderStyle(project)}
                                                         onClick={() => navigateToProject(project.id)}
                                                     >
+                                                        <CardContent className="pt-5">
                                                         <div className="flex items-center min-w-0">
                                                             <h3 className="font-medium text-foreground truncate">{project.title}</h3>
                                                             <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground whitespace-nowrap">
@@ -786,7 +803,8 @@ const ClientDashboard = ({
                                                                 </button>
                                                             </div>
                                                         ) : null}
-                                                    </div>
+                                                        </CardContent>
+                                                    </Card>
                                                 );
                                             })}
                                         </div>

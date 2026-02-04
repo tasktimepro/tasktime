@@ -66,6 +66,33 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('$150.00')
     })
 
+    it('renders flat rate project task totals with quantity', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 'flat', title: 'Flat Project Task', flatRate: 75, quantity: 2, useFlatRate: true }],
+            totalAmount: 150,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Flat Project Task')
+        expect(html).toContain('$150.00')
+    })
+
+    it('uses hourly totals when flat rate is disabled', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 'hourly', title: 'Hourly Task', hours: 2, hourlyRate: 50, useFlatRate: false }],
+            taskFlatRates: { hourly: 0 },
+            totalAmount: 100,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Hourly Task')
+        expect(html).toContain('$100.00')
+    })
+
     it('calculates merged subtask totals with hourly rates', () => {
 
         const html = createInvoiceHTML({
@@ -122,6 +149,19 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Description')
         expect(html).toContain('Total')
         expect(html).not.toContain('Hours</th>')
+    })
+
+    it('shows quantity column for flat-only invoices', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 'flat', title: 'Flat', flatRate: 100, quantity: 2, useFlatRate: true }],
+            totalAmount: 200,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Qty</th>')
+        expect(html).not.toContain('Rate</th>')
     })
 
     it('renders hourly table with rate and hours columns', () => {
@@ -247,7 +287,7 @@ describe('createInvoiceHTML', () => {
             currency: 'USD'
         })
 
-        expect(html).toContain('Flat Merged (2.00h)')
+        expect(html).toContain('Flat Merged')
         expect(html).toContain('$150.00')
     })
 
@@ -278,6 +318,22 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('—')
     })
 
+    it('shows both rate and quantity columns for mixed invoices', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [
+                { id: 'hourly', title: 'Hourly', hours: 1, hourlyRate: 100 },
+                { id: 'flat', title: 'Flat', flatRate: 50, quantity: 3, useFlatRate: true }
+            ],
+            totalAmount: 250,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Rate</th>')
+        expect(html).toContain('Qty</th>')
+    })
+
     it('calculates merged hourly totals in simplified table', () => {
 
         const html = createInvoiceHTML({
@@ -295,7 +351,8 @@ describe('createInvoiceHTML', () => {
             currency: 'USD'
         })
 
-        expect(html).toContain('Merged Hourly (1.00h)')
+        expect(html).toContain('Merged Hourly')
+        expect(html).toContain('1.00')
         expect(html).toContain('$100.00')
     })
 

@@ -266,7 +266,6 @@ describe('InvoiceGenerator', () => {
         const entry = timeEntryHookMocks.createEntry.mock.calls[0][0]
         expect(entry.taskId).toBe('task-1')
         expect(entry.source).toBe('invoice-adjustment')
-        expect(entry.invoiceId).toEqual(expect.any(String))
         expect(entry.billedInvoiceId).toEqual(expect.any(String))
         expect(entry.end - entry.start).toBe(3600000)
 

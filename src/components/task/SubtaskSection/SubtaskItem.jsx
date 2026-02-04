@@ -47,7 +47,7 @@ const SubtaskItem = ({
     // Calculate time for this subtask
     const mainTaskTime = useMemo(() => {
         return timeEntries
-            .filter(e => e.taskId === task.id && e.source !== 'invoice-adjustment')
+            .filter(e => e.taskId === task.id)
             .reduce((sum, e) => sum + (e.end - e.start), 0);
     }, [timeEntries, task.id]);
 
