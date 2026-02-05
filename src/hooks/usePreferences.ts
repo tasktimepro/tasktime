@@ -14,7 +14,8 @@ const DEFAULT_PREFERENCES: Preferences = {
     timeFormat: '12h',
     theme: 'system',
     defaultView: 'dashboard',
-    weekStartsOn: 0, // Sunday
+    weekStartsOn: 1, // Monday
+    autoHideTotalsOnRevisit: false,
     showCompletedTasks: true,
     defaultBillable: true,
     projectSort: 'createdAt',

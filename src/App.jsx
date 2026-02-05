@@ -136,7 +136,11 @@ function AppContent() {
     const timerElapsedTime = focusedTimer?.elapsedTime || 0;
     const timerStartTime = focusedTimer?.startTime || null;
 
+    const autoHideTotalsOnRevisit = preferences.autoHideTotalsOnRevisit === true;
     const [totalsHidden, setTotalsHidden] = useState(() => {
+        if (autoHideTotalsOnRevisit) {
+            return true;
+        }
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('tasktime-totals-hidden');
             if (saved !== null) return saved === 'true';
@@ -234,6 +238,36 @@ function AppContent() {
         }
         localStorage.setItem('tasktime-totals-hidden', String(totalsHidden));
     }, [totalsHidden]);
+
+    useEffect(() => {
+        if (!autoHideTotalsOnRevisit) {
+            return;
+        }
+
+        setTotalsHidden(true);
+    }, [autoHideTotalsOnRevisit]);
+
+    useEffect(() => {
+        if (!autoHideTotalsOnRevisit || typeof window === 'undefined') {
+            return;
+        }
+
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                setTotalsHidden(true);
+            }
+        };
+
+        window.addEventListener('visibilitychange', handleVisibility);
+        window.addEventListener('pageshow', handleVisibility);
+        window.addEventListener('focus', handleVisibility);
+
+        return () => {
+            window.removeEventListener('visibilitychange', handleVisibility);
+            window.removeEventListener('pageshow', handleVisibility);
+            window.removeEventListener('focus', handleVisibility);
+        };
+    }, [autoHideTotalsOnRevisit]);
 
     // === Modal State ===
     const [activeModal, setActiveModal] = useState(null);

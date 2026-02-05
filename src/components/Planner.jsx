@@ -1,7 +1,7 @@
 /**
  * Planner component - Weekly planner view
  * 
- * Displays a 7-column week view (Mon-Sun) with:
+ * Displays a 7-column week view with:
  * - Pinned clients/projects
  * - Recurring and due tasks
  * - Time progress indicator for today
@@ -10,7 +10,7 @@
  */
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { addDays, differenceInCalendarWeeks, getISOWeekYear, getWeek, setWeek, startOfWeek } from 'date-fns';
+import { addDays, differenceInCalendarWeeks, getWeek, getWeekYear, setWeek, startOfWeek } from 'date-fns';
 import { useUrlState } from '@/hooks/useUrlState';
 import { usePlannerItems } from '@/hooks/usePlannerItems';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
@@ -64,21 +64,38 @@ const Planner = ({
     );
 
     const today = useTodayDate();
-    const currentIsoYear = useMemo(() => getISOWeekYear(today), [today]);
+    const weekStartsOn = useMemo(
+        () => (typeof preferences.weekStartsOn === 'number' ? preferences.weekStartsOn : 1),
+        [preferences.weekStartsOn]
+    );
+    const firstWeekContainsDate = useMemo(
+        () => (weekStartsOn === 1 ? 4 : 1),
+        [weekStartsOn]
+    );
+    const weekOptions = useMemo(
+        () => ({ weekStartsOn, firstWeekContainsDate }),
+        [weekStartsOn, firstWeekContainsDate]
+    );
+    const currentWeekYear = useMemo(() => getWeekYear(today, weekOptions), [today, weekOptions]);
     const currentWeekNumber = useMemo(
-        () => getWeek(today, { weekStartsOn: 1, firstWeekContainsDate: 4 }),
-        [today]
+        () => getWeek(today, weekOptions),
+        [today, weekOptions]
     );
 
     const requestedYear = useMemo(() => {
         const parsed = parseInt(urlParams.year || '', 10);
-        if (Number.isNaN(parsed) || parsed < 1) return currentIsoYear;
+        if (Number.isNaN(parsed) || parsed < 1) return currentWeekYear;
         return parsed;
-    }, [urlParams.year, currentIsoYear]);
+    }, [urlParams.year, currentWeekYear]);
 
     const maxWeeksInRequestedYear = useMemo(() => {
-        return getWeek(new Date(requestedYear, 11, 28), { weekStartsOn: 1, firstWeekContainsDate: 4 });
-    }, [requestedYear]);
+        const endOfRequestedYear = new Date(requestedYear, 11, 31);
+        const endWeekYear = getWeekYear(endOfRequestedYear, weekOptions);
+        const anchorDate = endWeekYear === requestedYear
+            ? endOfRequestedYear
+            : addDays(endOfRequestedYear, -7);
+        return getWeek(anchorDate, weekOptions);
+    }, [requestedYear, weekOptions]);
 
     const requestedWeekNumber = useMemo(() => {
         const parsed = parseInt(urlParams.week || '', 10);
@@ -88,23 +105,20 @@ const Planner = ({
 
     useEffect(() => {
         if (!urlParams.week || !urlParams.year) {
-            updateUrl({ year: String(currentIsoYear), week: String(currentWeekNumber) });
+            updateUrl({ year: String(currentWeekYear), week: String(currentWeekNumber) });
         }
-    }, [urlParams.week, urlParams.year, updateUrl, currentIsoYear, currentWeekNumber]);
+    }, [urlParams.week, urlParams.year, updateUrl, currentWeekYear, currentWeekNumber]);
 
     const targetWeekStart = useMemo(() => {
-        const weekAnchor = setWeek(new Date(requestedYear, 0, 4), requestedWeekNumber, {
-            weekStartsOn: 1,
-            firstWeekContainsDate: 4,
-        });
-        return startOfWeek(weekAnchor, { weekStartsOn: 1 });
-    }, [requestedYear, requestedWeekNumber]);
+        const weekAnchor = setWeek(new Date(requestedYear, 0, firstWeekContainsDate), requestedWeekNumber, weekOptions);
+        return startOfWeek(weekAnchor, { weekStartsOn });
+    }, [requestedYear, requestedWeekNumber, firstWeekContainsDate, weekOptions, weekStartsOn]);
 
     // Calculate week offset from current week based on requested week number
     const weekOffset = useMemo(() => {
-        const thisWeekStart = startOfWeek(today, { weekStartsOn: 1 });
-        return differenceInCalendarWeeks(targetWeekStart, thisWeekStart, { weekStartsOn: 1 });
-    }, [today, targetWeekStart]);
+        const thisWeekStart = startOfWeek(today, { weekStartsOn });
+        return differenceInCalendarWeeks(targetWeekStart, thisWeekStart, { weekStartsOn });
+    }, [today, targetWeekStart, weekStartsOn]);
 
     // Get planner data for this week
     const { weekDays, weekStart } = usePlannerItems(weekOffset);
@@ -119,8 +133,8 @@ const Planner = ({
     // Calculate week end (Sunday)
     const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
     const weekNumber = useMemo(
-        () => getWeek(weekStart, { weekStartsOn: 1, firstWeekContainsDate: 4 }),
-        [weekStart]
+        () => getWeek(weekStart, weekOptions),
+        [weekStart, weekOptions]
     );
 
     // Mobile: selected day (default to today's index or first day)
@@ -168,14 +182,14 @@ const Planner = ({
     // Navigation handlers
     const navigateWeek = useCallback((direction) => {
         const nextWeekStart = addDays(weekStart, direction * 7);
-        const nextWeekNumber = getWeek(nextWeekStart, { weekStartsOn: 1, firstWeekContainsDate: 4 });
-        const nextWeekYear = getISOWeekYear(nextWeekStart);
+        const nextWeekNumber = getWeek(nextWeekStart, weekOptions);
+        const nextWeekYear = getWeekYear(nextWeekStart, weekOptions);
         updateUrl({ year: String(nextWeekYear), week: String(nextWeekNumber) });
-    }, [weekStart, updateUrl]);
+    }, [weekStart, updateUrl, weekOptions]);
 
     const navigateToToday = useCallback(() => {
-        updateUrl({ year: String(currentIsoYear), week: String(currentWeekNumber) });
-    }, [updateUrl, currentIsoYear, currentWeekNumber]);
+        updateUrl({ year: String(currentWeekYear), week: String(currentWeekNumber) });
+    }, [updateUrl, currentWeekYear, currentWeekNumber]);
 
     useEffect(() => {
         const handleKeyDown = (event) => {
@@ -220,9 +234,9 @@ const Planner = ({
         } else {
             // Go to previous week, last day
             navigateWeek(-1);
-            setSelectedDayIndex(6);
+            setSelectedDayIndex(weekDays.length - 1);
         }
-    }, [selectedDayIndex, navigateWeek]);
+    }, [selectedDayIndex, navigateWeek, weekDays.length]);
 
     const handleOpenDailyGoals = useCallback((dateStr) => {
         if (!dateStr) return;

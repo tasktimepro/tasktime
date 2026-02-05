@@ -32,12 +32,12 @@ export const getTodayRange = (): DateRange => {
  * Get date range for current week
  * @returns {Object} Object with start and end timestamps
  */
-export const getThisWeekRange = (): DateRange => {
+export const getThisWeekRange = (weekStartsOn: number = 1): DateRange => {
     const now = new Date();
 
     return {
-        start: startOfWeek(now, { weekStartsOn: 1 }).getTime(),
-        end: endOfWeek(now, { weekStartsOn: 1 }).getTime()
+        start: startOfWeek(now, { weekStartsOn }).getTime(),
+        end: endOfWeek(now, { weekStartsOn }).getTime()
     };
 };
 

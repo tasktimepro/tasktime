@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getISOWeekYear, getWeek } from 'date-fns';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { getWeek, getWeekYear } from 'date-fns';
+import { usePreferences } from '@/hooks/usePreferences';
 
 type ViewName = 'dashboard' | 'planner' | 'projects' | 'clients' | 'invoices' | 'expenses' | 'account' | 'auth-callback';
 
@@ -124,6 +125,19 @@ function getParamsFromUrl(): UrlParams {
 
 export const useUrlState = () => {
     const [urlParams, setUrlParams] = useState(getParamsFromUrl);
+    const { preferences } = usePreferences();
+    const weekStartsOn = useMemo(
+        () => (typeof preferences.weekStartsOn === 'number' ? preferences.weekStartsOn : 1),
+        [preferences.weekStartsOn]
+    );
+    const firstWeekContainsDate = useMemo(
+        () => (weekStartsOn === 1 ? 4 : 1),
+        [weekStartsOn]
+    );
+    const weekOptions = useMemo(
+        () => ({ weekStartsOn, firstWeekContainsDate }),
+        [weekStartsOn, firstWeekContainsDate]
+    );
 
     // Always update state from URL on any navigation
     useEffect(() => {
@@ -288,8 +302,8 @@ export const useUrlState = () => {
     const navigateToPlanner = useCallback((params: UrlUpdateParams = {}) => {
         const shouldDefaultWeek = !('year' in params) && !('week' in params);
         const today = new Date();
-        const defaultYear = String(getISOWeekYear(today));
-        const defaultWeek = String(getWeek(today, { weekStartsOn: 1, firstWeekContainsDate: 4 }));
+        const defaultYear = String(getWeekYear(today, weekOptions));
+        const defaultWeek = String(getWeek(today, weekOptions));
 
         updateUrl({
             view: 'planner',
@@ -302,7 +316,7 @@ export const useUrlState = () => {
             tab: null,
             ...params
         });
-    }, [updateUrl]);
+    }, [updateUrl, weekOptions]);
 
     /**
      * Navigate to clients view with optional parameters

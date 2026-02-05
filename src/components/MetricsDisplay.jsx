@@ -9,11 +9,14 @@ import {
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { ClockIcon, CurrencyDollarIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { usePreferences } from '@/hooks/usePreferences';
 
 /**
  * MetricsDisplay component - Shows time and earnings metrics for different periods
  */
 const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitle = true, title = "Project Metrics" }) => {
+    const { preferences } = usePreferences();
+    const weekStartsOn = typeof preferences.weekStartsOn === 'number' ? preferences.weekStartsOn : 1;
     
     // Helper function to get currency for display
     const getDisplayCurrency = () => {
@@ -90,7 +93,7 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
 
     const todayMetrics = calculateMetrics(todayRange.start, todayRange.end);
 
-    const weekRange = getThisWeekRange();
+    const weekRange = getThisWeekRange(weekStartsOn);
 
     const weekMetrics = calculateMetrics(weekRange.start, weekRange.end);
 

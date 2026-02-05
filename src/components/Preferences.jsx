@@ -4,6 +4,7 @@ import { DEFAULT_CURRENCY, getCurrencyOptions } from '../utils/currencyUtils.ts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import CustomCheckbox from './CustomCheckbox';
 
 /**
  * Preferences component - Manages user preferences including preferred currency
@@ -11,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const Preferences = ({ preferences = {}, updatePreferences }) => {
     const [preferredCurrency, setPreferredCurrency] = useState(DEFAULT_CURRENCY);
     const { showSuccess } = useToast();
+    const weekStartsOnSunday = (preferences.weekStartsOn ?? 1) === 0;
+    const autoHideTotalsOnRevisit = preferences.autoHideTotalsOnRevisit === true;
 
     // Load preferred currency from preferences prop on mount
     useEffect(() => {
@@ -33,6 +36,20 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
         }));
         
         showSuccess('Preferred currency updated successfully!');
+    };
+
+    const handleWeekStartToggle = (checked) => {
+        if (updatePreferences) {
+            updatePreferences({ weekStartsOn: checked ? 0 : 1 });
+        }
+        showSuccess('Week start preference updated!');
+    };
+
+    const handleAutoHideTotalsToggle = (checked) => {
+        if (updatePreferences) {
+            updatePreferences({ autoHideTotalsOnRevisit: checked });
+        }
+        showSuccess('Totals visibility preference updated!');
     };
 
     return (
@@ -71,6 +88,37 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
                         <p className="text-sm text-muted-foreground">
                             This currency will be used as the default for new projects and in dashboard metrics.
                         </p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card className="mt-6">
+                <CardHeader>
+                    <CardTitle>General Settings</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <CustomCheckbox
+                                checked={weekStartsOnSunday}
+                                onChange={handleWeekStartToggle}
+                                label="Sunday as first day of the week"
+                            />
+                            <p className="text-sm text-muted-foreground">
+                                Changes the planner week layout and week calculations.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <CustomCheckbox
+                                checked={autoHideTotalsOnRevisit}
+                                onChange={handleAutoHideTotalsToggle}
+                                label="Always auto-hide totals when returning to TaskTime"
+                            />
+                            <p className="text-sm text-muted-foreground">
+                                Totals will hide again whenever you revisit the tab.
+                            </p>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

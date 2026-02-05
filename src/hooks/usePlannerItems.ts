@@ -95,9 +95,9 @@ export interface PlannerDay {
 }
 
 export interface UsePlannerItemsResult {
-    /** Array of 7 days (Mon-Sun) */
+    /** Array of 7 days (start of week to end of week) */
     weekDays: PlannerDay[];
-    /** The Monday of the current view */
+    /** The start of the current view week */
     weekStart: Date;
     /** ISO string for the week start */
     weekStartStr: string;
@@ -141,10 +141,15 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     }, [exchangeRatesLoaded]);
 
     // Calculate week boundaries for time entries query
+    const weekStartsOn = useMemo(
+        () => (typeof preferences.weekStartsOn === 'number' ? preferences.weekStartsOn : 1),
+        [preferences.weekStartsOn]
+    );
+
     const weekStart = useMemo(() => {
-        const thisWeekStart = startOfWeek(today, { weekStartsOn: 1 });
+        const thisWeekStart = startOfWeek(today, { weekStartsOn });
         return addDays(thisWeekStart, weekOffset * 7);
-    }, [today, weekOffset]);
+    }, [today, weekOffset, weekStartsOn]);
 
     const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
 

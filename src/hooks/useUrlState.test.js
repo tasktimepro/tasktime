@@ -1,7 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useUrlState } from './useUrlState'
-import { getISOWeekYear, getWeek } from 'date-fns'
+import { getWeek, getWeekYear } from 'date-fns'
+
+vi.mock('@/hooks/usePreferences', () => ({
+    usePreferences: () => ({
+        preferences: { weekStartsOn: 1 },
+    })
+}))
 
 describe('useUrlState', () => {
 
@@ -209,7 +215,7 @@ describe('useUrlState', () => {
 
         const { result } = renderHook(() => useUrlState())
         const today = new Date()
-        const defaultYear = String(getISOWeekYear(today))
+        const defaultYear = String(getWeekYear(today, { weekStartsOn: 1, firstWeekContainsDate: 4 }))
         const defaultWeek = String(getWeek(today, { weekStartsOn: 1, firstWeekContainsDate: 4 }))
 
         act(() => {

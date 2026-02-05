@@ -203,6 +203,7 @@ export interface Preferences {
     theme?: 'light' | 'dark' | 'system';
     defaultView?: string;
     weekStartsOn?: number;
+    autoHideTotalsOnRevisit?: boolean;
     showCompletedTasks?: boolean;
     defaultBillable?: boolean;
     projectSort?: 'createdAt' | 'lastActive' | 'name';

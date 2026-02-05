@@ -149,10 +149,18 @@ describe('dateUtils', () => {
 
         it('returns this week range', () => {
 
-            const range = getThisWeekRange()
+            const range = getThisWeekRange(1)
             const now = new Date()
             expect(range.start).toBe(startOfWeek(now, { weekStartsOn: 1 }).getTime())
             expect(range.end).toBe(endOfWeek(now, { weekStartsOn: 1 }).getTime())
+        })
+
+        it('returns this week range with Sunday start', () => {
+
+            const range = getThisWeekRange(0)
+            const now = new Date()
+            expect(range.start).toBe(startOfWeek(now, { weekStartsOn: 0 }).getTime())
+            expect(range.end).toBe(endOfWeek(now, { weekStartsOn: 0 }).getTime())
         })
 
         it('returns this month range', () => {
