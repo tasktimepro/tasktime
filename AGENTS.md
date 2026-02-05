@@ -161,7 +161,7 @@ const { preferences, updatePreferences } = usePreferences();
 - `src/components/sync/YjsSyncSettings.tsx` - Settings panel
 
 **Sync Behavior (Jan 22, 2026 optimizations):**
-- **Sync interval:** 60 seconds (reduced from 15s to minimize Cloudflare requests)
+- **Sync interval:** 15 minutes (reduced periodic checks)
 - **Pull throttle:** 30 seconds - skips manifest reload if no local changes and last pull was recent
 - **Manifest change check:** Before full download, checks `modifiedTime` via metadata request
 - **Force sync triggers:** Tab visibility change, network online event (always bypass throttle)

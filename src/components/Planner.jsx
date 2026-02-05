@@ -598,6 +598,9 @@ const Planner = ({
         const totalTimeMs = weekDays.reduce((sum, day) => sum + (day.totalTimeMs || 0), 0);
         const totalEarnings = weekDays.reduce((sum, day) => sum + (day.totalEarnings || 0), 0);
         const actualHours = totalTimeMs / 3600000;
+        const hasTargetHours = typeof weeklyGoals.targetHours === 'number' && weeklyGoals.targetHours > 0;
+        const hasTargetEarnings = typeof weeklyGoals.targetEarnings === 'number' && weeklyGoals.targetEarnings > 0;
+        const shouldShow = actualHours > 0 || totalEarnings > 0 || hasTargetHours || hasTargetEarnings;
 
         const formatHours = (value, alwaysDecimal = false) => {
             if (!Number.isFinite(value)) return '0h';
@@ -621,6 +624,10 @@ const Planner = ({
             ? `${formatCurrency(totalEarnings, defaultCurrency, earningsDecimals)} / ${formatCurrency(weeklyGoals.targetEarnings, defaultCurrency, targetEarningsDecimals)}`
             : formatCurrency(totalEarnings, defaultCurrency, earningsDecimals);
 
+        if (!shouldShow) {
+            return null;
+        }
+
         return {
             hoursText,
             earningsText,
@@ -635,16 +642,6 @@ const Planner = ({
                 height: 'calc(100vh - var(--app-content-padding-top, 1.5rem) - var(--app-content-padding-bottom, 1.5rem))'
             }}
         >
-            {/* Page header */}
-            <div className="flex-shrink-0">
-                <h1 className="text-2xl font-bold text-foreground">
-                    Plan & Track
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Plan and track your week with clients, projects, tasks, and goals.
-                </p>
-            </div>
-
             {/* Week navigation header */}
             <div className="flex-shrink-0">
                 <WeekHeader

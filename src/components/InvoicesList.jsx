@@ -637,7 +637,6 @@ const InvoicesList = ({
                 isOpen={Boolean(pendingPaidEditInvoice)}
                 onClose={closePaidEditWarning}
                 title="Edit paid invoice?"
-                description="Editing a paid invoice can create inconsistencies in your records."
                 footer={(
                     <div className="flex justify-end space-x-3">
                         <Button
@@ -654,6 +653,9 @@ const InvoicesList = ({
                     </div>
                 )}
             >
+                <p className="text-sm text-muted-foreground mb-3">
+                    Editing a paid invoice can create inconsistencies in your records.
+                </p>
                 <Notice
                     title="This invoice is marked as paid. Continue anyway?"
                     variant="warning"

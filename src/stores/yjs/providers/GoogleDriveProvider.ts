@@ -28,7 +28,7 @@ import {
 export { AuthorizationError };
 
 const COMPACTION_THRESHOLD = 10; // Compact after 10 deltas
-const SYNC_INTERVAL_MS = 60_000; // 60 seconds (reduced from 15s to minimize requests)
+const SYNC_INTERVAL_MS = 900_000; // 15 minutes (reduced periodic checks)
 const SYNC_DEBOUNCE_MS = 100; // Small debounce to batch rapid changes
 const PULL_THROTTLE_MS = 30_000; // Skip pull if no local changes and last pull was < 30s ago
 

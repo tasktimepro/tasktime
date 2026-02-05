@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getISOWeekYear, getWeek } from 'date-fns';
 
 type ViewName = 'dashboard' | 'planner' | 'projects' | 'clients' | 'invoices' | 'expenses' | 'account' | 'auth-callback';
 
@@ -285,7 +286,22 @@ export const useUrlState = () => {
      * Navigate to planner view
      */
     const navigateToPlanner = useCallback((params: UrlUpdateParams = {}) => {
-        updateUrl({ view: 'planner', client: null, project: null, section: null, year: null, week: null, create: null, tab: null, ...params });
+        const shouldDefaultWeek = !('year' in params) && !('week' in params);
+        const today = new Date();
+        const defaultYear = String(getISOWeekYear(today));
+        const defaultWeek = String(getWeek(today, { weekStartsOn: 1, firstWeekContainsDate: 4 }));
+
+        updateUrl({
+            view: 'planner',
+            client: null,
+            project: null,
+            section: null,
+            year: shouldDefaultWeek ? defaultYear : null,
+            week: shouldDefaultWeek ? defaultWeek : null,
+            create: null,
+            tab: null,
+            ...params
+        });
     }, [updateUrl]);
 
     /**

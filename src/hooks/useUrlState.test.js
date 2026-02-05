@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useUrlState } from './useUrlState'
+import { getISOWeekYear, getWeek } from 'date-fns'
 
 describe('useUrlState', () => {
 
@@ -207,12 +208,15 @@ describe('useUrlState', () => {
     it('navigates to planner with optional year and week', () => {
 
         const { result } = renderHook(() => useUrlState())
+        const today = new Date()
+        const defaultYear = String(getISOWeekYear(today))
+        const defaultWeek = String(getWeek(today, { weekStartsOn: 1, firstWeekContainsDate: 4 }))
 
         act(() => {
             result.current.navigateToPlanner()
         })
 
-        expect(window.location.pathname).toBe('/planner')
+        expect(window.location.pathname).toBe(`/planner/${defaultYear}/${defaultWeek}`)
 
         act(() => {
             result.current.navigateToPlanner({ year: '2026', week: '05' })

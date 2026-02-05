@@ -19,6 +19,7 @@ import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { CornerDownRightIcon } from '@/components/ui/icons';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTodayString } from '@/hooks/useDayRollover';
+import { linkifyNodes } from '@/utils/linkifyUtils';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -498,7 +499,13 @@ const Dashboard = ({
                             </button>
                         )}
                         {hasProject && hasNote && <span className="mx-1">•</span>}
-                        {hasNote && <span>{task.note}</span>}
+                        {hasNote && (
+                            <span>
+                                {linkifyNodes(task.note, React.createElement, {
+                                    linkClassName: 'text-muted-foreground hover:text-foreground hover:underline'
+                                })}
+                            </span>
+                        )}
                     </p>
                 )}
             </div>

@@ -1,6 +1,8 @@
+import React from 'react';
 import CustomCheckbox from '../CustomCheckbox';
 import TaskEditForm from './TaskEditForm';
 import TaskTimeDisplay from './TaskTimeDisplay';
+import { linkifyNodes } from '@/utils/linkifyUtils';
 
 /**
  * TaskHeader component - Title, checkbox, and time display.
@@ -49,27 +51,41 @@ const TaskHeader = ({
                 ) : (
                     <div className="flex items-center space-x-3">
                         {onTitleClick ? (
-                            <button
-                                type="button"
-                                onClick={onTitleClick}
-                                className={`text-left text-sm font-medium transition-colors cursor-pointer flex flex-col items-start min-w-0 gap-0.5 ${
-                                    isCompleted
-                                        ? 'line-through text-muted-foreground hover:text-muted-foreground'
-                                        : 'text-foreground hover:text-blue-600 dark:hover:text-blue-400'
-                                }`}
-                            >
-                                <span className="truncate w-full">{task.title}</span>
+                            <div className="flex flex-col items-start min-w-0 gap-0.5">
+                                <button
+                                    type="button"
+                                    onClick={onTitleClick}
+                                    className={`text-left text-sm font-medium transition-colors cursor-pointer min-w-0 ${
+                                        isCompleted
+                                            ? 'line-through text-muted-foreground hover:text-muted-foreground'
+                                            : 'text-foreground hover:text-blue-600 dark:hover:text-blue-400'
+                                    }`}
+                                >
+                                    <span className="truncate w-full">{task.title}</span>
+                                </button>
                                 {task.note && (
-                                    <span className="text-xs text-muted-foreground truncate w-full">{task.note}</span>
+                                    <span className={`text-xs text-muted-foreground truncate w-full ${
+                                        isCompleted ? 'line-through' : ''
+                                    }`}>
+                                        {linkifyNodes(task.note, React.createElement, {
+                                            linkClassName: 'text-muted-foreground hover:text-foreground hover:underline'
+                                        })}
+                                    </span>
                                 )}
-                            </button>
+                            </div>
                         ) : (
                             <div className={`text-sm font-medium flex flex-col items-start min-w-0 gap-0.5 ${
                                 isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
                             }`}>
                                 <span className="truncate w-full">{task.title}</span>
                                 {task.note && (
-                                    <span className="text-xs text-muted-foreground truncate w-full">{task.note}</span>
+                                    <span className={`text-xs text-muted-foreground truncate w-full ${
+                                        isCompleted ? 'line-through' : ''
+                                    }`}>
+                                        {linkifyNodes(task.note, React.createElement, {
+                                            linkClassName: 'text-muted-foreground hover:text-foreground hover:underline'
+                                        })}
+                                    </span>
                                 )}
                             </div>
                         )}

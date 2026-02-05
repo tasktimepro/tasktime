@@ -474,10 +474,7 @@ function AppContent() {
     }, [timerTaskId, activeTasks]);
 
     useEffect(() => {
-        if (!timerIsActive || !timerTaskId) {
-            document.title = ORIGINAL_TITLE;
-            return;
-        }
+        if (!timerIsActive || !timerTaskId) return;
         
         if (!currentTaskName) return;
         
@@ -508,12 +505,28 @@ function AppContent() {
     const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToPlanner, updateUrl } = useUrlState();
     
     const activeView = urlParams.view;
+    const pageTitleMap = {
+        dashboard: 'Dashboard',
+        planner: 'Planner',
+        clients: 'Clients',
+        projects: 'Projects',
+        invoices: 'Invoices',
+        expenses: 'Expenses',
+        account: 'Account'
+    };
     const selectedProject = urlParams.projectId 
         ? projects.find(p => p.id === urlParams.projectId) 
         : null;
     const selectedClient = urlParams.clientId 
         ? clients.find(c => c.id === urlParams.clientId) 
         : null;
+
+    useEffect(() => {
+        if (timerIsActive && timerTaskId) return;
+
+        const pageTitle = pageTitleMap[activeView] || ORIGINAL_TITLE;
+        document.title = pageTitle === ORIGINAL_TITLE ? ORIGINAL_TITLE : `${pageTitle} | TaskTime`;
+    }, [activeView, timerIsActive, timerTaskId]);
 
     // Handle missing project/client in URL
     useEffect(() => {

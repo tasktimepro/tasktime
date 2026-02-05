@@ -12,6 +12,10 @@ export type LinkifyPart =
 
 type CreateElement = (type: any, props: any, ...children: ReactNode[]) => ReactNode;
 
+type LinkifyNodeOptions = {
+    linkClassName?: string;
+};
+
 /**
  * Converts URLs in text to anchor elements.
  *
@@ -38,12 +42,16 @@ export const linkifyParts = (text?: string | null): LinkifyPart[] => {
  *
  * @param text
  * @param createElement
+ * @param options
  */
 export const linkifyNodes = (
     text: string | null | undefined,
-    createElement: CreateElement
+    createElement: CreateElement,
+    options?: LinkifyNodeOptions
 ): Array<ReactNode> | null => {
     if (!text) return null;
+
+    const linkClassName = options?.linkClassName || 'text-blue-600 dark:text-blue-400 hover:underline';
 
     return linkifyParts(text).map((part, index) => {
         if (part.type === 'text') {
@@ -57,7 +65,7 @@ export const linkifyNodes = (
                 href: part.href,
                 target: '_blank',
                 rel: 'noopener noreferrer',
-                className: 'text-blue-600 dark:text-blue-400 hover:underline'
+                className: linkClassName
             },
             part.value
         );
