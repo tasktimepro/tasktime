@@ -6,7 +6,7 @@ import ExpenseDueCard from './ExpenseDueCard'
 
 describe('ExpenseDueCard', () => {
 
-    it('renders fixed expense with amount and mark paid button', () => {
+    it('renders fixed expense with amount and mark paid icon button', () => {
         const expense = {
             id: 'exp-1',
             title: 'Office Rent',
@@ -27,13 +27,11 @@ describe('ExpenseDueCard', () => {
 
         expect(screen.getByText('Office Rent')).toBeInTheDocument()
         expect(screen.getByText('Today')).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Mark Paid' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
         expect(screen.getByText(/USD/)).toBeInTheDocument()
     })
 
-    it('shows variable amount input and validates entry', async () => {
-        const user = userEvent.setup()
-        const onMarkPaid = vi.fn()
+    it('hides check action for variable expense without amount', async () => {
         const expense = {
             id: 'exp-2',
             title: 'Electricity',
@@ -46,26 +44,16 @@ describe('ExpenseDueCard', () => {
         render(
             <ExpenseDueCard
                 expense={expense}
-                onMarkPaid={onMarkPaid}
+                onMarkPaid={vi.fn()}
             />
         )
 
-        const input = screen.getByPlaceholderText('Enter amount')
-        const button = screen.getByRole('button', { name: 'Enter Amount & Pay' })
-
-        await user.click(button)
-        expect(screen.getByText('Amount required')).toBeInTheDocument()
-
-        await user.clear(input)
-        await user.type(input, '147.23')
-        await user.click(button)
-
-        expect(onMarkPaid).toHaveBeenCalledWith(147.23)
+        expect(screen.queryByRole('button', { name: 'Mark as paid' })).not.toBeInTheDocument()
     })
 
-    it('calls onEdit when card is clicked', async () => {
+    it('calls onView when card is clicked', async () => {
         const user = userEvent.setup()
-        const onEdit = vi.fn()
+            const onView = vi.fn()
         const expense = {
             id: 'exp-3',
             title: 'Domain',
@@ -78,13 +66,12 @@ describe('ExpenseDueCard', () => {
         render(
             <ExpenseDueCard
                 expense={expense}
-                onEdit={onEdit}
+                    onView={onView}
             />
         )
 
-        const card = screen.getByText('Domain').closest('div[role="button"]')
-        expect(card).toBeTruthy()
-        await user.click(card)
-        expect(onEdit).toHaveBeenCalledWith(expense)
+        const titleButton = screen.getByRole('button', { name: /Domain/ })
+        await user.click(titleButton)
+            expect(onView).toHaveBeenCalledWith(expense)
     })
 })

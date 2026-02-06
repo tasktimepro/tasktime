@@ -16,6 +16,7 @@ const ExpensesSection = ({
     clientId,
     projectId,
     openExpenseModal,
+    openExpenseView,
 }) => {
 
     const { expenses } = useExpenses();
@@ -123,6 +124,7 @@ const ExpensesSection = ({
                         clientsById={new Map()}
                         projectsById={new Map()}
                         compact
+                        onView={(expense) => openExpenseView?.(expense)}
                         onEdit={(expense) => openExpenseModal(expense)}
                         onTogglePaid={() => {}}
                     />

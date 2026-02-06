@@ -10,6 +10,7 @@ const ExpenseList = ({
     expenses,
     clientsById,
     projectsById,
+    onView,
     onEdit,
     onTogglePaid,
     compact = false,
@@ -38,6 +39,7 @@ const ExpenseList = ({
                         client={client}
                         project={project}
                         compact={compact}
+                        onView={onView}
                         onEdit={onEdit}
                         onTogglePaid={onTogglePaid}
                     />

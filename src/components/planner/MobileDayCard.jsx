@@ -163,11 +163,12 @@ const MobileDayCard = ({
                             amountType={item.amountType}
                             currency={item.currency}
                             supplierName={item.supplierName}
-                            onMarkPaid={item.type === 'expense'
+                            isPreview={item.isPreview}
+                            onMarkPaid={item.type === 'expense' && !item.isPreview
                                 ? (amount) => onMarkExpensePaid?.(item, amount)
                                 : undefined}
                             hasAttachment={!!item.attachment}
-                            onClick={() => onItemClick?.(item)}
+                            onClick={item.isPreview ? undefined : () => onItemClick?.(item)}
                             onEdit={() => onEditItem?.(item, dateStr)}
                             onRemove={() => onRemoveItem?.(item)}
                         />

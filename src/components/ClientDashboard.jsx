@@ -49,7 +49,8 @@ const ClientDashboard = ({
     openBusinessModal,
     openPaymentMethodModal,
     openTemplateModal,
-    openExpenseModal
+    openExpenseModal,
+    openExpenseView
 }) => {
     const [editingInvoice, setEditingInvoice] = useState(null);
     const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
@@ -952,6 +953,7 @@ const ClientDashboard = ({
             <ExpensesSection
                 clientId={client.id}
                 openExpenseModal={openExpenseModal}
+                openExpenseView={openExpenseView}
             />
 
             {/* Client Time Metrics */}

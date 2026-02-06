@@ -62,7 +62,7 @@ const ProjectsOverview = ({
                                                     <span> <span className="mx-1">•</span> {project.pendingHours.toFixed(1)}h pending</span>
                                                 </span>
                                             ) : (
-                                                <span>Personal <span className="mx-1">•</span> {project.pendingHours.toFixed(1)}h pending</span>
+                                                <span>Personal <span className="mx-1">•</span> {project.pendingHours.toFixed(1)}h</span>
                                             )}
                                         </div>
                                     </div>

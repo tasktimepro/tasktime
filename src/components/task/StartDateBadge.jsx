@@ -60,11 +60,9 @@ const StartDateBadge = ({ startDate, recurring, completed, recurringOverdue = fa
     const dayDiff = differenceInCalendarDays(parseISO(startDate), parseISO(today));
     const isSoon = dayDiff > 0 && dayDiff <= 3;
 
-    let variant = 'muted';
+    let variant = 'secondary';
     if (isOverdue) {
         variant = 'warning';
-    } else if (startDate === today || isSoon) {
-        variant = 'secondary';
     }
 
     const label = isOverdue ? 'Overdue' : getRelativeLabel(startDate);

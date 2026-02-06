@@ -10,7 +10,6 @@ import { CheckIcon, DocumentTextIcon, PlusIcon, UserIcon, GoalIcon } from '@/com
 import { format } from 'date-fns';
 import PlannerItem from './PlannerItem';
 import AddItemPopover from './AddItemPopover';
-import { useTimeProgress, getProgressGradientStyle } from './hooks/useTimeProgress';
 import DailyGoalProgress from './DailyGoalProgress';
 import {
     ContextMenu,
@@ -59,10 +58,6 @@ const DayColumn = ({
     onRemoveItem,
     onSetDailyGoal,
 }) => {
-
-    // Time progress for today's column
-    const progress = useTimeProgress();
-    const progressStyle = isToday ? getProgressGradientStyle(progress) : {};
 
     const dayName = format(date, 'EEE'); // Mon, Tue, etc.
     const dayNumber = format(date, 'd'); // 1, 2, ... 31
@@ -121,9 +116,8 @@ const DayColumn = ({
                     className={cn(
                         "group flex flex-col h-full rounded-lg border bg-card relative",
                         "transition-shadow",
-                        isToday && "border-t-2 border-t-black dark:border-t-white"
+                        isToday && "border-t-2 border-t-black dark:border-t-white bg-muted/30 dark:bg-card"
                     )}
-                    style={progressStyle}
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between px-2 py-2 border-b border-border">
@@ -180,11 +174,12 @@ const DayColumn = ({
                                 amountType={item.amountType}
                                 currency={item.currency}
                                 supplierName={item.supplierName}
-                                onMarkPaid={item.type === 'expense'
+                                isPreview={item.isPreview}
+                                onMarkPaid={item.type === 'expense' && !item.isPreview
                                     ? (amount) => onMarkExpensePaid?.(item, amount)
                                     : undefined}
                                 hasAttachment={!!item.attachment}
-                                onClick={() => onItemClick?.(item)}
+                                onClick={item.isPreview ? undefined : () => onItemClick?.(item)}
                                 onEdit={() => onEditItem?.(item, dateStr)}
                                 onRemove={() => onRemoveItem?.(item)}
                             />

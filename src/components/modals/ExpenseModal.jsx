@@ -784,7 +784,7 @@ const ExpenseModal = ({
     const modalFooter = (
         <div className="flex w-full justify-between items-center">
             <div className="flex items-center gap-2">
-                {isSubmittingRecurring && (
+                {(isSubmittingRecurring || (editingExpense && !editingRecurrenceId)) && (
                     <Button variant="destructive" type="button" onClick={handleDeleteInstance}>
                         Delete Expense
                     </Button>
@@ -894,6 +894,7 @@ const ExpenseModal = ({
                                         type="date"
                                         value={formData.date}
                                         onChange={(event) => handleChange('date', event.target.value)}
+                                        className="dark:[color-scheme:dark]"
                                     />
                                 </div>
                             ) : (
@@ -905,6 +906,7 @@ const ExpenseModal = ({
                                         value={formData.endDate}
                                         onChange={(event) => handleChange('endDate', event.target.value)}
                                         disabled={recurringFieldsLocked}
+                                        className="dark:[color-scheme:dark]"
                                     />
                                 </div>
                             )}
@@ -1046,6 +1048,7 @@ const ExpenseModal = ({
                                     type="date"
                                     value={formData.paidOn}
                                     onChange={(event) => handleChange('paidOn', event.target.value)}
+                                    className="dark:[color-scheme:dark]"
                                 />
                             </div>
                             <div className="space-y-2">

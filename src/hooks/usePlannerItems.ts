@@ -17,12 +17,14 @@ import { useClients } from './useClients';
 import { useTimers } from './useTimers';
 import { useTimeEntries } from './useTimeEntries';
 import { useExpenses } from './useExpenses';
+import { useExpenseRecurrences } from './useExpenseRecurrences';
 import { useTodayDate, useTodayString } from './useDayRollover';
 import { useDailyGoals } from './useDailyGoals';
 import { usePreferences } from './usePreferences';
 import { isRecurringTaskDueOnDate } from '@/utils/recurringUtils';
 import { toStorageDate } from '@/utils/dateUtils';
 import { isRecurringCompletedOnDate } from '@/utils/recurringCompletionUtils';
+import { buildExpenseFromRecurrence, isRecurringExpenseDueOnDate } from '@/utils/expenseUtils';
 import { convertCurrency, fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import type { Task, Project, Client, PlannerAttachment, TimeEntry, DailyGoal, Expense } from '@/stores/yjs/types';
 
@@ -81,6 +83,7 @@ export interface PlannerExpenseItem extends PlannerItemBase {
     amountType: 'fixed' | 'variable';
     currency: string;
     supplierName?: string | null;
+    isPreview?: boolean;
 }
 
 export type PlannerItem = PlannerClientItem | PlannerProjectItem | PlannerTaskItem | PlannerExpenseItem;
@@ -131,6 +134,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     const { clients, isLoading: clientsLoading } = useClients();
     const { timers } = useTimers();
     const { expenses } = useExpenses();
+    const { recurrences } = useExpenseRecurrences();
     const { preferences } = usePreferences();
     const { getGoalForDate } = useDailyGoals();
     const today = useTodayDate();
@@ -287,6 +291,18 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         return null;
     }, [projectsById, clientsById, getProjectColor]);
 
+    const expenseDatesByRecurrence = useMemo(() => {
+        const map = new Map<string, Set<string>>();
+        expenses.forEach((expense) => {
+            if (!expense.recurrenceId) return;
+            if (!map.has(expense.recurrenceId)) {
+                map.set(expense.recurrenceId, new Set());
+            }
+            map.get(expense.recurrenceId)?.add(expense.date);
+        });
+        return map;
+    }, [expenses]);
+
     // Build lookup of taskId → projectId
     const taskProjectMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -327,10 +343,27 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     const getTaskTimeOnDate = useCallback((taskId: string, dateStr: string): number => {
         const dayStart = startOfDay(new Date(dateStr)).getTime();
         const dayEnd = endOfDay(new Date(dateStr)).getTime();
-        return entries
+        const entryTime = entries
             .filter((e) => e.taskId === taskId)
             .reduce((sum, e) => sum + getEntryOverlapMs(e, dayStart, dayEnd), 0);
-    }, [entries, getEntryOverlapMs]);
+
+        if (dateStr !== todayStr) {
+            return entryTime;
+        }
+
+        const activeTimer = timers.find((timer) => timer.taskId === taskId && !timer.isPaused);
+        if (!activeTimer) {
+            return entryTime;
+        }
+
+        const timerStart = activeTimer.startTime;
+        const timerEnd = activeTimer.startTime + activeTimer.elapsedTime;
+        const overlapStart = Math.max(timerStart, dayStart);
+        const overlapEnd = Math.min(timerEnd, dayEnd);
+        const runningMs = overlapEnd > overlapStart ? (overlapEnd - overlapStart) : 0;
+
+        return entryTime + runningMs;
+    }, [entries, getEntryOverlapMs, timers, todayStr]);
 
     // Calculate total time for a project on a date (all its tasks)
     const getProjectTimeOnDate = useCallback((projectId: string, dateStr: string): number => {
@@ -591,23 +624,62 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         }
 
-        // 8. Unpaid expenses for this day (sorted alphabetically)
+        // 8. Expenses for this day (unpaid first, then paid)
         const dayExpenses = expenses
-            .filter((expense) => expense.paymentStatus === 'unpaid' && expense.date === dateStr)
-            .sort((a, b) => a.title.localeCompare(b.title));
+            .filter((expense) => expense.date === dateStr)
+            .sort((a, b) => {
+                if (a.paymentStatus === b.paymentStatus) {
+                    return a.title.localeCompare(b.title);
+                }
+                return a.paymentStatus === 'unpaid' ? -1 : 1;
+            });
 
         dayExpenses.forEach((expense) => {
             items.push({
                 key: `expense-${expense.id}-${dateStr}`,
                 type: 'expense',
                 title: expense.title,
-                isCompleted: false,
+                isCompleted: expense.paymentStatus === 'paid',
                 color: getExpenseColor(expense),
                 amount: expense.amount || 0,
                 amountType: expense.amountType || 'fixed',
                 currency: expense.currency || defaultCurrency,
                 supplierName: expense.supplierName || null,
                 expense,
+            });
+        });
+
+        // 9. Recurring expense previews (no instance yet)
+        const recurringPreviews = recurrences
+            .filter((recurrence) => recurrence.active)
+            .filter(() => dateStr >= safeTodayStr)
+            .filter((recurrence) => isRecurringExpenseDueOnDate(recurrence, dateStr))
+            .filter((recurrence) => !expenseDatesByRecurrence.get(recurrence.id)?.has(dateStr))
+            .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+
+        recurringPreviews.forEach((recurrence) => {
+            const preview = buildExpenseFromRecurrence(recurrence, dateStr);
+            const previewExpense = {
+                ...preview,
+                id: `preview-${recurrence.id}-${dateStr}`,
+                amount: recurrence.amountType === 'variable'
+                    ? (recurrence.amount || 0)
+                    : recurrence.amount,
+                isPreview: true,
+            };
+
+            items.push({
+                key: `expense-preview-${recurrence.id}-${dateStr}`,
+                type: 'expense',
+                title: previewExpense.title,
+                isCompleted: false,
+                color: getExpenseColor(previewExpense),
+                amount: previewExpense.amount || 0,
+                amountType: previewExpense.amountType || 'fixed',
+                currency: previewExpense.currency || defaultCurrency,
+                supplierName: previewExpense.supplierName || null,
+                expense: previewExpense,
+                isPreview: true,
             });
         });
 
@@ -710,7 +782,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
                 isActualBased: base.isActualBased,
             };
         });
-    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, expenses, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getExpenseColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs, getGoalForDate, projectClientMap, defaultCurrency]);
+    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, expenses, recurrences, expenseDatesByRecurrence, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getExpenseColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs, getGoalForDate, projectClientMap, defaultCurrency]);
 
     // Build the full week
     const weekDays = useMemo((): PlannerDay[] => {

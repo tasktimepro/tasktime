@@ -280,6 +280,7 @@ export interface PlannerExpenseItem extends PlannerItemBase {
     amountType: 'fixed' | 'variable';
     currency: string;
     supplierName?: string | null;
+    isPreview?: boolean;
 }
 
 export type PlannerItem = PlannerClientItem | PlannerProjectItem | PlannerTaskItem | PlannerExpenseItem;

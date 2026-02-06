@@ -25,9 +25,10 @@ import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
 import { useClients } from '@/hooks/useClients.ts';
 import { useProjects } from '@/hooks/useProjects.ts';
 import { usePreferences } from '@/hooks/usePreferences.ts';
+import { useToast } from '@/hooks/useToast.ts';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
-import { toStorageDate } from '@/utils/dateUtils.ts';
-import { isExpenseInDateRange } from '@/utils/expenseUtils';
+import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
+import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate, isExpenseInDateRange } from '@/utils/expenseUtils';
 import ExpenseList from '@/components/expenses/ExpenseList';
 import ExpenseFilters from '@/components/expenses/ExpenseFilters';
 import PaymentMethods from '@/components/PaymentMethods';
@@ -46,6 +47,7 @@ const PERIOD_OPTIONS = [
  */
 const Expenses = ({
     openExpenseModal,
+    openExpenseView,
     openPaymentMethodModal,
     editPaymentMethodModal,
     openBusinessModal,
@@ -53,6 +55,7 @@ const Expenses = ({
 }) => {
 
     const { urlParams, updateUrl } = useUrlState();
+    const { showSuccess } = useToast();
     const { expenses, markAsPaid, markAsUnpaid, createExpense } = useExpenses();
     const { recurrences, generatePendingExpenses, pauseRecurrence, resumeRecurrence, deleteRecurrence } = useExpenseRecurrences();
     const { clients } = useClients();
@@ -73,6 +76,7 @@ const Expenses = ({
     const initialFiltersAppliedRef = useRef(false);
     const recurrenceGeneratedRef = useRef(false);
     const [pendingDeleteRecurrence, setPendingDeleteRecurrence] = useState(null);
+    const todayStr = useMemo(() => toStorageDate(new Date()) || '', []);
 
     const sideNavItems = useMemo(() => [
         {
@@ -193,8 +197,84 @@ const Expenses = ({
         };
     }, [period, customStart, customEnd]);
 
+    const recurringPreviewExpenses = useMemo(() => {
+        if (!startDate || !endDate || !todayStr) {
+            return [];
+        }
+
+        const dateStart = parseStoredDate(startDate);
+        const dateEnd = parseStoredDate(endDate);
+        if (!dateStart || !dateEnd) {
+            return [];
+        }
+
+        const fromDate = parseStoredDate(todayStr) && parseStoredDate(todayStr) > dateStart
+            ? todayStr
+            : startDate;
+
+        const datesByRecurrence = new Map();
+        expenses.forEach((expense) => {
+            if (!expense.recurrenceId) return;
+            if (!datesByRecurrence.has(expense.recurrenceId)) {
+                datesByRecurrence.set(expense.recurrenceId, new Set());
+            }
+            datesByRecurrence.get(expense.recurrenceId).add(expense.date);
+        });
+
+        return recurrences
+            .filter((recurrence) => recurrence.active)
+            .map((recurrence) => {
+                if (!recurrence.startDate) return null;
+
+                const baseStart = recurrence.lastGeneratedDate
+                    ? advanceByRepeat(
+                        recurrence.lastGeneratedDate,
+                        recurrence.repeat,
+                        recurrence.monthlyType,
+                        recurrence.monthlyDay
+                    )
+                    : recurrence.startDate;
+
+                const nextDate = getNextRecurringDate({
+                    startDate: baseStart,
+                    repeat: recurrence.repeat,
+                    monthlyType: recurrence.monthlyType,
+                    monthlyDay: recurrence.monthlyDay,
+                    endDate: recurrence.endDate,
+                    fromDate,
+                });
+
+                if (!nextDate) return null;
+
+                const nextParsed = parseStoredDate(nextDate);
+                if (!nextParsed || nextParsed > dateEnd) return null;
+
+                const existingDates = datesByRecurrence.get(recurrence.id);
+                if (existingDates?.has(nextDate)) {
+                    return null;
+                }
+
+                const preview = buildExpenseFromRecurrence(recurrence, nextDate);
+                return {
+                    ...preview,
+                    id: `preview-${recurrence.id}-${nextDate}`,
+                    amount: recurrence.amountType === 'variable'
+                        ? (recurrence.amount || 0)
+                        : recurrence.amount,
+                    isPreview: true,
+                };
+            })
+            .filter(Boolean);
+    }, [
+        endDate,
+        expenses,
+        recurrences,
+        startDate,
+        todayStr,
+    ]);
+
     const filteredExpenses = useMemo(() => {
-        let result = expenses;
+        let result = [...expenses, ...recurringPreviewExpenses];
 
         if (startDate && endDate) {
             result = result.filter((expense) => isExpenseInDateRange(expense, startDate, endDate));
@@ -238,9 +318,30 @@ const Expenses = ({
             result = result.filter((expense) => expense.billingStatus === billedStatus);
         }
 
-        return [...result].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const getStatusRank = (expense) => {
+            if (expense.paymentStatus === 'paid') return 3;
+            if (!expense.date || !todayStr) return 2;
+            if (expense.date === todayStr) return 1;
+            const expenseDate = parseStoredDate(expense.date);
+            const todayDate = parseStoredDate(todayStr);
+            if (expenseDate && todayDate && expenseDate < todayDate) return 0;
+            return 2;
+        };
+
+        return [...result].sort((a, b) => {
+            const rankA = getStatusRank(a);
+            const rankB = getStatusRank(b);
+            if (rankA !== rankB) return rankA - rankB;
+
+            const dateA = parseStoredDate(a.date)?.getTime() || 0;
+            const dateB = parseStoredDate(b.date)?.getTime() || 0;
+            if (dateA !== dateB) return dateA - dateB;
+
+            return (a.title || '').localeCompare(b.title || '');
+        });
     }, [
         expenses,
+        recurringPreviewExpenses,
         startDate,
         endDate,
         search,
@@ -251,6 +352,7 @@ const Expenses = ({
         recurringOnly,
         paidStatus,
         billedStatus,
+        todayStr,
     ]);
 
     const clientsById = useMemo(() => {
@@ -298,6 +400,7 @@ const Expenses = ({
     const confirmDeleteTemplate = () => {
         if (!pendingDeleteRecurrence) return;
         deleteRecurrence(pendingDeleteRecurrence.id);
+        showSuccess('Recurring expense deleted');
         setPendingDeleteRecurrence(null);
     };
 
@@ -389,6 +492,7 @@ const Expenses = ({
                                 expenses={filteredExpenses}
                                 clientsById={clientsById}
                                 projectsById={projectsById}
+                                onView={(expense) => openExpenseView?.(expense)}
                                 onEdit={(expense) => openExpenseModal(expense)}
                                 onTogglePaid={handleTogglePaid}
                             />

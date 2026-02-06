@@ -2,7 +2,7 @@
  * ToDoToday component - Shows overdue, today, and upcoming tasks.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDownIcon, ChevronRightIcon, ClockIcon, ListTodoIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,13 @@ import CustomCheckbox from '../CustomCheckbox';
 import StartDateBadge from '../task/StartDateBadge';
 import TaskActionsMenu from '../task/TaskActionsMenu';
 import TimeEntriesModal from '../TimeEntriesModal';
-import ExpensesDueSection from '../expenses/ExpensesDueSection';
+import ExpenseDueCard from '../expenses/ExpenseDueCard';
 import { useTimers } from '../../hooks/useTimers';
+import { useExpenses } from '../../hooks/useExpenses.ts';
+import { useExpenseRecurrences } from '../../hooks/useExpenseRecurrences.ts';
+import { useToast } from '../../hooks/useToast.ts';
+import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
+import { parseStoredDate, toStorageDate } from '../../utils/dateUtils.ts';
 import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
 
 /**
@@ -28,7 +33,7 @@ import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
  * @param {Function} props.onEditTask
  * @param {Function} props.onDeleteTask
  * @param {Function} props.onArchiveTask
- * @param {Function} props.openExpenseModal
+ * @param {Function} props.openExpenseView
  */
 const ToDoToday = ({
     overdueTasks,
@@ -42,12 +47,17 @@ const ToDoToday = ({
     onEditTask,
     onDeleteTask,
     onArchiveTask,
-    openExpenseModal
+    openExpenseView
 }) => {
     const { getTimerForTask } = useTimers();
-    const [showUpcoming, setShowUpcoming] = useState(false);
+    const { expenses, markAsPaid } = useExpenses();
+    const { recurrences } = useExpenseRecurrences();
+    const { showError, showSuccess } = useToast();
+    const [showUpcomingTasks, setShowUpcomingTasks] = useState(false);
+    const [showUpcomingExpenses, setShowUpcomingExpenses] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
+    const todayStr = useMemo(() => toStorageDate(new Date()) || '', []);
 
     // Combine and deduplicate tasks (a task might be both overdue and planned for today)
     const combinedTasks = [...overdueTasks, ...tasksForToday].reduce((acc, current) => {
@@ -67,6 +77,130 @@ const ToDoToday = ({
         return aCompleted ? 1 : -1;
     });
     const incompleteCount = combinedTasks.filter((task) => !getTaskCompletedStatus(task)).length;
+
+    const recurrencesById = useMemo(() => {
+        const map = new Map();
+        recurrences.forEach((recurrence) => {
+            map.set(recurrence.id, recurrence);
+        });
+        return map;
+    }, [recurrences]);
+
+    const { overdueExpenses, todayExpenses, upcomingExpenses } = useMemo(() => {
+        const todayDate = parseStoredDate(todayStr);
+        if (!todayDate) {
+            return { overdueExpenses: [], todayExpenses: [], upcomingExpenses: [] };
+        }
+
+        const upcomingEnd = new Date(todayDate);
+        upcomingEnd.setDate(upcomingEnd.getDate() + 7);
+        const upcomingStart = new Date(todayDate);
+        upcomingStart.setDate(upcomingStart.getDate() + 1);
+
+        const upcomingStartStr = toStorageDate(upcomingStart) || '';
+        const upcomingEndStr = toStorageDate(upcomingEnd) || '';
+
+        const unpaid = expenses.filter((expense) => expense.paymentStatus === 'unpaid');
+        const paidToday = expenses.filter((expense) => expense.paymentStatus === 'paid' && expense.paidOn === todayStr);
+        const datesByRecurrence = new Map();
+        expenses.forEach((expense) => {
+            if (!expense.recurrenceId) return;
+            if (!datesByRecurrence.has(expense.recurrenceId)) {
+                datesByRecurrence.set(expense.recurrenceId, new Set());
+            }
+            datesByRecurrence.get(expense.recurrenceId).add(expense.date);
+        });
+
+        const groups = {
+            overdueExpenses: [],
+            todayExpenses: [],
+            upcomingExpenses: [],
+        };
+
+        unpaid.forEach((expense) => {
+            const expenseDate = parseStoredDate(expense.date);
+            if (!expenseDate) return;
+
+            if (expenseDate < todayDate) {
+                groups.overdueExpenses.push(expense);
+                return;
+            }
+
+            if (expenseDate.toDateString() === todayDate.toDateString()) {
+                groups.todayExpenses.push(expense);
+                return;
+            }
+
+            if (expenseDate > todayDate && expenseDate <= upcomingEnd) {
+                groups.upcomingExpenses.push(expense);
+            }
+        });
+
+        const previewExpenses = recurrences
+            .filter((recurrence) => recurrence.active)
+            .map((recurrence) => {
+                if (!upcomingStartStr || !upcomingEndStr) return null;
+
+                const baseStart = recurrence.lastGeneratedDate
+                    ? advanceByRepeat(
+                        recurrence.lastGeneratedDate,
+                        recurrence.repeat,
+                        recurrence.monthlyType,
+                        recurrence.monthlyDay
+                    )
+                    : recurrence.startDate;
+
+                const nextDate = getNextRecurringDate({
+                    startDate: baseStart,
+                    repeat: recurrence.repeat,
+                    monthlyType: recurrence.monthlyType,
+                    monthlyDay: recurrence.monthlyDay,
+                    endDate: recurrence.endDate,
+                    fromDate: upcomingStartStr,
+                });
+
+                if (!nextDate) return null;
+                const nextParsed = parseStoredDate(nextDate);
+                if (!nextParsed || nextParsed > upcomingEnd) return null;
+
+                const existingDates = datesByRecurrence.get(recurrence.id);
+                if (existingDates?.has(nextDate)) {
+                    return null;
+                }
+
+                const preview = buildExpenseFromRecurrence(recurrence, nextDate);
+                return {
+                    ...preview,
+                    id: `preview-${recurrence.id}-${nextDate}`,
+                    amount: recurrence.amountType === 'variable'
+                        ? (recurrence.amount || 0)
+                        : recurrence.amount,
+                    isPreview: true,
+                };
+            })
+            .filter(Boolean);
+
+        previewExpenses.forEach((expense) => {
+            groups.upcomingExpenses.push(expense);
+        });
+
+        paidToday.forEach((expense) => {
+            groups.todayExpenses.push(expense);
+        });
+
+        const sortByDate = (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime();
+
+        groups.overdueExpenses.sort(sortByDate);
+        groups.todayExpenses.sort((a, b) => {
+            if (a.paymentStatus === b.paymentStatus) {
+                return sortByDate(a, b);
+            }
+            return a.paymentStatus === 'unpaid' ? -1 : 1;
+        });
+        groups.upcomingExpenses.sort(sortByDate);
+
+        return groups;
+    }, [expenses, recurrences, todayStr]);
 
     const handleOpenTimeEntries = (task) => {
         setSelectedTask(task);
@@ -136,6 +270,31 @@ const ToDoToday = ({
         );
     };
 
+    const handleMarkExpensePaid = (expense) => {
+        try {
+            markAsPaid(expense.id);
+            showSuccess('Expense marked as paid');
+        } catch (error) {
+            showError(error?.message || 'Unable to mark expense as paid');
+        }
+    };
+
+    const renderExpenseRow = (expense, options = {}) => (
+        <ExpenseDueCard
+            key={expense.id}
+            expense={expense}
+            isOverdue={options.isOverdue}
+            isToday={options.isToday}
+            isPreview={expense.isPreview}
+            recurrence={expense.recurrenceId ? recurrencesById.get(expense.recurrenceId) : null}
+            onView={expense.isPreview ? undefined : () => openExpenseView?.(expense)}
+            onMarkPaid={expense.isPreview || expense.paymentStatus === 'paid' ? undefined : () => handleMarkExpensePaid(expense)}
+        />
+    );
+
+    const overdueTaskItems = sortedTasks.filter((task) => task.startDate && task.startDate < todayStr);
+    const todayTaskItems = sortedTasks.filter((task) => !task.startDate || task.startDate >= todayStr);
+
     return (
         <Card>
             <CardHeader className="pb-4">
@@ -146,9 +305,18 @@ const ToDoToday = ({
             </CardHeader>
             <CardContent className="pt-0">
                 <div className="divide-y divide-border">
-                    {combinedTasks.length > 0 ? (
+                    {combinedTasks.length > 0 || overdueExpenses.length > 0 || todayExpenses.length > 0 ? (
                         <div className="py-2">
-                            {sortedTasks.map(renderTaskRow)}
+                            {overdueTaskItems.map(renderTaskRow)}
+                            {overdueTaskItems.length > 0 && overdueExpenses.length > 0 && (
+                                <div className="border-t border-border" />
+                            )}
+                            {overdueExpenses.map((expense) => renderExpenseRow(expense, { isOverdue: true }))}
+                            {todayTaskItems.map(renderTaskRow)}
+                            {todayTaskItems.length > 0 && todayExpenses.length > 0 && (
+                                <div className="border-t border-border" />
+                            )}
+                            {todayExpenses.map((expense) => renderExpenseRow(expense, { isToday: true }))}
                         </div>
                     ) : (
                         <EmptyState
@@ -162,27 +330,47 @@ const ToDoToday = ({
                     {upcomingTasks.length > 0 && (
                         <div className="py-2">
                             <button
-                                onClick={() => setShowUpcoming(!showUpcoming)}
-                                className="flex items-center w-full text-left text-sm font-medium text-foreground hover:text-foreground transition-colors pt-2 cursor-pointer"
+                                onClick={() => setShowUpcomingTasks(!showUpcomingTasks)}
+                                className="flex items-center w-full text-left text-sm font-medium text-foreground hover:text-foreground transition-colors pt-2 pb-2 cursor-pointer"
                             >
-                                {showUpcoming ? (
+                                {showUpcomingTasks ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />
                                 ) : (
                                     <ChevronRightIcon className="h-4 w-4 mr-1" />
                                 )}
-                                <span>Upcoming ({upcomingTasks.length})</span>
+                                <span>Upcoming tasks ({upcomingTasks.length})</span>
                             </button>
 
-                            {showUpcoming && (
-                                <div className="mt-2">
+                            {showUpcomingTasks && (
+                                <div className="divide-y divide-border">
                                     {upcomingTasks.map(renderTaskRow)}
                                 </div>
                             )}
                         </div>
                     )}
-                </div>
 
-                <ExpensesDueSection openExpenseModal={openExpenseModal} />
+                    {upcomingExpenses.length > 0 && (
+                        <div className="py-2">
+                            <button
+                                onClick={() => setShowUpcomingExpenses(!showUpcomingExpenses)}
+                                className="flex items-center w-full text-left text-sm font-medium text-foreground hover:text-foreground transition-colors pt-2 pb-2 cursor-pointer"
+                            >
+                                {showUpcomingExpenses ? (
+                                    <ChevronDownIcon className="h-4 w-4 mr-1" />
+                                ) : (
+                                    <ChevronRightIcon className="h-4 w-4 mr-1" />
+                                )}
+                                <span>Upcoming expenses ({upcomingExpenses.length})</span>
+                            </button>
+
+                            {showUpcomingExpenses && (
+                                <div className="divide-y divide-border">
+                                    {upcomingExpenses.map((expense) => renderExpenseRow(expense))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </CardContent>
 
             {selectedTask && (

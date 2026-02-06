@@ -2,15 +2,26 @@ import { useMemo } from 'react';
 import { addDays } from 'date-fns';
 import { useToast } from '@/hooks/useToast.ts';
 import { useExpenses } from '@/hooks/useExpenses.ts';
+import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
+import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
 import ExpenseDueCard from './ExpenseDueCard';
 
 /**
  * ExpensesDueSection - Overdue/today/upcoming expenses for dashboard
  */
-const ExpensesDueSection = ({ openExpenseModal }) => {
+const ExpensesDueSection = ({ openExpenseView }) => {
     const { expenses, markAsPaid } = useExpenses();
+    const { recurrences } = useExpenseRecurrences();
     const { showError, showSuccess } = useToast();
+
+    const recurrencesById = useMemo(() => {
+        const map = new Map();
+        recurrences.forEach((recurrence) => {
+            map.set(recurrence.id, recurrence);
+        });
+        return map;
+    }, [recurrences]);
 
     const { overdue, today, upcoming } = useMemo(() => {
         const todayStr = toStorageDate(new Date()) || '';
@@ -20,8 +31,19 @@ const ExpensesDueSection = ({ openExpenseModal }) => {
         }
 
         const upcomingEnd = addDays(todayDate, 7);
+        const upcomingStart = addDays(todayDate, 1);
+        const upcomingStartStr = toStorageDate(upcomingStart) || '';
+        const upcomingEndStr = toStorageDate(upcomingEnd) || '';
 
         const unpaid = expenses.filter((expense) => expense.paymentStatus === 'unpaid');
+        const recurrenceDates = new Map();
+        expenses.forEach((expense) => {
+            if (!expense.recurrenceId) return;
+            if (!recurrenceDates.has(expense.recurrenceId)) {
+                recurrenceDates.set(expense.recurrenceId, new Set());
+            }
+            recurrenceDates.get(expense.recurrenceId).add(expense.date);
+        });
 
         const groups = {
             overdue: [],
@@ -48,6 +70,54 @@ const ExpensesDueSection = ({ openExpenseModal }) => {
             }
         });
 
+        const recurringPreviews = recurrences
+            .filter((recurrence) => recurrence.active)
+            .map((recurrence) => {
+                if (!upcomingStartStr || !upcomingEndStr) return null;
+
+                const baseStart = recurrence.lastGeneratedDate
+                    ? advanceByRepeat(
+                        recurrence.lastGeneratedDate,
+                        recurrence.repeat,
+                        recurrence.monthlyType,
+                        recurrence.monthlyDay
+                    )
+                    : recurrence.startDate;
+
+                const nextDate = getNextRecurringDate({
+                    startDate: baseStart,
+                    repeat: recurrence.repeat,
+                    monthlyType: recurrence.monthlyType,
+                    monthlyDay: recurrence.monthlyDay,
+                    endDate: recurrence.endDate,
+                    fromDate: upcomingStartStr,
+                });
+
+                if (!nextDate) return null;
+                const nextParsed = parseStoredDate(nextDate);
+                if (!nextParsed || nextParsed > upcomingEnd) return null;
+
+                const existingDates = recurrenceDates.get(recurrence.id);
+                if (existingDates?.has(nextDate)) {
+                    return null;
+                }
+
+                const preview = buildExpenseFromRecurrence(recurrence, nextDate);
+                return {
+                    ...preview,
+                    id: `preview-${recurrence.id}-${nextDate}`,
+                    amount: recurrence.amountType === 'variable'
+                        ? (recurrence.amount || 0)
+                        : recurrence.amount,
+                    isPreview: true,
+                };
+            })
+            .filter(Boolean);
+
+        recurringPreviews.forEach((preview) => {
+            groups.upcoming.push(preview);
+        });
+
         const sortByDate = (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime();
 
         groups.overdue.sort(sortByDate);
@@ -55,7 +125,7 @@ const ExpensesDueSection = ({ openExpenseModal }) => {
         groups.upcoming.sort(sortByDate);
 
         return groups;
-    }, [expenses]);
+    }, [expenses, recurrences]);
 
     const totalCount = overdue.length + today.length + upcoming.length;
 
@@ -63,9 +133,9 @@ const ExpensesDueSection = ({ openExpenseModal }) => {
         return null;
     }
 
-    const handleMarkPaid = (expense, amount) => {
+    const handleMarkPaid = (expense) => {
         try {
-            markAsPaid(expense.id, amount ? { amount } : undefined);
+            markAsPaid(expense.id);
             showSuccess('Expense marked as paid');
         } catch (error) {
             showError(error?.message || 'Unable to mark expense as paid');
@@ -88,8 +158,10 @@ const ExpensesDueSection = ({ openExpenseModal }) => {
                             expense={expense}
                             isOverdue={isOverdue}
                             isToday={isToday}
-                            onEdit={() => openExpenseModal?.(expense)}
-                            onMarkPaid={(amount) => handleMarkPaid(expense, amount)}
+                            isPreview={expense.isPreview}
+                            recurrence={expense.recurrenceId ? recurrencesById.get(expense.recurrenceId) : null}
+                                onView={expense.isPreview ? undefined : () => openExpenseView?.(expense)}
+                            onMarkPaid={expense.isPreview ? undefined : () => handleMarkPaid(expense)}
                         />
                     ))}
                 </div>

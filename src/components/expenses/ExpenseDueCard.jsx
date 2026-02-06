@@ -1,108 +1,133 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { ArrowPathIcon, CheckIcon, HandCoinsIcon } from '@/components/ui/icons';
+import StartDateBadge from '../task/StartDateBadge';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
-import { toDisplayDate } from '@/utils/dateUtils.ts';
+import { parseStoredDate } from '@/utils/dateUtils.ts';
+import { getOrdinalSuffix } from '@/utils/recurringUtils.ts';
 
 /**
  * ExpenseDueCard - Compact expense card with quick pay action
  */
 const ExpenseDueCard = ({
     expense,
-    onEdit,
+    onView,
     onMarkPaid,
     isOverdue = false,
     isToday = false,
+    isPreview = false,
+    recurrence = null,
 }) => {
     const isVariable = expense.amountType === 'variable';
-    const needsAmount = isVariable && (!expense.amount || expense.amount <= 0);
-    const [amountValue, setAmountValue] = useState(needsAmount ? '' : String(expense.amount || ''));
-    const [showError, setShowError] = useState(false);
+    const hasAmount = typeof expense.amount === 'number' && expense.amount > 0;
+    const isPaid = expense.paymentStatus === 'paid';
+    const isClickable = Boolean(onView) && !isPreview;
+    const canMarkPaid = Boolean(onMarkPaid) && !isPreview && (!isVariable || hasAmount);
 
-    useEffect(() => {
-        if (!needsAmount) {
-            setAmountValue(String(expense.amount || ''));
-        }
-    }, [expense.amount, needsAmount]);
-
-    const badgeText = useMemo(() => {
-        if (isOverdue) return 'Overdue';
-        if (isToday) return 'Today';
-        return 'Upcoming';
-    }, [isOverdue, isToday]);
-
-    const badgeVariant = isOverdue ? 'destructive' : isToday ? 'warning' : 'secondary';
-
-    const handleMarkPaid = (event) => {
-        event.stopPropagation();
-        setShowError(false);
-
-        if (needsAmount) {
-            const parsed = Number(amountValue);
-            if (!parsed || parsed <= 0) {
-                setShowError(true);
-                return;
-            }
-            onMarkPaid?.(parsed);
-            return;
+    const amountLabel = useMemo(() => {
+        if (!hasAmount) {
+            return null;
         }
 
-        onMarkPaid?.();
-    };
+        const prefix = isVariable ? '~' : '';
+        return `${prefix}${formatCurrency(expense.amount || 0, expense.currency)} ${expense.currency}`;
+    }, [expense.amount, expense.currency, hasAmount, isVariable]);
+
+    const metaLine = useMemo(() => {
+        const supplier = expense.supplierName?.trim();
+        const note = expense.note?.trim();
+        if (supplier && note) {
+            return `${supplier} • ${note}`;
+        }
+        return supplier || note || '';
+    }, [expense.note, expense.supplierName]);
+
+    const recurringLabel = useMemo(() => {
+        if (!recurrence?.repeat) return '';
+
+        if (recurrence.repeat === 'monthly') {
+            if (recurrence.monthlyType === 'first') return 'Monthly (1st)';
+            if (recurrence.monthlyType === 'last') return 'Monthly (last)';
+            const day = recurrence.monthlyDay || 1;
+            return `Monthly (${day}${getOrdinalSuffix(day)})`;
+        }
+
+        if (recurrence.repeat === 'yearly') {
+            const parsed = parseStoredDate(recurrence.startDate);
+            if (!parsed) return 'Yearly';
+            return `Yearly (${format(parsed, 'MMM d')})`;
+        }
+
+        return '';
+    }, [recurrence]);
+
+    const dateBadge = recurrence ? (
+        <Badge variant="secondary" className="flex items-center">
+            <ArrowPathIcon className="h-3 w-3 mr-1" />
+            {recurringLabel || 'Recurring'}
+        </Badge>
+    ) : (
+        <StartDateBadge
+            startDate={expense.date}
+            recurring={null}
+            completed={false}
+            recurringOverdue={Boolean(isOverdue)}
+        />
+    );
 
     return (
         <div
-            className={`rounded-lg border p-3 transition hover:bg-muted/40 ${isOverdue ? 'border-red-300' : 'border-border'}`}
-            role="button"
-            tabIndex={0}
-            onClick={() => onEdit?.(expense)}
-            onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                    onEdit?.(expense);
-                }
-            }}
+            className={`px-3 py-3 hover:bg-muted ${isOverdue ? 'opacity-90' : ''}`}
         >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                    <div className="text-sm font-semibold text-foreground">
-                        {expense.title}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                        {toDisplayDate(expense.date)}
-                        {expense.supplierName ? ` • ${expense.supplierName}` : ''}
-                    </div>
+            <div className="flex items-center gap-3">
+                <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
+                    {isClickable ? (
+                        <button
+                            type="button"
+                            onClick={() => onView?.(expense)}
+                            className="block w-full text-sm font-medium truncate text-left transition-colors text-foreground hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                            title="Open expense details"
+                        >
+                            <span className={isPaid ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                            {amountLabel && (
+                                <span className="ml-2 text-sm text-muted-foreground sensitive-data">
+                                    {amountLabel}
+                                </span>
+                            )}
+                        </button>
+                    ) : (
+                        <div className="text-sm font-medium text-foreground truncate">
+                            <span className={isPaid ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                            {amountLabel && (
+                                <span className="ml-2 text-sm text-muted-foreground sensitive-data">
+                                    {amountLabel}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    {metaLine && (
+                        <p className={`text-xs text-muted-foreground truncate ${isPaid ? 'line-through' : ''}`}>
+                            {metaLine}
+                        </p>
+                    )}
                 </div>
-                <Badge variant={badgeVariant}>{badgeText}</Badge>
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-                {needsAmount ? (
-                    <div className="flex-1 min-w-[140px]">
-                        <Input
-                            value={amountValue}
-                            onChange={(event) => setAmountValue(event.target.value)}
-                            placeholder="Enter amount"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            onClick={(event) => event.stopPropagation()}
-                        />
-                        {showError && (
-                            <div className="mt-1 text-xs text-red-600">
-                                Amount required
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="text-sm font-semibold text-foreground sensitive-data">
-                        {formatCurrency(expense.amount || 0, expense.currency)} {expense.currency}
-                    </div>
+                {dateBadge}
+                {canMarkPaid && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        aria-label="Mark as paid"
+                        title="Mark as paid"
+                        onClick={() => onMarkPaid?.()}
+                        type="button"
+                    >
+                        <CheckIcon className="h-4 w-4" />
+                    </Button>
                 )}
-
-                <Button size="sm" onClick={handleMarkPaid} type="button">
-                    {needsAmount ? 'Enter Amount & Pay' : 'Mark Paid'}
-                </Button>
             </div>
         </div>
     );

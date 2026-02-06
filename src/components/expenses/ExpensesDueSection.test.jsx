@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import ExpensesDueSection from './ExpensesDueSection'
 
 const expensesMock = vi.hoisted(() => [])
+const recurrencesMock = vi.hoisted(() => [])
 const markAsPaidMock = vi.hoisted(() => vi.fn())
 const showSuccessMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
@@ -24,10 +25,18 @@ vi.mock('@/hooks/useToast.ts', () => ({
     })
 }))
 
+vi.mock('@/hooks/useExpenseRecurrences.ts', () => ({
+
+    useExpenseRecurrences: () => ({
+        recurrences: recurrencesMock,
+    })
+}))
+
 describe('ExpensesDueSection', () => {
 
     beforeEach(() => {
         expensesMock.length = 0
+        recurrencesMock.length = 0
         markAsPaidMock.mockReset()
         showSuccessMock.mockReset()
         showErrorMock.mockReset()
@@ -47,7 +56,7 @@ describe('ExpensesDueSection', () => {
             { id: 'exp-4', title: 'Paid Bill', date: '2026-02-05', paymentStatus: 'paid', amount: 8, amountType: 'fixed', currency: 'USD' }
         )
 
-        render(<ExpensesDueSection openExpenseModal={vi.fn()} />)
+        render(<ExpensesDueSection openExpenseView={vi.fn()} />)
 
         expect(screen.getByText('Expenses Due (3)')).toBeInTheDocument()
         expect(screen.getByText('Overdue (1)')).toBeInTheDocument()
@@ -64,7 +73,7 @@ describe('ExpensesDueSection', () => {
             { id: 'exp-1', title: 'Paid', date: '2026-02-05', paymentStatus: 'paid', amount: 10, amountType: 'fixed', currency: 'USD' }
         )
 
-        render(<ExpensesDueSection openExpenseModal={vi.fn()} />)
+        render(<ExpensesDueSection openExpenseView={vi.fn()} />)
 
         expect(screen.queryByText('Expenses Due')).not.toBeInTheDocument()
     })
@@ -74,11 +83,10 @@ describe('ExpensesDueSection', () => {
         const expense = { id: 'exp-1', title: 'Overdue Bill', date: '2026-02-05', paymentStatus: 'unpaid', amount: 10, amountType: 'fixed', currency: 'USD' }
         expensesMock.push(expense)
 
-        render(<ExpensesDueSection openExpenseModal={openExpenseModal} />)
+        render(<ExpensesDueSection openExpenseView={openExpenseModal} />)
 
-        const card = screen.getByText('Overdue Bill').closest('div[role="button"]')
-        expect(card).toBeTruthy()
-        fireEvent.click(card)
+        const titleButton = screen.getByRole('button', { name: /Overdue Bill/ })
+        fireEvent.click(titleButton)
 
         expect(openExpenseModal).toHaveBeenCalledWith(expense)
     })
@@ -87,11 +95,43 @@ describe('ExpensesDueSection', () => {
         const expense = { id: 'exp-1', title: 'Overdue Bill', date: '2026-02-05', paymentStatus: 'unpaid', amount: 10, amountType: 'fixed', currency: 'USD' }
         expensesMock.push(expense)
 
-        render(<ExpensesDueSection openExpenseModal={vi.fn()} />)
+        render(<ExpensesDueSection openExpenseView={vi.fn()} />)
 
-        fireEvent.click(screen.getByRole('button', { name: 'Mark Paid' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Mark as paid' }))
 
-        expect(markAsPaidMock).toHaveBeenCalledWith('exp-1', undefined)
+        expect(markAsPaidMock).toHaveBeenCalledWith('exp-1')
         expect(showSuccessMock).toHaveBeenCalledWith('Expense marked as paid')
+    })
+
+    it('renders upcoming recurring previews as read-only', () => {
+        recurrencesMock.push({
+            id: 'rec-1',
+            title: 'Gym Membership',
+            startDate: '2026-02-10',
+            repeat: 'monthly',
+            amount: 45,
+            amountType: 'fixed',
+            currency: 'USD',
+            supplierName: 'Gym',
+            clientId: null,
+            projectId: null,
+            businessId: null,
+            isPersonal: true,
+            billable: false,
+            taxNumber: null,
+            isTaxExempt: false,
+            endDate: null,
+            active: true,
+        })
+
+        const openExpenseModal = vi.fn()
+        render(<ExpensesDueSection openExpenseView={openExpenseModal} />)
+
+        expect(screen.getByText('Gym Membership')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Mark Paid' })).not.toBeInTheDocument()
+
+        const titleButton = screen.queryByRole('button', { name: /Gym Membership/ })
+        expect(titleButton).toBeNull()
+        expect(openExpenseModal).not.toHaveBeenCalled()
     })
 })

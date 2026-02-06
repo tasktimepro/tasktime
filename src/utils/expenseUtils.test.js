@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { advanceByRepeat, buildExpenseFromRecurrence, getPendingPeriods, isExpenseInDateRange } from './expenseUtils';
+import {
+    advanceByRepeat,
+    buildExpenseFromRecurrence,
+    getPendingPeriods,
+    getNextRecurringDate,
+    isExpenseInDateRange,
+    isRecurringExpenseDueOnDate,
+} from './expenseUtils';
 
 const recurrenceBase = {
     id: 'r1',
@@ -81,5 +88,32 @@ describe('expenseUtils', () => {
         const expense = buildExpenseFromRecurrence(recurrenceBase, '2025-02-01');
         expect(isExpenseInDateRange(expense, '2025-02-01', '2025-02-28')).toBe(true);
         expect(isExpenseInDateRange(expense, '2025-02-02', '2025-02-28')).toBe(false);
+    });
+
+    it('getNextRecurringDate returns next matching date', () => {
+        const nextDate = getNextRecurringDate({
+            startDate: '2025-01-01',
+            repeat: 'monthly',
+            fromDate: '2025-03-10',
+        });
+
+        expect(nextDate).toBe('2025-04-01');
+    });
+
+    it('getNextRecurringDate respects endDate', () => {
+        const nextDate = getNextRecurringDate({
+            startDate: '2025-01-01',
+            repeat: 'monthly',
+            fromDate: '2025-03-10',
+            endDate: '2025-02-01',
+        });
+
+        expect(nextDate).toBeNull();
+    });
+
+    it('isRecurringExpenseDueOnDate matches monthly schedule', () => {
+        const recurrence = { ...recurrenceBase, startDate: '2025-01-15', repeat: 'monthly' };
+        expect(isRecurringExpenseDueOnDate(recurrence, '2025-02-15')).toBe(true);
+        expect(isRecurringExpenseDueOnDate(recurrence, '2025-02-16')).toBe(false);
     });
 });

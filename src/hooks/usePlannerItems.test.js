@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { format, startOfWeek } from 'date-fns';
+import { addDays, format, startOfWeek } from 'date-fns';
 
 // Mock dependencies
 const mockAttachments = vi.hoisted(() => []);
@@ -10,6 +10,7 @@ const mockClients = vi.hoisted(() => []);
 const mockTimers = vi.hoisted(() => []);
 const mockEntries = vi.hoisted(() => []);
 const mockExpenses = vi.hoisted(() => []);
+const mockRecurrences = vi.hoisted(() => []);
 const mockGetGoalForDate = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock('./usePlannerAttachments', () => ({
@@ -63,6 +64,12 @@ vi.mock('./useExpenses', () => ({
     })
 }));
 
+vi.mock('./useExpenseRecurrences', () => ({
+    useExpenseRecurrences: () => ({
+        recurrences: mockRecurrences,
+    })
+}));
+
 vi.mock('./useDailyGoals', () => ({
     useDailyGoals: () => ({
         getGoalForDate: mockGetGoalForDate,
@@ -107,6 +114,7 @@ describe('usePlannerItems', () => {
         mockTimers.length = 0;
         mockEntries.length = 0;
         mockExpenses.length = 0;
+        mockRecurrences.length = 0;
         mockGetGoalForDate.mockReset();
         mockGetGoalForDate.mockReturnValue(null);
         vi.mocked(isRecurringTaskDueOnDate).mockReset();
@@ -313,7 +321,7 @@ describe('usePlannerItems', () => {
         expect(day.items.find((i) => i.type === 'task' && i.subtype === 'attached')?.title).toBe('Legacy Task');
     });
 
-    it('includes unpaid expenses for the matching date', () => {
+    it('includes expenses for the matching date with paid marked completed', () => {
         const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
         const dateStr = format(weekStart, 'yyyy-MM-dd');
 
@@ -341,11 +349,11 @@ describe('usePlannerItems', () => {
         const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
 
         const expenseItems = day.items.filter((i) => i.type === 'expense');
-        expect(expenseItems).toHaveLength(1);
+        expect(expenseItems).toHaveLength(2);
         expect(expenseItems[0].title).toBe('Hosting');
-        expect(expenseItems[0].amount).toBe(120);
-        expect(expenseItems[0].amountType).toBe('fixed');
-        expect(expenseItems[0].supplierName).toBe('AWS');
+        expect(expenseItems[0].isCompleted).toBe(false);
+        expect(expenseItems[1].title).toBe('Paid Item');
+        expect(expenseItems[1].isCompleted).toBe(true);
     });
 
     it('excludes expenses that do not match the date', () => {
@@ -366,6 +374,39 @@ describe('usePlannerItems', () => {
         const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
 
         expect(day.items.find((i) => i.type === 'expense')).toBeFalsy();
+    });
+
+    it('includes recurring expense previews when no instance exists', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(addDays(weekStart, 2), 'yyyy-MM-dd');
+
+        mockRecurrences.push({
+            id: 'rec-1',
+            title: 'Hosting Renewal',
+            startDate: dateStr,
+            repeat: 'monthly',
+            amount: 25,
+            amountType: 'fixed',
+            currency: 'USD',
+            supplierName: 'HostCo',
+            clientId: null,
+            projectId: null,
+            businessId: null,
+            isPersonal: true,
+            billable: false,
+            taxNumber: null,
+            isTaxExempt: false,
+            endDate: null,
+            active: true,
+        });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        const expenseItems = day.items.filter((i) => i.type === 'expense');
+        expect(expenseItems).toHaveLength(1);
+        expect(expenseItems[0].title).toBe('Hosting Renewal');
+        expect(expenseItems[0].isPreview).toBe(true);
     });
 
     it('calculates earnings with billed rate and currency conversion', async () => {

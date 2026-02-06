@@ -17,6 +17,12 @@ vi.mock('@/hooks/useExpenses.ts', () => ({
     })
 }))
 
+vi.mock('@/hooks/useExpenseRecurrences.ts', () => ({
+    useExpenseRecurrences: () => ({
+        recurrences: [],
+    })
+}))
+
 vi.mock('@/hooks/useToast.ts', () => ({
     useToast: () => ({
         showError: vi.fn(),
@@ -97,7 +103,7 @@ describe('ToDoToday', () => {
         expect(screen.getByText('Today Task')).toBeInTheDocument()
 
         expect(screen.queryByText('Upcoming Task')).not.toBeInTheDocument()
-        await user.click(screen.getByText('Upcoming (1)'))
+        await user.click(screen.getByText('Upcoming tasks (1)'))
         expect(screen.getByText('Upcoming Task')).toBeInTheDocument()
     })
 

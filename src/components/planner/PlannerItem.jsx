@@ -7,7 +7,7 @@
  * Has dropdown menu for actions (remove, etc.)
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { 
     UserIcon, 
@@ -18,9 +18,6 @@ import {
     CalendarDaysIcon,
     HandCoinsIcon,
 } from '@/components/ui/icons';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { formatCurrency } from '@/utils/currencyUtils.ts';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -48,6 +45,7 @@ import { MoreHorizontal, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-
  * @param {string | null} props.supplierName - Expense supplier
  * @param {(amount?: number) => void} props.onMarkPaid - Expense quick action
  * @param {boolean} props.hasAttachment - Whether item has a planner attachment (can be removed)
+ * @param {boolean} props.isPreview - Whether item is a non-interactive preview
  * @param {() => void} props.onClick - Click handler
  * @param {() => void} props.onEdit - Called when user wants to edit planner options
  * @param {() => void} props.onRemove - Called when user wants to remove from planner
@@ -69,21 +67,14 @@ const PlannerItem = ({
     supplierName,
     onMarkPaid,
     hasAttachment = false,
+    isPreview = false,
     onClick,
     onEdit,
     onRemove,
 }) => {
     const [menuOpen, setMenuOpen] = useState(false);
     const isExpense = type === 'expense';
-    const needsAmount = isExpense && amountType === 'variable' && (!amount || amount <= 0);
-    const [expenseAmount, setExpenseAmount] = useState(needsAmount ? '' : String(amount || ''));
-    const [showAmountError, setShowAmountError] = useState(false);
-
-    useEffect(() => {
-        if (!needsAmount) {
-            setExpenseAmount(String(amount || ''));
-        }
-    }, [amount, needsAmount]);
+    const isClickable = typeof onClick === 'function' && !isPreview;
 
     // Icon based on type and subtype
     const getIcon = () => {
@@ -148,6 +139,9 @@ const PlannerItem = ({
             }
             return;
         }
+        if (!isClickable) {
+            return;
+        }
         onClick?.();
     };
 
@@ -188,44 +182,25 @@ const PlannerItem = ({
     const typeLabel = type === 'client' ? 'Client' : type === 'project' ? 'Project' : type === 'task' ? 'Task' : 'Expense';
     const canShowMenu = hasAttachment && type !== 'task' && type !== 'expense';
 
-    const expenseAmountDisplay = useMemo(() => {
-        if (!isExpense) return null;
-        if (needsAmount) return 'Enter amount';
-        return `${formatCurrency(amount || 0, currency)} ${currency}`;
-    }, [isExpense, needsAmount, amount, currency]);
-
-    const handleMarkPaid = (event) => {
-        event.stopPropagation();
-        setShowAmountError(false);
-
-        if (needsAmount) {
-            const parsed = Number(expenseAmount);
-            if (!parsed || parsed <= 0) {
-                setShowAmountError(true);
-                return;
-            }
-            onMarkPaid?.(parsed);
-            return;
-        }
-
-        onMarkPaid?.();
-    };
 
     return (
         <div
-            role="button"
-            tabIndex={0}
+            role={isClickable ? 'button' : 'presentation'}
+            tabIndex={isClickable ? 0 : -1}
             onClick={handleClick}
             onContextMenu={handleContextMenu}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    onClick?.();
+                    if (isClickable) {
+                        onClick?.();
+                    }
                 }
             }}
             title={progressTooltip}
             className={cn(
-                "group/item p-2 rounded-md border cursor-pointer transition-all relative overflow-hidden",
+                "group/item p-2 rounded-md border transition-all relative overflow-hidden",
+                isClickable ? "cursor-pointer" : "cursor-default",
                 "flex items-center",
                 "hover:shadow-sm",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
@@ -259,44 +234,10 @@ const PlannerItem = ({
                     )}>
                         {title}
                     </div>
-                    {isExpense && supplierName && (
-                        <div className="text-xs text-muted-foreground truncate">
-                            {supplierName}
-                        </div>
-                    )}
                 </div>
 
                 {type === 'task' && isTimerActive && (
                     <span className="text-xs text-green-600 dark:text-green-400 animate-pulse flex-shrink-0">●</span>
-                )}
-
-                {isExpense && (
-                    <div className="flex items-center gap-2">
-                        {needsAmount ? (
-                            <div className="w-24">
-                                <Input
-                                    value={expenseAmount}
-                                    onChange={(event) => setExpenseAmount(event.target.value)}
-                                    placeholder="Amount"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    onClick={(event) => event.stopPropagation()}
-                                    className="h-7 px-2 text-xs"
-                                />
-                                {showAmountError && (
-                                    <div className="text-[10px] text-red-600">Required</div>
-                                )}
-                            </div>
-                        ) : (
-                            <span className="text-xs font-medium text-foreground sensitive-data">
-                                {expenseAmountDisplay}
-                            </span>
-                        )}
-                        <Button size="xs" onClick={handleMarkPaid} type="button">
-                            {needsAmount ? 'Pay' : 'Mark Paid'}
-                        </Button>
-                    </div>
                 )}
 
                 {/* Three-dot menu button - appears on hover */}

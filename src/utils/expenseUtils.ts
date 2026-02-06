@@ -15,6 +15,23 @@ type GetPendingPeriodsParams = {
     today?: string;
 };
 
+type GetNextRecurringDateParams = {
+    startDate: string;
+    repeat: RepeatInterval;
+    monthlyType?: 'first' | 'last' | 'specific';
+    monthlyDay?: number;
+    endDate?: string | null;
+    fromDate?: string;
+    maxIterations?: number;
+};
+
+const compareStoredDates = (left: string, right: string): number => {
+    const leftDate = parseStoredDate(left);
+    const rightDate = parseStoredDate(right);
+    if (!leftDate || !rightDate) return 0;
+    return leftDate.getTime() - rightDate.getTime();
+};
+
 /**
  * Advance a YYYY-MM-DD date string by the given repeat interval.
  * @param {string} dateValue
@@ -151,4 +168,65 @@ export const isExpenseInDateRange = (expense: Expense, startDate: string, endDat
     if (!expenseDate || !start || !end) return false;
 
     return expenseDate >= start && expenseDate <= end;
+};
+
+/**
+ * Get the next recurrence date on or after the provided fromDate.
+ * @param {GetNextRecurringDateParams} params
+ * @returns {string | null}
+ */
+export const getNextRecurringDate = ({
+    startDate,
+    repeat,
+    monthlyType,
+    monthlyDay,
+    endDate,
+    fromDate,
+    maxIterations = 240,
+}: GetNextRecurringDateParams): string | null => {
+    if (!startDate) return null;
+
+    const baseline = fromDate || startDate;
+    let nextDate = startDate;
+    let iterations = 0;
+
+    while (compareStoredDates(nextDate, baseline) < 0 && iterations < maxIterations) {
+        nextDate = advanceByRepeat(nextDate, repeat, monthlyType, monthlyDay);
+        iterations += 1;
+    }
+
+    if (endDate && compareStoredDates(nextDate, endDate) > 0) {
+        return null;
+    }
+
+    return nextDate;
+};
+
+/**
+ * Check if a recurrence is due on a specific date.
+ * @param {ExpenseRecurrence} recurrence
+ * @param {string} dateStr
+ * @returns {boolean}
+ */
+export const isRecurringExpenseDueOnDate = (recurrence: ExpenseRecurrence, dateStr: string): boolean => {
+    if (!recurrence?.startDate) return false;
+
+    if (compareStoredDates(dateStr, recurrence.startDate) < 0) {
+        return false;
+    }
+
+    if (recurrence.endDate && compareStoredDates(dateStr, recurrence.endDate) > 0) {
+        return false;
+    }
+
+    const nextDate = getNextRecurringDate({
+        startDate: recurrence.startDate,
+        repeat: recurrence.repeat,
+        monthlyType: recurrence.monthlyType,
+        monthlyDay: recurrence.monthlyDay,
+        endDate: recurrence.endDate,
+        fromDate: dateStr,
+    });
+
+    return nextDate === dateStr;
 };

@@ -35,7 +35,7 @@ const Dashboard = ({
     navigateToInvoices,
     onEditTask,
     onViewTask,
-    openExpenseModal
+    openExpenseView
 }) => {
     const hasClients = clients.length > 0;
     const { showWarning, showSuccess } = useToast();
@@ -640,7 +640,7 @@ const Dashboard = ({
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
                 onArchiveTask={handleArchiveTask}
-                openExpenseModal={openExpenseModal}
+                openExpenseView={openExpenseView}
             />
 
             {/* Recent Tasks and Projects Grid */}

@@ -43,7 +43,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
  * @param {Function} props.openClientModal - Opens the client creation modal
  * @param {Function} props.openProjectModal - Opens the project creation modal
  * @param {Function} props.openTaskModal - Opens the task creation/edit modal
- * @param {Function} props.openExpenseModal - Opens the expense modal
+ * @param {Function} props.openExpenseView - Opens the expense view modal
  * @param {string | null} props.activeModal - Active global modal key
  * @param {(task: Object, options?: Object) => void} props.onViewTask - Opens the task view modal
  */
@@ -51,7 +51,7 @@ const Planner = ({
     openClientModal,
     openProjectModal,
     openTaskModal,
-    openExpenseModal,
+    openExpenseView,
     activeModal = null,
     onViewTask
 }) => {
@@ -381,10 +381,10 @@ const Planner = ({
                 });
                 break;
             case 'expense':
-                openExpenseModal?.(item.expense);
+                openExpenseView?.(item.expense);
                 break;
         }
-    }, [navigateToClient, navigateToProject, onViewTask, openExpenseModal]);
+    }, [navigateToClient, navigateToProject, onViewTask, openExpenseView]);
     const handleExpenseMarkPaid = useCallback((expense, amount) => {
         try {
             markAsPaid(expense.id, typeof amount === 'number' ? { amount } : undefined);

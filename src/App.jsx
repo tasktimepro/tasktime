@@ -26,6 +26,7 @@ import Account from './components/Account';
 import Invoices from './components/Invoices';
 import AuthCallback from './components/AuthCallback';
 import TaskViewModal from './components/modals/TaskViewModal';
+import ExpenseViewModal from './components/modals/ExpenseViewModal';
 import TimeEntriesModal from './components/TimeEntriesModal';
 import { EntityPickerModal } from './components/planner/index.js';
 import GlobalTimerStack from './components/timer/GlobalTimerStack';
@@ -301,6 +302,10 @@ function AppContent() {
         dateStr: null,
         attachment: null
     });
+    const [expenseViewState, setExpenseViewState] = useState({
+        isOpen: false,
+        expense: null
+    });
     const [taskViewOverlay, setTaskViewOverlay] = useState({
         isOpen: false,
         type: null,
@@ -310,6 +315,7 @@ function AppContent() {
     });
     const [pendingTaskViewReturn, setPendingTaskViewReturn] = useState(null);
     const [pendingTaskViewOverlayReturn, setPendingTaskViewOverlayReturn] = useState(null);
+    const [pendingExpenseViewReturn, setPendingExpenseViewReturn] = useState(null);
     const prevActiveModalRef = useRef(activeModal);
 
     const openClientModal = (client = null) => {
@@ -374,6 +380,32 @@ function AppContent() {
         setEditingItem(expense);
         setModalOptions(options || null);
     };
+
+    const openExpenseView = useCallback((expense) => {
+        if (!expense) return;
+
+        const needsSubmit = expense.isRecurring
+            && expense.amountType === 'variable'
+            && (!expense.amount || expense.amount <= 0)
+            && expense.paymentStatus === 'unpaid';
+
+        if (needsSubmit) {
+            openExpenseModal(expense);
+            return;
+        }
+
+        setExpenseViewState({
+            isOpen: true,
+            expense
+        });
+    }, [openExpenseModal]);
+
+    const closeExpenseView = useCallback(() => {
+        setExpenseViewState({
+            isOpen: false,
+            expense: null
+        });
+    }, []);
 
     const openTaskView = useCallback((task, options = {}) => {
         if (!task) return;
@@ -458,6 +490,13 @@ function AppContent() {
         openTaskModal(task);
     }, [openTaskModal, taskViewState.dateStr, taskViewState.attachment, todayStr]);
 
+    const handleEditExpenseFromView = useCallback((expense) => {
+        if (!expense) return;
+        setPendingExpenseViewReturn({ expense });
+        openExpenseModal(expense);
+        closeExpenseView();
+    }, [openExpenseModal, closeExpenseView]);
+
     useEffect(() => {
         if (prevActiveModalRef.current === 'task' && !activeModal && pendingTaskViewReturn) {
             setTaskViewState({
@@ -468,8 +507,17 @@ function AppContent() {
             });
             setPendingTaskViewReturn(null);
         }
+
+        if (prevActiveModalRef.current === 'expense' && !activeModal && pendingExpenseViewReturn) {
+            setExpenseViewState({
+                isOpen: true,
+                expense: pendingExpenseViewReturn.expense
+            });
+            setPendingExpenseViewReturn(null);
+        }
+
         prevActiveModalRef.current = activeModal;
-    }, [activeModal, pendingTaskViewReturn]);
+    }, [activeModal, pendingTaskViewReturn, pendingExpenseViewReturn]);
 
     const handleDeleteTask = useCallback((task) => {
         if (!task) return;
@@ -1067,7 +1115,7 @@ function AppContent() {
                                 navigateToInvoices={navigateToInvoices}
                                 onEditTask={openTaskModal}
                                 onViewTask={openTaskView}
-                                openExpenseModal={openExpenseModal}
+                                openExpenseView={openExpenseView}
                             />
                             </ErrorBoundary>
                         )}
@@ -1082,7 +1130,7 @@ function AppContent() {
                                 openClientModal={openClientModal}
                                 openProjectModal={openProjectModal}
                                 openTaskModal={openTaskModal}
-                                openExpenseModal={openExpenseModal}
+                                openExpenseView={openExpenseView}
                                 activeModal={activeModal}
                                 onViewTask={openTaskView}
                             />
@@ -1125,6 +1173,7 @@ function AppContent() {
                                 onViewTask={openTaskView}
                                 navigateToClient={navigateToClient}
                                 openExpenseModal={openExpenseModal}
+                                openExpenseView={openExpenseView}
                             />
                             </ErrorBoundary>
                         )}
@@ -1162,6 +1211,7 @@ function AppContent() {
                                 openPaymentMethodModal={openPaymentMethodModal}
                                 openTemplateModal={openTemplateModal}
                                 openExpenseModal={openExpenseModal}
+                                openExpenseView={openExpenseView}
                             />
                             </ErrorBoundary>
                         )}
@@ -1197,6 +1247,7 @@ function AppContent() {
                             <ErrorBoundary>
                             <Expenses
                                 openExpenseModal={openExpenseModal}
+                                openExpenseView={openExpenseView}
                                 openPaymentMethodModal={openPaymentMethodModal}
                                 editPaymentMethodModal={editPaymentMethodModal}
                                 openBusinessModal={openBusinessModal}
@@ -1273,6 +1324,15 @@ function AppContent() {
                 onNavigateToProject={navigateToProject}
                 onOpenTimeEntries={handleOpenTaskTimeEntries}
                 onOpenPlannerOptions={handleOpenTaskPlannerOptions}
+            />
+        )}
+
+        {expenseViewState.expense && (
+            <ExpenseViewModal
+                isOpen={expenseViewState.isOpen}
+                onClose={closeExpenseView}
+                expense={expenseViewState.expense}
+                onEdit={handleEditExpenseFromView}
             />
         )}
 

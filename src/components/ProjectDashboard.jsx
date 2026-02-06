@@ -52,7 +52,8 @@ const ProjectDashboard = ({
     openTaskModal,
     onViewTask,
     navigateToClient,
-    openExpenseModal
+    openExpenseModal,
+    openExpenseView
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -646,6 +647,7 @@ const ProjectDashboard = ({
                 clientId={projectClient?.id}
                 projectId={project.id}
                 openExpenseModal={openExpenseModal}
+                openExpenseView={openExpenseView}
             />
 
             {/* Metrics Display */}
