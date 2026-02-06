@@ -8,21 +8,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Notice } from '@/components/ui/notice';
 import CustomCheckbox from '../CustomCheckbox';
+import RecurringPicker from '../task/RecurringPicker';
 import { useToast } from '../../hooks/useToast.ts';
 import { useExpenses } from '../../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../../hooks/useExpenseRecurrences.ts';
 import { useClients } from '../../hooks/useClients.ts';
 import { useProjects } from '../../hooks/useProjects.ts';
+import { useBusinessInfos } from '../../hooks/useBusinessInfos.ts';
 import { usePreferences } from '../../hooks/usePreferences.ts';
+import { usePaymentMethods } from '../../hooks/usePaymentMethods.ts';
 import { buildExpenseFromRecurrence } from '@/utils/expenseUtils';
 import { CURRENCY_NAMES, DEFAULT_CURRENCY } from '@/utils/currencyUtils.ts';
 import { toStorageDate } from '@/utils/dateUtils.ts';
 
 const NO_CLIENT_VALUE = 'no-client';
 const NO_PROJECT_VALUE = 'no-project';
+const NO_BUSINESS_VALUE = 'no-business';
 const DEFAULT_REPEAT = 'monthly';
 const DEFAULT_AMOUNT_TYPE = 'fixed';
 
@@ -46,11 +50,13 @@ const ExpenseModal = ({
     clearSavedState,
 }) => {
     const { showSuccess, showError } = useToast();
-    const { createExpense, updateExpense } = useExpenses();
+    const { createExpense, updateExpense, deleteExpense } = useExpenses();
     const { createRecurrence, getRecurrence, updateRecurrence, deleteRecurrence } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
+    const { businessInfos, defaultBusinessInfo } = useBusinessInfos();
     const { preferences } = usePreferences();
+    const { paymentMethods, defaultPaymentMethod } = usePaymentMethods();
 
     const todayString = useMemo(() => toStorageDate(new Date()) || '', []);
     const currencyOptions = useMemo(() => Object.keys(CURRENCY_NAMES).sort(), []);
@@ -75,6 +81,7 @@ const ExpenseModal = ({
         paidBy: '',
         clientId: NO_CLIENT_VALUE,
         projectId: NO_PROJECT_VALUE,
+        businessId: '',
         isPersonal: true,
         billable: false,
         isRecurring: false,
@@ -82,19 +89,38 @@ const ExpenseModal = ({
         startDate: todayString,
         endDate: '',
         amountType: DEFAULT_AMOUNT_TYPE,
+        monthlyType: 'first',
+        monthlyDay: 1,
         taxNumber: '',
         isTaxExempt: false,
     });
 
     const [editingRecurrenceId, setEditingRecurrenceId] = useState(null);
+    const [confirmDialog, setConfirmDialog] = useState(null);
+
+    const isEditingTemplate = Boolean(editingRecurrenceId);
+    const isEditingInstance = Boolean(editingExpense) && !isEditingTemplate;
+    const isSubmittingRecurring = Boolean(editingExpense?.isRecurring && !editingRecurrenceId);
+    const showOneTimeFields = !formData.isRecurring || isEditingInstance;
+    const showRecurringFields = formData.isRecurring && !isEditingInstance;
+    const typeSelectionLocked = Boolean(editingExpense?.isRecurring || editingRecurrenceId);
+    const recurringFieldsLocked = Boolean(editingExpense?.isRecurring && !editingRecurrenceId);
 
     const lastInitializedRef = useRef({ initialized: false, expenseId: undefined, recurrenceId: undefined });
+    const titleInputRef = useRef(null);
 
     useEffect(() => {
         if (!isOpen) {
             lastInitializedRef.current = { initialized: false, expenseId: undefined, recurrenceId: undefined };
             setEditingRecurrenceId(null);
+            return;
         }
+
+        const focusTimer = setTimeout(() => {
+            titleInputRef.current?.focus();
+        }, 0);
+
+        return () => clearTimeout(focusTimer);
     }, [isOpen]);
 
     useEffect(() => {
@@ -133,26 +159,52 @@ const ExpenseModal = ({
 
         if (editingExpense) {
             setEditingRecurrenceId(null);
+            const recurrenceTemplate = editingExpense.recurrenceId
+                ? getRecurrence(editingExpense.recurrenceId)
+                : null;
+            const recurrencePaidBy = recurrenceTemplate?.paidBy || null;
+            const shouldInheritEstimate = editingExpense.amountType === 'variable'
+                && (!editingExpense.amount || editingExpense.amount <= 0);
+            const resolvedAmount = shouldInheritEstimate
+                ? recurrenceTemplate?.amount
+                : editingExpense.amount;
+            const isPersonal = editingExpense.isPersonal !== false;
+            const resolvedPaidBy = isSubmittingRecurring
+                ? (recurrencePaidBy || editingExpense.paidBy || '')
+                : (editingExpense.paidBy || recurrencePaidBy || '');
+            const resolvedPaidOn = isSubmittingRecurring
+                ? (editingExpense.paidOn || todayString)
+                : (editingExpense.paidOn || '');
+            const resolvedBusinessId = isPersonal
+                ? ''
+                : (editingExpense.businessId || defaultBusinessInfo?.id || '');
+            const resolvedBusiness = businessInfos.find((info) => info.id === resolvedBusinessId);
+            const resolvedTaxNumber = isPersonal
+                ? ''
+                : (resolvedBusiness?.taxNumber || editingExpense.taxNumber || '');
             setFormData({
                 title: editingExpense.title || '',
                 note: editingExpense.note || '',
                 date: editingExpense.date || todayString,
                 supplierName: editingExpense.supplierName || '',
                 receiptNumber: editingExpense.receiptNumber || '',
-                amount: editingExpense.amount != null ? String(editingExpense.amount) : '',
+                amount: resolvedAmount != null ? String(resolvedAmount) : '',
                 currency: editingExpense.currency || preferences.currency || DEFAULT_CURRENCY,
-                paidOn: editingExpense.paidOn || '',
-                paidBy: editingExpense.paidBy || '',
+                paidOn: resolvedPaidOn,
+                paidBy: resolvedPaidBy,
                 clientId: editingExpense.clientId || NO_CLIENT_VALUE,
                 projectId: editingExpense.projectId || NO_PROJECT_VALUE,
-                isPersonal: editingExpense.isPersonal !== false,
+                businessId: resolvedBusinessId,
+                isPersonal,
                 billable: editingExpense.billable === true,
                 isRecurring: Boolean(editingExpense.isRecurring),
                 repeat: DEFAULT_REPEAT,
                 startDate: editingExpense.date || todayString,
                 endDate: '',
                 amountType: editingExpense.amountType || DEFAULT_AMOUNT_TYPE,
-                taxNumber: editingExpense.taxNumber || '',
+                monthlyType: (editingExpense.date || todayString).split('-')[2] === '01' ? 'first' : 'specific',
+                monthlyDay: Number((editingExpense.date || todayString).split('-')[2]) || 1,
+                taxNumber: resolvedTaxNumber,
                 isTaxExempt: editingExpense.isTaxExempt === true,
             });
             return;
@@ -161,11 +213,19 @@ const ExpenseModal = ({
         if (currentEditingRecurrenceId) {
             const recurrence = getRecurrence(currentEditingRecurrenceId);
             if (!recurrence) {
-                showError('Recurring template not found');
+                showError('Recurring expense not found');
                 return;
             }
 
             setEditingRecurrenceId(recurrence.id);
+            const isPersonal = recurrence.isPersonal !== false;
+            const resolvedBusinessId = isPersonal
+                ? ''
+                : (recurrence.businessId || defaultBusinessInfo?.id || '');
+            const resolvedBusiness = businessInfos.find((info) => info.id === resolvedBusinessId);
+            const resolvedTaxNumber = isPersonal
+                ? ''
+                : (resolvedBusiness?.taxNumber || recurrence.taxNumber || '');
             setFormData({
                 title: recurrence.title || '',
                 note: recurrence.note || '',
@@ -175,17 +235,23 @@ const ExpenseModal = ({
                 amount: recurrence.amount != null ? String(recurrence.amount) : '',
                 currency: recurrence.currency || preferences.currency || DEFAULT_CURRENCY,
                 paidOn: '',
-                paidBy: '',
+                paidBy: recurrence.paidBy || '',
                 clientId: recurrence.clientId || NO_CLIENT_VALUE,
                 projectId: recurrence.projectId || NO_PROJECT_VALUE,
-                isPersonal: recurrence.isPersonal !== false,
+                businessId: resolvedBusinessId,
+                isPersonal,
                 billable: recurrence.billable === true,
                 isRecurring: true,
                 repeat: recurrence.repeat || DEFAULT_REPEAT,
                 startDate: recurrence.startDate || todayString,
                 endDate: recurrence.endDate || '',
                 amountType: recurrence.amountType || DEFAULT_AMOUNT_TYPE,
-                taxNumber: recurrence.taxNumber || '',
+                monthlyType: recurrence.monthlyType
+                    || ((recurrence.startDate || todayString).split('-')[2] === '01' ? 'first' : 'specific'),
+                monthlyDay: recurrence.monthlyDay
+                    || Number((recurrence.startDate || todayString).split('-')[2])
+                    || 1,
+                taxNumber: resolvedTaxNumber,
                 isTaxExempt: recurrence.isTaxExempt === true,
             });
             return;
@@ -195,6 +261,11 @@ const ExpenseModal = ({
         const initialClientId = modalOptions?.clientId || NO_CLIENT_VALUE;
         const initialProjectId = modalOptions?.projectId || NO_PROJECT_VALUE;
         const isPersonal = !modalOptions?.clientId && !modalOptions?.projectId;
+        const shouldStartRecurring = Boolean(modalOptions?.isRecurring);
+        const defaultPaidBy = defaultPaymentMethod?.id || '';
+        const defaultBusinessId = isPersonal ? '' : (defaultBusinessInfo?.id || '');
+        const defaultBusiness = businessInfos.find((info) => info.id === defaultBusinessId);
+        const defaultTaxNumber = isPersonal ? '' : (defaultBusiness?.taxNumber || '');
 
         setFormData({
             title: '',
@@ -205,20 +276,34 @@ const ExpenseModal = ({
             amount: '',
             currency: defaultCurrency,
             paidOn: '',
-            paidBy: '',
+            paidBy: defaultPaidBy,
             clientId: initialClientId,
             projectId: initialProjectId,
+            businessId: defaultBusinessId,
             isPersonal,
             billable: false,
-            isRecurring: false,
+            isRecurring: shouldStartRecurring,
             repeat: DEFAULT_REPEAT,
             startDate: modalOptions?.date || todayString,
             endDate: '',
             amountType: DEFAULT_AMOUNT_TYPE,
-            taxNumber: '',
+            monthlyType: 'first',
+            monthlyDay: 1,
+            taxNumber: defaultTaxNumber,
             isTaxExempt: false,
         });
-    }, [isOpen, editingExpense, getSavedState, modalOptions, preferences.currency, todayString]);
+    }, [
+        isOpen,
+        editingExpense,
+        getRecurrence,
+        getSavedState,
+        modalOptions,
+        preferences.currency,
+        todayString,
+        businessInfos,
+        defaultBusinessInfo?.id,
+        defaultPaymentMethod?.id
+    ]);
 
     useEffect(() => {
         if (!saveFormState || !isOpen) {
@@ -235,6 +320,37 @@ const ExpenseModal = ({
         return () => clearTimeout(timeoutId);
     }, [formData, saveFormState, editingExpense, isOpen]);
 
+    useEffect(() => {
+        if (!isOpen || editingExpense || editingRecurrenceId) {
+            return;
+        }
+
+        if (formData.paidBy || !defaultPaymentMethod?.id) {
+            return;
+        }
+
+        setFormData((prev) => ({
+            ...prev,
+            paidBy: defaultPaymentMethod.id
+        }));
+    }, [defaultPaymentMethod?.id, editingExpense, editingRecurrenceId, formData.paidBy, isOpen]);
+
+    useEffect(() => {
+        if (!isOpen || formData.isPersonal || !formData.businessId) {
+            return;
+        }
+
+        const nextBusiness = businessInfos.find((info) => info.id === formData.businessId);
+        const nextTaxNumber = nextBusiness?.taxNumber || '';
+
+        if (formData.taxNumber !== nextTaxNumber) {
+            setFormData((prev) => ({
+                ...prev,
+                taxNumber: nextTaxNumber
+            }));
+        }
+    }, [businessInfos, formData.businessId, formData.isPersonal, formData.taxNumber, isOpen]);
+
     const handleChange = (field, value) => {
         setFormData((prev) => ({
             ...prev,
@@ -242,14 +358,23 @@ const ExpenseModal = ({
         }));
     };
 
+    const handleBusinessChange = (value) => {
+        const nextId = !value || value === NO_BUSINESS_VALUE ? '' : value;
+        const selected = businessInfos.find((info) => info.id === nextId);
+
+        setFormData((prev) => ({
+            ...prev,
+            businessId: nextId,
+            taxNumber: selected?.taxNumber || ''
+        }));
+    };
+
     const handleClientChange = (value) => {
-        if (value === NO_CLIENT_VALUE) {
+        if (!value || value === NO_CLIENT_VALUE) {
             setFormData((prev) => ({
                 ...prev,
                 clientId: NO_CLIENT_VALUE,
                 projectId: NO_PROJECT_VALUE,
-                isPersonal: true,
-                billable: false,
             }));
             return;
         }
@@ -258,7 +383,6 @@ const ExpenseModal = ({
             ...prev,
             clientId: value,
             projectId: NO_PROJECT_VALUE,
-            isPersonal: false,
         }));
     };
 
@@ -266,38 +390,179 @@ const ExpenseModal = ({
         setFormData((prev) => ({
             ...prev,
             projectId: value === NO_PROJECT_VALUE ? NO_PROJECT_VALUE : value,
-            isPersonal: value === NO_PROJECT_VALUE && prev.clientId === NO_CLIENT_VALUE,
         }));
     };
 
-    const handlePersonalToggle = (checked) => {
-        if (checked) {
+    const handleBusinessToggle = (checked) => {
+        if (!checked) {
             setFormData((prev) => ({
                 ...prev,
                 isPersonal: true,
                 clientId: NO_CLIENT_VALUE,
                 projectId: NO_PROJECT_VALUE,
+                businessId: '',
+                taxNumber: '',
                 billable: false,
             }));
             return;
         }
 
+        const defaultId = defaultBusinessInfo?.id || '';
+        const selected = businessInfos.find((info) => info.id === defaultId);
+
         setFormData((prev) => ({
             ...prev,
             isPersonal: false,
+            businessId: prev.businessId || defaultId,
+            taxNumber: prev.businessId ? prev.taxNumber : (selected?.taxNumber || '')
         }));
     };
 
-    const handleRecurringToggle = (checked) => {
-        if (editingExpense?.isRecurring) {
+    const buildMonthlyDateForMonth = (monthlyType, monthlyDay, year, month) => {
+        if (monthlyType === 'last') {
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            return new Date(year, month, lastDay);
+        }
+
+        if (monthlyType === 'first') {
+            return new Date(year, month, 1);
+        }
+
+        const day = monthlyDay || 1;
+        return new Date(year, month, day);
+    };
+
+    const getNextMonthlyStartDate = (monthlyType, monthlyDay, todayValue) => {
+        const resolvedToday = todayValue ? new Date(todayValue) : new Date();
+        const todayDate = Number.isNaN(resolvedToday.getTime()) ? new Date() : resolvedToday;
+        const year = todayDate.getFullYear();
+        const month = todayDate.getMonth();
+
+        let candidate = buildMonthlyDateForMonth(monthlyType, monthlyDay, year, month);
+
+        if (candidate < todayDate) {
+            candidate = buildMonthlyDateForMonth(monthlyType, monthlyDay, year, month + 1);
+        }
+
+        return toStorageDate(candidate) || todayString;
+    };
+
+    const getNextYearlyStartDate = (yearlyDate, todayValue) => {
+        const resolvedToday = todayValue ? new Date(todayValue) : new Date();
+        const todayDate = Number.isNaN(resolvedToday.getTime()) ? new Date() : resolvedToday;
+        const baseDate = yearlyDate ? new Date(yearlyDate) : todayDate;
+        const baseValid = Number.isNaN(baseDate.getTime()) ? todayDate : baseDate;
+        const year = todayDate.getFullYear();
+        const month = baseValid.getMonth();
+        const day = baseValid.getDate();
+
+        let candidate = new Date(year, month, day);
+
+        if (candidate < todayDate) {
+            candidate = new Date(year + 1, month, day);
+        }
+
+        return toStorageDate(candidate) || todayString;
+    };
+
+    const handleExpenseTypeChange = (value) => {
+        const nextIsRecurring = value === 'recurring';
+
+        setFormData((prev) => {
+            if (prev.isRecurring === nextIsRecurring) {
+                return prev;
+            }
+
+            if (nextIsRecurring) {
+                return {
+                    ...prev,
+                    isRecurring: true,
+                    repeat: DEFAULT_REPEAT,
+                    startDate: getNextMonthlyStartDate('first', 1, todayString),
+                    paidOn: '',
+                    paidBy: '',
+                    monthlyType: 'first',
+                    monthlyDay: 1,
+                };
+            }
+
+            return {
+                ...prev,
+                isRecurring: false,
+                date: prev.date || todayString,
+                paidOn: prev.paidOn || '',
+                paidBy: prev.paidBy || ''
+            };
+        });
+    };
+
+    const handleRecurringConfigChange = (config) => {
+        if (!config) {
+            return;
+        }
+
+        if (config.type === 'yearly') {
+            setFormData((prev) => ({
+                ...prev,
+                isRecurring: true,
+                repeat: 'yearly',
+                startDate: getNextYearlyStartDate(config.yearlyDate || prev.startDate || todayString, todayString)
+            }));
+            return;
+        }
+
+        if (config.type === 'monthly') {
+            const day = config.monthlyDay || 1;
+            const monthlyType = config.monthlyType || 'specific';
+            setFormData((prev) => ({
+                ...prev,
+                isRecurring: true,
+                repeat: 'monthly',
+                startDate: getNextMonthlyStartDate(monthlyType, day, todayString),
+                monthlyType,
+                monthlyDay: day,
+            }));
+        }
+    };
+
+    const handleRecurringClear = () => {
+        if (typeSelectionLocked) {
             return;
         }
 
         setFormData((prev) => ({
             ...prev,
-            isRecurring: checked,
+            isRecurring: false,
+            repeat: DEFAULT_REPEAT,
+            startDate: todayString,
+            monthlyType: 'first',
+            monthlyDay: 1,
         }));
     };
+
+    const recurringPickerValue = useMemo(() => {
+        if (!formData.isRecurring) {
+            return null;
+        }
+
+        if (formData.repeat === 'yearly') {
+            return {
+                type: 'yearly',
+                yearlyDate: formData.startDate || todayString
+            };
+        }
+
+        const startDate = formData.startDate || todayString;
+        const day = Number(startDate.split('-')[2]) || 1;
+        const monthlyDay = formData.monthlyDay || day;
+        const monthlyType = formData.monthlyType || (monthlyDay === 1 ? 'first' : 'specific');
+
+        return {
+            type: 'monthly',
+            monthlyType,
+            monthlyDay
+        };
+    }, [formData.isRecurring, formData.repeat, formData.startDate, formData.monthlyDay, formData.monthlyType, todayString]);
 
     const handleSubmit = (event) => {
         event.preventDefault();
@@ -309,12 +574,12 @@ const ExpenseModal = ({
             return;
         }
 
-        if (!formData.date && !isEditingTemplate) {
+        if (showOneTimeFields && !formData.date) {
             showError('Expense date is required');
             return;
         }
 
-        if (isEditingTemplate && !formData.startDate) {
+        if (showRecurringFields && !formData.startDate) {
             showError('Recurring start date is required');
             return;
         }
@@ -327,7 +592,9 @@ const ExpenseModal = ({
             return;
         }
 
-        const effectiveDate = isEditingTemplate ? formData.startDate : formData.date;
+        const effectiveDate = showOneTimeFields ? formData.date : formData.startDate;
+        const effectiveBusinessId = !formData.isPersonal ? (formData.businessId || null) : null;
+        const effectiveTaxNumber = !formData.isPersonal ? (selectedBusiness?.taxNumber || null) : null;
 
         const payload = {
             title: formData.title.trim(),
@@ -337,11 +604,12 @@ const ExpenseModal = ({
             receiptNumber: formData.receiptNumber.trim() ? formData.receiptNumber.trim() : null,
             currency: formData.currency || DEFAULT_CURRENCY,
             amount: amountValue || 0,
-            paidOn: formData.paidOn || null,
-            paidBy: formData.paidBy.trim() ? formData.paidBy.trim() : null,
-            paymentStatus: formData.paidOn ? 'paid' : 'unpaid',
+            paidOn: showOneTimeFields && formData.paidOn ? formData.paidOn : null,
+            paidBy: formData.paidBy ? formData.paidBy : null,
+            paymentStatus: showOneTimeFields && formData.paidOn ? 'paid' : 'unpaid',
             clientId: formData.clientId === NO_CLIENT_VALUE ? null : formData.clientId,
             projectId: formData.projectId === NO_PROJECT_VALUE ? null : formData.projectId,
+            businessId: effectiveBusinessId,
             isPersonal: formData.isPersonal,
             billable: formData.billable,
             billingStatus: editingExpense?.billingStatus || 'unbilled',
@@ -350,14 +618,14 @@ const ExpenseModal = ({
             isRecurring: formData.isRecurring,
             recurrenceId: editingExpense?.recurrenceId || null,
             amountType: formData.isRecurring ? formData.amountType : null,
-            taxNumber: formData.taxNumber.trim() ? formData.taxNumber.trim() : null,
+            taxNumber: effectiveTaxNumber,
             isTaxExempt: formData.isTaxExempt,
         };
 
         if (isEditingTemplate) {
             const existing = getRecurrence(editingRecurrenceId);
             if (!existing) {
-                showError('Recurring template not found');
+                showError('Recurring expense not found');
                 return;
             }
 
@@ -365,20 +633,24 @@ const ExpenseModal = ({
                 title: payload.title,
                 note: payload.note,
                 supplierName: payload.supplierName,
+                paidBy: payload.paidBy,
                 currency: payload.currency,
                 amount: amountValue || 0,
                 amountType: formData.amountType,
                 repeat: formData.repeat,
                 startDate: formData.startDate,
+                monthlyType: formData.repeat === 'monthly' ? formData.monthlyType : undefined,
+                monthlyDay: formData.repeat === 'monthly' ? formData.monthlyDay : undefined,
                 endDate: formData.endDate || null,
                 clientId: payload.clientId,
                 projectId: payload.projectId,
+                businessId: payload.businessId,
                 isPersonal: payload.isPersonal,
                 billable: payload.billable,
                 taxNumber: payload.taxNumber,
                 isTaxExempt: payload.isTaxExempt,
             });
-            showSuccess('Recurring template updated');
+            showSuccess('Recurring expense updated');
 
             if (clearSavedState) {
                 clearSavedState();
@@ -392,28 +664,35 @@ const ExpenseModal = ({
             updateExpense(editingExpense.id, payload);
             showSuccess('Expense updated');
         } else if (formData.isRecurring) {
+            const shouldGenerateInitial = formData.startDate && formData.startDate <= todayString;
             const recurrence = createRecurrence({
                 title: payload.title,
                 note: payload.note,
                 supplierName: payload.supplierName,
+                paidBy: payload.paidBy,
                 currency: payload.currency,
                 amount: amountValue || 0,
                 amountType: formData.amountType,
                 repeat: formData.repeat,
                 startDate: formData.startDate,
+                monthlyType: formData.repeat === 'monthly' ? formData.monthlyType : undefined,
+                monthlyDay: formData.repeat === 'monthly' ? formData.monthlyDay : undefined,
                 endDate: formData.endDate || null,
                 clientId: payload.clientId,
                 projectId: payload.projectId,
+                businessId: payload.businessId,
                 isPersonal: payload.isPersonal,
                 billable: payload.billable,
                 taxNumber: payload.taxNumber,
                 isTaxExempt: payload.isTaxExempt,
-                lastGeneratedDate: formData.startDate,
+                lastGeneratedDate: shouldGenerateInitial ? formData.startDate : null,
                 active: true,
             });
 
-            const instance = buildExpenseFromRecurrence(recurrence, formData.startDate);
-            createExpense(instance);
+            if (shouldGenerateInitial) {
+                const instance = buildExpenseFromRecurrence(recurrence, formData.startDate);
+                createExpense(instance);
+            }
             showSuccess('Recurring expense created');
         } else {
             createExpense({
@@ -440,23 +719,41 @@ const ExpenseModal = ({
         onClose();
     };
 
+    const selectedBusiness = useMemo(() => {
+        if (formData.isPersonal || !formData.businessId) {
+            return null;
+        }
+
+        return businessInfos.find((info) => info.id === formData.businessId) || null;
+    }, [businessInfos, formData.businessId, formData.isPersonal]);
+
     const availableProjects = useMemo(() => {
+        if (formData.isPersonal) {
+            return activeProjects.filter((project) => project.isPersonal && !project.archived);
+        }
+
         if (formData.clientId !== NO_CLIENT_VALUE) {
             return getProjectsByClient(formData.clientId).filter((project) => !project.archived);
         }
-        return activeProjects;
-    }, [formData.clientId, getProjectsByClient, activeProjects]);
 
-    const canBill = formData.clientId !== NO_CLIENT_VALUE || formData.projectId !== NO_PROJECT_VALUE;
+        return activeProjects.filter((project) => !project.isPersonal && project.preferredClientId && !project.archived);
+    }, [formData.clientId, formData.isPersonal, getProjectsByClient, activeProjects]);
 
     const handleDeleteTemplate = () => {
         if (!editingRecurrenceId) return;
-        if (!window.confirm('Delete this recurring template? Existing expenses will not be removed.')) {
-            return;
-        }
+        setConfirmDialog('delete-recurrence');
+    };
 
+    const handleDeleteInstance = () => {
+        if (!editingExpense) return;
+        setConfirmDialog('delete-instance');
+    };
+
+    const confirmDeleteRecurrence = () => {
+        if (!editingRecurrenceId) return;
         deleteRecurrence(editingRecurrenceId);
-        showSuccess('Recurring template deleted');
+        showSuccess('Recurring expense deleted');
+        setConfirmDialog(null);
 
         if (clearSavedState) {
             clearSavedState();
@@ -465,184 +762,215 @@ const ExpenseModal = ({
         onClose();
     };
 
+    const confirmDeleteInstance = () => {
+        if (!editingExpense) return;
+        deleteExpense(editingExpense.id);
+        showSuccess('Expense deleted');
+        setConfirmDialog(null);
+
+        if (clearSavedState) {
+            clearSavedState();
+        }
+
+        onClose();
+    };
+
+    const submitLabel = isSubmittingRecurring
+        ? 'Submit'
+        : (editingRecurrenceId
+            ? 'Save Expense'
+            : (editingExpense ? 'Save Expense' : 'Create Expense'));
+
     const modalFooter = (
-        <div className="flex justify-between items-center">
-            <div>
+        <div className="flex w-full justify-between items-center">
+            <div className="flex items-center gap-2">
+                {isSubmittingRecurring && (
+                    <Button variant="destructive" type="button" onClick={handleDeleteInstance}>
+                        Delete Expense
+                    </Button>
+                )}
                 {editingRecurrenceId && (
                     <Button variant="destructive" type="button" onClick={handleDeleteTemplate}>
-                        Delete Template
+                        Delete Expense
                     </Button>
                 )}
             </div>
-            <div className="flex justify-end space-x-3">
+            <div className="flex justify-end items-center gap-3">
                 <Button variant="outline" onClick={handleClose} type="button">
                     Cancel
                 </Button>
                 <Button onClick={handleSubmit} type="submit">
-                    {editingRecurrenceId ? 'Save Recurrence' : (editingExpense ? 'Save Expense' : 'Create Expense')}
+                    {submitLabel}
                 </Button>
             </div>
         </div>
     );
 
     return (
-        <Modal
-            isOpen={isOpen}
-            onClose={handleClose}
-            size="2xl"
-            title={editingRecurrenceId && !editingExpense ? 'Edit Recurring Template' : (editingExpense ? 'Edit Expense' : 'New Expense')}
-            footer={modalFooter}
-        >
-            <form onSubmit={handleSubmit} className="space-y-6">
-                {editingExpense?.isRecurring && !editingRecurrenceId && (
-                    <Notice
-                        title="Recurring expense"
-                        description="This is a recurring expense. Editing only updates this instance."
-                    >
-                        {editingExpense.recurrenceId && (
-                            <Button
-                                type="button"
-                                variant="link"
-                                size="sm"
-                                className="h-auto p-0"
-                                onClick={() => {
-                                    const recurrence = getRecurrence(editingExpense.recurrenceId);
-                                    if (!recurrence) {
-                                        showError('Recurring template not found');
-                                        return;
-                                    }
-                                    setEditingRecurrenceId(recurrence.id);
-                                    setFormData({
-                                        title: recurrence.title || '',
-                                        note: recurrence.note || '',
-                                        date: recurrence.startDate || todayString,
-                                        supplierName: recurrence.supplierName || '',
-                                        receiptNumber: '',
-                                        amount: recurrence.amount != null ? String(recurrence.amount) : '',
-                                        currency: recurrence.currency || preferences.currency || DEFAULT_CURRENCY,
-                                        paidOn: '',
-                                        paidBy: '',
-                                        clientId: recurrence.clientId || NO_CLIENT_VALUE,
-                                        projectId: recurrence.projectId || NO_PROJECT_VALUE,
-                                        isPersonal: recurrence.isPersonal !== false,
-                                        billable: recurrence.billable === true,
-                                        isRecurring: true,
-                                        repeat: recurrence.repeat || DEFAULT_REPEAT,
-                                        startDate: recurrence.startDate || todayString,
-                                        endDate: recurrence.endDate || '',
-                                        amountType: recurrence.amountType || DEFAULT_AMOUNT_TYPE,
-                                        taxNumber: recurrence.taxNumber || '',
-                                        isTaxExempt: recurrence.isTaxExempt === true,
-                                    });
-                                }}
-                            >
-                                Edit template
-                            </Button>
+        <>
+            <Modal
+                isOpen={isOpen}
+                onClose={handleClose}
+                size="2xl"
+                title={isSubmittingRecurring
+                    ? `Submit ${editingExpense?.title || 'recurring'} expense`
+                    : (editingRecurrenceId && !editingExpense
+                        ? 'Edit Recurring Expense'
+                        : (editingExpense ? 'Edit Expense' : 'New Expense'))
+                }
+                footer={modalFooter}
+            >
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {editingRecurrenceId && (
+                        <Notice
+                            title="Editing recurring expense"
+                            description="Changes apply to future expenses only."
+                        />
+                    )}
+
+                    {editingExpense?.billingStatus === 'billed' && (
+                        <Notice
+                            title="Expense is billed"
+                            description="This expense is attached to an invoice. Editing won't update that invoice."
+                        />
+                    )}
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        {!isSubmittingRecurring && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label>Type</Label>
+                                    <Select
+                                        value={formData.isRecurring ? 'recurring' : 'one-time'}
+                                        onValueChange={handleExpenseTypeChange}
+                                        disabled={typeSelectionLocked}
+                                    >
+                                        <SelectTrigger aria-label="Expense type">
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="one-time">One-time</SelectItem>
+                                            <SelectItem value="recurring">Recurring</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {formData.isRecurring ? (
+                                    <div className="space-y-2">
+                                        <Label>Repeat</Label>
+                                        <RecurringPicker
+                                            value={recurringPickerValue}
+                                            onChange={handleRecurringConfigChange}
+                                            onClear={handleRecurringClear}
+                                            disabled={recurringFieldsLocked}
+                                            buttonClassName="w-full"
+                                            inactiveVariant="ghost"
+                                            inactiveClassName="border border-input bg-transparent"
+                                            allowedTypes={['monthly', 'yearly']}
+                                            monthlyMode="full"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="hidden md:block" aria-hidden="true" />
+                                )}
+                            </>
                         )}
-                    </Notice>
-                )}
-
-                {editingRecurrenceId && (
-                    <Notice
-                        title="Editing recurring template"
-                        description="Changes apply to future expenses only."
-                    >
-                        {editingExpense && (
-                            <Button
-                                type="button"
-                                variant="link"
-                                size="sm"
-                                className="h-auto p-0"
-                                onClick={() => {
-                                    setEditingRecurrenceId(null);
-                                    setFormData({
-                                        title: editingExpense.title || '',
-                                        note: editingExpense.note || '',
-                                        date: editingExpense.date || todayString,
-                                        supplierName: editingExpense.supplierName || '',
-                                        receiptNumber: editingExpense.receiptNumber || '',
-                                        amount: editingExpense.amount != null ? String(editingExpense.amount) : '',
-                                        currency: editingExpense.currency || preferences.currency || DEFAULT_CURRENCY,
-                                        paidOn: editingExpense.paidOn || '',
-                                        paidBy: editingExpense.paidBy || '',
-                                        clientId: editingExpense.clientId || NO_CLIENT_VALUE,
-                                        projectId: editingExpense.projectId || NO_PROJECT_VALUE,
-                                        isPersonal: editingExpense.isPersonal !== false,
-                                        billable: editingExpense.billable === true,
-                                        isRecurring: Boolean(editingExpense.isRecurring),
-                                        repeat: DEFAULT_REPEAT,
-                                        startDate: editingExpense.date || todayString,
-                                        endDate: '',
-                                        amountType: editingExpense.amountType || DEFAULT_AMOUNT_TYPE,
-                                        taxNumber: editingExpense.taxNumber || '',
-                                        isTaxExempt: editingExpense.isTaxExempt === true,
-                                    });
-                                }}
+                        {!isSubmittingRecurring && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="expense-title">Title <span className="text-red-500">*</span></Label>
+                                    <Input
+                                        id="expense-title"
+                                        ref={titleInputRef}
+                                        value={formData.title}
+                                        onChange={(event) => handleChange('title', event.target.value)}
+                                        placeholder="Enter expense title"
+                                    />
+                                </div>
+                                {showOneTimeFields ? (
+                                <div className="space-y-2">
+                                    <Label htmlFor="expense-date">Date <span className="text-red-500">*</span></Label>
+                                    <Input
+                                        id="expense-date"
+                                        type="date"
+                                        value={formData.date}
+                                        onChange={(event) => handleChange('date', event.target.value)}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <Label htmlFor="expense-end">End Date</Label>
+                                    <Input
+                                        id="expense-end"
+                                        type="date"
+                                        value={formData.endDate}
+                                        onChange={(event) => handleChange('endDate', event.target.value)}
+                                        disabled={recurringFieldsLocked}
+                                    />
+                                </div>
+                            )}
+                        </>
+                    )}
+                    {showRecurringFields && (
+                        <div className="space-y-2">
+                            <Label>Amount Type</Label>
+                            <Select
+                                value={formData.amountType}
+                                onValueChange={(value) => handleChange('amountType', value)}
+                                disabled={recurringFieldsLocked}
                             >
-                                Edit this instance
-                            </Button>
-                        )}
-                    </Notice>
-                )}
-
-                {editingExpense?.billingStatus === 'billed' && (
-                    <Notice
-                        title="Expense is billed"
-                        description="This expense is attached to an invoice. Editing won't update that invoice."
-                    />
-                )}
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                        <Label htmlFor="expense-title">Title <span className="text-red-500">*</span></Label>
-                        <Input
-                            id="expense-title"
-                            value={formData.title}
-                            onChange={(event) => handleChange('title', event.target.value)}
-                            placeholder="Enter expense title"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="expense-date">Date <span className="text-red-500">*</span></Label>
-                        <Input
-                            id="expense-date"
-                            type="date"
-                            value={formData.date}
-                            onChange={(event) => handleChange('date', event.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="expense-note">Note</Label>
-                        <Textarea
-                            id="expense-note"
-                            value={formData.note}
-                            onChange={(event) => handleChange('note', event.target.value)}
-                            placeholder="Optional note"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="expense-supplier">Supplier / Business</Label>
-                        <Input
-                            id="expense-supplier"
-                            value={formData.supplierName}
-                            onChange={(event) => handleChange('supplierName', event.target.value)}
-                            placeholder="Supplier name"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="expense-receipt">Receipt / Invoice #</Label>
-                        <Input
-                            id="expense-receipt"
-                            value={formData.receiptNumber}
-                            onChange={(event) => handleChange('receiptNumber', event.target.value)}
-                            placeholder="Receipt number"
-                        />
-                    </div>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Amount Type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="fixed">Fixed</SelectItem>
+                                    <SelectItem value="variable">Variable</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                    {showRecurringFields && (
+                        <div className="space-y-2">
+                            <Label htmlFor="expense-paid-by-recurring">Payment Method</Label>
+                            <Select
+                                value={formData.paidBy}
+                                onValueChange={(value) => handleChange('paidBy', value)}
+                            >
+                                <SelectTrigger id="expense-paid-by-recurring">
+                                    <SelectValue placeholder="Select payment method" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {paymentMethods.length > 0 ? (
+                                        <SelectGroup>
+                                            <SelectLabel>Payment methods</SelectLabel>
+                                            {paymentMethods.map((method) => (
+                                                <SelectItem key={method.id} value={method.id}>
+                                                    {method.title || method.name || 'Untitled'}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    ) : (
+                                        <SelectGroup>
+                                            <SelectLabel>No payment methods found</SelectLabel>
+                                        </SelectGroup>
+                                    )}
+                                    <SelectGroup>
+                                        <SelectLabel>Other methods</SelectLabel>
+                                        <SelectItem value="card">Card</SelectItem>
+                                        <SelectItem value="cash">Cash</SelectItem>
+                                        <SelectItem value="credits">Credits</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                     <div className="space-y-2">
                         <Label htmlFor="expense-amount">
-                            {formData.isRecurring && formData.amountType === 'variable'
-                                ? 'Budget Estimate (optional)'
-                                : 'Amount'}
+                            {isSubmittingRecurring
+                                ? 'Amount '
+                                : (formData.isRecurring && formData.amountType === 'variable'
+                                    ? 'Amount (recurring estimate)'
+                                    : 'Amount ')}
                             {!(formData.isRecurring && formData.amountType === 'variable') && (
                                 <span className="text-red-500">*</span>
                             )}
@@ -672,177 +1000,259 @@ const ExpenseModal = ({
                             </SelectContent>
                         </Select>
                     </div>
-                </div>
-
-                <div className="space-y-4">
-                    <div className="text-sm font-semibold text-muted-foreground">Payment</div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {!isSubmittingRecurring && (
                         <div className="space-y-2">
-                            <Label htmlFor="expense-paid-on">Paid On</Label>
+                            <Label htmlFor="expense-supplier">Supplier / Business</Label>
                             <Input
-                                id="expense-paid-on"
-                                type="date"
-                                value={formData.paidOn}
-                                onChange={(event) => handleChange('paidOn', event.target.value)}
+                                id="expense-supplier"
+                                value={formData.supplierName}
+                                onChange={(event) => handleChange('supplierName', event.target.value)}
+                                placeholder="Supplier name"
                             />
                         </div>
+                    )}
+                    {showOneTimeFields && (
                         <div className="space-y-2">
-                            <Label htmlFor="expense-paid-by">Paid By</Label>
+                            <Label htmlFor="expense-receipt">Receipt / Invoice #</Label>
                             <Input
-                                id="expense-paid-by"
-                                value={formData.paidBy}
-                                onChange={(event) => handleChange('paidBy', event.target.value)}
-                                placeholder="Company card, cash, etc."
+                                id="expense-receipt"
+                                value={formData.receiptNumber}
+                                onChange={(event) => handleChange('receiptNumber', event.target.value)}
+                                placeholder="Receipt number"
                             />
                         </div>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    <div className="text-sm font-semibold text-muted-foreground">Assignment</div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Client</Label>
-                            <Select value={formData.clientId} onValueChange={handleClientChange}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select client" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={NO_CLIENT_VALUE}>Personal</SelectItem>
-                                    {activeClients.map((client) => (
-                                        <SelectItem key={client.id} value={client.id}>
-                                            {client.title}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Project</Label>
-                            <Select
-                                value={formData.projectId}
-                                onValueChange={handleProjectChange}
-                                disabled={formData.clientId === NO_CLIENT_VALUE}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select project" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={NO_PROJECT_VALUE}>No project</SelectItem>
-                                    {availableProjects.map((project) => (
-                                        <SelectItem key={project.id} value={project.id}>
-                                            {project.title}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-4">
-                        <CustomCheckbox
-                            checked={formData.isPersonal}
-                            onChange={handlePersonalToggle}
-                            label="Mark as Personal"
-                        />
-                        <CustomCheckbox
-                            checked={formData.billable}
-                            onChange={(checked) => handleChange('billable', checked)}
-                            disabled={!canBill}
-                            label="Billable"
-                        />
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    <div className="text-sm font-semibold text-muted-foreground">Recurrence</div>
-                    <CustomCheckbox
-                        checked={formData.isRecurring}
-                        onChange={handleRecurringToggle}
-                        label="Recurring"
-                        disabled={Boolean(editingExpense?.isRecurring)}
-                    />
-
-                    {formData.isRecurring && (
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label>Repeat</Label>
-                                <Select
-                                    value={formData.repeat}
-                                    onValueChange={(value) => handleChange('repeat', value)}
-                                    disabled={Boolean(editingExpense?.isRecurring)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Repeat" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="monthly">Monthly</SelectItem>
-                                        <SelectItem value="yearly">Yearly</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Amount Type</Label>
-                                <Select
-                                    value={formData.amountType}
-                                    onValueChange={(value) => handleChange('amountType', value)}
-                                    disabled={Boolean(editingExpense?.isRecurring)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Amount Type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="fixed">Fixed</SelectItem>
-                                        <SelectItem value="variable">Variable</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="expense-start">Start Date</Label>
-                                <Input
-                                    id="expense-start"
-                                    type="date"
-                                    value={formData.startDate}
-                                    onChange={(event) => handleChange('startDate', event.target.value)}
-                                    disabled={Boolean(editingExpense?.isRecurring)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="expense-end">End Date</Label>
-                                <Input
-                                    id="expense-end"
-                                    type="date"
-                                    value={formData.endDate}
-                                    onChange={(event) => handleChange('endDate', event.target.value)}
-                                    disabled={Boolean(editingExpense?.isRecurring)}
-                                />
-                            </div>
+                    )}
+                    {(isSubmittingRecurring || !formData.isRecurring) && (
+                        <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="expense-note">Note</Label>
+                            <Textarea
+                                id="expense-note"
+                                value={formData.note}
+                                onChange={(event) => handleChange('note', event.target.value)}
+                                placeholder="Optional note"
+                            />
                         </div>
                     )}
                 </div>
 
-                <div className="space-y-4">
-                    <div className="text-sm font-semibold text-muted-foreground">Tax</div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="expense-tax">Tax No</Label>
-                            <Input
-                                id="expense-tax"
-                                value={formData.taxNumber}
-                                onChange={(event) => handleChange('taxNumber', event.target.value)}
-                                placeholder="Tax number"
-                            />
-                        </div>
-                        <div className="flex items-center">
-                            <CustomCheckbox
-                                checked={formData.isTaxExempt}
-                                onChange={(checked) => handleChange('isTaxExempt', checked)}
-                                label="Tax Exempt"
-                            />
+                {showOneTimeFields && (
+                    <div className="space-y-4">
+                        <div className="text-sm font-semibold text-muted-foreground">Payment</div>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="expense-paid-on">Paid On</Label>
+                                <Input
+                                    id="expense-paid-on"
+                                    type="date"
+                                    value={formData.paidOn}
+                                    onChange={(event) => handleChange('paidOn', event.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="expense-paid-by">Payment Method</Label>
+                                <Select
+                                    value={formData.paidBy}
+                                    onValueChange={(value) => handleChange('paidBy', value)}
+                                >
+                                    <SelectTrigger id="expense-paid-by">
+                                        <SelectValue placeholder="Select payment method" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {paymentMethods.length > 0 ? (
+                                            <SelectGroup>
+                                                <SelectLabel>My payment methods</SelectLabel>
+                                                {paymentMethods.map((method) => (
+                                                    <SelectItem key={method.id} value={method.id}>
+                                                        {method.title || method.name || 'Untitled'}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        ) : (
+                                            <SelectGroup>
+                                                <SelectLabel>No payment methods found</SelectLabel>
+                                            </SelectGroup>
+                                        )}
+                                        <SelectGroup>
+                                            <SelectLabel>Other methods</SelectLabel>
+                                            <SelectItem value="card">Card</SelectItem>
+                                            <SelectItem value="cash">Cash</SelectItem>
+                                            <SelectItem value="credits">Credits</SelectItem>
+                                            <SelectItem value="other">Other</SelectItem>
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
+
+                {!isSubmittingRecurring && (
+                    <div className="space-y-4">
+                        <div className="text-sm font-semibold text-muted-foreground">Assignment</div>
+                        <div className="flex flex-wrap gap-4">
+                            <CustomCheckbox
+                                checked={!formData.isPersonal}
+                                onChange={handleBusinessToggle}
+                                label="Business Expense"
+                            />
+                            {!formData.isPersonal && (
+                                <CustomCheckbox
+                                    checked={formData.billable}
+                                    onChange={(checked) => handleChange('billable', checked)}
+                                    label="Billable"
+                                />
+                            )}
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            {!formData.isPersonal && (
+                                <div className="space-y-2">
+                                    <Label>Client</Label>
+                                    <Select
+                                        value={formData.clientId === NO_CLIENT_VALUE ? '' : formData.clientId}
+                                        onValueChange={handleClientChange}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select client" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {formData.clientId !== NO_CLIENT_VALUE && (
+                                                <SelectItem value={NO_CLIENT_VALUE}>No client</SelectItem>
+                                            )}
+                                            {activeClients.map((client) => (
+                                                <SelectItem key={client.id} value={client.id}>
+                                                    {client.title}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                <Label>Project</Label>
+                                <Select
+                                    value={formData.projectId === NO_PROJECT_VALUE ? '' : formData.projectId}
+                                    onValueChange={handleProjectChange}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select project" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {formData.projectId !== NO_PROJECT_VALUE && (
+                                            <SelectItem value={NO_PROJECT_VALUE}>No project</SelectItem>
+                                        )}
+                                        {availableProjects.map((project) => (
+                                            <SelectItem key={project.id} value={project.id}>
+                                                {project.title}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        {!formData.isPersonal && (
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Business</Label>
+                                    <Select
+                                        value={formData.businessId || ''}
+                                        onValueChange={handleBusinessChange}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select business" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {formData.businessId && (
+                                                <SelectItem value={NO_BUSINESS_VALUE}>No business</SelectItem>
+                                            )}
+                                            {businessInfos.length > 0 ? (
+                                                businessInfos.map((info) => (
+                                                    <SelectItem key={info.id} value={info.id}>
+                                                        {info.title || info.name || info.businessName || 'Untitled business'}
+                                                    </SelectItem>
+                                                ))
+                                            ) : (
+                                                <SelectItem value="no-business-found" disabled>
+                                                    No businesses found
+                                                </SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="hidden md:block" aria-hidden="true" />
+                                <div className="space-y-2">
+                                    <Label>
+                                        Tax No <span className="text-xs text-muted-foreground">(from selected business)</span>
+                                    </Label>
+                                    <div className="h-9 rounded-md border border-input bg-muted/40 px-3 flex items-center text-sm">
+                                        <span className={selectedBusiness?.taxNumber ? 'text-foreground' : 'text-muted-foreground'}>
+                                            {formData.businessId
+                                                ? (selectedBusiness?.taxNumber || 'No tax no available in this business.')
+                                                : 'Select a business to see tax no.'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center h-9 mt-6">
+                                    <CustomCheckbox
+                                        checked={formData.isTaxExempt}
+                                        onChange={(checked) => handleChange('isTaxExempt', checked)}
+                                        disabled={!formData.businessId}
+                                        label="Tax Exempt"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </form>
         </Modal>
+
+        <Modal
+            isOpen={confirmDialog === 'delete-recurrence'}
+            onClose={() => setConfirmDialog(null)}
+            title="Delete recurring expense?"
+            size="md"
+            footer={(
+                <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setConfirmDialog(null)}>
+                        Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={confirmDeleteRecurrence}>
+                        Delete
+                    </Button>
+                </div>
+            )}
+        >
+            <Notice
+                title={formData.title ? `Deleting "${formData.title}" cannot be undone.` : 'Deleting this recurring expense cannot be undone.'}
+                description="Existing expenses already created from this recurrence will remain."
+                variant="destructive"
+            />
+        </Modal>
+
+        <Modal
+            isOpen={confirmDialog === 'delete-instance'}
+            onClose={() => setConfirmDialog(null)}
+            title="Delete expense?"
+            size="md"
+            footer={(
+                <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setConfirmDialog(null)}>
+                        Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={confirmDeleteInstance}>
+                        Delete
+                    </Button>
+                </div>
+            )}
+        >
+            <Notice
+                title={editingExpense?.title
+                    ? `Deleting "${editingExpense.title}" cannot be undone.`
+                    : 'Deleting this expense cannot be undone.'}
+                variant="destructive"
+            />
+        </Modal>
+        </>
     );
 };
 

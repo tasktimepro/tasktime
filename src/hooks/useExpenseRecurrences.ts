@@ -24,6 +24,8 @@ export function useExpenseRecurrences() {
                 lastGeneratedDate: recurrence.lastGeneratedDate,
                 endDate: recurrence.endDate,
                 repeat: recurrence.repeat,
+                    monthlyType: recurrence.monthlyType,
+                    monthlyDay: recurrence.monthlyDay,
             });
 
             if (pendingDates.length === 0) return;

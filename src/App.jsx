@@ -1195,7 +1195,13 @@ function AppContent() {
 
                     {activeView === 'expenses' && (
                             <ErrorBoundary>
-                            <Expenses openExpenseModal={openExpenseModal} />
+                            <Expenses
+                                openExpenseModal={openExpenseModal}
+                                openPaymentMethodModal={openPaymentMethodModal}
+                                editPaymentMethodModal={editPaymentMethodModal}
+                                openBusinessModal={openBusinessModal}
+                                editBusinessModal={editBusinessModal}
+                            />
                             </ErrorBoundary>
                         )}
 
@@ -1227,7 +1233,6 @@ function AppContent() {
 
                     <FloatingActionButton
                         onTaskClick={() => openTaskModal(null)}
-                        onExpenseClick={() => openExpenseModal(null)}
                     />
                 </div>
                 

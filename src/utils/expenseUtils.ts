@@ -9,6 +9,8 @@ type GetPendingPeriodsParams = {
     lastGeneratedDate?: string | null;
     endDate?: string | null;
     repeat: RepeatInterval;
+    monthlyType?: 'first' | 'last' | 'specific';
+    monthlyDay?: number;
     maxPeriods?: number;
     today?: string;
 };
@@ -19,7 +21,12 @@ type GetPendingPeriodsParams = {
  * @param {RepeatInterval} repeat
  * @returns {string}
  */
-export const advanceByRepeat = (dateValue: string, repeat: RepeatInterval): string => {
+export const advanceByRepeat = (
+    dateValue: string,
+    repeat: RepeatInterval,
+    monthlyType?: 'first' | 'last' | 'specific',
+    monthlyDay?: number
+): string => {
     const baseDate = parseStoredDate(dateValue);
     if (!baseDate) return dateValue;
 
@@ -28,7 +35,17 @@ export const advanceByRepeat = (dateValue: string, repeat: RepeatInterval): stri
     if (repeat === 'monthly') {
         const nextMonthDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
         const monthEnd = endOfMonth(nextMonthDate);
-        const clampedDay = Math.min(day, monthEnd.getDate());
+
+        if (monthlyType === 'first') {
+            return toStorageDate(new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), 1)) || dateValue;
+        }
+
+        if (monthlyType === 'last') {
+            return toStorageDate(new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), monthEnd.getDate())) || dateValue;
+        }
+
+        const resolvedDay = monthlyDay || day;
+        const clampedDay = Math.min(resolvedDay, monthEnd.getDate());
         return toStorageDate(new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), clampedDay)) || dateValue;
     }
 
@@ -48,6 +65,8 @@ export const getPendingPeriods = ({
     lastGeneratedDate,
     endDate,
     repeat,
+    monthlyType,
+    monthlyDay,
     maxPeriods = 24,
     today,
 }: GetPendingPeriodsParams): string[] => {
@@ -56,7 +75,7 @@ export const getPendingPeriods = ({
 
     const pending: string[] = [];
     let nextDate = lastGeneratedDate
-        ? advanceByRepeat(lastGeneratedDate, repeat)
+        ? advanceByRepeat(lastGeneratedDate, repeat, monthlyType, monthlyDay)
         : startDate;
 
     const endLimit = endDate || null;
@@ -76,7 +95,7 @@ export const getPendingPeriods = ({
         }
 
         pending.push(nextDate);
-        nextDate = advanceByRepeat(nextDate, repeat);
+        nextDate = advanceByRepeat(nextDate, repeat, monthlyType, monthlyDay);
     }
 
     return pending;
@@ -99,10 +118,11 @@ export const buildExpenseFromRecurrence = (recurrence: ExpenseRecurrence, dateVa
         currency: recurrence.currency,
         amount: recurrence.amountType === 'fixed' ? recurrence.amount : 0,
         paidOn: null,
-        paidBy: null,
+        paidBy: recurrence.paidBy ?? null,
         paymentStatus: 'unpaid',
         clientId: recurrence.clientId ?? null,
         projectId: recurrence.projectId ?? null,
+        businessId: recurrence.businessId ?? null,
         isPersonal: recurrence.isPersonal,
         billable: recurrence.billable,
         billingStatus: 'unbilled',

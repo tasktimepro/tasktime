@@ -1,9 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { endOfMonth, endOfYear, startOfMonth, startOfYear } from 'date-fns';
+import {
+    ArrowPathIcon,
+    BuildingOfficeIcon,
+    CreditCardIcon,
+    DocumentDuplicateIcon,
+    HandCoinsIcon,
+    MoreHorizontalIcon,
+    PauseIcon,
+    PencilIcon,
+    PlayIcon,
+    PlusIcon,
+    TrashIcon,
+} from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
+import Modal from '@/components/Modal';
+import { Notice } from '@/components/ui/notice';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useUrlState } from '@/hooks/useUrlState.ts';
 import { useExpenses } from '@/hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
 import { useClients } from '@/hooks/useClients.ts';
@@ -13,8 +29,10 @@ import { formatCurrency } from '@/utils/currencyUtils.ts';
 import { toStorageDate } from '@/utils/dateUtils.ts';
 import { isExpenseInDateRange } from '@/utils/expenseUtils';
 import ExpenseList from '@/components/expenses/ExpenseList';
-import ExpenseMetrics from '@/components/expenses/ExpenseMetrics';
 import ExpenseFilters from '@/components/expenses/ExpenseFilters';
+import PaymentMethods from '@/components/PaymentMethods';
+import BusinessInfo from '@/components/BusinessInfo';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const PERIOD_OPTIONS = [
     { value: 'month', label: 'This Month' },
@@ -26,8 +44,15 @@ const PERIOD_OPTIONS = [
 /**
  * Expenses component - Main expenses page
  */
-const Expenses = ({ openExpenseModal }) => {
+const Expenses = ({
+    openExpenseModal,
+    openPaymentMethodModal,
+    editPaymentMethodModal,
+    openBusinessModal,
+    editBusinessModal,
+}) => {
 
+    const { urlParams, updateUrl } = useUrlState();
     const { expenses, markAsPaid, markAsUnpaid, createExpense } = useExpenses();
     const { recurrences, generatePendingExpenses, pauseRecurrence, resumeRecurrence, deleteRecurrence } = useExpenseRecurrences();
     const { clients } = useClients();
@@ -47,6 +72,46 @@ const Expenses = ({ openExpenseModal }) => {
     const [customEnd, setCustomEnd] = useState(() => toStorageDate(new Date()) || '');
     const initialFiltersAppliedRef = useRef(false);
     const recurrenceGeneratedRef = useRef(false);
+    const [pendingDeleteRecurrence, setPendingDeleteRecurrence] = useState(null);
+
+    const sideNavItems = useMemo(() => [
+        {
+            id: 'all',
+            name: 'All Expenses',
+            icon: HandCoinsIcon,
+            description: 'View and manage all expenses'
+        },
+        {
+            id: 'recurring',
+            name: 'Recurring Expenses',
+            icon: ArrowPathIcon,
+            description: 'Manage recurring expenses'
+        },
+        {
+            id: 'payment-methods',
+            name: 'Payment Methods',
+            icon: CreditCardIcon,
+            description: 'Manage payment methods'
+        },
+        {
+            id: 'business-info',
+            name: 'Your Business',
+            icon: BuildingOfficeIcon,
+            description: 'Manage business information'
+        }
+    ], []);
+
+    const activeTab = urlParams.section || sideNavItems[0].id;
+
+    useEffect(() => {
+        if (!urlParams.section) {
+            updateUrl({ section: sideNavItems[0].id });
+        }
+    }, [urlParams.section, updateUrl, sideNavItems]);
+
+    const handleSectionChange = (sectionId) => {
+        updateUrl({ section: sectionId, create: null });
+    };
 
     const activeClients = useMemo(() => {
 
@@ -59,11 +124,16 @@ const Expenses = ({ openExpenseModal }) => {
     }, [projects]);
 
     const availableProjects = useMemo(() => {
+        if (personalOnly) {
+            return activeProjects.filter((project) => project.isPersonal);
+        }
+
         if (clientId !== 'all') {
             return getProjectsByClient(clientId).filter((project) => !project.archived);
         }
+
         return activeProjects;
-    }, [clientId, getProjectsByClient, activeProjects]);
+    }, [clientId, getProjectsByClient, activeProjects, personalOnly]);
 
     useEffect(() => {
         if (recurrenceGeneratedRef.current) return;
@@ -199,30 +269,6 @@ const Expenses = ({ openExpenseModal }) => {
         return map;
     }, [projects]);
 
-    const sumByCurrency = (items) => {
-        return items.reduce((acc, expense) => {
-            const currency = expense.currency || preferences.currency || 'EUR';
-            acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
-            return acc;
-        }, {});
-    };
-
-    const totalByCurrency = useMemo(() => sumByCurrency(filteredExpenses), [filteredExpenses]);
-    const unpaidByCurrency = useMemo(() => sumByCurrency(filteredExpenses.filter((expense) => expense.paymentStatus === 'unpaid')), [filteredExpenses]);
-    const paidByCurrency = useMemo(() => sumByCurrency(filteredExpenses.filter((expense) => expense.paymentStatus === 'paid')), [filteredExpenses]);
-    const billableByCurrency = useMemo(() => sumByCurrency(filteredExpenses.filter((expense) => expense.billable && expense.billingStatus === 'unbilled')), [filteredExpenses]);
-
-    const formatAmounts = (amounts) => {
-        const entries = Object.entries(amounts).filter(([, value]) => value > 0);
-        if (entries.length === 0) return '—';
-        if (entries.length === 1) {
-            const [currency, value] = entries[0];
-            return formatCurrency(value, currency);
-        }
-
-        return entries.map(([currency, value]) => `${formatCurrency(value, currency)} ${currency}`).join(' · ');
-    };
-
     const handleTogglePaid = (expense) => {
         if (expense.paymentStatus === 'paid') {
             markAsUnpaid(expense.id);
@@ -246,10 +292,13 @@ const Expenses = ({ openExpenseModal }) => {
     };
 
     const handleDeleteTemplate = (recurrence) => {
-        if (!window.confirm(`Delete template "${recurrence.title}"? Existing expenses will remain.`)) {
-            return;
-        }
-        deleteRecurrence(recurrence.id);
+        setPendingDeleteRecurrence(recurrence);
+    };
+
+    const confirmDeleteTemplate = () => {
+        if (!pendingDeleteRecurrence) return;
+        deleteRecurrence(pendingDeleteRecurrence.id);
+        setPendingDeleteRecurrence(null);
     };
 
     return (
@@ -262,157 +311,263 @@ const Expenses = ({ openExpenseModal }) => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Select value={period} onValueChange={setPeriod}>
-                        <SelectTrigger className="w-[160px]">
-                            <SelectValue placeholder="Period" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {PERIOD_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button onClick={() => openExpenseModal(null)}>
-                        + Add Expense
+                    <Button leadingIcon={PlusIcon} onClick={() => openExpenseModal(null)}>
+                        New Expense
                     </Button>
                 </div>
             </div>
 
-            {period === 'custom' && (
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">From</span>
-                        <input
-                            type="date"
-                            value={customStart}
-                            onChange={(event) => setCustomStart(event.target.value)}
-                            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">To</span>
-                        <input
-                            type="date"
-                            value={customEnd}
-                            onChange={(event) => setCustomEnd(event.target.value)}
-                            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                        />
-                    </div>
-                </div>
-            )}
+            <Tabs value={activeTab} onValueChange={handleSectionChange}>
+                <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+                    {sideNavItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                            <TabsTrigger
+                                key={item.id}
+                                value={item.id}
+                                className="flex items-center py-2 px-1 mr-8 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm whitespace-nowrap transition-colors data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                            >
+                                <Icon className="h-4 w-4 mr-2" />
+                                {item.name}
+                            </TabsTrigger>
+                        );
+                    })}
+                </TabsList>
+            </Tabs>
 
-            <ExpenseMetrics
-                totalLabel={formatAmounts(totalByCurrency)}
-                unpaidLabel={formatAmounts(unpaidByCurrency)}
-                billableLabel={formatAmounts(billableByCurrency)}
-                paidLabel={formatAmounts(paidByCurrency)}
-            />
-
-            <ExpenseFilters
-                search={search}
-                onSearchChange={setSearch}
-                clients={activeClients}
-                projects={availableProjects}
-                clientId={clientId}
-                projectId={projectId}
-                onClientChange={(value) => {
-                    setClientId(value);
-                    setProjectId('all');
-                }}
-                onProjectChange={setProjectId}
-                personalOnly={personalOnly}
-                billableOnly={billableOnly}
-                recurringOnly={recurringOnly}
-                onPersonalToggle={setPersonalOnly}
-                onBillableToggle={setBillableOnly}
-                onRecurringToggle={setRecurringOnly}
-                paidStatus={paidStatus}
-                billedStatus={billedStatus}
-                onPaidStatusChange={setPaidStatus}
-                onBilledStatusChange={setBilledStatus}
-            />
-
-            {sortedRecurrences.length > 0 && (
-                <Card>
-                    <CardHeader className="pb-4">
-                        <CardTitle className="text-lg">
-                            Recurring Templates ({sortedRecurrences.length})
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                        <div className="space-y-3">
-                            {sortedRecurrences.map((recurrence) => {
-                                const clientLabel = recurrence.clientId && clientsById.get(recurrence.clientId)?.clientName;
-                                const projectLabel = recurrence.projectId && projectsById.get(recurrence.projectId)?.title;
-                                const contextLabel = recurrence.isPersonal
-                                    ? 'Personal'
-                                    : (projectLabel || clientLabel || 'Assigned');
-
-                                return (
-                                    <div
-                                        key={recurrence.id}
-                                        className="flex flex-col gap-3 rounded-lg border border-border p-3 md:flex-row md:items-center md:justify-between"
-                                    >
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-foreground">
-                                                    {recurrence.title}
-                                                </span>
-                                                <Badge variant={recurrence.active ? 'default' : 'secondary'}>
-                                                    {recurrence.active ? 'Active' : 'Paused'}
-                                                </Badge>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {recurrence.repeat === 'yearly' ? 'Yearly' : 'Monthly'} · {contextLabel}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                Starts {recurrence.startDate}
-                                                {recurrence.endDate ? ` · Ends ${recurrence.endDate}` : ''}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className="text-sm font-medium text-foreground">
-                                                {formatCurrency(recurrence.amount || 0, recurrence.currency || preferences.currency)}
-                                            </span>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => handleEditTemplate(recurrence)}
-                                            >
-                                                Edit Template
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => (recurrence.active ? pauseRecurrence(recurrence.id) : resumeRecurrence(recurrence.id))}
-                                            >
-                                                {recurrence.active ? 'Pause' : 'Resume'}
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="destructive"
-                                                onClick={() => handleDeleteTemplate(recurrence)}
-                                            >
-                                                Delete
-                                            </Button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+            <div>
+                {activeTab === 'all' && (
+                    <div>
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-bold text-foreground">
+                                All Expenses {filteredExpenses.length > 0 && (
+                                    <span>
+                                        ({filteredExpenses.length})
+                                    </span>
+                                )}
+                            </h2>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                View and manage all expenses across your workspace.
+                            </p>
                         </div>
-                    </CardContent>
-                </Card>
-            )}
 
-            <ExpenseList
-                expenses={filteredExpenses}
-                clientsById={clientsById}
-                projectsById={projectsById}
-                onEdit={(expense) => openExpenseModal(expense)}
-                onTogglePaid={handleTogglePaid}
-            />
+                        <div className="mt-6">
+                            <ExpenseFilters
+                                search={search}
+                                onSearchChange={setSearch}
+                                period={period}
+                                onPeriodChange={setPeriod}
+                                periodOptions={PERIOD_OPTIONS}
+                                customStart={customStart}
+                                customEnd={customEnd}
+                                onCustomStartChange={setCustomStart}
+                                onCustomEndChange={setCustomEnd}
+                                clients={activeClients}
+                                projects={availableProjects}
+                                clientId={clientId}
+                                projectId={projectId}
+                                onClientChange={(value) => {
+                                    setClientId(value);
+                                    setProjectId('all');
+                                }}
+                                onProjectChange={setProjectId}
+                                personalOnly={personalOnly}
+                                billableOnly={billableOnly}
+                                recurringOnly={recurringOnly}
+                                onPersonalToggle={setPersonalOnly}
+                                onBillableToggle={setBillableOnly}
+                                onRecurringToggle={setRecurringOnly}
+                                paidStatus={paidStatus}
+                                billedStatus={billedStatus}
+                                onPaidStatusChange={setPaidStatus}
+                                onBilledStatusChange={setBilledStatus}
+                            />
+                        </div>
+
+                        <div className="mt-6">
+                            <ExpenseList
+                                expenses={filteredExpenses}
+                                clientsById={clientsById}
+                                projectsById={projectsById}
+                                onEdit={(expense) => openExpenseModal(expense)}
+                                onTogglePaid={handleTogglePaid}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'recurring' && (
+                    <div className="space-y-6">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-2xl font-bold text-foreground">
+                                    Recurring Expenses {sortedRecurrences.length > 0 && (
+                                        <span>
+                                            ({sortedRecurrences.length})
+                                        </span>
+                                    )}
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Manage recurring expenses and schedules.
+                                </p>
+                            </div>
+                            <Button leadingIcon={PlusIcon} onClick={() => openExpenseModal(null, { isRecurring: true })}>
+                                New Recurring Expense
+                            </Button>
+                        </div>
+
+                        {sortedRecurrences.length === 0 ? (
+                            <div className="text-center py-12">
+                                <ArrowPathIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <h4 className="mt-2 text-sm font-medium text-foreground">No recurring expenses</h4>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Create a recurring expense to automate repeating expenses.
+                                </p>
+                                <div className="mt-6">
+                                    <Button leadingIcon={PlusIcon} onClick={() => openExpenseModal(null, { isRecurring: true })}>
+                                        New Recurring Expense
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {sortedRecurrences.map((recurrence) => {
+                                    const clientLabel = recurrence.clientId && clientsById.get(recurrence.clientId)?.title;
+                                    const projectLabel = recurrence.projectId && projectsById.get(recurrence.projectId)?.title;
+                                    const client = recurrence.clientId ? clientsById.get(recurrence.clientId) : null;
+                                    const project = recurrence.projectId ? projectsById.get(recurrence.projectId) : null;
+                                    const borderColor = project?.color || client?.color || null;
+                                    const contextLabel = recurrence.isPersonal
+                                        ? 'Personal'
+                                        : (projectLabel || clientLabel || 'Assigned');
+                                    const amountLabel = recurrence.amountType === 'variable'
+                                        ? (recurrence.amount && recurrence.amount > 0
+                                            ? `${formatCurrency(recurrence.amount, recurrence.currency || preferences.currency)} (Est.)`
+                                            : 'Variable amount')
+                                        : formatCurrency(recurrence.amount || 0, recurrence.currency || preferences.currency);
+
+                                    return (
+                                        <Card
+                                            key={recurrence.id}
+                                            className="hover:shadow-md transition-shadow border-l-4 border-l-border"
+                                            style={borderColor ? { borderLeftColor: borderColor } : undefined}
+                                        >
+                                            <CardContent className="pt-5">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center space-x-3">
+                                                            <ArrowPathIcon className="h-6 w-6 text-muted-foreground" />
+                                                            <div>
+                                                                <div className="flex items-center space-x-2">
+                                                                    <h4 className="text-lg font-medium text-foreground">
+                                                                        {recurrence.title}
+                                                                    </h4>
+                                                                    <Badge variant={recurrence.active ? 'default' : 'secondary'}>
+                                                                        {recurrence.active ? 'Active' : 'Paused'}
+                                                                    </Badge>
+                                                                </div>
+                                                                <div className="mt-1 text-sm text-muted-foreground space-y-1">
+                                                                    <p>{recurrence.repeat === 'yearly' ? 'Yearly' : 'Monthly'} · {contextLabel}</p>
+                                                                    <p>Amount: {amountLabel}</p>
+                                                                    <p>
+                                                                        Starts: {recurrence.startDate}
+                                                                        {recurrence.endDate ? ` · Ends ${recurrence.endDate}` : ''}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="text-muted-foreground hover:bg-muted rounded-full transition-colors group"
+                                                                title="More actions"
+                                                                aria-label="More actions"
+                                                            >
+                                                                <MoreHorizontalIcon className="h-5 w-5 group-hover:text-muted-foreground" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onClick={() => handleEditTemplate(recurrence)}>
+                                                                <PencilIcon className="h-4 w-4" />
+                                                                <span>Edit</span>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={() => (recurrence.active ? pauseRecurrence(recurrence.id) : resumeRecurrence(recurrence.id))}
+                                                            >
+                                                                {recurrence.active ? (
+                                                                    <PauseIcon className="h-4 w-4" />
+                                                                ) : (
+                                                                    <PlayIcon className="h-4 w-4" />
+                                                                )}
+                                                                <span>{recurrence.active ? 'Pause' : 'Resume'}</span>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleDeleteTemplate(recurrence)}>
+                                                                <TrashIcon className="h-4 w-4" />
+                                                                <span>Delete</span>
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'payment-methods' && (
+                    <PaymentMethods
+                        autoOpenCreate={urlParams.create === 'payment-method'}
+                        openPaymentMethodModal={openPaymentMethodModal}
+                        editPaymentMethodModal={editPaymentMethodModal}
+                    />
+                )}
+
+                {activeTab === 'business-info' && (
+                    <BusinessInfo
+                        autoOpenCreate={urlParams.create === 'business-info'}
+                        openBusinessModal={openBusinessModal}
+                        editBusinessModal={editBusinessModal}
+                    />
+                )}
+            </div>
+
+            <Modal
+                isOpen={Boolean(pendingDeleteRecurrence)}
+                onClose={() => setPendingDeleteRecurrence(null)}
+                title="Delete recurring expense?"
+                size="md"
+                footer={(
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setPendingDeleteRecurrence(null)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDeleteTemplate}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                )}
+            >
+                <Notice
+                    title={pendingDeleteRecurrence?.title
+                        ? `Deleting "${pendingDeleteRecurrence.title}" cannot be undone.`
+                        : 'Deleting this recurring expense cannot be undone.'}
+                    description="Existing expenses already created from this recurrence will remain."
+                    variant="destructive"
+                />
+            </Modal>
         </div>
     );
 };

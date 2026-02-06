@@ -75,8 +75,7 @@ const DailyGoalProgress = ({
                         {hasEarningsGoal && (
                             <span
                                 className={cn(
-                                    "font-medium",
-                                    earningsPercent >= 100 && "text-orange-400"
+                                    "font-medium"
                                 )}
                             >
                                 {earningsPercent}%
@@ -107,8 +106,7 @@ const DailyGoalProgress = ({
                         {hasHoursGoal && (
                             <span
                                 className={cn(
-                                    "font-medium",
-                                    hoursPercent >= 100 && "text-orange-400"
+                                    "font-medium"
                                 )}
                             >
                                 {hoursPercent}%

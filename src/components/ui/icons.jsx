@@ -48,6 +48,7 @@ export {
     MoreHorizontal as MoreHorizontalIcon,
     Search as MagnifyingGlassIcon,
     Search as SearchIcon,
+    SlidersHorizontal as FilterIcon,
     Pause as PauseIcon,
     Pencil as PencilIcon,
     Pin as PinIcon,

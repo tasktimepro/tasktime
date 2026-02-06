@@ -71,7 +71,7 @@ const PaymentMethods = ({
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Payment Methods</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Manage reusable payment methods for your invoices
+                        Manage reusable payment methods
                     </p>
                 </div>
 

@@ -48,10 +48,11 @@ export interface Task {
 }
 
 export interface RecurringConfig {
-    type: 'weekly' | 'monthly';
+    type: 'weekly' | 'monthly' | 'yearly';
     weeklyDays?: number[];
     monthlyType?: 'first' | 'last' | 'specific';
     monthlyDay?: number;
+    yearlyDate?: string;
 }
 
 export interface TimeEntry {
@@ -173,6 +174,7 @@ export interface Expense {
     paymentStatus: 'unpaid' | 'paid';
     clientId?: string | null;
     projectId?: string | null;
+    businessId?: string | null;
     isPersonal: boolean;
     billable: boolean;
     billingStatus: 'unbilled' | 'billed';
@@ -192,14 +194,18 @@ export interface ExpenseRecurrence {
     title: string;
     note?: string | null;
     supplierName?: string | null;
+    paidBy?: string | null;
     currency: string;
     amount: number;
     amountType: 'fixed' | 'variable';
     repeat: 'monthly' | 'yearly';
+    monthlyType?: 'first' | 'last' | 'specific';
+    monthlyDay?: number;
     startDate: string;
     endDate?: string | null;
     clientId?: string | null;
     projectId?: string | null;
+    businessId?: string | null;
     isPersonal: boolean;
     billable: boolean;
     taxNumber?: string | null;

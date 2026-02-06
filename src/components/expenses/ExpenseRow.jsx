@@ -4,26 +4,63 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowPathIcon, PencilIcon } from '@/components/ui/icons';
+import { Card, CardContent } from '@/components/ui/card';
+import { CheckIcon, HandCoinsIcon, PencilIcon } from '@/components/ui/icons';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
 import { toDisplayDate } from '@/utils/dateUtils.ts';
 
 const ExpenseRow = ({
     expense,
-    clientName,
-    projectName,
+    client,
+    project,
     compact = false,
     onEdit,
     onTogglePaid,
 }) => {
-
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const expenseDate = expense.date ? new Date(expense.date) : null;
+    const isPaid = expense.paymentStatus === 'paid';
+    const isUpcoming = !isPaid && expenseDate && expenseDate > todayStart;
+    const amountValue = expense.amount || 0;
+    const amountLabel = formatCurrency(amountValue, expense.currency);
     const amountDisplay = expense.amountType === 'variable' && (!expense.amount || expense.amount <= 0)
-        ? 'Enter amount'
-        : `${formatCurrency(expense.amount || 0, expense.currency)} ${expense.currency}`;
+        ? (isUpcoming ? '' : 'Enter amount')
+        : `${amountLabel} ${expense.currency}`;
+    const borderColor = project?.color || client?.color || null;
+    const clientName = client?.title || null;
+    const projectName = project?.title || null;
+
+    const statusBadge = (() => {
+        if (isPaid) {
+            return (
+                <Badge variant="success">
+                    <CheckIcon className="h-3 w-3 mr-1" />
+                    Paid <span className="mx-1">•</span>
+                    <span className="sensitive-data">{amountLabel}</span>
+                </Badge>
+            );
+        }
+
+        if (isUpcoming) {
+            return (
+                <Badge variant="secondary">
+                    Upcoming
+                </Badge>
+            );
+        }
+
+        return (
+            <Badge variant="warning">
+                Unpaid
+            </Badge>
+        );
+    })();
 
     return (
-        <div
-            className="flex flex-col gap-3 rounded-lg border border-border p-4 transition hover:bg-muted/40"
+        <Card
+            className="transition-shadow hover:shadow-md border-l-4 border-l-border"
+            style={borderColor ? { borderLeftColor: borderColor } : undefined}
             role="button"
             tabIndex={0}
             onClick={() => onEdit(expense)}
@@ -33,72 +70,102 @@ const ExpenseRow = ({
                 }
             }}
         >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+            <CardContent className="p-4">
+                <div className="flex flex-col space-y-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                        <HandCoinsIcon className="h-6 w-6 text-muted-foreground" />
+                        <div className="flex items-center space-x-2">
+                            <h3 className="text-sm font-medium text-foreground">
+                                {expense.title}
+                            </h3>
+                            {expense.isRecurring && (
+                                <Badge variant="secondary">Recurring</Badge>
+                            )}
+                        </div>
+                    </div>
                     <div>
-                        <div className="text-sm font-semibold text-foreground">
-                            {expense.title}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
+                        {statusBadge}
+                    </div>
+                </div>
+
+                <div className="flex items-end justify-between ml-9">
+                    <div className="flex-1">
+                        <p className="text-sm text-muted-foreground">
                             {toDisplayDate(expense.date)}
-                            {expense.supplierName ? ` • ${expense.supplierName}` : ''}
-                        </div>
-                    </div>
-                </div>
-                <div className="text-sm font-semibold text-foreground">
-                    {amountDisplay}
-                </div>
-            </div>
-
-            {!compact && (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span>
-                            {expense.isPersonal ? 'Personal' : clientName || 'Client'}
-                            {projectName ? ` • ${projectName}` : ''}
-                        </span>
-                        {expense.isRecurring && (
-                            <Badge variant="secondary">Recurring</Badge>
+                            {expense.supplierName ? (
+                                <>
+                                    <span className="mx-1">•</span>
+                                    {expense.supplierName}
+                                </>
+                            ) : null}
+                            {amountDisplay ? (
+                                <>
+                                    <span className="mx-1">•</span>
+                                    <span className="sensitive-data">{amountDisplay}</span>
+                                </>
+                            ) : null}
+                        </p>
+                        {!compact && (
+                            <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                                {expense.isPersonal ? (
+                                    <p>
+                                        Type: <span className="font-medium text-muted-foreground">Personal expense</span>
+                                    </p>
+                                ) : (
+                                    <p>
+                                        Client: <span className="font-medium text-muted-foreground">
+                                            {clientName || 'Client'}
+                                        </span>
+                                    </p>
+                                )}
+                                {projectName && (
+                                    <p>
+                                        Project: <span className="font-medium text-muted-foreground">
+                                            {projectName}
+                                        </span>
+                                    </p>
+                                )}
+                                {expense.billable && (
+                                    <div>
+                                        <Badge variant={expense.billingStatus === 'billed' ? 'success' : 'secondary'}>
+                                            {expense.billingStatus === 'billed' ? 'Billed' : 'Unbilled'}
+                                        </Badge>
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={expense.paymentStatus === 'paid' ? 'success' : 'warning'}>
-                            {expense.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
-                        </Badge>
-                        {expense.billable && (
-                            <Badge variant={expense.billingStatus === 'billed' ? 'success' : 'secondary'}>
-                                {expense.billingStatus === 'billed' ? 'Billed' : 'Unbilled'}
-                            </Badge>
+
+                    <div className="flex justify-end items-center space-x-2">
+                        {!isPaid && (
+                            <Button
+                                size="sm"
+                                leadingIcon={CheckIcon}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onTogglePaid(expense);
+                                }}
+                            >
+                                Mark as Paid
+                            </Button>
                         )}
+                        <Button
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onEdit(expense);
+                            }}
+                            variant="ghost"
+                            size="icon"
+                            title="Edit Expense"
+                        >
+                            <PencilIcon className="h-5 w-5" />
+                        </Button>
                     </div>
                 </div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onEdit(expense);
-                    }}
-                >
-                    <PencilIcon className="mr-1 h-4 w-4" />
-                    Edit
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onTogglePaid(expense);
-                    }}
-                >
-                    <ArrowPathIcon className="mr-1 h-4 w-4" />
-                    {expense.paymentStatus === 'paid' ? 'Mark Unpaid' : 'Mark Paid'}
-                </Button>
-            </div>
-        </div>
+                </div>
+            </CardContent>
+        </Card>
     );
 };
 

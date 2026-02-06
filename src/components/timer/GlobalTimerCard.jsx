@@ -33,6 +33,16 @@ const GlobalTimerCard = ({
         }
     };
 
+    const isTypingElement = (target) => {
+        if (!(target instanceof HTMLElement)) return false;
+
+        const tagName = target.tagName?.toLowerCase();
+        return tagName === 'input'
+            || tagName === 'textarea'
+            || tagName === 'select'
+            || target.isContentEditable;
+    };
+
     return (
         <div
             className="transition-all bg-card shadow-md cursor-pointer rounded-lg"
@@ -40,6 +50,10 @@ const GlobalTimerCard = ({
             role="button"
             tabIndex={0}
             onKeyDown={(event) => {
+                if (isTypingElement(event.target)) {
+                    return;
+                }
+
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     handleFocus();

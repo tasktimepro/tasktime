@@ -162,7 +162,10 @@ describe('InvoicesList', () => {
         await user.click(screen.getByRole('button', { name: 'Mark as Paid' }))
 
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
-        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith('inv-1', { paymentProcessed: true })
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith(
+            'inv-1',
+            expect.objectContaining({ paymentProcessed: true, paidAt: expect.any(Number) })
+        )
     })
 
     it('warns before editing paid invoices', async () => {

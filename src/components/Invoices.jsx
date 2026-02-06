@@ -176,7 +176,7 @@ const Invoices = ({
                                 )}
                             </h2>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                View and manage all your invoices from all projects.
+                                View and manage all your invoices across your workspace.
                             </p>
                         </div>
                         <InvoicesList

@@ -36,7 +36,7 @@ const BusinessModal = ({
         custom: [],
         isDefault: false,
         taxEnabled: false,
-        taxLabel: 'VAT',
+        taxLabel: 'Tax',
         taxRate: 0
     });
 
@@ -63,7 +63,7 @@ const BusinessModal = ({
                 custom: [...(editingBusinessInfo.custom || [])],
                 isDefault: editingBusinessInfo.isDefault || false,
                 taxEnabled: editingBusinessInfo.taxEnabled || false,
-                taxLabel: editingBusinessInfo.taxLabel || 'VAT',
+                taxLabel: editingBusinessInfo.taxLabel || 'Tax',
                 taxRate: editingBusinessInfo.taxRate || 0
             });
         } else {
@@ -83,7 +83,7 @@ const BusinessModal = ({
                 custom: [],
                 isDefault: false,
                 taxEnabled: false,
-                taxLabel: 'VAT',
+                taxLabel: 'Tax',
                 taxRate: 0
             });
         }

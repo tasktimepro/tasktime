@@ -2,7 +2,7 @@
  * Recurring task utilities
  */
 
-import { addDays, endOfMonth, startOfDay } from 'date-fns';
+import { addDays, endOfMonth, format, parseISO, startOfDay } from 'date-fns';
 import type { RecurringConfig } from '@/stores/yjs/types';
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -62,6 +62,13 @@ export const formatRecurringLabel = (config?: RecurringConfig | null): string =>
         return `Monthly (${day}${getOrdinalSuffix(day)})`;
     }
 
+    if (config.type === 'yearly') {
+        if (!config.yearlyDate) return 'Yearly';
+        const parsed = parseISO(config.yearlyDate);
+        if (Number.isNaN(parsed.getTime())) return 'Yearly';
+        return `Yearly (${format(parsed, 'MMM d')})`;
+    }
+
     return '';
 };
 
@@ -97,6 +104,13 @@ export const isRecurringTaskDueOnDate = (
         if (config.monthlyType === 'specific') {
             return dayOfMonth === (config.monthlyDay || 1);
         }
+    }
+
+    if (config.type === 'yearly') {
+        if (!config.yearlyDate) return false;
+        const parsed = parseISO(config.yearlyDate);
+        if (Number.isNaN(parsed.getTime())) return false;
+        return date.getMonth() === parsed.getMonth() && date.getDate() === parsed.getDate();
     }
 
     return false;

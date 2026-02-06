@@ -27,17 +27,22 @@ const ExpenseList = ({
 
     return (
         <div className="space-y-3">
-            {expenses.map((expense) => (
-                <ExpenseRow
-                    key={expense.id}
-                    expense={expense}
-                    clientName={clientsById.get(expense.clientId || '')?.title || null}
-                    projectName={projectsById.get(expense.projectId || '')?.title || null}
-                    compact={compact}
-                    onEdit={onEdit}
-                    onTogglePaid={onTogglePaid}
-                />
-            ))}
+            {expenses.map((expense) => {
+                const client = clientsById.get(expense.clientId || '') || null;
+                const project = projectsById.get(expense.projectId || '') || null;
+
+                return (
+                    <ExpenseRow
+                        key={expense.id}
+                        expense={expense}
+                        client={client}
+                        project={project}
+                        compact={compact}
+                        onEdit={onEdit}
+                        onTogglePaid={onTogglePaid}
+                    />
+                );
+            })}
         </div>
     );
 };

@@ -71,7 +71,7 @@ const BusinessInfo = ({
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Your Business</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Manage sender business information for your invoices
+                        Manage sender business information
                     </p>
                 </div>
 

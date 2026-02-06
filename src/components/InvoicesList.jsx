@@ -271,9 +271,11 @@ const InvoicesList = ({
      * Handle payment processed toggle
      */
     const handlePaymentProcessedToggle = (invoice) => {
+        const nextPaidState = !invoice.paymentProcessed;
         // Update the invoice with the new payment processed status using Yjs hook
         updateInvoice(invoice.id, {
-            paymentProcessed: !invoice.paymentProcessed
+            paymentProcessed: nextPaidState,
+            paidAt: nextPaidState ? Date.now() : null
         });
 
         // If marking as paid and we're on outstanding or overdue tab, and it's the last item on the page,
@@ -356,9 +358,17 @@ const InvoicesList = ({
                     {currentInvoices.map((invoice) => {
                         const invoiceCurrency = invoice.currency || getPreferredCurrency();
                         const invoiceTotal = `${getCurrencySymbol(invoiceCurrency)}${(invoice.totalAmount || 0).toFixed(2)}`;
+                        const clientForColor = invoice.clientId
+                            ? clients.find((client) => client.id === invoice.clientId)
+                            : null;
+                        const borderColor = invoice.project?.color || clientForColor?.color || null;
 
                         return (
-                            <Card key={invoice.id} className="hover:shadow-md transition-shadow">
+                            <Card
+                                key={invoice.id}
+                                className={`hover:shadow-md transition-shadow ${borderColor ? 'border-l-4' : ''}`}
+                                style={borderColor ? { borderLeftColor: borderColor } : undefined}
+                            >
                                 <CardContent className="p-4">
                                     <div className="flex flex-col space-y-4">
                                     {/* Header row with invoice number and status tag */}
@@ -406,7 +416,7 @@ const InvoicesList = ({
                                                 {getCurrencySymbol(invoice.currency || getPreferredCurrency())}{invoice.totalAmount.toFixed(2)}
                                             </span>
                                         </p>
-                                        {invoice.dueDate && (
+                                        {invoice.dueDate && !invoice.paymentProcessed && (
                                             <p className={`text-sm mt-1 ${
                                                 isInvoiceOverdue(invoice) 
                                                     ? 'text-red-600 font-medium' 

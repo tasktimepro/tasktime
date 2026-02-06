@@ -295,6 +295,12 @@ const TaskViewModal = ({
 
     const recurringLabel = currentTask.recurring ? formatRecurringLabel(currentTask.recurring) : '';
     const startDateLabel = currentTask.startDate ? toDisplayDate(currentTask.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    const completedDateValue = !currentTask.recurring && isCompleted
+        ? (currentTask.completedOnDate || effectiveDateStr || todayStr)
+        : null;
+    const completedDateLabel = completedDateValue
+        ? toDisplayDate(completedDateValue, { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
 
     const modalFooter = (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
@@ -418,6 +424,13 @@ const TaskViewModal = ({
                                     <p>Repeats: {recurringLabel}</p>
                                 )}
                             </div>
+                        </div>
+                    )}
+
+                    {!currentTask.recurring && isCompleted && completedDateLabel && (
+                        <div className="space-y-1">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
+                            <p className="text-sm text-foreground">Completed ({completedDateLabel})</p>
                         </div>
                     )}
 

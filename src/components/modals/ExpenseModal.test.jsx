@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExpenseModal from './ExpenseModal'
 
@@ -13,12 +13,16 @@ const toastMocks = vi.hoisted(() => ({
 const expensesMocks = vi.hoisted(() => ({
 
     createExpense: vi.fn(),
-    updateExpense: vi.fn()
+    updateExpense: vi.fn(),
+    deleteExpense: vi.fn()
 }))
 
 const recurrencesMocks = vi.hoisted(() => ({
 
-    createRecurrence: vi.fn()
+    createRecurrence: vi.fn(),
+    getRecurrence: vi.fn(),
+    updateRecurrence: vi.fn(),
+    deleteRecurrence: vi.fn()
 }))
 
 const clientsMocks = vi.hoisted(() => ({
@@ -37,6 +41,18 @@ const preferencesMocks = vi.hoisted(() => ({
     preferences: { currency: 'EUR' }
 }))
 
+const businessInfosMocks = vi.hoisted(() => ({
+
+    businessInfos: [],
+    defaultBusinessInfo: null
+}))
+
+const paymentMethodsMocks = vi.hoisted(() => ({
+
+    paymentMethods: [],
+    defaultPaymentMethod: null
+}))
+
 vi.mock('../../hooks/useToast.ts', () => ({
 
     useToast: () => ({
@@ -49,14 +65,18 @@ vi.mock('../../hooks/useExpenses.ts', () => ({
 
     useExpenses: () => ({
         createExpense: expensesMocks.createExpense,
-        updateExpense: expensesMocks.updateExpense
+        updateExpense: expensesMocks.updateExpense,
+        deleteExpense: expensesMocks.deleteExpense
     })
 }))
 
 vi.mock('../../hooks/useExpenseRecurrences.ts', () => ({
 
     useExpenseRecurrences: () => ({
-        createRecurrence: recurrencesMocks.createRecurrence
+        createRecurrence: recurrencesMocks.createRecurrence,
+        getRecurrence: recurrencesMocks.getRecurrence,
+        updateRecurrence: recurrencesMocks.updateRecurrence,
+        deleteRecurrence: recurrencesMocks.deleteRecurrence
     })
 }))
 
@@ -79,6 +99,22 @@ vi.mock('../../hooks/usePreferences.ts', () => ({
 
     usePreferences: () => ({
         preferences: preferencesMocks.preferences
+    })
+}))
+
+vi.mock('../../hooks/useBusinessInfos.ts', () => ({
+
+    useBusinessInfos: () => ({
+        businessInfos: businessInfosMocks.businessInfos,
+        defaultBusinessInfo: businessInfosMocks.defaultBusinessInfo
+    })
+}))
+
+vi.mock('../../hooks/usePaymentMethods.ts', () => ({
+
+    usePaymentMethods: () => ({
+        paymentMethods: paymentMethodsMocks.paymentMethods,
+        defaultPaymentMethod: paymentMethodsMocks.defaultPaymentMethod
     })
 }))
 
@@ -149,16 +185,24 @@ describe('ExpenseModal', () => {
     })
 
     it('creates a recurring expense template and first instance', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 1, 1, 12));
         const onClose = vi.fn()
-        const user = userEvent.setup()
 
         render(<ExpenseModal isOpen onClose={onClose} />)
 
-        await user.type(screen.getByLabelText(/Title/i), 'Adobe CC')
-        await user.clear(screen.getByLabelText(/Amount/i))
-        await user.type(screen.getByLabelText(/Amount/i), '54.99')
-        await user.click(screen.getByLabelText(/Recurring/i))
-        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+        fireEvent.change(screen.getByLabelText(/Title/i), { target: { value: 'Adobe CC' } })
+        fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '54.99' } })
+        const typeSelect = Array.from(document.querySelectorAll('select')).find((element) => (
+            element.querySelector('option[value="recurring"]')
+        ))
+
+        if (!typeSelect) {
+            throw new Error('Expense type select not found')
+        }
+
+        fireEvent.change(typeSelect, { target: { value: 'recurring' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Create Expense' }))
 
         expect(recurrencesMocks.createRecurrence).toHaveBeenCalledWith(expect.objectContaining({
             title: 'Adobe CC',
@@ -168,5 +212,7 @@ describe('ExpenseModal', () => {
         expect(expensesMocks.createExpense).toHaveBeenCalled()
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Recurring expense created')
         expect(onClose).toHaveBeenCalled()
+
+        vi.useRealTimers();
     })
 })
