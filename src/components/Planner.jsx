@@ -16,6 +16,7 @@ import { usePlannerItems } from '@/hooks/usePlannerItems';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTasks } from '@/hooks/useTasks';
 import { useTimers } from '@/hooks/useTimers';
+import { useExpenses } from '@/hooks/useExpenses';
 import { useTodayDate } from '@/hooks/useDayRollover';
 import { usePreferences } from '@/hooks/usePreferences';
 import { useWeeklyGoals } from '@/hooks/useWeeklyGoals';
@@ -42,6 +43,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
  * @param {Function} props.openClientModal - Opens the client creation modal
  * @param {Function} props.openProjectModal - Opens the project creation modal
  * @param {Function} props.openTaskModal - Opens the task creation/edit modal
+ * @param {Function} props.openExpenseModal - Opens the expense modal
  * @param {string | null} props.activeModal - Active global modal key
  * @param {(task: Object, options?: Object) => void} props.onViewTask - Opens the task view modal
  */
@@ -49,14 +51,16 @@ const Planner = ({
     openClientModal,
     openProjectModal,
     openTaskModal,
+    openExpenseModal,
     activeModal = null,
     onViewTask
 }) => {
 
     const { urlParams, updateUrl, navigateToProject, navigateToClient } = useUrlState();
-    const { showSuccess } = useToast();
+    const { showSuccess, showError } = useToast();
     const { preferences } = usePreferences();
     const { weeklyGoals, hasGoals: hasWeeklyGoals } = useWeeklyGoals();
+    const { markAsPaid } = useExpenses();
 
     const defaultCurrency = useMemo(
         () => normalizeCurrencyCode(preferences.currency || 'EUR'),
@@ -376,8 +380,19 @@ const Planner = ({
                     attachment: item.attachment || null
                 });
                 break;
+            case 'expense':
+                openExpenseModal?.(item.expense);
+                break;
         }
-    }, [navigateToClient, navigateToProject, onViewTask]);
+    }, [navigateToClient, navigateToProject, onViewTask, openExpenseModal]);
+    const handleExpenseMarkPaid = useCallback((expense, amount) => {
+        try {
+            markAsPaid(expense.id, typeof amount === 'number' ? { amount } : undefined);
+            showSuccess('Expense marked as paid');
+        } catch (error) {
+            showError(error?.message || 'Unable to mark expense as paid');
+        }
+    }, [markAsPaid, showSuccess, showError]);
 
     // Delete task from preview
     const handleDeleteTask = useCallback((task) => {
@@ -712,6 +727,7 @@ const Planner = ({
                         onAddClick={handleAddClick}
                         onCreateTask={handleCreateTask}
                         onItemClick={handleItemClick}
+                        onMarkExpensePaid={handleExpenseMarkPaid}
                         onRemoveItem={handleRemoveItem}
                         onEditItem={handleEditPlannerOptions}
                         onSetDailyGoal={handleOpenDailyGoals}
@@ -737,6 +753,7 @@ const Planner = ({
                         onAddClick={handleAddClick}
                         onCreateTask={handleCreateTask}
                         onItemClick={handleItemClick}
+                        onMarkExpensePaid={handleExpenseMarkPaid}
                         onRemoveItem={handleRemoveItem}
                         onEditItem={handleEditPlannerOptions}
                         onSetDailyGoal={handleOpenDailyGoals}

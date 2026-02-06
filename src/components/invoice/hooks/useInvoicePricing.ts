@@ -15,6 +15,11 @@ type AdditionalTask = {
     useFlatRate?: boolean;
 };
 
+type ExpenseItem = {
+    id: string;
+    amount?: number;
+};
+
 type BusinessInfo = {
     taxEnabled?: boolean;
     taxRate?: number;
@@ -39,6 +44,7 @@ type TaxOverride = {
 type InvoicePricingParams = {
     invoiceTasks: TaskItem[];
     additionalTasks: AdditionalTask[];
+    expenseItems: ExpenseItem[];
     editableHours: Record<string, number>;
     discountType: 'percentage' | 'fixed';
     discountValue: number | string;
@@ -49,6 +55,7 @@ type InvoicePricingParams = {
     taskHourlyRates: Record<string, number>;
     taskQuantities: Record<string, number>;
     selectedTasksForBilling: Record<string, boolean>;
+    selectedExpensesForBilling: Record<string, boolean>;
     mergedSubtasks: Record<string, boolean>;
     selectedBusinessInfo?: BusinessInfo | null;
     selectedClient?: ClientInfo | null;
@@ -61,6 +68,7 @@ type InvoicePricingParams = {
 const useInvoicePricing = ({
     invoiceTasks,
     additionalTasks,
+    expenseItems = [],
     editableHours,
     discountType,
     discountValue,
@@ -71,6 +79,7 @@ const useInvoicePricing = ({
     taskHourlyRates,
     taskQuantities,
     selectedTasksForBilling,
+    selectedExpensesForBilling = {},
     mergedSubtasks,
     selectedBusinessInfo,
     selectedClient,
@@ -78,7 +87,7 @@ const useInvoicePricing = ({
 }: InvoicePricingParams) => {
 
     const pricing = useMemo(() => {
-        if (invoiceTasks.length === 0 && additionalTasks.length === 0) {
+        if (invoiceTasks.length === 0 && additionalTasks.length === 0 && expenseItems.length === 0) {
             return {
                 subtotal: 0,
                 discount: 0,
@@ -95,6 +104,7 @@ const useInvoicePricing = ({
         let projectSubtotal = 0;
         let additionalTaskAmount = 0;
         let totalHours = 0;
+        let expenseAmount = 0;
 
         // Calculate regular project tasks subtotal (only include selected tasks)
         invoiceTasks.forEach(task => {
@@ -161,7 +171,13 @@ const useInvoicePricing = ({
             }
         });
 
-        const subtotal = projectSubtotal + additionalTaskAmount;
+        expenseItems.forEach(expense => {
+            if (!expense || !expense.id) return;
+            if (!selectedExpensesForBilling[expense.id]) return;
+            expenseAmount += expense.amount || 0;
+        });
+
+        const subtotal = projectSubtotal + additionalTaskAmount + expenseAmount;
 
         // Calculate discount
         const discountVal = discountValue === '' ? 0 : discountValue;
@@ -206,6 +222,7 @@ const useInvoicePricing = ({
         selectedProject,
         invoiceTasks,
         additionalTasks,
+        expenseItems,
         editableHours,
         discountType,
         discountValue,
@@ -216,6 +233,7 @@ const useInvoicePricing = ({
         taskHourlyRates,
         taskQuantities,
         selectedTasksForBilling,
+        selectedExpensesForBilling,
         mergedSubtasks,
         selectedBusinessInfo,
         selectedClient

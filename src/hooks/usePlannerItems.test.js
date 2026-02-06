@@ -9,6 +9,7 @@ const mockProjects = vi.hoisted(() => []);
 const mockClients = vi.hoisted(() => []);
 const mockTimers = vi.hoisted(() => []);
 const mockEntries = vi.hoisted(() => []);
+const mockExpenses = vi.hoisted(() => []);
 const mockGetGoalForDate = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock('./usePlannerAttachments', () => ({
@@ -56,6 +57,12 @@ vi.mock('./useTimeEntries', () => ({
     })
 }));
 
+vi.mock('./useExpenses', () => ({
+    useExpenses: () => ({
+        expenses: mockExpenses,
+    })
+}));
+
 vi.mock('./useDailyGoals', () => ({
     useDailyGoals: () => ({
         getGoalForDate: mockGetGoalForDate,
@@ -99,6 +106,7 @@ describe('usePlannerItems', () => {
         mockClients.length = 0;
         mockTimers.length = 0;
         mockEntries.length = 0;
+        mockExpenses.length = 0;
         mockGetGoalForDate.mockReset();
         mockGetGoalForDate.mockReturnValue(null);
         vi.mocked(isRecurringTaskDueOnDate).mockReset();
@@ -303,6 +311,61 @@ describe('usePlannerItems', () => {
         const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
 
         expect(day.items.find((i) => i.type === 'task' && i.subtype === 'attached')?.title).toBe('Legacy Task');
+    });
+
+    it('includes unpaid expenses for the matching date', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(weekStart, 'yyyy-MM-dd');
+
+        mockExpenses.push({
+            id: 'ex-1',
+            title: 'Hosting',
+            date: dateStr,
+            paymentStatus: 'unpaid',
+            amount: 120,
+            amountType: 'fixed',
+            currency: 'USD',
+            supplierName: 'AWS',
+        });
+        mockExpenses.push({
+            id: 'ex-2',
+            title: 'Paid Item',
+            date: dateStr,
+            paymentStatus: 'paid',
+            amount: 50,
+            amountType: 'fixed',
+            currency: 'USD',
+        });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        const expenseItems = day.items.filter((i) => i.type === 'expense');
+        expect(expenseItems).toHaveLength(1);
+        expect(expenseItems[0].title).toBe('Hosting');
+        expect(expenseItems[0].amount).toBe(120);
+        expect(expenseItems[0].amountType).toBe('fixed');
+        expect(expenseItems[0].supplierName).toBe('AWS');
+    });
+
+    it('excludes expenses that do not match the date', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(weekStart, 'yyyy-MM-dd');
+
+        mockExpenses.push({
+            id: 'ex-3',
+            title: 'Future Expense',
+            date: '2026-12-25',
+            paymentStatus: 'unpaid',
+            amount: 80,
+            amountType: 'fixed',
+            currency: 'USD',
+        });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        expect(day.items.find((i) => i.type === 'expense')).toBeFalsy();
     });
 
     it('calculates earnings with billed rate and currency conversion', async () => {

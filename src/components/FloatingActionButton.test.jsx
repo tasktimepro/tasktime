@@ -6,16 +6,34 @@ import FloatingActionButton from './FloatingActionButton'
 
 describe('FloatingActionButton', () => {
 
-    it('renders and triggers click handler', async () => {
+    it('renders dropdown options and triggers actions', async () => {
 
-        const onClick = vi.fn()
-        render(<FloatingActionButton onClick={onClick} />)
+        const onTaskClick = vi.fn()
+        const onExpenseClick = vi.fn()
+        const user = userEvent.setup()
 
-        const button = screen.getByRole('button', { name: 'Create new task' })
+        render(
+            <FloatingActionButton
+                onTaskClick={onTaskClick}
+                onExpenseClick={onExpenseClick}
+            />
+        )
+
+        const button = screen.getByRole('button', { name: 'Create new item' })
         expect(button).toBeInTheDocument()
         expect(button.className).toContain('fixed')
 
-        await userEvent.click(button)
-        expect(onClick).toHaveBeenCalled()
+        await user.click(button)
+
+        const taskOption = screen.getByRole('menuitem', { name: 'New Task' })
+        const expenseOption = screen.getByRole('menuitem', { name: 'New Expense' })
+
+        await user.click(taskOption)
+        expect(onTaskClick).toHaveBeenCalled()
+
+        await user.click(button)
+        const expenseOptionAfterOpen = screen.getByRole('menuitem', { name: 'New Expense' })
+        await user.click(expenseOptionAfterOpen)
+        expect(onExpenseClick).toHaveBeenCalled()
     })
 })

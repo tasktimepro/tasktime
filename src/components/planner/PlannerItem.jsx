@@ -7,7 +7,7 @@
  * Has dropdown menu for actions (remove, etc.)
  */
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { 
     UserIcon, 
@@ -16,7 +16,11 @@ import {
     PlayIcon,
     ArrowPathIcon,
     CalendarDaysIcon,
+    HandCoinsIcon,
 } from '@/components/ui/icons';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { formatCurrency } from '@/utils/currencyUtils.ts';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -28,7 +32,7 @@ import { MoreHorizontal, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-
 
 /**
  * @param {Object} props
- * @param {'client' | 'project' | 'task'} props.type - Type of item
+ * @param {'client' | 'project' | 'task' | 'expense'} props.type - Type of item
  * @param {string} props.title - Display title
  * @param {boolean} props.isCompleted - Whether item is completed (tasks only)
  * @param {boolean} props.isStatic - Whether item is pinned (static/weekday mode)
@@ -38,6 +42,11 @@ import { MoreHorizontal, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-
  * @param {number} props.actualTimeMs - Actual time worked in milliseconds
  * @param {number | null} props.heightPercent - Height percentage (0-1) relative to column
  * @param {boolean} props.isTimerActive - Whether this item has an active timer (tasks only)
+ * @param {number} props.amount - Expense amount (expenses only)
+ * @param {'fixed' | 'variable'} props.amountType - Expense amount type
+ * @param {string} props.currency - Expense currency
+ * @param {string | null} props.supplierName - Expense supplier
+ * @param {(amount?: number) => void} props.onMarkPaid - Expense quick action
  * @param {boolean} props.hasAttachment - Whether item has a planner attachment (can be removed)
  * @param {() => void} props.onClick - Click handler
  * @param {() => void} props.onEdit - Called when user wants to edit planner options
@@ -54,12 +63,27 @@ const PlannerItem = ({
     actualTimeMs = 0,
     heightPercent,
     isTimerActive = false,
+    amount,
+    amountType,
+    currency,
+    supplierName,
+    onMarkPaid,
     hasAttachment = false,
     onClick,
     onEdit,
     onRemove,
 }) => {
     const [menuOpen, setMenuOpen] = useState(false);
+    const isExpense = type === 'expense';
+    const needsAmount = isExpense && amountType === 'variable' && (!amount || amount <= 0);
+    const [expenseAmount, setExpenseAmount] = useState(needsAmount ? '' : String(amount || ''));
+    const [showAmountError, setShowAmountError] = useState(false);
+
+    useEffect(() => {
+        if (!needsAmount) {
+            setExpenseAmount(String(amount || ''));
+        }
+    }, [amount, needsAmount]);
 
     // Icon based on type and subtype
     const getIcon = () => {
@@ -71,6 +95,9 @@ const PlannerItem = ({
         }
         if (type === 'task' && subtype === 'due') {
             return CalendarDaysIcon;
+        }
+        if (type === 'expense') {
+            return HandCoinsIcon;
         }
         return {
             client: UserIcon,
@@ -158,8 +185,31 @@ const PlannerItem = ({
         onClick?.();
     };
 
-    const typeLabel = type === 'client' ? 'Client' : type === 'project' ? 'Project' : 'Task';
-    const canShowMenu = hasAttachment && type !== 'task';
+    const typeLabel = type === 'client' ? 'Client' : type === 'project' ? 'Project' : type === 'task' ? 'Task' : 'Expense';
+    const canShowMenu = hasAttachment && type !== 'task' && type !== 'expense';
+
+    const expenseAmountDisplay = useMemo(() => {
+        if (!isExpense) return null;
+        if (needsAmount) return 'Enter amount';
+        return `${formatCurrency(amount || 0, currency)} ${currency}`;
+    }, [isExpense, needsAmount, amount, currency]);
+
+    const handleMarkPaid = (event) => {
+        event.stopPropagation();
+        setShowAmountError(false);
+
+        if (needsAmount) {
+            const parsed = Number(expenseAmount);
+            if (!parsed || parsed <= 0) {
+                setShowAmountError(true);
+                return;
+            }
+            onMarkPaid?.(parsed);
+            return;
+        }
+
+        onMarkPaid?.();
+    };
 
     return (
         <div
@@ -202,15 +252,51 @@ const PlannerItem = ({
             <div className="flex items-center gap-2 min-w-0 relative z-10 w-full mb-0.5">
                 <Icon className={cn("h-4 w-4 flex-shrink-0", iconClasses)} />
                 
-                <span className={cn(
-                    "text-sm flex-1 min-w-0 truncate",
-                    isCompleted && "line-through text-muted-foreground"
-                )}>
-                    {title}
-                </span>
+                <div className="flex-1 min-w-0">
+                    <div className={cn(
+                        "text-sm truncate",
+                        isCompleted && "line-through text-muted-foreground"
+                    )}>
+                        {title}
+                    </div>
+                    {isExpense && supplierName && (
+                        <div className="text-xs text-muted-foreground truncate">
+                            {supplierName}
+                        </div>
+                    )}
+                </div>
 
                 {type === 'task' && isTimerActive && (
                     <span className="text-xs text-green-600 dark:text-green-400 animate-pulse flex-shrink-0">●</span>
+                )}
+
+                {isExpense && (
+                    <div className="flex items-center gap-2">
+                        {needsAmount ? (
+                            <div className="w-24">
+                                <Input
+                                    value={expenseAmount}
+                                    onChange={(event) => setExpenseAmount(event.target.value)}
+                                    placeholder="Amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    onClick={(event) => event.stopPropagation()}
+                                    className="h-7 px-2 text-xs"
+                                />
+                                {showAmountError && (
+                                    <div className="text-[10px] text-red-600">Required</div>
+                                )}
+                            </div>
+                        ) : (
+                            <span className="text-xs font-medium text-foreground sensitive-data">
+                                {expenseAmountDisplay}
+                            </span>
+                        )}
+                        <Button size="xs" onClick={handleMarkPaid} type="button">
+                            {needsAmount ? 'Pay' : 'Mark Paid'}
+                        </Button>
+                    </div>
                 )}
 
                 {/* Three-dot menu button - appears on hover */}

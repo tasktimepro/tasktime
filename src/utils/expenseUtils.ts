@@ -1,0 +1,134 @@
+import { endOfMonth } from 'date-fns';
+import { parseStoredDate, toStorageDate } from './dateUtils';
+import type { Expense, ExpenseRecurrence } from '@/stores/yjs/types';
+
+type RepeatInterval = 'monthly' | 'yearly';
+
+type GetPendingPeriodsParams = {
+    startDate: string;
+    lastGeneratedDate?: string | null;
+    endDate?: string | null;
+    repeat: RepeatInterval;
+    maxPeriods?: number;
+    today?: string;
+};
+
+/**
+ * Advance a YYYY-MM-DD date string by the given repeat interval.
+ * @param {string} dateValue
+ * @param {RepeatInterval} repeat
+ * @returns {string}
+ */
+export const advanceByRepeat = (dateValue: string, repeat: RepeatInterval): string => {
+    const baseDate = parseStoredDate(dateValue);
+    if (!baseDate) return dateValue;
+
+    const day = baseDate.getDate();
+
+    if (repeat === 'monthly') {
+        const nextMonthDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+        const monthEnd = endOfMonth(nextMonthDate);
+        const clampedDay = Math.min(day, monthEnd.getDate());
+        return toStorageDate(new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), clampedDay)) || dateValue;
+    }
+
+    const nextYearDate = new Date(baseDate.getFullYear() + 1, baseDate.getMonth(), 1);
+    const yearEnd = endOfMonth(nextYearDate);
+    const clampedDay = Math.min(day, yearEnd.getDate());
+    return toStorageDate(new Date(nextYearDate.getFullYear(), nextYearDate.getMonth(), clampedDay)) || dateValue;
+};
+
+/**
+ * Build a list of pending recurrence dates between the last generated date and today.
+ * @param {GetPendingPeriodsParams} params
+ * @returns {string[]}
+ */
+export const getPendingPeriods = ({
+    startDate,
+    lastGeneratedDate,
+    endDate,
+    repeat,
+    maxPeriods = 24,
+    today,
+}: GetPendingPeriodsParams): string[] => {
+    const todayValue = today || toStorageDate(new Date()) || '';
+    if (!todayValue) return [];
+
+    const pending: string[] = [];
+    let nextDate = lastGeneratedDate
+        ? advanceByRepeat(lastGeneratedDate, repeat)
+        : startDate;
+
+    const endLimit = endDate || null;
+
+    while (pending.length < maxPeriods) {
+        const nextParsed = parseStoredDate(nextDate);
+        if (!nextParsed) break;
+
+        const todayParsed = parseStoredDate(todayValue);
+        if (!todayParsed) break;
+
+        if (nextParsed > todayParsed) break;
+
+        if (endLimit) {
+            const endParsed = parseStoredDate(endLimit);
+            if (endParsed && nextParsed > endParsed) break;
+        }
+
+        pending.push(nextDate);
+        nextDate = advanceByRepeat(nextDate, repeat);
+    }
+
+    return pending;
+};
+
+/**
+ * Build an expense instance from a recurrence template.
+ * @param {ExpenseRecurrence} recurrence
+ * @param {string} dateValue
+ * @returns {Expense}
+ */
+export const buildExpenseFromRecurrence = (recurrence: ExpenseRecurrence, dateValue: string): Expense => {
+    return {
+        id: '',
+        title: recurrence.title,
+        note: recurrence.note ?? null,
+        date: dateValue,
+        supplierName: recurrence.supplierName ?? null,
+        receiptNumber: null,
+        currency: recurrence.currency,
+        amount: recurrence.amountType === 'fixed' ? recurrence.amount : 0,
+        paidOn: null,
+        paidBy: null,
+        paymentStatus: 'unpaid',
+        clientId: recurrence.clientId ?? null,
+        projectId: recurrence.projectId ?? null,
+        isPersonal: recurrence.isPersonal,
+        billable: recurrence.billable,
+        billingStatus: 'unbilled',
+        invoiceId: null,
+        billedAt: null,
+        isRecurring: true,
+        recurrenceId: recurrence.id,
+        amountType: recurrence.amountType,
+        taxNumber: recurrence.taxNumber ?? null,
+        isTaxExempt: recurrence.isTaxExempt,
+    };
+};
+
+/**
+ * Check if an expense falls within the provided inclusive date range.
+ * @param {Expense} expense
+ * @param {string} startDate
+ * @param {string} endDate
+ * @returns {boolean}
+ */
+export const isExpenseInDateRange = (expense: Expense, startDate: string, endDate: string): boolean => {
+    const expenseDate = parseStoredDate(expense.date);
+    const start = parseStoredDate(startDate);
+    const end = parseStoredDate(endDate);
+
+    if (!expenseDate || !start || !end) return false;
+
+    return expenseDate >= start && expenseDate <= end;
+};

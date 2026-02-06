@@ -26,6 +26,8 @@ import type {
     BusinessInfo,
     InvoiceTemplate,
     PaymentMethod,
+    Expense,
+    ExpenseRecurrence,
     Preferences,
     MultiTimerState,
     PlannerAttachment,
@@ -116,6 +118,16 @@ export class YjsStore {
     get paymentMethods(): Y.Map<string, PaymentMethod> {
         this.assertReady();
         return this._coreDoc!.getMap('paymentMethods');
+    }
+
+    get expenses(): Y.Map<string, Expense> {
+        this.assertReady();
+        return this._coreDoc!.getMap('expenses');
+    }
+
+    get expenseRecurrences(): Y.Map<string, ExpenseRecurrence> {
+        this.assertReady();
+        return this._coreDoc!.getMap('expenseRecurrences');
     }
 
     get preferences(): Y.Map<string, Preferences[keyof Preferences]> {

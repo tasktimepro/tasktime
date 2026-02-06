@@ -21,6 +21,8 @@ import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
+import { useExpenses } from '../hooks/useExpenses.ts';
+import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import ClientDeleteDialog from './modals/ClientDeleteDialog';
@@ -48,6 +50,8 @@ const ClientList = ({
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { invoices, deleteInvoice } = useInvoices();
+    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses();
+    const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { preferences, updatePreferences } = usePreferences();
 
     const clientSort = preferences.clientSort || 'createdAt';
@@ -228,13 +232,24 @@ const ClientList = ({
             const relatedInvoiceIds = invoices
                 .filter(invoice => relatedProjectIds.includes(invoice.projectId))
                 .map(i => i.id);
+
+            const relatedExpenseIds = expenses
+                .filter(expense => expense.clientId === clientId || relatedProjectIds.includes(expense.projectId))
+                .map(expense => expense.id);
+
+            const relatedRecurrenceIds = recurrences
+                .filter(recurrence => recurrence.clientId === clientId || relatedProjectIds.includes(recurrence.projectId))
+                .map(recurrence => recurrence.id);
             
             // Execute all core document deletions in a single transaction
             // This ensures they are synced as a single atomic update
             store.projects.doc.transact(() => {
                 relatedProjectIds.forEach(id => deleteProject(id));
                 relatedTaskIds.forEach(id => deleteTask(id));
+                relatedInvoiceIds.forEach(id => unbillExpensesForInvoice(id));
                 relatedInvoiceIds.forEach(id => deleteInvoice(id));
+                relatedExpenseIds.forEach(id => deleteExpense(id));
+                relatedRecurrenceIds.forEach(id => deleteRecurrence(id));
                 deleteClient(clientId);
             });
         } else {
@@ -248,7 +263,14 @@ const ClientList = ({
                         flatRate: false,
                         isPersonal: true
                     }));
-                
+                expenses
+                    .filter(expense => expense.clientId === clientId)
+                    .forEach(expense => deleteExpense(expense.id));
+
+                recurrences
+                    .filter(recurrence => recurrence.clientId === clientId)
+                    .forEach(recurrence => deleteRecurrence(recurrence.id));
+
                 deleteClient(clientId);
             });
         }

@@ -9,6 +9,8 @@ import { useInvoices } from './hooks/useInvoices.ts';
 import { useBusinessInfos } from './hooks/useBusinessInfos.ts';
 import { useInvoiceTemplates } from './hooks/useInvoiceTemplates.ts';
 import { usePaymentMethods } from './hooks/usePaymentMethods.ts';
+import { useExpenses } from './hooks/useExpenses.ts';
+import { useExpenseRecurrences } from './hooks/useExpenseRecurrences.ts';
 import { usePreferences } from './hooks/usePreferences.ts';
 import { useTimers } from './hooks/useTimers.ts';
 import { useUrlState } from './hooks/useUrlState.ts';
@@ -102,6 +104,14 @@ function AppContent() {
         isLoading: invoicesLoading 
     } = useInvoices();
 
+    const {
+        createExpense,
+    } = useExpenses();
+
+    const {
+        generatePendingExpenses,
+    } = useExpenseRecurrences();
+
     const { 
         businessInfos, 
         createBusinessInfo,
@@ -119,6 +129,17 @@ function AppContent() {
         createPaymentMethod,
         isLoading: paymentsLoading 
     } = usePaymentMethods();
+
+    const expenseGenerationRef = useRef(false);
+
+    useEffect(() => {
+        if (!isReady || expenseGenerationRef.current) {
+            return;
+        }
+
+        generatePendingExpenses(createExpense);
+        expenseGenerationRef.current = true;
+    }, [isReady, generatePendingExpenses, createExpense]);
 
     const { 
         preferences, 
@@ -345,6 +366,12 @@ function AppContent() {
     const openTaskModal = (task = null, options = null) => {
         setActiveModal('task');
         setEditingItem(task);
+        setModalOptions(options || null);
+    };
+
+    const openExpenseModal = (expense = null, options = null) => {
+        setActiveModal('expense');
+        setEditingItem(expense);
         setModalOptions(options || null);
     };
 
@@ -1040,6 +1067,7 @@ function AppContent() {
                                 navigateToInvoices={navigateToInvoices}
                                 onEditTask={openTaskModal}
                                 onViewTask={openTaskView}
+                                openExpenseModal={openExpenseModal}
                             />
                             </ErrorBoundary>
                         )}
@@ -1054,6 +1082,7 @@ function AppContent() {
                                 openClientModal={openClientModal}
                                 openProjectModal={openProjectModal}
                                 openTaskModal={openTaskModal}
+                                openExpenseModal={openExpenseModal}
                                 activeModal={activeModal}
                                 onViewTask={openTaskView}
                             />
@@ -1095,6 +1124,7 @@ function AppContent() {
                                 openTaskModal={openTaskModal}
                                 onViewTask={openTaskView}
                                 navigateToClient={navigateToClient}
+                                openExpenseModal={openExpenseModal}
                             />
                             </ErrorBoundary>
                         )}
@@ -1131,6 +1161,7 @@ function AppContent() {
                                 openBusinessModal={openBusinessModal}
                                 openPaymentMethodModal={openPaymentMethodModal}
                                 openTemplateModal={openTemplateModal}
+                                openExpenseModal={openExpenseModal}
                             />
                             </ErrorBoundary>
                         )}
@@ -1164,7 +1195,7 @@ function AppContent() {
 
                     {activeView === 'expenses' && (
                             <ErrorBoundary>
-                            <Expenses />
+                            <Expenses openExpenseModal={openExpenseModal} />
                             </ErrorBoundary>
                         )}
 
@@ -1194,7 +1225,10 @@ function AppContent() {
                         setModalOptions={setModalOptions}
                     />
 
-                    <FloatingActionButton onClick={() => openTaskModal(null)} />
+                    <FloatingActionButton
+                        onTaskClick={() => openTaskModal(null)}
+                        onExpenseClick={() => openExpenseModal(null)}
+                    />
                 </div>
                 
                 {/* Global Timer Display - Fixed at top */}

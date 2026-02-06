@@ -6,7 +6,8 @@ import {
     ClockIcon,
     CurrencyDollarIcon,
     DocumentTextIcon,
-    ExclamationTriangleIcon
+    ExclamationTriangleIcon,
+    HandCoinsIcon
 } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '../../utils/currencyUtils.ts';
@@ -22,6 +23,9 @@ const MetricsCards = ({
     invoiceMetrics,
     thisMonthBillableHours,
     thisMonthUnbilledDisplay,
+    expenseTotalsByCurrency,
+    expenseUnpaidByCurrency,
+    expenseBillableUnbilledByCurrency,
     hasClients,
     preferredCurrency,
     formatDuration,
@@ -29,6 +33,26 @@ const MetricsCards = ({
     exchangeRatesLoading,
     navigateToInvoices
 }) => {
+    const formatExpenseAmounts = (amountsByCurrency) => {
+        const entries = Object.entries(amountsByCurrency || {}).filter(([, value]) => value > 0);
+        if (entries.length === 0) {
+            return <span className="text-muted-foreground sensitive-data">{formatCurrency(0, preferredCurrency)}</span>;
+        }
+        if (entries.length === 1) {
+            const [currency, value] = entries[0];
+            return <span className="sensitive-data">{formatCurrency(value, currency)}</span>;
+        }
+
+        return (
+            <div className="space-y-1">
+                {entries.map(([currency, value]) => (
+                    <div key={currency} className="sensitive-data">
+                        {formatCurrency(value, currency)} {currency}
+                    </div>
+                ))}
+            </div>
+        );
+    };
     const renderEarningsByCurrency = (metrics, colorScheme = 'blue') => {
         if (!hasClients) {
             return null;
@@ -340,6 +364,44 @@ const MetricsCards = ({
                     )}
                 </div>
                 )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div className="bg-muted/40 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-medium text-foreground">Expenses This Month</h3>
+                                <div className="mt-2 text-lg font-semibold text-foreground">
+                                    {formatExpenseAmounts(expenseTotalsByCurrency)}
+                                </div>
+                            </div>
+                            <HandCoinsIcon className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                    </div>
+
+                    <div className="bg-muted/40 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-medium text-foreground">Unpaid Expenses</h3>
+                                <div className="mt-2 text-lg font-semibold text-foreground">
+                                    {formatExpenseAmounts(expenseUnpaidByCurrency)}
+                                </div>
+                            </div>
+                            <ClockIcon className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                    </div>
+
+                    <div className="bg-muted/40 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-medium text-foreground">Billable Ready to Invoice</h3>
+                                <div className="mt-2 text-lg font-semibold text-foreground">
+                                    {formatExpenseAmounts(expenseBillableUnbilledByCurrency)}
+                                </div>
+                            </div>
+                            <CurrencyDollarIcon className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                    </div>
+                </div>
             </CardContent>
         </Card>
     );

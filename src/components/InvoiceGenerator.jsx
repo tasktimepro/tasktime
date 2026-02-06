@@ -14,6 +14,7 @@ import { useInvoices } from '../hooks/useInvoices.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
+import { useExpenses } from '../hooks/useExpenses.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { getInvoicesForProject, getLatestInvoiceForProject } from '../utils/invoiceUtils.ts';
@@ -44,6 +45,7 @@ const InvoiceGenerator = ({
     const { projects } = useProjects();
     const { tasks, updateTask } = useTasks();
     const { createEntry, updateEntry, deleteEntry } = useTimeEntries();
+    const { expenses, markAsBilled, markAsUnbilled } = useExpenses();
     const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
     const { getTimerForProject } = useTimers();
     
@@ -94,6 +96,58 @@ const InvoiceGenerator = ({
         return getInvoicesForProject(invoices, currentProject.id);
     }, [invoices, selectedProject, project]);
 
+    const invoiceCurrency = selectedClient?.defaultCurrency || getPreferredCurrency();
+
+    const availableExpenses = useMemo(() => {
+        const invoiceId = editingInvoice?.id || null;
+
+        if (!selectedClient && !selectedProject) {
+            return [];
+        }
+
+        return expenses
+            .filter((expense) => {
+                if (!expense || !expense.billable) return false;
+
+                if (selectedProject?.id) {
+                    if (expense.projectId !== selectedProject.id) return false;
+                } else if (selectedClient?.id) {
+                    if (expense.clientId !== selectedClient.id) return false;
+                } else {
+                    return false;
+                }
+
+                const expenseCurrency = expense.currency || invoiceCurrency;
+                if (expenseCurrency !== invoiceCurrency) return false;
+
+                if (expense.billingStatus === 'unbilled') return true;
+                if (invoiceId && expense.invoiceId === invoiceId) return true;
+                return false;
+            })
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [expenses, selectedClient, selectedProject, editingInvoice, invoiceCurrency]);
+
+    const incompatibleExpensesCount = useMemo(() => {
+        if (!selectedClient && !selectedProject) {
+            return 0;
+        }
+
+        return expenses.filter((expense) => {
+            if (!expense || !expense.billable) return false;
+
+            if (selectedProject?.id) {
+                if (expense.projectId !== selectedProject.id) return false;
+            } else if (selectedClient?.id) {
+                if (expense.clientId !== selectedClient.id) return false;
+            } else {
+                return false;
+            }
+
+            const expenseCurrency = expense.currency || invoiceCurrency;
+            return expenseCurrency !== invoiceCurrency;
+        }).length;
+    }, [expenses, selectedClient, selectedProject, invoiceCurrency]);
+
     // Auto-open the form when showButton is false (modal mode)
     useEffect(() => {
         if (!showButton) { // Modal mode (auto-open is possible)
@@ -117,6 +171,7 @@ const InvoiceGenerator = ({
      * Initialize payment method based on previous invoices or editing invoice
      * Prioritizes client-based invoice history over project-based history
      */
+            const [selectedExpensesForBilling, setSelectedExpensesForBilling] = useState({});
     const initializePaymentMethod = useCallback(() => {
         // Don't override if project was manually changed (user may have gotten auto-populated values)
         if (projectManuallyChanged && selectedPaymentMethod !== null) {
@@ -727,6 +782,7 @@ const InvoiceGenerator = ({
         setShippingAmount,
         setTaxOverride,
         setSelectedTasksForBilling,
+        setSelectedExpensesForBilling,
         setNewTaskQuantity,
         setMergedSubtasks,
         setInvoiceDateOverride,
@@ -774,6 +830,7 @@ const InvoiceGenerator = ({
     const calculatePricing = useInvoicePricing({
         invoiceTasks,
         additionalTasks,
+        expenseItems: availableExpenses,
         editableHours,
         discountType,
         discountValue,
@@ -784,6 +841,7 @@ const InvoiceGenerator = ({
         taskHourlyRates,
         taskQuantities,
         selectedTasksForBilling,
+        selectedExpensesForBilling,
         mergedSubtasks,
         selectedBusinessInfo,
         selectedClient,
@@ -817,10 +875,11 @@ const InvoiceGenerator = ({
 
         // Check if any tasks are selected for billing
         const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length;
-        const hasSelectedTasks = selectedTasksCount > 0 || additionalTasks.length > 0;
+        const selectedExpensesCount = Object.values(selectedExpensesForBilling).filter(Boolean).length;
+        const hasSelectedItems = selectedTasksCount > 0 || additionalTasks.length > 0 || selectedExpensesCount > 0;
         
-        if (!hasSelectedTasks) {
-            showError('Please select at least one task to bill or add additional tasks');
+        if (!hasSelectedItems) {
+            showError('Please select at least one task or expense to bill, or add an additional task');
             return null;
         }
 
@@ -886,6 +945,25 @@ const InvoiceGenerator = ({
             return invoiceTemplates.find(t => t.id === templateId) || editingInvoice.template || null;
         })();
 
+        const selectedExpenseItems = availableExpenses
+            .filter((expense) => selectedExpensesForBilling[expense.id])
+            .map((expense) => ({
+                id: expense.id,
+                title: expense.title,
+                amount: expense.amount || 0,
+                date: expense.date,
+                supplierName: expense.supplierName || null,
+                currency: expense.currency || invoiceCurrency
+            }));
+
+        const expenseInvoiceItems = selectedExpenseItems.map((expense) => ({
+            description: expense.title,
+            quantity: 1,
+            rate: expense.amount,
+            amount: expense.amount,
+            expenseId: expense.id
+        }));
+
         return {
             id: invoiceId,
             project: selectedProject,
@@ -917,6 +995,8 @@ const InvoiceGenerator = ({
                 ...task,
                 hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
             })),
+            expenseItems: selectedExpenseItems,
+            items: expenseInvoiceItems,
             taskFlatRates: taskFlatRates,
             useFlatRate: useFlatRate,
             taskHourlyRates: taskHourlyRates,
@@ -989,6 +1069,7 @@ const InvoiceGenerator = ({
                     ...task,
                     hourlyRate: task?.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
                 })),
+                expenseItems: selectedExpenseItems,
                 taskFlatRates: taskFlatRates,
                 useFlatRate: useFlatRate,
                 taskQuantities: taskQuantities, // Include quantities in PDF data
@@ -1108,6 +1189,23 @@ const InvoiceGenerator = ({
 
         const adjustmentTimestamp = Date.now();
         syncInvoiceAdjustments(invoiceData, adjustmentTimestamp);
+
+        const selectedExpenseIds = new Set(
+            Object.keys(selectedExpensesForBilling).filter((expenseId) => selectedExpensesForBilling[expenseId])
+        );
+        const previouslyBilledExpenseIds = new Set(
+            expenses.filter((expense) => expense.invoiceId === invoiceId).map((expense) => expense.id)
+        );
+
+        selectedExpenseIds.forEach((expenseId) => {
+            markAsBilled(expenseId, invoiceId);
+        });
+
+        previouslyBilledExpenseIds.forEach((expenseId) => {
+            if (!selectedExpenseIds.has(expenseId)) {
+                markAsUnbilled(expenseId);
+            }
+        });
 
         // Update tasks to set lastBilledAt for billed tasks and projects
         if (selectedProject && !editingInvoice) {
@@ -1291,6 +1389,33 @@ const InvoiceGenerator = ({
                 });
             }
             setSelectedTasksForBilling(allTasksSelected);
+
+            const initialExpenseSelection = {};
+            const editingProjectId = editingInvoice.projectId || selectedProject?.id || null;
+            const editingClientId = editingInvoice.clientId || selectedClient?.id || null;
+            const editingCurrency = editingInvoice.currency || invoiceCurrency;
+
+            expenses
+                .filter((expense) => {
+                    if (!expense || !expense.billable) return false;
+                    if (editingProjectId) {
+                        if (expense.projectId !== editingProjectId) return false;
+                    } else if (editingClientId) {
+                        if (expense.clientId !== editingClientId) return false;
+                    } else {
+                        return false;
+                    }
+
+                    const expenseCurrency = expense.currency || editingCurrency;
+                    if (expenseCurrency !== editingCurrency) return false;
+
+                    if (expense.billingStatus === 'unbilled') return true;
+                    return expense.invoiceId === editingInvoice.id;
+                })
+                .forEach((expense) => {
+                    initialExpenseSelection[expense.id] = expense.invoiceId === editingInvoice.id;
+                });
+            setSelectedExpensesForBilling(initialExpenseSelection);
             
             // If the invoice has a projectId, set the selected project
             if (editingInvoice.projectId) {
@@ -1329,6 +1454,12 @@ const InvoiceGenerator = ({
                 
                 setEditableHours(initialHours);
                 setSelectedTasksForBilling(initialTaskSelection);
+
+                const initialExpenseSelection = {};
+                availableExpenses.forEach((expense) => {
+                    initialExpenseSelection[expense.id] = true;
+                });
+                setSelectedExpensesForBilling(initialExpenseSelection);
                 
                 // Apply flat rate toggles for flat rate projects
                 if (selectedProject && selectedProject.flatRate) {
@@ -1352,6 +1483,7 @@ const InvoiceGenerator = ({
                 setUseFlatRate({});
                 setTaskHourlyRates({});
                 setSelectedTasksForBilling({});
+                setSelectedExpensesForBilling({});
                 
                 // Set new task flat rate toggle based on project setting even when no billable tasks
                 if (selectedProject && selectedProject.flatRate) {
@@ -1372,7 +1504,7 @@ const InvoiceGenerator = ({
             }
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, isTimerActive, isTimerPaused, showError, client]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, selectedClient, isTimerActive, isTimerPaused, showError, client, availableExpenses, expenses, invoiceCurrency]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {
@@ -1518,6 +1650,10 @@ const InvoiceGenerator = ({
                     setSelectedBusinessInfo={setSelectedBusinessInfo}
                     setSelectedPaymentMethod={setSelectedPaymentMethod}
                     setSelectedTasksForBilling={setSelectedTasksForBilling}
+                    availableExpenses={availableExpenses}
+                    selectedExpensesForBilling={selectedExpensesForBilling}
+                    setSelectedExpensesForBilling={setSelectedExpensesForBilling}
+                    incompatibleExpensesCount={incompatibleExpensesCount}
                     mergedSubtasks={mergedSubtasks}
                     handleToggleMergeSubtasks={handleToggleMergeSubtasks}
                     taskInputRef={taskInputRef}

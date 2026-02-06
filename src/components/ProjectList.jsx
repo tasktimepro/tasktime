@@ -21,6 +21,8 @@ import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
+import { useExpenses } from '../hooks/useExpenses.ts';
+import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
@@ -46,7 +48,9 @@ const ProjectList = ({
     const { projects, updateProject, deleteProject } = useProjects();
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
-    const { deleteInvoice } = useInvoices();
+    const { invoices, deleteInvoice } = useInvoices();
+    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses();
+    const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { timers, clearTimer } = useTimers();
     const { preferences, updatePreferences } = usePreferences();
 
@@ -232,8 +236,17 @@ const ProjectList = ({
             // Delete associated invoices if requested
             if (shouldDeleteInvoices) {
                 const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
+                projectInvoicesForDelete.forEach(invoice => unbillExpensesForInvoice(invoice.id));
                 projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
             }
+
+            expenses
+                .filter(expense => expense.projectId === projectId)
+                .forEach(expense => deleteExpense(expense.id));
+
+            recurrences
+                .filter(recurrence => recurrence.projectId === projectId)
+                .forEach(recurrence => deleteRecurrence(recurrence.id));
 
             // Delete the project
             deleteProject(projectId);

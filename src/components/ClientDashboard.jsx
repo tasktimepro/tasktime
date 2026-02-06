@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, ArchiveBoxIcon, TrashIcon } from '@/components/ui/icons';
+import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
-import { getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, formatDuration, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useToast } from '../hooks/useToast.ts';
@@ -14,6 +14,10 @@ import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
+import { useExpenses } from '../hooks/useExpenses.ts';
+import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
+import { usePreferences } from '../hooks/usePreferences.ts';
+import ExpensesSection from './expenses/ExpensesSection';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -44,7 +48,8 @@ const ClientDashboard = ({
     openProjectModal,
     openBusinessModal,
     openPaymentMethodModal,
-    openTemplateModal
+    openTemplateModal,
+    openExpenseModal
 }) => {
     const [editingInvoice, setEditingInvoice] = useState(null);
     const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
@@ -56,6 +61,9 @@ const ClientDashboard = ({
     const { deleteTask } = useTasks();
     const { deleteEntry } = useTimeEntries();
     const { deleteInvoice } = useInvoices();
+    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses();
+    const { recurrences, deleteRecurrence } = useExpenseRecurrences();
+    const { preferences } = usePreferences();
     const { showSuccess } = useToast();
     // Get client's currency
     const clientCurrency = useMemo(() => {
@@ -106,6 +114,38 @@ const ClientDashboard = ({
             projectIds.includes(invoice.projectId) || invoice.clientId === client.id
         );
     }, [invoices, clientProjects, client.id]);
+
+    const clientExpenses = useMemo(() => {
+        return expenses.filter((expense) => expense.clientId === client.id);
+    }, [expenses, client.id]);
+
+    const expenseTotalsByCurrency = useMemo(() => {
+        return clientExpenses.reduce((acc, expense) => {
+            const currency = expense.currency || preferences.currency || getPreferredCurrency();
+            acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
+            return acc;
+        }, {});
+    }, [clientExpenses, preferences.currency]);
+
+    const unbilledExpenseTotalsByCurrency = useMemo(() => {
+        return clientExpenses
+            .filter((expense) => expense.billable && expense.billingStatus === 'unbilled')
+            .reduce((acc, expense) => {
+                const currency = expense.currency || preferences.currency || getPreferredCurrency();
+                acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
+                return acc;
+            }, {});
+    }, [clientExpenses, preferences.currency]);
+
+    const formatAmounts = (amounts) => {
+        const entries = Object.entries(amounts).filter(([, value]) => value > 0);
+        if (entries.length === 0) return '—';
+        if (entries.length === 1) {
+            const [currency, value] = entries[0];
+            return formatCurrency(value, currency);
+        }
+        return entries.map(([currency, value]) => `${formatCurrency(value, currency)} ${currency}`).join(' · ');
+    };
 
     // Calculate client metrics
     const clientMetrics = useMemo(() => {
@@ -336,7 +376,16 @@ const ClientDashboard = ({
             const relatedInvoiceIds = invoices
                 .filter(invoice => relatedProjectIds.includes(invoice.projectId))
                 .map(i => i.id);
+            relatedInvoiceIds.forEach(id => unbillExpensesForInvoice(id));
             relatedInvoiceIds.forEach(id => deleteInvoice(id));
+
+            expenses
+                .filter(expense => expense.clientId === clientId || relatedProjectIds.includes(expense.projectId))
+                .forEach(expense => deleteExpense(expense.id));
+
+            recurrences
+                .filter(recurrence => recurrence.clientId === clientId || relatedProjectIds.includes(recurrence.projectId))
+                .forEach(recurrence => deleteRecurrence(recurrence.id));
         } else {
             projects
                 .filter(project => project.preferredClientId === clientId)
@@ -346,6 +395,14 @@ const ClientDashboard = ({
                     flatRate: false,
                     isPersonal: true
                 }));
+
+            expenses
+                .filter(expense => expense.clientId === clientId)
+                .forEach(expense => deleteExpense(expense.id));
+
+            recurrences
+                .filter(recurrence => recurrence.clientId === clientId)
+                .forEach(recurrence => deleteRecurrence(recurrence.id));
         }
 
         deleteClient(clientId);
@@ -536,7 +593,7 @@ const ClientDashboard = ({
             />
 
             {/* Client Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-6">
                 <Card>
                     <CardContent className="pt-5">
                         <div className="flex items-center">
@@ -621,6 +678,46 @@ const ClientDashboard = ({
                                     <dd className="text-lg font-semibold text-foreground">
                                         <span className="sensitive-data">
                                             {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
+                                        </span>
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-5">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <div className="ml-4 w-0 flex-1">
+                                <dl>
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Expenses</dt>
+                                    <dd className="text-lg font-semibold text-foreground">
+                                        <span className="sensitive-data">
+                                            {formatAmounts(expenseTotalsByCurrency)}
+                                        </span>
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-5">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <div className="ml-4 w-0 flex-1">
+                                <dl>
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled Expenses</dt>
+                                    <dd className="text-lg font-semibold text-foreground">
+                                        <span className="sensitive-data">
+                                            {formatAmounts(unbilledExpenseTotalsByCurrency)}
                                         </span>
                                     </dd>
                                 </dl>
@@ -851,6 +948,11 @@ const ClientDashboard = ({
                     </CardContent>
                 )}
             </Card>
+
+            <ExpensesSection
+                clientId={client.id}
+                openExpenseModal={openExpenseModal}
+            />
 
             {/* Client Time Metrics */}
             {clientTimeEntries.length > 0 ? (

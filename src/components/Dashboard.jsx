@@ -8,6 +8,8 @@ import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
 import { useTimers } from '../hooks/useTimers';
+import { useExpenses } from '../hooks/useExpenses';
+import { usePreferences } from '../hooks/usePreferences';
 import { THIRTY_DAYS_MS, ONE_HOUR_MS, ONE_MINUTE_MS } from '../constants/app';
 import useCurrencyConversion from './dashboard/hooks/useCurrencyConversion';
 import useMetricsCalculation from './dashboard/hooks/useMetricsCalculation';
@@ -32,7 +34,8 @@ const Dashboard = ({
     navigateToClient,
     navigateToInvoices,
     onEditTask,
-    onViewTask
+    onViewTask,
+    openExpenseModal
 }) => {
     const hasClients = clients.length > 0;
     const { showWarning, showSuccess } = useToast();
@@ -41,6 +44,8 @@ const Dashboard = ({
     const { tasks, updateTask, deleteTask, archiveTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus } = useTasks();
     const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
+    const { expenses } = useExpenses();
+    const { preferences } = usePreferences();
     const { getForDate } = usePlannerAttachments();
     
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
@@ -86,6 +91,35 @@ const Dashboard = ({
         preferredCurrency,
         convertToCurrency
     });
+
+    const expenseMetricsByCurrency = useMemo(() => {
+        const today = new Date();
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+        const inMonth = expenses.filter((expense) => {
+            const date = new Date(expense.date);
+            if (Number.isNaN(date.getTime())) return false;
+            return date >= monthStart && date <= monthEnd;
+        });
+
+        const initial = { total: {}, unpaid: {}, billableUnbilled: {} };
+
+        return inMonth.reduce((acc, expense) => {
+            const currency = expense.currency || preferences.currency || 'EUR';
+            acc.total[currency] = (acc.total[currency] || 0) + (expense.amount || 0);
+
+            if (expense.paymentStatus === 'unpaid') {
+                acc.unpaid[currency] = (acc.unpaid[currency] || 0) + (expense.amount || 0);
+            }
+
+            if (expense.billable && expense.billingStatus === 'unbilled') {
+                acc.billableUnbilled[currency] = (acc.billableUnbilled[currency] || 0) + (expense.amount || 0);
+            }
+
+            return acc;
+        }, initial);
+    }, [expenses, preferences.currency]);
 
     // Show warning if any conversion errors occurred (only once per session)
     useEffect(() => {
@@ -606,6 +640,7 @@ const Dashboard = ({
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
                 onArchiveTask={handleArchiveTask}
+                openExpenseModal={openExpenseModal}
             />
 
             {/* Recent Tasks and Projects Grid */}
@@ -641,6 +676,9 @@ const Dashboard = ({
                 invoiceMetrics={invoiceMetrics}
                 thisMonthBillableHours={thisMonthBillableHours}
                 thisMonthUnbilledDisplay={thisMonthUnbilledDisplay}
+                expenseTotalsByCurrency={expenseMetricsByCurrency.total}
+                expenseUnpaidByCurrency={expenseMetricsByCurrency.unpaid}
+                expenseBillableUnbilledByCurrency={expenseMetricsByCurrency.billableUnbilled}
                 hasClients={hasClients}
                 preferredCurrency={preferredCurrency}
                 formatDuration={formatDuration}

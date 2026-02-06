@@ -13,6 +13,14 @@ type InvoiceTask = {
     mergedSubtasks?: InvoiceTask[];
 };
 
+type InvoiceExpenseItem = {
+    id: string;
+    title: string;
+    amount: number;
+    date?: string;
+    supplierName?: string | null;
+};
+
 type ProjectInfo = {
     title?: string;
     hourlyRate?: number | string;
@@ -59,6 +67,7 @@ type InvoiceData = {
     client: ClientInfo;
     tasks: InvoiceTask[];
     additionalTasks?: InvoiceTask[];
+    expenseItems?: InvoiceExpenseItem[];
     note?: string;
     totalHours?: number | string;
     totalAmount: number;
@@ -135,6 +144,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         client,
         tasks: originalTasks,
         additionalTasks: originalAdditionalTasks = [],
+        expenseItems = [],
         note = '',
         totalHours,
         totalAmount,
@@ -163,7 +173,15 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     });
 
     const tasks = originalTasks.filter(task => !mergedTaskIds.has(task.id));
-    const additionalTasks = originalAdditionalTasks.filter(task => !mergedTaskIds.has(task.id));
+    const expenseAdditionalTasks = expenseItems.map((expense) => ({
+        id: `expense-${expense.id}`,
+        title: `${expense.title}${expense.date ? ` (${expense.date})` : ''}${expense.supplierName ? ` • ${expense.supplierName}` : ''}`,
+        flatRate: expense.amount,
+        quantity: 1,
+        useFlatRate: true
+    }));
+
+    const additionalTasks = [...originalAdditionalTasks, ...expenseAdditionalTasks].filter(task => !mergedTaskIds.has(task.id));
 
     return `
         <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">

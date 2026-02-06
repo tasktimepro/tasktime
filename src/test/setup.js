@@ -11,6 +11,15 @@ const localStorageMock = {
 
 global.localStorage = localStorageMock
 
+class ResizeObserverMock {
+
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+}
+
+global.ResizeObserver = ResizeObserverMock
+
 beforeEach(() => {
     vi.useRealTimers()
     vi.clearAllMocks()

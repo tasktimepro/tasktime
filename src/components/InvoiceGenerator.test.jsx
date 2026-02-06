@@ -97,6 +97,15 @@ vi.mock('../hooks/useInvoiceTemplates.ts', () => ({
     })
 }))
 
+vi.mock('../hooks/useExpenses.ts', () => ({
+
+    useExpenses: () => ({
+        expenses: [],
+        markAsBilled: vi.fn(),
+        markAsUnbilled: vi.fn()
+    })
+}))
+
 vi.mock('../hooks/useTimers.ts', () => ({
 
     useTimers: () => ({

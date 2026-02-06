@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon } from '@/components/ui/icons';
+import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +6,7 @@ import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
-import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
+import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useTimers } from '../hooks/useTimers.ts';
@@ -14,6 +14,9 @@ import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
+import { useExpenses } from '../hooks/useExpenses.ts';
+import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
+import { usePreferences } from '../hooks/usePreferences.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { getInvoicesForProject } from '../utils/invoiceUtils.ts';
 import {
@@ -24,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
 import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
+import ExpensesSection from './expenses/ExpensesSection';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -47,7 +51,8 @@ const ProjectDashboard = ({
     openTemplateModal,
     openTaskModal,
     onViewTask,
-    navigateToClient
+    navigateToClient,
+    openExpenseModal
 }) => {
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
@@ -59,10 +64,45 @@ const ProjectDashboard = ({
     const { deleteTask } = useTasks();
     const { deleteEntry } = useTimeEntries();
     const { deleteInvoice } = useInvoices();
+    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses();
+    const { recurrences, deleteRecurrence } = useExpenseRecurrences();
+    const { preferences } = usePreferences();
     const projectTimer = getTimerForProject(project.id);
     
     // Get invoices for this project
     const projectInvoices = getInvoicesForProject(invoices, project.id);
+
+    const projectExpenses = useMemo(() => {
+        return expenses.filter((expense) => expense.projectId === project.id);
+    }, [expenses, project.id]);
+
+    const expenseTotalsByCurrency = useMemo(() => {
+        return projectExpenses.reduce((acc, expense) => {
+            const currency = expense.currency || preferences.currency || getPreferredCurrency();
+            acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
+            return acc;
+        }, {});
+    }, [projectExpenses, preferences.currency]);
+
+    const unbilledExpenseTotalsByCurrency = useMemo(() => {
+        return projectExpenses
+            .filter((expense) => expense.billable && expense.billingStatus === 'unbilled')
+            .reduce((acc, expense) => {
+                const currency = expense.currency || preferences.currency || getPreferredCurrency();
+                acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
+                return acc;
+            }, {});
+    }, [projectExpenses, preferences.currency]);
+
+    const formatAmounts = (amounts) => {
+        const entries = Object.entries(amounts).filter(([, value]) => value > 0);
+        if (entries.length === 0) return '—';
+        if (entries.length === 1) {
+            const [currency, value] = entries[0];
+            return formatCurrency(value, currency);
+        }
+        return entries.map(([currency, value]) => `${formatCurrency(value, currency)} ${currency}`).join(' · ');
+    };
     
     /**
      * Handle editing an existing invoice
@@ -102,8 +142,17 @@ const ProjectDashboard = ({
 
         if (shouldDeleteInvoices) {
             const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
+            projectInvoicesForDelete.forEach(invoice => unbillExpensesForInvoice(invoice.id));
             projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
         }
+
+        expenses
+            .filter(expense => expense.projectId === projectId)
+            .forEach(expense => deleteExpense(expense.id));
+
+        recurrences
+            .filter(recurrence => recurrence.projectId === projectId)
+            .forEach(recurrence => deleteRecurrence(recurrence.id));
 
         deleteProject(projectId);
         taskIdsArray.forEach(taskId => deleteTask(taskId));
@@ -392,7 +441,7 @@ const ProjectDashboard = ({
 
             {/* Project Metrics - Only show for non-personal projects */}
             {!project.isPersonal && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-6">
                     <Card>
                         <CardContent className="pt-5">
                             <div className="flex items-center">
@@ -484,6 +533,46 @@ const ProjectDashboard = ({
                             </div>
                         </CardContent>
                     </Card>
+
+                    <Card>
+                        <CardContent className="pt-5">
+                            <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                    <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <div className="ml-4 w-0 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-muted-foreground truncate">Expenses</dt>
+                                        <dd className="text-lg font-semibold text-foreground">
+                                            <span className="sensitive-data">
+                                                {formatAmounts(expenseTotalsByCurrency)}
+                                            </span>
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="pt-5">
+                            <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                    <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <div className="ml-4 w-0 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled Expenses</dt>
+                                        <dd className="text-lg font-semibold text-foreground">
+                                            <span className="sensitive-data">
+                                                {formatAmounts(unbilledExpenseTotalsByCurrency)}
+                                            </span>
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             )}
 
@@ -552,6 +641,12 @@ const ProjectDashboard = ({
                     )}
                 </Card>
             )}
+
+            <ExpensesSection
+                clientId={projectClient?.id}
+                projectId={project.id}
+                openExpenseModal={openExpenseModal}
+            />
 
             {/* Metrics Display */}
             <MetricsDisplay

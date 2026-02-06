@@ -77,6 +77,19 @@ vi.mock('./hooks/useTimeEntries.ts', () => ({
     }),
 }))
 
+vi.mock('./hooks/useExpenses.ts', () => ({
+    useExpenses: () => ({
+        expenses: [],
+        createExpense: vi.fn(),
+    }),
+}))
+
+vi.mock('./hooks/useExpenseRecurrences.ts', () => ({
+    useExpenseRecurrences: () => ({
+        generatePendingExpenses: vi.fn(),
+    }),
+}))
+
 vi.mock('./hooks/useClients.ts', () => ({
     useClients: () => ({
         clients: [],

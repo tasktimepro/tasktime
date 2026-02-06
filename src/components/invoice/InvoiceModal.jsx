@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Notice } from '@/components/ui/notice';
 import InvoiceTaskSelector from './InvoiceTaskSelector';
+import InvoiceExpenseSelector from './InvoiceExpenseSelector';
 import InvoicePreview from './InvoicePreview';
 import InvoiceActions from './InvoiceActions';
 
@@ -76,6 +77,10 @@ const InvoiceModal = ({
     setNewTaskUseFlatRate,
     selectedTasksForBilling,
     setSelectedTasksForBilling,
+    availableExpenses,
+    selectedExpensesForBilling,
+    setSelectedExpensesForBilling,
+    incompatibleExpensesCount,
     setSelectedPaymentMethod,
     setSelectedBusinessInfo,
     mergedSubtasks,
@@ -165,10 +170,12 @@ const InvoiceModal = ({
         }
         // Check if there are any tasks to bill (either from project or additional tasks)
         const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length;
+        const selectedExpensesCount = Object.values(selectedExpensesForBilling).filter(Boolean).length;
         const hasAnyTasks = invoiceTasks.length > 0 || additionalTasks.length > 0;
-        const hasSelectedTasks = selectedTasksCount > 0 || additionalTasks.length > 0;
+        const hasAnyExpenses = availableExpenses.length > 0;
+        const hasSelectedTasks = selectedTasksCount > 0 || additionalTasks.length > 0 || selectedExpensesCount > 0;
         
-        if (!hasAnyTasks || !hasSelectedTasks) {
+        if ((!hasAnyTasks && !hasAnyExpenses) || !hasSelectedTasks) {
             setActiveSection('tasksTime');
             return;
         }
@@ -440,6 +447,16 @@ const InvoiceModal = ({
                     selectedClient={selectedClient}
                     getInvoiceCurrency={getInvoiceCurrency}
                     setNewTaskUseFlatRate={setNewTaskUseFlatRate}
+                />
+
+                <InvoiceExpenseSelector
+                    activeSection={activeSection}
+                    toggleSection={toggleSection}
+                    expenses={availableExpenses}
+                    selectedExpensesForBilling={selectedExpensesForBilling}
+                    setSelectedExpensesForBilling={setSelectedExpensesForBilling}
+                    getInvoiceCurrency={getInvoiceCurrency}
+                    incompatibleExpensesCount={incompatibleExpensesCount}
                 />
 
                 <InvoicePreview

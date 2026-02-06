@@ -14,6 +14,8 @@ type UrlParams = {
     create: string | null;
     tab: string | null;
     preselectedClientId: string | null;
+    expenseClientId: string | null;
+    expenseProjectId: string | null;
 };
 
 type UrlUpdateParams = Partial<{
@@ -26,6 +28,8 @@ type UrlUpdateParams = Partial<{
     create: string | null;
     tab: string | null;
     preselectedClientId: string | null;
+    expenseClientId: string | null;
+    expenseProjectId: string | null;
 }>;
 
 /**
@@ -99,7 +103,9 @@ function getParamsFromUrl(): UrlParams {
         week,
         create: params.get('create') || null,
         tab: params.get('tab') || null,
-        preselectedClientId: params.get('preselectedClientId') || null
+        preselectedClientId: params.get('preselectedClientId') || null,
+        expenseClientId: params.get('clientId') || null,
+        expenseProjectId: params.get('projectId') || null
     };
 }
 
@@ -182,6 +188,8 @@ export const useUrlState = () => {
             create: currentState.create,
             tab: currentState.tab,
             preselectedClientId: currentState.preselectedClientId,
+            expenseClientId: currentState.expenseClientId,
+            expenseProjectId: currentState.expenseProjectId,
             ...newParams
         };
 
@@ -232,6 +240,8 @@ export const useUrlState = () => {
         if (mergedParams.create) queryParams.create = mergedParams.create;
         if (mergedParams.tab) queryParams.tab = mergedParams.tab;
         if (mergedParams.preselectedClientId) queryParams.preselectedClientId = mergedParams.preselectedClientId;
+        if (mergedParams.expenseClientId) queryParams.clientId = mergedParams.expenseClientId;
+        if (mergedParams.expenseProjectId) queryParams.projectId = mergedParams.expenseProjectId;
 
         const newUrl = buildUrl(path, queryParams);
 
@@ -279,7 +289,7 @@ export const useUrlState = () => {
      * Navigate to expenses view
      */
     const navigateToExpenses = useCallback((params: UrlUpdateParams = {}) => {
-        updateUrl({ view: 'expenses', client: null, project: null, section: null, year: null, week: null, create: null, tab: null, ...params });
+        updateUrl({ view: 'expenses', client: null, project: null, section: null, year: null, week: null, create: null, tab: null, expenseClientId: null, expenseProjectId: null, ...params });
     }, [updateUrl]);
 
     /**

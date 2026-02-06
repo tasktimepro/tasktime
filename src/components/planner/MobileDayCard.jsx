@@ -31,6 +31,7 @@ import DailyGoalProgress from './DailyGoalProgress';
  * @param {(dateStr: string, type: string) => void} props.onAddClick
  * @param {(dateStr: string) => void} props.onCreateTask
  * @param {(item: any) => void} props.onItemClick
+ * @param {(item: any, amount?: number) => void} props.onMarkExpensePaid
  * @param {(item: any, dateStr: string) => void} props.onEditItem - Handler for editing planner options
  * @param {(item: any) => void} props.onRemoveItem - Handler for removing item from planner
  * @param {(dateStr: string) => void} props.onSetDailyGoal - Handler for daily goals
@@ -51,6 +52,7 @@ const MobileDayCard = ({
     onAddClick,
     onCreateTask,
     onItemClick,
+    onMarkExpensePaid,
     onEditItem,
     onRemoveItem,
     onSetDailyGoal,
@@ -157,6 +159,13 @@ const MobileDayCard = ({
                             actualTimeMs={item.actualTimeMs}
                             heightPercent={item.heightPercent}
                             isTimerActive={item.isTimerActive}
+                            amount={item.amount}
+                            amountType={item.amountType}
+                            currency={item.currency}
+                            supplierName={item.supplierName}
+                            onMarkPaid={item.type === 'expense'
+                                ? (amount) => onMarkExpensePaid?.(item, amount)
+                                : undefined}
                             hasAttachment={!!item.attachment}
                             onClick={() => onItemClick?.(item)}
                             onEdit={() => onEditItem?.(item, dateStr)}

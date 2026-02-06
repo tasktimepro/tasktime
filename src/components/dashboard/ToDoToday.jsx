@@ -11,6 +11,7 @@ import CustomCheckbox from '../CustomCheckbox';
 import StartDateBadge from '../task/StartDateBadge';
 import TaskActionsMenu from '../task/TaskActionsMenu';
 import TimeEntriesModal from '../TimeEntriesModal';
+import ExpensesDueSection from '../expenses/ExpensesDueSection';
 import { useTimers } from '../../hooks/useTimers';
 import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
 
@@ -27,6 +28,7 @@ import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
  * @param {Function} props.onEditTask
  * @param {Function} props.onDeleteTask
  * @param {Function} props.onArchiveTask
+ * @param {Function} props.openExpenseModal
  */
 const ToDoToday = ({
     overdueTasks,
@@ -39,7 +41,8 @@ const ToDoToday = ({
     handleProjectTitleClick,
     onEditTask,
     onDeleteTask,
-    onArchiveTask
+    onArchiveTask,
+    openExpenseModal
 }) => {
     const { getTimerForTask } = useTimers();
     const [showUpcoming, setShowUpcoming] = useState(false);
@@ -178,6 +181,8 @@ const ToDoToday = ({
                         </div>
                     )}
                 </div>
+
+                <ExpensesDueSection openExpenseModal={openExpenseModal} />
             </CardContent>
 
             {selectedTask && (

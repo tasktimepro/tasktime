@@ -117,6 +117,7 @@ export interface InvoiceItem {
     rate: number;
     amount: number;
     taskId?: string;
+    expenseId?: string;
 }
 
 export interface Invoice {
@@ -158,6 +159,57 @@ export interface PaymentMethod {
     isDefault?: boolean;
 }
 
+export interface Expense {
+    id: string;
+    title: string;
+    note?: string | null;
+    date: string;
+    supplierName?: string | null;
+    receiptNumber?: string | null;
+    currency: string;
+    amount: number;
+    paidOn?: string | null;
+    paidBy?: string | null;
+    paymentStatus: 'unpaid' | 'paid';
+    clientId?: string | null;
+    projectId?: string | null;
+    isPersonal: boolean;
+    billable: boolean;
+    billingStatus: 'unbilled' | 'billed';
+    invoiceId?: string | null;
+    billedAt?: number | null;
+    isRecurring: boolean;
+    recurrenceId?: string | null;
+    amountType?: 'fixed' | 'variable';
+    taxNumber?: string | null;
+    isTaxExempt: boolean;
+    createdAt?: number;
+    updatedAt?: number;
+}
+
+export interface ExpenseRecurrence {
+    id: string;
+    title: string;
+    note?: string | null;
+    supplierName?: string | null;
+    currency: string;
+    amount: number;
+    amountType: 'fixed' | 'variable';
+    repeat: 'monthly' | 'yearly';
+    startDate: string;
+    endDate?: string | null;
+    clientId?: string | null;
+    projectId?: string | null;
+    isPersonal: boolean;
+    billable: boolean;
+    taxNumber?: string | null;
+    isTaxExempt: boolean;
+    lastGeneratedDate?: string | null;
+    active: boolean;
+    createdAt?: number;
+    updatedAt?: number;
+}
+
 // ============================================================================
 // Planner
 // ============================================================================
@@ -181,6 +233,50 @@ export interface PlannerAttachment {
     /** Estimated hours for this attachment (for workload planning) */
     estimatedHours?: number | null;
 }
+
+export interface PlannerItemBase {
+    key: string;
+    title: string;
+    isCompleted: boolean;
+    color?: string | null;
+    estimatedHours?: number | null;
+    actualTimeMs?: number;
+    isTimerActive?: boolean;
+    rawHours?: number;
+    effectiveHours?: number;
+    heightPercent?: number;
+    isActualBased?: boolean;
+}
+
+export interface PlannerClientItem extends PlannerItemBase {
+    type: 'client';
+    entity: Client;
+    attachment: PlannerAttachment;
+}
+
+export interface PlannerProjectItem extends PlannerItemBase {
+    type: 'project';
+    entity: Project;
+    attachment: PlannerAttachment;
+}
+
+export interface PlannerTaskItem extends PlannerItemBase {
+    type: 'task';
+    subtype: 'recurring' | 'due' | 'attached' | 'timer' | 'worked';
+    entity: Task;
+    attachment?: PlannerAttachment;
+}
+
+export interface PlannerExpenseItem extends PlannerItemBase {
+    type: 'expense';
+    expense: Expense;
+    amount: number;
+    amountType: 'fixed' | 'variable';
+    currency: string;
+    supplierName?: string | null;
+}
+
+export type PlannerItem = PlannerClientItem | PlannerProjectItem | PlannerTaskItem | PlannerExpenseItem;
 
 export interface DailyGoal {
     id: string;

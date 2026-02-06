@@ -6,6 +6,7 @@ import PaymentMethodModal from './PaymentMethodModal';
 import BusinessModal from './BusinessModal';
 import InvoiceModal from '../invoice/InvoiceModal';
 import TaskModal from './TaskModal';
+import ExpenseModal from './ExpenseModal';
 
 /**
  * ModalManager - Central manager for all form modals
@@ -143,6 +144,19 @@ const ModalManager = ({
                     saveFormState={(formData) => saveCurrentModalState('task', formData)}
                     getSavedState={() => getSavedModalState('task')}
                     clearSavedState={() => clearModalState('task')}
+                />
+            )}
+
+            {/* Expense Modal */}
+            {activeModal === 'expense' && (
+                <ExpenseModal
+                    isOpen={true}
+                    onClose={closeModal}
+                    editingExpense={editingItem}
+                    modalOptions={modalOptions}
+                    saveFormState={(formData) => saveCurrentModalState('expense', formData)}
+                    getSavedState={() => getSavedModalState('expense')}
+                    clearSavedState={() => clearModalState('expense')}
                 />
             )}
         </>

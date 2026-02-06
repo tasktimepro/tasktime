@@ -16,6 +16,7 @@ import { useProjects } from './useProjects';
 import { useClients } from './useClients';
 import { useTimers } from './useTimers';
 import { useTimeEntries } from './useTimeEntries';
+import { useExpenses } from './useExpenses';
 import { useTodayDate, useTodayString } from './useDayRollover';
 import { useDailyGoals } from './useDailyGoals';
 import { usePreferences } from './usePreferences';
@@ -23,7 +24,7 @@ import { isRecurringTaskDueOnDate } from '@/utils/recurringUtils';
 import { toStorageDate } from '@/utils/dateUtils';
 import { isRecurringCompletedOnDate } from '@/utils/recurringCompletionUtils';
 import { convertCurrency, fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
-import type { Task, Project, Client, PlannerAttachment, TimeEntry, DailyGoal } from '@/stores/yjs/types';
+import type { Task, Project, Client, PlannerAttachment, TimeEntry, DailyGoal, Expense } from '@/stores/yjs/types';
 
 // ============================================================================
 // Types
@@ -73,7 +74,16 @@ export interface PlannerTaskItem extends PlannerItemBase {
     attachment?: PlannerAttachment;
 }
 
-export type PlannerItem = PlannerClientItem | PlannerProjectItem | PlannerTaskItem;
+export interface PlannerExpenseItem extends PlannerItemBase {
+    type: 'expense';
+    expense: Expense;
+    amount: number;
+    amountType: 'fixed' | 'variable';
+    currency: string;
+    supplierName?: string | null;
+}
+
+export type PlannerItem = PlannerClientItem | PlannerProjectItem | PlannerTaskItem | PlannerExpenseItem;
 
 export interface PlannerDay {
     /** Date object for this day */
@@ -120,6 +130,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     const { projects, isLoading: projectsLoading } = useProjects();
     const { clients, isLoading: clientsLoading } = useClients();
     const { timers } = useTimers();
+    const { expenses } = useExpenses();
     const { preferences } = usePreferences();
     const { getGoalForDate } = useDailyGoals();
     const today = useTodayDate();
@@ -263,6 +274,18 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         }
         return null;
     }, [projectsById, getProjectColor]);
+
+    const getExpenseColor = useCallback((expense: Expense): string | null => {
+        if (expense.projectId) {
+            const project = projectsById.get(expense.projectId);
+            if (project) return getProjectColor(project);
+        }
+        if (expense.clientId) {
+            const client = clientsById.get(expense.clientId);
+            return client?.color || null;
+        }
+        return null;
+    }, [projectsById, clientsById, getProjectColor]);
 
     // Build lookup of taskId → projectId
     const taskProjectMap = useMemo(() => {
@@ -568,6 +591,26 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         }
 
+        // 8. Unpaid expenses for this day (sorted alphabetically)
+        const dayExpenses = expenses
+            .filter((expense) => expense.paymentStatus === 'unpaid' && expense.date === dateStr)
+            .sort((a, b) => a.title.localeCompare(b.title));
+
+        dayExpenses.forEach((expense) => {
+            items.push({
+                key: `expense-${expense.id}-${dateStr}`,
+                type: 'expense',
+                title: expense.title,
+                isCompleted: false,
+                color: getExpenseColor(expense),
+                amount: expense.amount || 0,
+                amountType: expense.amountType || 'fixed',
+                currency: expense.currency || defaultCurrency,
+                supplierName: expense.supplierName || null,
+                expense,
+            });
+        });
+
         const dailyGoal = getGoalForDate(dateStr);
         const dayTargetHours = 24;
 
@@ -667,7 +710,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
                 isActualBased: base.isActualBased,
             };
         });
-    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs, getGoalForDate, projectClientMap]);
+    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, expenses, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getExpenseColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs, getGoalForDate, projectClientMap, defaultCurrency]);
 
     // Build the full week
     const weekDays = useMemo((): PlannerDay[] => {

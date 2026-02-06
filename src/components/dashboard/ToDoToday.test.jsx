@@ -10,6 +10,20 @@ vi.mock('../../hooks/useTimers', () => ({
     })
 }))
 
+vi.mock('@/hooks/useExpenses.ts', () => ({
+    useExpenses: () => ({
+        expenses: [],
+        markAsPaid: vi.fn()
+    })
+}))
+
+vi.mock('@/hooks/useToast.ts', () => ({
+    useToast: () => ({
+        showError: vi.fn(),
+        showSuccess: vi.fn()
+    })
+}))
+
 vi.mock('../TimeEntriesModal', () => ({
     default: ({ isOpen, task }) => (isOpen ? <div>Time entries for {task.title}</div> : null)
 }))

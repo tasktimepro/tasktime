@@ -253,6 +253,7 @@ export const handleResetInvoiceForm = (
     setShippingAmount,
     setTaxOverride,
     setSelectedTasksForBilling,
+    setSelectedExpensesForBilling,
     setNewTaskQuantity,
     setMergedSubtasks,
     setInvoiceDateOverride,
@@ -275,6 +276,7 @@ export const handleResetInvoiceForm = (
         rate: 0
     });
     setSelectedTasksForBilling({});
+    setSelectedExpensesForBilling({});
     setNewTaskQuantity(1);
     setMergedSubtasks({});
     setInvoiceDateOverride('');

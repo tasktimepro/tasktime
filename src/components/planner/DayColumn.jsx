@@ -35,6 +35,7 @@ import {
  * @param {(dateStr: string, type: string, mode: string) => void} props.onAddClick - Handler for attach button
  * @param {(dateStr: string) => void} props.onCreateTask - Handler for creating a new task
  * @param {(item: any) => void} props.onItemClick - Handler for item clicks
+ * @param {(item: any, amount?: number) => void} props.onMarkExpensePaid - Handler for marking expense paid
  * @param {(item: any, dateStr: string) => void} props.onEditItem - Handler for editing planner options
  * @param {(item: any) => void} props.onRemoveItem - Handler for removing item from planner
  * @param {(dateStr: string) => void} props.onSetDailyGoal - Handler for daily goals
@@ -53,6 +54,7 @@ const DayColumn = ({
     onAddClick,
     onCreateTask,
     onItemClick,
+    onMarkExpensePaid,
     onEditItem,
     onRemoveItem,
     onSetDailyGoal,
@@ -174,6 +176,13 @@ const DayColumn = ({
                                 actualTimeMs={item.actualTimeMs}
                                 heightPercent={item.heightPercent}
                                 isTimerActive={item.isTimerActive}
+                                amount={item.amount}
+                                amountType={item.amountType}
+                                currency={item.currency}
+                                supplierName={item.supplierName}
+                                onMarkPaid={item.type === 'expense'
+                                    ? (amount) => onMarkExpensePaid?.(item, amount)
+                                    : undefined}
                                 hasAttachment={!!item.attachment}
                                 onClick={() => onItemClick?.(item)}
                                 onEdit={() => onEditItem?.(item, dateStr)}
