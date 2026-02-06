@@ -28,12 +28,12 @@ const ExpenseRow = ({
     const amountValue = expense.amount || 0;
     const amountLabel = formatCurrency(amountValue, expense.currency);
     const isVariable = expense.amountType === 'variable';
-    let amountDisplay = `${amountLabel} ${expense.currency}`;
+    let amountDisplay = `${amountLabel}`;
 
     if (isVariable) {
         if (expense.amount && expense.amount > 0) {
             const prefix = isUpcoming ? '~' : '';
-            amountDisplay = `${prefix}${amountLabel} ${expense.currency}`;
+            amountDisplay = `${prefix}${amountLabel}`;
         } else {
             amountDisplay = expense.isPreview
                 ? 'Variable amount'

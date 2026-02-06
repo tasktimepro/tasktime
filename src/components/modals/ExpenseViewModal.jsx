@@ -78,7 +78,7 @@ const ExpenseViewModal = ({
             return 'Enter amount';
         }
         const prefix = isVariable && !isPaid ? '~' : '';
-        return `${prefix}${formatCurrency(amountValue || 0, currentExpense.currency)} ${currentExpense.currency}`;
+        return `${prefix}${formatCurrency(amountValue || 0, currentExpense.currency)}`;
     }, [currentExpense, isVariable, amountValue, isPaid]);
 
     const paidByLabel = useMemo(() => {

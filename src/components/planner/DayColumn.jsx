@@ -116,7 +116,7 @@ const DayColumn = ({
                     className={cn(
                         "group flex flex-col h-full rounded-lg border bg-card relative",
                         "transition-shadow",
-                        isToday && "border-t-2 border-t-black dark:border-t-white bg-muted/30 dark:bg-card"
+                        isToday && "border-t-2 border-t-black dark:border-t-white bg-muted/80 dark:bg-muted/10"
                     )}
                 >
                     {/* Header */}
