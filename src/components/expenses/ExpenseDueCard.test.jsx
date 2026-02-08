@@ -74,4 +74,34 @@ describe('ExpenseDueCard', () => {
         await user.click(titleButton)
             expect(onView).toHaveBeenCalledWith(expense)
     })
+
+    it('shows overdue badge for recurring expenses', () => {
+        const expense = {
+            id: 'exp-4',
+            title: 'Weekly Service',
+            date: '2026-02-07',
+            amount: 25,
+            amountType: 'fixed',
+            currency: 'USD',
+        }
+
+        render(
+            <ExpenseDueCard
+                expense={expense}
+                isOverdue
+                recurrence={{
+                    id: 'rec-1',
+                    title: 'Weekly Service',
+                    startDate: '2026-01-01',
+                    repeat: 'weekly',
+                    amount: 25,
+                    amountType: 'fixed',
+                    currency: 'USD',
+                    active: true
+                }}
+            />
+        )
+
+        expect(screen.getByText('Overdue')).toBeInTheDocument()
+    })
 })

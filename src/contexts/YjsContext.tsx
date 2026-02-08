@@ -42,7 +42,7 @@ export interface YjsContextValue {
     /** Auto-sync mode */
     autoSyncMode: AutoSyncMode;
     /** Manually trigger Drive sync */
-    forceSyncDrive: () => Promise<void>;
+    forceSyncDrive: (options?: { allowPull?: boolean }) => Promise<void>;
     /** Disconnect Drive sync */
     disconnectDrive: () => void;
     /** Wipe all TaskTime files from Drive */
@@ -154,11 +154,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
                     setSyncPhase(store.getSyncPhase());
                     setLastSyncedAt(store.getLastSyncedAt());
                     console.log('[YjsContext] Connected to Drive');
-                    // Sync if auto-sync is enabled and mode is 'sync'
-                    const currentMode = store.getDriveSyncMode();
-                    if (currentMode === 'sync') {
-                        await store.forceDriveSync();
-                    }
+                    // connect() already handles initial sync based on the sync mode,
+                    // no need for a follow-up forceDriveSync
                 })
                 .catch((error) => {
                     setIsDriveConnected(false);
@@ -235,10 +232,10 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
     // --- Callbacks ---
 
-    const forceSyncDrive = useCallback(async () => {
+    const forceSyncDrive = useCallback(async (options?: { allowPull?: boolean }) => {
         setManualSyncInProgress(true);
         try {
-            await store.forceDriveSync();
+            await store.forceDriveSync(options);
         } finally {
             setManualSyncInProgress(false);
         }
@@ -267,7 +264,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             }
 
             if (autoSyncMode === 'backup' && store.hasPendingSyncChanges()) {
-                store.forceDriveSync().catch(console.error);
+                store.forceDriveSync({ allowPull: false }).catch(console.error);
             }
         };
 
@@ -302,8 +299,13 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
         // For auto-sync mode: trigger sync to complete what was interrupted
         if (autoSyncEnabled) {
-            console.log('[YjsContext] Auto-triggering sync for persisted pending changes');
-            store.forceDriveSync().catch(console.error);
+            console.log('[YjsContext] Auto-triggering sync for persisted pending changes', { autoSyncMode });
+            if (autoSyncMode === 'backup') {
+                // Backup mode: only push, don't pull
+                store.forceDriveSync({ allowPull: false }).catch(console.error);
+            } else {
+                store.forceDriveSync().catch(console.error);
+            }
         }
         // For manual mode: pendingSyncChanges will show "Sync changes" in UI
         // because GoogleDriveProvider.updatePendingState() now checks persisted state

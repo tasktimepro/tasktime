@@ -64,10 +64,16 @@ const ExpenseDueCard = ({
     }, [recurrence]);
 
     const dateBadge = recurrence ? (
-        <Badge variant="secondary" className="flex items-center">
-            <ArrowPathIcon className="h-3 w-3 mr-1" />
-            {recurringLabel || 'Recurring'}
-        </Badge>
+        isOverdue ? (
+            <Badge variant="warning">
+                Overdue
+            </Badge>
+        ) : (
+            <Badge variant="secondary" className="flex items-center">
+                <ArrowPathIcon className="h-3 w-3 mr-1" />
+                {recurringLabel || 'Recurring'}
+            </Badge>
+        )
     ) : (
         <StartDateBadge
             startDate={expense.date}

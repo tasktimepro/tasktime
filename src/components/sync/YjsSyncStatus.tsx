@@ -66,7 +66,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
     }, [navigateToAccount]);
 
     const handleManualSync = useCallback(async () => {
-        await forceSyncDrive();
+        await forceSyncDrive({ allowPull: false });
     }, [forceSyncDrive]);
 
     // NOTE: Sidebar cloud icon should never spin.

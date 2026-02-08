@@ -186,6 +186,15 @@ export function useTasks(options: UseTasksOptions = {}) {
 
         return projectActiveTasks.filter(task => {
             if (task.recurring) {
+                const createdDateStr = typeof task.createdAt === 'number'
+                    ? toStorageDate(task.createdAt)
+                    : null;
+                const recurringStartStr = task.startDate || createdDateStr;
+
+                if (recurringStartStr && today < recurringStartStr) {
+                    return false;
+                }
+
                 if (isRecurringTaskDueOnDate(todayDate, task.recurring)) {
                     return true;
                 }
@@ -200,6 +209,10 @@ export function useTasks(options: UseTasksOptions = {}) {
 
                 if (!previousDueStr || !nextDueStr) return false;
                 if (today >= nextDueStr) return false;
+
+                if (recurringStartStr && previousDueStr < recurringStartStr) {
+                    return false;
+                }
 
                 const wasCompleted = isCompletedOnDate(task, previousDueStr);
 
@@ -251,6 +264,21 @@ export function useTasks(options: UseTasksOptions = {}) {
 
         const todayDate = new Date();
 
+        const createdDateStr = typeof task.createdAt === 'number'
+            ? toStorageDate(task.createdAt)
+            : null;
+        const recurringStartStr = task.startDate || createdDateStr;
+
+        if (recurringStartStr && resolvedToday < recurringStartStr) {
+            return {
+                isDueToday: false,
+                isOverdue: false,
+                lastDueDateStr: null as string | null,
+                nextDueDateStr: null as string | null,
+                effectiveDateStr: null as string | null,
+            };
+        }
+
         if (isRecurringTaskDueOnDate(todayDate, task.recurring)) {
             return {
                 isDueToday: true,
@@ -266,7 +294,15 @@ export function useTasks(options: UseTasksOptions = {}) {
         const previousDueStr = previousDueDate ? toStorageDate(previousDueDate) : null;
         const nextDueStr = nextDueDate ? toStorageDate(nextDueDate) : null;
 
-        const isOverdue = Boolean(previousDueStr && nextDueStr && resolvedToday < nextDueStr);
+        const isBeforeRecurringStart = Boolean(recurringStartStr && previousDueStr && previousDueStr < recurringStartStr);
+        const wasCompleted = previousDueStr ? isCompletedOnDate(task, previousDueStr) : false;
+        const isOverdue = Boolean(
+            previousDueStr
+                && nextDueStr
+                && resolvedToday < nextDueStr
+                && !isBeforeRecurringStart
+                && !wasCompleted
+        );
 
         return {
             isDueToday: false,
@@ -275,7 +311,7 @@ export function useTasks(options: UseTasksOptions = {}) {
             nextDueDateStr: nextDueStr,
             effectiveDateStr: isOverdue ? previousDueStr : null,
         };
-    }, []);
+    }, [isCompletedOnDate]);
 
     return {
         // Data

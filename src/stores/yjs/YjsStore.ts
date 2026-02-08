@@ -530,7 +530,7 @@ export class YjsStore {
 
         this.driveProvider = new YjsDriveProvider(this.docManager, accessToken, sessionId);
         this.driveProvider.setSyncMode(this.driveSyncMode);
-        await this.driveProvider.connect();
+        await this.driveProvider.connect(this.driveSyncMode);
     }
 
     /**
@@ -550,9 +550,10 @@ export class YjsStore {
 
     /**
      * Force immediate sync with Google Drive
+     * @param options - Optional sync options (e.g., allowPull: false for backup mode)
      */
-    async forceDriveSync(): Promise<void> {
-        await this.driveProvider?.sync(true);
+    async forceDriveSync(options?: { allowPull?: boolean }): Promise<void> {
+        await this.driveProvider?.sync(true, options);
     }
 
     /**

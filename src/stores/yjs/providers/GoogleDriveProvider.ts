@@ -123,9 +123,13 @@ export class YjsDriveProvider {
 
     /**
      * Connect to Google Drive and start syncing
+     * @param syncMode - Optional sync mode to determine connect behavior.
+     *   'sync' = pull + push (default), 'backup' = push only, 'manual' = subscribe only
      */
-    async connect(): Promise<void> {
+    async connect(syncMode?: DriveSyncMode): Promise<void> {
         if (this.connected) return;
+
+        const mode = syncMode ?? this.syncMode;
 
         try {
             if (!this.isOnline()) {
@@ -133,29 +137,38 @@ export class YjsDriveProvider {
                 return;
             }
 
-            // Always perform an initial sync check on connection, regardless of mode
-            // This ensures we're up to date when the session starts
-            this.setState('syncing');
-            this.setPhase('checking');
-            this.log('connect: starting');
+            this.log('connect: starting', { mode });
 
-            // Load manifest from Drive
-            await this.manifest.load();
-            this.log('connect: manifest loaded');
+            if (mode === 'sync') {
+                // Sync mode: load manifest and pull remote changes.
+                // No need to force-push full state — IndexedDB has everything
+                // and any pending changes from interrupted syncs are handled
+                // separately by the persisted state recovery in YjsContext.
+                this.setState('syncing');
+                this.setPhase('checking');
 
-            // Force a full state push for all loaded docs after reconnect
-            this.forceFullStateDocs = new Set(this.docManager.getLoadedDocs());
-            this.log('connect: force full state for docs', Array.from(this.forceFullStateDocs));
+                await this.manifest.load();
+                this.lastPullAt = Date.now();
+                this.log('connect: manifest loaded');
 
-            // Sync all currently loaded documents
-            for (const docName of this.docManager.getLoadedDocs()) {
-                await this.syncDoc(docName);
-                this.subscribeToDoc(docName);
+                for (const docName of this.docManager.getLoadedDocs()) {
+                    await this.syncDoc(docName);
+                    this.subscribeToDoc(docName);
+                }
+
+                // Save manifest only if we modified it during connect
+                if (this.manifest.isDirty()) {
+                    await this.manifest.save();
+                    this.log('connect: manifest saved');
+                }
+            } else {
+                // Backup & Manual: no network requests on connect.
+                // Just subscribe to doc updates so changes are captured.
+                // Manifest will be loaded lazily on the first actual sync.
+                for (const docName of this.docManager.getLoadedDocs()) {
+                    this.subscribeToDoc(docName);
+                }
             }
-
-            // Save manifest updates from initial sync (e.g., cleared deltas, new state versions)
-            await this.manifest.save();
-            this.log('connect: manifest saved');
 
             this.connected = true;
             this.updateSyncInterval();
@@ -340,13 +353,6 @@ export class YjsDriveProvider {
 
         const allowPull = options.allowPull ?? true;
 
-        // On a forced sync, ensure every loaded doc does a full-state push to heal any missed deltas
-        if (force) {
-            for (const docName of this.docManager.getLoadedDocs()) {
-                this.forceFullStateDocs.add(docName);
-            }
-        }
-
         this.updatePendingState();
 
         const hasPendingLocal = this.hasLocalChangesToPush();
@@ -381,10 +387,11 @@ export class YjsDriveProvider {
                 this.setPhase('checking');
                 manifestChanged = await this.manifest.hasManifestChanged();
                 
-                if (manifestChanged || force || hasPendingLocal) {
-                    // Reload manifest from Drive to get latest changes from other devices
+                if (manifestChanged || force) {
+                    // Reload manifest from Drive to get latest changes
+                    // Use lightweight reload (no file listing) since we already have the file cache
                     this.setPhase('downloading');
-                    await this.manifest.load();
+                    await this.manifest.reload();
                     this.lastPullAt = Date.now();
                     this.log('sync: manifest reloaded (changed or forced)');
                 } else {
@@ -404,9 +411,13 @@ export class YjsDriveProvider {
                 await this.syncDoc(docName, shouldPull);
             }
 
-            // Save updated manifest
-            await this.manifest.save();
-            this.log('sync: manifest saved, lastSync', this.manifest.getLastSync());
+            // Only save manifest if it was modified during this sync
+            if (this.manifest.isDirty()) {
+                await this.manifest.save();
+                this.log('sync: manifest saved, lastSync', this.manifest.getLastSync());
+            } else {
+                this.log('sync: no manifest changes, skipping save');
+            }
 
             this.setState('idle');
             markSyncCompleted(); // Persist successful sync completion
@@ -611,8 +622,7 @@ export class YjsDriveProvider {
             for (const deltaId of orphanedDeltaIds) {
                 this.manifest.removeDelta(docName, deltaId);
             }
-            // Save manifest to persist the cleanup
-            await this.manifest.save();
+            // Manifest is now dirty and will be saved by the parent sync() call
             this.log(`pull: pruned ${orphanedDeltaIds.length} orphaned deltas for ${docName}`);
         }
     }
@@ -974,8 +984,10 @@ export class YjsDriveProvider {
         // Subscribe to future updates
         this.subscribeToDoc(docName);
 
-        // Save manifest with any new entries
-        await this.manifest.save();
+        // Save manifest only if it was modified
+        if (this.manifest.isDirty()) {
+            await this.manifest.save();
+        }
     }
 
     /**

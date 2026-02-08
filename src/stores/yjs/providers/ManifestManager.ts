@@ -58,6 +58,7 @@ export class ManifestManager {
     private manifest: Manifest | null = null;
     private fileIdCache: Map<string, string> = new Map();
     private lastManifestModifiedTime: string | null = null;
+    private _dirty: boolean = false;
 
     constructor(accessToken: string, sessionId?: string | null) {
         this.accessToken = accessToken;
@@ -72,6 +73,7 @@ export class ManifestManager {
         this.manifest = null;
         this.fileIdCache.clear();
         this.lastManifestModifiedTime = null;
+        this._dirty = false;
     }
 
     /**
@@ -157,13 +159,70 @@ export class ManifestManager {
         );
 
         if (this.manifestFileId) {
-            await this.updateFile(this.manifestFileId, MANIFEST_FILE_NAME, blob);
+            const modifiedTime = await this.updateFile(this.manifestFileId, MANIFEST_FILE_NAME, blob);
+            // Track Drive's actual modifiedTime so hasManifestChanged() won't false-positive
+            if (modifiedTime) {
+                this.lastManifestModifiedTime = modifiedTime;
+            }
         } else {
             this.manifestFileId = await this.createFile(MANIFEST_FILE_NAME, blob);
             this.fileIdCache.set(MANIFEST_FILE_NAME, this.manifestFileId);
         }
 
+        this._dirty = false;
+
         console.log('[ManifestManager] Saved manifest to Drive');
+    }
+
+    /**
+     * Whether local manifest has been modified and needs saving
+     */
+    isDirty(): boolean {
+        return this._dirty;
+    }
+
+    /**
+     * Mark manifest as needing to be saved
+     */
+    markDirty(): void {
+        this._dirty = true;
+    }
+
+    /**
+     * Clear dirty flag (called after successful save)
+     */
+    clearDirty(): void {
+        this._dirty = false;
+    }
+
+    /**
+     * Lightweight reload: download just the manifest content without listing all files.
+     * Use this when we already have the manifestFileId and file cache from a previous load().
+     * Falls back to full load() if we don't have the manifest file ID.
+     */
+    async reload(): Promise<Manifest> {
+        if (!this.manifestFileId) {
+            // No cached manifest ID, do full load
+            return this.load();
+        }
+
+        try {
+            // Fetch manifest metadata (modifiedTime) and content
+            const [metaResponse, content] = await Promise.all([
+                this.request(`/files/${this.manifestFileId}?fields=modifiedTime`),
+                this.downloadFileAsJson(this.manifestFileId),
+            ]);
+
+            const { modifiedTime } = await metaResponse.json();
+            this.lastManifestModifiedTime = modifiedTime;
+            this.manifest = content as Manifest;
+
+            console.log('[ManifestManager] Reloaded manifest (lightweight)');
+            return this.manifest;
+        } catch (error) {
+            console.warn('[ManifestManager] Lightweight reload failed, falling back to full load:', error);
+            return this.load();
+        }
     }
 
     /**
@@ -235,6 +294,7 @@ export class ManifestManager {
         };
 
         this.manifest.documents[docName] = { ...existing, ...update };
+        this._dirty = true;
     }
 
     /**
@@ -252,6 +312,7 @@ export class ManifestManager {
                 lastCompaction: new Date().toISOString(),
                 deltas: [],
             };
+            this._dirty = true;
         }
 
         return this.manifest.documents[docName];
@@ -266,6 +327,7 @@ export class ManifestManager {
             id: deltaId,
             timestamp: new Date().toISOString(),
         });
+        this._dirty = true;
     }
 
     /**
@@ -275,6 +337,7 @@ export class ManifestManager {
         const doc = this.manifest?.documents[docName];
         if (doc) {
             doc.deltas = doc.deltas.filter(d => d.id !== deltaId);
+            this._dirty = true;
         }
     }
 
@@ -287,6 +350,7 @@ export class ManifestManager {
             doc.deltas = [];
             doc.lastCompaction = new Date().toISOString();
             doc.stateVersion++;
+            this._dirty = true;
         }
     }
 
@@ -503,8 +567,9 @@ export class ManifestManager {
 
     /**
      * Update an existing file
+     * Returns the updated modifiedTime from Drive if available
      */
-    async updateFile(fileId: string, name: string, blob: Blob, retryCount = 0): Promise<void> {
+    async updateFile(fileId: string, name: string, blob: Blob, retryCount = 0): Promise<string | undefined> {
         const metadata = {
             name,
             mimeType: blob.type,
@@ -518,8 +583,8 @@ export class ManifestManager {
         form.append('file', blob);
 
         const uploadUrl = this.useWorker
-            ? `${SYNC_WORKER_CONFIG.endpoints.drive}/files/${fileId}?uploadType=multipart`
-            : `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`;
+            ? `${SYNC_WORKER_CONFIG.endpoints.drive}/files/${fileId}?uploadType=multipart&fields=modifiedTime`
+            : `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart&fields=modifiedTime`;
 
         const response = await fetch(uploadUrl, {
             method: 'PATCH',
@@ -542,6 +607,13 @@ export class ManifestManager {
 
             const text = await response.text();
             throw new Error(`Drive update error ${response.status}: ${text}`);
+        }
+
+        try {
+            const result = await response.json();
+            return result?.modifiedTime;
+        } catch {
+            return undefined;
         }
     }
 
