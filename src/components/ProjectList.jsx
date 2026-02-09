@@ -456,8 +456,8 @@ const ProjectList = ({
                 <EmptyState
                     icon={ClipboardDocumentCheckIcon}
                     title="No projects"
-                    description="Get started by creating a new project."
-                    actionLabel="New Project"
+                    description="Get started by creating your first project."
+                    actionLabel="Create First Project"
                     actionIcon={PlusIcon}
                     onAction={() => openProjectModal()}
                 />

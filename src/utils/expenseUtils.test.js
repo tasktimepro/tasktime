@@ -80,7 +80,7 @@ describe('expenseUtils', () => {
             amountType: 'variable',
             amount: 200,
         }, '2025-02-01');
-        expect(expense.amount).toBe(0);
+            expect(expense.amount).toBe(200);
         expect(expense.amountType).toBe('variable');
     });
 

@@ -137,4 +137,25 @@ describe('ExpenseDueCard', () => {
 
         expect(screen.queryByRole('button', { name: 'Mark as paid' })).not.toBeInTheDocument()
     })
+
+    it('shows mark paid action for variable auto-payment expenses with amount', () => {
+        const expense = {
+            id: 'exp-6',
+            title: 'Variable Auto',
+            date: '2026-02-06',
+            amount: 22,
+            amountType: 'variable',
+            currency: 'USD',
+            paymentMode: 'auto',
+        }
+
+        render(
+            <ExpenseDueCard
+                expense={expense}
+                onMarkPaid={vi.fn()}
+            />
+        )
+
+        expect(screen.getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
+    })
 })

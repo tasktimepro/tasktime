@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '../hooks/useToast.ts';
-import { DEFAULT_CURRENCY, getCurrencyOptions } from '../utils/currencyUtils.ts';
+import { DEFAULT_CURRENCY } from '../utils/currencyUtils.ts';
+import CurrencySelect from '@/components/ui/currency-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from './CustomCheckbox';
 
 /**
@@ -70,21 +70,11 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
                         <Label htmlFor="preferredCurrency">
                             Preferred Currency
                         </Label>
-                        <Select
+                        <CurrencySelect
+                            id="preferredCurrency"
                             value={preferredCurrency}
                             onValueChange={handleCurrencyChange}
-                        >
-                            <SelectTrigger id="preferredCurrency">
-                                <SelectValue placeholder="Select a currency" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {getCurrencyOptions(true).map(option => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        />
                         <p className="text-sm text-muted-foreground">
                             This currency will be used as the default for new projects and in dashboard metrics.
                         </p>

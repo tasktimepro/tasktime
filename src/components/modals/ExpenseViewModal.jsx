@@ -69,7 +69,8 @@ const ExpenseViewModal = ({
 
     const isPreview = Boolean(currentExpense?.isPreview);
     const isPaid = currentExpense?.paymentStatus === 'paid';
-    const isAutoPayment = currentExpense?.paymentMode === 'auto';
+    const isAutoPayment = currentExpense?.paymentMode === 'auto'
+        && currentExpense?.amountType !== 'variable';
     const showAutoPayment = currentExpense?.isRecurring && isAutoPayment;
     const isVariable = currentExpense?.amountType === 'variable';
     const amountValue = typeof currentExpense?.amount === 'number' ? currentExpense.amount : 0;

@@ -415,8 +415,8 @@ const ClientList = ({
                 <EmptyState
                     icon={UserGroupIcon}
                     title="No clients"
-                    description="Get started by creating a new client."
-                    actionLabel="New Client"
+                    description="Get started by creating your first client."
+                    actionLabel="Create First Client"
                     actionIcon={PlusIcon}
                     onAction={() => openClientModal()}
                 />

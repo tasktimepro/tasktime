@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
-import { getPreferredCurrency, getCurrencyOptions } from '../../utils/currencyUtils.ts';
+import { getPreferredCurrency } from '../../utils/currencyUtils.ts';
 import Modal from '../Modal';
 import { ColorPicker } from '@/components/ui/color-picker';
+import CurrencySelect from '@/components/ui/currency-select';
 
 /**
  * ClientModal component - Modal for creating and editing clients
@@ -631,21 +632,11 @@ const ClientModal = ({
                                 <Label htmlFor="defaultCurrency" className="mb-2">
                                     Default Currency
                                 </Label>
-                                <Select
+                                <CurrencySelect
+                                    id="defaultCurrency"
                                     value={formData.defaultCurrency}
                                     onValueChange={(value) => handleInputChange({ target: { name: 'defaultCurrency', value } })}
-                                >
-                                    <SelectTrigger id="defaultCurrency">
-                                        <SelectValue placeholder="Select a currency" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {getCurrencyOptions().map(option => (
-                                            <SelectItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                />
                                 <p className="mt-2 text-xs text-muted-foreground">
                                     This currency will be used as the default for new projects and invoices for this client.
                                 </p>

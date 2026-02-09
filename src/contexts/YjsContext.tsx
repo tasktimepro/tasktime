@@ -12,6 +12,13 @@ import { YjsStore, getYjsStore, SyncState, SyncPhase, AutoSyncMode } from '@/sto
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { shouldSyncOnLoad, wasSyncInterrupted, hasPersistedPendingChanges } from '@/utils/syncPersistence';
 
+declare global {
+
+    interface Window {
+        __TASKTIME_STORE__?: YjsStore;
+    }
+}
+
 export interface YjsContextValue {
     /** The underlying YjsStore instance */
     store: YjsStore;
@@ -71,6 +78,15 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
     // Get singleton store
     const store = useMemo(() => getYjsStore(), []);
+
+    useEffect(() => {
+        if (!import.meta.env.DEV) return;
+        window.__TASKTIME_STORE__ = store;
+
+        return () => {
+            delete window.__TASKTIME_STORE__;
+        };
+    }, [store]);
     
     // State
     const [isReady, setIsReady] = useState(false);

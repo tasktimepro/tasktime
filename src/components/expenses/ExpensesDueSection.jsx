@@ -35,8 +35,12 @@ const ExpensesDueSection = ({ openExpenseView }) => {
         const upcomingStartStr = toStorageDate(upcomingStart) || '';
         const upcomingEndStr = toStorageDate(upcomingEnd) || '';
 
+        const isManualExpense = (expense) => (
+            expense.paymentMode !== 'auto' || expense.amountType === 'variable'
+        );
+
         const unpaidManual = expenses.filter((expense) => (
-            expense.paymentStatus === 'unpaid' && expense.paymentMode !== 'auto'
+            expense.paymentStatus === 'unpaid' && isManualExpense(expense)
         ));
         const recurrenceDates = new Map();
         expenses.forEach((expense) => {
@@ -73,7 +77,7 @@ const ExpensesDueSection = ({ openExpenseView }) => {
         });
 
         expenses.forEach((expense) => {
-            if (expense.paymentMode !== 'auto') return;
+            if (expense.paymentMode !== 'auto' || expense.amountType === 'variable') return;
             const expenseDate = parseStoredDate(expense.date);
             if (!expenseDate) return;
             if (expenseDate > todayDate && expenseDate <= upcomingEnd) {
@@ -172,7 +176,9 @@ const ExpensesDueSection = ({ openExpenseView }) => {
                             isPreview={expense.isPreview}
                             recurrence={expense.recurrenceId ? recurrencesById.get(expense.recurrenceId) : null}
                             onView={() => openExpenseView?.(expense)}
-                            onMarkPaid={expense.isPreview || expense.paymentMode === 'auto' || expense.paymentStatus === 'paid'
+                            onMarkPaid={expense.isPreview
+                                || (expense.paymentMode === 'auto' && expense.amountType !== 'variable')
+                                || expense.paymentStatus === 'paid'
                                 ? undefined
                                 : () => handleMarkPaid(expense)}
                         />

@@ -151,4 +151,18 @@ describe('ExpensesDueSection', () => {
         expect(screen.queryByText('Auto Overdue')).not.toBeInTheDocument()
         expect(screen.queryByText('Auto Today')).not.toBeInTheDocument()
     })
+
+    it('includes variable auto-payment expenses in overdue/today groups', () => {
+        expensesMock.push(
+            { id: 'exp-var-overdue', title: 'Variable Auto Overdue', date: '2026-02-05', paymentStatus: 'unpaid', paymentMode: 'auto', amount: 12, amountType: 'variable', currency: 'USD' },
+            { id: 'exp-var-today', title: 'Variable Auto Today', date: '2026-02-06', paymentStatus: 'unpaid', paymentMode: 'auto', amount: 14, amountType: 'variable', currency: 'USD' }
+        )
+
+        render(<ExpensesDueSection openExpenseView={vi.fn()} />)
+
+        expect(screen.getByText('Overdue (1)')).toBeInTheDocument()
+        expect(screen.getByText('Today (1)')).toBeInTheDocument()
+        expect(screen.getByText('Variable Auto Overdue')).toBeInTheDocument()
+        expect(screen.getByText('Variable Auto Today')).toBeInTheDocument()
+    })
 })

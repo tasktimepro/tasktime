@@ -23,7 +23,7 @@ const ExpenseDueCard = ({
     const isVariable = expense.amountType === 'variable';
     const hasAmount = typeof expense.amount === 'number' && expense.amount > 0;
     const isPaid = expense.paymentStatus === 'paid';
-    const isAutoPayment = expense.paymentMode === 'auto';
+    const isAutoPayment = expense.paymentMode === 'auto' && expense.amountType !== 'variable';
     const isClickable = Boolean(onView);
     const canMarkPaid = Boolean(onMarkPaid) && !isPreview && !isAutoPayment && (!isVariable || hasAmount);
 

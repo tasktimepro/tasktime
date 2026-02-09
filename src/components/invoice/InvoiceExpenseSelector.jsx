@@ -118,10 +118,9 @@ const InvoiceExpenseSelector = ({
                         </Button>
                     </div>
                     {expenses.length === 0 ? (
-                        <Notice
-                            title="No billable expenses available"
-                            description="Only unbilled, billable expenses for the selected client or project appear here."
-                        />
+                            <Notice
+                                title="No billable expenses available"
+                            />
                     ) : (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                             {expenses.map((expense) => {

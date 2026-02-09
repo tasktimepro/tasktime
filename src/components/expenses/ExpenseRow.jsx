@@ -172,7 +172,7 @@ const ExpenseRow = ({
                     </div>
 
                     <div className="flex justify-end items-center space-x-2">
-                        {!isPaid && !isPreview && expense.paymentMode !== 'auto' && (
+                        {!isPaid && !isPreview && !(expense.paymentMode === 'auto' && expense.amountType !== 'variable') && (
                             <Button
                                 size="sm"
                                 leadingIcon={CheckIcon}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon } from '@/components/ui/icons';
+import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon, PlusIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -599,7 +599,7 @@ const InvoicesList = ({
                 title="No invoices yet"
                 description="Get started by generating your first invoice."
                 actionLabel={!hideNewInvoiceButton ? "Create First Invoice" : undefined}
-                actionIcon={!hideNewInvoiceButton ? DocumentTextIcon : undefined}
+                actionIcon={!hideNewInvoiceButton ? PlusIcon : undefined}
                 onAction={!hideNewInvoiceButton ? () => onEditInvoice && onEditInvoice(null) : undefined}
             />
         );

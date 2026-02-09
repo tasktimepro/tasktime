@@ -355,6 +355,26 @@ const Expenses = ({
         todayStr,
     ]);
 
+    const hasActiveFilters = useMemo(() => {
+        if (search.trim()) return true;
+        if (clientId !== 'all') return true;
+        if (projectId !== 'all') return true;
+        if (personalOnly || billableOnly || recurringOnly) return true;
+        if (paidStatus !== 'all' || billedStatus !== 'all') return true;
+        if (period !== 'month') return true;
+        return false;
+    }, [
+        search,
+        clientId,
+        projectId,
+        personalOnly,
+        billableOnly,
+        recurringOnly,
+        paidStatus,
+        billedStatus,
+        period,
+    ]);
+
     const clientsById = useMemo(() => {
         const map = new Map();
         clients.forEach((client) => {
@@ -490,11 +510,14 @@ const Expenses = ({
                         <div className="mt-6">
                             <ExpenseList
                                 expenses={filteredExpenses}
+                                hasAnyExpenses={expenses.length > 0}
+                                hasActiveFilters={hasActiveFilters}
                                 clientsById={clientsById}
                                 projectsById={projectsById}
                                 onView={(expense) => openExpenseView?.(expense)}
                                 onEdit={(expense) => openExpenseModal(expense)}
                                 onTogglePaid={handleTogglePaid}
+                                onCreateFirst={() => openExpenseModal(null)}
                             />
                         </div>
                     </div>

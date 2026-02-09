@@ -3,7 +3,7 @@
  */
 
 import { EmptyState } from '@/components/ui/empty-state';
-import { HandCoinsIcon } from '@/components/ui/icons';
+import { HandCoinsIcon, PlusIcon } from '@/components/ui/icons';
 import ExpenseRow from './ExpenseRow';
 
 const ExpenseList = ({
@@ -14,14 +14,30 @@ const ExpenseList = ({
     onEdit,
     onTogglePaid,
     compact = false,
+    hasAnyExpenses = false,
+    hasActiveFilters = false,
+    onCreateFirst,
 }) => {
 
     if (!expenses.length) {
+        const title = hasAnyExpenses
+            ? (hasActiveFilters ? 'No expenses match your filters' : 'No expenses in this period')
+            : 'No expenses yet';
+        const description = hasAnyExpenses
+            ? (hasActiveFilters
+                ? 'Try adjusting filters or date range to see other expenses.'
+                : 'Try a different time range to see other expenses.')
+            : 'Create your first expense to start tracking spending.';
+        const shouldShowCreate = !hasAnyExpenses && typeof onCreateFirst === 'function';
+
         return (
             <EmptyState
                 icon={HandCoinsIcon}
-                title="No expenses yet"
-                description="Create your first expense to start tracking spending."
+                title={title}
+                description={description}
+                actionLabel={shouldShowCreate ? 'Create First Expense' : undefined}
+                actionIcon={shouldShowCreate ? PlusIcon : undefined}
+                onAction={shouldShowCreate ? onCreateFirst : undefined}
             />
         );
     }

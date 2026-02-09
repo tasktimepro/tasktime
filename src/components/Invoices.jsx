@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { CreditCardIcon, BuildingOfficeIcon, DocumentTextIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
+import { CreditCardIcon, BuildingOfficeIcon, DocumentTextIcon, DocumentDuplicateIcon, PlusIcon } from '@/components/ui/icons';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useTimers } from '../hooks/useTimers.ts';
@@ -138,7 +138,7 @@ const Invoices = ({
                 {/* New Invoice Button */}
                 <Button
                     onClick={handleCreateNewInvoice}
-                    leadingIcon={DocumentTextIcon}
+                    leadingIcon={PlusIcon}
                 >
                     New Invoice
                 </Button>

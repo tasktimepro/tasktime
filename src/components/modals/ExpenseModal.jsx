@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Notice } from '@/components/ui/notice';
 import CustomCheckbox from '../CustomCheckbox';
 import RecurringPicker from '../task/RecurringPicker';
+import CurrencySelect from '@/components/ui/currency-select';
 import { useToast } from '../../hooks/useToast.ts';
 import { useExpenses } from '../../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../../hooks/useExpenseRecurrences.ts';
@@ -21,7 +22,7 @@ import { useBusinessInfos } from '../../hooks/useBusinessInfos.ts';
 import { usePreferences } from '../../hooks/usePreferences.ts';
 import { usePaymentMethods } from '../../hooks/usePaymentMethods.ts';
 import { buildExpenseFromRecurrence } from '@/utils/expenseUtils';
-import { CURRENCY_NAMES, DEFAULT_CURRENCY } from '@/utils/currencyUtils.ts';
+import { DEFAULT_CURRENCY } from '@/utils/currencyUtils.ts';
 import { toStorageDate } from '@/utils/dateUtils.ts';
 
 const NO_CLIENT_VALUE = 'no-client';
@@ -59,7 +60,6 @@ const ExpenseModal = ({
     const { paymentMethods, defaultPaymentMethod } = usePaymentMethods();
 
     const todayString = useMemo(() => toStorageDate(new Date()) || '', []);
-    const currencyOptions = useMemo(() => Object.keys(CURRENCY_NAMES).sort(), []);
 
     const activeClients = useMemo(() => {
         return clients.filter((client) => !client.archived);
@@ -602,7 +602,7 @@ const ExpenseModal = ({
         const effectiveDate = showOneTimeFields ? formData.date : formData.startDate;
         const effectiveBusinessId = !formData.isPersonal ? (formData.businessId || null) : null;
         const effectiveTaxNumber = !formData.isPersonal ? (selectedBusiness?.taxNumber || null) : null;
-        const isAutoPayment = formData.paymentMode === 'auto';
+        const isAutoPayment = formData.paymentMode === 'auto' && !isVariable;
         const resolvedPaidOn = isAutoPayment
             ? effectiveDate
             : (showOneTimeFields && formData.paidOn ? formData.paidOn : null);
@@ -1017,18 +1017,10 @@ const ExpenseModal = ({
                     </div>
                     <div className="space-y-2">
                         <Label>Currency</Label>
-                        <Select value={formData.currency} onValueChange={(value) => handleChange('currency', value)}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select currency" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {currencyOptions.map((currency) => (
-                                    <SelectItem key={currency} value={currency}>
-                                        {currency} — {CURRENCY_NAMES[currency]}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <CurrencySelect
+                            value={formData.currency}
+                            onValueChange={(value) => handleChange('currency', value)}
+                        />
                     </div>
                     {!isSubmittingRecurring && (
                         <div className="space-y-2">

@@ -13,10 +13,43 @@ describe('ExpenseList', () => {
                 projectsById={new Map()}
                 onEdit={vi.fn()}
                 onTogglePaid={vi.fn()}
+                onCreateFirst={vi.fn()}
             />
         )
 
         expect(screen.getByText('No expenses yet')).toBeInTheDocument()
+        expect(screen.getByText('Create First Expense')).toBeInTheDocument()
+    })
+
+    it('renders filtered empty state when expenses exist', () => {
+        render(
+            <ExpenseList
+                expenses={[]}
+                hasAnyExpenses
+                hasActiveFilters
+                clientsById={new Map()}
+                projectsById={new Map()}
+                onEdit={vi.fn()}
+                onTogglePaid={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('No expenses match your filters')).toBeInTheDocument()
+    })
+
+    it('renders period empty state when no filters are applied', () => {
+        render(
+            <ExpenseList
+                expenses={[]}
+                hasAnyExpenses
+                clientsById={new Map()}
+                projectsById={new Map()}
+                onEdit={vi.fn()}
+                onTogglePaid={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('No expenses in this period')).toBeInTheDocument()
     })
 
     it('renders expense rows', () => {
