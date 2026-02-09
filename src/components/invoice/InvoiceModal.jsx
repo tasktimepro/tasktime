@@ -80,6 +80,19 @@ const InvoiceModal = ({
     availableExpenses,
     selectedExpensesForBilling,
     setSelectedExpensesForBilling,
+    additionalExpenses,
+    showAddExpenseForm,
+    setShowAddExpenseForm,
+    newExpenseTitle,
+    setNewExpenseTitle,
+    newExpenseAmount,
+    setNewExpenseAmount,
+    newExpenseCurrency,
+    setNewExpenseCurrency,
+    newExpenseSupplierName,
+    setNewExpenseSupplierName,
+    handleAddAdditionalExpense,
+    handleRemoveAdditionalExpense,
     conversionUnavailableCount,
     exchangeRatesError,
     exchangeRatesLoading,
@@ -174,8 +187,8 @@ const InvoiceModal = ({
         const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length;
         const selectedExpensesCount = Object.values(selectedExpensesForBilling).filter(Boolean).length;
         const hasAnyTasks = invoiceTasks.length > 0 || additionalTasks.length > 0;
-        const hasAnyExpenses = availableExpenses.length > 0;
-        const hasSelectedTasks = selectedTasksCount > 0 || additionalTasks.length > 0 || selectedExpensesCount > 0;
+        const hasAnyExpenses = availableExpenses.length > 0 || additionalExpenses.length > 0;
+        const hasSelectedTasks = selectedTasksCount > 0 || additionalTasks.length > 0 || selectedExpensesCount > 0 || additionalExpenses.length > 0;
         
         if ((!hasAnyTasks && !hasAnyExpenses) || !hasSelectedTasks) {
             setActiveSection('tasksTime');
@@ -457,6 +470,19 @@ const InvoiceModal = ({
                     expenses={availableExpenses}
                     selectedExpensesForBilling={selectedExpensesForBilling}
                     setSelectedExpensesForBilling={setSelectedExpensesForBilling}
+                    additionalExpenses={additionalExpenses}
+                    showAddExpenseForm={showAddExpenseForm}
+                    setShowAddExpenseForm={setShowAddExpenseForm}
+                    newExpenseTitle={newExpenseTitle}
+                    setNewExpenseTitle={setNewExpenseTitle}
+                    newExpenseAmount={newExpenseAmount}
+                    setNewExpenseAmount={setNewExpenseAmount}
+                    newExpenseCurrency={newExpenseCurrency}
+                    setNewExpenseCurrency={setNewExpenseCurrency}
+                    newExpenseSupplierName={newExpenseSupplierName}
+                    setNewExpenseSupplierName={setNewExpenseSupplierName}
+                    handleAddAdditionalExpense={handleAddAdditionalExpense}
+                    handleRemoveAdditionalExpense={handleRemoveAdditionalExpense}
                     getInvoiceCurrency={getInvoiceCurrency}
                     conversionUnavailableCount={conversionUnavailableCount}
                     exchangeRatesError={exchangeRatesError}

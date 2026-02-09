@@ -53,6 +53,8 @@ const InvoiceTaskSelector = ({
     getInvoiceCurrency,
     setNewTaskUseFlatRate
 }) => {
+    const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length + additionalTasks.length;
+
     return (
         <div className="border border-border rounded-lg">
             <button
@@ -63,6 +65,7 @@ const InvoiceTaskSelector = ({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                         <h4 className="text-sm font-medium text-foreground">Tasks & Time</h4>
+                        <span className="text-xs text-muted-foreground">({selectedTasksCount})</span>
                         <div className="relative group flex">
                             <div
                                 className="text-muted-foreground hover:text-muted-foreground cursor-help focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
@@ -302,111 +305,117 @@ const InvoiceTaskSelector = ({
                             })}
 
                             {/* Additional Tasks */}
-                            {additionalTasks.map((task) => {
-                                const currentMinutes = hoursToMinutes(task.hours || 0);
-                                const currentFlatRate = task.flatRate !== undefined ? task.flatRate : '';
-
-                                // Check if this task uses flat rate (from task object or state)
-                                const isUsingFlatRate = task.useFlatRate || useFlatRate[task.id] || false;
-
-                                return (
-                                    <div key={task.id} className="flex items-center justify-between p-3 bg-card rounded border">
-                                        <div className="flex items-center space-x-3 flex-1">
-                                            {/* Task remove button */}
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleRemoveAdditionalTask(task.id)}
-                                                className="text-destructive-strong hover-text-destructive-strong"
-                                                title="Remove task"
-                                                aria-label="Remove task"
-                                            >
-                                                <TrashIcon className="w-5 h-5" />
-                                            </Button>
-                                            <div className="flex-1 pr-4">
-                                                <p className="text-sm font-medium text-foreground overflow-hidden" style={{
-                                                    display: '-webkit-box',
-                                                    WebkitLineClamp: 2,
-                                                    WebkitBoxOrient: 'vertical'
-                                                }}>{task.title}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Custom task
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center space-x-3">
-                                            {/* Add flat rate toggle */}
-                                            <div className="flex items-center ">
-                                                <CustomCheckbox
-                                                    checked={isUsingFlatRate}
-                                                    onChange={(checked) => handleToggleAdditionalTaskFlatRate(task.id, checked)}
-                                                    label="Flat rate"
-                                                    labelClassName="text-xs text-foreground"
-                                                    id={`flat-rate-${task.id}`}
-                                                />
-                                            </div>
-
-                                            {isUsingFlatRate ? (
-                                                // Flat rate input with quantity
-                                                <div className="flex items-center space-x-2">
-                                                    <div className="text-right">
-                                                        <div className="text-xs text-muted-foreground mb-1 text-left">Quantity</div>
-                                                        <input
-                                                            type="number"
-                                                            step="1"
-                                                            min="1"
-                                                            value={task.quantity || 1}
-                                                            onChange={(e) => handleAdditionalTaskQuantityChange(task.id, e.target.value)}
-                                                            className="w-16 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground"
-                                                            placeholder="1"
-                                                        />
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="text-xs text-muted-foreground mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={currentFlatRate}
-                                                            onChange={(e) => handleAdditionalTaskFlatRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground sensitive-data"
-                                                            placeholder="0.00"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                // Hours input with custom hourly rate
-                                                <div className="flex items-center space-x-2">
-                                                    <div className="text-right">
-                                                        <div className="text-xs text-muted-foreground mb-1 text-left">Hours ({currentMinutes}min)</div>
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={task.hours}
-                                                            onChange={(e) => handleAdditionalTaskHoursChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground"
-                                                        />
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="text-xs text-muted-foreground mb-1 text-left">Hourly rate</div>
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
-                                                            onChange={(e) => handleAdditionalTaskHourlyRateChange(task.id, e.target.value)}
-                                                            className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground sensitive-data"
-                                                            placeholder="0.00"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                            {additionalTasks.length > 0 && (
+                                <div className="pt-2 space-y-2">
+                                    <div className="text-xs text-muted-foreground">
+                                        Invoice-only tasks
                                     </div>
-                                );
-                            })}
+                                    <div className="space-y-2">
+                                        {additionalTasks.map((task) => {
+                                            const currentMinutes = hoursToMinutes(task.hours || 0);
+                                            const currentFlatRate = task.flatRate !== undefined ? task.flatRate : '';
+
+                                            // Check if this task uses flat rate (from task object or state)
+                                            const isUsingFlatRate = task.useFlatRate || useFlatRate[task.id] || false;
+
+                                            return (
+                                                <div key={task.id} className="flex items-center justify-between p-3 bg-card rounded border">
+                                                    <div className="flex items-center space-x-3 flex-1">
+                                                        {/* Task remove button */}
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleRemoveAdditionalTask(task.id)}
+                                                            className="text-destructive-strong hover-text-destructive-strong"
+                                                            title="Remove task"
+                                                            aria-label="Remove task"
+                                                        >
+                                                            <TrashIcon className="w-5 h-5" />
+                                                        </Button>
+                                                        <div className="flex-1 pr-4">
+                                                            <p className="text-sm font-medium text-foreground overflow-hidden" style={{
+                                                                display: '-webkit-box',
+                                                                WebkitLineClamp: 2,
+                                                                WebkitBoxOrient: 'vertical'
+                                                            }}>{task.title}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center space-x-3">
+                                                        {/* Add flat rate toggle */}
+                                                        <div className="flex items-center ">
+                                                            <CustomCheckbox
+                                                                checked={isUsingFlatRate}
+                                                                onChange={(checked) => handleToggleAdditionalTaskFlatRate(task.id, checked)}
+                                                                label="Flat rate"
+                                                                labelClassName="text-xs text-foreground"
+                                                                id={`flat-rate-${task.id}`}
+                                                            />
+                                                        </div>
+
+                                                        {isUsingFlatRate ? (
+                                                            // Flat rate input with quantity
+                                                            <div className="flex items-center space-x-2">
+                                                                <div className="text-right">
+                                                                    <div className="text-xs text-muted-foreground mb-1 text-left">Quantity</div>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="1"
+                                                                        min="1"
+                                                                        value={task.quantity || 1}
+                                                                        onChange={(e) => handleAdditionalTaskQuantityChange(task.id, e.target.value)}
+                                                                        className="w-16 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground"
+                                                                        placeholder="1"
+                                                                    />
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="text-xs text-muted-foreground mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        value={currentFlatRate}
+                                                                        onChange={(e) => handleAdditionalTaskFlatRateChange(task.id, e.target.value)}
+                                                                        className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground sensitive-data"
+                                                                        placeholder="0.00"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            // Hours input with custom hourly rate
+                                                            <div className="flex items-center space-x-2">
+                                                                <div className="text-right">
+                                                                    <div className="text-xs text-muted-foreground mb-1 text-left">Hours ({currentMinutes}min)</div>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        value={task.hours}
+                                                                        onChange={(e) => handleAdditionalTaskHoursChange(task.id, e.target.value)}
+                                                                        className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground"
+                                                                    />
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="text-xs text-muted-foreground mb-1 text-left">Hourly rate</div>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
+                                                                        onChange={(e) => handleAdditionalTaskHourlyRateChange(task.id, e.target.value)}
+                                                                        className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground sensitive-data"
+                                                                        placeholder="0.00"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Add Task Form */}

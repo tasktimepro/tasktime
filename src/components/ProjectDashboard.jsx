@@ -65,7 +65,7 @@ const ProjectDashboard = ({
     const { deleteTask } = useTasks();
     const { deleteEntry } = useTimeEntries();
     const { deleteInvoice } = useInvoices();
-    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses();
+    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
     const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { preferences } = usePreferences();
     const projectTimer = getTimerForProject(project.id);
@@ -529,6 +529,13 @@ const ProjectDashboard = ({
                 </CardContent>
             </Card>
 
+            <ExpensesSection
+                clientId={projectClient?.id}
+                projectId={project.id}
+                openExpenseModal={openExpenseModal}
+                openExpenseView={openExpenseView}
+            />
+
             {/* Invoices Section - Only show for non-personal projects */}
             {!project.isPersonal && (
                 <Card>
@@ -583,13 +590,6 @@ const ProjectDashboard = ({
                     )}
                 </Card>
             )}
-
-            <ExpensesSection
-                clientId={projectClient?.id}
-                projectId={project.id}
-                openExpenseModal={openExpenseModal}
-                openExpenseView={openExpenseView}
-            />
 
             {/* Metrics Display */}
             <MetricsDisplay

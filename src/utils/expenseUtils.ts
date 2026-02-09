@@ -125,6 +125,9 @@ export const getPendingPeriods = ({
  * @returns {Expense}
  */
 export const buildExpenseFromRecurrence = (recurrence: ExpenseRecurrence, dateValue: string): Expense => {
+    const paymentMode = recurrence.paymentMode || 'manual';
+    const isAutoPayment = paymentMode === 'auto';
+
     return {
         id: '',
         title: recurrence.title,
@@ -134,9 +137,10 @@ export const buildExpenseFromRecurrence = (recurrence: ExpenseRecurrence, dateVa
         receiptNumber: null,
         currency: recurrence.currency,
         amount: recurrence.amountType === 'fixed' ? recurrence.amount : 0,
-        paidOn: null,
+        paidOn: isAutoPayment ? dateValue : null,
         paidBy: recurrence.paidBy ?? null,
-        paymentStatus: 'unpaid',
+        paymentStatus: isAutoPayment ? 'paid' : 'unpaid',
+        paymentMode,
         clientId: recurrence.clientId ?? null,
         projectId: recurrence.projectId ?? null,
         businessId: recurrence.businessId ?? null,

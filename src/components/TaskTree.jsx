@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, SortIcon } from '@/components/ui/icons';
 import TaskItem from './TaskItem';
 import { Button } from '@/components/ui/button';
@@ -115,15 +115,6 @@ const TaskTree = ({
         return sortedRecurringTasks.filter(task => !dueTodayIds.has(task.id));
     }, [sortedRecurringTasks, dueTodayRecurringTasks, todayStr]);
 
-    const hasInitializedRecurringRef = useRef(false);
-
-    useEffect(() => {
-        if (hasInitializedRecurringRef.current) return;
-        if (recurringTasks.length > 0) {
-            setShowRecurringTasks(true);
-            hasInitializedRecurringRef.current = true;
-        }
-    }, [recurringTasks.length]);
 
     const pendingDeleteTask = pendingDeleteTaskId
         ? tasks.find(task => task.id === pendingDeleteTaskId)

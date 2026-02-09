@@ -175,7 +175,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     const tasks = originalTasks.filter(task => !mergedTaskIds.has(task.id));
     const expenseAdditionalTasks = expenseItems.map((expense) => ({
         id: `expense-${expense.id}`,
-        title: `${expense.title}${expense.date ? ` (${expense.date})` : ''}${expense.supplierName ? ` • ${expense.supplierName}` : ''}`,
+        title: `${expense.title}${expense.supplierName ? ` • ${expense.supplierName}` : ''}`,
         flatRate: expense.amount,
         quantity: 1,
         useFlatRate: true

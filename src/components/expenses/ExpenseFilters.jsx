@@ -4,7 +4,7 @@
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { FilterIcon } from '@/components/ui/icons';
+import { FilterIcon, MagnifyingGlassIcon } from '@/components/ui/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CustomCheckbox from '@/components/CustomCheckbox';
@@ -40,11 +40,15 @@ const ExpenseFilters = ({
     return (
         <div className="space-y-3">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
-                <Input
-                    placeholder="Search expenses..."
-                    value={search}
-                    onChange={(event) => onSearchChange(event.target.value)}
-                />
+                <div className="relative">
+                    <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Input
+                        placeholder="Search expenses..."
+                        value={search}
+                        onChange={(event) => onSearchChange(event.target.value)}
+                        className="pl-9"
+                    />
+                </div>
                 <Select value={period} onValueChange={onPeriodChange}>
                     <SelectTrigger>
                         <SelectValue placeholder="Period" />

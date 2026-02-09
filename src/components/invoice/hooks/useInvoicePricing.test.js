@@ -51,6 +51,17 @@ describe('useInvoicePricing', () => {
         expect(result.current.totalHours).toBe(0)
     })
 
+    it('includes invoice-only expenses in totals', () => {
+
+        const { result } = renderHook(() => useInvoicePricing({
+            ...baseParams,
+            invoiceOnlyExpenses: [{ amount: 75.5 }]
+        }))
+
+        expect(result.current.subtotal).toBe(75.5)
+        expect(result.current.total).toBe(75.5)
+    })
+
     it('merges subtasks and applies hourly rates', () => {
 
         const { result } = renderHook(() => useInvoicePricing({

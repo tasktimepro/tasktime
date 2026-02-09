@@ -629,6 +629,14 @@ const InvoiceGenerator = ({
     const [newTaskUseFlatRate, setNewTaskUseFlatRate] = useState(false); // Toggle for new tasks
     const [newTaskHourlyRate, setNewTaskHourlyRate] = useState(''); // Hourly rate for new tasks
     const [newTaskQuantity, setNewTaskQuantity] = useState(1); // Quantity for new flat rate tasks
+
+    // Additional invoice-only expenses state
+    const [additionalExpenses, setAdditionalExpenses] = useState([]);
+    const [showAddExpenseForm, setShowAddExpenseForm] = useState(false);
+    const [newExpenseTitle, setNewExpenseTitle] = useState('');
+    const [newExpenseAmount, setNewExpenseAmount] = useState('');
+    const [newExpenseCurrency, setNewExpenseCurrency] = useState(normalizedInvoiceCurrency);
+    const [newExpenseSupplierName, setNewExpenseSupplierName] = useState('');
     
     // Task selection state for selective billing
     const [selectedTasksForBilling, setSelectedTasksForBilling] = useState({});
@@ -739,6 +747,22 @@ const InvoiceGenerator = ({
             if (editingInvoice.additionalTasks) {
                 setAdditionalTasks(editingInvoice.additionalTasks);
             }
+
+            const invoiceOnlyItems = (editingInvoice.items || [])
+                .filter((item) => item && !item.expenseId)
+                .map((item, index) => ({
+                    id: item.id || `invoice-only-${editingInvoice.id}-${index}`,
+                    title: item.description || 'Invoice Expense',
+                    amount: Number(item.amount) || 0,
+                    currency: normalizedInvoiceCurrency,
+                    originalAmount: Number.isFinite(item.originalAmount) ? item.originalAmount : (Number(item.amount) || 0),
+                    originalCurrency: item.originalCurrency || normalizedInvoiceCurrency,
+                    exchangeRate: Number.isFinite(item.exchangeRate)
+                        ? item.exchangeRate
+                        : (item.originalAmount ? item.amount / item.originalAmount : 1),
+                    supplierName: item.supplierName || null
+                }));
+            setAdditionalExpenses(invoiceOnlyItems);
             
             // Initialize invoice note
             if (editingInvoice.note) {
@@ -784,12 +808,24 @@ const InvoiceGenerator = ({
                 rate: 0
             });
             setAdditionalTasks([]);
+            setAdditionalExpenses([]);
             setInvoiceNote('');
             setInvoiceDateOverride('');
             setUseInvoiceDateOverride(false);
             setMergedSubtasks({});
+            setShowAddExpenseForm(false);
+            setNewExpenseTitle('');
+            setNewExpenseAmount('');
+            setNewExpenseSupplierName('');
+            setNewExpenseCurrency(normalizedInvoiceCurrency);
         }
-    }, [editingInvoice]);
+    }, [editingInvoice, normalizedInvoiceCurrency]);
+
+    useEffect(() => {
+        if (!showAddExpenseForm) {
+            setNewExpenseCurrency(normalizedInvoiceCurrency);
+        }
+    }, [normalizedInvoiceCurrency, showAddExpenseForm]);
 
     /**
      * Prepare invoice data
@@ -848,6 +884,76 @@ const InvoiceGenerator = ({
         focusTaskInput
     );
     const handleRemoveAdditionalTask = InvoiceHandler.handleRemoveAdditionalTask(setAdditionalTasks);
+    const handleAddAdditionalExpense = useCallback(() => {
+        const trimmedTitle = newExpenseTitle.trim();
+        if (!trimmedTitle) {
+            showError('Please enter an expense description');
+            return;
+        }
+
+        const parsedAmount = parseFloat(newExpenseAmount);
+        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+            showError('Expense amount must be greater than zero');
+            return;
+        }
+
+        const originalCurrency = normalizeCurrencyCode(newExpenseCurrency || normalizedInvoiceCurrency);
+        let convertedAmount = parsedAmount;
+        let exchangeRate = 1;
+
+        if (originalCurrency !== normalizedInvoiceCurrency) {
+            const conversion = convertCurrency(
+                parsedAmount,
+                originalCurrency,
+                normalizedInvoiceCurrency,
+                exchangeRates
+            );
+
+            if (!conversion.success) {
+                showError(conversion.error || 'Exchange rate unavailable');
+                return;
+            }
+
+            convertedAmount = conversion.amount;
+            exchangeRate = parsedAmount
+                ? Math.round((convertedAmount / parsedAmount) * 1000000) / 1000000
+                : 1;
+        }
+
+        const roundedAmount = Math.round(convertedAmount * 100) / 100;
+        const supplierName = newExpenseSupplierName.trim();
+
+        setAdditionalExpenses((prev) => ([
+            ...prev,
+            {
+                id: `custom-expense-${Date.now()}`,
+                title: trimmedTitle,
+                amount: roundedAmount,
+                currency: normalizedInvoiceCurrency,
+                originalAmount: parsedAmount,
+                originalCurrency,
+                exchangeRate,
+                supplierName: supplierName || null
+            }
+        ]));
+
+        setNewExpenseTitle('');
+        setNewExpenseAmount('');
+        setNewExpenseSupplierName('');
+        setNewExpenseCurrency(normalizedInvoiceCurrency);
+        setShowAddExpenseForm(false);
+    }, [
+        newExpenseTitle,
+        newExpenseAmount,
+        newExpenseCurrency,
+        newExpenseSupplierName,
+        normalizedInvoiceCurrency,
+        exchangeRates,
+        showError
+    ]);
+    const handleRemoveAdditionalExpense = useCallback((expenseId) => {
+        setAdditionalExpenses((prev) => prev.filter((expense) => expense.id !== expenseId));
+    }, []);
     const handleAdditionalTaskHoursChange = InvoiceHandler.handleAdditionalTaskHoursChange(setAdditionalTasks);
     const handleAdditionalTaskFlatRateChange = InvoiceHandler.handleAdditionalTaskFlatRateChange(setAdditionalTasks);
     const handleAdditionalTaskQuantityChange = InvoiceHandler.handleAdditionalTaskQuantityChange(setAdditionalTasks);
@@ -862,6 +968,7 @@ const InvoiceGenerator = ({
         setTaskHourlyRates,
         setTaskQuantities,
         setAdditionalTasks,
+        setAdditionalExpenses,
         setInvoiceNote,
         setDiscountType,
         setDiscountValue,
@@ -872,7 +979,12 @@ const InvoiceGenerator = ({
         setNewTaskQuantity,
         setMergedSubtasks,
         setInvoiceDateOverride,
-        setUseInvoiceDateOverride
+        setUseInvoiceDateOverride,
+        setShowAddExpenseForm,
+        setNewExpenseTitle,
+        setNewExpenseAmount,
+        setNewExpenseCurrency,
+        setNewExpenseSupplierName
     );
     const handleProjectSelection = InvoiceHandler.handleProjectSelection(
         setSelectedProject,
@@ -920,6 +1032,7 @@ const InvoiceGenerator = ({
             ...expense,
             amount: expense.convertedAmount
         })),
+        invoiceOnlyExpenses: additionalExpenses,
         editableHours,
         discountType,
         discountValue,
@@ -965,10 +1078,10 @@ const InvoiceGenerator = ({
         // Check if any tasks are selected for billing
         const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length;
         const selectedExpensesCount = Object.values(selectedExpensesForBilling).filter(Boolean).length;
-        const hasSelectedItems = selectedTasksCount > 0 || additionalTasks.length > 0 || selectedExpensesCount > 0;
+        const hasSelectedItems = selectedTasksCount > 0 || additionalTasks.length > 0 || selectedExpensesCount > 0 || additionalExpenses.length > 0;
         
         if (!hasSelectedItems) {
-            showError('Please select at least one task or expense to bill, or add an additional task');
+            showError('Please select at least one task or expense to bill, or add an additional item');
             return null;
         }
 
@@ -1040,13 +1153,25 @@ const InvoiceGenerator = ({
                 id: expense.id,
                 title: expense.title,
                 amount: expense.convertedAmount || 0,
-                date: expense.date,
                 supplierName: expense.supplierName || null,
                 currency: normalizedInvoiceCurrency,
                 originalAmount: expense.originalAmount,
                 originalCurrency: expense.originalCurrency,
                 exchangeRate: expense.exchangeRate
             }));
+
+        const invoiceOnlyExpenseItems = additionalExpenses.map((expense) => ({
+            id: expense.id,
+            title: expense.title,
+            amount: expense.amount || 0,
+            supplierName: expense.supplierName || null,
+            currency: normalizedInvoiceCurrency,
+            originalAmount: expense.originalAmount || expense.amount || 0,
+            originalCurrency: expense.originalCurrency || normalizedInvoiceCurrency,
+            exchangeRate: expense.exchangeRate || 1
+        }));
+
+        const allExpenseItems = [...selectedExpenseItems, ...invoiceOnlyExpenseItems];
 
         const expenseInvoiceItems = selectedExpenseItems.map((expense) => ({
             description: expense.title,
@@ -1057,6 +1182,17 @@ const InvoiceGenerator = ({
             originalAmount: expense.originalAmount,
             originalCurrency: expense.originalCurrency,
             exchangeRate: expense.exchangeRate
+        }));
+
+        const invoiceOnlyItems = invoiceOnlyExpenseItems.map((expense) => ({
+            description: expense.title,
+            quantity: 1,
+            rate: expense.amount,
+            amount: expense.amount,
+            originalAmount: expense.originalAmount,
+            originalCurrency: expense.originalCurrency,
+            exchangeRate: expense.exchangeRate,
+            supplierName: expense.supplierName || null
         }));
 
         return {
@@ -1090,8 +1226,8 @@ const InvoiceGenerator = ({
                 ...task,
                 hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
             })),
-            expenseItems: selectedExpenseItems,
-            items: expenseInvoiceItems,
+            expenseItems: allExpenseItems,
+            items: [...expenseInvoiceItems, ...invoiceOnlyItems],
             taskFlatRates: taskFlatRates,
             useFlatRate: useFlatRate,
             taskHourlyRates: taskHourlyRates,
@@ -1164,7 +1300,7 @@ const InvoiceGenerator = ({
                     ...task,
                     hourlyRate: task?.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
                 })),
-                expenseItems: selectedExpenseItems,
+                expenseItems: allExpenseItems,
                 taskFlatRates: taskFlatRates,
                 useFlatRate: useFlatRate,
                 taskQuantities: taskQuantities, // Include quantities in PDF data
@@ -1750,6 +1886,19 @@ const InvoiceGenerator = ({
                     availableExpenses={availableExpensesWithConversion}
                     selectedExpensesForBilling={selectedExpensesForBilling}
                     setSelectedExpensesForBilling={setSelectedExpensesForBilling}
+                    additionalExpenses={additionalExpenses}
+                    showAddExpenseForm={showAddExpenseForm}
+                    setShowAddExpenseForm={setShowAddExpenseForm}
+                    newExpenseTitle={newExpenseTitle}
+                    setNewExpenseTitle={setNewExpenseTitle}
+                    newExpenseAmount={newExpenseAmount}
+                    setNewExpenseAmount={setNewExpenseAmount}
+                    newExpenseCurrency={newExpenseCurrency}
+                    setNewExpenseCurrency={setNewExpenseCurrency}
+                    newExpenseSupplierName={newExpenseSupplierName}
+                    setNewExpenseSupplierName={setNewExpenseSupplierName}
+                    handleAddAdditionalExpense={handleAddAdditionalExpense}
+                    handleRemoveAdditionalExpense={handleRemoveAdditionalExpense}
                     conversionUnavailableCount={conversionUnavailableCount}
                     exchangeRatesError={exchangeRatesError}
                     exchangeRatesLoading={exchangeRatesLoading}

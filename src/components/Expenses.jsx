@@ -56,7 +56,7 @@ const Expenses = ({
 
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess } = useToast();
-    const { expenses, markAsPaid, markAsUnpaid, createExpense } = useExpenses();
+    const { expenses, markAsPaid, markAsUnpaid, createExpense } = useExpenses({ includeArchived: true });
     const { recurrences, generatePendingExpenses, pauseRecurrence, resumeRecurrence, deleteRecurrence } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();

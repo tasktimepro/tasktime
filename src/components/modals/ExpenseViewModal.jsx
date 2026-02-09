@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { format } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +35,7 @@ const ExpenseViewModal = ({
     onEdit,
 }) => {
     const { showSuccess, showError } = useToast();
-    const { expenses, markAsPaid } = useExpenses();
+    const { expenses, markAsPaid } = useExpenses({ includeArchived: true });
     const { recurrences } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects } = useProjects();
@@ -67,10 +67,29 @@ const ExpenseViewModal = ({
         return businessInfos.find((item) => item.id === currentExpense.businessId) || null;
     }, [businessInfos, currentExpense]);
 
+    const isPreview = Boolean(currentExpense?.isPreview);
     const isPaid = currentExpense?.paymentStatus === 'paid';
+    const isAutoPayment = currentExpense?.paymentMode === 'auto';
     const isVariable = currentExpense?.amountType === 'variable';
     const amountValue = typeof currentExpense?.amount === 'number' ? currentExpense.amount : 0;
     const needsAmount = Boolean(isVariable && (!amountValue || amountValue <= 0));
+
+    const dueInLabel = useMemo(() => {
+        if (!isPreview || !currentExpense?.date) return '';
+        const dueDate = parseStoredDate(currentExpense.date);
+        if (!dueDate) return '';
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        dueDate.setHours(0, 0, 0, 0);
+
+        const diffDays = differenceInCalendarDays(dueDate, today);
+        if (diffDays === 0) return 'Due today';
+        if (diffDays === 1) return 'Due tomorrow';
+        if (diffDays > 1) return `Due in ${diffDays} days`;
+        if (diffDays === -1) return 'Due yesterday';
+        return `Due ${Math.abs(diffDays)} days ago`;
+    }, [currentExpense?.date, isPreview]);
 
     const amountLabel = useMemo(() => {
         if (!currentExpense) return '';
@@ -126,7 +145,8 @@ const ExpenseViewModal = ({
 
     const primaryAction = needsAmount ? handleEdit : handleMarkPaid;
     const primaryLabel = needsAmount ? 'Submit' : 'Mark as paid';
-    const showPrimaryAction = !isPaid;
+    const showPrimaryAction = !isPreview && !isPaid && !isAutoPayment;
+    const showEditAction = !isPreview;
 
     const paidOnLabel = currentExpense.paidOn
         ? toDisplayDate(currentExpense.paidOn, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -136,27 +156,40 @@ const ExpenseViewModal = ({
         ? toDisplayDate(currentExpense.date, { month: 'short', day: 'numeric', year: 'numeric' })
         : '';
 
+    const footerLeft = isPreview
+        ? (dueInLabel ? (
+            <div className="text-sm text-muted-foreground">
+                {dueInLabel}
+            </div>
+        ) : null)
+        : (showPrimaryAction ? null : (
+            <div className="text-sm text-muted-foreground">
+                Paid {paidOnLabel ? `on ${paidOnLabel}` : ''}
+            </div>
+        ));
+
     const modalFooter = (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
-            {showPrimaryAction ? (
-                <Button onClick={primaryAction} type="button">
-                    {primaryLabel}
-                </Button>
-            ) : (
-                <div className="text-sm text-muted-foreground">
-                    Paid {paidOnLabel ? `on ${paidOnLabel}` : ''}
-                </div>
-            )}
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                title="Edit expense"
-                onClick={handleEdit}
-                type="button"
-            >
-                <PencilIcon className="h-5 w-5" />
-            </Button>
+            {footerLeft || <div />}
+            <div className="flex items-center gap-2">
+                {showPrimaryAction && (
+                    <Button onClick={primaryAction} type="button">
+                        {primaryLabel}
+                    </Button>
+                )}
+                {showEditAction && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                        title="Edit expense"
+                        onClick={handleEdit}
+                        type="button"
+                    >
+                        <PencilIcon className="h-5 w-5" />
+                    </Button>
+                )}
+            </div>
         </div>
     );
 

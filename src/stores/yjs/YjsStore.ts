@@ -12,6 +12,7 @@
 import * as Y from 'yjs';
 import { YjsDocManager } from './YjsDocManager';
 import { YjsDriveProvider } from './providers/GoogleDriveProvider';
+import { parseStoredDate } from '@/utils/dateUtils';
 import type {
     DocName,
     SyncState,
@@ -52,6 +53,8 @@ export class YjsStore {
     private _archivedTasksLoading: Promise<Y.Doc> | null = null;
     private _archivedInvoicesDoc: Y.Doc | null = null;
     private _archivedInvoicesLoading: Promise<Y.Doc> | null = null;
+    private _archivedExpensesDoc: Y.Doc | null = null;
+    private _archivedExpensesLoading: Promise<Y.Doc> | null = null;
 
     constructor() {
         this.docManager = new YjsDocManager();
@@ -74,6 +77,7 @@ export class YjsStore {
         // Run automatic archival of old data
         await this.archiveOldEntries();
         await this.archiveOldInvoices();
+        await this.archiveOldExpenses();
 
         this._isReady = true;
         console.log('[YjsStore] Initialized');
@@ -239,6 +243,43 @@ export class YjsStore {
         }
 
         return allTasks;
+    }
+
+    // =========================================================================
+    // Archived Expenses (On-Demand)
+    // =========================================================================
+
+    /**
+     * Load archived expenses document (on-demand)
+     */
+    async loadArchivedExpenses(): Promise<Y.Map<string, Expense>> {
+        if (!this._archivedExpensesDoc) {
+            if (!this._archivedExpensesLoading) {
+                this._archivedExpensesLoading = this.docManager.getDoc('expenses-archived');
+            }
+            this._archivedExpensesDoc = await this._archivedExpensesLoading;
+            this._archivedExpensesLoading = null;
+
+            // Sync with Drive if connected
+            if (this.driveProvider?.isConnected()) {
+                await this.driveProvider.syncAndSubscribeDoc('expenses-archived');
+            }
+        }
+        return this._archivedExpensesDoc.getMap('expenses');
+    }
+
+    /**
+     * Check if archived expenses are loaded
+     */
+    get archivedExpensesLoaded(): boolean {
+        return this._archivedExpensesDoc !== null;
+    }
+
+    /**
+     * Get archived expenses synchronously (only if loaded)
+     */
+    get archivedExpenses(): Y.Map<string, Expense> | null {
+        return this._archivedExpensesDoc?.getMap('expenses') ?? null;
     }
 
     /**
@@ -514,6 +555,45 @@ export class YjsStore {
         console.log(`[YjsStore] Archived ${toArchive.length} paid invoices from previous years`);
     }
 
+    /**
+     * Move old expenses from active to archived document
+     * Called automatically on app start
+     */
+    private async archiveOldExpenses(): Promise<void> {
+        const cutoff = Date.now() - NINETY_DAYS_MS;
+        const toArchive: Expense[] = [];
+
+        // Access doc directly (not via getter, since we're in initialization)
+        const expensesMap = this._coreDoc!.getMap<Expense>('expenses');
+
+        for (const [, expense] of expensesMap) {
+            if (!expense?.date) continue;
+
+            const parsedDate = parseStoredDate(expense.date);
+            if (!parsedDate) continue;
+
+            if (parsedDate.getTime() >= cutoff) continue;
+
+            const isPaid = expense.paymentStatus === 'paid';
+            const isBillableUnbilled = expense.billable && expense.billingStatus === 'unbilled';
+
+            if (!isPaid || isBillableUnbilled) continue;
+
+            toArchive.push(expense);
+        }
+
+        if (toArchive.length === 0) return;
+
+        const archivedMap = await this.loadArchivedExpenses();
+
+        for (const expense of toArchive) {
+            archivedMap.set(expense.id, expense);
+            expensesMap.delete(expense.id);
+        }
+
+        console.log(`[YjsStore] Archived ${toArchive.length} expenses older than 90 days`);
+    }
+
     // =========================================================================
     // Google Drive Sync
     // =========================================================================
@@ -687,6 +767,7 @@ export class YjsStore {
             'core',
             'entries-active',
             'tasks-archived',
+            'expenses-archived',
             'invoices-archived'
         ];
         
@@ -706,6 +787,8 @@ export class YjsStore {
         this._archivedTasksLoading = null;
         this._archivedInvoicesDoc = null;
         this._archivedInvoicesLoading = null;
+        this._archivedExpensesDoc = null;
+        this._archivedExpensesLoading = null;
         this._isReady = false;
 
         console.log('[YjsStore] All data cleared');
@@ -723,6 +806,7 @@ export class YjsStore {
         this._activeEntriesDoc = null;
         this._archivedTasksDoc = null;
         this._archivedInvoicesDoc = null;
+        this._archivedExpensesDoc = null;
         this._isReady = false;
     }
 

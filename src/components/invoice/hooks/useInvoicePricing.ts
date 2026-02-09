@@ -20,6 +20,10 @@ type ExpenseItem = {
     amount?: number;
 };
 
+type InvoiceOnlyExpenseItem = {
+    amount?: number;
+};
+
 type BusinessInfo = {
     taxEnabled?: boolean;
     taxRate?: number;
@@ -45,6 +49,7 @@ type InvoicePricingParams = {
     invoiceTasks: TaskItem[];
     additionalTasks: AdditionalTask[];
     expenseItems: ExpenseItem[];
+    invoiceOnlyExpenses?: InvoiceOnlyExpenseItem[];
     editableHours: Record<string, number>;
     discountType: 'percentage' | 'fixed';
     discountValue: number | string;
@@ -69,6 +74,7 @@ const useInvoicePricing = ({
     invoiceTasks,
     additionalTasks,
     expenseItems = [],
+    invoiceOnlyExpenses = [],
     editableHours,
     discountType,
     discountValue,
@@ -87,7 +93,7 @@ const useInvoicePricing = ({
 }: InvoicePricingParams) => {
 
     const pricing = useMemo(() => {
-        if (invoiceTasks.length === 0 && additionalTasks.length === 0 && expenseItems.length === 0) {
+        if (invoiceTasks.length === 0 && additionalTasks.length === 0 && expenseItems.length === 0 && invoiceOnlyExpenses.length === 0) {
             return {
                 subtotal: 0,
                 discount: 0,
@@ -177,6 +183,11 @@ const useInvoicePricing = ({
             expenseAmount += expense.amount || 0;
         });
 
+        invoiceOnlyExpenses.forEach((expense) => {
+            if (!expense) return;
+            expenseAmount += expense.amount || 0;
+        });
+
         const subtotal = projectSubtotal + additionalTaskAmount + expenseAmount;
 
         // Calculate discount
@@ -223,6 +234,7 @@ const useInvoicePricing = ({
         invoiceTasks,
         additionalTasks,
         expenseItems,
+        invoiceOnlyExpenses,
         editableHours,
         discountType,
         discountValue,

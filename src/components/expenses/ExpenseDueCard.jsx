@@ -23,8 +23,9 @@ const ExpenseDueCard = ({
     const isVariable = expense.amountType === 'variable';
     const hasAmount = typeof expense.amount === 'number' && expense.amount > 0;
     const isPaid = expense.paymentStatus === 'paid';
-    const isClickable = Boolean(onView) && !isPreview;
-    const canMarkPaid = Boolean(onMarkPaid) && !isPreview && (!isVariable || hasAmount);
+    const isAutoPayment = expense.paymentMode === 'auto';
+    const isClickable = Boolean(onView);
+    const canMarkPaid = Boolean(onMarkPaid) && !isPreview && !isAutoPayment && (!isVariable || hasAmount);
 
     const amountLabel = useMemo(() => {
         if (!hasAmount) {
@@ -83,6 +84,20 @@ const ExpenseDueCard = ({
         />
     );
 
+    const dateBadgeNode = isOverdue && isClickable ? (
+        <button
+            type="button"
+            onClick={() => onView?.(expense)}
+            className="cursor-pointer"
+            title="Open expense details"
+            aria-label="Open expense details"
+        >
+            {dateBadge}
+        </button>
+    ) : (
+        dateBadge
+    );
+
     return (
         <div
             className={`px-3 py-3 hover:bg-muted ${isOverdue ? 'opacity-90' : ''}`}
@@ -120,18 +135,18 @@ const ExpenseDueCard = ({
                         </p>
                     )}
                 </div>
-                {dateBadge}
+                {dateBadgeNode}
                 {canMarkPaid && (
                     <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        size="xs"
+                        className="h-6 px-3"
                         aria-label="Mark as paid"
                         title="Mark as paid"
                         onClick={() => onMarkPaid?.()}
+                        leadingIcon={CheckIcon}
                         type="button"
                     >
-                        <CheckIcon className="h-4 w-4" />
+                        Mark Paid
                     </Button>
                 )}
             </div>

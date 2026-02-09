@@ -24,6 +24,10 @@ const expenseHookMocks = vi.hoisted(() => ({
     markAsUnbilled: vi.fn()
 }))
 
+const invoiceOnlyTestState = vi.hoisted(() => ({
+    enabled: false
+}))
+
 const templateHookMocks = vi.hoisted(() => ({
 
     updateInvoiceTemplate: vi.fn(),
@@ -116,6 +120,7 @@ vi.mock('../invoice/InvoiceModal', () => ({
 
     default: (props) => {
         const didSelectExpenses = React.useRef(false)
+        const didAddInvoiceOnly = React.useRef(false)
 
         React.useEffect(() => {
             if (!props.showInvoiceForm) {
@@ -142,8 +147,30 @@ vi.mock('../invoice/InvoiceModal', () => ({
                 return
             }
 
+            if (invoiceOnlyTestState.enabled && !didAddInvoiceOnly.current) {
+                if (!props.newExpenseTitle) {
+                    props.setNewExpenseTitle('Invoice-only expense')
+                    props.setNewExpenseAmount('80')
+                    props.setNewExpenseCurrency('EUR')
+                    props.setNewExpenseSupplierName('Vendor')
+                    return
+                }
+
+                didAddInvoiceOnly.current = true
+                props.handleAddAdditionalExpense()
+                return
+            }
+
             props.handleSaveInvoice({ preventDefault: () => {} })
-        }, [props.showInvoiceForm, props.selectedTemplate, props.selectedExpensesForBilling, props.availableExpenses])
+        }, [
+            props.showInvoiceForm,
+            props.selectedTemplate,
+            props.selectedExpensesForBilling,
+            props.availableExpenses,
+            props.newExpenseTitle,
+            props.newExpenseAmount,
+            props.newExpenseCurrency
+        ])
 
         return props.showInvoiceForm ? <div>Invoice Modal</div> : null
     }
@@ -175,6 +202,7 @@ describe('invoice expenses integration', () => {
         invoiceHookMocks.createInvoice.mockClear()
         expenseHookMocks.markAsBilled.mockClear()
         expenseHookMocks.markAsUnbilled.mockClear()
+        invoiceOnlyTestState.enabled = false
 
         expenseHookMocks.expenses = [
             {
@@ -335,6 +363,43 @@ describe('invoice expenses integration', () => {
         // The non-convertible expense should NOT be included in invoice items
         const expenseItem = invoiceData.items.find(i => i.expenseId === 'exp-chf')
         expect(expenseItem).toBeUndefined()
+        expect(expenseHookMocks.markAsBilled).not.toHaveBeenCalled()
+    })
+
+    it('adds invoice-only expenses as invoice items', async () => {
+        expenseHookMocks.expenses = []
+        invoiceOnlyTestState.enabled = true
+
+        const user = userEvent.setup()
+
+        render(
+            <InvoiceGenerator
+                project={baseProject}
+                client={baseClient}
+                timeEntries={[baseEntry]}
+                editingInvoice={null}
+                onInvoiceSaved={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[baseClient]}
+                showButton={true}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        await waitFor(() => {
+            expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        })
+
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        const invoiceOnlyItem = invoiceData.items.find((item) => !item.expenseId && item.description === 'Invoice-only expense')
+
+        expect(invoiceOnlyItem).toBeTruthy()
+        expect(invoiceOnlyItem.amount).toBe(80)
+        expect(invoiceOnlyItem.rate).toBe(80)
+        expect(invoiceOnlyItem.originalAmount).toBe(80)
+        expect(invoiceOnlyItem.originalCurrency).toBe('EUR')
         expect(expenseHookMocks.markAsBilled).not.toHaveBeenCalled()
     })
 })

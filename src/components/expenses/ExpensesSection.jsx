@@ -20,7 +20,7 @@ const ExpensesSection = ({
     openExpenseView,
 }) => {
 
-    const { expenses } = useExpenses();
+    const { expenses, markAsPaid, markAsUnpaid } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -124,6 +124,20 @@ const ExpensesSection = ({
         openExpenseModal(null, { clientId, projectId });
     };
 
+    const handleTogglePaid = (expense) => {
+        if (expense.paymentStatus === 'paid') {
+            markAsUnpaid(expense.id);
+            return;
+        }
+
+        if (expense.amountType === 'variable' && (!expense.amount || expense.amount <= 0)) {
+            openExpenseModal(expense);
+            return;
+        }
+
+        markAsPaid(expense.id);
+    };
+
     return (
         <Card>
             <CardHeader>
@@ -156,7 +170,7 @@ const ExpensesSection = ({
                         compact
                         onView={(expense) => openExpenseView?.(expense)}
                         onEdit={(expense) => openExpenseModal(expense)}
-                        onTogglePaid={() => {}}
+                        onTogglePaid={handleTogglePaid}
                     />
                 </CardContent>
             )}

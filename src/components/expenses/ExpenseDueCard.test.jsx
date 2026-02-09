@@ -116,4 +116,25 @@ describe('ExpenseDueCard', () => {
 
         expect(screen.getByText('Overdue')).toBeInTheDocument()
     })
+
+    it('hides mark paid action for auto-payment expenses', () => {
+        const expense = {
+            id: 'exp-5',
+            title: 'Auto Subscription',
+            date: '2026-02-06',
+            amount: 15,
+            amountType: 'fixed',
+            currency: 'USD',
+            paymentMode: 'auto',
+        }
+
+        render(
+            <ExpenseDueCard
+                expense={expense}
+                onMarkPaid={vi.fn()}
+            />
+        )
+
+        expect(screen.queryByRole('button', { name: 'Mark as paid' })).not.toBeInTheDocument()
+    })
 })

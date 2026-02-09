@@ -62,7 +62,7 @@ const ClientDashboard = ({
     const { deleteTask } = useTasks();
     const { deleteEntry } = useTimeEntries();
     const { deleteInvoice } = useInvoices();
-    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses();
+    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
     const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { preferences } = usePreferences();
     const { showSuccess } = useToast();
@@ -867,6 +867,12 @@ const ClientDashboard = ({
                 </CardContent>
             </Card>
 
+            <ExpensesSection
+                clientId={client.id}
+                openExpenseModal={openExpenseModal}
+                openExpenseView={openExpenseView}
+            />
+
             {/* Invoices Section */}
             <Card>
                 <CardHeader>
@@ -902,12 +908,6 @@ const ClientDashboard = ({
                     </CardContent>
                 )}
             </Card>
-
-            <ExpensesSection
-                clientId={client.id}
-                openExpenseModal={openExpenseModal}
-                openExpenseView={openExpenseView}
-            />
 
             {/* Client Time Metrics */}
             {clientTimeEntries.length > 0 ? (

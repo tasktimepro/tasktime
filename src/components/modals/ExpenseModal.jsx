@@ -50,7 +50,7 @@ const ExpenseModal = ({
     clearSavedState,
 }) => {
     const { showSuccess, showError } = useToast();
-    const { createExpense, updateExpense, deleteExpense } = useExpenses();
+    const { createExpense, updateExpense, deleteExpense } = useExpenses({ includeArchived: true });
     const { createRecurrence, getRecurrence, updateRecurrence, deleteRecurrence } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
@@ -79,6 +79,7 @@ const ExpenseModal = ({
         currency: preferences.currency || DEFAULT_CURRENCY,
         paidOn: '',
         paidBy: '',
+        paymentMode: 'manual',
         clientId: NO_CLIENT_VALUE,
         projectId: NO_PROJECT_VALUE,
         businessId: '',
@@ -163,6 +164,9 @@ const ExpenseModal = ({
                 ? getRecurrence(editingExpense.recurrenceId)
                 : null;
             const recurrencePaidBy = recurrenceTemplate?.paidBy || null;
+            const resolvedPaymentMode = editingExpense.paymentMode
+                || recurrenceTemplate?.paymentMode
+                || 'manual';
             const shouldInheritEstimate = editingExpense.amountType === 'variable'
                 && (!editingExpense.amount || editingExpense.amount <= 0);
             const resolvedAmount = shouldInheritEstimate
@@ -192,6 +196,7 @@ const ExpenseModal = ({
                 currency: editingExpense.currency || preferences.currency || DEFAULT_CURRENCY,
                 paidOn: resolvedPaidOn,
                 paidBy: resolvedPaidBy,
+                paymentMode: resolvedPaymentMode,
                 clientId: editingExpense.clientId || NO_CLIENT_VALUE,
                 projectId: editingExpense.projectId || NO_PROJECT_VALUE,
                 businessId: resolvedBusinessId,
@@ -236,6 +241,7 @@ const ExpenseModal = ({
                 currency: recurrence.currency || preferences.currency || DEFAULT_CURRENCY,
                 paidOn: '',
                 paidBy: recurrence.paidBy || '',
+                paymentMode: recurrence.paymentMode || 'manual',
                 clientId: recurrence.clientId || NO_CLIENT_VALUE,
                 projectId: recurrence.projectId || NO_PROJECT_VALUE,
                 businessId: resolvedBusinessId,
@@ -277,6 +283,7 @@ const ExpenseModal = ({
             currency: defaultCurrency,
             paidOn: '',
             paidBy: defaultPaidBy,
+            paymentMode: 'manual',
             clientId: initialClientId,
             projectId: initialProjectId,
             businessId: defaultBusinessId,
@@ -595,6 +602,10 @@ const ExpenseModal = ({
         const effectiveDate = showOneTimeFields ? formData.date : formData.startDate;
         const effectiveBusinessId = !formData.isPersonal ? (formData.businessId || null) : null;
         const effectiveTaxNumber = !formData.isPersonal ? (selectedBusiness?.taxNumber || null) : null;
+        const isAutoPayment = formData.paymentMode === 'auto';
+        const resolvedPaidOn = isAutoPayment
+            ? effectiveDate
+            : (showOneTimeFields && formData.paidOn ? formData.paidOn : null);
 
         const payload = {
             title: formData.title.trim(),
@@ -604,9 +615,12 @@ const ExpenseModal = ({
             receiptNumber: formData.receiptNumber.trim() ? formData.receiptNumber.trim() : null,
             currency: formData.currency || DEFAULT_CURRENCY,
             amount: amountValue || 0,
-            paidOn: showOneTimeFields && formData.paidOn ? formData.paidOn : null,
+            paidOn: resolvedPaidOn,
             paidBy: formData.paidBy ? formData.paidBy : null,
-            paymentStatus: showOneTimeFields && formData.paidOn ? 'paid' : 'unpaid',
+            paymentStatus: isAutoPayment
+                ? 'paid'
+                : (showOneTimeFields && formData.paidOn ? 'paid' : 'unpaid'),
+            paymentMode: formData.paymentMode || 'manual',
             clientId: formData.clientId === NO_CLIENT_VALUE ? null : formData.clientId,
             projectId: formData.projectId === NO_PROJECT_VALUE ? null : formData.projectId,
             businessId: effectiveBusinessId,
@@ -634,6 +648,7 @@ const ExpenseModal = ({
                 note: payload.note,
                 supplierName: payload.supplierName,
                 paidBy: payload.paidBy,
+                paymentMode: payload.paymentMode,
                 currency: payload.currency,
                 amount: amountValue || 0,
                 amountType: formData.amountType,
@@ -670,6 +685,7 @@ const ExpenseModal = ({
                 note: payload.note,
                 supplierName: payload.supplierName,
                 paidBy: payload.paidBy,
+                paymentMode: payload.paymentMode,
                 currency: payload.currency,
                 amount: amountValue || 0,
                 amountType: formData.amountType,
@@ -964,6 +980,18 @@ const ExpenseModal = ({
                                     </SelectGroup>
                                 </SelectContent>
                             </Select>
+                            <div className="pt-2">
+                                <CustomCheckbox
+                                    checked={formData.paymentMode === 'auto'}
+                                    onChange={(checked) => {
+                                        handleChange('paymentMode', checked ? 'auto' : 'manual');
+                                        if (checked && formData.paidOn) {
+                                            handleChange('paidOn', '');
+                                        }
+                                    }}
+                                    label="Auto-payment"
+                                />
+                            </div>
                         </div>
                     )}
                     <div className="space-y-2">
@@ -1041,6 +1069,18 @@ const ExpenseModal = ({
                     <div className="space-y-4">
                         <div className="text-sm font-semibold text-muted-foreground">Payment</div>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="md:col-span-2">
+                                <CustomCheckbox
+                                    checked={formData.paymentMode === 'auto'}
+                                    onChange={(checked) => {
+                                        handleChange('paymentMode', checked ? 'auto' : 'manual');
+                                        if (checked && formData.paidOn) {
+                                            handleChange('paidOn', '');
+                                        }
+                                    }}
+                                    label="Auto-payment"
+                                />
+                            </div>
                             <div className="space-y-2">
                                 <Label htmlFor="expense-paid-on">Paid On</Label>
                                 <Input
@@ -1048,6 +1088,7 @@ const ExpenseModal = ({
                                     type="date"
                                     value={formData.paidOn}
                                     onChange={(event) => handleChange('paidOn', event.target.value)}
+                                    disabled={formData.paymentMode === 'auto'}
                                     className="dark:[color-scheme:dark]"
                                 />
                             </div>

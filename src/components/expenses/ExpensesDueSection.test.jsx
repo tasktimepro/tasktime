@@ -103,7 +103,7 @@ describe('ExpensesDueSection', () => {
         expect(showSuccessMock).toHaveBeenCalledWith('Expense marked as paid')
     })
 
-    it('renders upcoming recurring previews as read-only', () => {
+    it('renders upcoming recurring previews with view support', () => {
         recurrencesMock.push({
             id: 'rec-1',
             title: 'Gym Membership',
@@ -130,8 +130,25 @@ describe('ExpensesDueSection', () => {
         expect(screen.getByText('Gym Membership')).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Mark Paid' })).not.toBeInTheDocument()
 
-        const titleButton = screen.queryByRole('button', { name: /Gym Membership/ })
-        expect(titleButton).toBeNull()
-        expect(openExpenseModal).not.toHaveBeenCalled()
+        const titleButton = screen.getByRole('button', { name: /Gym Membership/ })
+        fireEvent.click(titleButton)
+        expect(openExpenseModal).toHaveBeenCalledTimes(1)
+    })
+
+    it('excludes auto-payment expenses from overdue/today but includes upcoming', () => {
+        expensesMock.push(
+            { id: 'exp-auto-overdue', title: 'Auto Overdue', date: '2026-02-05', paymentStatus: 'paid', paymentMode: 'auto', amount: 8, amountType: 'fixed', currency: 'USD' },
+            { id: 'exp-auto-today', title: 'Auto Today', date: '2026-02-06', paymentStatus: 'paid', paymentMode: 'auto', amount: 9, amountType: 'fixed', currency: 'USD' },
+            { id: 'exp-auto-upcoming', title: 'Auto Upcoming', date: '2026-02-10', paymentStatus: 'paid', paymentMode: 'auto', amount: 10, amountType: 'fixed', currency: 'USD' }
+        )
+
+        render(<ExpensesDueSection openExpenseView={vi.fn()} />)
+
+        expect(screen.queryByText('Overdue (1)')).not.toBeInTheDocument()
+        expect(screen.queryByText('Today (1)')).not.toBeInTheDocument()
+        expect(screen.getByText('Upcoming (1)')).toBeInTheDocument()
+        expect(screen.getByText('Auto Upcoming')).toBeInTheDocument()
+        expect(screen.queryByText('Auto Overdue')).not.toBeInTheDocument()
+        expect(screen.queryByText('Auto Today')).not.toBeInTheDocument()
     })
 })

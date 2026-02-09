@@ -247,6 +247,7 @@ export const handleResetInvoiceForm = (
     setTaskHourlyRates,
     setTaskQuantities,
     setAdditionalTasks,
+    setAdditionalExpenses,
     setInvoiceNote,
     setDiscountType,
     setDiscountValue,
@@ -257,7 +258,12 @@ export const handleResetInvoiceForm = (
     setNewTaskQuantity,
     setMergedSubtasks,
     setInvoiceDateOverride,
-    setUseInvoiceDateOverride
+    setUseInvoiceDateOverride,
+    setShowAddExpenseForm,
+    setNewExpenseTitle,
+    setNewExpenseAmount,
+    setNewExpenseCurrency,
+    setNewExpenseSupplierName
 ) => () => {
     setInvoiceTasks([]);
     setEditableHours({});
@@ -266,6 +272,7 @@ export const handleResetInvoiceForm = (
     setTaskHourlyRates({});
     setTaskQuantities({});
     setAdditionalTasks([]);
+    setAdditionalExpenses([]);
     setInvoiceNote('');
     setDiscountType('percentage');
     setDiscountValue(0);
@@ -279,6 +286,11 @@ export const handleResetInvoiceForm = (
     setSelectedExpensesForBilling({});
     setNewTaskQuantity(1);
     setMergedSubtasks({});
+    setShowAddExpenseForm(false);
+    setNewExpenseTitle('');
+    setNewExpenseAmount('');
+    setNewExpenseCurrency('');
+    setNewExpenseSupplierName('');
     setInvoiceDateOverride('');
     setUseInvoiceDateOverride(false);
 };

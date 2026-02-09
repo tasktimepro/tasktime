@@ -53,6 +53,8 @@ export interface YjsContextValue {
     loadArchivedTasks: () => Promise<void>;
     /** Load archived invoices */
     loadArchivedInvoices: () => Promise<void>;
+    /** Load archived expenses */
+    loadArchivedExpenses: () => Promise<void>;
     /** Get available years from Drive and local */
     getAvailableYears: () => Promise<number[]>;
     /** Clear all data from all collections and IndexedDB databases */
@@ -339,6 +341,10 @@ export function YjsProvider({ children }: YjsProviderProps) {
         await store.loadArchivedInvoices();
     }, [store]);
 
+    const loadArchivedExpenses = useCallback(async () => {
+        await store.loadArchivedExpenses();
+    }, [store]);
+
     const getAvailableYears = useCallback(async () => {
         return store.getAvailableYears();
     }, [store]);
@@ -387,6 +393,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         loadEntriesForYear,
         loadArchivedTasks,
         loadArchivedInvoices,
+        loadArchivedExpenses,
         getAvailableYears,
         clearAllData,
     }), [
@@ -409,6 +416,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         loadEntriesForYear,
         loadArchivedTasks,
         loadArchivedInvoices,
+        loadArchivedExpenses,
         getAvailableYears,
         clearAllData,
     ]);

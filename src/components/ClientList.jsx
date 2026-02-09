@@ -50,7 +50,7 @@ const ClientList = ({
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { invoices, deleteInvoice } = useInvoices();
-    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses();
+    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
     const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { preferences, updatePreferences } = usePreferences();
 

@@ -344,16 +344,28 @@ describe('usePlannerItems', () => {
             amountType: 'fixed',
             currency: 'USD',
         });
+        mockExpenses.push({
+            id: 'ex-3',
+            title: 'Auto Paid',
+            date: dateStr,
+            paymentStatus: 'paid',
+            paymentMode: 'auto',
+            amount: 15,
+            amountType: 'fixed',
+            currency: 'USD',
+        });
 
         const { result } = renderHook(() => usePlannerItems(0));
         const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
 
         const expenseItems = day.items.filter((i) => i.type === 'expense');
-        expect(expenseItems).toHaveLength(2);
+        expect(expenseItems).toHaveLength(3);
         expect(expenseItems[0].title).toBe('Hosting');
         expect(expenseItems[0].isCompleted).toBe(false);
-        expect(expenseItems[1].title).toBe('Paid Item');
-        expect(expenseItems[1].isCompleted).toBe(true);
+
+        const paidItems = expenseItems.slice(1);
+        expect(paidItems.map((item) => item.title)).toEqual(['Auto Paid', 'Paid Item']);
+        expect(paidItems.every((item) => item.isCompleted)).toBe(true);
     });
 
     it('excludes expenses that do not match the date', () => {

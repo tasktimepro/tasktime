@@ -637,6 +637,7 @@ const Dashboard = ({
                 renderTaskTitle={renderTaskTitle}
                 renderTaskControls={renderTaskControls}
                 handleProjectTitleClick={handleProjectTitleClick}
+                onTaskTitleClick={handleTaskTitleClick}
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
                 onArchiveTask={handleArchiveTask}

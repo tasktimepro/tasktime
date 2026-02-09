@@ -143,4 +143,37 @@ describe('ExpenseViewModal', () => {
         expect(onClose).toHaveBeenCalled()
         expect(onEdit).toHaveBeenCalledWith(expense)
     })
+
+    it('shows due in label for preview expenses', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-02-06T10:00:00Z'))
+
+        const expense = {
+            id: 'preview-rec-1',
+            title: 'Gym Membership',
+            date: '2026-02-10',
+            amount: 45,
+            amountType: 'fixed',
+            currency: 'USD',
+            paymentStatus: 'unpaid',
+            billingStatus: 'unbilled',
+            billable: false,
+            isRecurring: true,
+            isPreview: true,
+        }
+
+        render(
+            <ExpenseViewModal
+                isOpen
+                onClose={vi.fn()}
+                expense={expense}
+                onEdit={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Due in 4 days')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Mark as paid' })).not.toBeInTheDocument()
+
+        vi.useRealTimers()
+    })
 })

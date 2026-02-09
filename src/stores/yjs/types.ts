@@ -119,6 +119,7 @@ export interface InvoiceItem {
     amount: number;
     taskId?: string;
     expenseId?: string;
+    supplierName?: string;
     originalAmount?: number;
     originalCurrency?: string;
     exchangeRate?: number;
@@ -175,6 +176,7 @@ export interface Expense {
     paidOn?: string | null;
     paidBy?: string | null;
     paymentStatus: 'unpaid' | 'paid';
+    paymentMode?: 'manual' | 'auto';
     clientId?: string | null;
     projectId?: string | null;
     businessId?: string | null;
@@ -188,6 +190,7 @@ export interface Expense {
     amountType?: 'fixed' | 'variable';
     taxNumber?: string | null;
     isTaxExempt: boolean;
+    isPreview?: boolean;
     createdAt?: number;
     updatedAt?: number;
 }
@@ -201,6 +204,7 @@ export interface ExpenseRecurrence {
     currency: string;
     amount: number;
     amountType: 'fixed' | 'variable';
+    paymentMode?: 'manual' | 'auto';
     repeat: 'monthly' | 'yearly';
     monthlyType?: 'first' | 'last' | 'specific';
     monthlyDay?: number;
@@ -351,5 +355,6 @@ export type DocName =
     | 'core'
     | 'tasks-archived'
     | 'entries-active'
+    | 'expenses-archived'
     | `entries-${number}`
     | 'invoices-archived';

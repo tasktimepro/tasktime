@@ -35,7 +35,9 @@ const ExpensesDueSection = ({ openExpenseView }) => {
         const upcomingStartStr = toStorageDate(upcomingStart) || '';
         const upcomingEndStr = toStorageDate(upcomingEnd) || '';
 
-        const unpaid = expenses.filter((expense) => expense.paymentStatus === 'unpaid');
+        const unpaidManual = expenses.filter((expense) => (
+            expense.paymentStatus === 'unpaid' && expense.paymentMode !== 'auto'
+        ));
         const recurrenceDates = new Map();
         expenses.forEach((expense) => {
             if (!expense.recurrenceId) return;
@@ -51,7 +53,7 @@ const ExpensesDueSection = ({ openExpenseView }) => {
             upcoming: [],
         };
 
-        unpaid.forEach((expense) => {
+        unpaidManual.forEach((expense) => {
             const expenseDate = parseStoredDate(expense.date);
             if (!expenseDate) return;
 
@@ -65,6 +67,15 @@ const ExpensesDueSection = ({ openExpenseView }) => {
                 return;
             }
 
+            if (expenseDate > todayDate && expenseDate <= upcomingEnd) {
+                groups.upcoming.push(expense);
+            }
+        });
+
+        expenses.forEach((expense) => {
+            if (expense.paymentMode !== 'auto') return;
+            const expenseDate = parseStoredDate(expense.date);
+            if (!expenseDate) return;
             if (expenseDate > todayDate && expenseDate <= upcomingEnd) {
                 groups.upcoming.push(expense);
             }
@@ -160,8 +171,10 @@ const ExpensesDueSection = ({ openExpenseView }) => {
                             isToday={isToday}
                             isPreview={expense.isPreview}
                             recurrence={expense.recurrenceId ? recurrencesById.get(expense.recurrenceId) : null}
-                                onView={expense.isPreview ? undefined : () => openExpenseView?.(expense)}
-                            onMarkPaid={expense.isPreview ? undefined : () => handleMarkPaid(expense)}
+                            onView={() => openExpenseView?.(expense)}
+                            onMarkPaid={expense.isPreview || expense.paymentMode === 'auto' || expense.paymentStatus === 'paid'
+                                ? undefined
+                                : () => handleMarkPaid(expense)}
                         />
                     ))}
                 </div>

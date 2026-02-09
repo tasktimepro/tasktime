@@ -93,7 +93,7 @@ describe('PlannerItem', () => {
         expect(handleClick).toHaveBeenCalledTimes(1);
     });
 
-    it('does not call onClick when item is a preview', () => {
+    it('allows clicking preview expense items', () => {
         const handleClick = vi.fn();
 
         render(
@@ -110,7 +110,7 @@ describe('PlannerItem', () => {
         );
 
         fireEvent.click(screen.getByText('Upcoming Expense'));
-        expect(handleClick).not.toHaveBeenCalled();
+        expect(handleClick).toHaveBeenCalledTimes(1);
     });
 
     it('does not render a pin icon even when isStatic is true', () => {

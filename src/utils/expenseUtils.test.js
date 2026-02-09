@@ -84,6 +84,17 @@ describe('expenseUtils', () => {
         expect(expense.amountType).toBe('variable');
     });
 
+    it('buildExpenseFromRecurrence auto-marks paid when auto-payment', () => {
+        const expense = buildExpenseFromRecurrence({
+            ...recurrenceBase,
+            paymentMode: 'auto',
+        }, '2025-02-01');
+
+        expect(expense.paymentMode).toBe('auto');
+        expect(expense.paymentStatus).toBe('paid');
+        expect(expense.paidOn).toBe('2025-02-01');
+    });
+
     it('isExpenseInDateRange includes boundaries', () => {
         const expense = buildExpenseFromRecurrence(recurrenceBase, '2025-02-01');
         expect(isExpenseInDateRange(expense, '2025-02-01', '2025-02-28')).toBe(true);

@@ -384,6 +384,15 @@ function AppContent() {
     const openExpenseView = useCallback((expense) => {
         if (!expense) return;
 
+        const isPreview = Boolean(expense.isPreview);
+        if (isPreview) {
+            setExpenseViewState({
+                isOpen: true,
+                expense
+            });
+            return;
+        }
+
         const needsSubmit = expense.isRecurring
             && expense.amountType === 'variable'
             && (!expense.amount || expense.amount <= 0)

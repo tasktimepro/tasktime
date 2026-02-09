@@ -175,7 +175,10 @@ const DayColumn = ({
                                 currency={item.currency}
                                 supplierName={item.supplierName}
                                 isPreview={item.isPreview}
-                                onMarkPaid={item.type === 'expense' && !item.isPreview
+                                onMarkPaid={item.type === 'expense'
+                                    && !item.isPreview
+                                    && item.expense?.paymentMode !== 'auto'
+                                    && item.expense?.paymentStatus !== 'paid'
                                     ? (amount) => onMarkExpensePaid?.(item, amount)
                                     : undefined}
                                 hasAttachment={!!item.attachment}

@@ -74,7 +74,7 @@ const PlannerItem = ({
 }) => {
     const [menuOpen, setMenuOpen] = useState(false);
     const isExpense = type === 'expense';
-    const isClickable = typeof onClick === 'function' && !isPreview;
+    const isClickable = typeof onClick === 'function' && (!isPreview || isExpense);
 
     // Icon based on type and subtype
     const getIcon = () => {

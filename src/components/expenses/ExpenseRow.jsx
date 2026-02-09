@@ -44,7 +44,7 @@ const ExpenseRow = ({
     const clientName = client?.title || null;
     const projectName = project?.title || null;
     const isPreview = Boolean(expense.isPreview);
-    const canView = Boolean(onView) && !isPreview;
+    const canView = Boolean(onView);
 
     const statusBadge = (() => {
         if (isPaid) {
@@ -172,7 +172,7 @@ const ExpenseRow = ({
                     </div>
 
                     <div className="flex justify-end items-center space-x-2">
-                        {!isPaid && !isPreview && (
+                        {!isPaid && !isPreview && expense.paymentMode !== 'auto' && (
                             <Button
                                 size="sm"
                                 leadingIcon={CheckIcon}

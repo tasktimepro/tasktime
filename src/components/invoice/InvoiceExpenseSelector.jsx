@@ -1,7 +1,10 @@
-import { toDisplayDate } from '../../utils/dateUtils.ts';
-import { formatCurrency } from '../../utils/currencyUtils.ts';
+import { formatCurrency, CURRENCY_NAMES, normalizeCurrencyCode } from '../../utils/currencyUtils.ts';
 import { Notice } from '@/components/ui/notice';
 import CustomCheckbox from '../CustomCheckbox';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TrashIcon } from '@/components/ui/icons';
 
 /**
  * InvoiceExpenseSelector component - Expense selection for invoicing.
@@ -13,6 +16,19 @@ const InvoiceExpenseSelector = ({
     expenses,
     selectedExpensesForBilling,
     setSelectedExpensesForBilling,
+    additionalExpenses,
+    showAddExpenseForm,
+    setShowAddExpenseForm,
+    newExpenseTitle,
+    setNewExpenseTitle,
+    newExpenseAmount,
+    setNewExpenseAmount,
+    newExpenseCurrency,
+    setNewExpenseCurrency,
+    newExpenseSupplierName,
+    setNewExpenseSupplierName,
+    handleAddAdditionalExpense,
+    handleRemoveAdditionalExpense,
     getInvoiceCurrency,
     conversionUnavailableCount,
     exchangeRatesError,
@@ -41,7 +57,7 @@ const InvoiceExpenseSelector = ({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                         <h4 className="text-sm font-medium text-foreground">Expenses</h4>
-                        <span className="text-xs text-muted-foreground">({expenses.length})</span>
+                        <span className="text-xs text-muted-foreground">({expenses.length + additionalExpenses.length})</span>
                     </div>
                     <svg
                         className={`w-5 h-5 text-muted-foreground transform transition-transform ${activeSection === 'expenses' ? 'rotate-180' : ''}`}
@@ -67,15 +83,10 @@ const InvoiceExpenseSelector = ({
                             description={exchangeRatesError}
                         />
                     )}
-                    {expenses.length === 0 ? (
-                        <Notice
-                            title="No billable expenses available"
-                            description="Only unbilled, billable expenses for the selected client or project appear here."
-                        />
-                    ) : (
-                        <>
-                            <div className="flex justify-between items-center">
-                                <div className="flex space-x-2">
+                    <div className="flex justify-between items-center">
+                        <div className="flex space-x-2">
+                            {expenses.length > 0 && (
+                                <>
                                     <button
                                         type="button"
                                         onClick={handleSelectAll}
@@ -91,16 +102,35 @@ const InvoiceExpenseSelector = ({
                                     >
                                         Deselect All
                                     </button>
-                                </div>
-                            </div>
-                            <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {expenses.map((expense) => {
-                                    const invoiceCurrency = getInvoiceCurrency();
-                                    const isConvertible = expense.isConvertible !== false;
-                                    const originalCurrency = expense.originalCurrency || invoiceCurrency;
-                                    const showOriginal = originalCurrency !== invoiceCurrency;
+                                </>
+                            )}
+                        </div>
+                        <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0"
+                            onClick={() => {
+                                setShowAddExpenseForm(true);
+                            }}
+                        >
+                            + Add Expense
+                        </Button>
+                    </div>
+                    {expenses.length === 0 ? (
+                        <Notice
+                            title="No billable expenses available"
+                            description="Only unbilled, billable expenses for the selected client or project appear here."
+                        />
+                    ) : (
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {expenses.map((expense) => {
+                                const invoiceCurrency = getInvoiceCurrency();
+                                const isConvertible = expense.isConvertible !== false;
+                                const originalCurrency = expense.originalCurrency || invoiceCurrency;
+                                const showOriginal = originalCurrency !== invoiceCurrency;
 
-                                    return (
+                                return (
                                     <div
                                         key={expense.id}
                                         className={`flex items-center justify-between p-3 bg-card rounded border ${!isConvertible ? 'opacity-60' : ''}`}
@@ -118,10 +148,11 @@ const InvoiceExpenseSelector = ({
                                                 <p className="text-sm font-medium text-foreground">
                                                     {expense.title}
                                                 </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {toDisplayDate(expense.date)}
-                                                    {expense.supplierName ? ` • ${expense.supplierName}` : ''}
-                                                </p>
+                                                {expense.supplierName && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {expense.supplierName}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="text-right">
@@ -148,9 +179,162 @@ const InvoiceExpenseSelector = ({
                                             )}
                                         </div>
                                     </div>
-                                );})}
+                                );
+                            })}
+                        </div>
+                    )}
+                    {additionalExpenses.length > 0 && (
+                        <div className="pt-2 space-y-2">
+                            <div className="text-xs text-muted-foreground">
+                                Invoice-only expenses
                             </div>
-                        </>
+                            <div className="space-y-2">
+                                {additionalExpenses.map((expense) => {
+                                    const invoiceCurrency = getInvoiceCurrency();
+                                    const originalCurrency = expense.originalCurrency || invoiceCurrency;
+                                    const showOriginal = normalizeCurrencyCode(originalCurrency) !== normalizeCurrencyCode(invoiceCurrency);
+
+                                    return (
+                                        <div
+                                            key={expense.id}
+                                            className="flex items-center justify-between p-3 bg-card rounded border"
+                                        >
+                                            <div className="flex items-center space-x-3 flex-1">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleRemoveAdditionalExpense(expense.id)}
+                                                    className="text-destructive-strong hover-text-destructive-strong cursor-pointer"
+                                                    title="Remove expense"
+                                                    aria-label="Remove expense"
+                                                >
+                                                    <TrashIcon className="w-5 h-5" />
+                                                </Button>
+                                                <div className="flex-1 pr-4">
+                                                    <p className="text-sm font-medium text-foreground">
+                                                        {expense.title}
+                                                    </p>
+                                                    {expense.supplierName && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {expense.supplierName}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-sm font-medium text-foreground sensitive-data">
+                                                    {formatCurrency(expense.amount || 0, invoiceCurrency)}
+                                                </div>
+                                                {showOriginal && (
+                                                    <div className="text-xs text-muted-foreground sensitive-data">
+                                                        {formatCurrency(expense.originalAmount || expense.amount || 0, originalCurrency)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                    {showAddExpenseForm && (
+                        <div className="mt-2 mb-2 p-3 bg-card border border-border rounded-md">
+                            <div className="space-y-3">
+                                <Input
+                                    type="text"
+                                    value={newExpenseTitle}
+                                    onChange={(e) => setNewExpenseTitle(e.target.value)}
+                                    placeholder="Expense description"
+                                    required
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleAddAdditionalExpense();
+                                        }
+                                    }}
+                                />
+
+                                <div className="flex flex-wrap items-end gap-3">
+                                    <div className="flex-1 min-w-[140px]">
+                                        <div className="text-xs text-muted-foreground mb-1">Amount</div>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={newExpenseAmount}
+                                            onChange={(e) => setNewExpenseAmount(e.target.value)}
+                                            placeholder="0.00"
+                                            className="sensitive-data"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleAddAdditionalExpense();
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="w-36">
+                                        <div className="text-xs text-muted-foreground mb-1">Currency</div>
+                                        <Select
+                                            value={newExpenseCurrency}
+                                            onValueChange={setNewExpenseCurrency}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Currency" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {Object.keys(CURRENCY_NAMES).map((code) => (
+                                                    <SelectItem key={code} value={code}>
+                                                        {code}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex-1 min-w-[160px]">
+                                        <div className="text-xs text-muted-foreground mb-1">Supplier (optional)</div>
+                                        <Input
+                                            type="text"
+                                            value={newExpenseSupplierName}
+                                            onChange={(e) => setNewExpenseSupplierName(e.target.value)}
+                                            placeholder="Supplier name"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleAddAdditionalExpense();
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end space-x-2">
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() => {
+                                            setShowAddExpenseForm(false);
+                                            setNewExpenseTitle('');
+                                            setNewExpenseAmount('');
+                                            setNewExpenseSupplierName('');
+                                            setNewExpenseCurrency(getInvoiceCurrency());
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={handleAddAdditionalExpense}
+                                    >
+                                        Add Expense
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             )}

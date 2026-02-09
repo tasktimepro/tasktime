@@ -215,4 +215,41 @@ describe('ExpenseModal', () => {
 
         vi.useRealTimers();
     })
+
+    it('clears paid on when auto-payment is selected (one-time)', async () => {
+        const user = userEvent.setup()
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        const paidOnInput = screen.getByLabelText(/Paid On/i)
+        await user.type(paidOnInput, '2026-02-01')
+        expect(paidOnInput).toHaveValue('2026-02-01')
+
+        await user.click(screen.getByLabelText(/Auto-payment/i))
+        expect(paidOnInput).toHaveValue('')
+    })
+
+    it('clears paid on when auto-payment is selected (recurring)', async () => {
+        const user = userEvent.setup()
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        const paidOnInput = screen.getByLabelText(/Paid On/i)
+        await user.type(paidOnInput, '2026-02-01')
+        expect(paidOnInput).toHaveValue('2026-02-01')
+
+        const typeSelect = Array.from(document.querySelectorAll('select')).find((element) => (
+            element.querySelector('option[value="recurring"]')
+        ))
+
+        if (!typeSelect) {
+            throw new Error('Expense type select not found')
+        }
+
+        fireEvent.change(typeSelect, { target: { value: 'recurring' } })
+        await user.click(screen.getByLabelText(/Auto-payment/i))
+
+        fireEvent.change(typeSelect, { target: { value: 'one-time' } })
+        expect(screen.getByLabelText(/Paid On/i)).toHaveValue('')
+    })
 })

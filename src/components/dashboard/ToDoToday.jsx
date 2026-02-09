@@ -30,6 +30,7 @@ import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
  * @param {Function} props.renderTaskTitle
  * @param {Function} props.renderTaskControls
  * @param {Function} props.handleProjectTitleClick
+ * @param {Function} props.onTaskTitleClick
  * @param {Function} props.onEditTask
  * @param {Function} props.onDeleteTask
  * @param {Function} props.onArchiveTask
@@ -44,6 +45,7 @@ const ToDoToday = ({
     renderTaskTitle,
     renderTaskControls,
     handleProjectTitleClick,
+    onTaskTitleClick,
     onEditTask,
     onDeleteTask,
     onArchiveTask,
@@ -100,8 +102,14 @@ const ToDoToday = ({
         const upcomingStartStr = toStorageDate(upcomingStart) || '';
         const upcomingEndStr = toStorageDate(upcomingEnd) || '';
 
-        const unpaid = expenses.filter((expense) => expense.paymentStatus === 'unpaid');
-        const paidToday = expenses.filter((expense) => expense.paymentStatus === 'paid' && expense.paidOn === todayStr);
+        const unpaidManual = expenses.filter((expense) => (
+            expense.paymentStatus === 'unpaid' && expense.paymentMode !== 'auto'
+        ));
+        const paidToday = expenses.filter((expense) => (
+            expense.paymentStatus === 'paid'
+            && expense.paidOn === todayStr
+            && expense.paymentMode !== 'auto'
+        ));
         const datesByRecurrence = new Map();
         expenses.forEach((expense) => {
             if (!expense.recurrenceId) return;
@@ -117,7 +125,7 @@ const ToDoToday = ({
             upcomingExpenses: [],
         };
 
-        unpaid.forEach((expense) => {
+        unpaidManual.forEach((expense) => {
             const expenseDate = parseStoredDate(expense.date);
             if (!expenseDate) return;
 
@@ -131,6 +139,15 @@ const ToDoToday = ({
                 return;
             }
 
+            if (expenseDate > todayDate && expenseDate <= upcomingEnd) {
+                groups.upcomingExpenses.push(expense);
+            }
+        });
+
+        expenses.forEach((expense) => {
+            if (expense.paymentMode !== 'auto') return;
+            const expenseDate = parseStoredDate(expense.date);
+            if (!expenseDate) return;
             if (expenseDate > todayDate && expenseDate <= upcomingEnd) {
                 groups.upcomingExpenses.push(expense);
             }
@@ -218,6 +235,34 @@ const ToDoToday = ({
         const shouldDisable = !!timer && !timer.isPaused && !isTimerActive;
         const hideActions = !!timer;
         const isCompleted = getTaskCompletedStatus(task);
+        const isOverdue = !isCompleted && (
+            Boolean(task.recurringStatus?.isOverdue) ||
+            (task.startDate && task.startDate < todayStr)
+        );
+        const canOpenDetails = Boolean(onTaskTitleClick);
+
+        const dateBadge = (
+            <StartDateBadge
+                startDate={task.startDate}
+                recurring={task.recurring}
+                completed={isCompleted}
+                recurringOverdue={Boolean(task.recurringStatus?.isOverdue)}
+            />
+        );
+
+        const dateBadgeNode = isOverdue && canOpenDetails ? (
+            <button
+                type="button"
+                onClick={() => onTaskTitleClick(task)}
+                className="cursor-pointer"
+                title="Open task details"
+                aria-label="Open task details"
+            >
+                {dateBadge}
+            </button>
+        ) : (
+            dateBadge
+        );
 
         return (
             <div key={task.id} className={`px-3 py-3 hover:bg-muted ${shouldDisable ? 'opacity-50' : ''}`}>
@@ -230,12 +275,7 @@ const ToDoToday = ({
                     <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
                         {renderTaskTitle(task, isCompleted)}
                     </div>
-                    <StartDateBadge
-                        startDate={task.startDate}
-                        recurring={task.recurring}
-                        completed={isCompleted}
-                        recurringOverdue={Boolean(task.recurringStatus?.isOverdue)}
-                    />
+                    {dateBadgeNode}
                     {(task.recentTime || 0) > 0 && (
                         <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                             {formatDurationWithSeconds(task.recentTime || 0)}
@@ -287,8 +327,10 @@ const ToDoToday = ({
             isToday={options.isToday}
             isPreview={expense.isPreview}
             recurrence={expense.recurrenceId ? recurrencesById.get(expense.recurrenceId) : null}
-            onView={expense.isPreview ? undefined : () => openExpenseView?.(expense)}
-            onMarkPaid={expense.isPreview || expense.paymentStatus === 'paid' ? undefined : () => handleMarkExpensePaid(expense)}
+            onView={() => openExpenseView?.(expense)}
+            onMarkPaid={expense.isPreview || expense.paymentMode === 'auto' || expense.paymentStatus === 'paid'
+                ? undefined
+                : () => handleMarkExpensePaid(expense)}
         />
     );
 
