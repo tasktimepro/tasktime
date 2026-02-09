@@ -171,7 +171,9 @@ const MobileDayCard = ({
                                 ? (amount) => onMarkExpensePaid?.(item, amount)
                                 : undefined}
                             hasAttachment={!!item.attachment}
-                            onClick={item.isPreview ? undefined : () => onItemClick?.(item)}
+                            onClick={!item.isPreview || item.type === 'expense'
+                                ? () => onItemClick?.(item)
+                                : undefined}
                             onEdit={() => onEditItem?.(item, dateStr)}
                             onRemove={() => onRemoveItem?.(item)}
                         />

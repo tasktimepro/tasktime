@@ -70,6 +70,7 @@ const ExpenseViewModal = ({
     const isPreview = Boolean(currentExpense?.isPreview);
     const isPaid = currentExpense?.paymentStatus === 'paid';
     const isAutoPayment = currentExpense?.paymentMode === 'auto';
+    const showAutoPayment = currentExpense?.isRecurring && isAutoPayment;
     const isVariable = currentExpense?.amountType === 'variable';
     const amountValue = typeof currentExpense?.amount === 'number' ? currentExpense.amount : 0;
     const needsAmount = Boolean(isVariable && (!amountValue || amountValue <= 0));
@@ -202,16 +203,22 @@ const ExpenseViewModal = ({
         >
             <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={isPaid ? 'success' : 'warning'}>
-                        {isPaid ? 'Paid' : 'Unpaid'}
-                    </Badge>
-                    {currentExpense.billable && (
-                        <Badge variant={currentExpense.billingStatus === 'billed' ? 'success' : 'secondary'}>
-                            {currentExpense.billingStatus === 'billed' ? 'Billed' : 'Unbilled'}
-                        </Badge>
-                    )}
                     {currentExpense.isRecurring && (
                         <Badge variant="secondary">Recurring</Badge>
+                    )}
+                    {isPreview ? (
+                        <Badge variant="secondary">Upcoming</Badge>
+                    ) : (
+                        <>
+                            <Badge variant={isPaid ? 'success' : 'warning'}>
+                                {isPaid ? 'Paid' : 'Unpaid'}
+                            </Badge>
+                            {currentExpense.billable && (
+                                <Badge variant={currentExpense.billingStatus === 'billed' ? 'success' : 'secondary'}>
+                                    {currentExpense.billingStatus === 'billed' ? 'Billed' : 'Unbilled'}
+                                </Badge>
+                            )}
+                        </>
                     )}
                 </div>
 
@@ -265,7 +272,7 @@ const ExpenseViewModal = ({
                     </div>
                 )}
 
-                {(currentExpense.note || currentExpense.receiptNumber || paidByLabel) && (
+                {(currentExpense.note || currentExpense.receiptNumber || paidByLabel || showAutoPayment) && (
                     <div className="space-y-3">
                         {currentExpense.note && (
                             <div className="space-y-1">
@@ -281,10 +288,20 @@ const ExpenseViewModal = ({
                                 <p className="text-sm text-foreground">{currentExpense.receiptNumber}</p>
                             </div>
                         )}
-                        {paidByLabel && (
-                            <div className="space-y-1">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Paid by</p>
-                                <p className="text-sm text-foreground">{paidByLabel}</p>
+                        {(paidByLabel || showAutoPayment) && (
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                {paidByLabel && (
+                                    <div className="space-y-1">
+                                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Paid by</p>
+                                        <p className="text-sm text-foreground">{paidByLabel}</p>
+                                    </div>
+                                )}
+                                {showAutoPayment && (
+                                    <div className="space-y-1">
+                                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Payment mode</p>
+                                        <p className="text-sm text-foreground">Auto payment</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
