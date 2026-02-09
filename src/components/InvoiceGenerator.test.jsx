@@ -188,6 +188,17 @@ vi.mock('../utils/pdfUtils.ts', () => ({
     createInvoiceHTML: vi.fn(() => '<html />')
 }))
 
+vi.mock('../utils/currencyUtils.ts', async () => {
+    const actual = await vi.importActual('../utils/currencyUtils.ts')
+    return {
+        ...actual,
+        fetchExchangeRates: vi.fn(() => Promise.resolve({
+            rates: { USD: 1, EUR: 0.92, CHF: 0.88, GBP: 0.79 },
+            error: null
+        }))
+    }
+})
+
 describe('InvoiceGenerator', () => {
 
     const baseProject = { id: 'project-1', title: 'Project', hourlyRate: 100, invoiceIds: [] }

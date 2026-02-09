@@ -115,21 +115,35 @@ vi.mock('../invoice/InvoiceGeneratorButton', () => ({
 vi.mock('../invoice/InvoiceModal', () => ({
 
     default: (props) => {
+        const didSelectExpenses = React.useRef(false)
+
         React.useEffect(() => {
-            if (!props.showInvoiceForm) return
+            if (!props.showInvoiceForm) {
+                didSelectExpenses.current = false
+                return
+            }
 
             if (!props.selectedTemplate) {
                 props.handleTemplateSelection('tpl-1')
                 return
             }
 
-            if (!props.selectedExpensesForBilling?.['exp-1']) {
-                props.setSelectedExpensesForBilling({ 'exp-1': true })
+            // Auto-select all convertible available expenses (only once)
+            if (!didSelectExpenses.current) {
+                didSelectExpenses.current = true
+                const available = props.availableExpenses || []
+                const selection = {}
+                available.forEach((exp) => {
+                    if (exp.isConvertible !== false) {
+                        selection[exp.id] = true
+                    }
+                })
+                props.setSelectedExpensesForBilling(selection)
                 return
             }
 
             props.handleSaveInvoice({ preventDefault: () => {} })
-        }, [props.showInvoiceForm, props.selectedTemplate, props.selectedExpensesForBilling])
+        }, [props.showInvoiceForm, props.selectedTemplate, props.selectedExpensesForBilling, props.availableExpenses])
 
         return props.showInvoiceForm ? <div>Invoice Modal</div> : null
     }
@@ -139,6 +153,17 @@ vi.mock('../../utils/pdfUtils.ts', () => ({
 
     createInvoiceHTML: vi.fn(() => '<html />')
 }))
+
+vi.mock('../../utils/currencyUtils.ts', async () => {
+    const actual = await vi.importActual('../../utils/currencyUtils.ts')
+    return {
+        ...actual,
+        fetchExchangeRates: vi.fn(() => Promise.resolve({
+            rates: { USD: 1, EUR: 0.92, CHF: 0.88, GBP: 0.79 },
+            error: null
+        }))
+    }
+})
 
 describe('invoice expenses integration', () => {
 
@@ -167,7 +192,7 @@ describe('invoice expenses integration', () => {
         ]
     })
 
-    it('saves invoice with selected expenses and bills them', async () => {
+    it('saves invoice with same-currency expenses (no conversion needed)', async () => {
         const user = userEvent.setup()
 
         render(
@@ -197,9 +222,119 @@ describe('invoice expenses integration', () => {
                 quantity: 1,
                 rate: 125,
                 amount: 125,
-                expenseId: 'exp-1'
+                expenseId: 'exp-1',
+                originalAmount: 125,
+                originalCurrency: 'EUR',
+                exchangeRate: 1
             }
         ])
         expect(expenseHookMocks.markAsBilled).toHaveBeenCalledWith('exp-1', invoiceData.id)
+    })
+
+    it('converts cross-currency expenses to invoice currency', async () => {
+        // Expense is in GBP, client default is EUR
+        // With rates: USD=1, EUR=0.92, GBP=0.79
+        // GBP→EUR: (100 / 0.79) * 0.92 = 116.46 (rounded to 2dp)
+        expenseHookMocks.expenses = [
+            {
+                id: 'exp-gbp',
+                title: 'UK Service',
+                date: '2026-02-01',
+                amount: 100,
+                currency: 'GBP',
+                billable: true,
+                billingStatus: 'unbilled',
+                clientId: 'client-1',
+                projectId: 'project-1',
+                isPersonal: false
+            }
+        ]
+
+        const user = userEvent.setup()
+
+        // Override the mock InvoiceModal to select the GBP expense
+        render(
+            <InvoiceGenerator
+                project={baseProject}
+                client={baseClient}
+                timeEntries={[baseEntry]}
+                editingInvoice={null}
+                onInvoiceSaved={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[baseClient]}
+                showButton={true}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        await waitFor(() => {
+            expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        })
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+
+        // Verify the expense was converted
+        const expenseItem = invoiceData.items.find(i => i.expenseId === 'exp-gbp')
+        expect(expenseItem).toBeTruthy()
+        expect(expenseItem.originalAmount).toBe(100)
+        expect(expenseItem.originalCurrency).toBe('GBP')
+        // GBP→EUR via USD: (100 / 0.79) * 0.92 ≈ 116.46
+        expect(expenseItem.amount).toBeCloseTo(116.46, 1)
+        expect(expenseItem.rate).toBeCloseTo(116.46, 1)
+        expect(expenseItem.exchangeRate).toBeGreaterThan(1) // GBP is worth more than EUR
+        expect(expenseHookMocks.markAsBilled).toHaveBeenCalledWith('exp-gbp', invoiceData.id)
+    })
+
+    it('does not include non-convertible expenses when rates are unavailable', async () => {
+        // Override fetchExchangeRates to return null rates
+        const currencyUtils = await import('../../utils/currencyUtils.ts')
+        currencyUtils.fetchExchangeRates.mockResolvedValueOnce({
+            rates: null,
+            error: 'Unable to load exchange rates.'
+        })
+
+        expenseHookMocks.expenses = [
+            {
+                id: 'exp-chf',
+                title: 'Swiss Expense',
+                date: '2026-02-01',
+                amount: 200,
+                currency: 'CHF',
+                billable: true,
+                billingStatus: 'unbilled',
+                clientId: 'client-1',
+                projectId: 'project-1',
+                isPersonal: false
+            }
+        ]
+
+        const user = userEvent.setup()
+
+        render(
+            <InvoiceGenerator
+                project={baseProject}
+                client={baseClient}
+                timeEntries={[baseEntry]}
+                editingInvoice={null}
+                onInvoiceSaved={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[baseClient]}
+                showButton={true}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        await waitFor(() => {
+            expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        })
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+
+        // The non-convertible expense should NOT be included in invoice items
+        const expenseItem = invoiceData.items.find(i => i.expenseId === 'exp-chf')
+        expect(expenseItem).toBeUndefined()
+        expect(expenseHookMocks.markAsBilled).not.toHaveBeenCalled()
     })
 })

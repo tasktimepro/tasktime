@@ -96,14 +96,30 @@ describe('currencyUtils', () => {
         const mockRates = {
             EUR: 0.85,
             USD: 1,
-            GBP: 0.75
+            GBP: 0.75,
+            CHF: 0.88
         }
 
-        it('converts between currencies correctly', () => {
+        it('converts from USD to another currency', () => {
 
             const result = convertCurrency(100, 'USD', 'EUR', mockRates)
             expect(result.success).toBe(true)
-            expect(result.amount).toBeCloseTo(85)
+            expect(result.amount).toBe(85)
+        })
+
+        it('converts from another currency to USD', () => {
+
+            const result = convertCurrency(85, 'EUR', 'USD', mockRates)
+            expect(result.success).toBe(true)
+            expect(result.amount).toBe(100)
+        })
+
+        it('converts between two non-USD currencies via cross-rate', () => {
+
+            // GBP→EUR: (100 / 0.75) * 0.85 = 113.33
+            const result = convertCurrency(100, 'GBP', 'EUR', mockRates)
+            expect(result.success).toBe(true)
+            expect(result.amount).toBeCloseTo(113.33, 2)
         })
 
         it('returns same amount for same currency', () => {
@@ -111,6 +127,57 @@ describe('currencyUtils', () => {
             const result = convertCurrency(100, 'USD', 'USD', mockRates)
             expect(result.success).toBe(true)
             expect(result.amount).toBe(100)
+        })
+
+        it('returns same amount for same currency with different casing', () => {
+
+            const result = convertCurrency(100, 'eur', 'EUR', mockRates)
+            expect(result.success).toBe(true)
+            expect(result.amount).toBe(100)
+        })
+
+        it('rounds results to 2 decimal places', () => {
+
+            // CHF→GBP: (100 / 0.88) * 0.75 = 85.227272... → should round to 85.23
+            const result = convertCurrency(100, 'CHF', 'GBP', mockRates)
+            expect(result.success).toBe(true)
+            expect(result.amount).toBe(85.23)
+        })
+
+        it('handles zero amount', () => {
+
+            const result = convertCurrency(0, 'USD', 'EUR', mockRates)
+            expect(result.success).toBe(true)
+            expect(result.amount).toBe(0)
+        })
+
+        it('fails gracefully with null exchange rates', () => {
+
+            const result = convertCurrency(100, 'USD', 'EUR', null)
+            expect(result.success).toBe(false)
+            expect(result.amount).toBe(100)
+            expect(result.error).toBeTruthy()
+        })
+
+        it('fails gracefully with empty exchange rates', () => {
+
+            const result = convertCurrency(100, 'USD', 'EUR', {})
+            expect(result.success).toBe(false)
+            expect(result.amount).toBe(100)
+        })
+
+        it('fails when target currency rate is missing', () => {
+
+            const result = convertCurrency(100, 'USD', 'JPY', mockRates)
+            expect(result.success).toBe(false)
+            expect(result.error).toContain('JPY')
+        })
+
+        it('fails when source currency rate is missing for cross-rate', () => {
+
+            const result = convertCurrency(100, 'JPY', 'EUR', mockRates)
+            expect(result.success).toBe(false)
+            expect(result.error).toContain('JPY')
         })
 
         it('handles invalid amounts gracefully', () => {

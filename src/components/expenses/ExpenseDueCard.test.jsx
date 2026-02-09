@@ -1,10 +1,21 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExpenseDueCard from './ExpenseDueCard'
 
 describe('ExpenseDueCard', () => {
+
+    beforeEach(() => {
+
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 1, 6, 10, 0, 0));
+    });
+
+    afterEach(() => {
+
+        vi.useRealTimers();
+    });
 
     it('renders fixed expense with amount and mark paid icon button', () => {
         const expense = {
@@ -52,8 +63,9 @@ describe('ExpenseDueCard', () => {
     })
 
     it('calls onView when card is clicked', async () => {
-        const user = userEvent.setup()
-            const onView = vi.fn()
+        vi.useRealTimers();
+        const user = userEvent.setup();
+        const onView = vi.fn()
         const expense = {
             id: 'exp-3',
             title: 'Domain',
@@ -66,13 +78,13 @@ describe('ExpenseDueCard', () => {
         render(
             <ExpenseDueCard
                 expense={expense}
-                    onView={onView}
+                onView={onView}
             />
         )
 
         const titleButton = screen.getByRole('button', { name: /Domain/ })
         await user.click(titleButton)
-            expect(onView).toHaveBeenCalledWith(expense)
+        expect(onView).toHaveBeenCalledWith(expense)
     })
 
     it('shows overdue badge for recurring expenses', () => {

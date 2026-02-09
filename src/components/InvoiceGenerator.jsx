@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createInvoiceHTML } from '../utils/pdfUtils.ts';
 import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils.ts';
-import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { getCurrencySymbol, getPreferredCurrency, fetchExchangeRates, convertCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import InvoiceModal from './invoice/InvoiceModal';
 import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
@@ -66,6 +66,9 @@ const InvoiceGenerator = ({
     const taskInputRef = useRef(null); // Ref for task description input field
     const [isHiddenForNestedModal, setIsHiddenForNestedModal] = useState(false);
     const [invoiceFormState, setInvoiceFormState] = useState(null);
+    const [exchangeRates, setExchangeRates] = useState(null);
+    const [exchangeRatesError, setExchangeRatesError] = useState(null);
+    const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
 
     useEffect(() => {
         if (!showInvoiceForm) {
@@ -97,6 +100,35 @@ const InvoiceGenerator = ({
     }, [invoices, selectedProject, project]);
 
     const invoiceCurrency = selectedClient?.defaultCurrency || getPreferredCurrency();
+    const normalizedInvoiceCurrency = normalizeCurrencyCode(invoiceCurrency);
+
+    useEffect(() => {
+        let isActive = true;
+
+        const loadRates = async () => {
+            setExchangeRatesLoading(true);
+            const { rates, error } = await fetchExchangeRates();
+            if (!isActive) return;
+            setExchangeRates(rates);
+            setExchangeRatesError(error);
+            setExchangeRatesLoading(false);
+        };
+
+        loadRates();
+
+        return () => {
+            isActive = false;
+        };
+    }, []);
+
+    const editingExpenseItemMap = useMemo(() => {
+        if (!editingInvoice?.items) return new Map();
+        return new Map(
+            editingInvoice.items
+                .filter((item) => item?.expenseId)
+                .map((item) => [item.expenseId, item])
+        );
+    }, [editingInvoice]);
 
     const availableExpenses = useMemo(() => {
         const invoiceId = editingInvoice?.id || null;
@@ -117,36 +149,90 @@ const InvoiceGenerator = ({
                     return false;
                 }
 
-                const expenseCurrency = expense.currency || invoiceCurrency;
-                if (expenseCurrency !== invoiceCurrency) return false;
-
                 if (expense.billingStatus === 'unbilled') return true;
                 if (invoiceId && expense.invoiceId === invoiceId) return true;
                 return false;
             })
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [expenses, selectedClient, selectedProject, editingInvoice, invoiceCurrency]);
+    }, [expenses, selectedClient, selectedProject, editingInvoice]);
 
-    const incompatibleExpensesCount = useMemo(() => {
-        if (!selectedClient && !selectedProject) {
-            return 0;
-        }
+    const availableExpensesWithConversion = useMemo(() => {
+        return availableExpenses.map((expense) => {
+            const originalAmount = expense.amount || 0;
+            const originalCurrency = normalizeCurrencyCode(expense.currency || invoiceCurrency);
+            const existingItem = editingExpenseItemMap.get(expense.id);
 
-        return expenses.filter((expense) => {
-            if (!expense || !expense.billable) return false;
+            if (existingItem && Number.isFinite(existingItem.amount)) {
+                const storedOriginalAmount = Number.isFinite(existingItem.originalAmount)
+                    ? existingItem.originalAmount
+                    : originalAmount;
+                const storedOriginalCurrency = normalizeCurrencyCode(existingItem.originalCurrency || originalCurrency);
+                const exchangeRate = Number.isFinite(existingItem.exchangeRate)
+                    ? existingItem.exchangeRate
+                    : (storedOriginalAmount ? existingItem.amount / storedOriginalAmount : 1);
 
-            if (selectedProject?.id) {
-                if (expense.projectId !== selectedProject.id) return false;
-            } else if (selectedClient?.id) {
-                if (expense.clientId !== selectedClient.id) return false;
-            } else {
-                return false;
+                return {
+                    ...expense,
+                    convertedAmount: existingItem.amount,
+                    exchangeRate,
+                    originalAmount: storedOriginalAmount,
+                    originalCurrency: storedOriginalCurrency,
+                    isConvertible: true,
+                    conversionError: null
+                };
             }
 
-            const expenseCurrency = expense.currency || invoiceCurrency;
-            return expenseCurrency !== invoiceCurrency;
-        }).length;
-    }, [expenses, selectedClient, selectedProject, invoiceCurrency]);
+            if (originalCurrency === normalizedInvoiceCurrency) {
+                return {
+                    ...expense,
+                    convertedAmount: originalAmount,
+                    exchangeRate: 1,
+                    originalAmount,
+                    originalCurrency,
+                    isConvertible: true,
+                    conversionError: null
+                };
+            }
+
+            const conversion = convertCurrency(
+                originalAmount,
+                originalCurrency,
+                normalizedInvoiceCurrency,
+                exchangeRates
+            );
+
+            if (!conversion.success) {
+                return {
+                    ...expense,
+                    convertedAmount: originalAmount,
+                    exchangeRate: undefined,
+                    originalAmount,
+                    originalCurrency,
+                    isConvertible: false,
+                    conversionError: conversion.error || 'Exchange rate unavailable'
+                };
+            }
+
+            const convertedAmount = conversion.amount;
+            const exchangeRate = originalAmount
+                ? Math.round((convertedAmount / originalAmount) * 1000000) / 1000000
+                : 1;
+
+            return {
+                ...expense,
+                convertedAmount,
+                exchangeRate,
+                originalAmount,
+                originalCurrency,
+                isConvertible: true,
+                conversionError: null
+            };
+        });
+    }, [availableExpenses, editingExpenseItemMap, exchangeRates, invoiceCurrency, normalizedInvoiceCurrency]);
+
+    const conversionUnavailableCount = useMemo(() => {
+        return availableExpensesWithConversion.filter((expense) => !expense.isConvertible).length;
+    }, [availableExpensesWithConversion]);
 
     // Auto-open the form when showButton is false (modal mode)
     useEffect(() => {
@@ -830,7 +916,10 @@ const InvoiceGenerator = ({
     const calculatePricing = useInvoicePricing({
         invoiceTasks,
         additionalTasks,
-        expenseItems: availableExpenses,
+        expenseItems: availableExpensesWithConversion.map((expense) => ({
+            ...expense,
+            amount: expense.convertedAmount
+        })),
         editableHours,
         discountType,
         discountValue,
@@ -945,15 +1034,18 @@ const InvoiceGenerator = ({
             return invoiceTemplates.find(t => t.id === templateId) || editingInvoice.template || null;
         })();
 
-        const selectedExpenseItems = availableExpenses
-            .filter((expense) => selectedExpensesForBilling[expense.id])
+        const selectedExpenseItems = availableExpensesWithConversion
+            .filter((expense) => selectedExpensesForBilling[expense.id] && expense.isConvertible !== false)
             .map((expense) => ({
                 id: expense.id,
                 title: expense.title,
-                amount: expense.amount || 0,
+                amount: expense.convertedAmount || 0,
                 date: expense.date,
                 supplierName: expense.supplierName || null,
-                currency: expense.currency || invoiceCurrency
+                currency: normalizedInvoiceCurrency,
+                originalAmount: expense.originalAmount,
+                originalCurrency: expense.originalCurrency,
+                exchangeRate: expense.exchangeRate
             }));
 
         const expenseInvoiceItems = selectedExpenseItems.map((expense) => ({
@@ -961,7 +1053,10 @@ const InvoiceGenerator = ({
             quantity: 1,
             rate: expense.amount,
             amount: expense.amount,
-            expenseId: expense.id
+            expenseId: expense.id,
+            originalAmount: expense.originalAmount,
+            originalCurrency: expense.originalCurrency,
+            exchangeRate: expense.exchangeRate
         }));
 
         return {
@@ -1393,7 +1488,11 @@ const InvoiceGenerator = ({
             const initialExpenseSelection = {};
             const editingProjectId = editingInvoice.projectId || selectedProject?.id || null;
             const editingClientId = editingInvoice.clientId || selectedClient?.id || null;
-            const editingCurrency = editingInvoice.currency || invoiceCurrency;
+            const editingExpenseIds = new Set(
+                (editingInvoice.items || [])
+                    .filter((item) => item?.expenseId)
+                    .map((item) => item.expenseId)
+            );
 
             expenses
                 .filter((expense) => {
@@ -1406,14 +1505,11 @@ const InvoiceGenerator = ({
                         return false;
                     }
 
-                    const expenseCurrency = expense.currency || editingCurrency;
-                    if (expenseCurrency !== editingCurrency) return false;
-
                     if (expense.billingStatus === 'unbilled') return true;
                     return expense.invoiceId === editingInvoice.id;
                 })
                 .forEach((expense) => {
-                    initialExpenseSelection[expense.id] = expense.invoiceId === editingInvoice.id;
+                    initialExpenseSelection[expense.id] = editingExpenseIds.has(expense.id) || expense.invoiceId === editingInvoice.id;
                 });
             setSelectedExpensesForBilling(initialExpenseSelection);
             
@@ -1432,7 +1528,7 @@ const InvoiceGenerator = ({
             const tasksData = prepareInvoiceData();
             
             // Even if there are no billable tasks, we still open the form
-            // This allows users to manually add tasks with the "Add Task" feature
+            // This allows users to manually add tasks with the "New Task" feature
             if (tasksData) {
                 setInvoiceTasks(tasksData);
                 // Initialize editable hours with original hours
@@ -1456,7 +1552,8 @@ const InvoiceGenerator = ({
                 setSelectedTasksForBilling(initialTaskSelection);
 
                 const initialExpenseSelection = {};
-                availableExpenses.forEach((expense) => {
+                availableExpensesWithConversion.forEach((expense) => {
+                    if (!expense.isConvertible) return;
                     initialExpenseSelection[expense.id] = true;
                 });
                 setSelectedExpensesForBilling(initialExpenseSelection);
@@ -1504,7 +1601,7 @@ const InvoiceGenerator = ({
             }
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, selectedClient, isTimerActive, isTimerPaused, showError, client, availableExpenses, expenses, invoiceCurrency]);
+    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, selectedClient, isTimerActive, isTimerPaused, showError, client, availableExpensesWithConversion, expenses]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {
@@ -1650,10 +1747,12 @@ const InvoiceGenerator = ({
                     setSelectedBusinessInfo={setSelectedBusinessInfo}
                     setSelectedPaymentMethod={setSelectedPaymentMethod}
                     setSelectedTasksForBilling={setSelectedTasksForBilling}
-                    availableExpenses={availableExpenses}
+                    availableExpenses={availableExpensesWithConversion}
                     selectedExpensesForBilling={selectedExpensesForBilling}
                     setSelectedExpensesForBilling={setSelectedExpensesForBilling}
-                    incompatibleExpensesCount={incompatibleExpensesCount}
+                    conversionUnavailableCount={conversionUnavailableCount}
+                    exchangeRatesError={exchangeRatesError}
+                    exchangeRatesLoading={exchangeRatesLoading}
                     mergedSubtasks={mergedSubtasks}
                     handleToggleMergeSubtasks={handleToggleMergeSubtasks}
                     taskInputRef={taskInputRef}

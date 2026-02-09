@@ -150,11 +150,6 @@ const ClientDashboard = ({
 
     // Calculate client metrics
     const clientMetrics = useMemo(() => {
-        // Total time worked
-        const totalTime = clientTimeEntries.reduce((total, entry) => {
-            return total + (entry.end - entry.start);
-        }, 0);
-    
         // Total revenue from paid invoices only
         const totalRevenue = clientInvoices.reduce((total, invoice) => {
             // Only include invoices that have been marked as paid
@@ -165,7 +160,6 @@ const ClientDashboard = ({
         }, 0);
 
         // Unbilled time and potential revenue
-        let unbilledTime = 0;
         let potentialRevenue = 0;
 
         clientProjects.forEach(project => {
@@ -200,8 +194,6 @@ const ClientDashboard = ({
                     return total + roundedTaskHours;
                 }, 0);
 
-                const projectUnbilledTime = projectUnbilledHours * 60 * 60 * 1000; // Convert back to milliseconds for consistency
-                unbilledTime += projectUnbilledTime;
                 potentialRevenue += projectUnbilledHours * project.hourlyRate;
             }
         });
@@ -216,12 +208,9 @@ const ClientDashboard = ({
         }, 0);
 
         return {
-            totalTime,
             totalRevenue,
-            unbilledTime,
             potentialRevenue,
             pendingAmount,
-            projectCount: clientProjects.length,
             invoiceCount: clientInvoices.length
         };
     }, [clientTimeEntries, clientInvoices, clientProjects, clientTasks]);
@@ -486,6 +475,13 @@ const ClientDashboard = ({
 
                     <div>
                         <div className="flex items-center flex-wrap gap-2">
+                            {client.color && (
+                                <div
+                                    className="w-4 h-4 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: client.color }}
+                                    title="Client color"
+                                />
+                            )}
                             <h1 className="text-2xl font-bold text-foreground">{client.title}</h1>
                             {client.archived && (
                                 <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
@@ -493,11 +489,13 @@ const ClientDashboard = ({
                                 </span>
                             )}
                         </div>
-                        {client.clientName && (
-                            <p className="text-sm text-muted-foreground">{client.clientName}</p>
-                        )}
-                        {client.contactPerson && (
-                            <p className="text-sm text-muted-foreground">Contact: {client.contactPerson}</p>
+                        {(client.clientName || client.contactPerson) && (
+                            <p className="text-sm text-muted-foreground">
+                                {[
+                                    client.clientName,
+                                    client.contactPerson ? client.contactPerson : null
+                                ].filter(Boolean).join(' · ')}
+                            </p>
                         )}
                     </div>
                 </div>
@@ -594,42 +592,11 @@ const ClientDashboard = ({
             />
 
             {/* Client Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-6">
-                <Card>
-                    <CardContent className="pt-5">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <ClipboardDocumentCheckIcon className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div className="ml-4 w-0 flex-1">
-                                <dl>
-                                    <dt className="text-sm font-medium text-muted-foreground truncate">Projects</dt>
-                                    <dd className="text-lg font-semibold text-foreground">{clientMetrics.projectCount}</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
-                <Card>
-                    <CardContent className="pt-5">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <ClockIcon className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div className="ml-4 w-0 flex-1">
-                                <dl>
-                                    <dt className="text-sm font-medium text-muted-foreground truncate">Total Time</dt>
-                                    <dd className="text-lg font-semibold text-foreground">{formatDuration(clientMetrics.totalTime)}</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="pt-5">
-                        <div className="flex items-center">
+                <Card className="h-full">
+                    <CardContent className="p-5 flex items-center h-full">
+                        <div className="flex items-center w-full">
                             <div className="flex-shrink-0">
                                 <BanknotesIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
@@ -647,9 +614,9 @@ const ClientDashboard = ({
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardContent className="pt-5">
-                        <div className="flex items-center">
+                <Card className="h-full">
+                    <CardContent className="p-5 flex items-center h-full">
+                        <div className="flex items-center w-full">
                             <div className="flex-shrink-0">
                                 <DocumentTextIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
@@ -667,29 +634,9 @@ const ClientDashboard = ({
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardContent className="pt-5">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <CurrencyDollarIcon className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div className="ml-4 w-0 flex-1">
-                                <dl>
-                                    <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
-                                    <dd className="text-lg font-semibold text-foreground">
-                                        <span className="sensitive-data">
-                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
-                                        </span>
-                                    </dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="pt-5">
-                        <div className="flex items-center">
+                <Card className="h-full">
+                    <CardContent className="p-5 flex items-center h-full">
+                        <div className="flex items-center w-full">
                             <div className="flex-shrink-0">
                                 <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
@@ -707,21 +654,27 @@ const ClientDashboard = ({
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardContent className="pt-5">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div className="ml-4 w-0 flex-1">
+                <Card className="h-full">
+                    <CardContent className="p-5 flex items-center h-full">
+                        <div className="flex items-center w-full">
+                            <div className="w-full">
                                 <dl>
-                                    <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled Expenses</dt>
-                                    <dd className="text-lg font-semibold text-foreground">
-                                        <span className="sensitive-data">
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
+                                </dl>
+                                <div className="mt-2 space-y-1">
+                                    <div className="flex items-center text-sm text-muted-foreground">
+                                        <CurrencyDollarIcon className="h-4 w-4 mr-2" />
+                                        <span className="sensitive-data text-foreground font-semibold">
+                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center text-sm text-muted-foreground">
+                                        <HandCoinsIcon className="h-4 w-4 mr-2" />
+                                        <span className="sensitive-data text-foreground font-semibold">
                                             {formatAmounts(unbilledExpenseTotalsByCurrency)}
                                         </span>
-                                    </dd>
-                                </dl>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </CardContent>

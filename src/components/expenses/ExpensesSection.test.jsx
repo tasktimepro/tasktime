@@ -1,14 +1,13 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExpensesSection from './ExpensesSection'
 
-const navigateToExpensesMock = vi.fn()
-
 const hookMocks = vi.hoisted(() => ({
 
-    expenses: []
+    expenses: [],
+    recurrences: []
 }))
 
 vi.mock('@/hooks/useExpenses.ts', () => ({
@@ -18,17 +17,10 @@ vi.mock('@/hooks/useExpenses.ts', () => ({
     })
 }))
 
-vi.mock('@/hooks/usePreferences.ts', () => ({
+vi.mock('@/hooks/useExpenseRecurrences.ts', () => ({
 
-    usePreferences: () => ({
-        preferences: { currency: 'USD' }
-    })
-}))
-
-vi.mock('@/hooks/useUrlState.ts', () => ({
-
-    useUrlState: () => ({
-        navigateToExpenses: navigateToExpensesMock
+    useExpenseRecurrences: () => ({
+        recurrences: hookMocks.recurrences
     })
 }))
 
@@ -63,7 +55,6 @@ describe('ExpensesSection', () => {
 
     beforeEach(() => {
 
-        navigateToExpensesMock.mockClear()
         hookMocks.expenses = [
             baseExpense,
             {
@@ -73,6 +64,7 @@ describe('ExpensesSection', () => {
                 clientId: 'client-2'
             }
         ]
+        hookMocks.recurrences = []
         user = userEvent.setup()
     })
 
@@ -85,7 +77,6 @@ describe('ExpensesSection', () => {
         )
 
         expect(screen.getByText('Expenses (1)')).toBeInTheDocument()
-        expect(screen.getByText('Unbilled: $50.00')).toBeInTheDocument()
         expect(screen.queryByTestId('expense-list')).not.toBeInTheDocument()
     })
 
@@ -113,13 +104,30 @@ describe('ExpensesSection', () => {
             />
         )
 
-        await user.click(screen.getByRole('button', { name: 'Expenses (1)' }))
-        await user.click(screen.getByRole('button', { name: 'Add Expense' }))
+        await user.click(screen.getByRole('button', { name: 'New Expense' }))
 
         expect(openExpenseModal).toHaveBeenCalledWith(null, expect.objectContaining({ clientId: 'client-1' }))
     })
 
-    it('navigates to expenses with filters', async () => {
+    it('shows upcoming recurring previews in the main list', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 1, 1, 10, 0, 0));
+
+        hookMocks.recurrences = [
+            {
+                id: 'rec-1',
+                title: 'Monthly Hosting',
+                repeat: 'monthly',
+                startDate: '2026-02-03',
+                amount: 20,
+                amountType: 'fixed',
+                active: true,
+                clientId: 'client-1',
+                projectId: null,
+                isPersonal: false
+            }
+        ];
+
         render(
             <ExpensesSection
                 clientId="client-1"
@@ -127,12 +135,10 @@ describe('ExpensesSection', () => {
             />
         )
 
-        await user.click(screen.getByRole('button', { name: 'Expenses (1)' }))
-        await user.click(screen.getByRole('button', { name: 'View all expenses' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Expenses (2)' }))
 
-        expect(navigateToExpensesMock).toHaveBeenCalledWith({
-            expenseClientId: 'client-1',
-            expenseProjectId: null
-        })
+        expect(screen.getByText('Monthly Hosting')).toBeInTheDocument()
+
+        vi.useRealTimers();
     })
 })

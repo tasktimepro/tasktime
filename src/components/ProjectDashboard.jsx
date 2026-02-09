@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, DocumentCheckIcon, ClockIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon } from '@/components/ui/icons';
+import { ArrowLeftIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
-import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
+import { millisecondsToHours } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { useProjects } from '../hooks/useProjects.ts';
@@ -214,19 +214,8 @@ const ProjectDashboard = ({
         projectTaskIds.includes(entry.taskId)
     );
 
-    // Count visible tasks (not completed and not archived, including both parent tasks and subtasks)
-    const visibleTasksCount = projectTasks.filter(task => 
-        !task.completed && !task.archived
-    ).length;
-
     // Calculate project metrics
     const projectMetrics = useMemo(() => {
-        // Total time worked on this project (including invoice adjustments)
-        const totalTime = projectTimeEntries
-            .reduce((total, entry) => {
-                return total + (entry.end - entry.start);
-            }, 0);
-
         // Total revenue from paid invoices only
         const totalRevenue = projectInvoices.reduce((total, invoice) => {
             // Only include invoices that have been marked as paid
@@ -290,13 +279,11 @@ const ProjectDashboard = ({
         }
 
         return {
-            totalTime,
             totalRevenue,
             pendingAmount,
-            potentialRevenue,
-            activeTaskCount: visibleTasksCount
+            potentialRevenue
         };
-    }, [projectTimeEntries, projectInvoices, project, projectTasks, visibleTasksCount]);
+    }, [projectTimeEntries, projectInvoices, project, projectTasks]);
 
     const projectClient = useMemo(() => {
         if (!project.preferredClientId) return null;
@@ -442,42 +429,10 @@ const ProjectDashboard = ({
 
             {/* Project Metrics - Only show for non-personal projects */}
             {!project.isPersonal && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-6">
-                    <Card>
-                        <CardContent className="pt-5">
-                            <div className="flex items-center">
-                                <div className="flex-shrink-0">
-                                    <DocumentCheckIcon className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                                <div className="ml-4 w-0 flex-1">
-                                    <dl>
-                                        <dt className="text-sm font-medium text-muted-foreground truncate">Tasks</dt>
-                                        <dd className="text-lg font-semibold text-foreground">{projectMetrics.activeTaskCount}</dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardContent className="pt-5">
-                            <div className="flex items-center">
-                                <div className="flex-shrink-0">
-                                    <ClockIcon className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                                <div className="ml-4 w-0 flex-1">
-                                    <dl>
-                                        <dt className="text-sm font-medium text-muted-foreground truncate">Total Time</dt>
-                                        <dd className="text-lg font-semibold text-foreground">{formatDuration(projectMetrics.totalTime)}</dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardContent className="pt-5">
-                            <div className="flex items-center">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <Card className="h-full">
+                        <CardContent className="p-5 flex items-center h-full">
+                            <div className="flex items-center w-full">
                                 <div className="flex-shrink-0">
                                     <BanknotesIcon className="h-5 w-5 text-muted-foreground" />
                                 </div>
@@ -495,9 +450,9 @@ const ProjectDashboard = ({
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardContent className="pt-5">
-                            <div className="flex items-center">
+                    <Card className="h-full">
+                        <CardContent className="p-5 flex items-center h-full">
+                            <div className="flex items-center w-full">
                                 <div className="flex-shrink-0">
                                     <DocumentTextIcon className="h-5 w-5 text-muted-foreground" />
                                 </div>
@@ -515,29 +470,9 @@ const ProjectDashboard = ({
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardContent className="pt-5">
-                            <div className="flex items-center">
-                                <div className="flex-shrink-0">
-                                    <CurrencyDollarIcon className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                                <div className="ml-4 w-0 flex-1">
-                                    <dl>
-                                        <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
-                                        <dd className="text-lg font-semibold text-foreground">
-                                            <span className="sensitive-data">
-                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.potentialRevenue.toFixed(2)}
-                                            </span>
-                                        </dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardContent className="pt-5">
-                            <div className="flex items-center">
+                    <Card className="h-full">
+                        <CardContent className="p-5 flex items-center h-full">
+                            <div className="flex items-center w-full">
                                 <div className="flex-shrink-0">
                                     <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
                                 </div>
@@ -555,21 +490,27 @@ const ProjectDashboard = ({
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardContent className="pt-5">
-                            <div className="flex items-center">
-                                <div className="flex-shrink-0">
-                                    <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                                <div className="ml-4 w-0 flex-1">
+                    <Card className="h-full">
+                        <CardContent className="p-5 flex items-center h-full">
+                            <div className="flex items-center w-full">
+                                <div className="w-full">
                                     <dl>
-                                        <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled Expenses</dt>
-                                        <dd className="text-lg font-semibold text-foreground">
-                                            <span className="sensitive-data">
+                                        <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
+                                    </dl>
+                                    <div className="mt-2 space-y-1">
+                                        <div className="flex items-center text-sm text-muted-foreground">
+                                            <CurrencyDollarIcon className="h-4 w-4 mr-2" />
+                                            <span className="sensitive-data text-foreground font-semibold">
+                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.potentialRevenue.toFixed(2)}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center text-sm text-muted-foreground">
+                                            <HandCoinsIcon className="h-4 w-4 mr-2" />
+                                            <span className="sensitive-data text-foreground font-semibold">
                                                 {formatAmounts(unbilledExpenseTotalsByCurrency)}
                                             </span>
-                                        </dd>
-                                    </dl>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>

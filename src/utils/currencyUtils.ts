@@ -250,6 +250,11 @@ export const convertCurrency = (
     const fromCurrencyStd = normalizeCurrencyCode(fromCurrency);
     const toCurrencyStd = normalizeCurrencyCode(toCurrency);
 
+    // Re-check after normalization (handles case differences like 'eur' vs 'EUR')
+    if (fromCurrencyStd === toCurrencyStd) {
+        return { success: true, amount };
+    }
+
     // Check if we have valid exchange rates
     if (!exchangeRates || Object.keys(exchangeRates).length === 0) {
         return {
@@ -269,7 +274,7 @@ export const convertCurrency = (
                 error: `Missing exchange rate for ${toCurrencyStd}`
             };
         }
-        return { success: true, amount: amount * toRate };
+        return { success: true, amount: Math.round(amount * toRate * 100) / 100 };
     }
 
     if (toCurrencyStd === 'USD') {
@@ -281,7 +286,7 @@ export const convertCurrency = (
                 error: `Missing exchange rate for ${fromCurrencyStd}`
             };
         }
-        return { success: true, amount: amount / fromRate };
+        return { success: true, amount: Math.round((amount / fromRate) * 100) / 100 };
     }
 
     // For non-USD to non-USD conversion, go through USD
@@ -297,7 +302,7 @@ export const convertCurrency = (
     }
 
     const amountInUSD = amount / fromRate;
-    return { success: true, amount: amountInUSD * toRate };
+    return { success: true, amount: Math.round(amountInUSD * toRate * 100) / 100 };
 };
 
 /**

@@ -314,7 +314,7 @@ const TaskTree = ({
                             onClick={() => setShowCreateForm(true)}
                             leadingIcon={PlusIcon}
                         >
-                            Add Task
+                            New Task
                         </Button>
                     )}
                 </div>

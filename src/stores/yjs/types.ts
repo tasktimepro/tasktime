@@ -119,6 +119,9 @@ export interface InvoiceItem {
     amount: number;
     taskId?: string;
     expenseId?: string;
+    originalAmount?: number;
+    originalCurrency?: string;
+    exchangeRate?: number;
 }
 
 export interface Invoice {

@@ -14,11 +14,14 @@ const InvoiceExpenseSelector = ({
     selectedExpensesForBilling,
     setSelectedExpensesForBilling,
     getInvoiceCurrency,
-    incompatibleExpensesCount
+    conversionUnavailableCount,
+    exchangeRatesError,
+    exchangeRatesLoading
 }) => {
     const handleSelectAll = () => {
         const allSelected = {};
         expenses.forEach((expense) => {
+            if (expense.isConvertible === false) return;
             allSelected[expense.id] = true;
         });
         setSelectedExpensesForBilling(allSelected);
@@ -52,10 +55,16 @@ const InvoiceExpenseSelector = ({
             </button>
             {activeSection === 'expenses' && (
                 <div className="p-4 space-y-3">
-                    {incompatibleExpensesCount > 0 && (
+                    {conversionUnavailableCount > 0 && (
                         <Notice
-                            title="Some expenses were excluded"
-                            description={`${incompatibleExpensesCount} expense${incompatibleExpensesCount === 1 ? '' : 's'} have a different currency than this invoice.`}
+                            title="Some expenses need exchange rates"
+                            description={`${conversionUnavailableCount} expense${conversionUnavailableCount === 1 ? '' : 's'} cannot be selected until rates are available.`}
+                        />
+                    )}
+                    {exchangeRatesError && !exchangeRatesLoading && (
+                        <Notice
+                            title="Exchange rates unavailable"
+                            description={exchangeRatesError}
                         />
                     )}
                     {expenses.length === 0 ? (
@@ -85,8 +94,17 @@ const InvoiceExpenseSelector = ({
                                 </div>
                             </div>
                             <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {expenses.map((expense) => (
-                                    <div key={expense.id} className="flex items-center justify-between p-3 bg-card rounded border">
+                                {expenses.map((expense) => {
+                                    const invoiceCurrency = getInvoiceCurrency();
+                                    const isConvertible = expense.isConvertible !== false;
+                                    const originalCurrency = expense.originalCurrency || invoiceCurrency;
+                                    const showOriginal = originalCurrency !== invoiceCurrency;
+
+                                    return (
+                                    <div
+                                        key={expense.id}
+                                        className={`flex items-center justify-between p-3 bg-card rounded border ${!isConvertible ? 'opacity-60' : ''}`}
+                                    >
                                         <div className="flex items-center space-x-3 flex-1">
                                             <CustomCheckbox
                                                 checked={selectedExpensesForBilling[expense.id] || false}
@@ -94,6 +112,7 @@ const InvoiceExpenseSelector = ({
                                                     ...prev,
                                                     [expense.id]: checked
                                                 }))}
+                                                disabled={!isConvertible}
                                             />
                                             <div className="flex-1 pr-4">
                                                 <p className="text-sm font-medium text-foreground">
@@ -105,11 +124,31 @@ const InvoiceExpenseSelector = ({
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="text-sm font-medium text-foreground sensitive-data">
-                                            {formatCurrency(expense.amount || 0, expense.currency || getInvoiceCurrency())}
+                                        <div className="text-right">
+                                            {isConvertible ? (
+                                                <>
+                                                    <div className="text-sm font-medium text-foreground sensitive-data">
+                                                        {formatCurrency(expense.convertedAmount ?? expense.amount ?? 0, invoiceCurrency)}
+                                                    </div>
+                                                    {showOriginal && (
+                                                        <div className="text-xs text-muted-foreground sensitive-data">
+                                                            {formatCurrency(expense.originalAmount ?? expense.amount ?? 0, originalCurrency)}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="text-sm font-medium text-muted-foreground sensitive-data">
+                                                        {formatCurrency(expense.originalAmount ?? expense.amount ?? 0, originalCurrency)}
+                                                    </div>
+                                                    <div className="text-xs text-destructive">
+                                                        Rate unavailable
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
-                                ))}
+                                );})}
                             </div>
                         </>
                     )}

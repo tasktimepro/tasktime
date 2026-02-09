@@ -80,7 +80,9 @@ const InvoiceModal = ({
     availableExpenses,
     selectedExpensesForBilling,
     setSelectedExpensesForBilling,
-    incompatibleExpensesCount,
+    conversionUnavailableCount,
+    exchangeRatesError,
+    exchangeRatesLoading,
     setSelectedPaymentMethod,
     setSelectedBusinessInfo,
     mergedSubtasks,
@@ -456,7 +458,9 @@ const InvoiceModal = ({
                     selectedExpensesForBilling={selectedExpensesForBilling}
                     setSelectedExpensesForBilling={setSelectedExpensesForBilling}
                     getInvoiceCurrency={getInvoiceCurrency}
-                    incompatibleExpensesCount={incompatibleExpensesCount}
+                    conversionUnavailableCount={conversionUnavailableCount}
+                    exchangeRatesError={exchangeRatesError}
+                    exchangeRatesLoading={exchangeRatesLoading}
                 />
 
                 <InvoicePreview
