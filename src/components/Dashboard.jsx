@@ -2,13 +2,17 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import TaskTimer from './TaskTimer';
 import {
     formatDuration,
-    millisecondsToHours
+    millisecondsToHours,
+    parseStoredDate,
+    toStorageDate
 } from '../utils/dateUtils';
+import { addDays, endOfMonth, startOfMonth, subDays, subMonths } from 'date-fns';
 import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
 import { useTimers } from '../hooks/useTimers';
 import { useExpenses } from '../hooks/useExpenses';
+import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences';
 import { usePreferences } from '../hooks/usePreferences';
 import { THIRTY_DAYS_MS, ONE_HOUR_MS, ONE_MINUTE_MS } from '../constants/app';
 import useCurrencyConversion from './dashboard/hooks/useCurrencyConversion';
@@ -22,6 +26,7 @@ import { CornerDownRightIcon } from '@/components/ui/icons';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTodayString } from '@/hooks/useDayRollover';
 import { linkifyNodes } from '@/utils/linkifyUtils';
+import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -45,6 +50,7 @@ const Dashboard = ({
     const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
     const { expenses } = useExpenses();
+    const { recurrences } = useExpenseRecurrences();
     const { preferences } = usePreferences();
     const { getForDate } = usePlannerAttachments();
     
@@ -93,33 +99,135 @@ const Dashboard = ({
     });
 
     const expenseMetricsByCurrency = useMemo(() => {
-        const today = new Date();
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const todayDate = parseStoredDate(todayStr) || new Date();
+        const monthStart = startOfMonth(todayDate);
+        const monthEnd = endOfMonth(todayDate);
+        const lastMonthStart = startOfMonth(subMonths(todayDate, 1));
+        const lastMonthEnd = endOfMonth(subMonths(todayDate, 1));
+        const last90Start = subDays(todayDate, 89);
 
-        const inMonth = expenses.filter((expense) => {
-            const date = new Date(expense.date);
-            if (Number.isNaN(date.getTime())) return false;
-            return date >= monthStart && date <= monthEnd;
+        const monthStartStr = toStorageDate(monthStart) || '';
+        const monthEndStr = toStorageDate(monthEnd) || '';
+        const upcomingStart = addDays(todayDate, 1);
+        const upcomingStartStr = toStorageDate(upcomingStart) || '';
+
+        const datesByRecurrence = new Map();
+        expenses.forEach((expense) => {
+            if (!expense.recurrenceId) return;
+            if (!datesByRecurrence.has(expense.recurrenceId)) {
+                datesByRecurrence.set(expense.recurrenceId, new Set());
+            }
+            datesByRecurrence.get(expense.recurrenceId).add(expense.date);
         });
 
-        const initial = { total: {}, unpaid: {}, billableUnbilled: {} };
+        const recurringPreviews = recurrences
+            .filter((recurrence) => recurrence.active)
+            .map((recurrence) => {
+                if (!upcomingStartStr || !monthEndStr) return null;
 
-        return inMonth.reduce((acc, expense) => {
+                const baseStart = recurrence.lastGeneratedDate
+                    ? advanceByRepeat(
+                        recurrence.lastGeneratedDate,
+                        recurrence.repeat,
+                        recurrence.monthlyType,
+                        recurrence.monthlyDay
+                    )
+                    : recurrence.startDate;
+
+                const nextDate = getNextRecurringDate({
+                    startDate: baseStart,
+                    repeat: recurrence.repeat,
+                    monthlyType: recurrence.monthlyType,
+                    monthlyDay: recurrence.monthlyDay,
+                    endDate: recurrence.endDate,
+                    fromDate: upcomingStartStr,
+                });
+
+                if (!nextDate) return null;
+                const nextParsed = parseStoredDate(nextDate);
+                if (!nextParsed || nextParsed > monthEnd) return null;
+
+                const existingDates = datesByRecurrence.get(recurrence.id);
+                if (existingDates?.has(nextDate)) {
+                    return null;
+                }
+
+                const preview = buildExpenseFromRecurrence(recurrence, nextDate);
+                return {
+                    ...preview,
+                    id: `preview-${recurrence.id}-${nextDate}`,
+                    isPreview: true,
+                };
+            })
+            .filter(Boolean);
+
+        const upcomingExpenses = [...expenses, ...recurringPreviews].filter((expense) => {
+            const expenseDate = parseStoredDate(expense.date);
+            if (!expenseDate) return false;
+            if (expenseDate <= todayDate) return false;
+            return expenseDate >= monthStart && expenseDate <= monthEnd;
+        });
+
+        const addAmount = (acc, key, currency, amount) => {
+            acc[key][currency] = (acc[key][currency] || 0) + (amount || 0);
+        };
+
+        const initial = {
+            upcomingThisMonth: {},
+            upcomingThisMonthHasEstimate: false,
+            paidThisMonth: {},
+            paidLastMonth: {},
+            paidLast90Days: {},
+        };
+
+        const withUpcoming = upcomingExpenses.reduce((acc, expense) => {
             const currency = expense.currency || preferences.currency || 'EUR';
-            acc.total[currency] = (acc.total[currency] || 0) + (expense.amount || 0);
+            addAmount(acc, 'upcomingThisMonth', currency, expense.amount || 0);
+            if (expense.amountType === 'variable') {
+                acc.upcomingThisMonthHasEstimate = true;
+            }
+            return acc;
+        }, initial);
 
-            if (expense.paymentStatus === 'unpaid') {
-                acc.unpaid[currency] = (acc.unpaid[currency] || 0) + (expense.amount || 0);
+        return expenses.reduce((acc, expense) => {
+            const expenseDate = parseStoredDate(expense.date);
+            if (!expenseDate) return acc;
+
+            const currency = expense.currency || preferences.currency || 'EUR';
+            const amount = expense.amount || 0;
+
+            if (expenseDate >= monthStart && expenseDate <= monthEnd && expenseDate <= todayDate && expense.paymentStatus === 'paid') {
+                addAmount(acc, 'paidThisMonth', currency, amount);
             }
 
-            if (expense.billable && expense.billingStatus === 'unbilled') {
-                acc.billableUnbilled[currency] = (acc.billableUnbilled[currency] || 0) + (expense.amount || 0);
+            if (expense.paymentStatus === 'paid') {
+                if (expenseDate >= lastMonthStart && expenseDate <= lastMonthEnd) {
+                    addAmount(acc, 'paidLastMonth', currency, amount);
+                }
+
+                if (expenseDate >= last90Start && expenseDate <= todayDate) {
+                    addAmount(acc, 'paidLast90Days', currency, amount);
+                }
             }
 
             return acc;
-        }, initial);
-    }, [expenses, preferences.currency]);
+        }, withUpcoming);
+    }, [expenses, preferences.currency, recurrences, todayStr]);
+
+    const expenseMetrics = useMemo(() => {
+        const upcoming = convertToCurrency(expenseMetricsByCurrency.upcomingThisMonth);
+        const paidThisMonth = convertToCurrency(expenseMetricsByCurrency.paidThisMonth);
+        const paidLastMonth = convertToCurrency(expenseMetricsByCurrency.paidLastMonth);
+        const paidLast90Days = convertToCurrency(expenseMetricsByCurrency.paidLast90Days);
+
+        return {
+            upcomingThisMonthTotal: upcoming.amounts[preferredCurrency] || 0,
+            upcomingThisMonthHasEstimate: expenseMetricsByCurrency.upcomingThisMonthHasEstimate,
+            paidThisMonthTotal: paidThisMonth.amounts[preferredCurrency] || 0,
+            paidLastMonthTotal: paidLastMonth.amounts[preferredCurrency] || 0,
+            paidLast90DaysTotal: paidLast90Days.amounts[preferredCurrency] || 0,
+        };
+    }, [convertToCurrency, expenseMetricsByCurrency, preferredCurrency]);
 
     // Show warning if any conversion errors occurred (only once per session)
     useEffect(() => {
@@ -677,9 +785,11 @@ const Dashboard = ({
                 invoiceMetrics={invoiceMetrics}
                 thisMonthBillableHours={thisMonthBillableHours}
                 thisMonthUnbilledDisplay={thisMonthUnbilledDisplay}
-                expenseTotalsByCurrency={expenseMetricsByCurrency.total}
-                expenseUnpaidByCurrency={expenseMetricsByCurrency.unpaid}
-                expenseBillableUnbilledByCurrency={expenseMetricsByCurrency.billableUnbilled}
+                expenseThisMonthUpcomingTotal={expenseMetrics.upcomingThisMonthTotal}
+                expenseThisMonthUpcomingHasEstimate={expenseMetrics.upcomingThisMonthHasEstimate}
+                expenseThisMonthPaidTotal={expenseMetrics.paidThisMonthTotal}
+                expenseLastMonthPaidTotal={expenseMetrics.paidLastMonthTotal}
+                expenseLast90DaysPaidTotal={expenseMetrics.paidLast90DaysTotal}
                 hasClients={hasClients}
                 preferredCurrency={preferredCurrency}
                 formatDuration={formatDuration}

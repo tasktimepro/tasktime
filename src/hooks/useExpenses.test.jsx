@@ -288,4 +288,37 @@ describe('useExpenses', () => {
 
         vi.useRealTimers()
     })
+
+    it('returns archived expense when includeArchived is true', () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [{ id: 'exp-1' }],
+            archived: [{ id: 'exp-2' }]
+        })
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses({ includeArchived: true }))
+
+        expect(result.current.getExpense('exp-2')).toEqual({ id: 'exp-2' })
+    })
+
+    it('handles create/update/delete when store is not ready', () => {
+        const { store, loadArchivedExpenses } = buildStore()
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: false,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        expect(() => result.current.createExpense({ title: 'Test' })).toThrow('Store not ready')
+        expect(result.current.updateExpense('missing', { title: 'Nope' })).toBeUndefined()
+        expect(result.current.deleteExpense('missing')).toBe(false)
+    })
 })

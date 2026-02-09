@@ -30,6 +30,15 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
     const [archivedLoading, setArchivedLoading] = useState(false);
     const [archivedLoaded, setArchivedLoaded] = useState(false);
 
+    useEffect(() => {
+        if (!options.includeArchived || archivedLoaded || !store.archivedInvoicesSync) return;
+
+        const invoices: Invoice[] = [];
+        store.archivedInvoicesSync.forEach((invoice) => invoices.push(invoice));
+        setArchivedInvoices(invoices);
+        setArchivedLoaded(true);
+    }, [options.includeArchived, archivedLoaded, store]);
+
     // Load archived invoices when requested
     useEffect(() => {
         if (!options.includeArchived || !isReady || archivedLoaded || archivedLoading) return;

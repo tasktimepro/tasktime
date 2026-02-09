@@ -29,9 +29,11 @@ describe('MetricsCards', () => {
                 invoiceMetrics={invoiceMetrics}
                 thisMonthBillableHours={0}
                 thisMonthUnbilledDisplay="$0.00"
-                expenseTotalsByCurrency={{ USD: 120, EUR: 80 }}
-                expenseUnpaidByCurrency={{ USD: 50 }}
-                expenseBillableUnbilledByCurrency={{ EUR: 30 }}
+                expenseThisMonthUpcomingTotal={120}
+                expenseThisMonthUpcomingHasEstimate={true}
+                expenseThisMonthPaidTotal={50}
+                expenseLastMonthPaidTotal={30}
+                expenseLast90DaysPaidTotal={10}
                 hasClients={false}
                 preferredCurrency="USD"
                 formatDuration={() => '0h'}
@@ -41,14 +43,9 @@ describe('MetricsCards', () => {
             />
         )
 
-        expect(screen.getByText('Expenses This Month')).toBeInTheDocument()
-        expect(screen.getByText('$120.00 USD')).toBeInTheDocument()
-        expect(screen.getByText('€80.00 EUR')).toBeInTheDocument()
-
-        expect(screen.getByText('Unpaid Expenses')).toBeInTheDocument()
+        expect(screen.getByText('This Month')).toBeInTheDocument()
+        expect(screen.getByText('~$120.00')).toBeInTheDocument()
         expect(screen.getByText('$50.00')).toBeInTheDocument()
-
-        expect(screen.getByText('Billable Ready to Invoice')).toBeInTheDocument()
-        expect(screen.getByText('€30.00')).toBeInTheDocument()
+        expect(screen.getAllByText('paid').length).toBeGreaterThan(0)
     })
 })

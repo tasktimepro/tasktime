@@ -259,6 +259,127 @@ describe('usePlannerItems', () => {
         expect(day.items.find((i) => i.type === 'task' && i.title === 'Archived Task')).toBeFalsy();
     });
 
+    it('includes timer-only tasks for today', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+        mockTasks.push({ id: 't-timer', title: 'Timer Task', projectId: 'p1', completed: false });
+        mockTimers.push({ taskId: 't-timer', projectId: 'p1', elapsedTime: 60000, isPaused: false });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const today = result.current.weekDays.find((d) => d.dateStr === todayStr);
+
+        const timerItem = today.items.find((i) => i.type === 'task' && i.subtype === 'timer');
+        expect(timerItem?.title).toBe('Timer Task');
+        expect(timerItem?.isTimerActive).toBe(true);
+    });
+
+    it('includes recurring expense previews and skips when instance exists', () => {
+        const dateStr = format(new Date(), 'yyyy-MM-dd');
+
+        mockRecurrences.push(
+            { id: 'r1', title: 'Preview Expense', startDate: dateStr, repeat: 'monthly', amount: 40, amountType: 'fixed', currency: 'USD', active: true, isPersonal: true, billable: false },
+            { id: 'r2', title: 'Existing Expense', startDate: dateStr, repeat: 'monthly', amount: 20, amountType: 'fixed', currency: 'USD', active: true, isPersonal: true, billable: false }
+        );
+
+        mockExpenses.push({ id: 'e1', title: 'Existing Expense', date: dateStr, recurrenceId: 'r2', amount: 20, paymentStatus: 'unpaid' });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        const previewItem = day.items.find((i) => i.type === 'expense' && i.isPreview);
+        expect(previewItem?.title).toBe('Preview Expense');
+        expect(day.items.some((i) => i.type === 'expense' && i.title === 'Existing Expense' && i.isPreview)).toBe(false);
+    });
+
+    it('excludes archived clients after archivedOnDate', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(addDays(weekStart, 2), 'yyyy-MM-dd');
+
+        mockClients.push({ id: 'c-arch', title: 'Archived Client', archived: true, archivedOnDate: '2026-02-01' });
+        mockAttachments.push({ id: 'a-arch', type: 'client', referenceId: 'c-arch', mode: 'date', date: dateStr, estimatedHours: 1 });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        expect(day.items.find((i) => i.type === 'client' && i.title === 'Archived Client')).toBeFalsy();
+    });
+
+    it('uses project color for expense items', () => {
+        const dateStr = format(new Date(), 'yyyy-MM-dd');
+
+        mockProjects.push({ id: 'p-exp', title: 'Expense Project', color: '#123456' });
+        mockExpenses.push({ id: 'exp-1', title: 'Expense', date: dateStr, amount: 10, paymentStatus: 'unpaid', projectId: 'p-exp' });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        const expenseItem = day.items.find((i) => i.type === 'expense' && i.title === 'Expense');
+        expect(expenseItem?.color).toBe('#123456');
+    });
+
+    it('excludes archived projects after archivedOnDate', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(addDays(weekStart, 3), 'yyyy-MM-dd');
+
+        mockProjects.push({ id: 'p-arch', title: 'Archived Project', archived: true, archivedOnDate: '2026-02-01' });
+        mockAttachments.push({ id: 'a-proj', type: 'project', referenceId: 'p-arch', mode: 'date', date: dateStr, estimatedHours: 1 });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        expect(day.items.find((i) => i.type === 'project' && i.title === 'Archived Project')).toBeFalsy();
+    });
+
+    it('skips recurring expense previews for past dates', () => {
+        const pastDate = format(addDays(new Date(), -1), 'yyyy-MM-dd');
+
+        mockRecurrences.push({
+            id: 'r-past',
+            title: 'Past Preview',
+            startDate: pastDate,
+            repeat: 'monthly',
+            amount: 15,
+            amountType: 'fixed',
+            currency: 'USD',
+            active: true,
+            isPersonal: true,
+            billable: false,
+        })
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === pastDate);
+
+        expect(day.items.some((i) => i.type === 'expense' && i.isPreview)).toBe(false);
+    });
+
+    it('falls back to client color when project color is missing', () => {
+        const dateStr = format(new Date(), 'yyyy-MM-dd');
+
+        mockClients.push({ id: 'c-color', title: 'Color Client', color: '#ff00ff' });
+        mockProjects.push({ id: 'p-color', title: 'Color Project', preferredClientId: 'c-color' });
+        mockAttachments.push({ id: 'a-color', type: 'project', referenceId: 'p-color', mode: 'date', date: dateStr, estimatedHours: 1 });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        const projectItem = day.items.find((i) => i.type === 'project' && i.title === 'Color Project');
+        expect(projectItem?.color).toBe('#ff00ff');
+    });
+
+    it('includes archived tasks before archivedOnDate', () => {
+        const dateStr = format(new Date(), 'yyyy-MM-dd');
+
+        mockTasks.push({ id: 't-arch', title: 'Archived Task', archived: true, archivedOnDate: '2026-02-10' });
+        mockAttachments.push({ id: 'a-task', type: 'task', referenceId: 't-arch', mode: 'date', date: dateStr });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        const taskItem = day.items.find((i) => i.type === 'task' && i.title === 'Archived Task');
+        expect(taskItem).toBeTruthy();
+    });
+
     it('includes worked tasks with time entries when not otherwise added', () => {
         const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
         const dateStr = format(weekStart, 'yyyy-MM-dd');

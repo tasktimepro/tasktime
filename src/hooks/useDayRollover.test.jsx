@@ -55,4 +55,41 @@ describe('useDayRollover', () => {
 
         unmount();
     });
+
+    it('only refreshes on visibility when visible', () => {
+
+        vi.setSystemTime(new Date(2026, 1, 2, 12, 0, 0));
+
+        const { result, unmount } = renderHook(() => useTodayString());
+
+        expect(result.current).toBe('2026-02-02');
+
+        vi.setSystemTime(new Date(2026, 1, 3, 12, 0, 0));
+
+        Object.defineProperty(document, 'visibilityState', {
+            value: 'hidden',
+            configurable: true,
+        });
+
+        act(() => {
+
+            window.dispatchEvent(new Event('visibilitychange'));
+        });
+
+        expect(result.current).toBe('2026-02-02');
+
+        Object.defineProperty(document, 'visibilityState', {
+            value: 'visible',
+            configurable: true,
+        });
+
+        act(() => {
+
+            window.dispatchEvent(new Event('visibilitychange'));
+        });
+
+        expect(result.current).toBe('2026-02-03');
+
+        unmount();
+    });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { isTokenExpired, getStoredToken, storeToken, clearStoredToken, getTokenTimeRemaining } from './googleAuthStorage';
+import { getStoredSession, storeSession, clearStoredSession } from './googleAuthStorage';
 
 // Mock IndexedDB
 const mockDb = {
@@ -171,6 +172,58 @@ describe('googleAuthStorage', () => {
             };
 
             expect(getTokenTimeRemaining(token)).toBe(0);
+        });
+    });
+
+    describe('session storage', () => {
+
+        it('returns stored session when exists', async () => {
+            const storedSession = {
+                sessionId: 'session-1',
+                userId: 'user-1',
+                email: 'person@example.com',
+                createdAt: new Date('2026-01-19T12:00:00Z').toISOString(),
+            };
+            mockDb.get.mockResolvedValue(storedSession);
+
+            const result = await getStoredSession();
+
+            expect(result).toEqual(storedSession);
+        });
+
+        it('returns null when no session stored', async () => {
+            mockDb.get.mockResolvedValue(undefined);
+
+            const result = await getStoredSession();
+
+            expect(result).toBeNull();
+        });
+
+        it('returns null on session read error', async () => {
+            mockDb.get.mockRejectedValue(new Error('DB error'));
+
+            const result = await getStoredSession();
+
+            expect(result).toBeNull();
+        });
+
+        it('stores session in IndexedDB', async () => {
+            const session = {
+                sessionId: 'session-2',
+                userId: 'user-2',
+                email: 'person2@example.com',
+                createdAt: new Date('2026-01-20T12:00:00Z').toISOString(),
+            };
+
+            await storeSession(session);
+
+            expect(mockDb.put).toHaveBeenCalledWith('app-data', session, 'google-auth-session');
+        });
+
+        it('clears session in IndexedDB', async () => {
+            await clearStoredSession();
+
+            expect(mockDb.delete).toHaveBeenCalledWith('app-data', 'google-auth-session');
         });
     });
 });

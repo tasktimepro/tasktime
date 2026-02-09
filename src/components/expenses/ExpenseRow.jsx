@@ -21,10 +21,13 @@ const ExpenseRow = ({
     const todayStr = toStorageDate(new Date()) || '';
     const todayStart = parseStoredDate(todayStr);
     const expenseDate = parseStoredDate(expense.date);
+    const isAutoPayment = expense.paymentMode === 'auto' && expense.amountType !== 'variable';
+    const isUpcomingAuto = isAutoPayment && expenseDate && todayStart && expenseDate > todayStart;
     const isPaid = expense.paymentStatus === 'paid';
-    const isToday = !isPaid && Boolean(expense.date) && expense.date === todayStr;
-    const isOverdue = !isPaid && expenseDate && todayStart && expenseDate < todayStart;
-    const isUpcoming = !isPaid && expenseDate && todayStart && expenseDate > todayStart;
+    const isPaidDisplay = isPaid && !isUpcomingAuto;
+    const isToday = !isPaidDisplay && Boolean(expense.date) && expense.date === todayStr;
+    const isOverdue = !isPaidDisplay && expenseDate && todayStart && expenseDate < todayStart;
+    const isUpcoming = !isPaidDisplay && expenseDate && todayStart && expenseDate > todayStart;
     const amountValue = expense.amount || 0;
     const amountLabel = formatCurrency(amountValue, expense.currency);
     const isVariable = expense.amountType === 'variable';
@@ -47,7 +50,7 @@ const ExpenseRow = ({
     const canView = Boolean(onView);
 
     const statusBadge = (() => {
-        if (isPaid) {
+        if (isPaidDisplay) {
             return (
                 <Badge variant="success">
                     <CheckIcon className="h-3 w-3 mr-1" />
@@ -172,7 +175,7 @@ const ExpenseRow = ({
                     </div>
 
                     <div className="flex justify-end items-center space-x-2">
-                        {!isPaid && !isPreview && !(expense.paymentMode === 'auto' && expense.amountType !== 'variable') && (
+                        {!isPaidDisplay && !isPreview && !(expense.paymentMode === 'auto' && expense.amountType !== 'variable') && (
                             <Button
                                 size="sm"
                                 leadingIcon={CheckIcon}

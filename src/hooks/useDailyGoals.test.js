@@ -81,4 +81,36 @@ describe('useDailyGoals', () => {
 
         expect(result.current.getGoalForWeekday(2)).toBeNull();
     });
+
+    it('returns null for invalid weekday and empty date', async () => {
+        const mockMap = createMockYMap({
+            '0': { id: '0', weekday: 0, targetHours: 2, targetEarnings: 50, createdAt: Date.now() },
+        });
+        mockUseYjs.mockReturnValue({ store: { dailyGoals: mockMap }, isReady: true });
+
+        const { result } = renderHook(() => useDailyGoals());
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+        expect(result.current.getGoalForWeekday(-1)).toBeNull();
+        expect(result.current.getGoalForWeekday(7)).toBeNull();
+        expect(result.current.getGoalForDate('')).toBeNull();
+    });
+
+    it('updates an existing goal when setting the same weekday', async () => {
+        const mockMap = createMockYMap({
+            '3': { id: '3', weekday: 3, targetHours: 2, targetEarnings: 80, createdAt: Date.now() },
+        });
+        mockUseYjs.mockReturnValue({ store: { dailyGoals: mockMap }, isReady: true });
+
+        const { result } = renderHook(() => useDailyGoals());
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+        act(() => {
+            result.current.setGoal(3, { targetHours: 5 });
+        });
+
+        const updated = result.current.getGoalForWeekday(3);
+        expect(updated?.targetHours).toBe(5);
+        expect(updated?.targetEarnings).toBe(80);
+    });
 });

@@ -71,4 +71,28 @@ describe('useWeeklyGoals', () => {
             weeklyGoalTargetEarnings: null,
         });
     });
+
+    it('marks hasGoals when either value is set and merges partial updates', () => {
+        const updatePreferences = vi.fn();
+        mockUsePreferences.mockReturnValue({
+            preferences: {
+                weeklyGoalTargetHours: 8,
+                weeklyGoalTargetEarnings: null,
+            },
+            updatePreferences,
+        });
+
+        const { result } = renderHook(() => useWeeklyGoals());
+
+        expect(result.current.hasGoals).toBe(true);
+
+        act(() => {
+            result.current.setWeeklyGoals({ targetEarnings: 400 });
+        });
+
+        expect(updatePreferences).toHaveBeenCalledWith({
+            weeklyGoalTargetHours: 8,
+            weeklyGoalTargetEarnings: 400,
+        });
+    });
 });

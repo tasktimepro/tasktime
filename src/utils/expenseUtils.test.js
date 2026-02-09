@@ -38,6 +38,11 @@ describe('expenseUtils', () => {
         expect(advanceByRepeat('2025-01-31', 'monthly')).toBe('2025-02-28');
     });
 
+    it('advanceByRepeat monthly: first and last', () => {
+        expect(advanceByRepeat('2025-01-15', 'monthly', 'first')).toBe('2025-02-01');
+        expect(advanceByRepeat('2025-01-15', 'monthly', 'last')).toBe('2025-02-28');
+    });
+
     it('advanceByRepeat yearly: leap day', () => {
         expect(advanceByRepeat('2024-02-29', 'yearly')).toBe('2025-02-28');
     });
@@ -126,5 +131,15 @@ describe('expenseUtils', () => {
         const recurrence = { ...recurrenceBase, startDate: '2025-01-15', repeat: 'monthly' };
         expect(isRecurringExpenseDueOnDate(recurrence, '2025-02-15')).toBe(true);
         expect(isRecurringExpenseDueOnDate(recurrence, '2025-02-16')).toBe(false);
+    });
+
+    it('isRecurringExpenseDueOnDate respects start and end dates', () => {
+        const recurrence = { ...recurrenceBase, startDate: '2025-01-15', endDate: '2025-02-15', repeat: 'monthly' };
+        expect(isRecurringExpenseDueOnDate(recurrence, '2025-01-01')).toBe(false);
+        expect(isRecurringExpenseDueOnDate(recurrence, '2025-03-15')).toBe(false);
+    });
+
+    it('isRecurringExpenseDueOnDate returns false when startDate missing', () => {
+        expect(isRecurringExpenseDueOnDate({ ...recurrenceBase, startDate: '' }, '2025-02-15')).toBe(false);
     });
 });

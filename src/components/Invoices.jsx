@@ -73,7 +73,7 @@ const Invoices = ({
     const sideNavItems = useMemo(() => [
         {
             id: 'invoices',
-            name: 'All Invoices',
+            name: 'Invoices',
             icon: DocumentTextIcon,
             description: 'View and manage all invoices'
         },
@@ -128,22 +128,6 @@ const Invoices = ({
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">Manage invoices and related settings</p>
-                </div>
-                
-                {/* New Invoice Button */}
-                <Button
-                    onClick={handleCreateNewInvoice}
-                    leadingIcon={PlusIcon}
-                >
-                    New Invoice
-                </Button>
-            </div>
-
             {/* Navigation Tabs */}
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
                 <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
@@ -167,17 +151,25 @@ const Invoices = ({
             <div>
                 {activeTab === 'invoices' && (
                     <div>
-                        <div className="mb-6">
-                            <h2 className="text-2xl font-bold text-foreground">
-                                All Invoices {invoices.length > 0 && (
-                                    <span>
-                                        ({invoices.length})
-                                    </span>
-                                )}
-                            </h2>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                View and manage all your invoices across your workspace.
-                            </p>
+                        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-foreground">
+                                    Invoices {invoices.length > 0 && (
+                                        <span>
+                                            ({invoices.length})
+                                        </span>
+                                    )}
+                                </h1>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    View and manage all your invoices across your workspace.
+                                </p>
+                            </div>
+                            <Button
+                                onClick={handleCreateNewInvoice}
+                                leadingIcon={PlusIcon}
+                            >
+                                New Invoice
+                            </Button>
                         </div>
                         <InvoicesList
                             projectInvoices={invoices}

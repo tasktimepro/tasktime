@@ -81,7 +81,7 @@ const Expenses = ({
     const sideNavItems = useMemo(() => [
         {
             id: 'all',
-            name: 'All Expenses',
+            name: 'Expenses',
             icon: HandCoinsIcon,
             description: 'View and manage all expenses'
         },
@@ -118,12 +118,10 @@ const Expenses = ({
     };
 
     const activeClients = useMemo(() => {
-
         return clients.filter((client) => !client.archived);
     }, [clients]);
 
     const activeProjects = useMemo(() => {
-
         return projects.filter((project) => !project.archived);
     }, [projects]);
 
@@ -355,6 +353,61 @@ const Expenses = ({
         todayStr,
     ]);
 
+    const todayDate = useMemo(() => parseStoredDate(todayStr), [todayStr]);
+
+    const getEffectivePaymentStatus = (expense) => {
+        if (expense.isPreview) return 'unpaid';
+        return expense.paymentStatus;
+    };
+
+    const outstandingExpenses = useMemo(() => {
+        return filteredExpenses.filter((expense) => {
+            if (getEffectivePaymentStatus(expense) === 'paid') return false;
+            if (!todayDate) return false;
+            const expenseDate = parseStoredDate(expense.date);
+            if (!expenseDate) return false;
+            return expenseDate <= todayDate;
+        });
+    }, [filteredExpenses, todayDate]);
+
+    const upcomingExpenses = useMemo(() => {
+        return filteredExpenses.filter((expense) => {
+            if (getEffectivePaymentStatus(expense) === 'paid') return false;
+            if (!todayDate) return true;
+            const expenseDate = parseStoredDate(expense.date);
+            if (!expenseDate) return true;
+            return expenseDate > todayDate;
+        });
+    }, [filteredExpenses, todayDate]);
+
+    const paidExpenses = useMemo(() => {
+        return filteredExpenses.filter((expense) => getEffectivePaymentStatus(expense) === 'paid');
+    }, [filteredExpenses]);
+
+    const defaultStatusTab = useMemo(() => {
+        if (outstandingExpenses.length > 0) return 'outstanding';
+        if (upcomingExpenses.length > 0) return 'upcoming';
+        return 'paid';
+    }, [outstandingExpenses.length, upcomingExpenses.length]);
+
+    const [activeStatusTab, setActiveStatusTab] = useState(defaultStatusTab);
+    const previousDefaultTab = useRef(defaultStatusTab);
+
+    useEffect(() => {
+        if (previousDefaultTab.current !== defaultStatusTab && activeStatusTab === previousDefaultTab.current) {
+            setActiveStatusTab(defaultStatusTab);
+        }
+        previousDefaultTab.current = defaultStatusTab;
+    }, [defaultStatusTab, activeStatusTab]);
+
+    const displayedExpenses = useMemo(() => {
+        if (activeStatusTab === 'paid') return paidExpenses;
+        if (activeStatusTab === 'upcoming') return upcomingExpenses;
+        return outstandingExpenses;
+    }, [activeStatusTab, outstandingExpenses, upcomingExpenses, paidExpenses]);
+
+    const hasStatusFilters = activeStatusTab !== 'outstanding';
+
     const hasActiveFilters = useMemo(() => {
         if (search.trim()) return true;
         if (clientId !== 'all') return true;
@@ -426,20 +479,6 @@ const Expenses = ({
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-foreground">Expenses</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Track and manage expenses.
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Button leadingIcon={PlusIcon} onClick={() => openExpenseModal(null)}>
-                        New Expense
-                    </Button>
-                </div>
-            </div>
-
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
                 <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
                     {sideNavItems.map((item) => {
@@ -461,17 +500,22 @@ const Expenses = ({
             <div>
                 {activeTab === 'all' && (
                     <div>
-                        <div className="mb-6">
-                            <h2 className="text-2xl font-bold text-foreground">
-                                All Expenses {filteredExpenses.length > 0 && (
-                                    <span>
-                                        ({filteredExpenses.length})
-                                    </span>
-                                )}
-                            </h2>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                View and manage all expenses across your workspace.
-                            </p>
+                        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-foreground">
+                                    Expenses {filteredExpenses.length > 0 && (
+                                        <span>
+                                            ({filteredExpenses.length})
+                                        </span>
+                                    )}
+                                </h1>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    View and manage all expenses across your workspace.
+                                </p>
+                            </div>
+                            <Button leadingIcon={PlusIcon} onClick={() => openExpenseModal(null)}>
+                                New Expense
+                            </Button>
                         </div>
 
                         <div className="mt-6">
@@ -508,10 +552,38 @@ const Expenses = ({
                         </div>
 
                         <div className="mt-6">
+                            <Tabs value={activeStatusTab} onValueChange={setActiveStatusTab}>
+                                <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+                                    <TabsTrigger
+                                        value="outstanding"
+                                        className={`px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border ${outstandingExpenses.length > 0
+                                            ? 'data-[state=active]:text-amber-700 dark:data-[state=active]:text-amber-300 data-[state=active]:border-amber-700 dark:data-[state=active]:border-amber-300'
+                                            : 'data-[state=active]:text-foreground data-[state=active]:border-foreground'
+                                        }`}
+                                    >
+                                        Outstanding ({outstandingExpenses.length})
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        value="upcoming"
+                                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                    >
+                                        Upcoming ({upcomingExpenses.length})
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        value="paid"
+                                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                    >
+                                        Paid ({paidExpenses.length})
+                                    </TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                        </div>
+
+                        <div className="mt-6">
                             <ExpenseList
-                                expenses={filteredExpenses}
-                                hasAnyExpenses={expenses.length > 0}
-                                hasActiveFilters={hasActiveFilters}
+                                expenses={displayedExpenses}
+                                hasAnyExpenses={filteredExpenses.length > 0}
+                                hasActiveFilters={hasActiveFilters || hasStatusFilters}
                                 clientsById={clientsById}
                                 projectsById={projectsById}
                                 onView={(expense) => openExpenseView?.(expense)}

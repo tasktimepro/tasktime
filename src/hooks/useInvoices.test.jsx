@@ -102,4 +102,146 @@ describe('useInvoices', () => {
 
         await waitFor(() => expect(loadArchivedInvoices).toHaveBeenCalled())
     })
+
+    it('loads archived invoices, filters by client/project, and reacts to archive updates', async () => {
+        const loadArchivedInvoices = vi.fn(async () => {})
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: null },
+            isReady: true,
+            loadArchivedInvoices,
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [
+                { id: 'a', status: 'sent', date: '2025-01-04', total: 100, clientId: 'c1', projectId: 'p1' },
+                { id: 'b', status: 'draft', date: '2025-01-02', total: 200, clientId: 'c2', projectId: 'p2' },
+            ],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices({ includeArchived: true, clientId: 'c1', projectId: 'p1' }))
+
+        await act(async () => {})
+
+        await waitFor(() => expect(loadArchivedInvoices).toHaveBeenCalled())
+
+        await act(async () => {
+            await loadArchivedInvoices.mock.results[0].value
+        })
+
+        await act(async () => {})
+
+        expect(result.current.invoices.map((invoice) => invoice.id)).toEqual(['a'])
+    })
+
+    it('does not include archived invoices when includeArchived is false', () => {
+        const archivedMap = createObservableMap({
+            x: { id: 'x', status: 'paid', date: '2024-12-31', total: 75, clientId: 'c1', projectId: 'p1' },
+        })
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: archivedMap },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [
+                { id: 'a', status: 'sent', date: '2025-01-04', total: 100, clientId: 'c1', projectId: 'p1' },
+            ],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices({ includeArchived: false }))
+
+        expect(result.current.invoices.map((i) => i.id)).toEqual(['a'])
+    })
+
+    it('filters by client/project and computes totals with mixed statuses', () => {
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: createObservableMap() },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [
+                { id: 'a', status: 'paid', date: '2025-01-10', total: 100, clientId: 'c1', projectId: 'p1' },
+                { id: 'b', status: 'sent', date: '2025-01-05', total: 50, clientId: 'c1', projectId: 'p1' },
+                { id: 'c', status: 'draft', date: '2025-01-08', total: 25, clientId: 'c2', projectId: 'p2' },
+            ],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices({ clientId: 'c1', projectId: 'p1' }))
+
+        expect(result.current.invoices.map((i) => i.id)).toEqual(['a', 'b'])
+        expect(result.current.paidInvoices.map((i) => i.id)).toEqual(['a'])
+        expect(result.current.sentInvoices.map((i) => i.id)).toEqual(['b'])
+        expect(result.current.totals).toEqual({ outstanding: 50, paid: 100, total: 150 })
+    })
+
+    it('does not load archived invoices when store is not ready', () => {
+        const loadArchivedInvoices = vi.fn(async () => {})
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: createObservableMap() },
+            isReady: false,
+            loadArchivedInvoices,
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: true,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices({ includeArchived: true }))
+
+        expect(loadArchivedInvoices).not.toHaveBeenCalled()
+        expect(result.current.isLoading).toBe(true)
+    })
+
+    it('uses archived invoices when already available in store', async () => {
+        const archivedMap = createObservableMap({
+            x: { id: 'x', status: 'paid', date: '2024-12-31', total: 75, clientId: 'c1', projectId: 'p1' },
+        })
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: archivedMap },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [
+                { id: 'a', status: 'sent', date: '2025-01-04', total: 100, clientId: 'c1', projectId: 'p1' },
+            ],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices({ includeArchived: true }))
+
+        await waitFor(() => expect(result.current.invoices.map((i) => i.id)).toEqual(['a', 'x']))
+    })
 })

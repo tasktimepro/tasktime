@@ -334,6 +334,97 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Qty</th>')
     })
 
+    it('includes expense items as flat rate additions', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [],
+            expenseItems: [{ id: 'exp-1', title: 'Hosting', supplierName: 'AWS', amount: 25 }],
+            totalAmount: 25,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Hosting • AWS')
+        expect(html).toContain('$25.00')
+    })
+
+    it('renders flat additional tasks in simplified table', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [],
+            additionalTasks: [{ title: 'Flat Extra', flatRate: 30, quantity: 2, useFlatRate: true }],
+            totalAmount: 60,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Flat Extra')
+        expect(html).toContain('$60.00')
+    })
+
+    it('uses taskHourlyRates in simplified table when hourlyRate missing', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            project: { hourlyRate: 0 },
+            tasks: [{ id: 't-rate', title: 'Rate Task', hours: 2 }],
+            taskHourlyRates: { 't-rate': 75 },
+            totalAmount: 150,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Rate Task')
+        expect(html).toContain('$150.00')
+    })
+
+    it('treats flatRate as implicit flat task when useFlatRate is undefined', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 't-flat', title: 'Implicit Flat', flatRate: 40, quantity: 2 }],
+            totalAmount: 80,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Implicit Flat')
+        expect(html).toContain('$80.00')
+    })
+
+    it('renders simplified table branch when forcing no task types', () => {
+
+        const someSpy = vi.spyOn(Array.prototype, 'some').mockReturnValue(false)
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 't1', title: 'Forced Task', hours: 2, hourlyRate: 50, flatRate: 0 }],
+            additionalTasks: [{ title: 'Forced Extra', hours: 1, hourlyRate: 25 }],
+            totalAmount: 125,
+            currency: 'USD'
+        })
+
+        someSpy.mockRestore()
+
+        expect(html).toContain('Description')
+        expect(html).toContain('Total')
+        expect(html).toContain('Forced Task')
+        expect(html).toContain('Forced Extra')
+    })
+
+    it('uses project hourly rate for additional hourly tasks', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            project: { hourlyRate: 60 },
+            tasks: [{ id: 't1', title: 'Hourly', hours: 1, hourlyRate: 60 }],
+            additionalTasks: [{ title: 'Extra Hourly', hours: 2 }],
+            totalAmount: 180,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Extra Hourly')
+        expect(html).toContain('$120.00')
+    })
+
     it('calculates merged hourly totals in simplified table', () => {
 
         const html = createInvoiceHTML({

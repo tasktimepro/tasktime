@@ -4,6 +4,8 @@ import { vi } from 'vitest'
 import { useTasks } from './useTasks'
 import { useYjs } from '@/contexts/YjsContext'
 import { useYjsCollection } from './useYjsCollection'
+import * as recurringUtils from '@/utils/recurringUtils.ts'
+import * as dateUtils from '@/utils/dateUtils.ts'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 vi.mock('./useYjsCollection', () => ({ useYjsCollection: vi.fn() }))
@@ -178,5 +180,243 @@ describe('useTasks', () => {
             'recurring-completed-today',
             'recurring-overdue'
         ])
+    })
+
+    it('toggles recurring completion and reports recurring status', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2025-01-06T09:00:00Z'))
+
+        const update = vi.fn((id, data) => ({ id, ...data }))
+        const activeTasks = [
+            {
+                id: 'recurring-task',
+                projectId: 'p1',
+                archived: false,
+                completed: false,
+                recurring: { type: 'weekly', weeklyDays: [1] },
+                startDate: '2025-01-01',
+                createdAt: new Date('2025-01-01T00:00:00Z').getTime(),
+                completedDatesByYear: {},
+            },
+        ]
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: activeTasks,
+            isLoading: false,
+            get: vi.fn((id) => activeTasks.find((t) => t.id === id)),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        const statusDue = result.current.getRecurringStatus(activeTasks[0], '2025-01-06')
+        expect(statusDue.isDueToday).toBe(true)
+        expect(statusDue.isOverdue).toBe(false)
+
+        act(() => {
+            result.current.toggleRecurringCompletion('recurring-task', '2025-01-06')
+        })
+
+        expect(update).toHaveBeenCalledWith(
+            'recurring-task',
+            expect.objectContaining({
+                completedDatesByYear: expect.any(Object),
+                lastActive: expect.any(Number),
+            })
+        )
+    })
+
+    it('marks recurring tasks as overdue when prior due date is missed', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2025-01-07T09:00:00Z'))
+
+        const activeTasks = [
+            {
+                id: 'recurring-overdue',
+                projectId: 'p1',
+                archived: false,
+                completed: false,
+                recurring: { type: 'weekly', weeklyDays: [1] },
+                startDate: '2025-01-01',
+                createdAt: new Date('2025-01-01T00:00:00Z').getTime(),
+                completedDatesByYear: {},
+            },
+        ]
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: activeTasks,
+            isLoading: false,
+            get: vi.fn((id) => activeTasks.find((t) => t.id === id)),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        const status = result.current.getRecurringStatus(activeTasks[0], '2025-01-07')
+        expect(status.isDueToday).toBe(false)
+        expect(status.isOverdue).toBe(true)
+        expect(status.effectiveDateStr).toBe('2025-01-06')
+    })
+
+    it('returns non-recurring status defaults', () => {
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        const status = result.current.getRecurringStatus({ id: 't1', recurring: null })
+        expect(status.isDueToday).toBe(false)
+        expect(status.isOverdue).toBe(false)
+        expect(status.effectiveDateStr).toBeNull()
+    })
+
+    it('does not mark recurring tasks due before start date', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2025-01-01T09:00:00Z'))
+
+        const activeTasks = [
+            {
+                id: 'recurring-future',
+                projectId: 'p1',
+                archived: false,
+                completed: false,
+                recurring: { type: 'weekly', weeklyDays: [1] },
+                startDate: '2025-02-01',
+            },
+        ]
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: activeTasks,
+            isLoading: false,
+            get: vi.fn((id) => activeTasks.find((t) => t.id === id)),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        const status = result.current.getRecurringStatus(activeTasks[0], '2025-01-01')
+        expect(status.isDueToday).toBe(false)
+        expect(status.isOverdue).toBe(false)
+        expect(status.lastDueDateStr).toBeNull()
+    })
+
+    it('skips recurring tasks when previous/next due dates are missing', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2025-01-06T09:00:00Z'))
+
+        const previousSpy = vi.spyOn(recurringUtils, 'findPreviousRecurringDueDate').mockReturnValue(null)
+        const nextSpy = vi.spyOn(recurringUtils, 'findNextRecurringDueDate').mockReturnValue(null)
+        const dueSpy = vi.spyOn(recurringUtils, 'isRecurringTaskDueOnDate').mockReturnValue(false)
+
+        const activeTasks = [
+            { id: 'recurring-null', projectId: 'p1', archived: false, completed: false, recurring: { type: 'weekly', weeklyDays: [1] } },
+        ]
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: activeTasks,
+            isLoading: false,
+            get: vi.fn((id) => activeTasks.find((t) => t.id === id)),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        expect(result.current.getTasksForToday()).toEqual([])
+
+        previousSpy.mockRestore()
+        nextSpy.mockRestore()
+        dueSpy.mockRestore()
+    })
+
+    it('returns empty lists when today is unavailable', () => {
+        const todaySpy = vi.spyOn(dateUtils, 'getTodayString').mockReturnValue(null)
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        expect(result.current.getOverdueTasks()).toEqual([])
+        expect(result.current.getTasksForToday()).toEqual([])
+        expect(result.current.getUpcomingTasks()).toEqual([])
+
+        todaySpy.mockRestore()
+    })
+
+    it('returns undefined when toggling completion for missing task', () => {
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: false,
+            get: vi.fn(() => undefined),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        expect(result.current.toggleRecurringCompletion('missing', '2025-01-06')).toBeUndefined()
     })
 })

@@ -65,6 +65,22 @@ describe('usePlannerAttachments', () => {
         expect(forJan31).toHaveLength(2); // static + 01-31
     });
 
+    it('getForDate includes weekday attachments on matching days', () => {
+        const monday = new Date('2026-02-02');
+        const mondayStr = '2026-02-02';
+        const mondayMs = monday.getTime();
+        mockAttachments.push(
+            { id: '1', type: 'client', referenceId: 'c1', mode: 'weekday', weekday: 1, createdAt: mondayMs },
+            { id: '2', type: 'client', referenceId: 'c2', mode: 'weekday', weekday: 2, createdAt: mondayMs }
+        );
+
+        const { result } = renderHook(() => usePlannerAttachments());
+
+        const forMonday = result.current.getForDate(mondayStr);
+        expect(forMonday).toHaveLength(1);
+        expect(forMonday[0].id).toBe('1');
+    });
+
     it('staticAttachments returns only static attachments', () => {
         const jan30 = new Date('2026-01-30').getTime();
         mockAttachments.push(
@@ -125,5 +141,18 @@ describe('usePlannerAttachments', () => {
 
         expect(result.current.isAttached('client', 'c1')).toBe(true);
         expect(result.current.isAttached('client', 'c2')).toBe(false);
+    });
+
+    it('isAttached matches date and weekday options', () => {
+        mockAttachments.push(
+            { id: '1', type: 'task', referenceId: 't1', mode: 'date', date: '2026-02-02' },
+            { id: '2', type: 'task', referenceId: 't1', mode: 'weekday', weekday: 1 },
+        );
+
+        const { result } = renderHook(() => usePlannerAttachments());
+
+        expect(result.current.isAttached('task', 't1', { date: '2026-02-02' })).toBe(true);
+        expect(result.current.isAttached('task', 't1', { weekday: 1 })).toBe(true);
+        expect(result.current.isAttached('task', 't1', { date: '2026-02-03' })).toBe(false);
     });
 });

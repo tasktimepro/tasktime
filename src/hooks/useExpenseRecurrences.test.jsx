@@ -82,4 +82,52 @@ describe('useExpenseRecurrences', () => {
         expect(createExpense).toHaveBeenCalledTimes(2)
         expect(update).toHaveBeenCalledWith('r1', { lastGeneratedDate: '2025-03-01' })
     })
+
+    it('skips updates when there are no pending dates', () => {
+        const update = vi.fn()
+        const createExpense = vi.fn()
+
+        getPendingPeriods.mockReturnValue([])
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [baseRecurrence],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useExpenseRecurrences())
+
+        act(() => {
+            result.current.generatePendingExpenses(createExpense)
+        })
+
+        expect(createExpense).not.toHaveBeenCalled()
+        expect(update).not.toHaveBeenCalled()
+    })
+
+    it('pauses and resumes recurrences', () => {
+        const update = vi.fn()
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [baseRecurrence],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useExpenseRecurrences())
+
+        act(() => {
+            result.current.pauseRecurrence('r1')
+            result.current.resumeRecurrence('r1')
+        })
+
+        expect(update).toHaveBeenCalledWith('r1', { active: false })
+        expect(update).toHaveBeenCalledWith('r1', { active: true })
+    })
 })

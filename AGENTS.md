@@ -16,6 +16,7 @@
 3. **NO migration paths** — Users can clear browser data if needed
 4. **NO workarounds for old patterns** — Clean implementations only
 5. **NO deprecated code comments** — Delete, don't comment out
+6. **Per-file test coverage ≥ 70%** — For `src/hooks/**` and `src/utils/**`, each file must meet at least 75% coverage
 
 ### When This Changes
 - These rules apply until first public release

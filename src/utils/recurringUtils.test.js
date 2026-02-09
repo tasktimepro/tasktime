@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { endOfMonth } from 'date-fns';
-import { getOrdinalSuffix, formatRecurringLabel, isRecurringTaskDueOnDate } from './recurringUtils';
+import { getOrdinalSuffix, formatRecurringLabel, isRecurringTaskDueOnDate, findPreviousRecurringDueDate, findNextRecurringDueDate } from './recurringUtils';
 
 describe('recurringUtils', () => {
 
@@ -45,6 +45,12 @@ describe('recurringUtils', () => {
             expect(formatRecurringLabel({ type: 'monthly', monthlyType: 'specific', monthlyDay: 22 })).toBe('Monthly (22nd)');
         });
 
+        it('formats yearly configs', () => {
+
+            expect(formatRecurringLabel({ type: 'yearly', yearlyDate: '2025-02-10' })).toBe('Yearly (Feb 10)');
+            expect(formatRecurringLabel({ type: 'yearly', yearlyDate: 'invalid' })).toBe('Yearly');
+        });
+
         it('returns empty string for unknown type', () => {
 
             expect(formatRecurringLabel({ type: 'unknown' })).toBe('');
@@ -81,6 +87,32 @@ describe('recurringUtils', () => {
         it('returns false for unknown type', () => {
 
             expect(isRecurringTaskDueOnDate(new Date('2025-01-06T00:00:00Z'), { type: 'unknown' })).toBe(false);
+        });
+
+        it('checks yearly schedules', () => {
+
+            const date = new Date('2025-02-10T00:00:00Z');
+            expect(isRecurringTaskDueOnDate(date, { type: 'yearly', yearlyDate: '2025-02-10' })).toBe(true);
+            expect(isRecurringTaskDueOnDate(date, { type: 'yearly', yearlyDate: 'invalid' })).toBe(false);
+        });
+    });
+
+    describe('previous/next recurring dates', () => {
+
+        it('finds previous and next weekly dates', () => {
+            const baseDate = new Date('2025-01-08T00:00:00Z');
+            const config = { type: 'weekly', weeklyDays: [1] };
+
+            const previous = findPreviousRecurringDueDate(baseDate, config, 10);
+            const next = findNextRecurringDueDate(baseDate, config, 10);
+
+            expect(previous).toBeTruthy();
+            expect(next).toBeTruthy();
+        });
+
+        it('returns null without config', () => {
+            expect(findPreviousRecurringDueDate(new Date(), null)).toBeNull();
+            expect(findNextRecurringDueDate(new Date(), undefined)).toBeNull();
         });
     });
 });
