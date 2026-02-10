@@ -11,10 +11,12 @@ import { ClockIcon } from '@/components/ui/icons';
 import { SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
+import { useClients } from '@/hooks/useClients';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useToast } from '@/hooks/useToast';
 import { formatRecurringLabel } from '@/utils/recurringUtils';
-import { formatDurationWithSeconds, getTodayString, toDisplayDate } from '@/utils/dateUtils';
+import { formatDuration, formatDurationWithSeconds, getTodayString, millisecondsToHours, toDisplayDate } from '@/utils/dateUtils';
+import { formatCurrency, getProjectCurrency } from '@/utils/currencyUtils';
 import { differenceInCalendarDays, endOfDay, parseISO, startOfDay } from 'date-fns';
 import TimerControls from '../TimerControls';
 import TaskActionsMenu from '../task/TaskActionsMenu';
@@ -51,6 +53,7 @@ const TaskViewModal = ({
 }) => {
     const { showSuccess } = useToast();
     const { projects } = useProjects();
+    const { clients } = useClients();
     const { tasks, updateTask, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer, isTaskTimerActive } = useTimers();
@@ -87,7 +90,15 @@ const TaskViewModal = ({
     const dayTimeLabel = useMemo(() => {
         if (!effectiveDateStr) return 'Today';
         if (todayStr && effectiveDateStr === todayStr) return 'Today';
-        return toDisplayDate(effectiveDateStr, { month: 'short', day: 'numeric', year: 'numeric' }) || 'Today';
+        const currentYear = todayStr ? Number(todayStr.split('-')[0]) : null;
+        const effectiveYear = Number(effectiveDateStr.split('-')[0]);
+        const includeYear = !currentYear || effectiveYear !== currentYear;
+        return toDisplayDate(
+            effectiveDateStr,
+            includeYear
+                ? { month: 'short', day: 'numeric', year: 'numeric' }
+                : { month: 'short', day: 'numeric' }
+        ) || 'Today';
     }, [effectiveDateStr, todayStr]);
 
     const isCompleted = useMemo(() => {
@@ -199,6 +210,68 @@ const TaskViewModal = ({
                 return sum + (overlapEnd - overlapStart);
             }, 0);
     }, [timeEntries, currentTask, subtaskIds, effectiveDateStr]);
+
+    const dateTotalWithSubtasks = useMemo(() => {
+        if (!currentTask || !dateStr) return 0;
+        const allTaskIds = [currentTask.id, ...subtaskIds];
+
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        const dayStart = startOfDay(date).getTime();
+        const dayEnd = endOfDay(date).getTime();
+
+        return timeEntries
+            .filter((entry) => allTaskIds.includes(entry.taskId))
+            .reduce((sum, entry) => {
+                if (!entry || typeof entry.end !== 'number') return sum;
+                if (entry.end <= entry.start) return sum;
+                const overlapStart = Math.max(entry.start, dayStart);
+                const overlapEnd = Math.min(entry.end, dayEnd);
+                if (overlapEnd <= overlapStart) return sum;
+                return sum + (overlapEnd - overlapStart);
+            }, 0);
+    }, [timeEntries, currentTask, dateStr, subtaskIds]);
+
+    const billableRateInfo = useMemo(() => {
+        if (!currentTask || !project) return { rate: 0, currency: null };
+        const client = project?.preferredClientId
+            ? clients.find((item) => item.id === project.preferredClientId)
+            : null;
+
+        if (project?.flatRate || client?.flatRate) {
+            return { rate: 0, currency: null };
+        }
+
+        const rate = project?.hourlyRate
+            ?? client?.defaultHourlyRate
+            ?? client?.hourlyRate
+            ?? 0;
+
+        const currency = project ? getProjectCurrency(project, clients) : null;
+
+        return { rate, currency };
+    }, [clients, currentTask, project]);
+
+    const billableTimeMs = useMemo(() => {
+        if (!currentTask) return 0;
+        if (dateStr) return dateTotalWithSubtasks;
+        if (currentTask.recurring) return todayTotalWithSubtasks;
+        return totalTimeWithSubtasks;
+    }, [currentTask, dateStr, dateTotalWithSubtasks, todayTotalWithSubtasks, totalTimeWithSubtasks]);
+
+    const billableTotal = useMemo(() => {
+        if (!currentTask?.billable) return 0;
+        if (!billableRateInfo.rate || billableRateInfo.rate <= 0) return 0;
+        const hours = millisecondsToHours(billableTimeMs);
+        const roundedHours = Math.round(hours * 100) / 100;
+        return roundedHours * billableRateInfo.rate;
+    }, [billableRateInfo.rate, billableTimeMs, currentTask?.billable]);
+
+    const shouldShowBillableTotal = useMemo(() => {
+        return !isTimerActive
+            && Boolean(billableRateInfo.currency)
+            && billableTotal > 0;
+    }, [billableRateInfo.currency, billableTotal, isTimerActive]);
 
     const liveTaskTime = useMemo(() => {
         if (!currentTask) return 0;
@@ -353,18 +426,18 @@ const TaskViewModal = ({
                 footer={modalFooter}
             >
                 <div className="space-y-4">
-                    <div className="space-y-1">
+                    <div className={`grid gap-4 ${shouldShowBillableTotal ? 'sm:grid-cols-2 items-start' : ''}`}>
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Time</p>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                 <span>
-                                    Total: <span className="font-medium text-foreground">{formatDurationWithSeconds(totalTimeWithSubtasks)}</span>
+                                    Total: <span className="font-medium text-foreground">{formatDuration(totalTimeWithSubtasks)}</span>
                                 </span>
-                                {currentTask.recurring && (
+                                {(currentTask.recurring || dateStr) && (
                                     <>
                                         <span className="text-muted-foreground">•</span>
                                         <span>
-                                            {dayTimeLabel}: <span className="font-medium text-foreground">{formatDurationWithSeconds(todayTotalWithSubtasks)}</span>
+                                            {dayTimeLabel}: <span className="font-medium text-foreground">{formatDuration(dateStr ? dateTotalWithSubtasks : todayTotalWithSubtasks)}</span>
                                         </span>
                                     </>
                                 )}
@@ -386,7 +459,16 @@ const TaskViewModal = ({
                                 )}
                             </div>
                         </div>
-
+                        {shouldShowBillableTotal && (
+                            <div className="space-y-1 sm:text-right">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Billable total</p>
+                                <div className="text-sm text-muted-foreground">
+                                    <span className="font-medium text-foreground sensitive-data">
+                                        {formatCurrency(billableTotal, billableRateInfo.currency)}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {(project || parentTask) && (

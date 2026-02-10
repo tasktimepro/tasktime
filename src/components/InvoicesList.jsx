@@ -60,21 +60,34 @@ const InvoicesList = ({
 
     // Filter out soft-deleted invoices (projectInvoices already filtered by parent)
     const activeInvoices = useMemo(() => projectInvoices, [projectInvoices]);
+
+    // Filter invoices by payment status (using activeInvoices which excludes deleted)
+    const outstandingInvoices = useMemo(() => 
+        activeInvoices.filter(invoice => !invoice.paymentProcessed),
+    [activeInvoices]);
+
+    const paidInvoices = useMemo(() => 
+        activeInvoices.filter(invoice => invoice.paymentProcessed),
+    [activeInvoices]);
+
+    // Filter overdue invoices (subset of outstanding)
+    const overdueInvoices = useMemo(() => 
+        outstandingInvoices.filter(invoice => isInvoiceOverdue(invoice)),
+    [outstandingInvoices]);
     
-    // Default to overdue tab if there are overdue invoices, otherwise outstanding
-    // But allow override via selectedTab prop
+    // Default to first non-empty tab (overdue -> outstanding -> paid), with optional override via selectedTab
     const defaultTab = useMemo(() => {
-        // If a specific tab is selected via prop, use that (if valid)
-        if (selectedTab && ['overdue', 'outstanding', 'paid'].includes(selectedTab)) {
-            return selectedTab;
+        const validTabs = ['overdue', 'outstanding', 'paid'];
+        if (selectedTab && validTabs.includes(selectedTab)) {
+            if (selectedTab !== 'overdue' || overdueInvoices.length > 0) {
+                return selectedTab;
+            }
         }
-        
-        // Otherwise use the existing logic
-        const hasOverdueInvoices = activeInvoices.some(invoice => 
-            !invoice.paymentProcessed && isInvoiceOverdue(invoice)
-        );
-        return hasOverdueInvoices ? 'overdue' : 'outstanding';
-    }, [activeInvoices, selectedTab]);
+
+        if (overdueInvoices.length > 0) return 'overdue';
+        if (outstandingInvoices.length > 0) return 'outstanding';
+        return 'paid';
+    }, [selectedTab, overdueInvoices.length, outstandingInvoices.length]);
     
     const [activeTab, setActiveTab] = useState(defaultTab);
     
@@ -90,20 +103,6 @@ const InvoicesList = ({
     const [paidPage, setPaidPage] = useState(1);
     const [overduePage, setOverduePage] = useState(1);
     const ITEMS_PER_PAGE = 8;
-
-    // Filter invoices by payment status (using activeInvoices which excludes deleted)
-    const outstandingInvoices = useMemo(() => 
-        activeInvoices.filter(invoice => !invoice.paymentProcessed),
-    [activeInvoices]);
-
-    const paidInvoices = useMemo(() => 
-        activeInvoices.filter(invoice => invoice.paymentProcessed),
-    [activeInvoices]);
-
-    // Filter overdue invoices (subset of outstanding)
-    const overdueInvoices = useMemo(() => 
-        outstandingInvoices.filter(invoice => isInvoiceOverdue(invoice)),
-    [outstandingInvoices]);
 
     // Calculate paginated invoices for each tab
     const paginatedOutstandingInvoices = useMemo(() => {
