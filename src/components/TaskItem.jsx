@@ -4,6 +4,7 @@ import TaskActions from './task/TaskActions';
 import StartDateBadge from './task/StartDateBadge';
 import SubtaskSection from './task/SubtaskSection';
 import TimeEntriesModal from './TimeEntriesModal';
+import AddTimeEntryModal from './modals/AddTimeEntryModal';
 import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
@@ -32,6 +33,8 @@ const TaskItem = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
+    const [showAddEntryModal, setShowAddEntryModal] = useState(false);
+    const [addEntryDateStr, setAddEntryDateStr] = useState(null);
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
     const [newSubtaskStartDate, setNewSubtaskStartDate] = useState('');
@@ -168,6 +171,10 @@ const TaskItem = ({
 
         if (task.recurring && recurringCompletionDate) {
             toggleRecurringCompletion(task.id, recurringCompletionDate);
+            if (checked && task.promptTimeEntry) {
+                setAddEntryDateStr(effectiveDateStr);
+                setShowAddEntryModal(true);
+            }
             return;
         }
 
@@ -177,7 +184,7 @@ const TaskItem = ({
             completedOnDate: checked ? todayStr : null,
             lastActive: now
         });
-    }, [isTimerActive, projectTimer, task.id, task.recurring, recurringCompletionDate, createEntry, clearTimer, updateTask, toggleRecurringCompletion, timerKey]);
+    }, [isTimerActive, projectTimer, task.id, task.recurring, task.promptTimeEntry, recurringCompletionDate, effectiveDateStr, createEntry, clearTimer, updateTask, toggleRecurringCompletion, timerKey]);
 
     /**
      * Update task title.
@@ -304,6 +311,16 @@ const TaskItem = ({
                 isOpen={showTimeEntriesModal}
                 onClose={() => setShowTimeEntriesModal(false)}
                 task={task}
+            />
+
+            <AddTimeEntryModal
+                isOpen={showAddEntryModal}
+                onClose={() => {
+                    setShowAddEntryModal(false);
+                    setAddEntryDateStr(null);
+                }}
+                task={task}
+                initialDateStr={addEntryDateStr}
             />
 
             {!task.recurring && (

@@ -219,8 +219,13 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         const createdDate = typeof task.createdAt === 'number'
             ? toStorageDate(task.createdAt)
             : null;
+        const startDate = typeof task.startDate === 'string' ? task.startDate : null;
 
-        if (createdDate && dateStr < createdDate) {
+        if (startDate && dateStr < startDate) {
+            return false;
+        }
+
+        if (createdDate && dateStr < createdDate && (!startDate || dateStr < startDate)) {
             return false;
         }
 
@@ -583,7 +588,11 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             .map(([taskId, timeMs]) => ({ task: tasksById.get(taskId), timeMs }))
             .filter((item): item is { task: Task; timeMs: number } => Boolean(item.task))
             .filter((item) => !addedTaskIds.has(item.task.id))
-            .filter((item) => isTaskVisibleOnDate(item.task, dateStr))
+            .filter((item) => {
+                if (!item.task.archived) return true;
+                if (!item.task.archivedOnDate) return false;
+                return dateStr <= item.task.archivedOnDate;
+            })
             .sort((a, b) => a.task.title.localeCompare(b.task.title));
 
         workedTasks.forEach(({ task, timeMs }) => {

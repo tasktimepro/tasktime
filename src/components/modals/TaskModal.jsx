@@ -15,6 +15,7 @@ import { useTasks } from '../../hooks/useTasks.ts';
 import { useTimeEntries } from '../../hooks/useTimeEntries.ts';
 import { useProjects } from '../../hooks/useProjects.ts';
 import RecurringPicker from '../task/RecurringPicker';
+import CustomCheckbox from '../CustomCheckbox';
 
 const NO_PROJECT_VALUE = 'no-project';
 
@@ -53,6 +54,7 @@ const TaskModal = ({
         projectId: NO_PROJECT_VALUE,
         startDate: '',
         recurring: null,
+        promptTimeEntry: false,
         note: ''
     });
 
@@ -100,6 +102,7 @@ const TaskModal = ({
                 projectId: savedState.projectId || NO_PROJECT_VALUE,
                 startDate: savedState.startDate || '',
                 recurring: savedState.recurring || null,
+                promptTimeEntry: savedState.promptTimeEntry || false,
                 note: savedState.note || ''
             });
             return;
@@ -111,6 +114,7 @@ const TaskModal = ({
                 projectId: editingTask.projectId || NO_PROJECT_VALUE,
                 startDate: editingTask.recurring ? '' : (editingTask.startDate || ''),
                 recurring: editingTask.recurring || null,
+                promptTimeEntry: editingTask.promptTimeEntry || false,
                 note: editingTask.note || ''
             });
             return;
@@ -121,6 +125,7 @@ const TaskModal = ({
             projectId: NO_PROJECT_VALUE,
             startDate: modalOptions?.startDate || '',
             recurring: null,
+            promptTimeEntry: false,
             note: ''
         });
     }, [isOpen, editingTask, getSavedState, modalOptions]);
@@ -155,7 +160,8 @@ const TaskModal = ({
         setFormData((prev) => ({
             ...prev,
             startDate: value,
-            recurring: value ? null : prev.recurring
+            recurring: value ? null : prev.recurring,
+            promptTimeEntry: value ? false : prev.promptTimeEntry
         }));
     };
 
@@ -170,7 +176,8 @@ const TaskModal = ({
     const handleRecurringClear = () => {
         setFormData((prev) => ({
             ...prev,
-            recurring: null
+            recurring: null,
+            promptTimeEntry: false
         }));
     };
 
@@ -187,6 +194,7 @@ const TaskModal = ({
             projectId: formData.projectId === NO_PROJECT_VALUE ? null : formData.projectId,
             startDate: formData.recurring ? null : (formData.startDate || null),
             recurring: formData.recurring || null,
+            promptTimeEntry: formData.promptTimeEntry,
             note: formData.note.trim() ? formData.note.trim() : null,
             lastActive: Date.now()
         };
@@ -288,6 +296,16 @@ const TaskModal = ({
                             />
                         </div>
                     </div>
+                    {formData.recurring && (
+                        <div className="mt-4">
+                            <CustomCheckbox
+                                checked={formData.promptTimeEntry}
+                                onChange={(checked) => handleChange('promptTimeEntry', checked)}
+                                label="Prompt for time entry when completing"
+                                className="text-sm"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-2">

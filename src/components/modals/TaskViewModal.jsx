@@ -4,7 +4,7 @@
  * Shows task details, due/repeat info, quick actions, and planner attachment controls.
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { ClockIcon } from '@/components/ui/icons';
@@ -23,6 +23,7 @@ import TaskActionsMenu from '../task/TaskActionsMenu';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useTimers } from '@/hooks/useTimers';
 import { linkifyNodes } from '@/utils/linkifyUtils';
+import AddTimeEntryModal from './AddTimeEntryModal';
 
 /**
  * @param {Object} props
@@ -58,6 +59,9 @@ const TaskViewModal = ({
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer, isTaskTimerActive } = useTimers();
     const { deleteAttachment } = usePlannerAttachments();
+
+    const [showAddEntryModal, setShowAddEntryModal] = useState(false);
+    const [addEntryDateStr, setAddEntryDateStr] = useState(null);
 
     const currentTask = useMemo(() => {
         if (!task) return null;
@@ -299,6 +303,10 @@ const TaskViewModal = ({
         if (currentTask.recurring && effectiveDateStr) {
             toggleRecurringCompletion(currentTask.id, effectiveDateStr);
             showSuccess(isCompleted ? 'Marked as incomplete for today' : 'Done for today');
+            if (!isCompleted && currentTask.promptTimeEntry) {
+                setAddEntryDateStr(effectiveDateStr);
+                setShowAddEntryModal(true);
+            }
             return;
         }
 
@@ -547,6 +555,16 @@ const TaskViewModal = ({
                     )}
                 </div>
             </Modal>
+
+            <AddTimeEntryModal
+                isOpen={showAddEntryModal}
+                onClose={() => {
+                    setShowAddEntryModal(false);
+                    setAddEntryDateStr(null);
+                }}
+                task={currentTask}
+                initialDateStr={addEntryDateStr}
+            />
 
         </>
     );

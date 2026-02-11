@@ -27,6 +27,7 @@ import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTodayString } from '@/hooks/useDayRollover';
 import { linkifyNodes } from '@/utils/linkifyUtils';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
+import AddTimeEntryModal from '@/components/modals/AddTimeEntryModal';
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -59,6 +60,9 @@ const Dashboard = ({
     const [conversionWarningShown, setConversionWarningShown] = useState(false);
     const lastWarningKeyRef = useRef(null);
     const todayStr = useTodayString();
+    const [showAddEntryModal, setShowAddEntryModal] = useState(false);
+    const [addEntryTask, setAddEntryTask] = useState(null);
+    const [addEntryDateStr, setAddEntryDateStr] = useState(null);
 
     const getTaskCompletedStatus = useCallback((task) => {
         if (task.recurring && todayStr) {
@@ -528,6 +532,11 @@ const Dashboard = ({
             const status = getRecurringStatus(task, todayStr);
             const effectiveDateStr = status.effectiveDateStr || todayStr;
             toggleRecurringCompletion(task.id, effectiveDateStr);
+            if (newCompletedStatus && task.promptTimeEntry) {
+                setAddEntryTask(task);
+                setAddEntryDateStr(effectiveDateStr);
+                setShowAddEntryModal(true);
+            }
         } else {
             updateTask(task.id, {
                 completed: newCompletedStatus,
@@ -796,6 +805,17 @@ const Dashboard = ({
                 needsExchangeRates={needsExchangeRates}
                 exchangeRatesLoading={exchangeRatesLoading}
                 navigateToInvoices={navigateToInvoices}
+            />
+
+            <AddTimeEntryModal
+                isOpen={showAddEntryModal}
+                onClose={() => {
+                    setShowAddEntryModal(false);
+                    setAddEntryTask(null);
+                    setAddEntryDateStr(null);
+                }}
+                task={addEntryTask}
+                initialDateStr={addEntryDateStr}
             />
 
         </div>

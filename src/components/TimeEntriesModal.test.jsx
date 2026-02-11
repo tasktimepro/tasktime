@@ -107,7 +107,8 @@ describe('TimeEntriesModal', () => {
         await user.type(screen.getByLabelText('Time spent'), '1h')
         await user.type(screen.getByLabelText('Note (optional)'), 'Manual entry')
 
-        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
+        const addButtons = screen.getAllByRole('button', { name: 'Add Entry' })
+        await user.click(addButtons[addButtons.length - 1])
 
         expect(timeEntriesHookMocks.createEntry).toHaveBeenCalledTimes(1)
 
@@ -138,7 +139,8 @@ describe('TimeEntriesModal', () => {
         await user.clear(screen.getByLabelText('Time spent'))
         await user.type(screen.getByLabelText('Time spent'), '0m')
 
-        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
+        const addButtons = screen.getAllByRole('button', { name: 'Add Entry' })
+        await user.click(addButtons[addButtons.length - 1])
 
         expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
         expect(toastMocks.showError).toHaveBeenCalledWith('Time spent must be greater than 0')
@@ -158,7 +160,8 @@ describe('TimeEntriesModal', () => {
 
         await user.clear(screen.getByLabelText('Date started'))
 
-        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
+        const addButtons = screen.getAllByRole('button', { name: 'Add Entry' })
+        await user.click(addButtons[addButtons.length - 1])
 
         expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
         expect(toastMocks.showError).toHaveBeenCalledWith('Please fill in date started and start time')

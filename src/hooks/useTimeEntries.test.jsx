@@ -58,7 +58,7 @@ describe('useTimeEntries', () => {
         const { result } = renderHook(() => useTimeEntries({ taskId: 't1', startDate: 15, endDate: 55 }))
 
         await waitFor(() => expect(result.current.isLoading).toBe(false))
-        expect(result.current.entries.map((e) => e.id)).toEqual(['e3'])
+        expect(result.current.entries.map((e) => e.id)).toEqual(['e3', 'e1'])
     })
 
     it('creates, updates, and deletes entries', () => {

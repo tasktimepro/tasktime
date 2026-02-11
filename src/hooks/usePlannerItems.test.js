@@ -243,7 +243,7 @@ describe('usePlannerItems', () => {
         expect(taskItem?.isCompleted).toBe(true);
     });
 
-    it('excludes tasks created after the date and tasks archived before the date', () => {
+    it('shows tasks with a startDate even if created later, and excludes archived tasks', () => {
         const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
         const dateStr = format(weekStart, 'yyyy-MM-dd');
 
@@ -255,8 +255,29 @@ describe('usePlannerItems', () => {
         const { result } = renderHook(() => usePlannerItems(0));
         const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
 
-        expect(day.items.find((i) => i.type === 'task' && i.title === 'New Task')).toBeFalsy();
+        expect(day.items.find((i) => i.type === 'task' && i.title === 'New Task')).toBeTruthy();
         expect(day.items.find((i) => i.type === 'task' && i.title === 'Archived Task')).toBeFalsy();
+    });
+
+    it('shows worked tasks even if created after the entry date', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(weekStart, 'yyyy-MM-dd');
+
+        mockTasks.push({
+            id: 't-worked',
+            title: 'Worked Task',
+            createdAt: new Date('2026-02-10T00:00:00Z').getTime(),
+        });
+
+        const entryStart = new Date(`${dateStr}T09:00:00.000Z`).getTime();
+        const entryEnd = new Date(`${dateStr}T10:00:00.000Z`).getTime();
+        mockEntries.push({ id: 'e-worked', taskId: 't-worked', start: entryStart, end: entryEnd });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        const workedItem = day.items.find((i) => i.type === 'task' && i.subtype === 'worked');
+        expect(workedItem?.title).toBe('Worked Task');
     });
 
     it('includes timer-only tasks for today', () => {
@@ -395,6 +416,51 @@ describe('usePlannerItems', () => {
 
         expect(taskItem?.title).toBe('Worked Task');
         expect(taskItem?.actualTimeMs).toBe(entryEnd - entryStart);
+    });
+
+    it('excludes worked tasks when archived without archivedOnDate', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(weekStart, 'yyyy-MM-dd');
+
+        mockTasks.push({ id: 't-archived', title: 'Hidden Worked Task', archived: true });
+        const entryStart = new Date(`${dateStr}T09:00:00.000Z`).getTime();
+        const entryEnd = new Date(`${dateStr}T10:00:00.000Z`).getTime();
+        mockEntries.push({ id: 'e-hidden', taskId: 't-archived', start: entryStart, end: entryEnd });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        expect(day.items.find((i) => i.type === 'task' && i.subtype === 'worked')).toBeFalsy();
+    });
+
+    it('subtracts child task hours from project and client totals', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const dateStr = format(weekStart, 'yyyy-MM-dd');
+
+        mockClients.push({ id: 'c1', title: 'Client A' });
+        mockProjects.push({ id: 'p1', title: 'Project A', preferredClientId: 'c1' });
+        mockTasks.push({ id: 't1', title: 'Task A', projectId: 'p1', completed: false });
+
+        mockAttachments.push(
+            { id: 'a-client', type: 'client', referenceId: 'c1', mode: 'date', date: dateStr, estimatedHours: 4 },
+            { id: 'a-project', type: 'project', referenceId: 'p1', mode: 'date', date: dateStr, estimatedHours: 2 },
+            { id: 'a-task', type: 'task', referenceId: 't1', mode: 'date', date: dateStr, estimatedHours: 1 }
+        );
+
+        const entryStart = new Date(`${dateStr}T09:00:00.000Z`).getTime();
+        const entryEnd = new Date(`${dateStr}T15:00:00.000Z`).getTime();
+        mockEntries.push({ id: 'e1', taskId: 't1', start: entryStart, end: entryEnd });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        const projectItem = day.items.find((i) => i.type === 'project');
+        const clientItem = day.items.find((i) => i.type === 'client');
+        const taskItem = day.items.find((i) => i.type === 'task');
+
+        expect(taskItem?.isActualBased).toBe(true);
+        expect(projectItem?.effectiveHours).toBe(0);
+        expect(clientItem?.effectiveHours).toBe(4);
     });
 
     it('adds timer-only tasks for today', () => {

@@ -43,7 +43,10 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         }
         
         if (options.startDate !== undefined) {
-            filtered = filtered.filter(e => e.start >= options.startDate!);
+            filtered = filtered.filter((e) => {
+                const entryEnd = typeof e.end === 'number' ? e.end : e.start;
+                return entryEnd >= options.startDate!;
+            });
         }
         
         if (options.endDate !== undefined) {
