@@ -172,26 +172,26 @@ const ExpenseViewModal = ({
 
     const modalFooter = (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
-            {footerLeft || <div />}
             <div className="flex items-center gap-2">
+                {footerLeft}
                 {showPrimaryAction && (
                     <Button onClick={primaryAction} type="button">
                         {primaryLabel}
                     </Button>
                 )}
-                {showEditAction && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                        title="Edit expense"
-                        onClick={handleEdit}
-                        type="button"
-                    >
-                        <PencilIcon className="h-5 w-5" />
-                    </Button>
-                )}
             </div>
+            {showEditAction && (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                    title="Edit expense"
+                    onClick={handleEdit}
+                    type="button"
+                >
+                    <PencilIcon className="h-5 w-5" />
+                </Button>
+            )}
         </div>
     );
 

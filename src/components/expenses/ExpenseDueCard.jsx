@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowPathIcon, CheckIcon, HandCoinsIcon } from '@/components/ui/icons';
 import StartDateBadge from '../task/StartDateBadge';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
-import { parseStoredDate } from '@/utils/dateUtils.ts';
+import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { getOrdinalSuffix } from '@/utils/recurringUtils.ts';
 
 /**
@@ -24,6 +24,11 @@ const ExpenseDueCard = ({
     const hasAmount = typeof expense.amount === 'number' && expense.amount > 0;
     const isPaid = expense.paymentStatus === 'paid';
     const isAutoPayment = expense.paymentMode === 'auto' && expense.amountType !== 'variable';
+    const todayStr = toStorageDate(new Date()) || '';
+    const todayStart = parseStoredDate(todayStr);
+    const expenseDate = parseStoredDate(expense.date);
+    const isUpcomingAuto = isAutoPayment && expenseDate && todayStart && expenseDate > todayStart;
+    const isPaidDisplay = isPaid && !isUpcomingAuto;
     const isClickable = Boolean(onView);
     const canMarkPaid = Boolean(onMarkPaid) && !isPreview && !isAutoPayment && (!isVariable || hasAmount);
 
@@ -112,7 +117,7 @@ const ExpenseDueCard = ({
                             className="block w-full text-sm font-medium truncate text-left transition-colors text-foreground hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
                             title="Open expense details"
                         >
-                            <span className={isPaid ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                            <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
                             {amountLabel && (
                                 <span className="ml-2 text-sm text-muted-foreground sensitive-data">
                                     {amountLabel}
@@ -121,7 +126,7 @@ const ExpenseDueCard = ({
                         </button>
                     ) : (
                         <div className="text-sm font-medium text-foreground truncate">
-                            <span className={isPaid ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                            <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
                             {amountLabel && (
                                 <span className="ml-2 text-sm text-muted-foreground sensitive-data">
                                     {amountLabel}
@@ -130,7 +135,7 @@ const ExpenseDueCard = ({
                         </div>
                     )}
                     {metaLine && (
-                        <p className={`text-xs text-muted-foreground truncate ${isPaid ? 'line-through' : ''}`}>
+                        <p className={`text-xs text-muted-foreground truncate ${isPaidDisplay ? 'line-through' : ''}`}>
                             {metaLine}
                         </p>
                     )}

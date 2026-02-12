@@ -3,6 +3,13 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ToDoToday from './ToDoToday'
+import { toStorageDate } from '../../utils/dateUtils.ts'
+
+const hookMocks = {
+    expenses: [],
+    markAsPaid: vi.fn(),
+    recurrences: [],
+}
 
 vi.mock('../../hooks/useTimers', () => ({
     useTimers: () => ({
@@ -12,14 +19,14 @@ vi.mock('../../hooks/useTimers', () => ({
 
 vi.mock('@/hooks/useExpenses.ts', () => ({
     useExpenses: () => ({
-        expenses: [],
-        markAsPaid: vi.fn()
+        expenses: hookMocks.expenses,
+        markAsPaid: hookMocks.markAsPaid,
     })
 }))
 
 vi.mock('@/hooks/useExpenseRecurrences.ts', () => ({
     useExpenseRecurrences: () => ({
-        recurrences: [],
+        recurrences: hookMocks.recurrences,
     })
 }))
 
@@ -44,6 +51,12 @@ vi.mock('../task/TaskActionsMenu', () => ({
 }))
 
 describe('ToDoToday', () => {
+
+    beforeEach(() => {
+        hookMocks.expenses = []
+        hookMocks.recurrences = []
+        hookMocks.markAsPaid = vi.fn()
+    })
 
     const overdueTask = {
         id: 't1',
@@ -141,5 +154,77 @@ describe('ToDoToday', () => {
 
         await user.click(screen.getAllByText('Delete task')[0])
         expect(onDeleteTask).toHaveBeenCalledWith(overdueTask)
+    })
+
+    it('shows completed tasks and paid expenses at the bottom in the top list', () => {
+
+        const getTaskCompletedStatus = vi.fn((task) => task.completed === true)
+        const todayStr = toStorageDate(new Date()) || '2026-02-12'
+
+        const dueIncomplete = {
+            ...todayTask,
+            id: 't4',
+            title: 'Due Incomplete',
+            completed: false,
+            startDate: todayStr,
+        }
+
+        const dueCompleted = {
+            ...todayTask,
+            id: 't5',
+            title: 'Due Completed',
+            completed: true,
+            startDate: todayStr,
+        }
+
+        hookMocks.expenses = [
+            {
+                id: 'e1',
+                title: 'Today Unpaid Expense',
+                paymentStatus: 'unpaid',
+                paymentMode: 'manual',
+                amountType: 'fixed',
+                amount: 10,
+                currency: 'USD',
+                date: todayStr,
+                isRecurring: false,
+            },
+            {
+                id: 'e2',
+                title: 'Today Paid Expense',
+                paymentStatus: 'paid',
+                paidOn: todayStr,
+                paymentMode: 'manual',
+                amountType: 'fixed',
+                amount: 20,
+                currency: 'USD',
+                date: todayStr,
+                isRecurring: false,
+            },
+        ]
+
+        render(
+            <ToDoToday
+                overdueTasks={[]}
+                tasksForToday={[dueCompleted, dueIncomplete]}
+                upcomingTasks={[]}
+                handleCompleteTask={vi.fn()}
+                getTaskCompletedStatus={getTaskCompletedStatus}
+                renderTaskTitle={(task) => <span>{task.title}</span>}
+                renderTaskControls={() => null}
+                onEditTask={vi.fn()}
+                onDeleteTask={vi.fn()}
+            />
+        )
+
+        const dueIncompleteNode = screen.getByText('Due Incomplete')
+        const dueCompletedNode = screen.getByText('Due Completed')
+        const unpaidExpenseNode = screen.getByText('Today Unpaid Expense')
+        const paidExpenseNode = screen.getByText('Today Paid Expense')
+
+        expect(dueIncompleteNode.compareDocumentPosition(dueCompletedNode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(unpaidExpenseNode.compareDocumentPosition(paidExpenseNode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+        expect(unpaidExpenseNode.compareDocumentPosition(dueCompletedNode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 })

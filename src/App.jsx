@@ -106,6 +106,7 @@ function AppContent() {
     } = useInvoices();
 
     const {
+        expenses,
         createExpense,
     } = useExpenses();
 
@@ -384,30 +385,35 @@ function AppContent() {
     const openExpenseView = useCallback((expense) => {
         if (!expense) return;
 
-        const isPreview = Boolean(expense.isPreview);
+        const resolvedExpense = expense.isPreview && expense.recurrenceId && expense.date
+            ? expenses.find((item) => item.recurrenceId === expense.recurrenceId && item.date === expense.date)
+            : null;
+        const targetExpense = resolvedExpense || expense;
+        const isPreview = Boolean(targetExpense.isPreview);
+
         if (isPreview) {
             setExpenseViewState({
                 isOpen: true,
-                expense
+                expense: targetExpense
             });
             return;
         }
 
-        const needsSubmit = expense.isRecurring
-            && expense.amountType === 'variable'
-            && (!expense.amount || expense.amount <= 0)
-            && expense.paymentStatus === 'unpaid';
+        const needsSubmit = targetExpense.isRecurring
+            && targetExpense.amountType === 'variable'
+            && (!targetExpense.amount || targetExpense.amount <= 0)
+            && targetExpense.paymentStatus === 'unpaid';
 
         if (needsSubmit) {
-            openExpenseModal(expense);
+            openExpenseModal(targetExpense);
             return;
         }
 
         setExpenseViewState({
             isOpen: true,
-            expense
+            expense: targetExpense
         });
-    }, [openExpenseModal]);
+    }, [expenses, openExpenseModal]);
 
     const closeExpenseView = useCallback(() => {
         setExpenseViewState({

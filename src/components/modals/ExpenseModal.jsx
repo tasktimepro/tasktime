@@ -1061,18 +1061,20 @@ const ExpenseModal = ({
                     <div className="space-y-4">
                         <div className="text-sm font-semibold text-muted-foreground">Payment</div>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="md:col-span-2">
-                                <CustomCheckbox
-                                    checked={formData.paymentMode === 'auto'}
-                                    onChange={(checked) => {
-                                        handleChange('paymentMode', checked ? 'auto' : 'manual');
-                                        if (checked && formData.paidOn) {
-                                            handleChange('paidOn', '');
-                                        }
-                                    }}
-                                    label="Auto-payment"
-                                />
-                            </div>
+                            {!isSubmittingRecurring && (
+                                <div className="md:col-span-2">
+                                    <CustomCheckbox
+                                        checked={formData.paymentMode === 'auto'}
+                                        onChange={(checked) => {
+                                            handleChange('paymentMode', checked ? 'auto' : 'manual');
+                                            if (checked && formData.paidOn) {
+                                                handleChange('paidOn', '');
+                                            }
+                                        }}
+                                        label="Auto-payment"
+                                    />
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <Label htmlFor="expense-paid-on">Paid On</Label>
                                 <Input

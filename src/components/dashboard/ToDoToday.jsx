@@ -342,6 +342,12 @@ const ToDoToday = ({
 
     const overdueTaskItems = sortedTasks.filter((task) => task.startDate && task.startDate < todayStr);
     const todayTaskItems = sortedTasks.filter((task) => !task.startDate || task.startDate >= todayStr);
+    const overdueIncompleteTaskItems = overdueTaskItems.filter((task) => !getTaskCompletedStatus(task));
+    const overdueCompletedTaskItems = overdueTaskItems.filter((task) => getTaskCompletedStatus(task));
+    const todayIncompleteTaskItems = todayTaskItems.filter((task) => !getTaskCompletedStatus(task));
+    const todayCompletedTaskItems = todayTaskItems.filter((task) => getTaskCompletedStatus(task));
+    const unpaidTodayExpenses = todayExpenses.filter((expense) => expense.paymentStatus !== 'paid');
+    const paidTodayExpenses = todayExpenses.filter((expense) => expense.paymentStatus === 'paid');
 
     return (
         <Card>
@@ -354,17 +360,14 @@ const ToDoToday = ({
             <CardContent className="pt-0">
                 <div className="divide-y divide-border">
                     {combinedTasks.length > 0 || overdueExpenses.length > 0 || todayExpenses.length > 0 ? (
-                        <div className="py-2">
-                            {overdueTaskItems.map(renderTaskRow)}
-                            {overdueTaskItems.length > 0 && overdueExpenses.length > 0 && (
-                                <div className="border-t border-border" />
-                            )}
+                        <div className="py-2 divide-y divide-border">
+                            {overdueIncompleteTaskItems.map(renderTaskRow)}
                             {overdueExpenses.map((expense) => renderExpenseRow(expense, { isOverdue: true }))}
-                            {todayTaskItems.map(renderTaskRow)}
-                            {todayTaskItems.length > 0 && todayExpenses.length > 0 && (
-                                <div className="border-t border-border" />
-                            )}
-                            {todayExpenses.map((expense) => renderExpenseRow(expense, { isToday: true }))}
+                            {todayIncompleteTaskItems.map(renderTaskRow)}
+                            {unpaidTodayExpenses.map((expense) => renderExpenseRow(expense, { isToday: true }))}
+                            {overdueCompletedTaskItems.map(renderTaskRow)}
+                            {todayCompletedTaskItems.map(renderTaskRow)}
+                            {paidTodayExpenses.map((expense) => renderExpenseRow(expense, { isToday: true }))}
                         </div>
                     ) : (
                         <EmptyState
