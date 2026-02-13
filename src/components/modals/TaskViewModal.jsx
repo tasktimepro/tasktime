@@ -9,7 +9,7 @@ import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ClockIcon } from '@/components/ui/icons';
-import { SlidersHorizontal, Trash2 } from 'lucide-react';
+import { RedoDot, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
 import { useClients } from '@/hooks/useClients';
@@ -56,7 +56,7 @@ const TaskViewModal = ({
     const { showSuccess } = useToast();
     const { projects } = useProjects();
     const { clients } = useClients();
-    const { tasks, updateTask, unarchiveTask, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus } = useTasks();
+    const { tasks, updateTask, unarchiveTask, toggleRecurringCompletion, skipRecurringOccurrence, isCompletedOnDate, getRecurringStatus } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer, isTaskTimerActive } = useTimers();
     const { deleteAttachment } = usePlannerAttachments();
@@ -104,6 +104,19 @@ const TaskViewModal = ({
                 ? { month: 'short', day: 'numeric', year: 'numeric' }
                 : { month: 'short', day: 'numeric' }
         ) || 'Today';
+    }, [effectiveDateStr, todayStr]);
+
+    const overdueActionDateLabel = useMemo(() => {
+        if (!effectiveDateStr) return '';
+        const currentYear = todayStr ? Number(todayStr.split('-')[0]) : null;
+        const effectiveYear = Number(effectiveDateStr.split('-')[0]);
+        const includeYear = !currentYear || effectiveYear !== currentYear;
+        return toDisplayDate(
+            effectiveDateStr,
+            includeYear
+                ? { month: 'short', day: 'numeric', year: 'numeric' }
+                : { month: 'short', day: 'numeric' }
+        ) || '';
     }, [effectiveDateStr, todayStr]);
 
     const isCompleted = useMemo(() => {
@@ -303,7 +316,10 @@ const TaskViewModal = ({
 
         if (currentTask.recurring && effectiveDateStr) {
             toggleRecurringCompletion(currentTask.id, effectiveDateStr);
-            showSuccess(isCompleted ? 'Marked as incomplete for today' : 'Done for today');
+            const recurringActionLabel = isRecurringOverdue && overdueActionDateLabel
+                ? (isCompleted ? `Marked as incomplete for ${overdueActionDateLabel}` : `Done for ${overdueActionDateLabel}`)
+                : (isCompleted ? 'Marked as incomplete for today' : 'Done for today');
+            showSuccess(recurringActionLabel);
             if (!isCompleted && currentTask.promptTimeEntry) {
                 setAddEntryDateStr(effectiveDateStr);
                 setShowAddEntryModal(true);
@@ -317,7 +333,15 @@ const TaskViewModal = ({
             lastActive: Date.now()
         });
         showSuccess(isCompleted ? 'Marked as incomplete' : 'Marked as done');
-    }, [currentTask, effectiveDateStr, isCompleted, isTimerActive, projectTimer, createEntry, clearTimer, toggleRecurringCompletion, updateTask, showSuccess]);
+    }, [currentTask, effectiveDateStr, isCompleted, isRecurringOverdue, overdueActionDateLabel, isTimerActive, projectTimer, createEntry, clearTimer, toggleRecurringCompletion, updateTask, showSuccess]);
+
+    const handleSkipRecurring = useCallback(() => {
+        if (!currentTask?.recurring || !effectiveDateStr) return;
+
+        skipRecurringOccurrence(currentTask.id, effectiveDateStr);
+        showSuccess('Skipped until next recurring date');
+        onClose();
+    }, [currentTask, effectiveDateStr, skipRecurringOccurrence, showSuccess, onClose]);
 
     const handleOpenTimeEntries = useCallback(() => {
         if (!currentTask) return;
@@ -374,10 +398,19 @@ const TaskViewModal = ({
     if (!currentTask) return null;
 
     const completedLabel = isCompleted
-        ? (currentTask.recurring ? 'Undo for today' : 'Mark as not done')
-        : (currentTask.recurring ? 'Done for today' : 'Mark as done');
+        ? (currentTask.recurring
+            ? (isRecurringOverdue && overdueActionDateLabel ? `Undo ${overdueActionDateLabel}` : 'Undo for today')
+            : 'Mark as not done')
+        : (currentTask.recurring
+            ? (isRecurringOverdue && overdueActionDateLabel ? `Done for ${overdueActionDateLabel}` : 'Done for today')
+            : 'Mark as done');
 
     const shouldShowCompleteAction = !currentTask.recurring || isRecurringDueToday || isRecurringOverdue || Boolean(dateStr);
+    const shouldShowSkipAction = Boolean(
+        currentTask.recurring
+        && !isCompleted
+        && (isRecurringDueToday || isRecurringOverdue)
+    );
     const dueInLabel = nextRecurringDueInDays === null
         ? 'Not due today'
         : `Due in ${nextRecurringDueInDays} ${nextRecurringDueInDays === 1 ? 'day' : 'days'}`;
@@ -400,12 +433,25 @@ const TaskViewModal = ({
     ) : (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
             {shouldShowCompleteAction ? (
-                <Button
-                    variant={isCompleted ? 'secondary' : 'default'}
-                    onClick={handleToggleComplete}
-                >
-                    {completedLabel}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant={isCompleted ? 'secondary' : 'default'}
+                        onClick={handleToggleComplete}
+                    >
+                        {completedLabel}
+                    </Button>
+                    {shouldShowSkipAction && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            title="Skip until next recurring"
+                            onClick={handleSkipRecurring}
+                        >
+                            <RedoDot className="h-5 w-5" />
+                        </Button>
+                    )}
+                </div>
             ) : (
                 <div className="text-sm font-medium text-muted-foreground">
                     {dueInLabel}

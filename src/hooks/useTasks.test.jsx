@@ -141,7 +141,7 @@ describe('useTasks', () => {
             remove: vi.fn(),
         })
 
-        const { result } = renderHook(() => useTasks())
+        const { result, rerender } = renderHook(() => useTasks())
 
         expect(result.current.getStandaloneTasks().map((t) => t.id)).toEqual(['standalone'])
         expect(result.current.getOverdueTasks().map((t) => t.id).sort()).toEqual(['completed-today', 'overdue'])
@@ -174,7 +174,7 @@ describe('useTasks', () => {
             remove: vi.fn(),
         })
 
-        const { result } = renderHook(() => useTasks())
+        const { result, rerender } = renderHook(() => useTasks())
 
         expect(result.current.getTasksForToday().map((t) => t.id).sort()).toEqual([
             'recurring-completed-today',
@@ -215,7 +215,7 @@ describe('useTasks', () => {
             remove: vi.fn(),
         })
 
-        const { result } = renderHook(() => useTasks())
+        const { result, rerender } = renderHook(() => useTasks())
 
         const statusDue = result.current.getRecurringStatus(activeTasks[0], '2025-01-06')
         expect(statusDue.isDueToday).toBe(true)
@@ -266,7 +266,7 @@ describe('useTasks', () => {
             remove: vi.fn(),
         })
 
-        const { result } = renderHook(() => useTasks())
+        const { result, rerender } = renderHook(() => useTasks())
 
         const status = result.current.getRecurringStatus(activeTasks[0], '2025-01-07')
         expect(status.isDueToday).toBe(false)
@@ -418,5 +418,83 @@ describe('useTasks', () => {
         const { result } = renderHook(() => useTasks())
 
         expect(result.current.toggleRecurringCompletion('missing', '2025-01-06')).toBeUndefined()
+    })
+
+    it('skips recurring task for current occurrence and resets on next recurrence', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2025-01-07T09:00:00Z'))
+
+        const task = {
+            id: 'recurring-overdue',
+            projectId: 'p1',
+            archived: false,
+            completed: false,
+            recurring: { type: 'weekly', weeklyDays: [1] },
+            startDate: '2025-01-01',
+            createdAt: new Date('2025-01-01T00:00:00Z').getTime(),
+            completedDatesByYear: {},
+            skipUntilNextRecurring: true,
+            skippedOccurrenceDate: '2025-01-06',
+        }
+
+        const activeTasks = [task]
+        const update = vi.fn((id, data) => {
+            const index = activeTasks.findIndex((t) => t.id === id)
+            if (index >= 0) {
+                activeTasks[index] = { ...activeTasks[index], ...data }
+                return activeTasks[index]
+            }
+            return undefined
+        })
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            get items() {
+                return activeTasks
+            },
+            isLoading: false,
+            get: vi.fn((id) => activeTasks.find((t) => t.id === id)),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks())
+
+        expect(result.current.getTasksForToday()).toEqual([])
+
+        act(() => {
+            result.current.skipRecurringOccurrence('recurring-overdue', '2025-01-06')
+        })
+
+        expect(update).toHaveBeenCalledWith(
+            'recurring-overdue',
+            expect.objectContaining({
+                skipUntilNextRecurring: true,
+                skippedOccurrenceDate: '2025-01-06',
+                lastActive: expect.any(Number),
+            })
+        )
+
+        vi.setSystemTime(new Date('2025-01-13T09:00:00Z'))
+
+        const status = result.current.getRecurringStatus(activeTasks[0], '2025-01-13')
+        expect(status.isDueToday).toBe(true)
+        expect(status.isOverdue).toBe(false)
+        expect(status.effectiveDateStr).toBe('2025-01-13')
+        expect(status.isSkipped).toBe(false)
+
+        expect(update).toHaveBeenCalledWith(
+            'recurring-overdue',
+            {
+                skipUntilNextRecurring: false,
+                skippedOccurrenceDate: null,
+            }
+        )
     })
 })

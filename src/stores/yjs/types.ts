@@ -42,6 +42,10 @@ export interface Task {
     startDate?: string | null;
     recurring?: RecurringConfig | null;
     promptTimeEntry?: boolean;
+    /** Temporary ignore flag for current recurring occurrence */
+    skipUntilNextRecurring?: boolean;
+    /** Occurrence date (YYYY-MM-DD) being skipped for recurring tasks */
+    skippedOccurrenceDate?: string | null;
     /** Per-day completion tracking for recurring tasks by year/month/day */
     completedDatesByYear?: Record<string, Record<string, number[]>>;
     /** Completion date for non-recurring tasks (YYYY-MM-DD) */

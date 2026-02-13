@@ -161,7 +161,26 @@ export function useTasks(options: UseTasksOptions = {}) {
         if (!task) return undefined;
 
         const nextCompletedDates = toggleRecurringCompletionDate(task.completedDatesByYear, dateStr);
-        return update(taskId, { completedDatesByYear: nextCompletedDates, lastActive: Date.now() });
+        return update(taskId, {
+            completedDatesByYear: nextCompletedDates,
+            skipUntilNextRecurring: false,
+            skippedOccurrenceDate: null,
+            lastActive: Date.now()
+        });
+    }, [get, update]);
+
+    /**
+     * Temporarily skip the current recurring occurrence until the next one arrives
+     */
+    const skipRecurringOccurrence = useCallback((taskId: string, dateStr: string): Task | undefined => {
+        const task = get(taskId);
+        if (!task || !task.recurring) return undefined;
+
+        return update(taskId, {
+            skipUntilNextRecurring: true,
+            skippedOccurrenceDate: dateStr,
+            lastActive: Date.now()
+        });
     }, [get, update]);
 
     const getOverdueTasks = useCallback(() => {
@@ -196,6 +215,13 @@ export function useTasks(options: UseTasksOptions = {}) {
                 }
 
                 if (isRecurringTaskDueOnDate(todayDate, task.recurring)) {
+                    const isSkippedForToday = Boolean(
+                        task.skipUntilNextRecurring
+                        && task.skippedOccurrenceDate
+                        && task.skippedOccurrenceDate === today
+                    );
+
+                    if (isSkippedForToday) return false;
                     return true;
                 }
 
@@ -215,6 +241,13 @@ export function useTasks(options: UseTasksOptions = {}) {
                 }
 
                 const wasCompleted = isCompletedOnDate(task, previousDueStr);
+                const isSkippedForOccurrence = Boolean(
+                    task.skipUntilNextRecurring
+                    && task.skippedOccurrenceDate
+                    && task.skippedOccurrenceDate === previousDueStr
+                );
+
+                if (isSkippedForOccurrence) return false;
 
                 if (!wasCompleted) return true;
 
@@ -280,12 +313,28 @@ export function useTasks(options: UseTasksOptions = {}) {
         }
 
         if (isRecurringTaskDueOnDate(todayDate, task.recurring)) {
+            const shouldResetSkipped = Boolean(
+                task.skipUntilNextRecurring
+                && task.skippedOccurrenceDate
+                && task.skippedOccurrenceDate !== resolvedToday
+            );
+
+            if (shouldResetSkipped) {
+                update(task.id, {
+                    skipUntilNextRecurring: false,
+                    skippedOccurrenceDate: null,
+                });
+            }
+
+            const isSkipped = Boolean(task.skipUntilNextRecurring && task.skippedOccurrenceDate === resolvedToday);
+
             return {
                 isDueToday: true,
                 isOverdue: false,
                 lastDueDateStr: resolvedToday,
                 nextDueDateStr: null as string | null,
                 effectiveDateStr: resolvedToday,
+                isSkipped,
             };
         }
 
@@ -296,12 +345,27 @@ export function useTasks(options: UseTasksOptions = {}) {
 
         const isBeforeRecurringStart = Boolean(recurringStartStr && previousDueStr && previousDueStr < recurringStartStr);
         const wasCompleted = previousDueStr ? isCompletedOnDate(task, previousDueStr) : false;
+        const isSkippedForOccurrence = Boolean(
+            previousDueStr
+            && task.skipUntilNextRecurring
+            && task.skippedOccurrenceDate
+            && task.skippedOccurrenceDate === previousDueStr
+        );
+
+        if (task.skipUntilNextRecurring && task.skippedOccurrenceDate && previousDueStr && task.skippedOccurrenceDate !== previousDueStr) {
+            update(task.id, {
+                skipUntilNextRecurring: false,
+                skippedOccurrenceDate: null,
+            });
+        }
+
         const isOverdue = Boolean(
             previousDueStr
                 && nextDueStr
                 && resolvedToday < nextDueStr
                 && !isBeforeRecurringStart
                 && !wasCompleted
+                && !isSkippedForOccurrence
         );
 
         return {
@@ -310,8 +374,9 @@ export function useTasks(options: UseTasksOptions = {}) {
             lastDueDateStr: previousDueStr,
             nextDueDateStr: nextDueStr,
             effectiveDateStr: isOverdue ? previousDueStr : null,
+            isSkipped: isSkippedForOccurrence,
         };
-    }, [isCompletedOnDate]);
+    }, [isCompletedOnDate, update]);
 
     return {
         // Data
@@ -344,6 +409,7 @@ export function useTasks(options: UseTasksOptions = {}) {
         // Recurring task completion
         isCompletedOnDate,
         toggleRecurringCompletion,
+        skipRecurringOccurrence,
         getRecurringStatus,
     };
 }
