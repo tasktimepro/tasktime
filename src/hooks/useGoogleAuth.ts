@@ -87,7 +87,20 @@ export const useGoogleAuth = () => {
             });
             if (!response.ok) return false;
             const data = await response.json();
-            return data.authenticated === true;
+
+            if (data.authenticated !== true) {
+                return false;
+            }
+
+            const driveProbeResponse = await fetch(
+                `${SYNC_WORKER_CONFIG.endpoints.drive}/files?spaces=appDataFolder&pageSize=1&fields=files(id)`,
+                {
+                    method: 'GET',
+                    headers: { 'X-Session-Id': session.sessionId },
+                }
+            );
+
+            return driveProbeResponse.ok;
         } catch {
             return false;
         }
@@ -136,6 +149,17 @@ export const useGoogleAuth = () => {
 
             const { sessionId, user } = await callbackResponse.json();
 
+            const isValid = await validateWorkerSession({
+                sessionId,
+                userId: user.id,
+                email: user.email,
+                createdAt: new Date().toISOString(),
+            });
+
+            if (!isValid) {
+                throw new Error('Google Drive access is not authorized for this session. Please reconnect and allow Drive access.');
+            }
+
             // 5. Store session
             await storeSession({
                 sessionId,
@@ -163,7 +187,7 @@ export const useGoogleAuth = () => {
                 error: error instanceof Error ? error.message : 'Sign in failed',
             }));
         }
-    }, []);
+    }, [validateWorkerSession]);
 
     const signOutFromWorker = useCallback(async (options?: { revoke?: boolean }): Promise<void> => {
 

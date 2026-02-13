@@ -197,13 +197,18 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
     const IconComponent = (isHovered && status.hoverIcon) ? status.hoverIcon : status.icon;
     const displayText = (isHovered && status.hoverText) ? status.hoverText : status.text;
 
-    const handleStatusClick = (event) => {
+    const handleStatusClick = async (event) => {
         if (!status.onClick) {
             return;
         }
 
         event.currentTarget.blur();
-        status.onClick();
+
+        try {
+            await status.onClick();
+        } catch (error) {
+            console.error('[YjsSyncStatus] Status action failed:', error);
+        }
     };
 
     if (isOffline) {

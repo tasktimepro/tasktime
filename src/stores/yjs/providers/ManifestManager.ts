@@ -473,7 +473,39 @@ export class ManifestManager {
 
         if (!response.ok) {
             if (response.status === 401 || response.status === 403) {
-                throw new AuthorizationError('Google authorization expired. Reconnect Google Drive.');
+                let errorMessage = 'Google authorization expired. Reconnect Google Drive.';
+
+                try {
+                    const cloned = response.clone();
+                    const contentType = cloned.headers.get('Content-Type') || '';
+
+                    if (contentType.includes('application/json')) {
+                        const payload = await cloned.json() as { error?: unknown; code?: string };
+                        const payloadError = typeof payload.error === 'string' ? payload.error : null;
+                        const payloadCode = typeof payload.code === 'string' ? payload.code : null;
+
+                        if (response.status === 403) {
+                            if (payloadError && payloadError.toLowerCase().includes('insufficient')) {
+                                errorMessage = 'Google Drive permission is missing for this session. Reconnect and allow Drive access.';
+                            } else {
+                                errorMessage = 'Google Drive access was denied. Reconnect Google Drive.';
+                            }
+                        } else if (payloadCode === 'SESSION_NOT_FOUND' || payloadCode === 'REFRESH_FAILED') {
+                            errorMessage = 'Google session expired. Reconnect Google Drive.';
+                        }
+                    } else if (response.status === 403) {
+                        const text = await cloned.text();
+                        if (text.toLowerCase().includes('insufficient')) {
+                            errorMessage = 'Google Drive permission is missing for this session. Reconnect and allow Drive access.';
+                        } else {
+                            errorMessage = 'Google Drive access was denied. Reconnect Google Drive.';
+                        }
+                    }
+                } catch {
+                    // Ignore parse failures and keep generic auth message
+                }
+
+                throw new AuthorizationError(errorMessage);
             }
 
             // Retry transient errors once

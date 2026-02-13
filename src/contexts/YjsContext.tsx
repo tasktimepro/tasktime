@@ -8,9 +8,11 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { YjsStore, getYjsStore, SyncState, SyncPhase, AutoSyncMode } from '@/stores/yjs';
+import { YjsStore, getYjsStore, SyncState, SyncPhase, AutoSyncMode, AuthorizationError } from '@/stores/yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { shouldSyncOnLoad, wasSyncInterrupted, hasPersistedPendingChanges } from '@/utils/syncPersistence';
+import Modal from '@/components/Modal';
+import { Button } from '@/components/ui/button';
 
 declare global {
 
@@ -100,9 +102,45 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
     const [autoSyncMode, setAutoSyncMode] = useState<AutoSyncMode>('sync');
     const [pendingSyncChanges, setPendingSyncChanges] = useState(false);
+    const [driveBindingVersion, setDriveBindingVersion] = useState(0);
+    const [showReconnectDialog, setShowReconnectDialog] = useState(false);
+    const [reconnectDialogMessage, setReconnectDialogMessage] = useState('Google authorization expired. Reconnect Google Drive to continue syncing.');
+    const [isReconnectProcessing, setIsReconnectProcessing] = useState(false);
+    const hasCheckedPersistedState = useRef(false);
     
     // Auth hook for Google Drive connection
-    const { isSignedIn, accessToken, sessionId, isLoading: authLoading } = useGoogleAuth();
+    const { isSignedIn, accessToken, sessionId, isLoading: authLoading, signIn, signOut } = useGoogleAuth();
+
+    const handleAuthorizationFailure = useCallback((error: unknown): boolean => {
+        if (!(error instanceof AuthorizationError)) {
+            return false;
+        }
+
+        store.disconnectDrive();
+        setIsDriveConnected(false);
+        setIsConnecting(false);
+        setSyncState('error');
+        setSyncPhase('error');
+        setHasSynced(false);
+        setManualSyncInProgress(false);
+        setDriveBindingVersion(previous => previous + 1);
+        hasCheckedPersistedState.current = false;
+        setReconnectDialogMessage(error.message || 'Google authorization expired. Reconnect Google Drive to continue syncing.');
+        setShowReconnectDialog(true);
+        return true;
+    }, [store]);
+
+    const runSyncWithAuthHandling = useCallback(async (options?: { allowPull?: boolean }) => {
+        try {
+            await store.forceDriveSync(options);
+        } catch (error) {
+            if (handleAuthorizationFailure(error)) {
+                return;
+            }
+
+            throw error;
+        }
+    }, [store, handleAuthorizationFailure]);
 
     // Initialize store on mount
     useEffect(() => {
@@ -171,11 +209,16 @@ export function YjsProvider({ children }: YjsProviderProps) {
                     setSyncState(store.getSyncState());
                     setSyncPhase(store.getSyncPhase());
                     setLastSyncedAt(store.getLastSyncedAt());
+                    setDriveBindingVersion(previous => previous + 1);
                     console.log('[YjsContext] Connected to Drive');
                     // connect() already handles initial sync based on the sync mode,
                     // no need for a follow-up forceDriveSync
                 })
                 .catch((error) => {
+                    if (handleAuthorizationFailure(error)) {
+                        return;
+                    }
+
                     setIsDriveConnected(false);
                     setSyncState('error');
                     setSyncPhase('error');
@@ -193,6 +236,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             setHasSynced(false);
             setLastSyncedAt(null);
             setManualSyncInProgress(false);
+            setDriveBindingVersion(previous => previous + 1);
         }
     }, [isReady, isSignedIn, accessToken, sessionId, authLoading, store]);
 
@@ -246,18 +290,18 @@ export function YjsProvider({ children }: YjsProviderProps) {
             unsubPhase();
             unsubPending();
         };
-    }, [store, isReady, isDriveConnected]);
+    }, [store, isReady, isDriveConnected, driveBindingVersion]);
 
     // --- Callbacks ---
 
     const forceSyncDrive = useCallback(async (options?: { allowPull?: boolean }) => {
         setManualSyncInProgress(true);
         try {
-            await store.forceDriveSync(options);
+            await runSyncWithAuthHandling(options);
         } finally {
             setManualSyncInProgress(false);
         }
-    }, [store]);
+    }, [runSyncWithAuthHandling]);
 
     // Trigger a sync when tab becomes visible or when network reconnects
     useEffect(() => {
@@ -267,7 +311,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             if (document.visibilityState !== 'visible') return;
 
             if (autoSyncEnabled && autoSyncMode === 'sync') {
-                store.forceDriveSync().catch(console.error);
+                runSyncWithAuthHandling().catch(console.error);
             }
         };
 
@@ -277,12 +321,12 @@ export function YjsProvider({ children }: YjsProviderProps) {
             }
 
             if (autoSyncMode === 'sync') {
-                store.forceDriveSync().catch(console.error);
+                runSyncWithAuthHandling().catch(console.error);
                 return;
             }
 
             if (autoSyncMode === 'backup' && store.hasPendingSyncChanges()) {
-                store.forceDriveSync({ allowPull: false }).catch(console.error);
+                runSyncWithAuthHandling({ allowPull: false }).catch(console.error);
             }
         };
 
@@ -294,11 +338,10 @@ export function YjsProvider({ children }: YjsProviderProps) {
             window.removeEventListener('online', handleOnline);
         };
 
-    }, [isDriveConnected, autoSyncEnabled, autoSyncMode, store]);
+    }, [isDriveConnected, autoSyncEnabled, autoSyncMode, store, runSyncWithAuthHandling]);
 
     // Handle persisted pending changes or interrupted syncs on load
     // This runs once after Drive connects to recover from page refresh mid-sync
-    const hasCheckedPersistedState = useRef(false);
     useEffect(() => {
         // Only run once per connection, and only after first successful sync state
         if (!isDriveConnected || hasCheckedPersistedState.current) return;
@@ -320,15 +363,29 @@ export function YjsProvider({ children }: YjsProviderProps) {
             console.log('[YjsContext] Auto-triggering sync for persisted pending changes', { autoSyncMode });
             if (autoSyncMode === 'backup') {
                 // Backup mode: only push, don't pull
-                store.forceDriveSync({ allowPull: false }).catch(console.error);
+                runSyncWithAuthHandling({ allowPull: false }).catch(console.error);
             } else {
-                store.forceDriveSync().catch(console.error);
+                runSyncWithAuthHandling().catch(console.error);
             }
         }
         // For manual mode: pendingSyncChanges will show "Sync changes" in UI
         // because GoogleDriveProvider.updatePendingState() now checks persisted state
 
-    }, [isDriveConnected, autoSyncEnabled, store]);
+    }, [isDriveConnected, autoSyncEnabled, store, autoSyncMode, runSyncWithAuthHandling]);
+
+    const handleReconnectNow = useCallback(async () => {
+        setIsReconnectProcessing(true);
+
+        try {
+            await signOut();
+            await signIn();
+            setShowReconnectDialog(false);
+        } catch (error) {
+            console.error('[YjsContext] Reconnect failed:', error);
+        } finally {
+            setIsReconnectProcessing(false);
+        }
+    }, [signIn, signOut]);
 
     const disconnectDrive = useCallback(() => {
         store.disconnectDrive();
@@ -338,6 +395,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         setSyncPhase('idle');
         setHasSynced(false);
         setManualSyncInProgress(false);
+        setDriveBindingVersion(previous => previous + 1);
         hasCheckedPersistedState.current = false; // Reset for next connection
     }, [store]);
 
@@ -440,6 +498,35 @@ export function YjsProvider({ children }: YjsProviderProps) {
     return (
         <YjsContext.Provider value={value}>
             {children}
+            <Modal
+                isOpen={showReconnectDialog}
+                onClose={() => !isReconnectProcessing && setShowReconnectDialog(false)}
+                title="Reconnect Google Drive"
+                description={reconnectDialogMessage}
+                showCloseButton={!isReconnectProcessing}
+                footer={(
+                    <div className="flex justify-end gap-2 w-full">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowReconnectDialog(false)}
+                            disabled={isReconnectProcessing}
+                        >
+                            Not now
+                        </Button>
+                        <Button
+                            onClick={handleReconnectNow}
+                            loading={isReconnectProcessing}
+                            loadingText="Reconnecting..."
+                        >
+                            Reconnect
+                        </Button>
+                    </div>
+                )}
+            >
+                <p className="text-sm text-muted-foreground">
+                    Local changes are kept safely on this device. Reconnect to resume cloud sync.
+                </p>
+            </Modal>
         </YjsContext.Provider>
     );
 }
