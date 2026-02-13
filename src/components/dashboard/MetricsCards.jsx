@@ -35,27 +35,32 @@ const MetricsCards = ({
     exchangeRatesLoading,
     navigateToInvoices
 }) => {
-    const formatExpenseAmount = (amount, hasEstimate = false) => {
+    const formatExpenseAmount = (amount, hasEstimate = false, className = '') => {
         const prefix = hasEstimate ? '~' : '';
-        return <span className="sensitive-data">{prefix}{formatCurrency(amount || 0, preferredCurrency)}</span>;
+        return <span className={`${className} sensitive-data`}>{prefix}{formatCurrency(amount || 0, preferredCurrency)}</span>;
     };
 
     const renderExpenseLine = ({
         amount,
         hasEstimate,
-        label,
-        textClassName
-    }) => (
-        <div className="flex items-center">
-            <HandCoinsIcon className="h-4 w-4 text-muted-foreground mr-1" />
-            <div className={`text-lg font-semibold ${textClassName}`}>
-                {formatExpenseAmount(amount, hasEstimate)}
+        label
+    }) => {
+        const hasAmount = (amount || 0) > 0;
+
+        return (
+            <div className="flex items-center">
+                <HandCoinsIcon className="h-4 w-4 text-muted-foreground mr-1" />
+                <div className="text-lg font-semibold text-foreground">
+                    {formatExpenseAmount(amount, hasEstimate, hasAmount ? 'text-foreground' : 'text-muted-foreground')}
+                </div>
+                {hasAmount && (
+                    <span className="text-xs font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
+                        {label}
+                    </span>
+                )}
             </div>
-            <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
-                {label}
-            </span>
-        </div>
-    );
+        );
+    };
     const renderEarningsByCurrency = (metrics, colorScheme = 'blue') => {
         if (!hasClients) {
             return null;
@@ -112,7 +117,7 @@ const MetricsCards = ({
                     <span className={`font-semibold ${colors.text} sensitive-data`}>
                         {formatCurrency(amount, currency)}
                     </span>
-                    <span className={`text-xs ${colors.bg} ${colors.badge} px-1.5 py-0.5 rounded ml-1`}>
+                    <span className={`text-xs font-medium ${colors.bg} ${colors.badge} px-1.5 py-0.5 rounded ml-1`}>
                         {label}
                     </span>
                 </div>
@@ -180,13 +185,11 @@ const MetricsCards = ({
                                         {renderExpenseLine({
                                             amount: expenseThisMonthUpcomingTotal,
                                             hasEstimate: expenseThisMonthUpcomingHasEstimate,
-                                            label: 'upcoming',
-                                            textClassName: 'text-blue-900 dark:text-blue-100'
+                                            label: 'upcoming'
                                         })}
                                         {renderExpenseLine({
                                             amount: expenseThisMonthPaidTotal,
-                                            label: 'paid',
-                                            textClassName: 'text-blue-900 dark:text-blue-100'
+                                            label: 'paid'
                                         })}
                                     </div>
                                     <div className="flex items-center mt-2">
@@ -218,8 +221,7 @@ const MetricsCards = ({
                                     <div className="mt-2">
                                         {renderExpenseLine({
                                             amount: expenseLastMonthPaidTotal,
-                                            label: 'paid',
-                                            textClassName: 'text-foreground'
+                                            label: 'paid'
                                         })}
                                     </div>
                                     <div className="flex items-center mt-2">
@@ -250,8 +252,7 @@ const MetricsCards = ({
                                     <div className="mt-2">
                                         {renderExpenseLine({
                                             amount: expenseLast90DaysPaidTotal,
-                                            label: 'paid',
-                                            textClassName: 'text-green-900 dark:text-green-100'
+                                            label: 'paid'
                                         })}
                                     </div>
                                     <div className="flex items-center mt-2">
@@ -283,7 +284,7 @@ const MetricsCards = ({
                                                 <span className="font-semibold text-foreground sensitive-data">
                                                     {thisMonthUnbilledDisplay}
                                                 </span>
-                                                <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
+                                                <span className="text-xs font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
                                                     unbilled
                                                 </span>
                                             </div>

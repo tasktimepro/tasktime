@@ -280,6 +280,29 @@ describe('usePlannerItems', () => {
         expect(workedItem?.title).toBe('Worked Task');
     });
 
+    it('keeps worked archived tasks visible when archivedOnDate is missing but lastActive exists', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const workedDateStr = format(weekStart, 'yyyy-MM-dd');
+
+        mockTasks.push({
+            id: 't-arch-missing-date',
+            title: 'Archived Worked Task',
+            archived: true,
+            archivedOnDate: null,
+            lastActive: new Date('2026-02-04T12:00:00Z').getTime(),
+        });
+
+        const entryStart = new Date(`${workedDateStr}T09:00:00.000Z`).getTime();
+        const entryEnd = new Date(`${workedDateStr}T10:00:00.000Z`).getTime();
+        mockEntries.push({ id: 'e-arch-worked', taskId: 't-arch-missing-date', start: entryStart, end: entryEnd });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === workedDateStr);
+
+        const workedItem = day.items.find((i) => i.type === 'task' && i.subtype === 'worked' && i.title === 'Archived Worked Task');
+        expect(workedItem).toBeTruthy();
+    });
+
     it('includes timer-only tasks for today', () => {
         const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
         const todayStr = format(new Date(), 'yyyy-MM-dd');

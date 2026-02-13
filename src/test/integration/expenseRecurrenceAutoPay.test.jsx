@@ -153,4 +153,123 @@ describe('Expense recurrence auto-pay integration', () => {
         expect(screen.getByText('Auto Rent')).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Mark as Paid' })).not.toBeInTheDocument()
     })
+
+    it('sorts outstanding by highest overdue first', () => {
+        mockRecurrences = []
+        mockExpenses = [
+            {
+                id: 'exp-overdue-oldest',
+                title: 'Overdue Oldest',
+                date: '2026-02-01',
+                paymentStatus: 'unpaid',
+                amount: 40,
+                amountType: 'fixed',
+                currency: 'USD'
+            },
+            {
+                id: 'exp-overdue-recent',
+                title: 'Overdue Recent',
+                date: '2026-02-08',
+                paymentStatus: 'unpaid',
+                amount: 35,
+                amountType: 'fixed',
+                currency: 'USD'
+            }
+        ]
+
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        )
+
+        const overdueOldest = screen.getByText('Overdue Oldest')
+        const overdueRecent = screen.getByText('Overdue Recent')
+        expect(overdueOldest.compareDocumentPosition(overdueRecent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('sorts upcoming by nearest date first', () => {
+        mockRecurrences = []
+        mockExpenses = [
+            {
+                id: 'exp-upcoming-nearest',
+                title: 'Upcoming Nearest',
+                date: '2026-02-10',
+                paymentStatus: 'unpaid',
+                amount: 20,
+                amountType: 'fixed',
+                currency: 'USD'
+            },
+            {
+                id: 'exp-upcoming-later',
+                title: 'Upcoming Later',
+                date: '2026-02-20',
+                paymentStatus: 'unpaid',
+                amount: 22,
+                amountType: 'fixed',
+                currency: 'USD'
+            }
+        ]
+
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        )
+
+        const upcomingNearest = screen.getByText('Upcoming Nearest')
+        const upcomingLater = screen.getByText('Upcoming Later')
+        expect(upcomingNearest.compareDocumentPosition(upcomingLater) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('sorts paid by most recent paid date first', () => {
+        mockRecurrences = []
+        mockExpenses = [
+            {
+                id: 'exp-paid-most-recent',
+                title: 'Paid Most Recent',
+                date: '2026-02-02',
+                paidOn: '2026-02-09',
+                paymentStatus: 'paid',
+                amount: 70,
+                amountType: 'fixed',
+                currency: 'USD'
+            },
+            {
+                id: 'exp-paid-older',
+                title: 'Paid Older',
+                date: '2026-02-08',
+                paidOn: '2026-02-07',
+                paymentStatus: 'paid',
+                amount: 65,
+                amountType: 'fixed',
+                currency: 'USD'
+            }
+        ]
+
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        )
+
+        const paidMostRecent = screen.getByText('Paid Most Recent')
+        const paidOlder = screen.getByText('Paid Older')
+        expect(paidMostRecent.compareDocumentPosition(paidOlder) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
 })

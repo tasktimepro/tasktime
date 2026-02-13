@@ -45,6 +45,7 @@ const AddTimeEntryModal = ({
     const DAYS_PER_WEEK = 7;
     const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR;
     const MINUTES_PER_WEEK = DAYS_PER_WEEK * MINUTES_PER_DAY;
+    const allowSeconds = Boolean(entry);
 
     const [formData, setFormData] = useState({
         startDate: '',
@@ -53,31 +54,46 @@ const AddTimeEntryModal = ({
         note: ''
     });
 
-    const getShortTimeString = () => getCurrentTimeString().slice(0, 5);
-    const formatShortTime = (timestamp) => timestampToTimeString(timestamp).slice(0, 5);
+    const getDefaultStartTime = () => getCurrentTimeString().slice(0, 5);
+    const formatStartTime = (timestamp, showSeconds = false) => {
+        const time = timestampToTimeString(timestamp);
+        return showSeconds ? time : time.slice(0, 5);
+    };
 
-    const formatDurationForInput = (durationMs) => {
+    const formatDurationForInput = (durationMs, showSeconds = false) => {
         if (!durationMs || durationMs <= 0) return '';
 
-        let remainingMinutes = Math.round(durationMs / (1000 * 60));
+        let remainingMs = durationMs;
 
-        const weeks = Math.floor(remainingMinutes / MINUTES_PER_WEEK);
-        remainingMinutes -= weeks * MINUTES_PER_WEEK;
+        const weeksMs = MINUTES_PER_WEEK * 60 * 1000;
+        const daysMs = MINUTES_PER_DAY * 60 * 1000;
+        const hoursMs = MINUTES_PER_HOUR * 60 * 1000;
+        const minutesMs = 60 * 1000;
 
-        const days = Math.floor(remainingMinutes / MINUTES_PER_DAY);
-        remainingMinutes -= days * MINUTES_PER_DAY;
+        const weeks = Math.floor(remainingMs / weeksMs);
+        remainingMs -= weeks * weeksMs;
 
-        const hours = Math.floor(remainingMinutes / MINUTES_PER_HOUR);
-        remainingMinutes -= hours * MINUTES_PER_HOUR;
+        const days = Math.floor(remainingMs / daysMs);
+        remainingMs -= days * daysMs;
 
-        const minutes = remainingMinutes;
+        const hours = Math.floor(remainingMs / hoursMs);
+        remainingMs -= hours * hoursMs;
+
+        const minutes = Math.floor(remainingMs / minutesMs);
+        remainingMs -= minutes * minutesMs;
+
+        const seconds = Math.floor(remainingMs / 1000);
 
         const parts = [];
 
         if (weeks) parts.push(`${weeks}w`);
         if (days) parts.push(`${days}d`);
         if (hours) parts.push(`${hours}h`);
-        if (minutes || parts.length === 0) parts.push(`${minutes}m`);
+        if (minutes) parts.push(`${minutes}m`);
+        if (showSeconds && seconds) parts.push(`${seconds}s`);
+        if (parts.length === 0) {
+            parts.push(showSeconds ? '0s' : '0m');
+        }
 
         return parts.join(' ');
     };
@@ -86,15 +102,15 @@ const AddTimeEntryModal = ({
         if (entry) {
             setFormData({
                 startDate: timestampToDateString(entry.start) || '',
-                startTime: formatShortTime(entry.start),
-                timeSpent: formatDurationForInput(entry.end - entry.start),
+                startTime: formatStartTime(entry.start, true),
+                timeSpent: formatDurationForInput(entry.end - entry.start, true),
                 note: entry.note || ''
             });
             return;
         }
 
         const todayDate = initialDateStr || getTodayString();
-        const currentTime = getShortTimeString();
+        const currentTime = getDefaultStartTime();
 
         setFormData({
             startDate: todayDate || '',
@@ -123,18 +139,19 @@ const AddTimeEntryModal = ({
 
         const normalized = value.toLowerCase().replace(/,/g, ' ').trim();
         const compact = normalized.replace(/\s+/g, '');
-        const matches = [...compact.matchAll(/(\d+)([wdhm])/g)];
+        const allowedUnits = allowSeconds ? 'wdhms' : 'wdhm';
+        const matches = [...compact.matchAll(new RegExp(`(\\d+)([${allowedUnits}])`, 'g'))];
 
         if (matches.length === 0) {
-            return { isValid: false, error: 'Use format like 2w 4d 6h 45m' };
+            return { isValid: false, error: allowSeconds ? 'Use format like 2w 4d 6h 45m 30s' : 'Use format like 2w 4d 6h 45m' };
         }
 
         const reconstructed = matches.map(match => `${match[1]}${match[2]}`).join('');
         if (reconstructed.length !== compact.length) {
-            return { isValid: false, error: 'Use format like 2w 4d 6h 45m' };
+            return { isValid: false, error: allowSeconds ? 'Use format like 2w 4d 6h 45m 30s' : 'Use format like 2w 4d 6h 45m' };
         }
 
-        let totalMinutes = 0;
+        let totalMs = 0;
 
         matches.forEach(match => {
             const amount = parseInt(match[1], 10);
@@ -146,27 +163,30 @@ const AddTimeEntryModal = ({
 
             switch (unit) {
                 case 'w':
-                    totalMinutes += amount * MINUTES_PER_WEEK;
+                    totalMs += amount * MINUTES_PER_WEEK * 60 * 1000;
                     break;
                 case 'd':
-                    totalMinutes += amount * MINUTES_PER_DAY;
+                    totalMs += amount * MINUTES_PER_DAY * 60 * 1000;
                     break;
                 case 'h':
-                    totalMinutes += amount * MINUTES_PER_HOUR;
+                    totalMs += amount * MINUTES_PER_HOUR * 60 * 1000;
                     break;
                 case 'm':
-                    totalMinutes += amount;
+                    totalMs += amount * 60 * 1000;
+                    break;
+                case 's':
+                    totalMs += amount * 1000;
                     break;
                 default:
                     break;
             }
         });
 
-        if (totalMinutes <= 0) {
+        if (totalMs <= 0) {
             return { isValid: false, error: 'Time spent must be greater than 0' };
         }
 
-        return { isValid: true, durationMs: totalMinutes * 60 * 1000 };
+        return { isValid: true, durationMs: totalMs };
     };
 
     const updateFormForTimeSpent = (value) => {
@@ -183,7 +203,7 @@ const AddTimeEntryModal = ({
             if (durationResult.isValid && shouldAutoSetStart) {
                 const startTimestamp = now - durationResult.durationMs;
                 nextForm.startDate = timestampToDateString(startTimestamp);
-                nextForm.startTime = formatShortTime(startTimestamp);
+                nextForm.startTime = formatStartTime(startTimestamp, false);
             }
 
             return nextForm;
@@ -313,7 +333,7 @@ const AddTimeEntryModal = ({
                         className="text-sm bg-background text-foreground"
                         ref={timeSpentInputRef}
                     />
-                    <p className="text-xs text-muted-foreground">Format: 2w 4d 6h 45m</p>
+                    <p className="text-xs text-muted-foreground">Format: {allowSeconds ? '2w 4d 6h 45m 30s' : '2w 4d 6h 45m'}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -333,7 +353,7 @@ const AddTimeEntryModal = ({
                             value={formData.startTime}
                             onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
                             className="text-sm bg-background"
-                            showSeconds={false}
+                            showSeconds={allowSeconds}
                         />
                     </div>
                 </div>

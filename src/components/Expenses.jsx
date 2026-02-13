@@ -360,28 +360,52 @@ const Expenses = ({
         return expense.paymentStatus;
     };
 
+    const getDateMs = (value) => parseStoredDate(value)?.getTime() || 0;
+
+    const compareByDueDateAscThenTitle = (a, b) => {
+        const dateDiff = getDateMs(a.date) - getDateMs(b.date);
+        if (dateDiff !== 0) return dateDiff;
+        return (a.title || '').localeCompare(b.title || '');
+    };
+
+    const comparePaidByMostRecent = (a, b) => {
+        const paidDiff = getDateMs(b.paidOn) - getDateMs(a.paidOn);
+        if (paidDiff !== 0) return paidDiff;
+
+        const dateDiff = getDateMs(b.date) - getDateMs(a.date);
+        if (dateDiff !== 0) return dateDiff;
+
+        return (a.title || '').localeCompare(b.title || '');
+    };
+
     const outstandingExpenses = useMemo(() => {
-        return filteredExpenses.filter((expense) => {
-            if (getEffectivePaymentStatus(expense) === 'paid') return false;
-            if (!todayDate) return false;
-            const expenseDate = parseStoredDate(expense.date);
-            if (!expenseDate) return false;
-            return expenseDate <= todayDate;
-        });
+        return filteredExpenses
+            .filter((expense) => {
+                if (getEffectivePaymentStatus(expense) === 'paid') return false;
+                if (!todayDate) return false;
+                const expenseDate = parseStoredDate(expense.date);
+                if (!expenseDate) return false;
+                return expenseDate <= todayDate;
+            })
+            .sort(compareByDueDateAscThenTitle);
     }, [filteredExpenses, todayDate]);
 
     const upcomingExpenses = useMemo(() => {
-        return filteredExpenses.filter((expense) => {
-            if (getEffectivePaymentStatus(expense) === 'paid') return false;
-            if (!todayDate) return true;
-            const expenseDate = parseStoredDate(expense.date);
-            if (!expenseDate) return true;
-            return expenseDate > todayDate;
-        });
+        return filteredExpenses
+            .filter((expense) => {
+                if (getEffectivePaymentStatus(expense) === 'paid') return false;
+                if (!todayDate) return true;
+                const expenseDate = parseStoredDate(expense.date);
+                if (!expenseDate) return true;
+                return expenseDate > todayDate;
+            })
+            .sort(compareByDueDateAscThenTitle);
     }, [filteredExpenses, todayDate]);
 
     const paidExpenses = useMemo(() => {
-        return filteredExpenses.filter((expense) => getEffectivePaymentStatus(expense) === 'paid');
+        return filteredExpenses
+            .filter((expense) => getEffectivePaymentStatus(expense) === 'paid')
+            .sort(comparePaidByMostRecent);
     }, [filteredExpenses]);
 
     const defaultStatusTab = useMemo(() => {

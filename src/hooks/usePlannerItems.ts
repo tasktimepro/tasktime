@@ -216,6 +216,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     }, []);
 
     const isTaskVisibleOnDate = useCallback((task: Task, dateStr: string): boolean => {
+        const resolvedArchivedOnDate = task.archivedOnDate || (typeof task.lastActive === 'number' ? toStorageDate(task.lastActive) : null);
         const createdDate = typeof task.createdAt === 'number'
             ? toStorageDate(task.createdAt)
             : null;
@@ -230,8 +231,8 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         }
 
         if (task.archived) {
-            if (!task.archivedOnDate) return false;
-            return dateStr <= task.archivedOnDate;
+            if (!resolvedArchivedOnDate) return false;
+            return dateStr <= resolvedArchivedOnDate;
         }
 
         return true;
@@ -589,9 +590,10 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             .filter((item): item is { task: Task; timeMs: number } => Boolean(item.task))
             .filter((item) => !addedTaskIds.has(item.task.id))
             .filter((item) => {
+                const resolvedArchivedOnDate = item.task.archivedOnDate || (typeof item.task.lastActive === 'number' ? toStorageDate(item.task.lastActive) : null);
                 if (!item.task.archived) return true;
-                if (!item.task.archivedOnDate) return false;
-                return dateStr <= item.task.archivedOnDate;
+                if (!resolvedArchivedOnDate) return false;
+                return dateStr <= resolvedArchivedOnDate;
             })
             .sort((a, b) => a.task.title.localeCompare(b.task.title));
 

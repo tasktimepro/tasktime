@@ -202,6 +202,63 @@ describe('TimeEntriesModal', () => {
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry updated successfully')
     })
 
+    it('supports seconds when editing an existing time entry', async () => {
+
+        const user = userEvent.setup()
+        const entry = {
+            id: 'entry-seconds',
+            taskId: 'task-1',
+            start: new Date('2026-01-19T10:00:15').getTime(),
+            end: new Date('2026-01-19T11:00:45').getTime(),
+            note: 'With seconds'
+        }
+
+        mockTimeEntries = [entry]
+
+        render(
+            <TimeEntriesModal
+                {...baseProps}
+            />
+        )
+
+        await user.click(screen.getByTitle('Edit entry'))
+
+        await user.clear(screen.getByLabelText('Time spent'))
+        await user.type(screen.getByLabelText('Time spent'), '1h 30m 45s')
+
+        await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+        expect(timeEntriesHookMocks.updateEntry).toHaveBeenCalledTimes(1)
+        const [entryId, updates] = timeEntriesHookMocks.updateEntry.mock.calls[0]
+        expect(entryId).toBe('entry-seconds')
+        expect(updates.end - updates.start).toBe((1 * 60 * 60 + 30 * 60 + 45) * 1000)
+        expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry updated successfully')
+    })
+
+    it('does not allow seconds when adding a new manual time entry', async () => {
+
+        const user = userEvent.setup()
+
+        render(
+            <TimeEntriesModal
+                {...baseProps}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
+
+        await user.clear(screen.getByLabelText('Date started'))
+        await user.type(screen.getByLabelText('Date started'), '2026-01-19')
+        await user.clear(screen.getByLabelText('Time spent'))
+        await user.type(screen.getByLabelText('Time spent'), '30s')
+
+        const addButtons = screen.getAllByRole('button', { name: 'Add Entry' })
+        await user.click(addButtons[addButtons.length - 1])
+
+        expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
+        expect(toastMocks.showError).toHaveBeenCalledWith('Use format like 2w 4d 6h 45m')
+    })
+
     it('deletes an existing time entry', async () => {
 
         const user = userEvent.setup()

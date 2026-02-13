@@ -48,4 +48,31 @@ describe('MetricsCards', () => {
         expect(screen.getByText('$50.00')).toBeInTheDocument()
         expect(screen.getAllByText('paid').length).toBeGreaterThan(0)
     })
+
+    it('does not show paid tag for zero expense totals', () => {
+        render(
+            <MetricsCards
+                thisMonthMetrics={baseMetrics}
+                lastMonthMetrics={baseMetrics}
+                last90DaysMetrics={baseMetrics}
+                invoiceMetrics={invoiceMetrics}
+                thisMonthBillableHours={0}
+                thisMonthUnbilledDisplay="$0.00"
+                expenseThisMonthUpcomingTotal={0}
+                expenseThisMonthUpcomingHasEstimate={false}
+                expenseThisMonthPaidTotal={0}
+                expenseLastMonthPaidTotal={0}
+                expenseLast90DaysPaidTotal={0}
+                hasClients={false}
+                preferredCurrency="USD"
+                formatDuration={() => '0h'}
+                needsExchangeRates={false}
+                exchangeRatesLoading={false}
+                navigateToInvoices={() => {}}
+            />
+        )
+
+        expect(screen.getAllByText('$0.00').length).toBeGreaterThan(0)
+        expect(screen.queryByText('paid')).not.toBeInTheDocument()
+    })
 })

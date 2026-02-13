@@ -16,6 +16,7 @@ import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { isRecurringTaskDueOnDate } from '../utils/recurringUtils.ts';
 import { useTodayDate, useTodayString } from '../hooks/useDayRollover';
+import { toStorageDate } from '../utils/dateUtils.ts';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -176,14 +177,22 @@ const TaskTree = ({
      * Archive a task
      */
     const handleArchiveTask = useCallback((taskId) => {
-        updateTask(taskId, { archived: true, lastActive: Date.now() });
+        updateTask(taskId, {
+            archived: true,
+            archivedOnDate: toStorageDate(new Date()),
+            lastActive: Date.now()
+        });
     }, [updateTask]);
 
     /**
      * Unarchive a task
      */
     const handleUnarchiveTask = useCallback((taskId) => {
-        updateTask(taskId, { archived: false, lastActive: Date.now() });
+        updateTask(taskId, {
+            archived: false,
+            archivedOnDate: null,
+            lastActive: Date.now()
+        });
     }, [updateTask]);
 
     /**

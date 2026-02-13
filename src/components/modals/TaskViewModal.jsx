@@ -7,6 +7,7 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ClockIcon } from '@/components/ui/icons';
 import { SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useTasks } from '@/hooks/useTasks';
@@ -55,7 +56,7 @@ const TaskViewModal = ({
     const { showSuccess } = useToast();
     const { projects } = useProjects();
     const { clients } = useClients();
-    const { tasks, updateTask, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus } = useTasks();
+    const { tasks, updateTask, unarchiveTask, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer, isTaskTimerActive } = useTimers();
     const { deleteAttachment } = usePlannerAttachments();
@@ -341,6 +342,13 @@ const TaskViewModal = ({
         onArchive?.(currentTask);
     }, [currentTask, onClose, onArchive]);
 
+    const handleUnarchive = useCallback(async () => {
+        if (!currentTask) return;
+        await unarchiveTask(currentTask.id);
+        showSuccess('Task unarchived');
+        onClose();
+    }, [currentTask, unarchiveTask, showSuccess, onClose]);
+
     const handleRemoveFromPlanner = useCallback(() => {
         if (!attachment) return;
         deleteAttachment(attachment.id);
@@ -383,7 +391,13 @@ const TaskViewModal = ({
         ? toDisplayDate(completedDateValue, { month: 'short', day: 'numeric', year: 'numeric' })
         : '';
 
-    const modalFooter = (
+    const modalFooter = currentTask.archived ? (
+        <div className="flex items-center justify-end w-full">
+            <Button onClick={handleUnarchive}>
+                Unarchive
+            </Button>
+        </div>
+    ) : (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
             {shouldShowCompleteAction ? (
                 <Button
@@ -434,7 +448,13 @@ const TaskViewModal = ({
                 footer={modalFooter}
             >
                 <div className="space-y-4">
-                    <div className={`grid gap-4 ${shouldShowBillableTotal ? 'sm:grid-cols-2 items-start' : ''}`}>
+                    {currentTask.archived && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">Archived</Badge>
+                        </div>
+                    )}
+
+                    <div className={`grid gap-4 ${shouldShowBillableTotal ? 'sm:grid-cols-[minmax(0,1fr)_auto] items-start' : ''}`}>
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Time</p>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
