@@ -64,16 +64,40 @@ const Dashboard = ({
     const [addEntryTask, setAddEntryTask] = useState(null);
     const [addEntryDateStr, setAddEntryDateStr] = useState(null);
 
+    const resolveRecurringActionDate = useCallback((task) => {
+        if (!task?.recurring || !todayStr) return null;
+
+        const status = getRecurringStatus(task, todayStr);
+
+        if (status.effectiveDateStr) {
+            return status.effectiveDateStr;
+        }
+
+        const lastActiveStr = task.lastActive
+            ? toStorageDate(new Date(task.lastActive))
+            : null;
+
+        if (
+            !status.isDueToday
+            && !status.isOverdue
+            && status.lastDueDateStr
+            && lastActiveStr === todayStr
+            && isCompletedOnDate(task, status.lastDueDateStr)
+        ) {
+            return status.lastDueDateStr;
+        }
+
+        return todayStr;
+    }, [getRecurringStatus, isCompletedOnDate, todayStr]);
+
     const getTaskCompletedStatus = useCallback((task) => {
         if (task.recurring && todayStr) {
-            const status = getRecurringStatus(task, todayStr);
-            if (status.effectiveDateStr) {
-                return isCompletedOnDate(task, status.effectiveDateStr);
-            }
-            return false;
+            const actionDateStr = resolveRecurringActionDate(task);
+            if (!actionDateStr) return false;
+            return isCompletedOnDate(task, actionDateStr);
         }
         return task.completed || false;
-    }, [getRecurringStatus, isCompletedOnDate, todayStr]);
+    }, [isCompletedOnDate, resolveRecurringActionDate, todayStr]);
 
     const {
         preferredCurrency,
@@ -529,8 +553,7 @@ const Dashboard = ({
 
         // Update task completion status and lastActive timestamp
         if (task.recurring && todayStr) {
-            const status = getRecurringStatus(task, todayStr);
-            const effectiveDateStr = status.effectiveDateStr || todayStr;
+            const effectiveDateStr = resolveRecurringActionDate(task) || todayStr;
             toggleRecurringCompletion(task.id, effectiveDateStr);
             if (newCompletedStatus && task.promptTimeEntry) {
                 setAddEntryTask(task);
@@ -544,7 +567,7 @@ const Dashboard = ({
                 lastActive: now
             });
         }
-    }, [timers, createEntry, clearTimer, updateTask, getTaskCompletedStatus, toggleRecurringCompletion, todayStr, getRecurringStatus]);
+    }, [timers, createEntry, clearTimer, updateTask, getTaskCompletedStatus, toggleRecurringCompletion, todayStr, resolveRecurringActionDate]);
 
     /**
      * Handle clicking on task title to navigate to project
@@ -553,13 +576,13 @@ const Dashboard = ({
         if (!task) return;
 
         if (task?.recurring && todayStr) {
-            const status = getRecurringStatus(task, todayStr);
-            onViewTask?.(task, { dateStr: status.effectiveDateStr || todayStr });
+            const effectiveDateStr = resolveRecurringActionDate(task) || todayStr;
+            onViewTask?.(task, { dateStr: effectiveDateStr });
             return;
         }
 
         onViewTask?.(task, { dateStr: todayStr });
-    }, [onViewTask, todayStr, getRecurringStatus]);
+    }, [onViewTask, todayStr, resolveRecurringActionDate]);
 
     const handleProjectTitleClick = useCallback((task) => {
         if (task?.project?.id && navigateToProject) {

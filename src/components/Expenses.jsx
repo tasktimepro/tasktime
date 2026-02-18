@@ -691,7 +691,7 @@ const Expenses = ({
                                                                 </div>
                                                                 <div className="mt-1 text-sm text-muted-foreground space-y-1">
                                                                     <p>{recurrence.repeat === 'yearly' ? 'Yearly' : 'Monthly'} · {contextLabel}</p>
-                                                                    <p>Amount: {amountLabel}</p>
+                                                                    <p>Amount: <span className="sensitive-data">{amountLabel}</span></p>
                                                                     <p>
                                                                         Starts: {recurrence.startDate}
                                                                         {recurrence.endDate ? ` · Ends ${recurrence.endDate}` : ''}
