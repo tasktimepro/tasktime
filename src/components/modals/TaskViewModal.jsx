@@ -92,6 +92,11 @@ const TaskViewModal = ({
         return todayStr || null;
     }, [dateStr, recurringStatus, todayStr]);
 
+    const isViewingFutureDate = useMemo(() => {
+        if (!dateStr || !todayStr) return false;
+        return dateStr > todayStr;
+    }, [dateStr, todayStr]);
+
     const dayTimeLabel = useMemo(() => {
         if (!effectiveDateStr) return 'Today';
         if (todayStr && effectiveDateStr === todayStr) return 'Today';
@@ -108,6 +113,20 @@ const TaskViewModal = ({
 
     const overdueActionDateLabel = useMemo(() => {
         if (!effectiveDateStr) return '';
+        const currentYear = todayStr ? Number(todayStr.split('-')[0]) : null;
+        const effectiveYear = Number(effectiveDateStr.split('-')[0]);
+        const includeYear = !currentYear || effectiveYear !== currentYear;
+        return toDisplayDate(
+            effectiveDateStr,
+            includeYear
+                ? { month: 'short', day: 'numeric', year: 'numeric' }
+                : { month: 'short', day: 'numeric' }
+        ) || '';
+    }, [effectiveDateStr, todayStr]);
+
+    const recurringActionDateLabel = useMemo(() => {
+        if (!effectiveDateStr) return '';
+        if (todayStr && effectiveDateStr === todayStr) return '';
         const currentYear = todayStr ? Number(todayStr.split('-')[0]) : null;
         const effectiveYear = Number(effectiveDateStr.split('-')[0]);
         const includeYear = !currentYear || effectiveYear !== currentYear;
@@ -316,8 +335,8 @@ const TaskViewModal = ({
 
         if (currentTask.recurring && effectiveDateStr) {
             toggleRecurringCompletion(currentTask.id, effectiveDateStr);
-            const recurringActionLabel = isRecurringOverdue && overdueActionDateLabel
-                ? (isCompleted ? `Marked as incomplete for ${overdueActionDateLabel}` : `Done for ${overdueActionDateLabel}`)
+            const recurringActionLabel = recurringActionDateLabel
+                ? (isCompleted ? `Marked as incomplete for ${recurringActionDateLabel}` : `Done for ${recurringActionDateLabel}`)
                 : (isCompleted ? 'Marked as incomplete for today' : 'Done for today');
             showSuccess(recurringActionLabel);
             if (!isCompleted && currentTask.promptTimeEntry) {
@@ -333,7 +352,7 @@ const TaskViewModal = ({
             lastActive: Date.now()
         });
         showSuccess(isCompleted ? 'Marked as incomplete' : 'Marked as done');
-    }, [currentTask, effectiveDateStr, isCompleted, isRecurringOverdue, overdueActionDateLabel, isTimerActive, projectTimer, createEntry, clearTimer, toggleRecurringCompletion, updateTask, showSuccess]);
+    }, [currentTask, effectiveDateStr, isCompleted, recurringActionDateLabel, isTimerActive, projectTimer, createEntry, clearTimer, toggleRecurringCompletion, updateTask, showSuccess]);
 
     const handleSkipRecurring = useCallback(() => {
         if (!currentTask?.recurring || !effectiveDateStr) return;
@@ -399,16 +418,18 @@ const TaskViewModal = ({
 
     const completedLabel = isCompleted
         ? (currentTask.recurring
-            ? (isRecurringOverdue && overdueActionDateLabel ? `Undo ${overdueActionDateLabel}` : 'Undo for today')
+            ? (recurringActionDateLabel ? `Undo ${recurringActionDateLabel}` : 'Undo for today')
             : 'Mark as not done')
         : (currentTask.recurring
-            ? (isRecurringOverdue && overdueActionDateLabel ? `Done for ${overdueActionDateLabel}` : 'Done for today')
+            ? (recurringActionDateLabel ? `Done for ${recurringActionDateLabel}` : 'Done for today')
             : 'Mark as done');
 
     const shouldShowCompleteAction = !currentTask.recurring || isRecurringDueToday || isRecurringOverdue || Boolean(dateStr);
     const shouldShowSkipAction = Boolean(
         currentTask.recurring
         && !isCompleted
+        && !isViewingFutureDate
+        && !recurringStatus?.isSkipped
         && (isRecurringDueToday || isRecurringOverdue)
     );
     const dueInLabel = nextRecurringDueInDays === null

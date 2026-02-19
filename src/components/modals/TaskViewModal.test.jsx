@@ -1,0 +1,222 @@
+import React from 'react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import TaskViewModal from './TaskViewModal'
+import { toDisplayDate } from '@/utils/dateUtils'
+
+const hookMocks = vi.hoisted(() => ({
+
+    tasks: [],
+    recurringStatus: null,
+    isCompleted: false,
+    showSuccess: vi.fn(),
+    updateTask: vi.fn(),
+    unarchiveTask: vi.fn(),
+    toggleRecurringCompletion: vi.fn(),
+    skipRecurringOccurrence: vi.fn(),
+    createEntry: vi.fn(),
+    getTimerForTask: vi.fn(() => null),
+    clearTimer: vi.fn(),
+    isTaskTimerActive: vi.fn(() => false),
+    deleteAttachment: vi.fn(),
+}))
+
+vi.mock('@/utils/dateUtils', async () => {
+
+    const actual = await vi.importActual('@/utils/dateUtils')
+    return {
+        ...actual,
+        getTodayString: () => '2026-02-19',
+    }
+})
+
+vi.mock('../Modal', () => ({
+
+    default: ({ isOpen, title, footer, children }) => {
+        if (!isOpen) return null
+        return (
+            <div>
+                <h2>{title}</h2>
+                <div>{children}</div>
+                <div>{footer}</div>
+            </div>
+        )
+    }
+}))
+
+vi.mock('../TimerControls', () => ({
+
+    default: () => <div>Timer controls</div>
+}))
+
+vi.mock('../task/TaskActionsMenu', () => ({
+
+    default: () => <div>Task actions</div>
+}))
+
+vi.mock('./AddTimeEntryModal', () => ({
+
+    default: () => null
+}))
+
+vi.mock('@/hooks/useToast', () => ({
+
+    useToast: () => ({
+        showSuccess: hookMocks.showSuccess,
+    })
+}))
+
+vi.mock('@/hooks/useProjects', () => ({
+
+    useProjects: () => ({
+        projects: [],
+    })
+}))
+
+vi.mock('@/hooks/useClients', () => ({
+
+    useClients: () => ({
+        clients: [],
+    })
+}))
+
+vi.mock('@/hooks/useTasks', () => ({
+
+    useTasks: () => ({
+        tasks: hookMocks.tasks,
+        updateTask: hookMocks.updateTask,
+        unarchiveTask: hookMocks.unarchiveTask,
+        toggleRecurringCompletion: hookMocks.toggleRecurringCompletion,
+        skipRecurringOccurrence: hookMocks.skipRecurringOccurrence,
+        isCompletedOnDate: () => hookMocks.isCompleted,
+        getRecurringStatus: () => hookMocks.recurringStatus,
+    })
+}))
+
+vi.mock('@/hooks/useTimeEntries', () => ({
+
+    useTimeEntries: () => ({
+        entries: [],
+        createEntry: hookMocks.createEntry,
+    })
+}))
+
+vi.mock('@/hooks/useTimers', () => ({
+
+    useTimers: () => ({
+        getTimerForTask: hookMocks.getTimerForTask,
+        clearTimer: hookMocks.clearTimer,
+        isTaskTimerActive: hookMocks.isTaskTimerActive,
+    })
+}))
+
+vi.mock('@/hooks/usePlannerAttachments', () => ({
+
+    usePlannerAttachments: () => ({
+        deleteAttachment: hookMocks.deleteAttachment,
+    })
+}))
+
+describe('TaskViewModal recurring actions', () => {
+
+    const recurringTask = {
+        id: 'task-1',
+        title: 'Recurring task',
+        recurring: { type: 'weekly', weeklyDays: [1, 3, 5] },
+        archived: false,
+        completed: false,
+        projectId: null,
+        promptTimeEntry: false,
+    }
+
+    const renderModal = (props = {}) => {
+        render(
+            <TaskViewModal
+                isOpen={true}
+                onClose={vi.fn()}
+                task={recurringTask}
+                dateStr={null}
+                attachment={null}
+                onEdit={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onNavigateToProject={vi.fn()}
+                onOpenTimeEntries={vi.fn()}
+                onOpenPlannerOptions={vi.fn()}
+                {...props}
+            />
+        )
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        hookMocks.tasks = [recurringTask]
+        hookMocks.isCompleted = false
+        hookMocks.recurringStatus = {
+            isDueToday: false,
+            isOverdue: false,
+            lastDueDateStr: null,
+            nextDueDateStr: '2026-02-21',
+            effectiveDateStr: null,
+            isSkipped: false,
+        }
+    })
+
+    it('hides skip button for future viewed dates and shows date-specific done label', () => {
+        renderModal({ dateStr: '2026-02-21' })
+
+        const expectedDateLabel = toDisplayDate('2026-02-21', { month: 'short', day: 'numeric' })
+        expect(screen.getByRole('button', { name: `Done for ${expectedDateLabel}` })).toBeInTheDocument()
+        expect(screen.queryByTitle('Skip until next recurring')).not.toBeInTheDocument()
+    })
+
+    it('hides skip button for already skipped occurrence and keeps date-specific done label', () => {
+        hookMocks.recurringStatus = {
+            isDueToday: false,
+            isOverdue: false,
+            lastDueDateStr: '2026-02-17',
+            nextDueDateStr: '2026-02-21',
+            effectiveDateStr: null,
+            isSkipped: true,
+        }
+
+        renderModal({ dateStr: '2026-02-17' })
+
+        const expectedDateLabel = toDisplayDate('2026-02-17', { month: 'short', day: 'numeric' })
+        expect(screen.getByRole('button', { name: `Done for ${expectedDateLabel}` })).toBeInTheDocument()
+        expect(screen.queryByTitle('Skip until next recurring')).not.toBeInTheDocument()
+    })
+
+    it('shows today labels and skip button when recurring task is due today', () => {
+        hookMocks.recurringStatus = {
+            isDueToday: true,
+            isOverdue: false,
+            lastDueDateStr: '2026-02-19',
+            nextDueDateStr: null,
+            effectiveDateStr: '2026-02-19',
+            isSkipped: false,
+        }
+
+        renderModal()
+
+        expect(screen.getByRole('button', { name: 'Done for today' })).toBeInTheDocument()
+        expect(screen.getByTitle('Skip until next recurring')).toBeInTheDocument()
+    })
+
+    it('shows overdue date label and skip button when recurring task is overdue', () => {
+        hookMocks.recurringStatus = {
+            isDueToday: false,
+            isOverdue: true,
+            lastDueDateStr: '2026-02-17',
+            nextDueDateStr: '2026-02-21',
+            effectiveDateStr: '2026-02-17',
+            isSkipped: false,
+        }
+
+        renderModal()
+
+        const expectedDateLabel = toDisplayDate('2026-02-17', { month: 'short', day: 'numeric' })
+        expect(screen.getByRole('button', { name: `Done for ${expectedDateLabel}` })).toBeInTheDocument()
+        expect(screen.getByTitle('Skip until next recurring')).toBeInTheDocument()
+    })
+})
