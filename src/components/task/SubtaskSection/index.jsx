@@ -22,6 +22,8 @@ const SubtaskSection = ({
     setShowCreateSubtaskForm,
     newSubtaskTitle,
     setNewSubtaskTitle,
+    newSubtaskNote,
+    setNewSubtaskNote,
     newSubtaskStartDate,
     setNewSubtaskStartDate,
     handleCreateSubtask,
@@ -123,6 +125,8 @@ const SubtaskSection = ({
                         <SubtaskCreateForm
                             newSubtaskTitle={newSubtaskTitle}
                             setNewSubtaskTitle={setNewSubtaskTitle}
+                            newSubtaskNote={newSubtaskNote}
+                            setNewSubtaskNote={setNewSubtaskNote}
                             newSubtaskStartDate={newSubtaskStartDate}
                             setNewSubtaskStartDate={setNewSubtaskStartDate}
                             onCreateSubtask={handleCreateSubtask}

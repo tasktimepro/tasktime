@@ -14,6 +14,7 @@ type CreateElement = (type: any, props: any, ...children: ReactNode[]) => ReactN
 
 type LinkifyNodeOptions = {
     linkClassName?: string;
+    linkAdditionalClassName?: string;
 };
 
 /**
@@ -51,7 +52,10 @@ export const linkifyNodes = (
 ): Array<ReactNode> | null => {
     if (!text) return null;
 
-    const linkClassName = options?.linkClassName || 'text-blue-600 dark:text-blue-400 hover:underline';
+    const baseLinkClassName = options?.linkClassName || 'text-blue-600 dark:text-blue-400 hover:underline';
+    const linkClassName = [baseLinkClassName, options?.linkAdditionalClassName]
+        .filter(Boolean)
+        .join(' ');
 
     return linkifyParts(text).map((part, index) => {
         if (part.type === 'text') {

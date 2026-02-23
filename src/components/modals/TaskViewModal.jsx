@@ -167,7 +167,9 @@ const TaskViewModal = ({
 
     const noteContent = useMemo(() => {
         if (!currentTask?.note) return null;
-        return linkifyNodes(currentTask.note, React.createElement);
+        return linkifyNodes(currentTask.note, React.createElement, {
+            linkAdditionalClassName: 'break-all'
+        });
     }, [currentTask?.note]);
 
     const subtasks = useMemo(() => {
@@ -614,7 +616,7 @@ const TaskViewModal = ({
                     {currentTask.note && (
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Note</p>
-                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                            <p className="text-sm text-foreground whitespace-pre-wrap break-words">
                                 {noteContent}
                             </p>
                         </div>

@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 const SubtaskCreateForm = ({
     newSubtaskTitle,
     setNewSubtaskTitle,
+    newSubtaskNote,
+    setNewSubtaskNote,
     newSubtaskStartDate,
     setNewSubtaskStartDate,
     onCreateSubtask,
@@ -28,6 +30,13 @@ const SubtaskCreateForm = ({
                     placeholder="Enter subtask title"
                     className="flex-1 text-sm"
                     autoFocus
+                />
+                <Input
+                    type="text"
+                    value={newSubtaskNote}
+                    onChange={(e) => setNewSubtaskNote(e.target.value)}
+                    placeholder="Note"
+                    className="flex-1 text-sm"
                 />
                 <Input
                     type="date"

@@ -43,4 +43,15 @@ describe('linkifyUtils', () => {
         expect(result?.[1]?.type).toBe('a');
         expect(result?.[1]?.props.href).toBe('https://example.com');
     });
+
+    it('appends additional classes to default link classes', () => {
+
+        const result = linkifyNodes('See https://example.com', React.createElement, {
+            linkAdditionalClassName: 'break-all'
+        });
+
+        expect(result?.[1]?.props.className).toContain('text-blue-600');
+        expect(result?.[1]?.props.className).toContain('hover:underline');
+        expect(result?.[1]?.props.className).toContain('break-all');
+    });
 });

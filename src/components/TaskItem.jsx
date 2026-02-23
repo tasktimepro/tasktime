@@ -37,6 +37,7 @@ const TaskItem = ({
     const [addEntryDateStr, setAddEntryDateStr] = useState(null);
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+    const [newSubtaskNote, setNewSubtaskNote] = useState('');
     const [newSubtaskStartDate, setNewSubtaskStartDate] = useState('');
     const { showSuccess } = useToast();
     
@@ -233,21 +234,24 @@ const TaskItem = ({
             onCreateSubtask({
                 parentTaskId: task.id,
                 title: newSubtaskTitle,
+                note: newSubtaskNote,
                 startDate: newSubtaskStartDate || null,
                 recurring: null
             });
 
             setNewSubtaskTitle('');
+            setNewSubtaskNote('');
             setNewSubtaskStartDate('');
             setShowCreateSubtaskForm(false);
         }
-    }, [newSubtaskTitle, newSubtaskStartDate, task.id, onCreateSubtask]);
+    }, [newSubtaskTitle, newSubtaskNote, newSubtaskStartDate, task.id, onCreateSubtask]);
 
     /**
      * Cancel subtask creation.
      */
     const cancelCreateSubtask = useCallback(() => {
         setNewSubtaskTitle('');
+        setNewSubtaskNote('');
         setNewSubtaskStartDate('');
         setShowCreateSubtaskForm(false);
     }, []);
@@ -333,6 +337,8 @@ const TaskItem = ({
                     setShowCreateSubtaskForm={setShowCreateSubtaskForm}
                     newSubtaskTitle={newSubtaskTitle}
                     setNewSubtaskTitle={setNewSubtaskTitle}
+                    newSubtaskNote={newSubtaskNote}
+                    setNewSubtaskNote={setNewSubtaskNote}
                     newSubtaskStartDate={newSubtaskStartDate}
                     setNewSubtaskStartDate={setNewSubtaskStartDate}
                     handleCreateSubtask={handleCreateSubtask}
