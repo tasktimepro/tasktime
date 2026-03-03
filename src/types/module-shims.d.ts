@@ -84,3 +84,14 @@ declare module '@/components/Modal' {
     const Modal: (props: ModalProps) => JSX.Element;
     export default Modal;
 }
+
+declare module 'html2pdf.js' {
+    type Html2PdfChain = {
+        set: (options: Record<string, unknown>) => Html2PdfChain;
+        from: (source: string | HTMLElement) => Html2PdfChain;
+        save: () => Promise<void>;
+    };
+
+    const html2pdf: () => Html2PdfChain;
+    export default html2pdf;
+}

@@ -52,6 +52,20 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Total: $209.00')
     })
 
+    it('uses full-width document container layout', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('width: 100%')
+        expect(html).toContain('max-width: none')
+        expect(html).toContain('padding: 0')
+    })
+
     it('renders flat rate additional task totals with quantity', () => {
 
         const html = createInvoiceHTML({
@@ -252,6 +266,9 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Invoice To:')
         expect(html).toContain('Invoice From:')
         expect(html).toContain('Payment Details:')
+        expect(html).toContain('vertical-align: middle;')
+        expect(html).toContain('display: flex; flex-direction: column; justify-content: center; gap: 8px;')
+        expect(html).toContain('margin: 0; line-height: 1.4;')
         expect(html).toContain('Thanks for your business')
     })
 
@@ -499,6 +516,15 @@ describe('generatePDF', () => {
 
         expect(html2pdfMocks.html2pdf).toHaveBeenCalled()
         expect(html2pdfMocks.set).toHaveBeenCalled()
+        const pdfOptions = html2pdfMocks.set.mock.calls[0][0]
+        expect(pdfOptions).toEqual(expect.objectContaining({
+            jsPDF: expect.objectContaining({
+                unit: 'mm',
+                orientation: 'portrait'
+            })
+        }))
+        expect(Array.isArray(pdfOptions.margin)).toBe(true)
+        expect(pdfOptions.margin).toHaveLength(4)
         expect(html2pdfMocks.from).toHaveBeenCalledWith('<p>Invoice</p>')
         expect(html2pdfMocks.save).toHaveBeenCalled()
     })

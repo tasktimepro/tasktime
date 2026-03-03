@@ -10,6 +10,7 @@ import * as InvoiceHandler from './invoice/InvoiceHandler.ts';
 import useInvoicePricing from './invoice/hooks/useInvoicePricing.ts';
 import { calculateDueDate, generateInvoiceNumber } from './invoice/utils/invoiceDateUtils.ts';
 import { buildInvoiceTaskData } from './invoice/InvoiceCalculations.ts';
+import { orderTasksWithSubtasks } from './invoice/utils/taskOrdering.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
@@ -1195,6 +1196,10 @@ const InvoiceGenerator = ({
             supplierName: expense.supplierName || null
         }));
 
+        const orderedSelectedInvoiceTasks = orderTasksWithSubtasks(
+            invoiceTasks.filter(task => task && task.id && selectedTasksForBilling[task.id])
+        );
+
         return {
             id: invoiceId,
             project: selectedProject,
@@ -1209,8 +1214,7 @@ const InvoiceGenerator = ({
                 zip: selectedClient?.zip || '',
                 country: selectedClient?.country || ''
             },
-            tasks: invoiceTasks
-                .filter(task => task && task.id && selectedTasksForBilling[task.id]) // Only include selected tasks
+            tasks: orderedSelectedInvoiceTasks
                 .map(task => ({
                     ...task,
                     hours: editableHours[task?.id] || task?.originalHours || 0,
@@ -1277,8 +1281,7 @@ const InvoiceGenerator = ({
                     zip: selectedClient?.zip || '',
                     country: selectedClient?.country || ''
                 },
-                tasks: invoiceTasks
-                    .filter(task => task && selectedTasksForBilling[task?.id]) // Only include selected tasks
+                tasks: orderedSelectedInvoiceTasks
                     .map(task => ({
                         ...task,
                         hours: editableHours[task.id] || task.originalHours,

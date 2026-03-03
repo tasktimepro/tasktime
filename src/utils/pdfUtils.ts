@@ -106,11 +106,11 @@ export const generatePDF = (
             }
 
             const defaultOptions = {
-                margin: [5, 20, 10, 20],  // top, right, bottom, left margins in mm
+                margin: [10, 20, 10, 20],  // top, right, bottom, left margins in mm
                 filename: filename,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                jsPDF: { unit: 'mm', format: [229, 297], orientation: 'portrait' }
             };
 
             const finalOptions = { ...defaultOptions, ...options };
@@ -173,7 +173,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     });
 
     const tasks = originalTasks.filter(task => !mergedTaskIds.has(task.id));
-    const expenseAdditionalTasks = expenseItems.map((expense) => ({
+    const expenseAdditionalTasks: InvoiceTask[] = expenseItems.map((expense) => ({
         id: `expense-${expense.id}`,
         title: `${expense.title}${expense.supplierName ? ` • ${expense.supplierName}` : ''}`,
         flatRate: expense.amount,
@@ -181,10 +181,10 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         useFlatRate: true
     }));
 
-    const additionalTasks = [...originalAdditionalTasks, ...expenseAdditionalTasks].filter(task => !mergedTaskIds.has(task.id));
+    const additionalTasks: InvoiceTask[] = [...originalAdditionalTasks, ...expenseAdditionalTasks].filter(task => !mergedTaskIds.has(task.id));
 
     return `
-        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <div style="font-family: Arial, sans-serif; width: 100%; max-width: none; margin: 0; padding: 0; box-sizing: border-box;">
             <div style="text-align: center; margin-bottom: 30px;">
                 <h1 style="color: #333; margin-bottom: 10px; font-size: 28px; font-weight: bold;">INVOICE</h1>
                 <p style="color: #666; margin: 0;">Invoice: #${invoiceNumber}</p>
@@ -249,11 +249,11 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                 <thead>
                     <tr style="background-color: #f8f9fa;">
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #ddd;">Description</th>
-                        ${showHoursAndRate ? '<th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Hours</th>' : ''}
-                        ${showHoursAndRate ? '<th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Rate</th>' : ''}
-                        ${showQuantity ? '<th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Qty</th>' : ''}
-                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Total</th>
+                        <th style="padding: 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid #ddd;">Description</th>
+                        ${showHoursAndRate ? '<th style="padding: 12px; text-align: right; vertical-align: middle; border-bottom: 1px solid #ddd;">Hours</th>' : ''}
+                        ${showHoursAndRate ? '<th style="padding: 12px; text-align: right; vertical-align: middle; border-bottom: 1px solid #ddd;">Rate</th>' : ''}
+                        ${showQuantity ? '<th style="padding: 12px; text-align: right; vertical-align: middle; border-bottom: 1px solid #ddd;">Qty</th>' : ''}
+                        <th style="padding: 12px; text-align: right; vertical-align: middle; border-bottom: 1px solid #ddd;">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -322,11 +322,11 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         
                         return `
                         <tr>
-                            <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
-                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${hours}</td>` : ''}
-                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${rateDisplay}</td>` : ''}
-                            ${showQuantity ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${quantity}</td>` : ''}
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
+                            <td style="padding: 8px; vertical-align: middle; ${borderStyle}">${taskTitle}</td>
+                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${hours}</td>` : ''}
+                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${rateDisplay}</td>` : ''}
+                            ${showQuantity ? `<td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${quantity}</td>` : ''}
+                            <td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
                     }).join('')}
@@ -357,11 +357,11 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         
                         return `
                         <tr>
-                            <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
-                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${hours}</td>` : ''}
-                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${rate}</td>` : ''}
-                            ${showQuantity ? `<td style="padding: 8px; text-align: right; ${borderStyle}">${quantity}</td>` : ''}
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
+                            <td style="padding: 8px; vertical-align: middle; ${borderStyle}">${taskTitle}</td>
+                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${hours}</td>` : ''}
+                            ${showHoursAndRate ? `<td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${rate}</td>` : ''}
+                            ${showQuantity ? `<td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${quantity}</td>` : ''}
+                            <td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
                     }).join('')}
@@ -373,8 +373,8 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                 <thead>
                     <tr style="background-color: #f8f9fa;">
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #ddd;">Description</th>
-                        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #ddd;">Total</th>
+                        <th style="padding: 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid #ddd;">Description</th>
+                        <th style="padding: 12px; text-align: right; vertical-align: middle; border-bottom: 1px solid #ddd;">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -427,8 +427,8 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         
                         return `
                         <tr>
-                            <td style="padding: 8px; ${borderStyle}">${finalTitle}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
+                            <td style="padding: 8px; vertical-align: middle; ${borderStyle}">${finalTitle}</td>
+                            <td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
                     }).join('')}
@@ -455,8 +455,8 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         
                         return `
                         <tr>
-                            <td style="padding: 8px; ${borderStyle}">${taskTitle}</td>
-                            <td style="padding: 8px; text-align: right; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
+                            <td style="padding: 8px; vertical-align: middle; ${borderStyle}">${taskTitle}</td>
+                            <td style="padding: 8px; text-align: right; vertical-align: middle; ${borderStyle}">${getCurrencySymbol(invoiceCurrency)}${taskAmount.toFixed(2)}</td>
                         </tr>
                     `;
                     }).join('')}
@@ -498,18 +498,18 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             ${paymentMethod ? `
             <div style="margin-top: 10px; padding-top: 30px; border-top: 1px solid #ddd;">
                 <h3 style="color: #333; margin-bottom: 15px;"><strong>Payment Details:</strong></h3>
-                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; padding-top: 15px; padding-bottom: 15px;">
                     
-                    ${paymentMethod.fullName ? `<p style="margin: 5px 0;"><strong>Account Holder:</strong> ${paymentMethod.fullName}</p>` : ''}
-                    ${paymentMethod.bank ? `<p style="margin: 5px 0;"><strong>Bank:</strong> ${paymentMethod.bank}</p>` : ''}
-                    ${paymentMethod.iban ? `<p style="margin: 5px 0;"><strong>IBAN:</strong> ${paymentMethod.iban}</p>` : ''}
-                    ${paymentMethod.swift ? `<p style="margin: 5px 0;"><strong>SWIFT/BIC:</strong> ${paymentMethod.swift}</p>` : ''}
-                    ${paymentMethod.bankAddress ? `<p style="margin: 5px 0;"><strong>Bank Address:</strong> ${paymentMethod.bankAddress}</p>` : ''}
-                    ${paymentMethod.paypal ? `<p style="margin: 5px 0;"><strong>PayPal:</strong> ${paymentMethod.paypal}</p>` : ''}
+                    ${paymentMethod.fullName ? `<p style="margin: 0; line-height: 1.4;"><strong>Account Holder:</strong> ${paymentMethod.fullName}</p>` : ''}
+                    ${paymentMethod.bank ? `<p style="margin: 0; line-height: 1.4;"><strong>Bank:</strong> ${paymentMethod.bank}</p>` : ''}
+                    ${paymentMethod.iban ? `<p style="margin: 0; line-height: 1.4;"><strong>IBAN:</strong> ${paymentMethod.iban}</p>` : ''}
+                    ${paymentMethod.swift ? `<p style="margin: 0; line-height: 1.4;"><strong>SWIFT/BIC:</strong> ${paymentMethod.swift}</p>` : ''}
+                    ${paymentMethod.bankAddress ? `<p style="margin: 0; line-height: 1.4;"><strong>Bank Address:</strong> ${paymentMethod.bankAddress}</p>` : ''}
+                    ${paymentMethod.paypal ? `<p style="margin: 0; line-height: 1.4;"><strong>PayPal:</strong> ${paymentMethod.paypal}</p>` : ''}
                     
                     ${paymentMethod.custom && paymentMethod.custom.length > 0 ? 
                         paymentMethod.custom.map(field => 
-                            `<p style="margin: 5px 0;"><strong>${field.label}:</strong> ${field.value}</p>`
+                            `<p style="margin: 0; line-height: 1.4;"><strong>${field.label}:</strong> ${field.value}</p>`
                         ).join('') : ''
                     }
                 </div>

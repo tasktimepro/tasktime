@@ -24,6 +24,7 @@ const projectHookMocks = vi.hoisted(() => ({
 
 const taskHookMocks = vi.hoisted(() => ({
 
+    tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 }],
     updateTask: vi.fn()
 }))
 
@@ -75,7 +76,7 @@ vi.mock('../hooks/useProjects.ts', () => ({
 vi.mock('../hooks/useTasks.ts', () => ({
 
     useTasks: () => ({
-        tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 }],
+        tasks: taskHookMocks.tasks,
         updateTask: taskHookMocks.updateTask
     })
 }))
@@ -230,6 +231,7 @@ describe('InvoiceGenerator', () => {
         timeEntryHookMocks.updateEntry.mockClear()
         timeEntryHookMocks.createEntry.mockClear()
         timeEntryHookMocks.deleteEntry.mockClear()
+        taskHookMocks.tasks = [{ id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 }]
         modalConfig = { applyDateOverride: false, skipTemplateSelection: false, adjustTaskHours: null }
         templateHookMocks.invoiceTemplates = [
             {
@@ -466,5 +468,31 @@ describe('InvoiceGenerator', () => {
         } finally {
             dateNowSpy.mockRestore()
         }
+    })
+
+    it('orders created invoice tasks with subtasks under parent', async () => {
+
+        invoiceHookMocks.createInvoice.mockClear()
+        taskHookMocks.tasks = [
+            { id: 'child-1', projectId: 'project-1', title: 'Child task', parentTaskId: 'parent-1', billable: true, hourlyRate: 100 },
+            { id: 'parent-1', projectId: 'project-1', title: 'Parent task', billable: true, hourlyRate: 100 },
+            { id: 'root-1', projectId: 'project-1', title: 'Root task', billable: true, hourlyRate: 100 }
+        ]
+
+        const user = userEvent.setup()
+        renderGenerator({
+            timeEntries: [
+                { id: 'entry-child', taskId: 'child-1', start: 1000, end: 3601000 },
+                { id: 'entry-parent', taskId: 'parent-1', start: 1000, end: 3601000 },
+                { id: 'entry-root', taskId: 'root-1', start: 1000, end: 3601000 }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.tasks.map(task => task.id)).toEqual(['parent-1', 'child-1', 'root-1'])
     })
 })

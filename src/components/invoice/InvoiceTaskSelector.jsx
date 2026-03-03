@@ -4,6 +4,7 @@ import CustomCheckbox from '../CustomCheckbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { orderTasksWithSubtasks } from './utils/taskOrdering.ts';
 
 /**
  * InvoiceTaskSelector component - Task selection and time inputs for invoicing.
@@ -54,6 +55,7 @@ const InvoiceTaskSelector = ({
     setNewTaskUseFlatRate
 }) => {
     const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length + additionalTasks.length;
+    const orderedInvoiceTasks = orderTasksWithSubtasks(invoiceTasks);
 
     return (
         <div className="border border-border rounded-lg">
@@ -145,9 +147,8 @@ const InvoiceTaskSelector = ({
                     {/* Tasks with Editable Hours */}
                     <div className="space-y-2">
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {invoiceTasks.map((task) => {
+                            {orderedInvoiceTasks.map((task) => {
                                 const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
-                                const currentMinutes = hoursToMinutes(parseFloat(currentHours) || 0);
                                 const currentFlatRate = taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : '';
                                 // For existing invoices, calculate originalTimeMs from originalHours if not present
                                 const originalTimeMs = task.originalTimeMs || (task.originalHours * 60 * 60 * 1000);
@@ -160,6 +161,18 @@ const InvoiceTaskSelector = ({
                                 const hasSubtasksInInvoice = invoiceTasks.some(subtask => subtask.parentTaskId === task.id);
                                 const isSubtask = Boolean(task.parentTaskId);
                                 const isParentMerged = task.parentTaskId && mergedSubtasks[task.parentTaskId];
+
+                                const numericCurrentHours = parseFloat(currentHours) || 0;
+                                const mergedSubtaskHours = mergedSubtasks[task.id]
+                                    ? invoiceTasks
+                                        .filter(subtask => subtask.parentTaskId === task.id)
+                                        .reduce((total, subtask) => {
+                                            const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
+                                            return total + (parseFloat(hours) || 0);
+                                        }, 0)
+                                    : 0;
+                                const displayHours = numericCurrentHours + mergedSubtaskHours;
+                                const displayMinutes = hoursToMinutes(displayHours);
 
                                 // Skip rendering subtasks if their parent is merged
                                 if (isSubtask && isParentMerged) {
@@ -254,35 +267,35 @@ const InvoiceTaskSelector = ({
                                                 <div className="flex items-center space-x-2">
                                                     <div className="text-right">
                                                         <div className="text-xs text-muted-foreground mb-1 text-left">
-                                                            Hours {(() => {
-                                                                // Ensure currentHours is numeric for calculations
-                                                                const numericCurrentHours = parseFloat(currentHours) || 0;
-                                                                let displayHours = numericCurrentHours;
-                                                                let displayMinutes = currentMinutes;
-
-                                                                // If this task has merged subtasks, calculate total hours
-                                                                if (mergedSubtasks[task.id]) {
-                                                                    const subtaskHours = invoiceTasks
-                                                                        .filter(subtask => subtask.parentTaskId === task.id)
-                                                                        .reduce((total, subtask) => {
-                                                                            const hours = editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.hours;
-                                                                            return total + (parseFloat(hours) || 0);
-                                                                        }, 0);
-                                                                    displayHours = numericCurrentHours + subtaskHours;
-                                                                    displayMinutes = hoursToMinutes(displayHours);
-                                                                }
-
-                                                                return `(${displayMinutes}min)`;
-                                                            })()}
+                                                            Hours ({displayMinutes}min)
                                                         </div>
                                                         <input
                                                             type="number"
                                                             step="0.01"
                                                             min="0"
-                                                            value={currentHours === '' ? '' : currentHours}
-                                                            onChange={(e) => handleHoursChange(task.id, e.target.value)}
+                                                            value={currentHours === '' ? '' : (mergedSubtasks[task.id] ? displayHours : currentHours)}
+                                                            onChange={(e) => {
+                                                                if (!mergedSubtasks[task.id]) {
+                                                                    handleHoursChange(task.id, e.target.value);
+                                                                    return;
+                                                                }
+
+                                                                if (e.target.value === '') {
+                                                                    handleHoursChange(task.id, '');
+                                                                    return;
+                                                                }
+
+                                                                const updatedMergedHours = parseFloat(e.target.value);
+                                                                if (!Number.isFinite(updatedMergedHours)) {
+                                                                    handleHoursChange(task.id, e.target.value);
+                                                                    return;
+                                                                }
+
+                                                                const updatedParentHours = Math.max(0, updatedMergedHours - mergedSubtaskHours);
+                                                                handleHoursChange(task.id, String(updatedParentHours));
+                                                            }}
                                                             className="w-20 text-sm px-2.5 py-1.5 border border-border rounded-md text-foreground"
-                                                            title={mergedSubtasks[task.id] ? "This shows the combined hours of parent and subtasks. Editing changes the parent task hours." : ""}
+                                                            title={mergedSubtasks[task.id] ? "This shows the combined hours of parent and subtasks. Editing adjusts the parent task hours so the merged total matches your input." : ""}
                                                         />
                                                     </div>
                                                     <div className="text-right">
