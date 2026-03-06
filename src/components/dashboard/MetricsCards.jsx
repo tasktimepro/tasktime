@@ -212,7 +212,6 @@ const MetricsCards = ({
                                 <div className="mt-2">
                                     {hasClients && (
                                         <div className="flex items-center">
-                                            <BanknotesIcon className="h-4 w-4 text-muted-foreground mr-1" />
                                             <div className="text-lg font-semibold text-foreground">
                                                 {renderEarningsByCurrency(lastMonthMetrics, 'gray')}
                                             </div>

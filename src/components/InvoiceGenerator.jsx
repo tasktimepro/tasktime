@@ -1487,6 +1487,8 @@ const InvoiceGenerator = ({
                 previousBillingCutoffs.set(taskId, task?.lastBilledAt || 0);
             });
 
+            const nextBillingCutoffs = new Map(previousBillingCutoffs);
+
             if (Array.isArray(timeEntries) && timeEntries.length > 0) {
                 timeEntries.forEach(entry => {
                     if (!billedRateByTaskId.has(entry.taskId)) return;
@@ -1502,14 +1504,21 @@ const InvoiceGenerator = ({
                         billedAt: currentTime,
                         billedInvoiceId: invoiceId
                     });
+
+                    const nextCutoff = Math.max(nextBillingCutoffs.get(entry.taskId) || 0, entry.end);
+                    nextBillingCutoffs.set(entry.taskId, nextCutoff);
                 });
             }
             
-            // Update lastBilledAt for all tasks that were included in this invoice
+            // Update lastBilledAt using the latest billed entry end per task.
+            // Using invoice creation time can block valid backdated entries.
             billedTaskIds.forEach(taskId => {
                 const task = tasks.find(t => t.id === taskId);
-                if (task && task.projectId === selectedProject.id) {
-                    updateTask(taskId, { lastBilledAt: currentTime });
+                const previousCutoff = previousBillingCutoffs.get(taskId) || 0;
+                const nextCutoff = nextBillingCutoffs.get(taskId) || 0;
+
+                if (task && task.projectId === selectedProject.id && nextCutoff > previousCutoff) {
+                    updateTask(taskId, { lastBilledAt: nextCutoff });
                 }
             });
             

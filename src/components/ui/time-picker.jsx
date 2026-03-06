@@ -22,6 +22,101 @@ const parseTime = (value) => {
 const buildTimeValue = (hours, minutes, seconds) => `${padTime(hours)}:${padTime(minutes)}:${padTime(seconds)}`;
 const buildTimeValueNoSeconds = (hours, minutes) => `${padTime(hours)}:${padTime(minutes)}`;
 
+/**
+ * Adjusts popup position to stay within viewport and modal boundaries.
+ * Applies a CSS transform to shift the popup without changing its layout position.
+ */
+const adjustPopupPosition = (popupEl, containerEl) => {
+
+    if (!popupEl || !containerEl) return;
+
+    // Reset previous adjustment so measurements are from the natural position
+    popupEl.style.transform = "";
+
+    const rect = popupEl.getBoundingClientRect();
+    const padding = 8;
+
+    // Find nearest modal/dialog boundary
+    const modal = popupEl.closest('[role="dialog"]');
+    const modalRect = modal ? modal.getBoundingClientRect() : null;
+
+    // Use the tighter of modal and viewport bounds
+    const bounds = {
+        top: Math.max(modalRect?.top ?? 0, 0) + padding,
+        left: Math.max(modalRect?.left ?? 0, 0) + padding,
+        right: Math.min(modalRect?.right ?? window.innerWidth, window.innerWidth) - padding,
+        bottom: Math.min(modalRect?.bottom ?? window.innerHeight, window.innerHeight) - padding,
+    };
+
+    let dx = 0;
+    let dy = 0;
+
+    // Horizontal overflow
+    if (rect.right > bounds.right) {
+        dx = bounds.right - rect.right;
+    }
+
+    if (rect.left + dx < bounds.left) {
+        dx = bounds.left - rect.left;
+    }
+
+    // Vertical overflow — flip above the input
+    if (rect.bottom > bounds.bottom) {
+        const containerRect = containerEl.getBoundingClientRect();
+        dy = -(rect.height + containerRect.height + 8);
+    }
+
+    if (dx !== 0 || dy !== 0) {
+        popupEl.style.transform = `translate(${dx}px, ${dy}px)`;
+    }
+};
+
+/**
+ * Individual time field input that supports clearing the value while editing.
+ * Validates and clamps on blur.
+ */
+const TimeFieldInput = ({ label, value, min, max, onCommit }) => {
+
+    const [editValue, setEditValue] = React.useState(null);
+
+    const displayValue = editValue !== null ? editValue : Number(value);
+
+    const handleChange = (e) => {
+
+        const raw = e.target.value;
+        setEditValue(raw);
+
+        if (raw !== "") {
+            const num = Math.min(max, Math.max(min, Number(raw) || 0));
+            onCommit(padTime(num));
+        }
+    };
+
+    const handleBlur = () => {
+
+        if (editValue === "" || editValue === null) {
+            onCommit(padTime(0));
+        }
+
+        setEditValue(null);
+    };
+
+    return (
+        <div className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">{label}</span>
+            <Input
+                type="number"
+                min={min}
+                max={max}
+                value={displayValue}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                className="h-8 text-sm"
+            />
+        </div>
+    );
+};
+
 const TimePicker = React.forwardRef(({
     className,
     value = "00:00:00",
@@ -33,10 +128,17 @@ const TimePicker = React.forwardRef(({
     const [isOpen, setIsOpen] = React.useState(false);
     const [localTime, setLocalTime] = React.useState(() => parseTime(value));
     const containerRef = React.useRef(null);
+    const popupRef = React.useRef(null);
 
     React.useEffect(() => {
         setLocalTime(parseTime(value));
     }, [value]);
+
+    // Adjust position before paint — no flash
+    React.useLayoutEffect(() => {
+        if (!isOpen) return;
+        adjustPopupPosition(popupRef.current, containerRef.current);
+    }, [isOpen]);
 
     React.useEffect(() => {
         if (!isOpen) return;
@@ -97,46 +199,35 @@ const TimePicker = React.forwardRef(({
 
             {isOpen && !disabled && (
                 <div
+                    ref={popupRef}
                     className={cn(
-                        "absolute z-50 mt-2 rounded-md border border-border bg-popover p-3 shadow-md",
+                        "absolute z-[100] mt-2 rounded-md border border-border bg-popover p-3 shadow-md",
                         showSeconds ? "min-w-[18rem]" : "min-w-[12.5rem]"
                     )}
                 >
                     <div className={cn("grid gap-2", showSeconds ? "grid-cols-3" : "grid-cols-2")}>
-                        <div className="space-y-1">
-                            <span className="text-xs font-medium text-muted-foreground">Hours</span>
-                            <Input
-                                type="number"
-                                min={0}
-                                max={23}
-                                value={Number(localTime.hours)}
-                                onChange={(event) => handleTimeChange({ hours: padTime(Math.min(23, Math.max(0, Number(event.target.value) || 0))) })}
-                                className="h-8 text-sm"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <span className="text-xs font-medium text-muted-foreground">Minutes</span>
-                            <Input
-                                type="number"
+                        <TimeFieldInput
+                            label="Hours"
+                            value={localTime.hours}
+                            min={0}
+                            max={23}
+                            onCommit={(v) => handleTimeChange({ hours: v })}
+                        />
+                        <TimeFieldInput
+                            label="Minutes"
+                            value={localTime.minutes}
+                            min={0}
+                            max={59}
+                            onCommit={(v) => handleTimeChange({ minutes: v })}
+                        />
+                        {showSeconds && (
+                            <TimeFieldInput
+                                label="Seconds"
+                                value={localTime.seconds}
                                 min={0}
                                 max={59}
-                                value={Number(localTime.minutes)}
-                                onChange={(event) => handleTimeChange({ minutes: padTime(Math.min(59, Math.max(0, Number(event.target.value) || 0))) })}
-                                className="h-8 text-sm"
+                                onCommit={(v) => handleTimeChange({ seconds: v })}
                             />
-                        </div>
-                        {showSeconds && (
-                            <div className="space-y-1">
-                                <span className="text-xs font-medium text-muted-foreground">Seconds</span>
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    max={59}
-                                    value={Number(localTime.seconds)}
-                                    onChange={(event) => handleTimeChange({ seconds: padTime(Math.min(59, Math.max(0, Number(event.target.value) || 0))) })}
-                                    className="h-8 text-sm"
-                                />
-                            </div>
                         )}
                     </div>
                 </div>

@@ -252,9 +252,9 @@ const AddTimeEntryModal = ({
         const endTimestamp = startTimestamp + durationResult.durationMs;
 
         if (!entry) {
-            const billingCutoffDate = task.lastBilledAt;
-            if (startTimestamp <= billingCutoffDate) {
-                showError('Cannot add time entries before the last billing date');
+            const billingCutoffDate = task.lastBilledAt || 0;
+            if (startTimestamp < billingCutoffDate) {
+                showError('Cannot add time entries before the latest billed time entry');
                 return;
             }
         }

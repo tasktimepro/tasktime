@@ -231,6 +231,7 @@ describe('InvoiceGenerator', () => {
         timeEntryHookMocks.updateEntry.mockClear()
         timeEntryHookMocks.createEntry.mockClear()
         timeEntryHookMocks.deleteEntry.mockClear()
+        taskHookMocks.updateTask.mockClear()
         taskHookMocks.tasks = [{ id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 }]
         modalConfig = { applyDateOverride: false, skipTemplateSelection: false, adjustTaskHours: null }
         templateHookMocks.invoiceTemplates = [
@@ -465,6 +466,40 @@ describe('InvoiceGenerator', () => {
                 billedAt: fixedDate.getTime(),
                 billedInvoiceId: expectedInvoiceId
             }))
+        } finally {
+            dateNowSpy.mockRestore()
+        }
+    })
+
+    it('sets lastBilledAt to latest billed entry end, not invoice save time', async () => {
+
+        const fixedDate = new Date('2026-01-11T10:00:00Z')
+        const fixedNow = fixedDate.getTime()
+        const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow)
+        try {
+            const user = userEvent.setup()
+
+            taskHookMocks.tasks = [
+                { id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100, lastBilledAt: 500 }
+            ]
+            taskHookMocks.updateTask.mockClear()
+
+            renderGenerator({
+                timeEntries: [
+                    { id: 'entry-1', taskId: 'task-1', start: 1000, end: 2000 }
+                ]
+            })
+
+            await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+            expect(taskHookMocks.updateTask).toHaveBeenCalledTimes(1)
+            expect(taskHookMocks.updateTask).toHaveBeenCalledWith('task-1', {
+                lastBilledAt: 2000
+            })
+            expect(taskHookMocks.updateTask).not.toHaveBeenCalledWith('task-1', {
+                lastBilledAt: fixedNow
+            })
         } finally {
             dateNowSpy.mockRestore()
         }
