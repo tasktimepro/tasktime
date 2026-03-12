@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import Expenses from '../../components/Expenses'
 
 let mockExpenses = []
@@ -271,5 +271,90 @@ describe('Expense recurrence auto-pay integration', () => {
         const paidMostRecent = screen.getByText('Paid Most Recent')
         const paidOlder = screen.getByText('Paid Older')
         expect(paidMostRecent.compareDocumentPosition(paidOlder) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('keeps outstanding expenses visible outside the selected period while upcoming stays within the default window', () => {
+        vi.setSystemTime(new Date('2026-03-12T12:00:00Z'))
+        mockRecurrences = []
+        mockExpenses = [
+            {
+                id: 'exp-overdue-february',
+                title: 'February Rent',
+                date: '2026-02-28',
+                paymentStatus: 'unpaid',
+                amount: 900,
+                amountType: 'fixed',
+                currency: 'USD'
+            },
+            {
+                id: 'exp-upcoming-march',
+                title: 'March Hosting',
+                date: '2026-03-20',
+                paymentStatus: 'unpaid',
+                amount: 20,
+                amountType: 'fixed',
+                currency: 'USD'
+            }
+        ]
+
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Outstanding (1)')).toBeInTheDocument()
+        expect(screen.getByText('February Rent')).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Expenses/i }).textContent).toContain('(2)')
+
+        expect(screen.getByRole('tab', { name: 'Upcoming (1)' })).toBeInTheDocument()
+    })
+
+    it('defaults paid tab to this month window', () => {
+        vi.setSystemTime(new Date('2026-03-12T12:00:00Z'))
+        mockRecurrences = []
+        mockExpenses = [
+            {
+                id: 'exp-paid-recent',
+                title: 'Recent Paid Expense',
+                date: '2026-03-01',
+                paidOn: '2026-03-02',
+                paymentStatus: 'paid',
+                amount: 50,
+                amountType: 'fixed',
+                currency: 'USD'
+            },
+            {
+                id: 'exp-paid-old',
+                title: 'Old Paid Expense',
+                date: '2025-11-30',
+                paidOn: '2025-11-30',
+                paymentStatus: 'paid',
+                amount: 75,
+                amountType: 'fixed',
+                currency: 'USD'
+            }
+        ]
+
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        )
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Paid (1)' }))
+
+        expect(screen.getByText('Recent Paid Expense')).toBeInTheDocument()
+        expect(screen.queryByText('Old Paid Expense')).not.toBeInTheDocument()
     })
 })

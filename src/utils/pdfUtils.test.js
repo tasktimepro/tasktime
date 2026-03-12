@@ -267,7 +267,7 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Invoice From:')
         expect(html).toContain('Payment Details:')
         expect(html).toContain('vertical-align: middle;')
-        expect(html).toContain('display: flex; flex-direction: column; justify-content: center; gap: 8px;')
+        expect(html).toContain('background-color: #f8f9fa; padding: 15px; border-radius: 5px;')
         expect(html).toContain('margin: 0; line-height: 1.4;')
         expect(html).toContain('Thanks for your business')
     })

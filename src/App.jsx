@@ -39,6 +39,7 @@ import YjsSyncStatus from './components/sync/YjsSyncStatus';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
+import { buildExpenseFromRecurrence } from './utils/expenseUtils.ts';
 import { getTaskIdsToDelete } from './utils/taskUtils.ts';
 import { useTodayString } from './hooks/useDayRollover';
 import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon } from '@/components/ui/icons';
@@ -111,7 +112,10 @@ function AppContent() {
     } = useExpenses();
 
     const {
+        recurrences,
+        isLoading: expenseRecurrencesLoading,
         generatePendingExpenses,
+        updateRecurrence,
     } = useExpenseRecurrences();
 
     const { 
@@ -132,17 +136,6 @@ function AppContent() {
         isLoading: paymentsLoading 
     } = usePaymentMethods();
 
-    const expenseGenerationRef = useRef(false);
-
-    useEffect(() => {
-        if (!isReady || expenseGenerationRef.current) {
-            return;
-        }
-
-        generatePendingExpenses(createExpense);
-        expenseGenerationRef.current = true;
-    }, [isReady, generatePendingExpenses, createExpense]);
-
     const { 
         preferences, 
         updatePreferences,
@@ -153,6 +146,21 @@ function AppContent() {
     const focusedTimer = timers[0] || null;
     const timerIsActive = !!focusedTimer;
     const todayStr = useTodayString();
+    const lastExpenseGenerationDayRef = useRef(null);
+
+    useEffect(() => {
+        if (
+            !isReady
+            || expenseRecurrencesLoading
+            || !todayStr
+            || lastExpenseGenerationDayRef.current === todayStr
+        ) {
+            return;
+        }
+
+        generatePendingExpenses(createExpense);
+        lastExpenseGenerationDayRef.current = todayStr;
+    }, [isReady, expenseRecurrencesLoading, todayStr, generatePendingExpenses, createExpense]);
 
     const isPaused = focusedTimer?.isPaused || false;
     const timerTaskId = focusedTimer?.taskId || null;
@@ -388,7 +396,26 @@ function AppContent() {
         const resolvedExpense = expense.isPreview && expense.recurrenceId && expense.date
             ? expenses.find((item) => item.recurrenceId === expense.recurrenceId && item.date === expense.date)
             : null;
-        const targetExpense = resolvedExpense || expense;
+        let targetExpense = resolvedExpense || expense;
+
+        if (
+            targetExpense.isPreview
+            && targetExpense.recurrenceId
+            && targetExpense.date
+            && todayStr
+            && targetExpense.date <= todayStr
+        ) {
+            const recurrence = recurrences.find((item) => item.id === targetExpense.recurrenceId);
+
+            if (recurrence) {
+                targetExpense = createExpense(buildExpenseFromRecurrence(recurrence, targetExpense.date));
+
+                if (!recurrence.lastGeneratedDate || recurrence.lastGeneratedDate < targetExpense.date) {
+                    updateRecurrence(recurrence.id, { lastGeneratedDate: targetExpense.date });
+                }
+            }
+        }
+
         const isPreview = Boolean(targetExpense.isPreview);
 
         if (isPreview) {
@@ -413,7 +440,7 @@ function AppContent() {
             isOpen: true,
             expense: targetExpense
         });
-    }, [expenses, openExpenseModal]);
+    }, [expenses, recurrences, todayStr, createExpense, updateRecurrence, openExpenseModal]);
 
     const closeExpenseView = useCallback(() => {
         setExpenseViewState({

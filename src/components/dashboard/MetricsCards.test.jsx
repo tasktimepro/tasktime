@@ -72,7 +72,33 @@ describe('MetricsCards', () => {
             />
         )
 
-        expect(screen.getAllByText('$0.00').length).toBeGreaterThan(0)
+        expect(screen.queryByText('upcoming')).not.toBeInTheDocument()
         expect(screen.queryByText('paid')).not.toBeInTheDocument()
+    })
+
+    it('does not render zero expense summary amounts', () => {
+        render(
+            <MetricsCards
+                thisMonthMetrics={baseMetrics}
+                lastMonthMetrics={baseMetrics}
+                last90DaysMetrics={baseMetrics}
+                invoiceMetrics={invoiceMetrics}
+                thisMonthBillableHours={0}
+                thisMonthUnbilledDisplay="$0.00"
+                expenseThisMonthUpcomingTotal={0}
+                expenseThisMonthUpcomingHasEstimate={false}
+                expenseThisMonthPaidTotal={0}
+                expenseLastMonthPaidTotal={0}
+                expenseLast90DaysPaidTotal={0}
+                hasClients={false}
+                preferredCurrency="USD"
+                formatDuration={() => '0h'}
+                needsExchangeRates={false}
+                exchangeRatesLoading={false}
+                navigateToInvoices={() => {}}
+            />
+        )
+
+        expect(screen.queryByText('$0.00')).not.toBeInTheDocument()
     })
 })

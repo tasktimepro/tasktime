@@ -6,8 +6,26 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import App from './App'
+
+const expenseHookState = vi.hoisted(() => ({
+    expenses: [],
+    createExpense: vi.fn((expense) => ({
+        ...expense,
+        id: expense.id || 'created-expense',
+    })),
+}))
+
+const recurrenceHookState = vi.hoisted(() => ({
+    recurrences: [],
+    generatePendingExpenses: vi.fn(),
+    updateRecurrence: vi.fn(),
+}))
+
+const todayStringState = vi.hoisted(() => ({
+    value: '2026-02-25',
+}))
 
 // Mock all Yjs-based hooks
 vi.mock('./contexts/YjsContext.tsx', () => ({
@@ -79,15 +97,21 @@ vi.mock('./hooks/useTimeEntries.ts', () => ({
 
 vi.mock('./hooks/useExpenses.ts', () => ({
     useExpenses: () => ({
-        expenses: [],
-        createExpense: vi.fn(),
+        expenses: expenseHookState.expenses,
+        createExpense: expenseHookState.createExpense,
     }),
 }))
 
 vi.mock('./hooks/useExpenseRecurrences.ts', () => ({
     useExpenseRecurrences: () => ({
-        generatePendingExpenses: vi.fn(),
+        recurrences: recurrenceHookState.recurrences,
+        generatePendingExpenses: recurrenceHookState.generatePendingExpenses,
+        updateRecurrence: recurrenceHookState.updateRecurrence,
     }),
+}))
+
+vi.mock('./hooks/useDayRollover', () => ({
+    useTodayString: () => todayStringState.value,
 }))
 
 vi.mock('./hooks/useClients.ts', () => ({
@@ -215,11 +239,37 @@ vi.mock('./components/ProjectList', () => ({ default: () => <div data-testid="pr
 vi.mock('./components/ProjectDashboard', () => ({ default: () => <div data-testid="project-dashboard" /> }))
 vi.mock('./components/ClientList', () => ({ default: () => <div data-testid="client-list" /> }))
 vi.mock('./components/ClientDashboard', () => ({ default: () => <div data-testid="client-dashboard" /> }))
-vi.mock('./components/Dashboard', () => ({ default: () => <div data-testid="dashboard" /> }))
+vi.mock('./components/Dashboard', () => ({
+    default: ({ openExpenseView }) => (
+        <div data-testid="dashboard">
+            <button
+                type="button"
+                onClick={() => openExpenseView?.({
+                    id: 'preview-office',
+                    title: 'Office',
+                    date: '2026-02-25',
+                    amount: 80,
+                    amountType: 'fixed',
+                    currency: 'EUR',
+                    paymentStatus: 'unpaid',
+                    paymentMode: 'manual',
+                    isRecurring: true,
+                    isPreview: true,
+                    recurrenceId: 'rec-office',
+                })}
+            >
+                Open preview expense
+            </button>
+        </div>
+    )
+}))
 vi.mock('./components/Account', () => ({ default: () => <div data-testid="account" /> }))
 vi.mock('./components/Invoices', () => ({ default: () => <div data-testid="invoices" /> }))
 vi.mock('./components/timer/GlobalTimerStack', () => ({ default: () => <div data-testid="global-timer" /> }))
 vi.mock('./components/modals/ModalManager', () => ({ default: () => <div data-testid="modal-manager" /> }))
+vi.mock('./components/modals/ExpenseViewModal', () => ({
+    default: ({ isOpen, expense }) => (isOpen ? <div data-testid="expense-view-modal">{expense?.id}:{expense?.title}:{expense?.isPreview ? 'preview' : 'actual'}</div> : null)
+}))
 vi.mock('./components/ErrorBoundary', () => ({ default: ({ children }) => children }))
 vi.mock('./components/OfflineIndicator', () => ({ default: () => <div data-testid="offline-indicator" /> }))
 vi.mock('./components/InstallPrompt', () => ({ default: () => <div data-testid="install-prompt" /> }))
@@ -244,6 +294,16 @@ describe('App component', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        expenseHookState.expenses.length = 0
+        expenseHookState.createExpense.mockReset()
+        expenseHookState.createExpense.mockImplementation((expense) => ({
+            ...expense,
+            id: expense.id || 'created-expense',
+        }))
+        recurrenceHookState.recurrences.length = 0
+        recurrenceHookState.generatePendingExpenses.mockReset()
+        recurrenceHookState.updateRecurrence.mockReset()
+        todayStringState.value = '2026-02-25'
     })
 
     afterEach(() => {
@@ -268,5 +328,61 @@ describe('App component', () => {
         render(<App />)
         // Dark Mode shows by default because matchMedia returns false for dark mode preference
         expect(screen.getByText('Dark Mode')).toBeInTheDocument()
+    })
+
+    it('generates pending recurring expenses on mount and day rollover', () => {
+        const { rerender } = render(<App />)
+
+        expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledTimes(1)
+        expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledWith(expenseHookState.createExpense)
+
+        rerender(<App />)
+        expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledTimes(1)
+
+        todayStringState.value = '2026-02-26'
+        rerender(<App />)
+
+        expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledTimes(2)
+    })
+
+    it('materializes due preview expenses before opening the expense view', () => {
+        recurrenceHookState.recurrences.push({
+            id: 'rec-office',
+            title: 'Office',
+            startDate: '2026-02-25',
+            repeat: 'monthly',
+            monthlyType: 'specific',
+            monthlyDay: 25,
+            amount: 80,
+            amountType: 'fixed',
+            currency: 'EUR',
+            supplierName: null,
+            note: null,
+            paidBy: 'cash',
+            paymentMode: 'manual',
+            clientId: null,
+            projectId: null,
+            businessId: null,
+            isPersonal: true,
+            billable: false,
+            taxNumber: null,
+            isTaxExempt: false,
+            endDate: null,
+            lastGeneratedDate: null,
+            active: true,
+        })
+
+        render(<App />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Open preview expense' }))
+
+        expect(expenseHookState.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Office',
+            date: '2026-02-25',
+            recurrenceId: 'rec-office',
+            paymentStatus: 'unpaid',
+        }))
+        expect(recurrenceHookState.updateRecurrence).toHaveBeenCalledWith('rec-office', { lastGeneratedDate: '2026-02-25' })
+        expect(screen.getByTestId('expense-view-modal')).toHaveTextContent('created-expense:Office:actual')
     })
 })

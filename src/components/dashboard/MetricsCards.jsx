@@ -47,17 +47,19 @@ const MetricsCards = ({
     }) => {
         const hasAmount = (amount || 0) > 0;
 
+        if (!hasAmount) {
+            return null;
+        }
+
         return (
             <div className="flex items-center">
                 <HandCoinsIcon className="h-4 w-4 text-muted-foreground mr-1" />
                 <div className="text-lg font-semibold text-foreground">
-                    {formatExpenseAmount(amount, hasEstimate, hasAmount ? 'text-foreground' : 'text-muted-foreground')}
+                    {formatExpenseAmount(amount, hasEstimate, 'text-foreground')}
                 </div>
-                {hasAmount && (
-                    <span className="text-xs font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
-                        {label}
-                    </span>
-                )}
+                <span className="text-xs font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
+                    {label}
+                </span>
             </div>
         );
     };

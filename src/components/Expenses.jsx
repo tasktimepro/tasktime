@@ -57,7 +57,14 @@ const Expenses = ({
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess } = useToast();
     const { expenses, markAsPaid, markAsUnpaid, createExpense } = useExpenses({ includeArchived: true });
-    const { recurrences, generatePendingExpenses, pauseRecurrence, resumeRecurrence, deleteRecurrence } = useExpenseRecurrences();
+    const {
+        recurrences,
+        isLoading: expenseRecurrencesLoading,
+        generatePendingExpenses,
+        pauseRecurrence,
+        resumeRecurrence,
+        deleteRecurrence,
+    } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
     const { preferences } = usePreferences();
@@ -138,10 +145,10 @@ const Expenses = ({
     }, [clientId, getProjectsByClient, activeProjects, personalOnly]);
 
     useEffect(() => {
-        if (recurrenceGeneratedRef.current) return;
+        if (expenseRecurrencesLoading || recurrenceGeneratedRef.current) return;
         generatePendingExpenses(createExpense);
         recurrenceGeneratedRef.current = true;
-    }, [generatePendingExpenses, createExpense]);
+    }, [expenseRecurrencesLoading, generatePendingExpenses, createExpense]);
 
     useEffect(() => {
         if (initialFiltersAppliedRef.current) return;
@@ -161,13 +168,16 @@ const Expenses = ({
         initialFiltersAppliedRef.current = true;
     }, []);
 
-    const { startDate, endDate } = useMemo(() => {
+    const { historicalStartDate, historicalEndDate, upcomingStartDate, upcomingEndDate } = useMemo(() => {
         const today = new Date();
+        const todayValue = toStorageDate(today) || '';
 
         if (period === 'month') {
             return {
-                startDate: toStorageDate(startOfMonth(today)) || '',
-                endDate: toStorageDate(endOfMonth(today)) || '',
+                historicalStartDate: toStorageDate(startOfMonth(today)) || '',
+                historicalEndDate: toStorageDate(endOfMonth(today)) || '',
+                upcomingStartDate: todayValue,
+                upcomingEndDate: toStorageDate(endOfMonth(today)) || '',
             };
         }
 
@@ -177,38 +187,44 @@ const Expenses = ({
             const quarterEnd = endOfMonth(new Date(today.getFullYear(), quarterStartMonth + 2, 1));
 
             return {
-                startDate: toStorageDate(quarterStart) || '',
-                endDate: toStorageDate(quarterEnd) || '',
+                historicalStartDate: toStorageDate(quarterStart) || '',
+                historicalEndDate: toStorageDate(quarterEnd) || '',
+                upcomingStartDate: todayValue,
+                upcomingEndDate: toStorageDate(quarterEnd) || '',
             };
         }
 
         if (period === 'year') {
             return {
-                startDate: toStorageDate(startOfYear(today)) || '',
-                endDate: toStorageDate(endOfYear(today)) || '',
+                historicalStartDate: toStorageDate(startOfYear(today)) || '',
+                historicalEndDate: toStorageDate(endOfYear(today)) || '',
+                upcomingStartDate: todayValue,
+                upcomingEndDate: toStorageDate(endOfYear(today)) || '',
             };
         }
 
         return {
-            startDate: customStart,
-            endDate: customEnd,
+            historicalStartDate: customStart,
+            historicalEndDate: customEnd,
+            upcomingStartDate: customStart,
+            upcomingEndDate: customEnd,
         };
     }, [period, customStart, customEnd]);
 
     const recurringPreviewExpenses = useMemo(() => {
-        if (!startDate || !endDate || !todayStr) {
+        if (!upcomingStartDate || !upcomingEndDate || !todayStr) {
             return [];
         }
 
-        const dateStart = parseStoredDate(startDate);
-        const dateEnd = parseStoredDate(endDate);
+        const dateStart = parseStoredDate(upcomingStartDate);
+        const dateEnd = parseStoredDate(upcomingEndDate);
         if (!dateStart || !dateEnd) {
             return [];
         }
 
         const fromDate = parseStoredDate(todayStr) && parseStoredDate(todayStr) > dateStart
             ? todayStr
-            : startDate;
+            : upcomingStartDate;
 
         const datesByRecurrence = new Map();
         expenses.forEach((expense) => {
@@ -264,19 +280,15 @@ const Expenses = ({
             })
             .filter(Boolean);
     }, [
-        endDate,
         expenses,
         recurrences,
-        startDate,
+        upcomingEndDate,
+        upcomingStartDate,
         todayStr,
     ]);
 
-    const filteredExpenses = useMemo(() => {
+    const commonFilteredExpenses = useMemo(() => {
         let result = [...expenses, ...recurringPreviewExpenses];
-
-        if (startDate && endDate) {
-            result = result.filter((expense) => isExpenseInDateRange(expense, startDate, endDate));
-        }
 
         if (search.trim()) {
             const query = search.toLowerCase();
@@ -340,8 +352,6 @@ const Expenses = ({
     }, [
         expenses,
         recurringPreviewExpenses,
-        startDate,
-        endDate,
         search,
         clientId,
         projectId,
@@ -352,6 +362,22 @@ const Expenses = ({
         billedStatus,
         todayStr,
     ]);
+
+    const historicalPeriodExpenses = useMemo(() => {
+        if (!historicalStartDate || !historicalEndDate) {
+            return commonFilteredExpenses;
+        }
+
+        return commonFilteredExpenses.filter((expense) => isExpenseInDateRange(expense, historicalStartDate, historicalEndDate));
+    }, [commonFilteredExpenses, historicalStartDate, historicalEndDate]);
+
+    const upcomingPeriodExpenses = useMemo(() => {
+        if (!upcomingStartDate || !upcomingEndDate) {
+            return commonFilteredExpenses;
+        }
+
+        return commonFilteredExpenses.filter((expense) => isExpenseInDateRange(expense, upcomingStartDate, upcomingEndDate));
+    }, [commonFilteredExpenses, upcomingStartDate, upcomingEndDate]);
 
     const todayDate = useMemo(() => parseStoredDate(todayStr), [todayStr]);
 
@@ -379,7 +405,7 @@ const Expenses = ({
     };
 
     const outstandingExpenses = useMemo(() => {
-        return filteredExpenses
+        return commonFilteredExpenses
             .filter((expense) => {
                 if (getEffectivePaymentStatus(expense) === 'paid') return false;
                 if (!todayDate) return false;
@@ -388,10 +414,10 @@ const Expenses = ({
                 return expenseDate <= todayDate;
             })
             .sort(compareByDueDateAscThenTitle);
-    }, [filteredExpenses, todayDate]);
+    }, [commonFilteredExpenses, todayDate]);
 
     const upcomingExpenses = useMemo(() => {
-        return filteredExpenses
+        return upcomingPeriodExpenses
             .filter((expense) => {
                 if (getEffectivePaymentStatus(expense) === 'paid') return false;
                 if (!todayDate) return true;
@@ -400,13 +426,15 @@ const Expenses = ({
                 return expenseDate > todayDate;
             })
             .sort(compareByDueDateAscThenTitle);
-    }, [filteredExpenses, todayDate]);
+    }, [upcomingPeriodExpenses, todayDate]);
 
     const paidExpenses = useMemo(() => {
-        return filteredExpenses
+        return historicalPeriodExpenses
             .filter((expense) => getEffectivePaymentStatus(expense) === 'paid')
             .sort(comparePaidByMostRecent);
-    }, [filteredExpenses]);
+    }, [historicalPeriodExpenses]);
+
+    const totalVisibleExpenseCount = outstandingExpenses.length + upcomingExpenses.length + paidExpenses.length;
 
     const defaultStatusTab = useMemo(() => {
         if (outstandingExpenses.length > 0) return 'outstanding';
@@ -438,9 +466,10 @@ const Expenses = ({
         if (projectId !== 'all') return true;
         if (personalOnly || billableOnly || recurringOnly) return true;
         if (paidStatus !== 'all' || billedStatus !== 'all') return true;
-        if (period !== 'month') return true;
+        if (activeStatusTab !== 'outstanding' && period !== 'month') return true;
         return false;
     }, [
+        activeStatusTab,
         search,
         clientId,
         projectId,
@@ -527,9 +556,9 @@ const Expenses = ({
                         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-foreground">
-                                    Expenses {filteredExpenses.length > 0 && (
+                                    Expenses {totalVisibleExpenseCount > 0 && (
                                         <span>
-                                            ({filteredExpenses.length})
+                                            ({totalVisibleExpenseCount})
                                         </span>
                                     )}
                                 </h1>
@@ -606,7 +635,7 @@ const Expenses = ({
                         <div className="mt-6">
                             <ExpenseList
                                 expenses={displayedExpenses}
-                                hasAnyExpenses={filteredExpenses.length > 0}
+                                hasAnyExpenses={totalVisibleExpenseCount > 0}
                                 hasActiveFilters={hasActiveFilters || hasStatusFilters}
                                 clientsById={clientsById}
                                 projectsById={projectsById}
