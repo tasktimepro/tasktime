@@ -57,6 +57,7 @@ describe('Modal', () => {
 
         expect(dialog.className.includes('w-[calc(100vw-1rem)]')).toBe(true)
         expect(dialog.className.includes('max-w-[calc(100vw-1rem)]')).toBe(true)
+        expect(dialog.className.includes('sm:max-w-md')).toBe(true)
         expect(dialog.className.includes('overflow-hidden')).toBe(true)
     })
 })

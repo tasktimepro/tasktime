@@ -55,17 +55,17 @@ const Modal = ({
 
     // Map size prop to max-width classes
     const sizeClasses = {
-        sm: 'max-w-sm',
-        md: 'max-w-md',
-        lg: 'max-w-lg',
-        xl: 'max-w-xl',
-        '2xl': 'max-w-2xl',
-        '3xl': 'max-w-3xl',
-        '4xl': 'max-w-4xl',
-        '5xl': 'max-w-5xl',
-        '6xl': 'max-w-6xl',
-        '7xl': 'max-w-7xl',
-        full: 'max-w-full',
+        sm: 'sm:max-w-sm',
+        md: 'sm:max-w-md',
+        lg: 'sm:max-w-lg',
+        xl: 'sm:max-w-xl',
+        '2xl': 'sm:max-w-2xl',
+        '3xl': 'sm:max-w-3xl',
+        '4xl': 'sm:max-w-4xl',
+        '5xl': 'sm:max-w-5xl',
+        '6xl': 'sm:max-w-6xl',
+        '7xl': 'sm:max-w-7xl',
+        full: 'sm:max-w-full',
     };
 
     return (
@@ -73,7 +73,7 @@ const Modal = ({
             <DialogContent
                 className={cn(
                     sizeClasses[size],
-                    'flex w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden max-h-[calc(100vh-1rem)] p-0 sm:w-full sm:max-w-none sm:max-h-[calc(100vh-2rem)]',
+                    'flex w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden max-h-[calc(100vh-1rem)] p-0 sm:w-full sm:max-h-[calc(100vh-2rem)]',
                     className
                 )}
                 // Hide default close button if showCloseButton is false

@@ -148,9 +148,11 @@ const PlannerItem = ({
                     : subtype === 'attached'
                         ? 'Attached'
                         : null;
-    const metaParts = isExpense
-        ? [amountLabel, supplierName].filter(Boolean)
-        : [taskSubtypeLabel, hasTarget ? `${estimatedHours}h plan` : null, actualTimeMs > 0 ? `${formatTime(actualTimeMs)} worked` : null].filter(Boolean);
+    const metaParts = isMobileLayout
+        ? (isExpense
+            ? [amountLabel, supplierName].filter(Boolean)
+            : [taskSubtypeLabel, hasTarget ? `${estimatedHours}h plan` : null, actualTimeMs > 0 ? `${formatTime(actualTimeMs)} worked` : null].filter(Boolean))
+        : [];
     
     const handleClick = (e) => {
         // Don't trigger click if menu is open
@@ -246,10 +248,10 @@ const PlannerItem = ({
                 />
             )} */}
 
-            <div className="relative z-10 mb-0.5 flex w-full min-w-0 items-start gap-2">
-                <Icon className={cn('mt-0.5 h-4 w-4 flex-shrink-0', iconClasses)} />
+            <div className={cn('relative z-10 mb-0.5 flex w-full min-w-0 gap-2', isMobileLayout ? 'items-start' : 'items-center')}>
+                <Icon className={cn('h-4 w-4 flex-shrink-0', isMobileLayout && 'mt-0.5', iconClasses)} />
                 
-                <div className="min-w-0 flex-1 space-y-0.5">
+                <div className={cn('min-w-0 flex-1', isMobileLayout && 'space-y-0.5')}>
                     <div className={cn(
                         isMobileLayout ? 'text-sm font-medium whitespace-normal break-words' : 'text-sm truncate',
                         isCompleted && "line-through text-muted-foreground"

@@ -166,4 +166,21 @@ describe('PlannerItem', () => {
         expect(item.style.height).toBe('auto');
         expect(item.style.minHeight).toBe('56px');
     });
+
+    it('keeps desktop planner items compact without mobile metadata rows', () => {
+        render(
+            <PlannerItem
+                type="expense"
+                title="Studio rent"
+                amount={1200}
+                amountType="fixed"
+                currency="EUR"
+                supplierName="Landlord"
+                onClick={() => {}}
+            />
+        );
+
+        expect(screen.queryByText('Landlord')).not.toBeInTheDocument();
+        expect(screen.queryByText(/€1,200.00 EUR|€1200.00 EUR|€1,200 EUR|€1200 EUR/)).not.toBeInTheDocument();
+    });
 });

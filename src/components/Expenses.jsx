@@ -29,6 +29,7 @@ import { useClients } from '@/hooks/useClients.ts';
 import { useProjects } from '@/hooks/useProjects.ts';
 import { usePreferences } from '@/hooks/usePreferences.ts';
 import { useToast } from '@/hooks/useToast.ts';
+import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate, isExpenseInDateRange } from '@/utils/expenseUtils';
@@ -38,6 +39,7 @@ import PaymentMethods from '@/components/PaymentMethods';
 import BusinessInfo from '@/components/BusinessInfo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { FilterIcon, MagnifyingGlassIcon, XMarkIcon } from '@/components/ui/icons';
+import { cn } from '@/lib/utils';
 
 const PERIOD_OPTIONS = [
     { value: 'month', label: 'This Month' },
@@ -57,6 +59,7 @@ const Expenses = ({
     openBusinessModal,
     editBusinessModal,
 }) => {
+    const isMobileLayout = useIsMobileLayout();
 
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess } = useToast();
@@ -572,14 +575,24 @@ const Expenses = ({
     return (
         <div className="space-y-6">
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
-                <TabsList className="h-auto w-full justify-start gap-5 overflow-x-auto whitespace-nowrap rounded-none border-b border-border bg-transparent p-0">
+                <TabsList className={cn(
+                    'w-full bg-transparent rounded-none',
+                    isMobileLayout
+                        ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
+                        : 'justify-start border-b border-border p-0'
+                )}>
                     {sideNavItems.map((item) => {
                         const Icon = item.icon;
                         return (
                             <TabsTrigger
                                 key={item.id}
                                 value={item.id}
-                                className="shrink-0 flex items-center border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 font-medium text-sm whitespace-nowrap transition-colors data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                className={cn(
+                                    'flex items-center font-medium text-sm whitespace-nowrap transition-colors',
+                                    isMobileLayout
+                                        ? 'rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
+                                        : 'mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border'
+                                )}
                             >
                                 <Icon className="h-4 w-4 mr-2" />
                                 {item.name}
