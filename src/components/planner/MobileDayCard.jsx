@@ -13,6 +13,7 @@ import AddItemPopover from './AddItemPopover';
 import { useTimeProgress, getProgressGradientStyle } from './hooks/useTimeProgress';
 import { cn } from '@/lib/utils';
 import DailyGoalProgress from './DailyGoalProgress';
+import { formatCurrency } from '@/utils/currencyUtils.ts';
 
 /**
  * @param {Object} props
@@ -63,7 +64,8 @@ const MobileDayCard = ({
     const progressStyle = isToday ? getProgressGradientStyle(progress) : {};
 
     const dayName = format(date, 'EEEE');
-    const monthDay = format(date, 'MMMM d');
+    const dayDate = format(date, 'MMMM d');
+    const itemCount = items.length;
 
     const handleAddSelect = (type) => {
         onAddClick?.(dateStr, type);
@@ -94,6 +96,7 @@ const MobileDayCard = ({
     };
 
     const formattedTime = formatTotalTime(totalTimeMs);
+    const formattedEarnings = totalEarnings > 0 ? formatCurrency(totalEarnings, currency) : null;
     const shouldShowProgress = Boolean(dailyGoal?.targetHours)
         || Boolean(dailyGoal?.targetEarnings)
         || totalEarnings > 0
@@ -102,53 +105,73 @@ const MobileDayCard = ({
     return (
         <div 
             className={cn(
-                "flex flex-col min-h-[50vh] rounded-lg border bg-card"
+                'flex min-h-[50vh] flex-col overflow-hidden rounded-xl border bg-card shadow-sm'
             )}
             style={progressStyle}
         >
             {/* Header with navigation */}
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onPrev}
-                    disabled={!hasPrev}
-                >
-                    <ChevronLeftIcon className="h-5 w-5" />
-                </Button>
+            <div className="border-b px-3 py-3 sm:px-4">
+                <div className="flex items-center justify-between gap-3">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onPrev}
+                        disabled={!hasPrev}
+                    >
+                        <ChevronLeftIcon className="h-5 w-5" />
+                    </Button>
 
-                <div className="text-center">
-                    <div className={cn(
-                        "text-sm font-medium",
-                        isToday ? "text-foreground" : "text-muted-foreground"
-                    )}>
-                        {isToday ? 'Today' : dayName}
+                    <div className="flex-1 text-center">
+                        <div className={cn(
+                            "text-sm font-medium",
+                            isToday ? "text-foreground" : "text-muted-foreground"
+                        )}>
+                            {isToday ? 'Today' : dayName}
+                        </div>
+                        <div className="mt-1 text-lg font-semibold">
+                            {dayDate}
+                        </div>
                     </div>
-                    <div className="text-lg font-semibold">
-                        {monthDay}
-                    </div>
+
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onNext}
+                        disabled={!hasNext}
+                    >
+                        <ChevronRightIcon className="h-5 w-5" />
+                    </Button>
                 </div>
 
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onNext}
-                    disabled={!hasNext}
-                >
-                    <ChevronRightIcon className="h-5 w-5" />
-                </Button>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground">
+                        {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                    </span>
+                    {formattedTime && (
+                        <span className="rounded-full bg-muted px-2.5 py-1">
+                            {formattedTime} worked
+                        </span>
+                    )}
+                    {formattedEarnings && (
+                        <span className="rounded-full bg-muted px-2.5 py-1 sensitive-data">
+                            {formattedEarnings}
+                        </span>
+                    )}
+                </div>
             </div>
 
             {/* Items list */}
-            <div className="flex-1 p-4 space-y-3 overflow-y-auto">
+            <div className="flex-1 space-y-2.5 overflow-y-auto px-3 py-3 sm:px-4">
                 {items.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-                        <p className="text-sm">No items for this day</p>
+                    <div className="flex h-32 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 text-center text-muted-foreground">
+                        <p className="text-sm font-medium">No items for this day</p>
+                        <p className="mt-1 text-xs">Attach a task, project, client, or expense.</p>
                     </div>
                 ) : (
                     items.map((item) => (
                         <PlannerItem
                             key={item.key}
+                            layout="mobile"
                             type={item.type}
                             title={item.title}
                             isCompleted={item.isCompleted}
@@ -182,7 +205,7 @@ const MobileDayCard = ({
             </div>
 
             {/* Footer - Daily goals progress and add button */}
-            <div className="p-4 border-t">
+            <div className="border-t px-3 py-3 sm:px-4">
                 {shouldShowProgress && (
                     <div className="mb-3">
                         <DailyGoalProgress
@@ -217,8 +240,7 @@ const MobileDayCard = ({
                     onSetDailyGoal={handleSetDailyGoal}
                     onCreateTask={handleCreateTask}
                 >
-                    <Button variant="outline" className="w-full">
-                        <PlusIcon className="h-4 w-4 mr-2" />
+                    <Button variant="outline" className="h-11 w-full rounded-xl" leadingIcon={PlusIcon}>
                         Attach item
                     </Button>
                 </AddItemPopover>

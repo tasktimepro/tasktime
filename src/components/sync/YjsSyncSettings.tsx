@@ -79,7 +79,7 @@ export default function YjsSyncSettings() {
         if (isOffline) {
             return {
                 text: 'Currently offline',
-                tone: 'text-yellow-700 dark:text-yellow-200',
+                tone: 'status-warning-text-strong',
                 icon: CloudOffIcon
             };
         }
@@ -95,7 +95,7 @@ export default function YjsSyncSettings() {
         if (isConnecting || !isDriveConnected) {
             return {
                 text: 'Syncing...',
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 icon: ArrowPathIcon,
                 spinning: true
             };
@@ -104,7 +104,7 @@ export default function YjsSyncSettings() {
         if (syncState === 'error') {
             return {
                 text: 'Sync error',
-                tone: 'text-red-700 dark:text-red-300',
+                tone: 'status-danger-text-strong',
                 icon: ExclamationTriangleIcon
             };
         }
@@ -112,7 +112,7 @@ export default function YjsSyncSettings() {
         if (syncPhase === 'checking') {
             return {
                 text: 'Checking for updates...',
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 icon: ArrowPathIcon,
                 spinning: true
             };
@@ -121,7 +121,7 @@ export default function YjsSyncSettings() {
         if (syncPhase === 'downloading') {
             return {
                 text: 'Fetching updates...',
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 icon: ArrowPathIcon,
                 spinning: true
             };
@@ -130,7 +130,7 @@ export default function YjsSyncSettings() {
         if (syncPhase === 'uploading') {
             return {
                 text: 'Syncing changes...',
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 icon: ArrowPathIcon,
                 spinning: true
             };
@@ -141,7 +141,7 @@ export default function YjsSyncSettings() {
         if (showSyncingText || isSyncing) {
             return {
                 text: 'Syncing...',
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 icon: ArrowPathIcon,
                 spinning: true
             };
@@ -151,7 +151,7 @@ export default function YjsSyncSettings() {
             text: lastSyncedAt
                 ? `Synced ${formatDistanceToNow(lastSyncedAt, { addSuffix: true, includeSeconds: true })}`
                 : 'Connected',
-            tone: 'text-green-700 dark:text-green-300',
+            tone: 'status-success-text-strong',
             icon: CheckIcon
         };
     }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now]);
@@ -323,7 +323,7 @@ export default function YjsSyncSettings() {
                                             <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
                                                 <DropdownMenuItem
                                                     onClick={handleWipeAndDisconnect}
-                                                    className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                                    className="status-danger-action flex items-center space-x-2"
                                                 >
                                                     <TrashIcon className="h-4 w-4" />
                                                     <span>Wipe & Disconnect</span>

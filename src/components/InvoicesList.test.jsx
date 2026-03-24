@@ -31,9 +31,26 @@ describe('InvoicesList', () => {
 
     let user
 
+    const setMatchMedia = (matches) => {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: vi.fn().mockImplementation(() => ({
+                matches,
+                media: '(max-width: 767px)',
+                onchange: null,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            }))
+        })
+    }
+
     beforeEach(() => {
 
         updateUrlMock.mockClear()
+        setMatchMedia(false)
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
         user = userEvent.setup()
     })
@@ -240,5 +257,27 @@ describe('InvoicesList', () => {
 
         expect(screen.getByText('No invoices yet')).toBeInTheDocument()
         expect(screen.getByText('Get started by generating your first invoice.')).toBeInTheDocument()
+    })
+
+    it('wraps tabs and actions safely on mobile', () => {
+
+        setMatchMedia(true)
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        const tablist = screen.getByRole('tablist')
+        const markPaidButton = screen.getByRole('button', { name: 'Mark as Paid' })
+
+        expect(tablist.className.includes('flex-wrap')).toBe(true)
+        expect(markPaidButton.parentElement?.className.includes('flex-wrap')).toBe(true)
     })
 })

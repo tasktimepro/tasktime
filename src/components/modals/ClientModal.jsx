@@ -259,11 +259,12 @@ const ClientModal = ({
     };
 
     const footer = (
-        <div className="flex justify-end space-x-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
+                className="w-full sm:w-auto"
             >
                 Cancel
             </Button>
@@ -271,6 +272,7 @@ const ClientModal = ({
             <Button
                 type="submit"
                 form="client-form"
+                className="w-full sm:w-auto"
             >
                 {editingClient ? 'Update' : 'Create'} Client
             </Button>
@@ -293,7 +295,7 @@ const ClientModal = ({
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="title">
-                            Client Title <span className="text-red-500">*</span>
+                            Client Title <span className="text-destructive-strong">*</span>
                         </Label>
                         <Input
                             type="text"
@@ -309,7 +311,7 @@ const ClientModal = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="clientName">
-                                Business/Name <span className="text-red-500">*</span>
+                                Business/Name <span className="text-destructive-strong">*</span>
                             </Label>
                             <Input
                                 type="text"
@@ -337,7 +339,7 @@ const ClientModal = ({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-2">
                             <Label htmlFor="email">
                                 Email
@@ -373,7 +375,7 @@ const ClientModal = ({
                             onClick={() => toggleSection('companyInfo')}
                             className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${expandedSections.companyInfo ? 'rounded-t-lg' : 'rounded-lg'}`}
                         >
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-3">
                                 <h4 className="text-sm font-medium text-foreground">Client Company Info</h4>
                                 <svg
                                     className={`w-5 h-5 text-muted-foreground transform transition-transform ${expandedSections.companyInfo ? 'rotate-180' : ''}`}
@@ -401,7 +403,7 @@ const ClientModal = ({
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                     <div className="space-y-2">
                                         <Label htmlFor="city">
                                             City
@@ -420,7 +422,7 @@ const ClientModal = ({
                                         <Label>
                                             State/ZIP
                                         </Label>
-                                        <div className="flex space-x-2 w-full">
+                                        <div className="flex flex-col gap-2 w-full sm:flex-row sm:items-center">
                                             <Input
                                                 type="text"
                                                 id="state"
@@ -436,7 +438,7 @@ const ClientModal = ({
                                                 name="zip"
                                                 value={formData.zip}
                                                 onChange={handleInputChange}
-                                                className="w-20 flex-shrink-0"
+                                                className="w-full sm:w-20 sm:flex-shrink-0"
                                                 placeholder="ZIP"
                                             />
                                         </div>
@@ -457,7 +459,7 @@ const ClientModal = ({
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                     <div className="space-y-2">
                                         <Label htmlFor="registrationNumber">
                                             Reg. Number
@@ -506,7 +508,7 @@ const ClientModal = ({
 
                     {/* Custom Fields */}
                     <div className="space-y-4">
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <h5 className="text-sm font-medium text-foreground">Custom Fields</h5>
                             <Button
                                 type="button"
@@ -520,7 +522,7 @@ const ClientModal = ({
                         </div>
 
                         {formData.custom.map((field, index) => (
-                            <div key={index} className="grid grid-cols-2 gap-4">
+                            <div key={index} className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div>
                                     <Input
                                         type="text"
@@ -529,7 +531,7 @@ const ClientModal = ({
                                         placeholder="Field label (e.g., Website)"
                                     />
                                 </div>
-                                <div className="flex space-x-2">
+                                <div className="flex gap-2">
                                     <Input
                                         type="text"
                                         value={field.value}
@@ -542,7 +544,7 @@ const ClientModal = ({
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => removeCustomField(index)}
-                                        className="hover:bg-accent text-destructive-strong hover-text-destructive-strong"
+                                        className="shrink-0 hover:bg-accent text-destructive-strong hover-text-destructive-strong"
                                     >
                                         <TrashIcon className="h-4 w-4" />
                                     </Button>
@@ -567,7 +569,7 @@ const ClientModal = ({
                     >
                         <div className="flex items-center justify-between">
                             <h4 className="text-sm font-medium text-foreground">
-                                Pricing & Taxes <span className="text-red-500">*</span>
+                                Pricing & Taxes <span className="text-destructive-strong">*</span>
                             </h4>
                             <svg
                                 className={`w-5 h-5 text-muted-foreground transform transition-transform ${expandedSections.pricingTaxes ? 'rotate-180' : ''}`}
@@ -593,7 +595,7 @@ const ClientModal = ({
 
                             <div className={formData.flatRate ? "hidden" : "space-y-2"}>
                                 <Label htmlFor="hourlyRate">
-                                    Hourly Rate <span className="text-red-500">*</span>
+                                    Hourly Rate <span className="text-destructive-strong">*</span>
                                 </Label>
                                 <Input
                                     type="number"

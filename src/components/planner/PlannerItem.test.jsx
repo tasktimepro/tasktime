@@ -126,4 +126,44 @@ describe('PlannerItem', () => {
 
         expect(screen.queryByText('📌')).not.toBeInTheDocument();
     });
+
+    it('renders expense metadata and mark paid action in mobile layout', () => {
+        const handleMarkPaid = vi.fn();
+
+        render(
+            <PlannerItem
+                type="expense"
+                layout="mobile"
+                title="Phone bill"
+                amount={15.99}
+                amountType="variable"
+                currency="EUR"
+                supplierName="A1"
+                onMarkPaid={handleMarkPaid}
+                onClick={() => {}}
+            />
+        );
+
+        expect(screen.getByText('~€15.99 EUR')).toBeInTheDocument();
+        expect(screen.getByText('A1')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Mark paid' }));
+        expect(handleMarkPaid).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores desktop height scaling in mobile layout', () => {
+        const { container } = render(
+            <PlannerItem
+                type="task"
+                layout="mobile"
+                title="Mobile task"
+                heightPercent={0.9}
+                onClick={() => {}}
+            />
+        );
+
+        const item = container.firstChild;
+        expect(item.style.height).toBe('auto');
+        expect(item.style.minHeight).toBe('56px');
+    });
 });

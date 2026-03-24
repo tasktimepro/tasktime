@@ -6,8 +6,20 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import App from './App'
+
+const createMatchMedia = (matchesByQuery = {}) => vi.fn().mockImplementation((query) => ({
+    matches: Boolean(matchesByQuery[query]),
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    onchange: null,
+    dispatchEvent: vi.fn()
+}))
 
 const expenseHookState = vi.hoisted(() => ({
     expenses: [],
@@ -21,6 +33,28 @@ const recurrenceHookState = vi.hoisted(() => ({
     recurrences: [],
     generatePendingExpenses: vi.fn(),
     updateRecurrence: vi.fn(),
+}))
+
+const projectsHookState = vi.hoisted(() => ({
+    projects: [],
+}))
+
+const clientsHookState = vi.hoisted(() => ({
+    clients: [],
+}))
+
+const urlHookState = vi.hoisted(() => ({
+    urlParams: { view: 'dashboard', projectId: null, clientId: null },
+    navigateToProjects: vi.fn(),
+    navigateToProject: vi.fn(),
+    navigateToClients: vi.fn(),
+    navigateToClient: vi.fn(),
+    navigateToInvoices: vi.fn(),
+    navigateToExpenses: vi.fn(),
+    navigateToAccount: vi.fn(),
+    navigateToDashboard: vi.fn(),
+    navigateToPlanner: vi.fn(),
+    updateUrl: vi.fn(),
 }))
 
 const todayStringState = vi.hoisted(() => ({
@@ -47,8 +81,8 @@ vi.mock('./contexts/YjsContext.tsx', () => ({
 
 vi.mock('./hooks/useProjects.ts', () => ({
     useProjects: () => ({
-        projects: [],
-        activeProjects: [],
+        projects: projectsHookState.projects,
+        activeProjects: projectsHookState.projects.filter((project) => !project.archived),
         archivedProjects: [],
         isLoading: false,
         getProject: vi.fn(),
@@ -116,8 +150,8 @@ vi.mock('./hooks/useDayRollover', () => ({
 
 vi.mock('./hooks/useClients.ts', () => ({
     useClients: () => ({
-        clients: [],
-        sortedClients: [],
+        clients: clientsHookState.clients,
+        sortedClients: clientsHookState.clients,
         isLoading: false,
         getClient: vi.fn(),
         createClient: vi.fn(),
@@ -212,15 +246,17 @@ vi.mock('./hooks/useTimers.ts', () => ({
 
 vi.mock('./hooks/useUrlState.ts', () => ({
     useUrlState: () => ({
-        urlParams: { view: 'dashboard', projectId: null, clientId: null },
-        navigateToProjects: vi.fn(),
-        navigateToProject: vi.fn(),
-        navigateToClients: vi.fn(),
-        navigateToClient: vi.fn(),
-        navigateToInvoices: vi.fn(),
-        navigateToAccount: vi.fn(),
-        navigateToDashboard: vi.fn(),
-        updateUrl: vi.fn()
+        urlParams: urlHookState.urlParams,
+        navigateToProjects: urlHookState.navigateToProjects,
+        navigateToProject: urlHookState.navigateToProject,
+        navigateToClients: urlHookState.navigateToClients,
+        navigateToClient: urlHookState.navigateToClient,
+        navigateToInvoices: urlHookState.navigateToInvoices,
+        navigateToExpenses: urlHookState.navigateToExpenses,
+        navigateToAccount: urlHookState.navigateToAccount,
+        navigateToDashboard: urlHookState.navigateToDashboard,
+        navigateToPlanner: urlHookState.navigateToPlanner,
+        updateUrl: urlHookState.updateUrl
     })
 }))
 
@@ -266,7 +302,13 @@ vi.mock('./components/Dashboard', () => ({
 vi.mock('./components/Account', () => ({ default: () => <div data-testid="account" /> }))
 vi.mock('./components/Invoices', () => ({ default: () => <div data-testid="invoices" /> }))
 vi.mock('./components/timer/GlobalTimerStack', () => ({ default: () => <div data-testid="global-timer" /> }))
-vi.mock('./components/modals/ModalManager', () => ({ default: () => <div data-testid="modal-manager" /> }))
+vi.mock('./components/modals/ModalManager', () => ({
+    default: ({ activeModal }) => (
+        <div data-testid="modal-manager" data-active-modal={activeModal || ''}>
+            {activeModal ? <div data-testid="active-modal">{activeModal}</div> : null}
+        </div>
+    )
+}))
 vi.mock('./components/modals/ExpenseViewModal', () => ({
     default: ({ isOpen, expense }) => (isOpen ? <div data-testid="expense-view-modal">{expense?.id}:{expense?.title}:{expense?.isPreview ? 'preview' : 'actual'}</div> : null)
 }))
@@ -276,24 +318,13 @@ vi.mock('./components/InstallPrompt', () => ({ default: () => <div data-testid="
 vi.mock('./components/ToastContainer', () => ({ ToastProvider: ({ children }) => children }))
 vi.mock('./components/sync/YjsSyncStatus', () => ({ default: () => <div data-testid="sync-status" /> }))
 
-// Mock matchMedia
-if (!window.matchMedia) {
-    window.matchMedia = vi.fn().mockImplementation(() => ({
-        matches: false,
-        media: '',
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        onchange: null,
-        dispatchEvent: vi.fn()
-    }))
-}
+window.matchMedia = createMatchMedia()
 
 describe('App component', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        window.matchMedia = createMatchMedia()
         expenseHookState.expenses.length = 0
         expenseHookState.createExpense.mockReset()
         expenseHookState.createExpense.mockImplementation((expense) => ({
@@ -303,6 +334,19 @@ describe('App component', () => {
         recurrenceHookState.recurrences.length = 0
         recurrenceHookState.generatePendingExpenses.mockReset()
         recurrenceHookState.updateRecurrence.mockReset()
+        projectsHookState.projects.length = 0
+        clientsHookState.clients.length = 0
+        urlHookState.urlParams = { view: 'dashboard', projectId: null, clientId: null }
+        urlHookState.navigateToProjects.mockReset()
+        urlHookState.navigateToProject.mockReset()
+        urlHookState.navigateToClients.mockReset()
+        urlHookState.navigateToClient.mockReset()
+        urlHookState.navigateToInvoices.mockReset()
+        urlHookState.navigateToExpenses.mockReset()
+        urlHookState.navigateToAccount.mockReset()
+        urlHookState.navigateToDashboard.mockReset()
+        urlHookState.navigateToPlanner.mockReset()
+        urlHookState.updateUrl.mockReset()
         todayStringState.value = '2026-02-25'
     })
 
@@ -315,19 +359,109 @@ describe('App component', () => {
         expect(await screen.findByTestId('dashboard')).toBeInTheDocument()
     })
 
-    it('renders the navigation sidebar', () => {
+    it('renders the desktop sidebar and not the mobile dock on larger screens', () => {
         render(<App />)
         expect(screen.getByText('TaskTime')).toBeInTheDocument()
         expect(screen.getByText('Dashboard')).toBeInTheDocument()
         expect(screen.getByText('Clients')).toBeInTheDocument()
         expect(screen.getByText('Projects')).toBeInTheDocument()
         expect(screen.getByText('Invoices')).toBeInTheDocument()
+        expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument()
     })
 
     it('shows theme toggle button', () => {
         render(<App />)
         // Dark Mode shows by default because matchMedia returns false for dark mode preference
         expect(screen.getByText('Dark Mode')).toBeInTheDocument()
+    })
+
+    it('renders the mobile dock and opens the more sheet on small screens', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+
+        render(<App />)
+
+        expect(screen.getByRole('navigation', { name: 'Mobile navigation' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Dashboard' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Planner' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Projects' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Expenses' })).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Open more actions' }))
+
+        const dialog = screen.getByRole('dialog')
+
+        expect(within(dialog).getByText('More')).toBeInTheDocument()
+        expect(within(dialog).getByText('Sync & appearance')).toBeInTheDocument()
+        expect(within(dialog).getByText('Clients')).toBeInTheDocument()
+        expect(within(dialog).getByText('Invoices')).toBeInTheDocument()
+        expect(within(dialog).getByText('Account')).toBeInTheDocument()
+        expect(within(dialog).getByText('Sync Settings')).toBeInTheDocument()
+    })
+
+    it('navigates through more-sheet destinations and closes the sheet on mobile', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+
+        const user = userEvent.setup()
+
+        render(<App />)
+
+        await user.click(screen.getByRole('button', { name: 'Open more actions' }))
+        await user.click(screen.getByRole('button', { name: /Clients/ }))
+
+        expect(urlHookState.navigateToClients).toHaveBeenCalledTimes(1)
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('routes sync settings from the more sheet on mobile', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+
+        const user = userEvent.setup()
+
+        render(<App />)
+
+        await user.click(screen.getByRole('button', { name: 'Open more actions' }))
+        await user.click(screen.getByRole('button', { name: /Sync Settings/ }))
+
+        expect(urlHookState.navigateToAccount).toHaveBeenCalledWith({ section: 'sync' })
+    })
+
+    it('opens the task modal from the mobile top bar create action', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+
+        const user = userEvent.setup()
+
+        render(<App />)
+
+        await user.click(screen.getByRole('button', { name: 'Create new task' }))
+
+        expect(screen.getByTestId('active-modal')).toHaveTextContent('task')
+    })
+
+    it('shows a mobile back affordance for project detail routes', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        projectsHookState.projects.push({ id: 'project-1', title: 'Launch Site', archived: false })
+        urlHookState.urlParams = { view: 'projects', projectId: 'project-1', clientId: null }
+
+        const user = userEvent.setup()
+
+        render(<App />)
+
+        expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+        expect(screen.getByText('Launch Site')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Back' }))
+
+        expect(urlHookState.navigateToProjects).toHaveBeenCalledTimes(1)
     })
 
     it('generates pending recurring expenses on mount and day rollover', () => {

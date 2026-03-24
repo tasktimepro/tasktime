@@ -29,7 +29,15 @@ export const ToastProvider = ({ children }) => {
     return (
         <ToastContext.Provider value={{ showSuccess, showError, showInfo, showWarning }}>
             {children}
-            <Toaster position="bottom-right" />
+            <Toaster
+                position="bottom-right"
+                offset={{ bottom: '1rem', right: '1rem' }}
+                mobileOffset={{
+                    bottom: 'calc(env(safe-area-inset-bottom) + 5.75rem)',
+                    left: '1rem',
+                    right: '1rem'
+                }}
+            />
         </ToastContext.Provider>
     );
 };

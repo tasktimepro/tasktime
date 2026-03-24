@@ -252,7 +252,7 @@ const EntityPickerModal = ({
                         <div className="space-y-2">
                             <div className="flex items-center justify-between mb-1">
                                 <Label htmlFor="entity-select">
-                                    {typeLabel} <span className="text-red-500">*</span>
+                                    {typeLabel} <span className="text-destructive-strong">*</span>
                                 </Label>
                                 {onCreateNew && (
                                     <Button
@@ -304,7 +304,7 @@ const EntityPickerModal = ({
                         <div className="space-y-2">
                             <div className="flex items-center justify-between mb-1">
                                 <Label>
-                                    Task <span className="text-red-500">*</span>
+                                    Task <span className="text-destructive-strong">*</span>
                                 </Label>
                                 {onCreateNew && (
                                     <Button
@@ -371,7 +371,7 @@ const EntityPickerModal = ({
                     {isEditMode && selectedEntity && (
                         <div className="space-y-2">
                             <Label>
-                                {typeLabel} <span className="text-red-500">*</span>
+                                {typeLabel} <span className="text-destructive-strong">*</span>
                             </Label>
                             <Input
                                 value={selectedEntity.title}

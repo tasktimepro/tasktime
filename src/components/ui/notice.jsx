@@ -29,23 +29,23 @@ const Notice = React.forwardRef(({
     
     const variantStyles = {
         default: "bg-muted border-border text-foreground",
-        warning: "bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800 text-yellow-900 dark:text-yellow-100",
-        destructive: "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100",
-        success: "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100",
+        warning: "status-warning-surface status-warning-border status-warning-text",
+        destructive: "status-danger-surface status-danger-border status-danger-text",
+        success: "status-success-surface status-success-border status-success-text",
     }
 
     const iconStyles = {
         default: "text-muted-foreground",
-        warning: "text-yellow-600 dark:text-yellow-400",
-        destructive: "text-red-600 dark:text-red-400",
-        success: "text-green-600 dark:text-green-400",
+        warning: "status-warning-text-strong",
+        destructive: "status-danger-text-strong",
+        success: "status-success-text-strong",
     }
 
     const descriptionStyles = {
         default: "text-muted-foreground",
-        warning: "text-yellow-700 dark:text-yellow-300",
-        destructive: "text-red-700 dark:text-red-300",
-        success: "text-green-700 dark:text-green-300",
+        warning: "status-warning-text",
+        destructive: "status-danger-text",
+        success: "status-success-text",
     }
 
     return (

@@ -246,7 +246,7 @@ const InvoiceModal = ({
                             <div className="mb-6">
                                 <div className="flex justify-between items-center mb-1">
                                     <h4 className="text-sm font-medium text-foreground">
-                                        Client <span className="text-red-500">*</span>
+                                        Client <span className="text-destructive-strong">*</span>
                                     </h4>
                                     {openClientModal && !isClientContextFixed && !editingInvoice && !(selectedProject && selectedProject.preferredClientId) && (
                                         <Button
@@ -688,7 +688,7 @@ const InvoiceModal = ({
                             <div className="mb-6">
                                 <div className="flex justify-between items-center mb-1">
                                     <h4 className="text-sm font-medium text-foreground">
-                                        Invoice Template <span className="text-red-500">*</span>
+                                        Invoice Template <span className="text-destructive-strong">*</span>
                                     </h4>
                                     <Button
                                         type="button"

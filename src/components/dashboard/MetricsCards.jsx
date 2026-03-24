@@ -162,23 +162,23 @@ const MetricsCards = ({
 
     return (
         <Card>
-            <CardHeader className="pb-4">
+            <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
                 <CardTitle className="flex items-center text-lg">
-                    <ChartBarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                    <ChartBarIcon className="status-info-text-strong mr-2 h-5 w-5" />
                     Reports Overview
                 </CardTitle>
             </CardHeader>
-            <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <CardContent className="px-3 pb-2.5 pt-0 sm:px-5 sm:pb-4">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-3 md:gap-6">
                     {/* This Month */}
-                    <div className="bg-muted/40 rounded-lg p-4">
+                    <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">This Month</h3>
+                                <h3 className="status-info-text text-sm font-medium">This Month</h3>
                                 <div className="mt-2">
                                     {hasClients && (
                                         <div className="flex items-center">
-                                            <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                                            <div className="status-info-text text-lg font-semibold">
                                                 {renderEarningsByCurrency(thisMonthMetrics, 'blue')}
                                             </div>
                                         </div>
@@ -195,19 +195,19 @@ const MetricsCards = ({
                                         })}
                                     </div>
                                     <div className="flex items-center mt-2">
-                                        <ClockIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-1" />
-                                        <span className="text-sm text-blue-700 dark:text-blue-300">
+                                        <ClockIcon className="status-info-text-strong mr-1 h-4 w-4" />
+                                        <span className="status-info-text text-sm">
                                             {formatDuration(thisMonthMetrics.time)}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-                            <CalendarDaysIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                            <CalendarDaysIcon className="status-info-text-strong h-8 w-8" />
                         </div>
                     </div>
 
                     {/* Last Month */}
-                    <div className="bg-muted/40 rounded-lg p-4">
+                    <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
                         <div className="flex items-center justify-between">
                             <div>
                                 <h3 className="text-sm font-medium text-foreground">Last Month</h3>
@@ -238,14 +238,14 @@ const MetricsCards = ({
                     </div>
 
                     {/* Last 90 Days */}
-                    <div className="bg-muted/40 rounded-lg p-4">
+                    <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h3 className="text-sm font-medium text-green-900 dark:text-green-100">Last 90 Days</h3>
+                                <h3 className="status-success-text text-sm font-medium">Last 90 Days</h3>
                                 <div className="mt-2">
                                     {hasClients && (
                                         <div className="flex items-center">
-                                            <div className="text-lg font-semibold text-green-900 dark:text-green-100">
+                                            <div className="status-success-text text-lg font-semibold">
                                                 {renderEarningsByCurrency(last90DaysMetrics, 'green')}
                                             </div>
                                         </div>
@@ -257,29 +257,29 @@ const MetricsCards = ({
                                         })}
                                     </div>
                                     <div className="flex items-center mt-2">
-                                        <ClockIcon className="h-4 w-4 text-green-600 dark:text-green-400 mr-1" />
-                                        <span className="text-sm text-green-700 dark:text-green-300">
+                                        <ClockIcon className="status-success-text-strong mr-1 h-4 w-4" />
+                                        <span className="status-success-text text-sm">
                                             {formatDuration(last90DaysMetrics.time)}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-                            <CalendarDaysIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
+                            <CalendarDaysIcon className="status-success-text-strong h-8 w-8" />
                         </div>
                     </div>
                 </div>
 
                 {/* Invoice Metrics */}
                 {hasClients && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:mt-5 sm:gap-4 md:grid-cols-3">
                     {/* Pending Bills This Month Notice */}
-                    <div className="bg-muted/40 rounded-lg p-4">
+                    <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">Pending Bills This Month</h3>
+                                <h3 className="status-info-text text-sm font-medium">Pending Bills This Month</h3>
                                 <div className="mt-2">
                                     <div className="flex items-center">
-                                        <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                                        <div className="status-info-text text-lg font-semibold">
                                             <div className="flex items-center">
                                                 <CurrencyDollarIcon className="h-4 w-4 text-muted-foreground mr-1" />
                                                 <span className="font-semibold text-foreground sensitive-data">
@@ -292,14 +292,14 @@ const MetricsCards = ({
                                         </div>
                                     </div>
                                     <div className="flex items-center mt-1">
-                                        <ClockIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-1" />
-                                        <span className="text-sm text-blue-700 dark:text-blue-300">
+                                        <ClockIcon className="status-info-text-strong mr-1 h-4 w-4" />
+                                        <span className="status-info-text text-sm">
                                             {formatDuration(thisMonthBillableHours * 3600000)}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-                            <ClockIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                            <ClockIcon className="status-info-text-strong h-8 w-8" />
                         </div>
                     </div>
 
@@ -307,43 +307,43 @@ const MetricsCards = ({
                     {invoiceMetrics.outstanding > 0 ? (
                         <button
                             onClick={() => navigateToInvoices({ section: 'invoices', tab: 'outstanding' })}
-                            className="bg-muted/40 rounded-lg p-4 text-left hover:bg-accent transition-colors border border-border cursor-pointer"
+                            className="rounded-lg border border-border bg-muted/40 p-3 text-left transition-colors hover:bg-accent cursor-pointer sm:p-4"
                         >
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-medium text-amber-900 dark:text-amber-100">Outstanding Invoices</h3>
+                                    <h3 className="status-warning-text text-sm font-medium">Outstanding Invoices</h3>
                                     <div className="flex items-center mt-2">
-                                        <DocumentTextIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-2" />
-                                        <span className="text-lg font-semibold text-amber-900 dark:text-amber-100">
+                                        <DocumentTextIcon className="status-warning-text-strong mr-2 h-4 w-4" />
+                                        <span className="status-warning-text text-lg font-semibold">
                                             {invoiceMetrics.outstanding} invoices
                                         </span>
                                     </div>
                                     <div className="flex items-center mt-1">
-                                        <CurrencyDollarIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-2" />
-                                        <span className="text-sm text-amber-700 dark:text-amber-300 sensitive-data">
+                                        <CurrencyDollarIcon className="status-warning-text-strong mr-2 h-4 w-4" />
+                                        <span className="status-warning-text text-sm sensitive-data">
                                             {formatCurrency(invoiceMetrics.outstandingTotal, preferredCurrency)} total
                                         </span>
                                     </div>
                                 </div>
-                                <DocumentTextIcon className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+                                <DocumentTextIcon className="status-warning-text-strong h-8 w-8" />
                             </div>
                         </button>
                     ) : (
-                        <div className="bg-muted/40 rounded-lg p-4">
+                        <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-medium text-green-900 dark:text-green-100">Outstanding Invoices</h3>
+                                    <h3 className="status-success-text text-sm font-medium">Outstanding Invoices</h3>
                                     <div className="flex items-center mt-2">
-                                        <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400 mr-2" />
-                                        <span className="text-lg font-semibold text-green-900 dark:text-green-100">
+                                        <CheckIcon className="status-success-text-strong mr-2 h-4 w-4" />
+                                        <span className="status-success-text text-lg font-semibold">
                                             No outstanding invoices
                                         </span>
                                     </div>
-                                    <div className="text-sm text-green-700 dark:text-green-300 mt-1">
+                                    <div className="status-success-text mt-1 text-sm">
                                         No outstanding payments
                                     </div>
                                 </div>
-                                <DocumentTextIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
+                                <DocumentTextIcon className="status-success-text-strong h-8 w-8" />
                             </div>
                         </div>
                     )}
@@ -352,45 +352,45 @@ const MetricsCards = ({
                     {invoiceMetrics.pastDue > 0 ? (
                         <button
                             onClick={() => navigateToInvoices({ section: 'invoices', tab: 'overdue' })}
-                            className="bg-muted/40 rounded-lg p-4 text-left hover:bg-accent transition-colors border border-border cursor-pointer"
+                            className="rounded-lg border border-border bg-muted/40 p-3 text-left transition-colors hover:bg-accent cursor-pointer sm:p-4"
                         >
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-medium text-red-900 dark:text-red-100 flex items-center">
+                                    <h3 className="status-danger-text flex items-center text-sm font-medium">
                                         Past Due Invoices
                                     </h3>
                                     <div className="flex items-center mt-2">
-                                        <DocumentTextIcon className="h-4 w-4 text-red-600 dark:text-red-400 mr-2" />
-                                        <span className="text-lg font-semibold text-red-900 dark:text-red-100">
+                                        <DocumentTextIcon className="status-danger-text-strong mr-2 h-4 w-4" />
+                                        <span className="status-danger-text text-lg font-semibold">
                                             {invoiceMetrics.pastDue} invoices
                                         </span>
                                     </div>
                                     <div className="flex items-center mt-1">
-                                        <CurrencyDollarIcon className="h-4 w-4 text-red-600 dark:text-red-400 mr-2" />
-                                        <span className="text-sm text-red-700 dark:text-red-300 sensitive-data">
+                                        <CurrencyDollarIcon className="status-danger-text-strong mr-2 h-4 w-4" />
+                                        <span className="status-danger-text text-sm sensitive-data">
                                             {formatCurrency(invoiceMetrics.pastDueTotal, preferredCurrency)} overdue
                                         </span>
                                     </div>
                                 </div>
-                                <ExclamationTriangleIcon className="h-8 w-8 text-red-600 dark:text-red-400" />
+                                <ExclamationTriangleIcon className="status-danger-text-strong h-8 w-8" />
                             </div>
                         </button>
                     ) : (
-                        <div className="bg-muted/40 rounded-lg p-4">
+                        <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-medium text-green-900 dark:text-green-100">No Past Due Invoices</h3>
+                                    <h3 className="status-success-text text-sm font-medium">No Past Due Invoices</h3>
                                     <div className="flex items-center mt-2">
-                                        <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400 mr-2" />
-                                        <span className="text-lg font-semibold text-green-900 dark:text-green-100">
+                                        <CheckIcon className="status-success-text-strong mr-2 h-4 w-4" />
+                                        <span className="status-success-text text-lg font-semibold">
                                             All invoices are up-to-date
                                         </span>
                                     </div>
-                                    <div className="text-sm text-green-700 dark:text-green-300 mt-1">
+                                    <div className="status-success-text mt-1 text-sm">
                                         Great job staying on top of payments!
                                     </div>
                                 </div>
-                                <DocumentTextIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
+                                <DocumentTextIcon className="status-success-text-strong h-8 w-8" />
                             </div>
                         </div>
                     )}

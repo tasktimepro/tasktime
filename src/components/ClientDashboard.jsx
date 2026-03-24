@@ -27,6 +27,8 @@ import {
 import { MoreHorizontal } from 'lucide-react';
 import ClientDeleteDialog from './modals/ClientDeleteDialog';
 import ClientArchiveDialog from './modals/ClientArchiveDialog';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 /**
  * ClientDashboard component - Main dashboard view for a selected client
@@ -52,6 +54,7 @@ const ClientDashboard = ({
     openExpenseModal,
     openExpenseView
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const [editingInvoice, setEditingInvoice] = useState(null);
     const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -456,11 +459,91 @@ const ClientDashboard = ({
         setShowArchiveModal(false);
     };
 
+    const renderProjectActionChip = (project) => {
+        const unbilledAmount = calculateUnbilledAmount(project);
+        const unbilledHours = calculateUnbilledHours(project);
+
+        if (unbilledAmount > 0) {
+            return (
+                <button
+                    onClick={(event) => handleGenerateInvoice(event)}
+                    className="inline-flex items-center rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    title="Click to generate invoice"
+                >
+                    <span className="sensitive-data">
+                        {getCurrencySymbol(getProjectCurrency(project, clients))}{unbilledAmount.toFixed(2)}
+                    </span>
+                </button>
+            );
+        }
+
+        if (!project.hourlyRate && unbilledHours > 0) {
+            return (
+                <button
+                    onClick={(event) => handleGenerateInvoice(event)}
+                    className="inline-flex items-center rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    title={`${unbilledHours.toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
+                >
+                    <ClockIcon className="mr-1 h-3 w-3" />
+                    {unbilledHours.toFixed(2)}h
+                </button>
+            );
+        }
+
+        return null;
+    };
+
+    const renderProjectSummaryCard = (project, archived = false) => {
+        const projectTasksForCard = clientTasks.filter((task) => task.projectId === project.id);
+        const projectTimeEntriesForCard = clientTimeEntries.filter((entry) => (
+            projectTasksForCard.some((task) => task.id === entry.taskId)
+        ));
+        const totalTime = projectTimeEntriesForCard.reduce((total, entry) => total + (entry.end - entry.start), 0);
+        const actionChip = renderProjectActionChip(project);
+
+        return (
+            <Card
+                key={project.id}
+                className="relative cursor-pointer border-l-4 transition-shadow hover:shadow-md"
+                style={getProjectBorderStyle(project)}
+                onClick={() => navigateToProject(project.id)}
+            >
+                <CardContent className={cn('space-y-2', isMobileLayout ? 'p-4' : 'pt-5')}>
+                    <div className="flex min-w-0 items-center gap-2">
+                        <h3 className="truncate font-medium text-foreground">{project.title}</h3>
+                        {archived && (
+                            <span className="inline-flex items-center whitespace-nowrap rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                Archived
+                            </span>
+                        )}
+                    </div>
+                    {project.hourlyRate && (
+                        <p className="text-sm text-muted-foreground">
+                            <span className="sensitive-data">
+                                {getCurrencySymbol(getProjectCurrency(project, clients))}
+                                {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
+                            </span>
+                        </p>
+                    )}
+                    <div className="text-sm text-muted-foreground">
+                        <p>{projectTasksForCard.filter((task) => !task.completed && !task.archived).length} active tasks</p>
+                        <p>{formatDuration(totalTime)} total time</p>
+                    </div>
+                    {actionChip && (
+                        <div className={cn(isMobileLayout ? 'mt-3 flex justify-end' : 'absolute bottom-4 right-4')}>
+                            {actionChip}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        );
+    };
+
     return (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4')}>
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
+            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
+                <div className={cn('flex items-center', isMobileLayout ? 'gap-3' : 'space-x-4')}>
                     <Button
                         type="button"
                         variant="ghost"
@@ -500,7 +583,7 @@ const ClientDashboard = ({
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className={cn('flex items-center gap-3', isMobileLayout && 'w-full justify-end')}>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
@@ -516,7 +599,7 @@ const ClientDashboard = ({
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem
                                 onClick={handleEditClient}
-                                className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
+                                className="status-warning-action flex items-center space-x-2"
                             >
                                 <PencilIcon className="h-4 w-4" />
                                 <span>Edit</span>
@@ -524,7 +607,7 @@ const ClientDashboard = ({
                             {client.archived ? (
                                 <DropdownMenuItem
                                     onClick={handleUnarchiveClient}
-                                    className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                    className="status-info-action flex items-center space-x-2"
                                 >
                                     <ArchiveBoxIcon className="h-4 w-4" />
                                     <span>Unarchive</span>
@@ -532,7 +615,7 @@ const ClientDashboard = ({
                             ) : (
                                 <DropdownMenuItem
                                     onClick={handleArchiveClient}
-                                    className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                    className="status-info-action flex items-center space-x-2"
                                 >
                                     <ArchiveBoxIcon className="h-4 w-4" />
                                     <span>Archive</span>
@@ -540,7 +623,7 @@ const ClientDashboard = ({
                             )}
                             <DropdownMenuItem
                                 onClick={handleDeleteClient}
-                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                className="status-danger-action flex items-center space-x-2"
                             >
                                 <TrashIcon className="h-4 w-4" />
                                 <span>Delete</span>
@@ -592,10 +675,17 @@ const ClientDashboard = ({
             />
 
             {/* Client Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div
+                className={cn(
+                    isMobileLayout
+                        ? '-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 scrollbar-hide'
+                        : 'grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4'
+                )}
+                data-testid="client-metrics-row"
+            >
 
-                <Card className="h-full">
-                    <CardContent className="p-5 flex items-center h-full">
+                <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
                         <div className="flex items-center w-full">
                             <div className="flex-shrink-0">
                                 <BanknotesIcon className="h-5 w-5 text-muted-foreground" />
@@ -603,7 +693,7 @@ const ClientDashboard = ({
                             <div className="ml-4 w-0 flex-1">
                                 <dl>
                                     <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
-                                    <dd className="text-lg font-semibold text-foreground">
+                                    <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                         <span className="sensitive-data">
                                             {getCurrencySymbol(clientCurrency)}{clientMetrics.totalRevenue.toFixed(2)}
                                         </span>
@@ -614,8 +704,8 @@ const ClientDashboard = ({
                     </CardContent>
                 </Card>
 
-                <Card className="h-full">
-                    <CardContent className="p-5 flex items-center h-full">
+                <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
                         <div className="flex items-center w-full">
                             <div className="flex-shrink-0">
                                 <DocumentTextIcon className="h-5 w-5 text-muted-foreground" />
@@ -623,7 +713,7 @@ const ClientDashboard = ({
                             <div className="ml-4 w-0 flex-1">
                                 <dl>
                                     <dt className="text-sm font-medium text-muted-foreground truncate">Pending</dt>
-                                    <dd className="text-lg font-semibold text-foreground">
+                                    <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                         <span className="sensitive-data">
                                             {getCurrencySymbol(clientCurrency)}{clientMetrics.pendingAmount.toFixed(2)}
                                         </span>
@@ -634,8 +724,8 @@ const ClientDashboard = ({
                     </CardContent>
                 </Card>
 
-                <Card className="h-full">
-                    <CardContent className="p-5 flex items-center h-full">
+                <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
                         <div className="flex items-center w-full">
                             <div className="flex-shrink-0">
                                 <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
@@ -643,7 +733,7 @@ const ClientDashboard = ({
                             <div className="ml-4 w-0 flex-1">
                                 <dl>
                                     <dt className="text-sm font-medium text-muted-foreground truncate">Expenses</dt>
-                                    <dd className="text-lg font-semibold text-foreground">
+                                    <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                         <span className="sensitive-data">
                                             {formatAmounts(expenseTotalsByCurrency)}
                                         </span>
@@ -654,8 +744,8 @@ const ClientDashboard = ({
                     </CardContent>
                 </Card>
 
-                <Card className="h-full">
-                    <CardContent className="p-5 flex items-center h-full">
+                <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
                         <div className="flex items-center w-full">
                             <div className="w-full">
                                 <dl>
@@ -683,8 +773,8 @@ const ClientDashboard = ({
 
             {/* Projects Section */}
             <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
+                <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
+                    <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
                         <CardTitle className="text-lg">
                             Projects ({clientProjects.length})
                         </CardTitle>
@@ -697,7 +787,7 @@ const ClientDashboard = ({
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
                     {activeClientProjects.length === 0 && archivedClientProjects.length === 0 ? (
                         <div className="text-center py-8">
                             <ClipboardDocumentCheckIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -713,66 +803,7 @@ const ClientDashboard = ({
                         <>
                             {activeClientProjects.length > 0 && (
                                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                    {activeClientProjects.map((project) => {
-                                        const projectTasks = clientTasks.filter(task => task.projectId === project.id);
-                                        const projectTimeEntries = clientTimeEntries.filter(entry => 
-                                            projectTasks.some(task => task.id === entry.taskId)
-                                        );
-                                        const totalTime = projectTimeEntries.reduce((total, entry) => 
-                                            total + (entry.end - entry.start), 0
-                                        );
-
-                                        return (
-                                            <Card
-                                                key={project.id}
-                                                className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4"
-                                                style={getProjectBorderStyle(project)}
-                                                onClick={() => navigateToProject(project.id)}
-                                            >
-                                                <CardContent className="pt-5">
-                                                <h3 className="font-medium text-foreground truncate">{project.title}</h3>
-                                                {project.hourlyRate && (
-                                                    <p className="text-sm text-muted-foreground mt-1">
-                                                        <span className="sensitive-data">
-                                                            {getCurrencySymbol(getProjectCurrency(project, clients))}
-                                                            {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
-                                                        </span>
-                                                    </p>
-                                                )}
-                                                <div className="mt-2 text-sm text-muted-foreground">
-                                                    <p>{projectTasks.filter(t => !t.completed && !t.archived).length} active tasks</p>
-                                                    <p>{formatDuration(totalTime)} total time</p>
-                                                </div>
-
-                                                {/* Billable Amount Tag or Clock Icon for missing rate */}
-                                                {calculateUnbilledAmount(project) > 0 ? (
-                                                    <div className="absolute bottom-4 right-4">
-                                                        <button
-                                                            onClick={(e) => handleGenerateInvoice(e)}
-                                                            className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
-                                                            title="Click to generate invoice"
-                                                        >
-                                                            <span className="sensitive-data">
-                                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
-                                                            </span>
-                                                        </button>
-                                                    </div>
-                                                ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
-                                                    <div className="absolute bottom-4 right-4">
-                                                        <button
-                                                            onClick={(e) => handleGenerateInvoice(e)}
-                                                            className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
-                                                            title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
-                                                        >
-                                                            <ClockIcon className="h-3 w-3 mr-1" />
-                                                            {calculateUnbilledHours(project).toFixed(2)}h
-                                                        </button>
-                                                    </div>
-                                                ) : null}
-                                                </CardContent>
-                                            </Card>
-                                        );
-                                    })}
+                                    {activeClientProjects.map((project) => renderProjectSummaryCard(project))}
                                 </div>
                             )}
 
@@ -793,71 +824,7 @@ const ClientDashboard = ({
 
                                     {showArchivedProjects && (
                                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                            {archivedClientProjects.map((project) => {
-                                                const projectTasks = clientTasks.filter(task => task.projectId === project.id);
-                                                const projectTimeEntries = clientTimeEntries.filter(entry => 
-                                                    projectTasks.some(task => task.id === entry.taskId)
-                                                );
-                                                const totalTime = projectTimeEntries.reduce((total, entry) => 
-                                                    total + (entry.end - entry.start), 0
-                                                );
-
-                                                return (
-                                                    <Card
-                                                        key={project.id}
-                                                        className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4"
-                                                        style={getProjectBorderStyle(project)}
-                                                        onClick={() => navigateToProject(project.id)}
-                                                    >
-                                                        <CardContent className="pt-5">
-                                                        <div className="flex items-center min-w-0">
-                                                            <h3 className="font-medium text-foreground truncate">{project.title}</h3>
-                                                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground whitespace-nowrap">
-                                                                Archived
-                                                            </span>
-                                                        </div>
-                                                        {project.hourlyRate && (
-                                                            <p className="text-sm text-muted-foreground mt-1">
-                                                                <span className="sensitive-data">
-                                                                    {getCurrencySymbol(getProjectCurrency(project, clients))}
-                                                                    {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
-                                                                </span>
-                                                            </p>
-                                                        )}
-                                                        <div className="mt-2 text-sm text-muted-foreground">
-                                                            <p>{projectTasks.filter(t => !t.completed && !t.archived).length} active tasks</p>
-                                                            <p>{formatDuration(totalTime)} total time</p>
-                                                        </div>
-
-                                                        {/* Billable Amount Tag or Clock Icon for missing rate */}
-                                                        {calculateUnbilledAmount(project) > 0 ? (
-                                                            <div className="absolute bottom-4 right-4">
-                                                                <button
-                                                                    onClick={(e) => handleGenerateInvoice(e)}
-                                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
-                                                                    title="Click to generate invoice"
-                                                                >
-                                                                    <span className="sensitive-data">
-                                                                        {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
-                                                                    </span>
-                                                                </button>
-                                                            </div>
-                                                        ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
-                                                            <div className="absolute bottom-4 right-4">
-                                                                <button
-                                                                    onClick={(e) => handleGenerateInvoice(e)}
-                                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
-                                                                    title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
-                                                                >
-                                                                    <ClockIcon className="h-3 w-3 mr-1" />
-                                                                    {calculateUnbilledHours(project).toFixed(2)}h
-                                                                </button>
-                                                            </div>
-                                                        ) : null}
-                                                        </CardContent>
-                                                    </Card>
-                                                );
-                                            })}
+                                            {archivedClientProjects.map((project) => renderProjectSummaryCard(project, true))}
                                         </div>
                                     )}
                                 </div>
@@ -875,7 +842,7 @@ const ClientDashboard = ({
 
             {/* Invoices Section */}
             <Card>
-                <CardHeader>
+                <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
                     <div className="flex items-center justify-between">
                         <button
                             type="button"
@@ -895,7 +862,7 @@ const ClientDashboard = ({
                 </CardHeader>
 
                 {isInvoicesExpanded && (
-                    <CardContent id="client-invoices-list">
+                    <CardContent id="client-invoices-list" className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
                         <InvoicesList
                             projectInvoices={clientInvoices}
                             onEditInvoice={handleEditInvoice}
@@ -917,10 +884,10 @@ const ClientDashboard = ({
                 />
             ) : (
                 <Card>
-                    <CardHeader>
+                    <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
                         <CardTitle className="text-lg">Time Analytics</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
                         <EmptyState
                             icon={ClockIcon}
                             description="No time entries for this client yet."

@@ -8,6 +8,7 @@ import { formatDurationWithSeconds, getTodayString } from '../../../utils/dateUt
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
+import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
 
 /**
  * SubtaskItem component - Displays individual subtask.
@@ -21,6 +22,7 @@ const SubtaskItem = ({
     onEditTask,
     onViewTask
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(task.title);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
@@ -141,52 +143,106 @@ const SubtaskItem = ({
     }, [onViewTask, task]);
 
     return (
-        <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md hover:bg-muted transition-colors ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
-            <TaskHeader
-                task={task}
-                isEditing={isEditing}
-                editTitle={editTitle}
-                setEditTitle={setEditTitle}
-                isCompleted={isCompleted}
-                isArchived={isArchived}
-                onToggleComplete={handleToggleComplete}
-                onSaveTitle={handleUpdateTitle}
-                onCancelEdit={cancelEdit}
-                onShowTimeEntries={() => setShowTimeEntriesModal(true)}
-                mainTaskTime={mainTaskTime}
-                totalTimeWithSubtasks={mainTaskTime}
-                isSubtask={true}
-                showTimeDisplay={false}
-                onTitleClick={handleViewTask}
-            />
+        <div className={`rounded-md px-2 py-2 transition-colors hover:bg-muted ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
+            {isMobileLayout ? (
+                <>
+                    <TaskHeader
+                        task={task}
+                        isEditing={isEditing}
+                        editTitle={editTitle}
+                        setEditTitle={setEditTitle}
+                        isCompleted={isCompleted}
+                        isArchived={isArchived}
+                        onToggleComplete={handleToggleComplete}
+                        onSaveTitle={handleUpdateTitle}
+                        onCancelEdit={cancelEdit}
+                        onShowTimeEntries={() => setShowTimeEntriesModal(true)}
+                        mainTaskTime={mainTaskTime}
+                        totalTimeWithSubtasks={mainTaskTime}
+                        isSubtask={true}
+                        showTimeDisplay={false}
+                        onTitleClick={handleViewTask}
+                    />
 
-            {(task.startDate || task.recurring) && (
-                <StartDateBadge
-                    startDate={task.startDate}
-                    recurring={task.recurring}
-                    completed={isCompleted}
-                />
-            )}
+                    <div className="mt-1.5 flex w-full flex-wrap items-center justify-end gap-2" data-testid={`subtask-item-secondary-${task.id}`}>
+                        {(task.startDate || task.recurring) && (
+                            <StartDateBadge
+                                startDate={task.startDate}
+                                recurring={task.recurring}
+                                completed={isCompleted}
+                            />
+                        )}
 
-            {liveTaskTime > 0 && (
-                <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                    {formatDurationWithSeconds(liveTaskTime)}
+                        {liveTaskTime > 0 && (
+                            <div className="flex-shrink-0 text-xs text-muted-foreground">
+                                {formatDurationWithSeconds(liveTaskTime)}
+                            </div>
+                        )}
+
+                        <TaskActions
+                            task={task}
+                            isEditing={isEditing}
+                            isTimerActive={isTimerActive}
+                            anyTimerActive={isAnyTimerActive}
+                            isArchived={isArchived}
+                            isCompleted={isCompleted}
+                            isRelatedToActiveTimer={isRelatedToActiveTimer}
+                            onDelete={onDelete}
+                            onToggleBillable={onToggleBillable}
+                            onShowTimeEntries={() => setShowTimeEntriesModal(true)}
+                            onEdit={handleEditTask}
+                        />
+                    </div>
+                </>
+            ) : (
+                <div className="flex items-center justify-between gap-3">
+                    <TaskHeader
+                        task={task}
+                        isEditing={isEditing}
+                        editTitle={editTitle}
+                        setEditTitle={setEditTitle}
+                        isCompleted={isCompleted}
+                        isArchived={isArchived}
+                        onToggleComplete={handleToggleComplete}
+                        onSaveTitle={handleUpdateTitle}
+                        onCancelEdit={cancelEdit}
+                        onShowTimeEntries={() => setShowTimeEntriesModal(true)}
+                        mainTaskTime={mainTaskTime}
+                        totalTimeWithSubtasks={mainTaskTime}
+                        isSubtask={true}
+                        showTimeDisplay={false}
+                        onTitleClick={handleViewTask}
+                    />
+
+                    {(task.startDate || task.recurring) && (
+                        <StartDateBadge
+                            startDate={task.startDate}
+                            recurring={task.recurring}
+                            completed={isCompleted}
+                        />
+                    )}
+
+                    {liveTaskTime > 0 && (
+                        <div className="flex-shrink-0 text-xs text-muted-foreground">
+                            {formatDurationWithSeconds(liveTaskTime)}
+                        </div>
+                    )}
+
+                    <TaskActions
+                        task={task}
+                        isEditing={isEditing}
+                        isTimerActive={isTimerActive}
+                        anyTimerActive={isAnyTimerActive}
+                        isArchived={isArchived}
+                        isCompleted={isCompleted}
+                        isRelatedToActiveTimer={isRelatedToActiveTimer}
+                        onDelete={onDelete}
+                        onToggleBillable={onToggleBillable}
+                        onShowTimeEntries={() => setShowTimeEntriesModal(true)}
+                        onEdit={handleEditTask}
+                    />
                 </div>
             )}
-
-            <TaskActions
-                task={task}
-                isEditing={isEditing}
-                isTimerActive={isTimerActive}
-                anyTimerActive={isAnyTimerActive}
-                isArchived={isArchived}
-                isCompleted={isCompleted}
-                isRelatedToActiveTimer={isRelatedToActiveTimer}
-                onDelete={onDelete}
-                onToggleBillable={onToggleBillable}
-                onShowTimeEntries={() => setShowTimeEntriesModal(true)}
-                onEdit={handleEditTask}
-            />
 
             <TimeEntriesModal
                 isOpen={showTimeEntriesModal}

@@ -44,4 +44,19 @@ describe('Modal', () => {
 
         expect(onClose).toHaveBeenCalled()
     })
+
+    it('uses a mobile-safe shell without horizontal overflow', () => {
+
+        render(
+            <Modal isOpen onClose={vi.fn()} title="Edit Task">
+                <div>Content</div>
+            </Modal>
+        )
+
+        const dialog = screen.getByRole('dialog')
+
+        expect(dialog.className.includes('w-[calc(100vw-1rem)]')).toBe(true)
+        expect(dialog.className.includes('max-w-[calc(100vw-1rem)]')).toBe(true)
+        expect(dialog.className.includes('overflow-hidden')).toBe(true)
+    })
 })

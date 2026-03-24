@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProjectList from './ProjectList'
 
@@ -153,5 +153,35 @@ describe('ProjectList', () => {
         expect(expensesHookMocks.deleteExpense).toHaveBeenCalledWith('expense-1')
         expect(recurrencesHookMocks.deleteRecurrence).toHaveBeenCalledWith('recurrence-1')
         expect(projectsHookMocks.deleteProject).toHaveBeenCalledWith('project-1')
+    })
+
+    it('shows client context and opens the project on card click', () => {
+        const onSelectProject = vi.fn()
+
+        projectsHookMocks.projects = [
+            {
+                id: 'project-1',
+                title: 'Project One',
+                createdAt: Date.now(),
+                archived: false,
+                preferredClientId: 'client-1',
+            }
+        ]
+
+        render(
+            <ProjectList
+                onSelectProject={onSelectProject}
+                clients={[{ id: 'client-1', title: 'Acme Co' }]}
+                openProjectModal={vi.fn()}
+                editProjectModal={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Client:')).toBeInTheDocument()
+        expect(screen.getByText('Acme Co')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByText('Project One'))
+
+        expect(onSelectProject).toHaveBeenCalledWith(expect.objectContaining({ id: 'project-1' }))
     })
 })

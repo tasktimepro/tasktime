@@ -58,7 +58,7 @@ const TaskHeader = ({
                                     className={`text-left text-sm font-medium transition-colors cursor-pointer min-w-0 ${
                                         isCompleted
                                             ? 'line-through text-muted-foreground hover:text-muted-foreground'
-                                            : 'text-foreground hover:text-blue-600 dark:hover:text-blue-400'
+                                            : 'text-foreground hover-status-info-text-strong'
                                     }`}
                                 >
                                     <span className="truncate w-full">{task.title}</span>

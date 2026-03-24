@@ -282,7 +282,7 @@ const OnboardingModal = ({
                     
                     <div className="bg-muted border border-border rounded-lg p-4">
                         <div className="text-center">
-                            <div className="font-medium text-blue-900 mb-1">🏠 Always just a click away</div>
+                            <div className="status-info-text mb-1 font-medium">🏠 Always just a click away</div>
                             <div className="text-sm text-muted-foreground">
                                 Click the TaskTime logo or "Dashboard" tab to return here anytime
                             </div>

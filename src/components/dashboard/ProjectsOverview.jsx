@@ -17,13 +17,13 @@ const ProjectsOverview = ({
 }) => {
     return (
         <Card>
-            <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
+            <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <CardTitle className="flex items-center text-lg">
-                        <ClipboardDocumentCheckIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                        <ClipboardDocumentCheckIcon className="status-info-text-strong mr-2 h-5 w-5" />
                         Recent Projects
                     </CardTitle>
-                    <div className="relative">
+                    <div className="relative w-full sm:w-auto sm:min-w-56">
                         <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
                         <Input
                             type="text"
@@ -35,7 +35,7 @@ const ProjectsOverview = ({
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="pt-0 max-h-96 overflow-y-auto">
+            <CardContent className="px-3 pb-2.5 pt-0 sm:px-5 sm:pb-4 max-h-96 overflow-y-auto">
                 {recentProjects.length > 0 ? (
                     <div className="divide-y divide-border">
                         {recentProjects.map((project) => (
@@ -44,7 +44,7 @@ const ProjectsOverview = ({
                                     <div className="flex-1 min-w-0 space-y-1">
                                         <button
                                             onClick={() => navigateToProject(project.id)}
-                                                    className="text-sm font-medium text-foreground truncate cursor-pointer hover:text-blue-600 dark:text-blue-400 text-left block"
+                                            className="hover-status-info-text-strong text-sm font-medium text-foreground truncate cursor-pointer text-left block"
                                             title={`Click to open ${project.title} project`}
                                         >
                                             {project.title}

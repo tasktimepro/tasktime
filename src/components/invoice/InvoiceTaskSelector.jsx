@@ -203,7 +203,7 @@ const InvoiceTaskSelector = ({
                                                 <p className="text-xs text-muted-foreground">
                                                     Original: {formatDurationWithSeconds(originalTimeMs)}
                                                     {task.isEdited && (
-                                                        <span className="text-blue-600 ml-2">(Modified)</span>
+                                                        <span className="status-info-text-strong ml-2">(Modified)</span>
                                                     )}
                                                 </p>
                                             </div>
@@ -218,7 +218,7 @@ const InvoiceTaskSelector = ({
                                                         onChange={(checked) => handleToggleMergeSubtasks(task.id, checked)}
                                                         title="Merge subtasks with this parent task"
                                                         label="Merge subtasks"
-                                                        labelClassName="text-xs text-blue-700 font-medium"
+                                                        labelClassName="text-xs status-info-text font-medium"
                                                     />
                                                 </div>
                                             )}

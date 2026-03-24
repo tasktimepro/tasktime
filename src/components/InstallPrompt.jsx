@@ -93,7 +93,7 @@ const InstallPrompt = () => {
     if (!showPrompt || !deferredPrompt) return null;
     
     return (
-        <div className="fixed bottom-4 right-4 bg-card border border-border rounded-lg shadow-xl p-4 max-w-sm z-50">
+        <div className="fixed left-4 right-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] bg-card border border-border rounded-lg shadow-xl p-4 z-50 sm:left-auto sm:max-w-sm sm:bottom-4 sm:right-4">
             <Button
                 onClick={handleDismiss}
                 variant="ghost"

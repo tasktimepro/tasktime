@@ -72,7 +72,7 @@ const ClientDeleteDialog = ({
                         <Button
                             onClick={onDeleteOnly}
                             variant="outline"
-                            className="w-full border-yellow-300 text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:ring-yellow-500 dark:border-yellow-700 dark:text-yellow-300 dark:bg-yellow-950 dark:hover:bg-yellow-900"
+                            className="w-full status-warning-border status-warning-surface status-warning-text hover:opacity-90"
                         >
                             Delete & Remove Client Reference
                         </Button>
@@ -80,7 +80,7 @@ const ClientDeleteDialog = ({
                         <Button
                             onClick={onDeleteAll}
                             variant="outline"
-                            className="w-full border-red-300 text-red-700 bg-red-50 hover:bg-red-100 focus:ring-ring dark:border-red-700 dark:text-red-300 dark:bg-red-950 dark:hover:bg-red-900"
+                            className="w-full status-danger-border status-danger-surface status-danger-text hover:opacity-90"
                         >
                             Delete Client & All Projects
                         </Button>

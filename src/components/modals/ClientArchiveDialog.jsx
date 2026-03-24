@@ -71,7 +71,7 @@ const ClientArchiveDialog = ({
                         <Button
                             onClick={onArchiveOnly}
                             variant="outline"
-                            className="w-full border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-ring dark:border-blue-700 dark:text-blue-300 dark:bg-blue-950 dark:hover:bg-blue-900"
+                            className="w-full status-info-border status-info-surface status-info-text hover:opacity-90"
                         >
                             Archive Client Only
                         </Button>

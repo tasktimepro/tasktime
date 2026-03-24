@@ -78,6 +78,11 @@ const ProjectList = ({
         return color ? { borderLeftColor: color } : {};
     };
 
+    const getProjectClient = (project) => {
+        if (!project.preferredClientId) return null;
+        return clientsById.get(project.preferredClientId) || null;
+    };
+
     const handleSortChange = (value) => {
 
         updatePreferences({ projectSort: value });
@@ -365,6 +370,151 @@ const ProjectList = ({
         showSuccess('Project unarchived successfully.');
     };
 
+    const renderProjectValueChip = (project) => {
+        if (!project.isPersonal && calculateUnbilledAmount(project) > 0) {
+            return (
+                <button
+                    onClick={(e) => handleGenerateInvoice(e, project)}
+                    className="inline-flex items-center rounded-full bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    title="Click to generate invoice"
+                >
+                    <span className="sensitive-data">
+                        {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
+                    </span>
+                </button>
+            );
+        }
+
+        if (!project.isPersonal && !project.hourlyRate && calculateUnbilledHours(project) > 0) {
+            return (
+                <button
+                    onClick={(e) => handleGenerateInvoice(e, project)}
+                    className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                    title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
+                >
+                    <ClockIcon className="mr-1 h-3 w-3" />
+                    {calculateUnbilledHours(project).toFixed(2)}h
+                </button>
+            );
+        }
+
+        return null;
+    };
+
+    const renderProjectCard = (project, { archived = false } = {}) => {
+        const client = getProjectClient(project);
+        const projectValueChip = renderProjectValueChip(project);
+        const lastActive = projectLastActiveMap.get(project.id);
+
+        return (
+            <Card
+                key={project.id}
+                className="relative cursor-pointer border-l-4 transition-shadow hover:shadow-md"
+                style={getProjectBorderStyle(project)}
+                onClick={() => onSelectProject(project)}
+            >
+                <CardContent className="p-4 sm:pt-5">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="truncate text-base font-medium text-foreground sm:text-lg">
+                                    {project.title}
+                                </h3>
+                                {archived && (
+                                    <Badge variant="secondary">Archived</Badge>
+                                )}
+                                {project.isPersonal && (
+                                    <Badge variant="secondary">Personal</Badge>
+                                )}
+                            </div>
+
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground sm:text-sm">
+                                <span>Created {toDisplayDate(project.createdAt)}</span>
+                                {lastActive ? (
+                                    <span>Last active {toDisplayDate(lastActive)}</span>
+                                ) : null}
+                            </div>
+
+                            {client?.title && !project.isPersonal && (
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    Client: <span className="font-medium text-foreground">{client.title}</span>
+                                </p>
+                            )}
+
+                            {project.hourlyRate && !project.flatRate && (
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    <span className="sensitive-data">
+                                        {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                    </span>
+                                </p>
+                            )}
+                        </div>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                {archived ? (
+                                    <button
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted group"
+                                        title="More actions"
+                                        aria-label="More actions"
+                                    >
+                                        <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
+                                    </button>
+                                ) : (
+                                    <Button
+                                        onClick={(e) => e.stopPropagation()}
+                                        variant="ghost"
+                                        size="icon"
+                                        className="rounded-full text-muted-foreground hover:bg-muted"
+                                        title="More actions"
+                                        aria-label="More actions"
+                                    >
+                                        <MoreHorizontal className="h-5 w-5" />
+                                    </Button>
+                                )}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                {!archived && (
+                                    <DropdownMenuItem
+                                        onClick={() => editProjectModal(project)}
+                                        className="status-warning-action flex items-center space-x-2"
+                                    >
+                                        <PencilIcon className="h-4 w-4" />
+                                        <span>Edit</span>
+                                    </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                    onClick={() => archived ? handleUnarchiveProject(project.id) : handleArchiveProject(project.id)}
+                                    className="status-info-action flex items-center space-x-2"
+                                >
+                                    <ArchiveBoxIcon className="h-4 w-4" />
+                                    <span>{archived ? 'Unarchive' : 'Archive'}</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => archived ? handleDeleteProject(project.id) : (() => {
+                                        setProjectToDelete(project);
+                                        setShowDeleteModal(true);
+                                    })()}
+                                    className="status-danger-action flex items-center space-x-2"
+                                >
+                                    <TrashIcon className="h-4 w-4" />
+                                    <span>Delete</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+
+                    {projectValueChip && (
+                        <div className="mt-4 flex justify-start sm:justify-end">
+                            {projectValueChip}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        );
+    };
+
     /**
      * Confirm project deletion (for direct deletion without invoices)
      */
@@ -409,7 +559,7 @@ const ProjectList = ({
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-2xl font-bold text-foreground">
                     Projects {activeProjects.length > 0 && (
                         <span>
@@ -418,7 +568,7 @@ const ProjectList = ({
                     )}
                 </h2>
 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center justify-between gap-3 sm:justify-start">
                     <Select value={projectSort} onValueChange={handleSortChange}>
                         <SelectTrigger
                             className="h-9 w-9"
@@ -441,6 +591,7 @@ const ProjectList = ({
                     </Select>
 
                     <Button 
+                        className="sm:w-auto"
                         onClick={() => openProjectModal()} 
                         leadingIcon={PlusIcon}
                     >
@@ -465,108 +616,8 @@ const ProjectList = ({
                 <>
                     {/* Active Projects */}
                     {sortedActiveProjects.length > 0 && (
-                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {sortedActiveProjects.map((project) => (
-                                <Card
-                                    key={project.id}
-                                    className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4"
-                                    style={getProjectBorderStyle(project)}
-                                    onClick={() => onSelectProject(project)}
-                                >
-                                    <CardContent className="pt-5">
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="text-lg font-medium text-foreground truncate">
-                                                {project.title}
-                                            </h3>
-
-                                            {/* Three-dot dropdown menu for Edit and Delete */}
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="text-muted-foreground hover:bg-muted rounded-full"
-                                                        title="More actions"
-                                                        aria-label="More actions"
-                                                    >
-                                                        <MoreHorizontal className="h-5 w-5" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                                    <DropdownMenuItem
-                                                        onClick={() => editProjectModal(project)}
-                                                        className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
-                                                    >
-                                                        <PencilIcon className="h-4 w-4" />
-                                                        <span>Edit</span>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleArchiveProject(project.id)}
-                                                        className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
-                                                    >
-                                                        <ArchiveBoxIcon className="h-4 w-4" />
-                                                        <span>Archive</span>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => {
-                                                            setProjectToDelete(project);
-                                                            setShowDeleteModal(true);
-                                                        }}
-                                                        className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
-                                                    >
-                                                        <TrashIcon className="h-4 w-4" />
-                                                        <span>Delete</span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-
-                                        {project.hourlyRate && !project.flatRate && (
-                                            <p className="mt-2 text-sm text-muted-foreground">
-                                                <span className="sensitive-data">
-                                                    {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
-                                                </span>
-                                            </p>
-                                        )}
-
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Created {toDisplayDate(project.createdAt)}
-                                            {project.isPersonal && (
-                                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground">
-                                                    Personal
-                                                </span>
-                                            )}
-                                        </p>
-
-                                        {/* Billable Amount Tag or Clock Icon for missing rate - Only show for non-personal projects */}
-                                        {!project.isPersonal && calculateUnbilledAmount(project) > 0 ? (
-                                            <div className="absolute bottom-4 right-4">
-                                                <button
-                                                    onClick={(e) => handleGenerateInvoice(e, project)}
-                                                    className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
-                                                    title="Click to generate invoice"
-                                                >
-                                                    <span className="sensitive-data">
-                                                        {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
-                                                    </span>
-                                                </button>
-                                            </div>
-                                        ) : !project.isPersonal && !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
-                                            <div className="absolute bottom-4 right-4">
-                                                <button
-                                                    onClick={(e) => handleGenerateInvoice(e, project)}
-                                                    className="inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground text-xs font-medium rounded-full hover:bg-secondary/80 transition-colors"
-                                                    title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
-                                                >
-                                                    <ClockIcon className="h-3 w-3 mr-1" />
-                                                    {calculateUnbilledHours(project).toFixed(2)}h
-                                                </button>
-                                            </div>
-                                        ) : null}
-                                    </CardContent>
-                                </Card>
-                            ))}
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {sortedActiveProjects.map((project) => renderProjectCard(project))}
                 </div>
                     )}
 
@@ -586,100 +637,8 @@ const ProjectList = ({
                             </button>
 
                             {showArchivedProjects && (
-                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {sortedArchivedProjects.map((project) => (
-                                        <Card
-                                            key={project.id}
-                                            className="hover:shadow-md transition-shadow cursor-pointer relative border-l-4"
-                                            style={getProjectBorderStyle(project)}
-                                            onClick={() => onSelectProject(project)}
-                                        >
-                                            <CardContent className="pt-5">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center min-w-0">
-                                                        <h3 className="text-lg font-medium text-foreground truncate">
-                                                            {project.title}
-                                                        </h3>
-                                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground whitespace-nowrap">
-                                                            Archived
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Three-dot dropdown menu for Unarchive and Delete */}
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <button
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors group"
-                                                                title="More actions"
-                                                            >
-                                                                <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
-                                                            </button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                                            <DropdownMenuItem
-                                                                onClick={() => handleUnarchiveProject(project.id)}
-                                                                className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
-                                                            >
-                                                                <ArchiveBoxIcon className="h-4 w-4" />
-                                                                <span>Unarchive</span>
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() => handleDeleteProject(project.id)}
-                                                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
-                                                            >
-                                                                <TrashIcon className="h-4 w-4" />
-                                                                <span>Delete</span>
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-
-                                                {project.hourlyRate && !project.flatRate && (
-                                                    <p className="mt-2 text-sm text-muted-foreground">
-                                                        <span className="sensitive-data">
-                                                            {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
-                                                        </span>
-                                                    </p>
-                                                )}
-
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    Created {toDisplayDate(project.createdAt)}
-                                                    {project.isPersonal && (
-                                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground">
-                                                            Personal
-                                                        </span>
-                                                    )}
-                                                </p>
-
-                                                {/* Billable Amount Tag or Clock Icon for missing rate */}
-                                                {calculateUnbilledAmount(project) > 0 ? (
-                                                    <div className="absolute bottom-4 right-4">
-                                                        <button
-                                                            onClick={(e) => handleGenerateInvoice(e, project)}
-                                                            className="inline-flex items-center px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full hover:bg-primary/90 transition-colors"
-                                                            title="Click to generate invoice"
-                                                        >
-                                                            <span className="sensitive-data">
-                                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{calculateUnbilledAmount(project).toFixed(2)}
-                                                            </span>
-                                                        </button>
-                                                    </div>
-                                                ) : !project.hourlyRate && calculateUnbilledHours(project) > 0 ? (
-                                                    <div className="absolute bottom-4 right-4">
-                                                        <button
-                                                            onClick={(e) => handleGenerateInvoice(e, project)}
-                                                            className="inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground text-xs font-medium rounded-full hover:bg-secondary/80 transition-colors"
-                                                            title={`${calculateUnbilledHours(project).toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
-                                                        >
-                                                            <ClockIcon className="h-3 w-3 mr-1" />
-                                                            {calculateUnbilledHours(project).toFixed(2)}h
-                                                        </button>
-                                                    </div>
-                                                ) : null}
-                                            </CardContent>
-                                        </Card>
-                                    ))}
+                                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                        {sortedArchivedProjects.map((project) => renderProjectCard(project, { archived: true }))}
                                 </div>
                             )}
                         </div>

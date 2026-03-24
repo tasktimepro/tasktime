@@ -73,7 +73,7 @@ const Modal = ({
             <DialogContent
                 className={cn(
                     sizeClasses[size],
-                    'flex flex-col max-h-[calc(100vh-2rem)] p-0',
+                    'flex w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden max-h-[calc(100vh-1rem)] p-0 sm:w-full sm:max-w-none sm:max-h-[calc(100vh-2rem)]',
                     className
                 )}
                 // Hide default close button if showCloseButton is false
@@ -82,20 +82,20 @@ const Modal = ({
             >
                 {/* Header */}
                 {(title || description) && (
-                    <DialogHeader className="px-6 pt-6 pb-0 flex-shrink-0">
+                    <DialogHeader className="flex-shrink-0 px-4 pb-0 pt-4 sm:px-6 sm:pt-6">
                         {title && <DialogTitle>{title}</DialogTitle>}
                         {description && <DialogDescription>{description}</DialogDescription>}
                     </DialogHeader>
                 )}
                 
                 {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto px-6 py-4">
+                <div className="flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-6">
                     {children}
                 </div>
 
                 {/* Footer */}
                 {footer && (
-                    <DialogFooter className="px-6 py-4 border-t border-border flex-shrink-0">
+                    <DialogFooter className="flex-shrink-0 border-t border-border px-4 py-4 sm:px-6">
                         {footer}
                     </DialogFooter>
                 )}

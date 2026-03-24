@@ -5,6 +5,8 @@ import { useToast } from '../hooks/useToast.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 import PaymentMethods from './PaymentMethods';
 import BusinessInfo from './BusinessInfo';
 import InvoiceGenerator from './InvoiceGenerator';
@@ -37,6 +39,7 @@ const Invoices = ({
     openProjectModal,
     activeModal,
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const { urlParams } = useUrlState();
     const { showError } = useToast();
     const { timers } = useTimers();
@@ -127,17 +130,27 @@ const Invoices = ({
     }, [autoOpenCreate, updateUrl]);
 
     return (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4 overflow-x-hidden')}>
             {/* Navigation Tabs */}
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
-                <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+                <TabsList className={cn(
+                    'w-full bg-transparent rounded-none',
+                    isMobileLayout
+                        ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
+                        : 'justify-start border-b border-border p-0'
+                )}>
                     {sideNavItems.map((item) => {
                         const Icon = item.icon;
                         return (
                             <TabsTrigger
                                 key={item.id}
                                 value={item.id}
-                                className="flex items-center py-2 px-1 mr-8 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm whitespace-nowrap transition-colors data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                className={cn(
+                                    'flex items-center font-medium text-sm whitespace-nowrap transition-colors',
+                                    isMobileLayout
+                                        ? 'rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
+                                        : 'mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border'
+                                )}
                             >
                                 <Icon className="h-4 w-4 mr-2" />
                                 {item.name}
@@ -151,7 +164,7 @@ const Invoices = ({
             <div>
                 {activeTab === 'invoices' && (
                     <div>
-                        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                        <div className={cn('mb-6 flex flex-wrap justify-between gap-4', isMobileLayout ? 'items-start' : 'items-center')}>
                             <div>
                                 <h1 className="text-2xl font-bold text-foreground">
                                     Invoices {invoices.length > 0 && (
@@ -167,6 +180,7 @@ const Invoices = ({
                             <Button
                                 onClick={handleCreateNewInvoice}
                                 leadingIcon={PlusIcon}
+                                className={cn(isMobileLayout && 'w-full sm:w-auto')}
                             >
                                 New Invoice
                             </Button>

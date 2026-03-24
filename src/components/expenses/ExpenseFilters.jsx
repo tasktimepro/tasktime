@@ -35,7 +35,115 @@ const ExpenseFilters = ({
     billedStatus,
     onPaidStatusChange,
     onBilledStatusChange,
+    advancedOnly = false,
 }) => {
+
+    const advancedFiltersContent = (
+        <div className="space-y-5">
+            <div className="space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Type
+                </div>
+                <div className="flex flex-wrap gap-3">
+                    <CustomCheckbox
+                        checked={personalOnly}
+                        onChange={onPersonalToggle}
+                        label="Personal"
+                    />
+                    <CustomCheckbox
+                        checked={recurringOnly}
+                        onChange={onRecurringToggle}
+                        label="Recurring"
+                    />
+                    {!personalOnly && (
+                        <CustomCheckbox
+                            checked={billableOnly}
+                            onChange={onBillableToggle}
+                            label="Billable"
+                        />
+                    )}
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Assignment
+                </div>
+                {!personalOnly && (
+                    <div className="space-y-1">
+                        <div className="text-xs font-medium text-muted-foreground">Client</div>
+                        <Select value={clientId} onValueChange={onClientChange}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="All clients" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All clients</SelectItem>
+                                {clients.map((client) => (
+                                    <SelectItem key={client.id} value={client.id}>
+                                        {client.title}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+                <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground">Project</div>
+                    <Select value={projectId} onValueChange={onProjectChange}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="All projects" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All projects</SelectItem>
+                            {projects.map((project) => (
+                                <SelectItem key={project.id} value={project.id}>
+                                    {project.title}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Status
+                </div>
+                <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground">Paid status</div>
+                    <Select value={paidStatus} onValueChange={onPaidStatusChange}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Paid status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="paid">Paid</SelectItem>
+                            <SelectItem value="unpaid">Unpaid</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                {!personalOnly && billableOnly && (
+                    <div className="space-y-1">
+                        <div className="text-xs font-medium text-muted-foreground">Billed status</div>
+                        <Select value={billedStatus} onValueChange={onBilledStatusChange}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Billed status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All</SelectItem>
+                                <SelectItem value="billed">Billed</SelectItem>
+                                <SelectItem value="unbilled">Unbilled</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    if (advancedOnly) {
+        return advancedFiltersContent;
+    }
 
     return (
         <div className="space-y-3">
@@ -68,106 +176,7 @@ const ExpenseFilters = ({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-[320px] p-4" align="end">
-                        <div className="space-y-5">
-                            <div className="space-y-2">
-                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Type
-                                </div>
-                                <div className="flex flex-wrap gap-3">
-                                    <CustomCheckbox
-                                        checked={personalOnly}
-                                        onChange={onPersonalToggle}
-                                        label="Personal"
-                                    />
-                                    <CustomCheckbox
-                                        checked={recurringOnly}
-                                        onChange={onRecurringToggle}
-                                        label="Recurring"
-                                    />
-                                    {!personalOnly && (
-                                        <CustomCheckbox
-                                            checked={billableOnly}
-                                            onChange={onBillableToggle}
-                                            label="Billable"
-                                        />
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Assignment
-                                </div>
-                                {!personalOnly && (
-                                    <div className="space-y-1">
-                                        <div className="text-xs font-medium text-muted-foreground">Client</div>
-                                        <Select value={clientId} onValueChange={onClientChange}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="All clients" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All clients</SelectItem>
-                                                {clients.map((client) => (
-                                                    <SelectItem key={client.id} value={client.id}>
-                                                        {client.title}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-                                <div className="space-y-1">
-                                    <div className="text-xs font-medium text-muted-foreground">Project</div>
-                                    <Select value={projectId} onValueChange={onProjectChange}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="All projects" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All projects</SelectItem>
-                                            {projects.map((project) => (
-                                                <SelectItem key={project.id} value={project.id}>
-                                                    {project.title}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Status
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="text-xs font-medium text-muted-foreground">Paid status</div>
-                                    <Select value={paidStatus} onValueChange={onPaidStatusChange}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Paid status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All</SelectItem>
-                                            <SelectItem value="paid">Paid</SelectItem>
-                                            <SelectItem value="unpaid">Unpaid</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                {!personalOnly && billableOnly && (
-                                    <div className="space-y-1">
-                                        <div className="text-xs font-medium text-muted-foreground">Billed status</div>
-                                        <Select value={billedStatus} onValueChange={onBilledStatusChange}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Billed status" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All</SelectItem>
-                                                <SelectItem value="billed">Billed</SelectItem>
-                                                <SelectItem value="unbilled">Unbilled</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        {advancedFiltersContent}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>

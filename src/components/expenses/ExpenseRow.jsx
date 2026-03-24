@@ -106,11 +106,11 @@ const ExpenseRow = ({
         >
             <CardContent className="p-4">
                 <div className="flex flex-col space-y-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center space-x-3">
                         <HandCoinsIcon className="h-6 w-6 text-muted-foreground" />
-                        <div className="flex items-center space-x-2">
-                            <h3 className="text-sm font-medium text-foreground">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <h3 className="truncate text-sm font-medium text-foreground">
                                 {expense.title}
                             </h3>
                             {expense.isRecurring && (
@@ -126,7 +126,7 @@ const ExpenseRow = ({
                     </div>
                 </div>
 
-                <div className="flex items-end justify-between ml-9">
+                <div className="ml-0 flex flex-col gap-3 sm:ml-9 sm:flex-row sm:items-end sm:justify-between">
                     <div className="flex-1">
                         <p className="text-sm text-muted-foreground">
                             {toDisplayDate(expense.date)}
@@ -174,11 +174,12 @@ const ExpenseRow = ({
                         )}
                     </div>
 
-                    <div className="flex justify-end items-center space-x-2">
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
                         {!isPaidDisplay && !isPreview && !(expense.paymentMode === 'auto' && expense.amountType !== 'variable') && (
                             <Button
                                 size="sm"
                                 leadingIcon={CheckIcon}
+                                className="w-full sm:w-auto"
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     onTogglePaid(expense);
@@ -195,6 +196,7 @@ const ExpenseRow = ({
                                 }}
                                 variant="ghost"
                                 size="icon"
+                                className="self-end"
                                 title="Edit Expense"
                             >
                                 <PencilIcon className="h-5 w-5" />

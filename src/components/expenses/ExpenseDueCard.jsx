@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowPathIcon, CheckIcon, HandCoinsIcon } from '@/components/ui/icons';
 import StartDateBadge from '../task/StartDateBadge';
+import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { getOrdinalSuffix } from '@/utils/recurringUtils.ts';
@@ -20,6 +21,7 @@ const ExpenseDueCard = ({
     isPreview = false,
     recurrence = null,
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const isVariable = expense.amountType === 'variable';
     const hasAmount = typeof expense.amount === 'number' && expense.amount > 0;
     const isPaid = expense.paymentStatus === 'paid';
@@ -105,56 +107,117 @@ const ExpenseDueCard = ({
 
     return (
         <div
-            className={`px-3 py-3 hover:bg-muted ${isOverdue ? 'opacity-90' : ''}`}
+            className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${isOverdue ? 'opacity-90' : ''}`}
         >
-            <div className="flex items-center gap-3">
-                <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
-                <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
-                    {isClickable ? (
-                        <button
-                            type="button"
-                            onClick={() => onView?.(expense)}
-                            className="block w-full text-sm font-medium truncate text-left transition-colors text-foreground hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
-                            title="Open expense details"
-                        >
-                            <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
-                            {amountLabel && (
-                                <span className="ml-2 text-sm text-muted-foreground sensitive-data">
-                                    {amountLabel}
+            {isMobileLayout ? (
+                <div className="flex items-start gap-3">
+                    <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden" data-testid={`expense-row-content-${expense.id}`}>
+                        {isClickable ? (
+                            <button
+                                type="button"
+                                onClick={() => onView?.(expense)}
+                                className="hover-status-info-text-strong block w-full text-left text-sm font-medium text-foreground transition-colors cursor-pointer"
+                                title="Open expense details"
+                            >
+                                <span className={`whitespace-normal break-words ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`}>
+                                    {expense.title}
                                 </span>
-                            )}
-                        </button>
-                    ) : (
-                        <div className="text-sm font-medium text-foreground truncate">
-                            <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
-                            {amountLabel && (
-                                <span className="ml-2 text-sm text-muted-foreground sensitive-data">
-                                    {amountLabel}
+                                {amountLabel && (
+                                    <span className="ml-2 text-sm text-muted-foreground sensitive-data whitespace-nowrap">
+                                        {amountLabel}
+                                    </span>
+                                )}
+                            </button>
+                        ) : (
+                            <div className="text-left text-sm font-medium text-foreground">
+                                <span className={`whitespace-normal break-words ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`}>
+                                    {expense.title}
                                 </span>
+                                {amountLabel && (
+                                    <span className="ml-2 text-sm text-muted-foreground sensitive-data whitespace-nowrap">
+                                        {amountLabel}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        {metaLine && (
+                            <p className={`text-xs text-muted-foreground whitespace-normal break-words ${isPaidDisplay ? 'line-through' : ''}`}>
+                                {metaLine}
+                            </p>
+                        )}
+                        <div className="flex w-full flex-wrap items-center justify-end gap-2" data-testid={`expense-row-secondary-${expense.id}`}>
+                            <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                                {dateBadgeNode}
+                            </div>
+                            {canMarkPaid && (
+                                <div className="flex flex-wrap items-center justify-end gap-2" data-testid={`expense-row-actions-${expense.id}`}>
+                                    <Button
+                                        size="xs"
+                                        className="h-7 px-3"
+                                        aria-label="Mark as paid"
+                                        title="Mark as paid"
+                                        onClick={() => onMarkPaid?.()}
+                                        leadingIcon={CheckIcon}
+                                        type="button"
+                                    >
+                                        Mark Paid
+                                    </Button>
+                                </div>
                             )}
                         </div>
-                    )}
-                    {metaLine && (
-                        <p className={`text-xs text-muted-foreground truncate ${isPaidDisplay ? 'line-through' : ''}`}>
-                            {metaLine}
-                        </p>
+                    </div>
+                </div>
+            ) : (
+                <div className="flex items-center gap-3">
+                    <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
+                        {isClickable ? (
+                            <button
+                                type="button"
+                                onClick={() => onView?.(expense)}
+                                className="hover-status-info-text-strong block w-full text-left text-sm font-medium text-foreground transition-colors cursor-pointer truncate"
+                                title="Open expense details"
+                            >
+                                <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                                {amountLabel && (
+                                    <span className="ml-2 text-sm text-muted-foreground sensitive-data">
+                                        {amountLabel}
+                                    </span>
+                                )}
+                            </button>
+                        ) : (
+                            <div className="text-sm font-medium text-foreground truncate">
+                                <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                                {amountLabel && (
+                                    <span className="ml-2 text-sm text-muted-foreground sensitive-data">
+                                        {amountLabel}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        {metaLine && (
+                            <p className={`text-xs text-muted-foreground truncate ${isPaidDisplay ? 'line-through' : ''}`}>
+                                {metaLine}
+                            </p>
+                        )}
+                    </div>
+                    {dateBadgeNode}
+                    {canMarkPaid && (
+                        <Button
+                            size="xs"
+                            className="h-6 px-3"
+                            aria-label="Mark as paid"
+                            title="Mark as paid"
+                            onClick={() => onMarkPaid?.()}
+                            leadingIcon={CheckIcon}
+                            type="button"
+                        >
+                            Mark Paid
+                        </Button>
                     )}
                 </div>
-                {dateBadgeNode}
-                {canMarkPaid && (
-                    <Button
-                        size="xs"
-                        className="h-6 px-3"
-                        aria-label="Mark as paid"
-                        title="Mark as paid"
-                        onClick={() => onMarkPaid?.()}
-                        leadingIcon={CheckIcon}
-                        type="button"
-                    >
-                        Mark Paid
-                    </Button>
-                )}
-            </div>
+            )}
         </div>
     );
 };

@@ -46,7 +46,7 @@ const TaskTimeDisplay = ({
                     )}
                     {totalTimeWithSubtasks > mainTaskTime && (
                         <span
-                            className="text-blue-600 font-medium"
+                            className="status-info-text-strong font-medium"
                             title="Total time including subtasks"
                         >
                             Total: {formatDurationWithSeconds(totalTimeWithSubtasks)}

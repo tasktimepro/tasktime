@@ -546,8 +546,8 @@ const TaskViewModal = ({
                                         </span>
                                         <span
                                             className={`text-xs font-mono px-2 py-1 rounded-md ${isTimerPaused
-                                                ? 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900'
-                                                : 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900'
+                                                ? 'status-warning-text status-warning-surface'
+                                                : 'status-danger-text status-danger-surface'
                                             }`}
                                         >
                                             {isTimerPaused ? 'Paused' : 'Running'}
@@ -575,7 +575,7 @@ const TaskViewModal = ({
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Project</p>
                                     <button
                                         onClick={handleNavigateToProject}
-                                        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                                        className="status-info-text-strong text-sm font-medium hover:underline cursor-pointer"
                                     >
                                         {project.title}
                                     </button>

@@ -50,7 +50,7 @@ describe('linkifyUtils', () => {
             linkAdditionalClassName: 'break-all'
         });
 
-        expect(result?.[1]?.props.className).toContain('text-blue-600');
+        expect(result?.[1]?.props.className).toContain('status-info-text-strong');
         expect(result?.[1]?.props.className).toContain('hover:underline');
         expect(result?.[1]?.props.className).toContain('break-all');
     });

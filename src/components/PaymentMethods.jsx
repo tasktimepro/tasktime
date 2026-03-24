@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import Modal from './Modal';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,6 +27,7 @@ const PaymentMethods = ({
     openPaymentMethodModal = null,
     editPaymentMethodModal = null
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const { showSuccess } = useToast();
     const { paymentMethods, deletePaymentMethod } = usePaymentMethods();
     const [pendingDeletePaymentMethodId, setPendingDeletePaymentMethodId] = useState(null);
@@ -65,9 +68,9 @@ const PaymentMethods = ({
         : null;
 
     return (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4 overflow-x-hidden')}>
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Payment Methods</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -78,6 +81,7 @@ const PaymentMethods = ({
                 <Button
                     onClick={() => openPaymentMethodModal && openPaymentMethodModal()}
                     leadingIcon={PlusIcon}
+                    className={cn(isMobileLayout && 'w-full sm:w-auto')}
                 >
                     New Payment Method
                 </Button>
@@ -106,21 +110,21 @@ const PaymentMethods = ({
                             key={method.id}
                             className="hover:shadow-md transition-shadow"
                         >
-                            <CardContent className="pt-5">
-                                <div className="flex items-center justify-between">
+                            <CardContent className={cn(isMobileLayout ? 'p-4' : 'pt-5')}>
+                                <div className={cn('justify-between gap-3', isMobileLayout ? 'space-y-3' : 'flex items-center')}>
                                     <div className="flex-1">
-                                        <div className="flex items-center space-x-3">
+                                        <div className="flex items-start space-x-3 min-w-0">
                                             <CreditCardIcon className="h-6 w-6 text-muted-foreground" />
-                                            <div>
-                                                <div className="flex items-center space-x-2">
-                                                    <h4 className="text-lg font-medium text-foreground">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h4 className="text-lg font-medium text-foreground break-words">
                                                         {method.title || method.name}
                                                     </h4>
                                                     {method.isDefault && (
                                                         <Badge variant="secondary">Default</Badge>
                                                     )}
                                                 </div>
-                                                <div className="mt-1 text-sm text-muted-foreground space-y-1">
+                                                <div className="mt-1 text-sm text-muted-foreground space-y-1 break-words">
                                                     {method.fullName && <p>Full Name: {method.fullName}</p>}
                                                     {method.bank && <p>Bank: {method.bank}</p>}
                                                     {method.iban && <p>IBAN: {method.iban}</p>}
@@ -143,6 +147,7 @@ const PaymentMethods = ({
                                     </div>
 
                                     {/* Three-dot dropdown menu for Edit and Delete */}
+                                    <div className={cn(isMobileLayout && 'flex justify-end')}>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button
@@ -158,20 +163,21 @@ const PaymentMethods = ({
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem
                                                 onClick={() => editPaymentMethodModal && editPaymentMethodModal(method)}
-                                                className="cursor-pointer hover:bg-accent focus:bg-accent hover:text-yellow-600 dark:hover:text-yellow-400 focus:text-yellow-600 dark:focus:text-yellow-400"
+                                                className="status-warning-action cursor-pointer"
                                             >
                                                 <PencilIcon className="h-4 w-4" />
                                                 <span>Edit</span>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => handleDeletePaymentMethod(method.id)}
-                                                className="cursor-pointer hover:bg-accent focus:bg-accent hover:text-red-600 dark:hover:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                                                className="status-danger-action cursor-pointer"
                                             >
                                                 <TrashIcon className="h-4 w-4" />
                                                 <span>Delete</span>
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

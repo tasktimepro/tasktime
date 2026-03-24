@@ -277,7 +277,7 @@ const TemplateModal = ({
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <Label>
-                            Template Name <span className="text-red-500">*</span>
+                            Template Name <span className="text-destructive-strong">*</span>
                         </Label>
                         <Input
                             type="text"
@@ -296,7 +296,7 @@ const TemplateModal = ({
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <Label>
-                                Invoice Number Format <span className="text-red-500">*</span>
+                                Invoice Number Format <span className="text-destructive-strong">*</span>
                             </Label>
                             <Input
                                 type="text"

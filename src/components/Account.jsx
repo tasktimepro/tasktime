@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 import { useToast } from '../hooks/useToast.ts';
 import { useYjs } from '../contexts/YjsContext';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
@@ -30,6 +32,7 @@ const Account = ({
     invoiceTemplates,
     onImport,
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
     const { clearAllData, isDriveConnected, forceSyncDrive, disconnectDrive, wipeDriveData } = useYjs();
@@ -210,9 +213,9 @@ const Account = ({
     };
 
     return (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4 overflow-x-hidden')}>
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
                 <div>
                     <h1 className="text-2xl font-bold text-foreground">Account</h1>
                     <p className="mt-1 text-sm text-muted-foreground">Manage your account settings</p>
@@ -223,6 +226,7 @@ const Account = ({
                         onClick={() => setShowSignOutModal(true)}
                         disabled={isSigningOut}
                         leadingIcon={SignOutIcon}
+                        className={cn(isMobileLayout && 'w-full sm:w-auto')}
                     >
                         {isSigningOut ? 'Signing out...' : 'Sign out'}
                     </Button>
@@ -231,14 +235,24 @@ const Account = ({
 
             {/* Navigation Tabs */}
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
-                <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+                <TabsList className={cn(
+                    'w-full bg-transparent rounded-none',
+                    isMobileLayout
+                        ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
+                        : 'justify-start border-b border-border p-0'
+                )}>
                     {sideNavItems.map((item) => {
                         const Icon = item.icon;
                         return (
                             <TabsTrigger
                                 key={item.id}
                                 value={item.id}
-                                className="flex items-center py-2 px-1 mr-8 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm whitespace-nowrap transition-colors data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                className={cn(
+                                    'flex items-center font-medium text-sm whitespace-nowrap transition-colors',
+                                    isMobileLayout
+                                        ? 'rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
+                                        : 'mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border'
+                                )}
                             >
                                 <Icon className="h-4 w-4 mr-2" />
                                 {item.name}

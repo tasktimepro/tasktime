@@ -27,6 +27,8 @@ import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import ClientDeleteDialog from './modals/ClientDeleteDialog';
 import ClientArchiveDialog from './modals/ClientArchiveDialog';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -36,6 +38,7 @@ const ClientList = ({
     openClientModal,
     editClientModal
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const [showArchivedClients, setShowArchivedClients] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [clientToDelete, setClientToDelete] = useState(null);
@@ -369,9 +372,9 @@ const ClientList = ({
     };
 
     return (
-        <div className="space-y-8">
+        <div className={cn('space-y-8', isMobileLayout && 'space-y-6 overflow-x-hidden')}>
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
                 <h2 className="text-2xl font-bold text-foreground">
                     Clients {activeClients.length > 0 && (
                         <span>
@@ -380,7 +383,7 @@ const ClientList = ({
                     )}
                 </h2>
 
-                <div className="flex items-center space-x-3">
+                <div className={cn('flex items-center space-x-3', isMobileLayout && 'w-full justify-between')}>
                     <Select value={clientSort} onValueChange={handleSortChange}>
                         <SelectTrigger
                             className="h-9 w-9"
@@ -432,9 +435,9 @@ const ClientList = ({
                                     style={getClientBorderStyle(client)}
                                     onClick={() => onSelectClient(client)}
                                 >
-                                    <CardContent className="pt-5">
+                                    <CardContent className={cn(isMobileLayout ? 'p-4' : 'pt-5')}>
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-lg font-medium text-foreground truncate">
+                                            <h3 className="text-lg font-medium text-foreground truncate min-w-0">
                                                 {client.title}
                                             </h3>
 
@@ -455,21 +458,21 @@ const ClientList = ({
                                                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenuItem
                                                         onClick={() => editClientModal(client)}
-                                                        className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
+                                                        className="status-warning-action flex items-center space-x-2"
                                                     >
                                                         <PencilIcon className="h-4 w-4" />
                                                         <span>Edit</span>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         onClick={() => handleArchiveClient(client.id)}
-                                                        className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                                        className="status-info-action flex items-center space-x-2"
                                                     >
                                                         <ArchiveBoxIcon className="h-4 w-4" />
                                                         <span>Archive</span>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         onClick={() => handleDeleteClient(client.id)}
-                                                        className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                                        className="status-danger-action flex items-center space-x-2"
                                                     >
                                                         <TrashIcon className="h-4 w-4" />
                                                         <span>Delete</span>
@@ -535,7 +538,7 @@ const ClientList = ({
                                             style={getClientBorderStyle(client)}
                                             onClick={() => onSelectClient(client)}
                                         >
-                                            <CardContent className="pt-5">
+                                            <CardContent className={cn(isMobileLayout ? 'p-4' : 'pt-5')}>
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center min-w-0">
                                                         <h3 className="text-lg font-medium text-foreground truncate">
@@ -560,14 +563,14 @@ const ClientList = ({
                                                         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                                             <DropdownMenuItem
                                                                 onClick={() => handleUnarchiveClient(client.id)}
-                                                                className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                                                className="status-info-action flex items-center space-x-2"
                                                             >
                                                                 <ArchiveBoxIcon className="h-4 w-4" />
                                                                 <span>Unarchive</span>
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem
                                                                 onClick={() => handleDeleteClient(client.id)}
-                                                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                                                className="status-danger-action flex items-center space-x-2"
                                                             >
                                                                 <TrashIcon className="h-4 w-4" />
                                                                 <span>Delete</span>

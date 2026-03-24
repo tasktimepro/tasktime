@@ -176,7 +176,7 @@ function TimerControls({
                     variant="ghost"
                     size="icon"
                     onClick={handleStart}
-                    className="h-8 w-8 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-100 dark:hover:bg-green-900"
+                    className="status-success-action h-8 w-8 status-success-text-strong"
                     title="Start Timer"
                 >
                     <PlayIcon className={iconSize} />
@@ -188,7 +188,7 @@ function TimerControls({
                         variant="ghost"
                         size="icon"
                         onClick={handleResume}
-                        className="h-8 w-8 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-100 dark:hover:bg-green-900"
+                        className="status-success-action h-8 w-8 status-success-text-strong"
                         title="Resume Timer"
                     >
                         <PlayIcon className={iconSize} />
@@ -197,7 +197,7 @@ function TimerControls({
                         variant="ghost"
                         size="icon"
                         onClick={handleStop}
-                        className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
+                        className="status-danger-action h-8 w-8 status-danger-text-strong"
                         title="Save & Stop Timer"
                     >
                         <StopIcon className={iconSize} />
@@ -210,7 +210,7 @@ function TimerControls({
                         variant="ghost"
                         size="icon"
                         onClick={handlePause}
-                        className="h-8 w-8 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-accent"
+                        className="status-warning-action h-8 w-8 status-warning-text-strong"
                         title="Pause Timer"
                     >
                         <PauseIcon className={iconSize} />
@@ -219,7 +219,7 @@ function TimerControls({
                         variant="ghost"
                         size="icon"
                         onClick={handleStop}
-                        className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-accent"
+                        className="status-danger-action h-8 w-8 status-danger-text-strong"
                         title="Save & Stop Timer"
                     >
                         <StopIcon className={iconSize} />

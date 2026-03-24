@@ -6,7 +6,24 @@ import ExpenseDueCard from './ExpenseDueCard'
 
 describe('ExpenseDueCard', () => {
 
+    const setMatchMedia = (matches) => {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: vi.fn().mockImplementation(() => ({
+                matches,
+                media: '(max-width: 767px)',
+                onchange: null,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            }))
+        })
+    }
+
     beforeEach(() => {
+        setMatchMedia(false)
 
         vi.useFakeTimers();
         vi.setSystemTime(new Date(2026, 1, 6, 10, 0, 0));
@@ -157,5 +174,35 @@ describe('ExpenseDueCard', () => {
         )
 
         expect(screen.getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
+    })
+
+    it('uses a full-width secondary row for badge and actions', () => {
+        setMatchMedia(true)
+
+        const expense = {
+            id: 'exp-7',
+            title: 'Phone bill with a longer mobile label',
+            date: '2026-02-05',
+            amount: 45,
+            amountType: 'fixed',
+            currency: 'USD',
+            supplierName: 'A1',
+        }
+
+        render(
+            <ExpenseDueCard
+                expense={expense}
+                isOverdue
+                onMarkPaid={vi.fn()}
+            />
+        )
+
+        const secondaryRow = screen.getByTestId('expense-row-secondary-exp-7')
+        const actionsRow = screen.getByTestId('expense-row-actions-exp-7')
+
+        expect(secondaryRow.className.includes('w-full')).toBe(true)
+        expect(secondaryRow.className.includes('justify-end')).toBe(true)
+        expect(actionsRow.className.includes('justify-end')).toBe(true)
+        expect(screen.getByText('A1')).toBeInTheDocument()
     })
 })

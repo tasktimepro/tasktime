@@ -212,7 +212,7 @@ const PaymentMethodModal = ({
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="title">
-                            Payment Method Title <span className="text-red-500">*</span>
+                            Payment Method Title <span className="text-destructive-strong">*</span>
                         </Label>
                         <Input
                             type="text"

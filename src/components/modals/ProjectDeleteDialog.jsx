@@ -73,7 +73,7 @@ const ProjectDeleteDialog = ({
                         <Button
                             onClick={onForceDelete}
                             variant="outline"
-                            className="w-full border-red-300 text-red-700 bg-red-50 hover:bg-red-100 focus:ring-ring dark:border-red-700 dark:text-red-300 dark:bg-red-950 dark:hover:bg-red-900"
+                            className="w-full status-danger-border status-danger-surface status-danger-text hover:opacity-90"
                         >
                             Force Delete Project & All Invoices
                         </Button>

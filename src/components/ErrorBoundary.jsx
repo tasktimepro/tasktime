@@ -8,8 +8,8 @@ const ErrorFallback = ({ error, resetError }) => {
     return (
         <div className="min-h-[200px] flex items-center justify-center p-6">
             <div className="text-center max-w-md">
-                <div className="mx-auto w-12 h-12 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900 mb-4">
-                    <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
+                <div className="status-danger-surface mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
+                    <ExclamationTriangleIcon className="status-danger-text-strong h-6 w-6" />
                 </div>
                 
                 <h2 className="text-lg font-semibold text-foreground mb-2">
@@ -25,7 +25,7 @@ const ErrorFallback = ({ error, resetError }) => {
                         <summary className="text-xs font-medium text-foreground cursor-pointer">
                             Error Details (Dev Only)
                         </summary>
-                        <pre className="mt-2 text-xs text-red-600 dark:text-red-400 overflow-auto max-h-32">
+                        <pre className="status-danger-text-strong mt-2 max-h-32 overflow-auto text-xs">
                             {error.message}
                             {error.stack && `\n\n${error.stack}`}
                         </pre>

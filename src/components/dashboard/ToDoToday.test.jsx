@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ToDoToday from './ToDoToday'
 import { toStorageDate } from '../../utils/dateUtils.ts'
@@ -70,7 +70,24 @@ vi.mock('../task/TaskActionsMenu', () => ({
 
 describe('ToDoToday', () => {
 
+    const setMatchMedia = (matches) => {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: vi.fn().mockImplementation(() => ({
+                matches,
+                media: '(max-width: 767px)',
+                onchange: null,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            }))
+        })
+    }
+
     beforeEach(() => {
+        setMatchMedia(false)
         hookMocks.expenses = []
         hookMocks.recurrences = []
         hookMocks.markAsPaid = vi.fn()
@@ -158,6 +175,24 @@ describe('ToDoToday', () => {
         expect(screen.queryByText('Upcoming Task')).not.toBeInTheDocument()
         await user.click(screen.getByText('Upcoming tasks (1)'))
         expect(screen.getByText('Upcoming Task')).toBeInTheDocument()
+    })
+
+    it('stacks task metadata and actions below the title content', () => {
+        setMatchMedia(true)
+
+        renderComponent({
+            upcomingTasks: [],
+            renderTaskControls: () => <button type="button">Start timer</button>,
+            renderTaskTitle: (task) => <span>{task.title} with an intentionally long mobile title</span>,
+        })
+
+        const secondaryRow = screen.getByTestId(`task-row-secondary-${overdueTask.id}`)
+        const actionsRow = screen.getByTestId(`task-row-actions-${overdueTask.id}`)
+
+        expect(secondaryRow.className.includes('w-full')).toBe(true)
+        expect(secondaryRow.className.includes('justify-end')).toBe(true)
+        expect(actionsRow.className.includes('justify-end')).toBe(true)
+        expect(within(actionsRow).getByText('Start timer')).toBeInTheDocument()
     })
 
     it('deduplicates tasks appearing in both overdue and today lists', () => {

@@ -185,7 +185,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => handleEditEntry(entry)}
-                                    className="h-7 w-7 text-muted-foreground hover:text-yellow-600 hover:bg-yellow-50 dark:hover:text-yellow-300 dark:hover:bg-yellow-500/20"
+                                    className="status-warning-action h-7 w-7 text-muted-foreground"
                                     title="Edit entry"
                                 >
                                     <PencilIcon className="h-4 w-4" />
@@ -194,7 +194,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => handleDeleteEntry(entry.id)}
-                                    className="h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:text-red-300 dark:hover:bg-red-500/20"
+                                    className="status-danger-action h-7 w-7 text-muted-foreground"
                                     title="Delete entry"
                                 >
                                     <TrashIcon className="h-4 w-4" />

@@ -16,6 +16,7 @@ import { useTimers } from '../../hooks/useTimers';
 import { useExpenses } from '../../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../../hooks/useExpenseRecurrences.ts';
 import { useToast } from '../../hooks/useToast.ts';
+import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
 import { parseStoredDate, toStorageDate } from '../../utils/dateUtils.ts';
 import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
@@ -55,6 +56,7 @@ const ToDoToday = ({
     const { expenses, markAsPaid } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
     const { showError, showSuccess } = useToast();
+    const isMobileLayout = useIsMobileLayout();
     const [showUpcomingTasks, setShowUpcomingTasks] = useState(false);
     const [showUpcomingExpenses, setShowUpcomingExpenses] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
@@ -269,47 +271,100 @@ const ToDoToday = ({
         );
 
         return (
-            <div key={task.id} className={`px-3 py-3 hover:bg-muted ${shouldDisable ? 'opacity-50' : ''}`}>
-                <div className="flex items-center gap-3">
-                    <CustomCheckbox
-                        checked={isCompleted}
-                        onChange={(checked) => handleCompleteTask(task, checked)}
-                        disabled={shouldDisable}
-                    />
-                    <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
-                        {renderTaskTitle(task, isCompleted)}
-                    </div>
-                    {dateBadgeNode}
-                    {(task.recentTime || 0) > 0 && (
-                        <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                            {formatDurationWithSeconds(task.recentTime || 0)}
-                        </div>
-                    )}
-                    {(!shouldDisable || !hideActions) && (
-                        <div className="flex flex-shrink-0 space-x-1">
-                            {renderTaskControls(task, shouldDisable)}
-                            {!hideActions && (
-                                <>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                        title="Add time entry"
-                                        onClick={() => handleOpenTimeEntries(task)}
+            <div key={task.id} className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${shouldDisable ? 'opacity-50' : ''}`}>
+                {isMobileLayout ? (
+                    <div className="flex items-start gap-3">
+                        <CustomCheckbox
+                            checked={isCompleted}
+                            onChange={(checked) => handleCompleteTask(task, checked)}
+                            disabled={shouldDisable}
+                        />
+                        <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden" data-testid={`task-row-content-${task.id}`}>
+                            {renderTaskTitle(task, isCompleted)}
+                            <div
+                                className="flex w-full flex-wrap items-center justify-end gap-2"
+                                data-testid={`task-row-secondary-${task.id}`}
+                            >
+                                <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                                    {dateBadgeNode}
+                                    {(task.recentTime || 0) > 0 && (
+                                        <div className={`text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                            {formatDurationWithSeconds(task.recentTime || 0)}
+                                        </div>
+                                    )}
+                                </div>
+                                {(!shouldDisable || !hideActions) && (
+                                    <div
+                                        className="flex flex-wrap items-center justify-end gap-1"
+                                        data-testid={`task-row-actions-${task.id}`}
                                     >
-                                        <ClockIcon className="h-5 w-5" />
-                                    </Button>
-                                    <TaskActionsMenu
-                                        task={task}
-                                        onEdit={onEditTask}
-                                        onDelete={onDeleteTask}
-                                        onArchive={onArchiveTask}
-                                    />
-                                </>
-                            )}
+                                        {renderTaskControls(task, shouldDisable)}
+                                        {!hideActions && (
+                                            <>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                    title="Add time entry"
+                                                    onClick={() => handleOpenTimeEntries(task)}
+                                                >
+                                                    <ClockIcon className="h-5 w-5" />
+                                                </Button>
+                                                <TaskActionsMenu
+                                                    task={task}
+                                                    onEdit={onEditTask}
+                                                    onDelete={onDeleteTask}
+                                                    onArchive={onArchiveTask}
+                                                />
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-3">
+                        <CustomCheckbox
+                            checked={isCompleted}
+                            onChange={(checked) => handleCompleteTask(task, checked)}
+                            disabled={shouldDisable}
+                        />
+                        <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
+                            {renderTaskTitle(task, isCompleted)}
+                        </div>
+                        {dateBadgeNode}
+                        {(task.recentTime || 0) > 0 && (
+                            <div className={`flex-shrink-0 text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                {formatDurationWithSeconds(task.recentTime || 0)}
+                            </div>
+                        )}
+                        {(!shouldDisable || !hideActions) && (
+                            <div className="flex flex-shrink-0 space-x-1">
+                                {renderTaskControls(task, shouldDisable)}
+                                {!hideActions && (
+                                    <>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                            title="Add time entry"
+                                            onClick={() => handleOpenTimeEntries(task)}
+                                        >
+                                            <ClockIcon className="h-5 w-5" />
+                                        </Button>
+                                        <TaskActionsMenu
+                                            task={task}
+                                            onEdit={onEditTask}
+                                            onDelete={onDeleteTask}
+                                            onArchive={onArchiveTask}
+                                        />
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         );
     };
@@ -351,16 +406,16 @@ const ToDoToday = ({
 
     return (
         <Card>
-            <CardHeader className="pb-4">
+            <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
                 <CardTitle className="flex items-center text-lg">
-                    <ListTodoIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                    <ListTodoIcon className="status-info-text-strong mr-2 h-5 w-5" />
                     To Do Today ({incompleteCount})
                 </CardTitle>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="px-3 pb-2.5 pt-0 sm:px-5 sm:pb-4">
                 <div className="divide-y divide-border">
                     {combinedTasks.length > 0 || overdueExpenses.length > 0 || todayExpenses.length > 0 ? (
-                        <div className="py-2 divide-y divide-border">
+                        <div className="divide-y divide-border py-0.5">
                             {overdueIncompleteTaskItems.map(renderTaskRow)}
                             {overdueExpenses.map((expense) => renderExpenseRow(expense, { isOverdue: true }))}
                             {todayIncompleteTaskItems.map(renderTaskRow)}
@@ -379,10 +434,10 @@ const ToDoToday = ({
                     )}
 
                     {upcomingTasks.length > 0 && (
-                        <div className="py-2">
+                        <div className="py-1 sm:py-1.5">
                             <button
                                 onClick={() => setShowUpcomingTasks(!showUpcomingTasks)}
-                                className="flex items-center w-full text-left text-sm font-medium text-foreground hover:text-foreground transition-colors pt-2 pb-2 cursor-pointer"
+                                className="flex w-full items-center py-2 text-left text-sm font-medium text-foreground transition-colors hover:text-foreground cursor-pointer"
                             >
                                 {showUpcomingTasks ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />
@@ -401,10 +456,10 @@ const ToDoToday = ({
                     )}
 
                     {upcomingExpenses.length > 0 && (
-                        <div className="py-2">
+                        <div className="py-1 sm:py-1.5">
                             <button
                                 onClick={() => setShowUpcomingExpenses(!showUpcomingExpenses)}
-                                className="flex items-center w-full text-left text-sm font-medium text-foreground hover:text-foreground transition-colors pt-2 pb-2 cursor-pointer"
+                                className="flex w-full items-center py-2 text-left text-sm font-medium text-foreground transition-colors hover:text-foreground cursor-pointer"
                             >
                                 {showUpcomingExpenses ? (
                                     <ChevronDownIcon className="h-4 w-4 mr-1" />

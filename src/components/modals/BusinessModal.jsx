@@ -248,7 +248,7 @@ const BusinessModal = ({
 
     // Modal footer with action buttons
     const modalFooter = (
-        <div className="flex items-center space-x-4 justify-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             {/* Default Checkbox */}
             <div className="flex items-center space-x-2">
                 <CustomCheckbox
@@ -260,17 +260,19 @@ const BusinessModal = ({
                 />
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row">
                 <Button
                     type="button"
                     variant="outline"
                     onClick={handleCancel}
+                    className="w-full sm:w-auto"
                 >
                     Cancel
                 </Button>
                 <Button
                     type="submit"
                     form="business-form"
+                    className="w-full sm:w-auto"
                 >
                     {editingBusinessInfo ? 'Update' : 'Create'} Business
                 </Button>
@@ -291,7 +293,7 @@ const BusinessModal = ({
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="title">
-                            Business Title <span className="text-red-500">*</span>
+                            Business Title <span className="text-destructive-strong">*</span>
                         </Label>
                         <Input
                             type="text"
@@ -306,7 +308,7 @@ const BusinessModal = ({
 
                     <div className="space-y-2">
                         <Label htmlFor="businessName">
-                            Business/Name <span className="text-red-500">*</span>
+                            Business/Name <span className="text-destructive-strong">*</span>
                         </Label>
                         <Input
                             type="text"
@@ -319,7 +321,7 @@ const BusinessModal = ({
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-2">
                             <Label htmlFor="email">
                                 Email
@@ -383,7 +385,7 @@ const BusinessModal = ({
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                     <div className="space-y-2">
                                         <Label htmlFor="city">
                                             City
@@ -402,7 +404,7 @@ const BusinessModal = ({
                                         <Label>
                                             State/ZIP
                                         </Label>
-                                        <div className="flex space-x-2 w-full">
+                                        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                                             <Input
                                                 type="text"
                                                 id="state"
@@ -418,7 +420,7 @@ const BusinessModal = ({
                                                 name="zip"
                                                 value={formData.zip}
                                                 onChange={handleInputChange}
-                                                className="w-20 flex-shrink-0"
+                                                className="w-full sm:w-20 sm:flex-shrink-0"
                                                 placeholder="ZIP"
                                             />
                                         </div>
@@ -439,7 +441,7 @@ const BusinessModal = ({
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                     <div className="space-y-2">
                                         <Label htmlFor="registrationNumber">
                                             Reg. Number
@@ -489,7 +491,7 @@ const BusinessModal = ({
 
                 {/* Custom Fields */}
                 <div className="space-y-4">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <h5 className="text-sm font-medium text-foreground">Custom Fields</h5>
                         <Button
                             type="button"
@@ -503,7 +505,7 @@ const BusinessModal = ({
                     </div>
 
                     {formData.custom.map((field, index) => (
-                        <div key={index} className="grid grid-cols-2 gap-4">
+                        <div key={index} className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div>
                                 <Input
                                     type="text"
@@ -512,7 +514,7 @@ const BusinessModal = ({
                                     placeholder="Field label (e.g., Website)"
                                 />
                             </div>
-                            <div className="flex space-x-2">
+                            <div className="flex gap-2">
                                 <Input
                                     type="text"
                                     value={field.value}
@@ -525,7 +527,7 @@ const BusinessModal = ({
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => removeCustomField(index)}
-                                    className="hover:bg-accent text-destructive-strong hover-text-destructive-strong"
+                                    className="shrink-0 hover:bg-accent text-destructive-strong hover-text-destructive-strong"
                                 >
                                     <TrashIcon className="h-4 w-4" />
                                 </Button>
@@ -556,7 +558,7 @@ const BusinessModal = ({
                         </div>
 
                         {formData.taxEnabled && (
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="taxLabel">
                                         Tax Label

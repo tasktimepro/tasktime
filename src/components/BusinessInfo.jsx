@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import Modal from './Modal';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,6 +27,7 @@ const BusinessInfo = ({
     openBusinessModal = null,
     editBusinessModal = null
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const { showSuccess } = useToast();
     const { businessInfos, deleteBusinessInfo } = useBusinessInfos();
     const [pendingDeleteBusinessId, setPendingDeleteBusinessId] = useState(null);
@@ -65,9 +68,9 @@ const BusinessInfo = ({
         : null;
 
     return (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4 overflow-x-hidden')}>
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Your Business</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -78,6 +81,7 @@ const BusinessInfo = ({
                 <Button
                     onClick={() => openBusinessModal && openBusinessModal()}
                     leadingIcon={PlusIcon}
+                    className={cn(isMobileLayout && 'w-full sm:w-auto')}
                 >
                     New Business
                 </Button>
@@ -108,21 +112,21 @@ const BusinessInfo = ({
                             key={info.id}
                             className="hover:shadow-md transition-shadow"
                         >
-                            <CardContent className="pt-5">
-                                <div className="flex items-center justify-between">
+                            <CardContent className={cn(isMobileLayout ? 'p-4' : 'pt-5')}>
+                                <div className={cn('justify-between gap-3', isMobileLayout ? 'space-y-3' : 'flex items-center')}>
                                     <div className="flex-1">
-                                        <div className="flex items-center space-x-3">
+                                        <div className="flex items-start space-x-3 min-w-0">
                                             <BuildingOfficeIcon className="h-6 w-6 text-muted-foreground" />
-                                            <div>
-                                                <div className="flex items-center space-x-2">
-                                                    <h4 className="text-lg font-medium text-foreground">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h4 className="text-lg font-medium text-foreground break-words">
                                                         {info.title || info.name}
                                                     </h4>
                                                     {info.isDefault && (
                                                         <Badge variant="secondary">Default</Badge>
                                                     )}
                                                 </div>
-                                                <div className="mt-1 text-sm text-muted-foreground space-y-1">
+                                                <div className="mt-1 text-sm text-muted-foreground space-y-1 break-words">
                                                     {info.businessName && <p>Business/Name: {info.businessName}</p>}
                                                     {info.address && <p>Address: {info.address}</p>}
                                                     {info.city && <p>City: {info.city}</p>}
@@ -151,6 +155,7 @@ const BusinessInfo = ({
                                     </div>
 
                                     {/* Three-dot dropdown menu for Edit and Delete */}
+                                    <div className={cn(isMobileLayout && 'flex justify-end')}>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button
@@ -166,20 +171,21 @@ const BusinessInfo = ({
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem
                                                 onClick={() => editBusinessModal && editBusinessModal(info)}
-                                                className="cursor-pointer hover:bg-yellow-50 focus:bg-yellow-50 hover:text-yellow-600 focus:text-yellow-600"
+                                                className="status-warning-action cursor-pointer"
                                             >
                                                 <PencilIcon className="h-4 w-4" />
                                                 <span>Edit</span>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => handleDeleteBusinessInfo(info.id)}
-                                                className="cursor-pointer hover:bg-red-50 focus:bg-red-50 hover:text-red-600 focus:text-red-600"
+                                                className="status-danger-action cursor-pointer"
                                             >
                                                 <TrashIcon className="h-4 w-4" />
                                                 <span>Delete</span>
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

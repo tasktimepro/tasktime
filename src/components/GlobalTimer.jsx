@@ -156,11 +156,11 @@ const GlobalTimer = ({
     }
 
     // Determine styles based on timer state - using semantic colors with dark mode support
-    const borderColor = isPaused ? 'border-yellow-300 dark:border-yellow-700' : 'border-red-300 dark:border-red-700';
-    const dotColor = isPaused ? 'bg-yellow-500 dark:bg-yellow-400' : 'bg-red-500 dark:bg-red-400';
+    const borderColor = isPaused ? 'status-warning-border' : 'status-danger-border';
+    const dotColor = isPaused ? 'status-warning-fill' : 'status-danger-fill';
     const dotAnimation = isPaused ? '' : 'animate-pulse';
-    const textColor = isPaused ? 'text-yellow-900 dark:text-yellow-100' : 'text-red-900 dark:text-red-100';
-    const timeColor = isPaused ? 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900' : 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900';
+    const textColor = isPaused ? 'status-warning-text-strong' : 'status-danger-text-strong';
+    const timeColor = isPaused ? 'status-warning-text status-warning-surface' : 'status-danger-text status-danger-surface';
 
     return (
         <div className={`border ${borderColor} rounded-lg px-4 py-2 ${isExpanded ? 'space-y-3 min-w-[26rem] max-w-full' : ''}`}>

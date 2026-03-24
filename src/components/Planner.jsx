@@ -35,6 +35,7 @@ import { useToast } from '@/hooks/useToast';
 import { PlusIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 /**
  * Planner component
@@ -140,6 +141,34 @@ const Planner = ({
         () => getWeek(weekStart, weekOptions),
         [weekStart, weekOptions]
     );
+
+    const [isMobileLayout, setIsMobileLayout] = useState(() => {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+            return false;
+        }
+
+        return window.matchMedia('(max-width: 767px)').matches;
+    });
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+            return undefined;
+        }
+
+        const mediaQuery = window.matchMedia('(max-width: 767px)');
+        const handleChange = (event) => {
+            setIsMobileLayout(event.matches);
+        };
+
+        setIsMobileLayout(mediaQuery.matches);
+        mediaQuery.addEventListener?.('change', handleChange);
+        mediaQuery.addListener?.(handleChange);
+
+        return () => {
+            mediaQuery.removeEventListener?.('change', handleChange);
+            mediaQuery.removeListener?.(handleChange);
+        };
+    }, []);
 
     // Mobile: selected day (default to today's index or first day)
     const [selectedDayIndex, setSelectedDayIndex] = useState(() => {
@@ -666,8 +695,11 @@ const Planner = ({
 
     return (
         <div
-            className="flex flex-col gap-4"
-            style={{
+            className={cn(
+                'flex flex-col gap-3 md:gap-4',
+                isMobileLayout && 'min-h-0'
+            )}
+            style={isMobileLayout ? undefined : {
                 height: 'calc(100vh - var(--app-content-padding-top, 1.5rem) - var(--app-content-padding-bottom, 1.5rem))'
             }}
         >
@@ -681,6 +713,7 @@ const Planner = ({
                     onNext={() => navigateWeek(1)}
                     onToday={navigateToToday}
                     isCurrentWeek={weekNumber === currentWeekNumber}
+                    isMobile={isMobileLayout}
                     weekSummary={weekSummary}
                     weekAddControl={(
                         <WeekAddPopover
@@ -710,7 +743,7 @@ const Planner = ({
 
             {/* Mobile: Single day view */}
             {selectedDay && (
-                <div className="md:hidden flex-1 overflow-hidden">
+                <div className="md:hidden flex-1 min-h-0 overflow-hidden">
                     <MobileDayCard
                         date={selectedDay.date}
                         dateStr={selectedDay.dateStr}

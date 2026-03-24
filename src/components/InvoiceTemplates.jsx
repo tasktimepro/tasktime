@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import Modal from './Modal';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,6 +27,7 @@ const InvoiceTemplates = ({
     openTemplateModal = null,
     editTemplateModal = null
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const { showSuccess } = useToast();
     const { invoiceTemplates, deleteInvoiceTemplate } = useInvoiceTemplates();
     const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
@@ -141,9 +144,9 @@ const InvoiceTemplates = ({
     }, [invoiceTemplates]);
 
     return (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4 overflow-x-hidden')}>
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">
                         Invoice Templates
@@ -155,6 +158,7 @@ const InvoiceTemplates = ({
                 <Button
                     onClick={() => openTemplateModal && openTemplateModal()}
                     leadingIcon={PlusIcon}
+                    className={cn(isMobileLayout && 'w-full sm:w-auto')}
                 >
                     New Template
                 </Button>
@@ -182,21 +186,21 @@ const InvoiceTemplates = ({
                             key={template.id}
                             className="hover:shadow-md transition-shadow"
                         >
-                            <CardContent className="pt-5">
-                                <div className="flex items-center justify-between">
+                            <CardContent className={cn(isMobileLayout ? 'p-4' : 'pt-5')}>
+                                <div className={cn('justify-between gap-3', isMobileLayout ? 'space-y-3' : 'flex items-center')}>
                                     <div className="flex-1">
-                                        <div className="flex items-center space-x-3">
+                                        <div className="flex items-start space-x-3 min-w-0">
                                             <DocumentDuplicateIcon className="h-6 w-6 text-muted-foreground" />
-                                            <div>
-                                                <div className="flex items-center">
-                                                    <h4 className="text-lg font-medium text-foreground">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h4 className="text-lg font-medium text-foreground break-words">
                                                         {template.name}
                                                     </h4>
                                                     {template.isDefault && (
                                                         <Badge variant="secondary" className="ml-2">Default</Badge>
                                                     )}
                                                 </div>
-                                                <div className="mt-1 text-sm text-muted-foreground space-y-1">
+                                                <div className="mt-1 text-sm text-muted-foreground space-y-1 break-words">
                                                     <p>Invoice Number: {generatePreviewInvoiceNumber(template)}</p>
                                                     {template.useSequentialNumbers && (
                                                         <p>Next Sequential: #{template.currentSequentialNumber.toString().padStart(template.sequentialNumberDigits || 4, '0')}</p>
@@ -211,6 +215,7 @@ const InvoiceTemplates = ({
                                     </div>
 
                                     {/* Three-dot dropdown menu for Edit and Delete */}
+                                    <div className={cn(isMobileLayout && 'flex justify-end')}>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button
@@ -226,20 +231,21 @@ const InvoiceTemplates = ({
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem
                                                 onClick={() => editTemplateModal && editTemplateModal(template)}
-                                                className="cursor-pointer hover:bg-accent focus:bg-accent hover:text-yellow-600 dark:hover:text-yellow-400 focus:text-yellow-600 dark:focus:text-yellow-400"
+                                                className="status-warning-action cursor-pointer"
                                             >
                                                 <PencilIcon className="h-4 w-4" />
                                                 <span>Edit</span>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => handleDelete(template.id)}
-                                                className="cursor-pointer hover:bg-accent focus:bg-accent hover:text-red-600 dark:hover:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                                                className="status-danger-action cursor-pointer"
                                             >
                                                 <TrashIcon className="h-4 w-4" />
                                                 <span>Delete</span>
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

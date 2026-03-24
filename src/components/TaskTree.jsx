@@ -17,6 +17,8 @@ import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { isRecurringTaskDueOnDate } from '../utils/recurringUtils.ts';
 import { useTodayDate, useTodayString } from '../hooks/useDayRollover';
 import { toStorageDate } from '../utils/dateUtils.ts';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 /**
  * TaskTree component - Displays and manages the hierarchical task structure
@@ -27,6 +29,7 @@ const TaskTree = ({
     onEditTask,
     onViewTask
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newTaskNote, setNewTaskNote] = useState('');
@@ -281,12 +284,12 @@ const TaskTree = ({
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
                 <h3 className="text-lg font-semibold text-foreground">
                     Tasks ({visibleTasksCount})
                 </h3>
 
-                <div className="flex items-center space-x-3">
+                <div className={cn('flex items-center space-x-3', isMobileLayout && 'w-full justify-between')}>
                     <Select value={taskSort} onValueChange={setTaskSort}>
                         <SelectTrigger
                             className="h-9 w-9"
@@ -322,18 +325,18 @@ const TaskTree = ({
 
             {/* Create Task Form */}
             {showCreateForm && (
-                <div className="bg-card border border-border rounded-lg p-4">
+                <div className={cn('rounded-lg border border-border bg-card', isMobileLayout ? 'p-3' : 'p-4')}>
                     <h3 className="text-sm font-medium text-foreground mb-3">
                         Create New Task
                     </h3>
 
-                    <form onSubmit={handleCreateMainTask} className="flex items-center space-x-3">
+                    <form onSubmit={handleCreateMainTask} className={cn(isMobileLayout ? 'space-y-3' : 'flex items-center space-x-3')}>
                         <Input
                             type="text"
                             value={newTaskTitle}
                             onChange={(e) => setNewTaskTitle(e.target.value)}
                             placeholder="Enter task title"
-                            className="flex-1"
+                            className={cn(!isMobileLayout && 'flex-1')}
                             autoFocus
                         />
 
@@ -342,7 +345,7 @@ const TaskTree = ({
                             value={newTaskNote}
                             onChange={(e) => setNewTaskNote(e.target.value)}
                             placeholder="Note"
-                            className="flex-1"
+                            className={cn(!isMobileLayout && 'flex-1')}
                         />
 
                         <Input
@@ -354,7 +357,7 @@ const TaskTree = ({
                                     setNewTaskRecurring(null);
                                 }
                             }}
-                            className="w-40 dark:[color-scheme:dark]"
+                            className={cn(isMobileLayout ? 'w-full dark:[color-scheme:dark]' : 'w-40 dark:[color-scheme:dark]')}
                             disabled={Boolean(newTaskRecurring)}
                         />
 
@@ -368,17 +371,19 @@ const TaskTree = ({
                             inactiveVariant="ghost"
                         />
 
-                        <Button type="submit">
-                            Create
-                        </Button>
+                        <div className={cn('flex gap-2', isMobileLayout && 'justify-end')}>
+                            <Button type="submit">
+                                Create
+                            </Button>
 
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={cancelCreate}
-                        >
-                            Cancel
-                        </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={cancelCreate}
+                            >
+                                Cancel
+                            </Button>
+                        </div>
                     </form>
                 </div>
             )}

@@ -231,17 +231,19 @@ const TaskModal = ({
     };
 
     const modalFooter = (
-        <div className="flex justify-end space-x-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
                 variant="outline"
                 onClick={handleClose}
                 type="button"
+                className="w-full sm:w-auto"
             >
                 Cancel
             </Button>
             <Button
                 onClick={handleSubmit}
                 type="submit"
+                className="w-full sm:w-auto"
             >
                 {editingTask ? 'Save' : 'Create'}
             </Button>
@@ -258,7 +260,7 @@ const TaskModal = ({
         >
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                    <Label htmlFor="task-title">Task Title <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="task-title">Task Title <span className="text-destructive-strong">*</span></Label>
                     <Input
                         id="task-title"
                         value={formData.title}
@@ -268,19 +270,19 @@ const TaskModal = ({
                 </div>
 
                 <div className="space-y-2">
-                    <div className="flex items-start gap-3">
-                        <div className="space-y-2">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-3">
+                        <div className="space-y-2 md:flex-none">
                             <Label htmlFor="task-start-date">Start Date</Label>
                             <Input
                                 id="task-start-date"
                                 type="date"
                                 value={formData.startDate}
                                 onChange={(event) => handleStartDateChange(event.target.value)}
-                                className="w-48 dark:[color-scheme:dark]"
+                                className="w-full md:w-48 dark:[color-scheme:dark]"
                                 disabled={Boolean(formData.recurring)}
                             />
                         </div>
-                        <div className="flex items-center justify-center text-sm text-muted-foreground px-2 pt-7">
+                        <div className="text-sm text-muted-foreground md:flex md:items-center md:justify-center md:px-2 md:pt-7">
                             or
                         </div>
                         <div className="space-y-2 flex-1">
@@ -321,7 +323,7 @@ const TaskModal = ({
                 </div>
 
                 <div className="space-y-2">
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="mb-1 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <Label>Project</Label>
                         {openProjectModal && (
                             <Button

@@ -65,7 +65,7 @@ const TaskActions = ({
                             variant="ghost"
                             size="icon"
                             onClick={onDelete}
-                            className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                            className="status-danger-action h-8 w-8 status-danger-text-strong"
                             title="Delete Task"
                             aria-label="Delete Task"
                         >
@@ -119,7 +119,7 @@ const TaskActions = ({
                             variant="ghost"
                             size="icon"
                             onClick={onArchive}
-                            className="h-8 w-8 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900"
+                            className="status-warning-action h-8 w-8 status-warning-text-strong"
                             title="Archive Task"
                         >
                             <ArchiveBoxIcon className="h-5 w-5" />

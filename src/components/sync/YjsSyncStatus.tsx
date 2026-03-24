@@ -89,7 +89,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             return {
                 text: 'Currently offline',
                 icon: CloudOffIcon,
-                tone: 'text-yellow-700 dark:text-yellow-200',
+                tone: 'status-warning-text-strong',
             };
         }
 
@@ -108,7 +108,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             return {
                 text: 'Syncing...',
                 icon: CloudSyncIcon,
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
             };
         }
 
@@ -117,7 +117,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             return {
                 text: 'Sync Error',
                 icon: ExclamationTriangleIcon,
-                tone: 'text-red-600 dark:text-red-400',
+                tone: 'status-danger-text-strong',
                 onClick: handleCloudOptions,
                 hoverIcon: CloudCogIcon,
                 hoverText: 'Cloud Options',
@@ -128,7 +128,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             return {
                 text: 'Checking for updates...',
                 icon: CloudSyncIcon,
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 onClick: handleCloudOptions,
             };
         }
@@ -137,7 +137,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             return {
                 text: 'Fetching updates...',
                 icon: CloudSyncIcon,
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 onClick: handleCloudOptions,
             };
         }
@@ -146,7 +146,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             return {
                 text: 'Syncing changes...',
                 icon: CloudSyncIcon,
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 onClick: handleCloudOptions,
             };
         }
@@ -158,7 +158,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             return {
                 text: 'Syncing...',
                 icon: CloudSyncIcon,
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 onClick: handleCloudOptions,
             };
         }
@@ -168,7 +168,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             return {
                 text: 'Sync changes',
                 icon: CloudUploadIcon,
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 onClick: handleManualSync,
             };
         }
@@ -178,7 +178,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             return {
                 text: 'In sync',
                 icon: CloudSyncIcon,
-                tone: 'text-yellow-700 dark:text-yellow-300',
+                tone: 'status-warning-text-strong',
                 onClick: handleCloudOptions,
             };
         }
@@ -187,7 +187,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
         return {
             text: 'In sync',
             icon: CloudCheckIcon,
-            tone: 'text-green-700 dark:text-green-300',
+            tone: 'status-success-text-strong',
             onClick: handleCloudOptions,
             hoverIcon: CloudCogIcon,
             hoverText: 'Cloud Options',

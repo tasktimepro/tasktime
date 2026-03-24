@@ -26,6 +26,7 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-react';
+import { formatCurrency } from '@/utils/currencyUtils.ts';
 
 /**
  * @param {Object} props
@@ -49,6 +50,7 @@ import { MoreHorizontal, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-
  * @param {() => void} props.onClick - Click handler
  * @param {() => void} props.onEdit - Called when user wants to edit planner options
  * @param {() => void} props.onRemove - Called when user wants to remove from planner
+ * @param {'default' | 'mobile'} props.layout
  */
 const PlannerItem = ({
     type,
@@ -71,10 +73,12 @@ const PlannerItem = ({
     onClick,
     onEdit,
     onRemove,
+    layout = 'default',
 }) => {
     const [menuOpen, setMenuOpen] = useState(false);
     const isExpense = type === 'expense';
     const isClickable = typeof onClick === 'function' && (!isPreview || isExpense);
+    const isMobileLayout = layout === 'mobile';
 
     // Icon based on type and subtype
     const getIcon = () => {
@@ -130,6 +134,23 @@ const PlannerItem = ({
         : 0;
 
     const dynamicHeight = `max(42px, ${Math.round(safeHeightPercent * 10000) / 100}% )`;
+    const amountLabel = isExpense && typeof amount === 'number'
+        ? `${amountType === 'variable' ? '~' : ''}${formatCurrency(amount || 0, currency)} ${currency}`
+        : null;
+    const taskSubtypeLabel = subtype === 'recurring'
+        ? 'Recurring'
+        : subtype === 'due'
+            ? 'Due'
+            : subtype === 'timer'
+                ? 'Timer'
+                : subtype === 'worked'
+                    ? 'Worked'
+                    : subtype === 'attached'
+                        ? 'Attached'
+                        : null;
+    const metaParts = isExpense
+        ? [amountLabel, supplierName].filter(Boolean)
+        : [taskSubtypeLabel, hasTarget ? `${estimatedHours}h plan` : null, actualTimeMs > 0 ? `${formatTime(actualTimeMs)} worked` : null].filter(Boolean);
     
     const handleClick = (e) => {
         // Don't trigger click if menu is open
@@ -199,19 +220,20 @@ const PlannerItem = ({
             }}
             title={progressTooltip}
             className={cn(
-                "group/item p-2 rounded-md border transition-all relative overflow-hidden",
+                'group/item relative overflow-hidden rounded-md border p-2 transition-all',
                 isClickable ? "cursor-pointer" : "cursor-default",
-                "flex items-center",
+                isMobileLayout ? 'flex items-start' : 'flex items-center',
                 "hover:shadow-sm",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
                 "bg-card border-border",
                 hasColor && "border-l-4",
-                isCompleted && "opacity-60"
+                isCompleted && "opacity-60",
+                isMobileLayout && 'rounded-xl px-3 py-3'
             )}
             style={{
                 ...(hasColor ? { borderLeftColor: color } : {}),
-                height: dynamicHeight,
-                minHeight: '42px',
+                height: isMobileLayout ? 'auto' : dynamicHeight,
+                minHeight: isMobileLayout ? '56px' : '42px',
             }}
         >
             {/* Progress fill background - Removed in favor of bottom border progress as requested */}
@@ -224,20 +246,45 @@ const PlannerItem = ({
                 />
             )} */}
 
-            <div className="flex items-center gap-2 min-w-0 relative z-10 w-full mb-0.5">
-                <Icon className={cn("h-4 w-4 flex-shrink-0", iconClasses)} />
+            <div className="relative z-10 mb-0.5 flex w-full min-w-0 items-start gap-2">
+                <Icon className={cn('mt-0.5 h-4 w-4 flex-shrink-0', iconClasses)} />
                 
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1 space-y-0.5">
                     <div className={cn(
-                        "text-sm truncate",
+                        isMobileLayout ? 'text-sm font-medium whitespace-normal break-words' : 'text-sm truncate',
                         isCompleted && "line-through text-muted-foreground"
                     )}>
                         {title}
                     </div>
+                    {metaParts.length > 0 && (
+                        <div className={cn(
+                            'text-xs text-muted-foreground',
+                            isMobileLayout ? 'space-y-0.5' : 'truncate'
+                        )}>
+                            {isMobileLayout ? metaParts.map((part) => (
+                                <div key={part} className="whitespace-normal break-words">
+                                    {part}
+                                </div>
+                            )) : metaParts.join(' • ')}
+                        </div>
+                    )}
                 </div>
 
                 {type === 'task' && isTimerActive && (
-                    <span className="text-xs text-green-600 dark:text-green-400 animate-pulse flex-shrink-0">●</span>
+                    <span className="status-success-text-strong animate-pulse flex-shrink-0 text-xs">●</span>
+                )}
+
+                {isExpense && typeof onMarkPaid === 'function' && (
+                    <button
+                        type="button"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onMarkPaid();
+                        }}
+                        className="ml-1 inline-flex h-8 flex-shrink-0 items-center rounded-md border border-border px-2.5 text-xs font-medium text-foreground hover:bg-muted cursor-pointer"
+                    >
+                        Mark paid
+                    </button>
                 )}
 
                 {/* Three-dot menu button - appears on hover */}
@@ -248,10 +295,10 @@ const PlannerItem = ({
                                 type="button"
                                 onClick={(e) => e.stopPropagation()}
                                 className={cn(
-                                    "ml-auto p-1 rounded",
-                                    "hidden group-hover/item:block",
-                                    "hover:bg-muted focus:outline-none focus:opacity-100 cursor-pointer",
-                                    menuOpen && "block"
+                                    'ml-auto rounded p-1',
+                                    'hover:bg-muted focus:outline-none focus:opacity-100 cursor-pointer',
+                                    'opacity-100 md:opacity-0 md:group-hover/item:opacity-100',
+                                    menuOpen && 'opacity-100'
                                 )}
                                 aria-label="Item options"
                             >

@@ -47,7 +47,7 @@ const InvoicePreview = ({
                 <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium text-foreground">Pricing & Totals</h4>
                     <div className="flex items-center space-x-3">
-                        <span className="text-sm font-medium text-blue-600 dark:text-blue-400 sensitive-data">
+                        <span className="status-info-text-strong text-sm font-medium sensitive-data">
                             {getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.total.toFixed(2)}
                         </span>
                         <svg
@@ -190,7 +190,7 @@ const InvoicePreview = ({
                         </div>
 
                         {calculatePricing.discount > 0 && (
-                            <div className="flex justify-between text-sm text-red-600 dark:text-red-400">
+                            <div className="status-danger-text-strong flex justify-between text-sm">
                                 <span>Discount ({discountType === 'percentage' ? `${discountValue}%` : getCurrencySymbol(getInvoiceCurrency()) + discountValue}):</span>
                                 <span className="sensitive-data">-{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.discount.toFixed(2)}</span>
                             </div>

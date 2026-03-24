@@ -798,24 +798,24 @@ const ExpenseModal = ({
             : (editingExpense ? 'Save Expense' : 'Create Expense'));
 
     const modalFooter = (
-        <div className="flex w-full justify-between items-center">
-            <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 {(isSubmittingRecurring || (editingExpense && !editingRecurrenceId)) && (
-                    <Button variant="destructive" type="button" onClick={handleDeleteInstance}>
+                    <Button variant="destructive" type="button" onClick={handleDeleteInstance} className="w-full sm:w-auto">
                         Delete Expense
                     </Button>
                 )}
                 {editingRecurrenceId && (
-                    <Button variant="destructive" type="button" onClick={handleDeleteTemplate}>
+                    <Button variant="destructive" type="button" onClick={handleDeleteTemplate} className="w-full sm:w-auto">
                         Delete Expense
                     </Button>
                 )}
             </div>
-            <div className="flex justify-end items-center gap-3">
-                <Button variant="outline" onClick={handleClose} type="button">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+                <Button variant="outline" onClick={handleClose} type="button" className="w-full sm:w-auto">
                     Cancel
                 </Button>
-                <Button onClick={handleSubmit} type="submit">
+                <Button onClick={handleSubmit} type="submit" className="w-full sm:w-auto">
                     {submitLabel}
                 </Button>
             </div>
@@ -893,7 +893,7 @@ const ExpenseModal = ({
                         {!isSubmittingRecurring && (
                             <>
                                 <div className="space-y-2">
-                                    <Label htmlFor="expense-title">Title <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="expense-title">Title <span className="text-destructive-strong">*</span></Label>
                                     <Input
                                         id="expense-title"
                                         ref={titleInputRef}
@@ -904,7 +904,7 @@ const ExpenseModal = ({
                                 </div>
                                 {showOneTimeFields ? (
                                 <div className="space-y-2">
-                                    <Label htmlFor="expense-date">Date <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="expense-date">Date <span className="text-destructive-strong">*</span></Label>
                                     <Input
                                         id="expense-date"
                                         type="date"
@@ -1002,7 +1002,7 @@ const ExpenseModal = ({
                                     ? 'Amount (recurring estimate)'
                                     : 'Amount ')}
                             {!(formData.isRecurring && formData.amountType === 'variable') && (
-                                <span className="text-red-500">*</span>
+                                <span className="text-destructive-strong">*</span>
                             )}
                         </Label>
                         <Input
@@ -1221,7 +1221,7 @@ const ExpenseModal = ({
                                     <Label>
                                         Tax No <span className="text-xs text-muted-foreground">(from selected business)</span>
                                     </Label>
-                                    <div className="h-9 rounded-md border border-input bg-muted/40 px-3 flex items-center text-sm">
+                                    <div className="flex min-h-9 items-center rounded-md border border-input bg-muted/40 px-3 py-2 text-sm">
                                         <span className={selectedBusiness?.taxNumber ? 'text-foreground' : 'text-muted-foreground'}>
                                             {formData.businessId
                                                 ? (selectedBusiness?.taxNumber || 'No tax no available in this business.')
@@ -1229,7 +1229,7 @@ const ExpenseModal = ({
                                         </span>
                                     </div>
                                 </div>
-                                <div className="flex items-center h-9 mt-6">
+                                <div className="flex min-h-9 items-center pt-1 md:mt-6 md:pt-0">
                                     <CustomCheckbox
                                         checked={formData.isTaxExempt}
                                         onChange={(checked) => handleChange('isTaxExempt', checked)}
@@ -1250,11 +1250,11 @@ const ExpenseModal = ({
             title="Delete recurring expense?"
             size="md"
             footer={(
-                <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={() => setConfirmDialog(null)}>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <Button variant="outline" onClick={() => setConfirmDialog(null)} className="w-full sm:w-auto">
                         Cancel
                     </Button>
-                    <Button variant="destructive" onClick={confirmDeleteRecurrence}>
+                    <Button variant="destructive" onClick={confirmDeleteRecurrence} className="w-full sm:w-auto">
                         Delete
                     </Button>
                 </div>

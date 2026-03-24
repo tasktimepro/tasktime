@@ -252,4 +252,11 @@ describe('ExpenseModal', () => {
         fireEvent.change(typeSelect, { target: { value: 'one-time' } })
         expect(screen.getByLabelText(/Paid On/i)).toHaveValue('')
     })
+
+    it('uses full-width mobile-safe footer actions', () => {
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        expect(screen.getByRole('button', { name: 'Cancel' }).className).toContain('w-full')
+        expect(screen.getByRole('button', { name: 'Create Expense' }).className).toContain('w-full')
+    })
 })

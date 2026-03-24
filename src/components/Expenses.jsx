@@ -18,7 +18,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import Modal from '@/components/Modal';
 import { Notice } from '@/components/ui/notice';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { useUrlState } from '@/hooks/useUrlState.ts';
 import { useExpenses } from '@/hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
@@ -34,6 +37,7 @@ import ExpenseFilters from '@/components/expenses/ExpenseFilters';
 import PaymentMethods from '@/components/PaymentMethods';
 import BusinessInfo from '@/components/BusinessInfo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { FilterIcon, MagnifyingGlassIcon, XMarkIcon } from '@/components/ui/icons';
 
 const PERIOD_OPTIONS = [
     { value: 'month', label: 'This Month' },
@@ -83,6 +87,7 @@ const Expenses = ({
     const initialFiltersAppliedRef = useRef(false);
     const recurrenceGeneratedRef = useRef(false);
     const [pendingDeleteRecurrence, setPendingDeleteRecurrence] = useState(null);
+    const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
     const todayStr = useMemo(() => toStorageDate(new Date()) || '', []);
 
     const sideNavItems = useMemo(() => [
@@ -481,6 +486,22 @@ const Expenses = ({
         period,
     ]);
 
+    const activeFilterCount = useMemo(() => {
+        let count = 0;
+
+        if (search.trim()) count += 1;
+        if (period !== 'month') count += 1;
+        if (clientId !== 'all') count += 1;
+        if (projectId !== 'all') count += 1;
+        if (personalOnly) count += 1;
+        if (billableOnly) count += 1;
+        if (recurringOnly) count += 1;
+        if (paidStatus !== 'all') count += 1;
+        if (billedStatus !== 'all') count += 1;
+
+        return count;
+    }, [search, period, clientId, projectId, personalOnly, billableOnly, recurringOnly, paidStatus, billedStatus]);
+
     const clientsById = useMemo(() => {
         const map = new Map();
         clients.forEach((client) => {
@@ -530,17 +551,35 @@ const Expenses = ({
         setPendingDeleteRecurrence(null);
     };
 
+    const resetAllFilters = () => {
+        setSearch('');
+        setClientId('all');
+        setProjectId('all');
+        setPersonalOnly(false);
+        setBillableOnly(false);
+        setRecurringOnly(false);
+        setPaidStatus('all');
+        setBilledStatus('all');
+        setPeriod('month');
+        setCustomStart(toStorageDate(new Date()) || '');
+        setCustomEnd(toStorageDate(new Date()) || '');
+    };
+
+    useEffect(() => {
+        setIsMobileFiltersOpen(false);
+    }, [activeTab]);
+
     return (
         <div className="space-y-6">
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
-                <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+                <TabsList className="h-auto w-full justify-start gap-5 overflow-x-auto whitespace-nowrap rounded-none border-b border-border bg-transparent p-0">
                     {sideNavItems.map((item) => {
                         const Icon = item.icon;
                         return (
                             <TabsTrigger
                                 key={item.id}
                                 value={item.id}
-                                className="flex items-center py-2 px-1 mr-8 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm whitespace-nowrap transition-colors data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                className="shrink-0 flex items-center border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 font-medium text-sm whitespace-nowrap transition-colors data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                             >
                                 <Icon className="h-4 w-4 mr-2" />
                                 {item.name}
@@ -553,7 +592,7 @@ const Expenses = ({
             <div>
                 {activeTab === 'all' && (
                     <div>
-                        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h1 className="text-2xl font-bold text-foreground">
                                     Expenses {totalVisibleExpenseCount > 0 && (
@@ -566,12 +605,12 @@ const Expenses = ({
                                     View and manage all expenses across your workspace.
                                 </p>
                             </div>
-                            <Button leadingIcon={PlusIcon} onClick={() => openExpenseModal(null)}>
+                            <Button className="w-full sm:w-auto" leadingIcon={PlusIcon} onClick={() => openExpenseModal(null)}>
                                 New Expense
                             </Button>
                         </div>
 
-                        <div className="mt-6">
+                        <div className="mt-6 hidden md:block">
                             <ExpenseFilters
                                 search={search}
                                 onSearchChange={setSearch}
@@ -604,13 +643,73 @@ const Expenses = ({
                             />
                         </div>
 
+                        <div className="mt-6 space-y-3 md:hidden">
+                            <div className="relative">
+                                <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search expenses..."
+                                    value={search}
+                                    onChange={(event) => setSearch(event.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+                                <Select value={period} onValueChange={setPeriod}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Period" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {PERIOD_OPTIONS.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <Button variant="outline" onClick={() => setIsMobileFiltersOpen(true)}>
+                                    <FilterIcon className="h-4 w-4" />
+                                    <span>Filters</span>
+                                    {activeFilterCount > 0 && (
+                                        <Badge variant="secondary" className="ml-1 min-w-5 justify-center px-1.5 py-0 text-[11px]">
+                                            {activeFilterCount}
+                                        </Badge>
+                                    )}
+                                </Button>
+                            </div>
+
+                            {period === 'custom' && (
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <label className="space-y-1">
+                                        <span className="text-sm text-muted-foreground">From</span>
+                                        <input
+                                            type="date"
+                                            value={customStart}
+                                            onChange={(event) => setCustomStart(event.target.value)}
+                                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-base"
+                                        />
+                                    </label>
+                                    <label className="space-y-1">
+                                        <span className="text-sm text-muted-foreground">To</span>
+                                        <input
+                                            type="date"
+                                            value={customEnd}
+                                            onChange={(event) => setCustomEnd(event.target.value)}
+                                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-base"
+                                        />
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="mt-6">
                             <Tabs value={activeStatusTab} onValueChange={setActiveStatusTab}>
-                                <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+                                <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto whitespace-nowrap rounded-none border-b border-border bg-transparent p-0">
                                     <TabsTrigger
                                         value="outstanding"
-                                        className={`px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border ${outstandingExpenses.length > 0
-                                            ? 'data-[state=active]:text-amber-700 dark:data-[state=active]:text-amber-300 data-[state=active]:border-amber-700 dark:data-[state=active]:border-amber-300'
+                                        className={`shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border ${outstandingExpenses.length > 0
+                                            ? 'status-warning-tab'
                                             : 'data-[state=active]:text-foreground data-[state=active]:border-foreground'
                                         }`}
                                     >
@@ -618,13 +717,13 @@ const Expenses = ({
                                     </TabsTrigger>
                                     <TabsTrigger
                                         value="upcoming"
-                                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                        className="shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                                     >
                                         Upcoming ({upcomingExpenses.length})
                                     </TabsTrigger>
                                     <TabsTrigger
                                         value="paid"
-                                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                        className="shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                                     >
                                         Paid ({paidExpenses.length})
                                     </TabsTrigger>
@@ -820,6 +919,75 @@ const Expenses = ({
                     variant="destructive"
                 />
             </Modal>
+
+            <Dialog open={isMobileFiltersOpen} onOpenChange={setIsMobileFiltersOpen}>
+                <DialogContent className="left-0 right-0 top-auto bottom-0 max-h-[85vh] w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-t-[1.75rem] rounded-b-none border-x-0 border-b-0 p-0 md:hidden">
+                    <DialogHeader className="border-b border-border px-5 pb-4 pt-5 text-left">
+                        <div className="mb-4 flex justify-center">
+                            <div className="h-1.5 w-14 rounded-full bg-border" aria-hidden="true" />
+                        </div>
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <DialogTitle className="text-xl">Filters</DialogTitle>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Narrow expenses by assignment, type, and status.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsMobileFiltersOpen(false)}
+                                className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                aria-label="Close filters"
+                            >
+                                <XMarkIcon className="h-5 w-5" />
+                            </button>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="space-y-5 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-5">
+                        <ExpenseFilters
+                            advancedOnly
+                            search={search}
+                            onSearchChange={setSearch}
+                            period={period}
+                            onPeriodChange={setPeriod}
+                            periodOptions={PERIOD_OPTIONS}
+                            customStart={customStart}
+                            customEnd={customEnd}
+                            onCustomStartChange={setCustomStart}
+                            onCustomEndChange={setCustomEnd}
+                            clients={activeClients}
+                            projects={availableProjects}
+                            clientId={clientId}
+                            projectId={projectId}
+                            onClientChange={(value) => {
+                                setClientId(value);
+                                setProjectId('all');
+                            }}
+                            onProjectChange={setProjectId}
+                            personalOnly={personalOnly}
+                            billableOnly={billableOnly}
+                            recurringOnly={recurringOnly}
+                            onPersonalToggle={setPersonalOnly}
+                            onBillableToggle={setBillableOnly}
+                            onRecurringToggle={setRecurringOnly}
+                            paidStatus={paidStatus}
+                            billedStatus={billedStatus}
+                            onPaidStatusChange={setPaidStatus}
+                            onBilledStatusChange={setBilledStatus}
+                        />
+
+                        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                            <Button variant="outline" onClick={resetAllFilters}>
+                                Reset filters
+                            </Button>
+                            <Button onClick={() => setIsMobileFiltersOpen(false)}>
+                                Apply filters
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

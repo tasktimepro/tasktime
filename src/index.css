@@ -99,6 +99,22 @@ main,
         --chart-3: 197 37% 24%;
         --chart-4: 43 74% 66%;
         --chart-5: 27 87% 67%;
+        --status-info-surface: 214 100% 97%;
+        --status-info-border: 214 92% 88%;
+        --status-info-foreground: 217 48% 32%;
+        --status-info-accent: 217 91% 60%;
+        --status-success-surface: 138 76% 97%;
+        --status-success-border: 141 79% 85%;
+        --status-success-foreground: 142 48% 28%;
+        --status-success-accent: 142 71% 45%;
+        --status-warning-surface: 48 100% 96%;
+        --status-warning-border: 44 96% 83%;
+        --status-warning-foreground: 28 58% 30%;
+        --status-warning-accent: 38 92% 50%;
+        --status-danger-surface: 0 93% 97%;
+        --status-danger-border: 0 86% 88%;
+        --status-danger-foreground: 0 53% 38%;
+        --status-danger-accent: 0 72% 51%;
     }
 
     .dark {
@@ -126,6 +142,22 @@ main,
         --chart-3: 30 80% 55%;
         --chart-4: 280 65% 60%;
         --chart-5: 340 75% 55%;
+        --status-info-surface: 221 46% 16%;
+        --status-info-border: 217 43% 36%;
+        --status-info-foreground: 214 100% 90%;
+        --status-info-accent: 213 94% 68%;
+        --status-success-surface: 142 44% 16%;
+        --status-success-border: 142 42% 31%;
+        --status-success-foreground: 138 70% 89%;
+        --status-success-accent: 142 69% 58%;
+        --status-warning-surface: 35 51% 16%;
+        --status-warning-border: 34 55% 34%;
+        --status-warning-foreground: 48 96% 89%;
+        --status-warning-accent: 42 96% 65%;
+        --status-danger-surface: 0 45% 17%;
+        --status-danger-border: 0 51% 34%;
+        --status-danger-foreground: 0 100% 92%;
+        --status-danger-accent: 0 91% 71%;
     }
 }
 
@@ -140,15 +172,169 @@ main,
 }
 
 @layer utilities {
+    .pt-safe-top {
+        padding-top: env(safe-area-inset-top);
+    }
+
+    .pb-safe-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .pb-safe-sheet {
+        padding-bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
+    }
+
+    .bottom-safe-dock {
+        bottom: calc(env(safe-area-inset-bottom) + 5.25rem);
+    }
+
     .text-destructive-strong {
-        @apply text-destructive dark:text-red-300;
+        color: hsl(var(--status-danger-accent));
     }
 
     .hover-text-destructive-strong:hover {
-        @apply text-destructive dark:text-red-300;
+        color: hsl(var(--status-danger-accent));
     }
 
     .focus-text-destructive-strong:focus {
-        @apply text-destructive dark:text-red-300;
+        color: hsl(var(--status-danger-accent));
+    }
+
+    .status-info-surface {
+        background-color: hsl(var(--status-info-surface));
+    }
+
+    .status-info-border {
+        border-color: hsl(var(--status-info-border));
+    }
+
+    .status-info-text {
+        color: hsl(var(--status-info-foreground));
+    }
+
+    .status-info-text-strong {
+        color: hsl(var(--status-info-accent));
+    }
+
+    .hover-status-info-text-strong:hover {
+        color: hsl(var(--status-info-accent));
+    }
+
+    .focus-status-info-text-strong:focus {
+        color: hsl(var(--status-info-accent));
+    }
+
+    .status-info-fill {
+        background-color: hsl(var(--status-info-accent));
+    }
+
+    .status-success-surface {
+        background-color: hsl(var(--status-success-surface));
+    }
+
+    .status-success-border {
+        border-color: hsl(var(--status-success-border));
+    }
+
+    .status-success-text {
+        color: hsl(var(--status-success-foreground));
+    }
+
+    .status-success-text-strong {
+        color: hsl(var(--status-success-accent));
+    }
+
+    .hover-status-success-text-strong:hover {
+        color: hsl(var(--status-success-accent));
+    }
+
+    .focus-status-success-text-strong:focus {
+        color: hsl(var(--status-success-accent));
+    }
+
+    .status-success-fill {
+        background-color: hsl(var(--status-success-accent));
+    }
+
+    .status-warning-surface {
+        background-color: hsl(var(--status-warning-surface));
+    }
+
+    .status-warning-border {
+        border-color: hsl(var(--status-warning-border));
+    }
+
+    .status-warning-text {
+        color: hsl(var(--status-warning-foreground));
+    }
+
+    .status-warning-text-strong {
+        color: hsl(var(--status-warning-accent));
+    }
+
+    .hover-status-warning-text-strong:hover {
+        color: hsl(var(--status-warning-accent));
+    }
+
+    .focus-status-warning-text-strong:focus {
+        color: hsl(var(--status-warning-accent));
+    }
+
+    .status-warning-fill {
+        background-color: hsl(var(--status-warning-accent));
+    }
+
+    .status-danger-surface {
+        background-color: hsl(var(--status-danger-surface));
+    }
+
+    .status-danger-border {
+        border-color: hsl(var(--status-danger-border));
+    }
+
+    .status-danger-text {
+        color: hsl(var(--status-danger-foreground));
+    }
+
+    .status-danger-text-strong {
+        color: hsl(var(--status-danger-accent));
+    }
+
+    .status-danger-fill {
+        background-color: hsl(var(--status-danger-accent));
+    }
+
+    .status-danger-tab[data-state='active'] {
+        border-color: hsl(var(--status-danger-accent));
+        color: hsl(var(--status-danger-accent));
+    }
+
+    .status-warning-tab[data-state='active'] {
+        border-color: hsl(var(--status-warning-accent));
+        color: hsl(var(--status-warning-accent));
+    }
+
+    .status-info-action:hover,
+    .status-info-action:focus {
+        background-color: hsl(var(--status-info-surface));
+        color: hsl(var(--status-info-accent));
+    }
+
+    .status-success-action:hover,
+    .status-success-action:focus {
+        background-color: hsl(var(--status-success-surface));
+        color: hsl(var(--status-success-accent));
+    }
+
+    .status-warning-action:hover,
+    .status-warning-action:focus {
+        background-color: hsl(var(--status-warning-surface));
+        color: hsl(var(--status-warning-accent));
+    }
+
+    .status-danger-action:hover,
+    .status-danger-action:focus {
+        background-color: hsl(var(--status-danger-surface));
+        color: hsl(var(--status-danger-accent));
     }
 }

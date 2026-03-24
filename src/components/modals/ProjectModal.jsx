@@ -301,11 +301,12 @@ const ProjectModal = ({
 
     // Footer content with action buttons
     const footer = (
-        <div className="flex justify-end space-x-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
                 type="button"
                 variant="outline"
                 onClick={handleClose}
+                className="w-full sm:w-auto"
             >
                 Cancel
             </Button>
@@ -313,6 +314,7 @@ const ProjectModal = ({
             <Button
                 type="submit"
                 form="project-form"
+                className="w-full sm:w-auto"
             >
                 {editingProject ? 'Update' : 'Create'} Project
             </Button>
@@ -334,7 +336,7 @@ const ProjectModal = ({
             >
                 <div>
                     <Label htmlFor="title">
-                        Project Title <span className="text-red-500">*</span>
+                        Project Title <span className="text-destructive-strong">*</span>
                     </Label>
 
                     <Input
@@ -382,9 +384,9 @@ const ProjectModal = ({
                 {/* Client Selection - Only show for non-personal projects */}
                 {!formData.isPersonal && (
                     <div>
-                        <div className="flex justify-between items-center mb-1">
+                        <div className="mb-1 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <Label htmlFor="preferredClientId">
-                                Client <span className="text-red-500">*</span>
+                                Client <span className="text-destructive-strong">*</span>
                             </Label>
                             {openClientModal && !modalOptions?.preselectedClientId && (
                                 <Button
@@ -482,7 +484,7 @@ const ProjectModal = ({
 
                         <div className={formData.flatRate ? "hidden" : ""}>
                             <Label htmlFor="hourlyRate">
-                                Hourly Rate {!formData.flatRate && <span className="text-red-500">*</span>}
+                                Hourly Rate {!formData.flatRate && <span className="text-destructive-strong">*</span>}
                             </Label>
 
                             <Input

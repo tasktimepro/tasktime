@@ -63,6 +63,34 @@ const Dashboard = ({
     const [showAddEntryModal, setShowAddEntryModal] = useState(false);
     const [addEntryTask, setAddEntryTask] = useState(null);
     const [addEntryDateStr, setAddEntryDateStr] = useState(null);
+    const [isMobileLayout, setIsMobileLayout] = useState(() => {
+        if (typeof window === 'undefined' || !window.matchMedia) {
+            return false;
+        }
+
+        return window.matchMedia('(max-width: 767px)').matches;
+    });
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.matchMedia) {
+            return undefined;
+        }
+
+        const mediaQuery = window.matchMedia('(max-width: 767px)');
+        const handleChange = (event) => {
+            setIsMobileLayout(event.matches);
+        };
+
+        setIsMobileLayout(mediaQuery.matches);
+
+        if (mediaQuery.addEventListener) {
+            mediaQuery.addEventListener('change', handleChange);
+            return () => mediaQuery.removeEventListener('change', handleChange);
+        }
+
+        mediaQuery.addListener(handleChange);
+        return () => mediaQuery.removeListener(handleChange);
+    }, []);
 
     const resolveRecurringActionDate = useCallback((task) => {
         if (!task?.recurring || !todayStr) return null;
@@ -631,7 +659,7 @@ const Dashboard = ({
      * Render task title with navigation
      */
     const renderTaskTitle = useCallback((task, isCompleted) => {
-        const baseClasses = `block w-full text-sm font-medium truncate text-left transition-colors ${
+        const baseClasses = `block w-full text-sm font-medium text-left transition-colors whitespace-normal break-words sm:truncate ${
             isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
         }`;
 
@@ -640,7 +668,7 @@ const Dashboard = ({
             <span className={`inline-flex items-center ${titleClass}`}>
                 <CornerDownRightIcon className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
                 {task.title}
-                {!task.parentTask && <span className="text-red-500 text-xs"> [Parent missing]</span>}
+                {!task.parentTask && <span className="text-destructive-strong text-xs"> [Parent missing]</span>}
             </span>
         ) : (
             <span className={titleClass}>{task.title}</span>
@@ -654,14 +682,14 @@ const Dashboard = ({
                 <button
                     onClick={() => handleTaskTitleClick(task)}
                     className={`${baseClasses} cursor-pointer ${
-                        isCompleted ? 'hover:text-muted-foreground' : 'hover:text-blue-600 dark:hover:text-blue-400'
+                        isCompleted ? 'hover:text-muted-foreground' : 'hover-status-info-text-strong'
                     }`}
                     title="Open task details"
                 >
                     {title}
                 </button>
                 {(hasProject || hasNote) && (
-                    <p className={`text-xs text-muted-foreground truncate ${isCompleted ? 'line-through' : ''}`}>
+                    <p className={`text-xs text-muted-foreground whitespace-normal break-words sm:truncate ${isCompleted ? 'line-through' : ''}`}>
                         {hasProject && (
                             <button
                                 type="button"
@@ -765,6 +793,28 @@ const Dashboard = ({
         showSuccess('Task archived');
     }, [archiveTask, timers, clearTimer, showSuccess]);
 
+    const reportsOverview = (
+        <MetricsCards
+            thisMonthMetrics={thisMonthMetrics}
+            lastMonthMetrics={lastMonthMetrics}
+            last90DaysMetrics={last90DaysMetrics}
+            invoiceMetrics={invoiceMetrics}
+            thisMonthBillableHours={thisMonthBillableHours}
+            thisMonthUnbilledDisplay={thisMonthUnbilledDisplay}
+            expenseThisMonthUpcomingTotal={expenseMetrics.upcomingThisMonthTotal}
+            expenseThisMonthUpcomingHasEstimate={expenseMetrics.upcomingThisMonthHasEstimate}
+            expenseThisMonthPaidTotal={expenseMetrics.paidThisMonthTotal}
+            expenseLastMonthPaidTotal={expenseMetrics.paidLastMonthTotal}
+            expenseLast90DaysPaidTotal={expenseMetrics.paidLast90DaysTotal}
+            hasClients={hasClients}
+            preferredCurrency={preferredCurrency}
+            formatDuration={formatDuration}
+            needsExchangeRates={needsExchangeRates}
+            exchangeRatesLoading={exchangeRatesLoading}
+            navigateToInvoices={navigateToInvoices}
+        />
+    );
+
 
     return (
         <div className="space-y-6">
@@ -783,6 +833,8 @@ const Dashboard = ({
                 onArchiveTask={handleArchiveTask}
                 openExpenseView={openExpenseView}
             />
+
+            {isMobileLayout && reportsOverview}
 
             {/* Recent Tasks and Projects Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -810,25 +862,7 @@ const Dashboard = ({
                 />
             </div>
 
-            <MetricsCards
-                thisMonthMetrics={thisMonthMetrics}
-                lastMonthMetrics={lastMonthMetrics}
-                last90DaysMetrics={last90DaysMetrics}
-                invoiceMetrics={invoiceMetrics}
-                thisMonthBillableHours={thisMonthBillableHours}
-                thisMonthUnbilledDisplay={thisMonthUnbilledDisplay}
-                expenseThisMonthUpcomingTotal={expenseMetrics.upcomingThisMonthTotal}
-                expenseThisMonthUpcomingHasEstimate={expenseMetrics.upcomingThisMonthHasEstimate}
-                expenseThisMonthPaidTotal={expenseMetrics.paidThisMonthTotal}
-                expenseLastMonthPaidTotal={expenseMetrics.paidLastMonthTotal}
-                expenseLast90DaysPaidTotal={expenseMetrics.paidLast90DaysTotal}
-                hasClients={hasClients}
-                preferredCurrency={preferredCurrency}
-                formatDuration={formatDuration}
-                needsExchangeRates={needsExchangeRates}
-                exchangeRatesLoading={exchangeRatesLoading}
-                navigateToInvoices={navigateToInvoices}
-            />
+            {!isMobileLayout && reportsOverview}
 
             <AddTimeEntryModal
                 isOpen={showAddEntryModal}

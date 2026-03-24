@@ -36,13 +36,16 @@ import ErrorBoundary from './components/ErrorBoundary';
 import OfflineIndicator from './components/OfflineIndicator';
 import InstallPrompt from './components/InstallPrompt';
 import YjsSyncStatus from './components/sync/YjsSyncStatus';
+import MobileBottomNav from './components/app/MobileBottomNav';
+import MobileMoreSheet from './components/app/MobileMoreSheet';
+import MobileTopBar from './components/app/MobileTopBar';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { buildExpenseFromRecurrence } from './utils/expenseUtils.ts';
 import { getTaskIdsToDelete } from './utils/taskUtils.ts';
 import { useTodayString } from './hooks/useDayRollover';
-import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon } from '@/components/ui/icons';
+import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon, CloudIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
@@ -737,6 +740,133 @@ function AppContent() {
         timers,
     ]);
 
+    const [isMobileLayout, setIsMobileLayout] = useState(() => {
+        if (typeof window === 'undefined' || !window.matchMedia) {
+            return false;
+        }
+
+        return window.matchMedia('(max-width: 767px)').matches;
+    });
+    const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.matchMedia) {
+            return undefined;
+        }
+
+        const mediaQuery = window.matchMedia('(max-width: 767px)');
+        const handleChange = (event) => {
+            setIsMobileLayout(event.matches);
+        };
+
+        setIsMobileLayout(mediaQuery.matches);
+
+        if (mediaQuery.addEventListener) {
+            mediaQuery.addEventListener('change', handleChange);
+            return () => mediaQuery.removeEventListener('change', handleChange);
+        }
+
+        mediaQuery.addListener(handleChange);
+        return () => mediaQuery.removeListener(handleChange);
+    }, []);
+
+    useEffect(() => {
+        setIsMoreMenuOpen(false);
+    }, [activeView, selectedProject, selectedClient]);
+
+    const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'account'].includes(activeView);
+    const isMoreViewActive = ['clients', 'invoices', 'account'].includes(activeView);
+    const mobileHeaderTitle = selectedProject?.title
+        || selectedClient?.title
+        || selectedClient?.name
+        || pageTitleMap[activeView]
+        || ORIGINAL_TITLE;
+    const mobileHeaderContext = selectedProject
+        ? 'Project'
+        : selectedClient
+            ? 'Client'
+            : activeView === 'auth-callback'
+                ? 'Authentication'
+                : 'TaskTime';
+    const mobileTopPadding = showGlobalTimer && timerIsActive ? '1rem' : '0.75rem';
+    const mobileBottomPadding = showGlobalTimer && timerIsActive ? '8.5rem' : '7rem';
+    const desktopTopPadding = showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem';
+    const desktopBottomPadding = '1.5rem';
+    const mobilePrimaryNavItems = [
+        {
+            key: 'dashboard',
+            label: 'Dashboard',
+            Icon: LayoutDashboardIcon,
+            isActive: activeView === 'dashboard',
+            onClick: () => navigateToDashboard(),
+        },
+        {
+            key: 'planner',
+            label: 'Planner',
+            Icon: KanbanIcon,
+            isActive: activeView === 'planner',
+            onClick: () => navigateToPlanner(),
+        },
+        {
+            key: 'projects',
+            label: 'Projects',
+            Icon: ClipboardDocumentCheckIcon,
+            isActive: activeView === 'projects',
+            onClick: () => navigateToProjects(),
+        },
+        {
+            key: 'expenses',
+            label: 'Expenses',
+            Icon: HandCoinsIcon,
+            isActive: activeView === 'expenses',
+            onClick: () => navigateToExpenses(),
+        },
+    ];
+    const mobileMoreNavItems = [
+        {
+            key: 'clients',
+            label: 'Clients',
+            description: 'View clients and client detail pages',
+            Icon: UserGroupIcon,
+            onClick: () => navigateToClients(),
+        },
+        {
+            key: 'invoices',
+            label: 'Invoices',
+            description: 'Open invoice management and templates',
+            Icon: DocumentTextIcon,
+            onClick: () => navigateToInvoices(),
+        },
+        {
+            key: 'account',
+            label: 'Account',
+            description: 'Preferences, backup, and data management',
+            Icon: UserCircleIcon,
+            onClick: () => navigateToAccount(),
+        },
+        {
+            key: 'sync',
+            label: 'Sync Settings',
+            description: 'Jump directly to cloud sync settings',
+            Icon: CloudIcon,
+            onClick: () => navigateToAccount({ section: 'sync' }),
+        },
+    ];
+    const handleMobileBack = () => {
+        if (selectedProject) {
+            navigateToProjects();
+            return;
+        }
+
+        if (selectedClient) {
+            navigateToClients();
+        }
+    };
+    const handleMoreSheetAction = (action) => () => {
+        setIsMoreMenuOpen(false);
+        action();
+    };
+
     // === Loading Screen ===
     if (isLoading) {
         return (
@@ -750,8 +880,6 @@ function AppContent() {
         );
     }
 
-    const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'account'].includes(activeView);
-
     const handleSidebarCollapsedAction = (action) => (event) => {
         event.currentTarget.blur();
         action();
@@ -760,9 +888,10 @@ function AppContent() {
     // === Main Render ===
     return (
         <div className={`min-h-screen ${totalsHidden ? 'totals-hidden' : ''}`}>
-            <div className="mx-auto w-full max-w-[100rem] px-6 pr-2">
-            <div className="flex gap-6">
+            <div className={isMobileLayout ? 'w-full' : 'mx-auto w-full max-w-[100rem] px-6 pr-2'}>
+            <div className={isMobileLayout ? 'min-h-screen' : 'flex gap-6'}>
             {/* Sidebar Navigation */}
+            {!isMobileLayout && (
             <aside className={`${isSidebarCollapsed ? 'w-18' : 'w-64'} bg-card shadow-sm border border-border rounded-xl flex flex-col h-[calc(100vh-3rem)] sidebar my-6 transition-[width] duration-200`}>
             <TooltipProvider>
                 {/* Sidebar Header */}
@@ -1134,16 +1263,28 @@ function AppContent() {
                 </div>
             </TooltipProvider>
             </aside>
+            )}
 
             {/* Main Content */}
-            <main className="flex-1 main-content relative">
+            <main className={`main-content relative ${isMobileLayout ? 'min-h-screen' : 'flex-1'}`}>
+                {isMobileLayout && (
+                    <MobileTopBar
+                        canGoBack={Boolean(selectedProject || selectedClient)}
+                        headerContext={mobileHeaderContext}
+                        headerTitle={mobileHeaderTitle}
+                        isMoreViewActive={isMoreViewActive}
+                        onBack={handleMobileBack}
+                        onCreateTask={() => openTaskModal(null)}
+                        onOpenMore={() => setIsMoreMenuOpen(true)}
+                        onOpenDashboard={() => navigateToDashboard()}
+                        showCreateAction={activeView !== 'auth-callback'}
+                    />
+                )}
                 <div
-                    className="pr-4"
+                    className={isMobileLayout ? 'app-shell-content px-4' : 'app-shell-content pr-4'}
                     style={{
-                        paddingTop: showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem',
-                        paddingBottom: '1.5rem',
-                        '--app-content-padding-top': showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem',
-                        '--app-content-padding-bottom': '1.5rem',
+                        '--app-content-padding-top': isMobileLayout ? mobileTopPadding : desktopTopPadding,
+                        '--app-content-padding-bottom': isMobileLayout ? mobileBottomPadding : desktopBottomPadding,
                     }}
                 >
                     {activeView === 'dashboard' && (
@@ -1324,13 +1465,15 @@ function AppContent() {
                         setModalOptions={setModalOptions}
                     />
 
-                    <FloatingActionButton
-                        onTaskClick={() => openTaskModal(null)}
-                    />
+                    {!isMobileLayout && (
+                        <FloatingActionButton
+                            onTaskClick={() => openTaskModal(null)}
+                        />
+                    )}
                 </div>
                 
                 {/* Global Timer Display - Fixed at top */}
-                {showGlobalTimer && timerIsActive && (
+                {!isMobileLayout && showGlobalTimer && timerIsActive && (
                     <div
                         className="fixed top-4 left-1/2 -translate-x-1/2 w-full max-w-[100rem] z-50 flex justify-center global-timer-mobile pointer-events-none"
                         style={{
@@ -1349,9 +1492,47 @@ function AppContent() {
                         </div>
                     </div>
                 )}
+
+                {isMobileLayout && showGlobalTimer && timerIsActive && (
+                    <div className="bottom-safe-dock fixed inset-x-0 z-50 px-4 md:hidden">
+                        <div className="mx-auto max-w-xl rounded-2xl border border-border bg-background/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/85">
+                            <GlobalTimerStack
+                                navigateToProject={navigateToProject}
+                                onOpenTaskView={openTaskView}
+                                onClose={() => {
+                                    setShowGlobalTimer(false);
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
         </div>
+
+        {isMobileLayout && (
+            <>
+                <MobileBottomNav
+                    items={mobilePrimaryNavItems}
+                    isMoreActive={isMoreViewActive || isMoreMenuOpen}
+                    onOpenMore={() => setIsMoreMenuOpen(true)}
+                />
+
+                <MobileMoreSheet
+                    darkMode={darkMode}
+                    isOpen={isMoreMenuOpen}
+                    items={mobileMoreNavItems.map((item) => ({
+                        ...item,
+                        onClick: handleMoreSheetAction(item.onClick),
+                    }))}
+                    onClose={() => setIsMoreMenuOpen(false)}
+                    onOpenChange={setIsMoreMenuOpen}
+                    onToggleDarkMode={() => setDarkMode(!darkMode)}
+                    onToggleTotals={() => setTotalsHidden(!totalsHidden)}
+                    totalsHidden={totalsHidden}
+                />
+            </>
+        )}
 
         {taskViewState.task && (
             <TaskViewModal

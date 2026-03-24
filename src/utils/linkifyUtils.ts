@@ -52,7 +52,7 @@ export const linkifyNodes = (
 ): Array<ReactNode> | null => {
     if (!text) return null;
 
-    const baseLinkClassName = options?.linkClassName || 'text-blue-600 dark:text-blue-400 hover:underline';
+    const baseLinkClassName = options?.linkClassName || 'status-info-text-strong hover:underline';
     const linkClassName = [baseLinkClassName, options?.linkAdditionalClassName]
         .filter(Boolean)
         .join(' ');

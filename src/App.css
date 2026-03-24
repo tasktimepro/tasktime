@@ -4,6 +4,8 @@
   min-height: 100vh;
   max-width: 100%;
   box-sizing: border-box;
+  --app-content-padding-top: 1.5rem;
+  --app-content-padding-bottom: 1.5rem;
 }
 
 /* Apply consistent padding to prevent layout shifts from scrollbar */
@@ -16,6 +18,11 @@ body {
 .main-content {
   max-height: 100vh;
   overflow-y: auto;
+}
+
+.app-shell-content {
+  padding-top: var(--app-content-padding-top);
+  padding-bottom: var(--app-content-padding-bottom);
 }
 
 /* For components that have their own scrolling areas */

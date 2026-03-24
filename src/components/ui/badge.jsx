@@ -20,11 +20,11 @@ const badgeVariants = cva(
           "border-transparent bg-destructive/10 text-destructive",
         // Status badges - subtle with slate base (semantic meaning)
         success:
-          "border-border bg-muted text-foreground",
+          "status-success-border status-success-surface status-success-text",
         warning:
-          "border-amber-700 text-amber-900 dark:border-amber-300 dark:text-amber-100",
+          "status-warning-border status-warning-surface status-warning-text",
         error:
-          "border-border bg-muted text-foreground",
+          "status-danger-border status-danger-surface status-danger-text",
       },
     },
     defaultVariants: {

@@ -28,6 +28,8 @@ import {
 import { MoreHorizontal } from 'lucide-react';
 import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
 import ExpensesSection from './expenses/ExpensesSection';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -55,6 +57,7 @@ const ProjectDashboard = ({
     openExpenseModal,
     openExpenseView
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     // Invoice editing state
     const [editingInvoice, setEditingInvoice] = useState(null);
     const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
@@ -291,10 +294,10 @@ const ProjectDashboard = ({
     }, [clients, project.preferredClientId]);
 
     return (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4')}>
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
+            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
+                <div className={cn('flex items-center', isMobileLayout ? 'gap-3' : 'space-x-4')}>
                     <Button
                         type="button"
                         variant="ghost"
@@ -346,7 +349,7 @@ const ProjectDashboard = ({
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className={cn('flex items-center gap-3', isMobileLayout && 'w-full justify-end')}>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
@@ -362,7 +365,7 @@ const ProjectDashboard = ({
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem
                                 onClick={handleEditProject}
-                                className="flex items-center space-x-2 hover:bg-yellow-50 hover:text-yellow-600"
+                                className="status-warning-action flex items-center space-x-2"
                             >
                                 <PencilIcon className="h-4 w-4" />
                                 <span>Edit</span>
@@ -370,7 +373,7 @@ const ProjectDashboard = ({
                             {project.archived ? (
                                 <DropdownMenuItem
                                     onClick={handleUnarchiveProject}
-                                    className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                    className="status-info-action flex items-center space-x-2"
                                 >
                                     <ArchiveBoxIcon className="h-4 w-4" />
                                     <span>Unarchive</span>
@@ -378,7 +381,7 @@ const ProjectDashboard = ({
                             ) : (
                                 <DropdownMenuItem
                                     onClick={handleArchiveProject}
-                                    className="flex items-center space-x-2 hover:bg-blue-50 hover:text-blue-600"
+                                    className="status-info-action flex items-center space-x-2"
                                 >
                                     <ArchiveBoxIcon className="h-4 w-4" />
                                     <span>Archive</span>
@@ -386,7 +389,7 @@ const ProjectDashboard = ({
                             )}
                             <DropdownMenuItem
                                 onClick={handleDeleteProject}
-                                className="flex items-center space-x-2 hover:bg-red-50 hover:text-red-600"
+                                className="status-danger-action flex items-center space-x-2"
                             >
                                 <TrashIcon className="h-4 w-4" />
                                 <span>Delete</span>
@@ -429,9 +432,16 @@ const ProjectDashboard = ({
 
             {/* Project Metrics - Only show for non-personal projects */}
             {!project.isPersonal && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <Card className="h-full">
-                        <CardContent className="p-5 flex items-center h-full">
+                <div
+                    className={cn(
+                        isMobileLayout
+                            ? '-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 scrollbar-hide'
+                            : 'grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4'
+                    )}
+                    data-testid="project-metrics-row"
+                >
+                    <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                        <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
                             <div className="flex items-center w-full">
                                 <div className="flex-shrink-0">
                                     <BanknotesIcon className="h-5 w-5 text-muted-foreground" />
@@ -439,7 +449,7 @@ const ProjectDashboard = ({
                                 <div className="ml-4 w-0 flex-1">
                                     <dl>
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
-                                        <dd className="text-lg font-semibold text-foreground">
+                                        <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                             <span className="sensitive-data">
                                                 {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.totalRevenue.toFixed(2)}
                                             </span>
@@ -450,8 +460,8 @@ const ProjectDashboard = ({
                         </CardContent>
                     </Card>
 
-                    <Card className="h-full">
-                        <CardContent className="p-5 flex items-center h-full">
+                    <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                        <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
                             <div className="flex items-center w-full">
                                 <div className="flex-shrink-0">
                                     <DocumentTextIcon className="h-5 w-5 text-muted-foreground" />
@@ -459,7 +469,7 @@ const ProjectDashboard = ({
                                 <div className="ml-4 w-0 flex-1">
                                     <dl>
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Pending</dt>
-                                        <dd className="text-lg font-semibold text-foreground">
+                                        <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                             <span className="sensitive-data">
                                                 {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.pendingAmount.toFixed(2)}
                                             </span>
@@ -470,8 +480,8 @@ const ProjectDashboard = ({
                         </CardContent>
                     </Card>
 
-                    <Card className="h-full">
-                        <CardContent className="p-5 flex items-center h-full">
+                    <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                        <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
                             <div className="flex items-center w-full">
                                 <div className="flex-shrink-0">
                                     <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
@@ -479,7 +489,7 @@ const ProjectDashboard = ({
                                 <div className="ml-4 w-0 flex-1">
                                     <dl>
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Expenses</dt>
-                                        <dd className="text-lg font-semibold text-foreground">
+                                        <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                             <span className="sensitive-data">
                                                 {formatAmounts(expenseTotalsByCurrency)}
                                             </span>
@@ -490,8 +500,8 @@ const ProjectDashboard = ({
                         </CardContent>
                     </Card>
 
-                    <Card className="h-full">
-                        <CardContent className="p-5 flex items-center h-full">
+                    <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                        <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
                             <div className="flex items-center w-full">
                                 <div className="w-full">
                                     <dl>
@@ -520,7 +530,7 @@ const ProjectDashboard = ({
 
             {/* Task Tree */}
             <Card>
-                <CardContent className="pt-6">
+                <CardContent className={cn(isMobileLayout ? 'px-3 py-3' : 'pt-6')}>
                     <TaskTree
                         project={project}
                         onEditTask={openTaskModal}
@@ -539,8 +549,8 @@ const ProjectDashboard = ({
             {/* Invoices Section - Only show for non-personal projects */}
             {!project.isPersonal && (
                 <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
+                    <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
+                        <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
                             <button
                                 type="button"
                                 onClick={toggleInvoicesExpanded}
@@ -556,27 +566,29 @@ const ProjectDashboard = ({
                                 />
                             </button>
                             
-                            <InvoiceGenerator
-                                project={project}
-                                timeEntries={projectTimeEntries}
-                                editingInvoice={editingInvoice}
-                                onInvoiceSaved={() => setEditingInvoice(null)}
-                                paymentMethods={paymentMethods}
-                                businessInfos={businessInfos}
-                                clients={clients}
-                                activeModal={activeModal}
-                                // Modal functions
-                                openClientModal={openClientModal}
-                                openProjectModal={openProjectModal}
-                                openBusinessModal={openBusinessModal}
-                                openPaymentMethodModal={openPaymentMethodModal}
-                                openTemplateModal={openTemplateModal}
-                            />
+                            <div className={cn(isMobileLayout && 'w-full flex justify-end')}>
+                                <InvoiceGenerator
+                                    project={project}
+                                    timeEntries={projectTimeEntries}
+                                    editingInvoice={editingInvoice}
+                                    onInvoiceSaved={() => setEditingInvoice(null)}
+                                    paymentMethods={paymentMethods}
+                                    businessInfos={businessInfos}
+                                    clients={clients}
+                                    activeModal={activeModal}
+                                    // Modal functions
+                                    openClientModal={openClientModal}
+                                    openProjectModal={openProjectModal}
+                                    openBusinessModal={openBusinessModal}
+                                    openPaymentMethodModal={openPaymentMethodModal}
+                                    openTemplateModal={openTemplateModal}
+                                />
+                            </div>
                         </div>
                     </CardHeader>
 
                     {isInvoicesExpanded && (
-                        <CardContent id="project-invoices-list">
+                        <CardContent id="project-invoices-list" className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
                             <InvoicesList
                                 projectInvoices={projectInvoices}
                                 onEditInvoice={handleEditInvoice}

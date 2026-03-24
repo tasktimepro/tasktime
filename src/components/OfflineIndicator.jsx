@@ -45,7 +45,7 @@ const OfflineIndicator = ({ className = '', isCompact = false }) => {
     
     const content = (
         <div
-            className={`${isCompact ? 'w-10 mx-auto justify-center px-2 py-2' : 'w-full px-3 py-2'} flex items-center text-sm font-medium rounded-md bg-yellow-50 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 ${className}`}
+            className={`${isCompact ? 'w-10 mx-auto justify-center px-2 py-2' : 'w-full px-3 py-2'} status-warning-surface status-warning-text flex items-center text-sm font-medium rounded-md ${className}`}
             title={isCompact ? undefined : 'You\'re offline'}
             aria-label={isCompact ? 'You\'re offline' : undefined}
         >

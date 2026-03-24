@@ -14,6 +14,8 @@ import { useInvoices } from '../hooks/useInvoices.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 /**
  * Helper function to determine if an invoice is overdue
@@ -50,6 +52,7 @@ const InvoicesList = ({
     invoiceTemplates = [],
     selectedTab = null // New prop to preselect a tab
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
     const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
@@ -368,17 +371,17 @@ const InvoicesList = ({
                                 className={`hover:shadow-md transition-shadow ${borderColor ? 'border-l-4' : ''}`}
                                 style={borderColor ? { borderLeftColor: borderColor } : undefined}
                             >
-                                <CardContent className="p-4">
+                                <CardContent className={cn(isMobileLayout ? 'p-3' : 'p-4')}>
                                     <div className="flex flex-col space-y-4">
                                     {/* Header row with invoice number and status tag */}
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-3">
+                                    <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
+                                        <div className="flex items-center space-x-3 min-w-0">
                                             <DocumentTextIcon className="h-6 w-6 text-muted-foreground" />
-                                            <h3 className="text-sm font-medium text-foreground">
+                                            <h3 className="text-sm font-medium text-foreground truncate">
                                                 {invoice.invoiceNumber}
                                             </h3>
                                         </div>
-                                        <div>
+                                        <div className={cn(isMobileLayout && 'w-full')}>
                                             {invoice.paymentProcessed ? (
                                                 <Badge variant="success">
                                                     <CheckIcon className="h-3 w-3 mr-1" />
@@ -400,8 +403,8 @@ const InvoicesList = ({
                                     </div>
 
                                 {/* Invoice details with action buttons on the same row */}
-                                <div className="flex items-end justify-between ml-9">
-                                    <div className="flex-1">
+                                <div className={cn('justify-between', isMobileLayout ? 'ml-0 space-y-3' : 'ml-9 flex items-end')}>
+                                    <div className="flex-1 min-w-0">
                                         <p className="text-sm text-muted-foreground">
                                             {toDisplayDate(invoice.date)}
                                             {invoice.totalHours > 0 && (
@@ -418,13 +421,13 @@ const InvoicesList = ({
                                         {invoice.dueDate && !invoice.paymentProcessed && (
                                             <p className={`text-sm mt-1 ${
                                                 isInvoiceOverdue(invoice) 
-                                                    ? 'text-red-600 font-medium' 
+                                                    ? 'status-danger-text-strong font-medium' 
                                                     : 'text-muted-foreground'
                                             }`}>
                                                 Due: {toDisplayDate(invoice.dueDate)}
                                             </p>
                                         )}
-                                        <div className="text-xs text-muted-foreground mt-1">
+                                        <div className="mt-1 text-xs text-muted-foreground break-words">
                                             <p>
                                                 Client: <span className="font-medium text-muted-foreground">
                                                     {(() => {
@@ -455,7 +458,7 @@ const InvoicesList = ({
                                                     <p>
                                                         Template: <span className="font-medium text-muted-foreground">{template.name}</span>
                                                         {isDeleted && (
-                                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium status-danger-surface status-danger-text">
                                                                 deleted
                                                             </span>
                                                         )}
@@ -472,7 +475,7 @@ const InvoicesList = ({
                                                     <p>
                                                         Business: <span className="font-medium text-muted-foreground">{businessInfo.title}</span>
                                                         {isDeleted && (
-                                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium status-danger-surface status-danger-text">
                                                                 deleted
                                                             </span>
                                                         )}
@@ -489,7 +492,7 @@ const InvoicesList = ({
                                                     <p>
                                                         Payment Method: <span className="font-medium text-muted-foreground">{paymentMethod.title || paymentMethod.name}</span>
                                                         {isDeleted && (
-                                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium status-danger-surface status-danger-text">
                                                                 deleted
                                                             </span>
                                                         )}
@@ -500,7 +503,7 @@ const InvoicesList = ({
                                     </div>
 
                                     {/* Action buttons - right side */}
-                                    <div className="flex justify-end items-center space-x-2">
+                                    <div className={cn('flex items-center gap-2', isMobileLayout ? 'w-full flex-wrap justify-end' : 'justify-end')}>
                                         {!invoice.paymentProcessed && (
                                             <Button
                                                 onClick={() => handlePaymentProcessedToggle(invoice)}
@@ -605,31 +608,48 @@ const InvoicesList = ({
     }
 
     return (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4 overflow-x-hidden')}>
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={handleTabChange}>
-                <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+                <TabsList className={cn(
+                    'w-full bg-transparent rounded-none',
+                    isMobileLayout
+                        ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
+                        : 'justify-start border-b border-border p-0'
+                )}>
                     {/* Overdue tab - only show when there are overdue invoices */}
                     {overdueInvoices.length > 0 && (
                         <TabsTrigger
                             value="overdue"
-                            className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-red-700 dark:data-[state=active]:border-red-300 data-[state=active]:text-red-700 dark:data-[state=active]:text-red-300 data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                            className={cn(
+                                isMobileLayout
+                                    ? 'status-danger-tab rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:shadow-none'
+                                    : 'status-danger-tab -mb-px rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 font-medium text-sm transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
+                            )}
                         >
                             Overdue ({overdueInvoices.length})
                         </TabsTrigger>
                     )}
                     <TabsTrigger
                         value="outstanding"
-                        className={`px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border ${outstandingInvoices.length > 0
-                            ? 'data-[state=active]:text-amber-700 dark:data-[state=active]:text-amber-300 data-[state=active]:border-amber-700 dark:data-[state=active]:border-amber-300'
-                            : 'data-[state=active]:text-foreground data-[state=active]:border-foreground'
-                        }`}
+                        className={cn(
+                            isMobileLayout
+                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:shadow-none'
+                                : 'px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border',
+                            outstandingInvoices.length > 0
+                                ? 'status-warning-tab'
+                                : 'data-[state=active]:text-foreground data-[state=active]:border-foreground'
+                        )}
                     >
                         Outstanding ({outstandingInvoices.length})
                     </TabsTrigger>
                     <TabsTrigger
                         value="paid"
-                        className="px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                        className={cn(
+                            isMobileLayout
+                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
+                                : 'px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
+                        )}
                     >
                         Paid ({paidInvoices.length})
                     </TabsTrigger>

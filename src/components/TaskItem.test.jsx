@@ -25,7 +25,7 @@ vi.mock('./task/TaskActions', () => ({
 }));
 
 vi.mock('./task/StartDateBadge', () => ({
-    default: () => null,
+    default: () => <div data-testid="task-start-date" />,
 }));
 
 vi.mock('./TimeEntriesModal', () => ({
@@ -114,7 +114,24 @@ vi.mock('../hooks/useTimers', () => ({
 }));
 
 describe('TaskItem subtask creation', () => {
+    const setMatchMedia = (matches) => {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: vi.fn().mockImplementation(() => ({
+                matches,
+                media: '(max-width: 767px)',
+                onchange: null,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            }))
+        });
+    };
+
     it('includes note in onCreateSubtask payload', async () => {
+        setMatchMedia(false);
         hookState.tasks = [];
         hookState.entries = [];
         hookState.getTimerForTask.mockReturnValue(null);
@@ -156,5 +173,42 @@ describe('TaskItem subtask creation', () => {
             startDate: '2026-02-23',
             recurring: null,
         });
+    });
+
+    it('uses a right-aligned secondary row on mobile', () => {
+        setMatchMedia(true);
+        hookState.tasks = [];
+        hookState.entries = [{ taskId: 'task-2', start: 0, end: 7200000 }];
+        hookState.getTimerForTask.mockReturnValue(null);
+
+        render(
+            <TaskItem
+                task={{
+                    id: 'task-2',
+                    projectId: 'project-1',
+                    title: 'Mobile task row',
+                    recurring: null,
+                    startDate: '2026-03-24',
+                    completed: false,
+                    archived: false,
+                    createdAt: Date.now(),
+                }}
+                onCreateSubtask={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onUnarchive={vi.fn()}
+                onToggleBillable={vi.fn()}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        const secondaryRow = screen.getByTestId('task-item-secondary-task-2');
+
+        expect(secondaryRow.className.includes('w-full')).toBe(true);
+        expect(secondaryRow.className.includes('justify-end')).toBe(true);
+        expect(screen.getByTestId('task-start-date')).toBeInTheDocument();
+        expect(screen.getByText('2h')).toBeInTheDocument();
+        expect(screen.getByTestId('task-actions')).toBeInTheDocument();
     });
 });
