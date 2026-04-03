@@ -143,7 +143,11 @@ export const useGoogleAuth = () => {
 
         setState(prev => ({ ...prev, isLoading: true, error: null }));
 
+        let popup: Window | null = null;
+
         try {
+            popup = openPendingAuthPopup();
+
             // 1. Get auth URL from Worker
             const initResponse = await fetch(SYNC_WORKER_CONFIG.endpoints.authInit, {
                 method: 'POST',
@@ -158,8 +162,8 @@ export const useGoogleAuth = () => {
             const { authUrl, state: authState } = await initResponse.json();
             sessionStorage.setItem('google_auth_state', authState);
 
-            // 2. Open popup for OAuth
-            const popup = openAuthPopup(authUrl);
+            // 2. Navigate the already-open popup to preserve the user gesture on mobile browsers
+            navigateAuthPopup(popup, authUrl);
 
             // 3. Wait for callback
             const code = await waitForAuthCallback(popup, authState);
@@ -213,6 +217,14 @@ export const useGoogleAuth = () => {
             notifyAuthSubscribers();
 
         } catch (error) {
+            if (popup && !popup.closed) {
+                try {
+                    popup.close();
+                } catch {
+                    // Ignore popup close failures
+                }
+            }
+
             const authError = toAuthError(error, SYNC_WORKER_CONFIG.endpoints.authInit);
 
             setState(prev => ({
@@ -355,20 +367,107 @@ export const useGoogleAuth = () => {
 // HELPER FUNCTIONS (for Worker OAuth popup flow)
 // ============================================
 
-function openAuthPopup(url: string): Window {
+function getAuthPopupFeatures(): string {
 
     const width = 500;
     const height = 600;
     const left = window.screenX + (window.innerWidth - width) / 2;
     const top = window.screenY + (window.innerHeight - height) / 2;
 
-    const popup = window.open(url, 'google-auth', `width=${width},height=${height},left=${left},top=${top},popup=1`);
+    return `width=${width},height=${height},left=${left},top=${top},popup=1`;
+}
+
+function openPendingAuthPopup(): Window {
+
+    const popup = window.open('', 'google-auth', getAuthPopupFeatures());
 
     if (!popup) {
         throw new Error('Failed to open auth popup. Check popup blocker settings.');
     }
 
+    renderPendingAuthPopup(popup);
+
     return popup;
+}
+
+function renderPendingAuthPopup(popup: Window): void {
+
+    try {
+        const popupTheme = resolvePendingAuthPopupTheme();
+        const popupDocument = popup.document;
+        const viewport = popupDocument.createElement('meta');
+        const title = popupDocument.createElement('title');
+        const style = popupDocument.createElement('style');
+        const message = popupDocument.createElement('p');
+
+        popupDocument.documentElement.lang = 'en';
+
+        viewport.setAttribute('name', 'viewport');
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1');
+
+        title.textContent = 'Connecting Google Drive...';
+
+        style.textContent = `
+            body {
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: system-ui, sans-serif;
+                background: ${popupTheme.background};
+                color: ${popupTheme.foreground};
+            }
+
+            p {
+                margin: 0;
+                padding: 24px;
+                text-align: center;
+            }
+        `;
+
+        message.textContent = 'Opening Google sign-in...';
+
+        popupDocument.head.replaceChildren(viewport, title, style);
+        popupDocument.body.replaceChildren(message);
+    } catch {
+        // Ignore cross-browser document access failures for blank popups.
+    }
+}
+
+function resolvePendingAuthPopupTheme(): { background: string; foreground: string } {
+
+    const darkModeActive = document.documentElement.classList.contains('dark');
+    const sourceElement = document.body ?? document.documentElement;
+    const sourceStyles = window.getComputedStyle(sourceElement);
+    const background = sourceStyles.backgroundColor;
+    const foreground = sourceStyles.color;
+
+    if (background && foreground) {
+        return { background, foreground };
+    }
+
+    if (darkModeActive) {
+        return {
+            background: 'rgb(10, 10, 10)',
+            foreground: 'rgb(250, 250, 250)',
+        };
+    }
+
+    return {
+        background: 'rgb(254, 254, 254)',
+        foreground: 'rgb(10, 10, 10)',
+    };
+}
+
+function navigateAuthPopup(popup: Window, url: string): void {
+
+    if (popup.closed) {
+        throw new Error('Authentication popup was closed before Google sign-in could start.');
+    }
+
+    popup.location.href = url;
+    popup.focus();
 }
 
 function waitForAuthCallback(popup: Window, expectedState: string): Promise<string> {
@@ -376,10 +475,18 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
     return new Promise((resolve, reject) => {
 
         let settled = false;
+        const closedCheckId = window.setInterval(() => {
+            if (popup.closed && !settled) {
+                cleanup();
+                settled = true;
+                reject(new Error('Authentication popup was closed before sign-in completed.'));
+            }
+        }, 500);
 
         const cleanup = () => {
             window.removeEventListener('message', handleMessage);
             clearTimeout(timeoutId);
+            window.clearInterval(closedCheckId);
         };
 
         const timeoutId = setTimeout(() => {

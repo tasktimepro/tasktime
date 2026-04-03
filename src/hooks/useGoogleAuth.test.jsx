@@ -22,11 +22,25 @@ vi.mock('@/utils/googleAuthStorage', () => ({
     clearStoredSession: vi.fn(),
 }))
 
+function createPopupStub() {
+    const popupDocument = document.implementation.createHTMLDocument('Connecting Google Drive...')
+
+    return {
+        closed: false,
+        close: vi.fn(),
+        focus: vi.fn(),
+        location: { href: '' },
+        document: popupDocument,
+    }
+}
+
 describe('useGoogleAuth', () => {
 
     beforeEach(() => {
+        vi.restoreAllMocks()
         vi.clearAllMocks()
         vi.stubGlobal('fetch', vi.fn())
+        vi.spyOn(window, 'open').mockImplementation(() => createPopupStub())
     })
 
     it('clears stored session when auth status passes but Drive access is denied', async () => {
@@ -113,5 +127,95 @@ describe('useGoogleAuth', () => {
         expect(thrownError).toBeInstanceOf(Error)
         expect(thrownError.message).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
         expect(result.current.error).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
+    })
+
+    it('opens the auth popup before initializing the auth request so mobile browsers keep the user gesture', async () => {
+        getStoredSession.mockResolvedValue(null)
+
+        const callOrder = []
+        const popup = createPopupStub()
+
+        window.open.mockImplementation(() => {
+            callOrder.push('open')
+            return popup
+        })
+
+        fetch.mockImplementation(async (input) => {
+            if (input === 'https://worker.example/auth/init') {
+                callOrder.push('authInit')
+                return {
+                    ok: true,
+                    json: async () => ({
+                        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                        state: 'oauth-state',
+                    }),
+                }
+            }
+
+            if (input === 'https://worker.example/auth/callback') {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        sessionId: 'session-789',
+                        user: {
+                            id: 'user-789',
+                            email: 'mobile@example.com',
+                        },
+                    }),
+                }
+            }
+
+            if (input === 'https://worker.example/auth/status') {
+                return {
+                    ok: true,
+                    json: async () => ({ authenticated: true }),
+                }
+            }
+
+            if (typeof input === 'string' && input.startsWith('https://worker.example/drive/files')) {
+                return {
+                    ok: true,
+                    json: async () => ({ files: [] }),
+                }
+            }
+
+            throw new Error(`Unexpected fetch: ${String(input)}`)
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let signInPromise
+
+        act(() => {
+            signInPromise = result.current.signIn()
+        })
+
+        expect(callOrder).toEqual(['open', 'authInit'])
+
+        await waitFor(() => {
+            expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+        })
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: {
+                    type: 'google-auth-callback',
+                    code: 'auth-code',
+                    state: 'oauth-state',
+                },
+            }))
+        })
+
+        await act(async () => {
+            await signInPromise
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(popup.focus).toHaveBeenCalledTimes(1)
     })
 })
