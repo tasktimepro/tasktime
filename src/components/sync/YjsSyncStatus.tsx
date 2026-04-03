@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { useToast } from '@/hooks/useToast';
 import { useUrlState } from '@/hooks/useUrlState';
 import { CloudIcon, CloudSyncIcon, CloudCheckIcon, CloudCogIcon, CloudOffIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -20,6 +21,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
 
     const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled } = useYjs();
     const { signIn, isLoading: authLoading, hadPreviousSession } = useGoogleAuth();
+    const { showError } = useToast();
     const { navigateToAccount } = useUrlState();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [isHovered, setIsHovered] = useState(false);
@@ -54,11 +56,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
     }, []);
 
     const handleConnect = useCallback(async () => {
-        try {
-            await signIn();
-        } catch {
-            // Error handled in useGoogleAuth
-        }
+        await signIn();
     }, [signIn]);
 
     const handleCloudOptions = useCallback(() => {
@@ -208,6 +206,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
             await status.onClick();
         } catch (error) {
             console.error('[YjsSyncStatus] Status action failed:', error);
+            showError(error instanceof Error ? error.message : 'Google Drive action failed.');
         }
     };
 

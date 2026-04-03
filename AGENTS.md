@@ -172,7 +172,7 @@ const { preferences, updatePreferences } = usePreferences();
 
 **Token persistence is handled by a Cloudflare Worker** to solve OAuth token expiry:
 
-- **Worker URL:** `https://tasktime-sync.owenfar1.workers.dev`
+- **Worker URL:** `https://sync.tasktime.pro`
 - **Source:** `cloudflare/` folder (TypeScript, no node_modules)
 - **Features:** Secure refresh token storage, auto-refresh, Drive API proxy
 

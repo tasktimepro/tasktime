@@ -47,6 +47,38 @@ const notifyAuthSubscribers = () => {
     });
 };
 
+function getEndpointOrigin(endpoint: string | undefined): string | null {
+
+    if (!endpoint) {
+        return null;
+    }
+
+    try {
+        return new URL(endpoint).origin;
+    } catch {
+        return endpoint;
+    }
+}
+
+function toAuthError(error: unknown, endpoint?: string): Error {
+
+    if (error instanceof TypeError) {
+        const origin = getEndpointOrigin(endpoint);
+
+        if (origin) {
+            return new Error(`Unable to reach the Google Drive sync service at ${origin}. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.`);
+        }
+
+        return new Error('Unable to reach the Google Drive sync service. Check your connection and try again.');
+    }
+
+    if (error instanceof Error) {
+        return error;
+    }
+
+    return new Error('Sign in failed');
+}
+
 /**
  * Google Auth hook - automatically uses Worker or SPA mode based on config
  */
@@ -181,11 +213,15 @@ export const useGoogleAuth = () => {
             notifyAuthSubscribers();
 
         } catch (error) {
+            const authError = toAuthError(error, SYNC_WORKER_CONFIG.endpoints.authInit);
+
             setState(prev => ({
                 ...prev,
                 isLoading: false,
-                error: error instanceof Error ? error.message : 'Sign in failed',
+                error: authError.message,
             }));
+
+            throw authError;
         }
     }, [validateWorkerSession]);
 

@@ -159,8 +159,9 @@ export default function YjsSyncSettings() {
     const handleConnect = async () => {
         try {
             await signIn();
-        } catch {
-            // Error handled in useGoogleAuth
+        } catch (error) {
+            console.error('[YjsSyncSettings] Connect failed:', error);
+            showError(error instanceof Error ? error.message : 'Google Drive action failed.');
         }
     };
 

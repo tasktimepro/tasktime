@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { useGoogleAuth } from './useGoogleAuth'
 import { getStoredSession, clearStoredSession } from '@/utils/googleAuthStorage'
 
@@ -88,5 +88,30 @@ describe('useGoogleAuth', () => {
         expect(result.current.sessionId).toBe('session-456')
         expect(result.current.user?.email).toBe('valid@example.com')
         expect(clearStoredSession).not.toHaveBeenCalled()
+    })
+
+    it('returns an actionable error when the sync worker is unreachable during sign-in', async () => {
+        getStoredSession.mockResolvedValue(null)
+        fetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let thrownError
+
+        await act(async () => {
+            try {
+                await result.current.signIn()
+            } catch (error) {
+                thrownError = error
+            }
+        })
+
+        expect(thrownError).toBeInstanceOf(Error)
+        expect(thrownError.message).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
+        expect(result.current.error).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
     })
 })

@@ -182,6 +182,15 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     }));
 
     const additionalTasks: InvoiceTask[] = [...originalAdditionalTasks, ...expenseAdditionalTasks].filter(task => !mergedTaskIds.has(task.id));
+    const allTasks = [...tasks, ...additionalTasks];
+    const usesFlatRateForTask = (task: InvoiceTask) => {
+        const hasExplicitFlatRate = task.flatRate !== undefined;
+        return task.useFlatRate === true || (task.useFlatRate !== false && hasExplicitFlatRate);
+    };
+    const hasFlatTasks = allTasks.some((task) => usesFlatRateForTask(task));
+    const hasHourlyTasks = allTasks.some((task) => !usesFlatRateForTask(task));
+    const hasTotalHoursValue = totalHours !== undefined && totalHours !== null;
+    const parsedTotalHours = parseFloat(String(totalHours ?? 0)) || 0;
 
     return `
         <div style="font-family: Arial, sans-serif; width: 100%; max-width: none; margin: 0; padding: 0; box-sizing: border-box;">
@@ -228,15 +237,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             </div>
             
             ${(() => {
-                // Determine if we have any hourly or flat-rate tasks
-                const allTasks = [...tasks, ...additionalTasks];
                 const invoiceCurrency = currency;
-                const usesFlatRateForTask = (task) => {
-                    const hasExplicitFlatRate = task.flatRate !== undefined;
-                    return task.useFlatRate === true || (task.useFlatRate !== false && hasExplicitFlatRate);
-                };
-                const hasFlatTasks = allTasks.some(task => usesFlatRateForTask(task));
-                const hasHourlyTasks = allTasks.some(task => !usesFlatRateForTask(task));
 
                 // Column layout rules:
                 // - Hourly only: Description, Hours, Rate, Total
@@ -468,7 +469,14 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             <div style="text-align: right; margin-bottom: 10px;">
                 <div style="border-top: 1px solid #ddd; padding-top: 8px;">
                     ${subtotal ? `
-                        <p style="margin: 5px 0; font-size: 16px;">Subtotal: <strong>${getCurrencySymbol(currency)}${subtotal.toFixed(2)}</strong></p>
+                        ${hasHourlyTasks && hasTotalHoursValue ? `
+                            <div style="display: flex; justify-content: flex-end; align-items: baseline; gap: 24px; margin: 5px 0; font-size: 16px;">
+                                <span>Total hours: <strong>${parsedTotalHours.toFixed(2)}</strong></span>
+                                <span>Subtotal: <strong>${getCurrencySymbol(currency)}${subtotal.toFixed(2)}</strong></span>
+                            </div>
+                        ` : `
+                            <p style="margin: 5px 0; font-size: 16px;">Subtotal: <strong>${getCurrencySymbol(currency)}${subtotal.toFixed(2)}</strong></p>
+                        `}
                         
                         ${discount && discount > 0 ? `
                             <p style="margin: 5px 0; font-size: 16px; color: #dc2626;">Discount: <strong>-${getCurrencySymbol(currency)}${discount.toFixed(2)}</strong></p>

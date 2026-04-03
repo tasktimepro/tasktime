@@ -52,6 +52,37 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Total: $209.00')
     })
 
+    it('renders total hours beside subtotal when hourly columns exist', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 'task', title: 'Hourly', hours: 5.25, hourlyRate: 50 }],
+            totalHours: 5.25,
+            totalAmount: 262.5,
+            subtotal: 262.5,
+            currency: 'CHF'
+        })
+
+        expect(html).toContain('Hours</th>')
+        expect(html).toContain('Total hours: <strong>5.25</strong>')
+        expect(html).toContain('Subtotal: <strong>CHF262.50</strong>')
+    })
+
+    it('does not render total hours beside subtotal for flat-only invoices', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 'task', title: 'Flat', flatRate: 100, quantity: 2, useFlatRate: true }],
+            totalAmount: 200,
+            subtotal: 200,
+            currency: 'USD'
+        })
+
+        expect(html).not.toContain('Hours</th>')
+        expect(html).not.toContain('Total hours: <strong>')
+        expect(html).toContain('Subtotal: <strong>$200.00</strong>')
+    })
+
     it('uses full-width document container layout', () => {
 
         const html = createInvoiceHTML({
