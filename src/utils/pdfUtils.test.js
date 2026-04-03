@@ -268,6 +268,26 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Invoice: #INV-0160')
     })
 
+    it('hydrates client details from clientId when rebuilding stored invoice html', () => {
+
+        const html = buildInvoiceHtmlContent({
+            clientId: 'client-1',
+            invoiceNumber: 'INV-0161',
+            client: { name: 'Stale Name' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD'
+        }, [{
+            id: 'client-1',
+            clientName: 'Fresh Client',
+            email: 'fresh@example.com'
+        }])
+
+        expect(html).toContain('Fresh Client')
+        expect(html).toContain('fresh@example.com')
+        expect(html).not.toContain('Stale Name')
+    })
+
     it('regenerates stale stored html when invoice number changed', () => {
 
         const html = getCurrentInvoiceHtmlContent({
@@ -281,6 +301,33 @@ describe('createInvoiceHTML', () => {
 
         expect(html).toContain('Invoice: #INV-0160')
         expect(html).not.toContain('INV-0159')
+    })
+
+    it('reuses stored html when the current invoice number already matches', () => {
+
+        const html = getCurrentInvoiceHtmlContent({
+            invoiceNumber: 'INV-0200',
+            htmlContent: '<div>Invoice: #INV-0200</div>',
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD'
+        })
+
+        expect(html).toBe('<div>Invoice: #INV-0200</div>')
+    })
+
+    it('reuses stored html when no invoice number is set yet', () => {
+
+        const html = getCurrentInvoiceHtmlContent({
+            htmlContent: '<div>Draft invoice</div>',
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD'
+        })
+
+        expect(html).toBe('<div>Draft invoice</div>')
     })
 
     it('renders business info, payment method, and note', () => {
@@ -591,6 +638,20 @@ describe('generatePDF', () => {
         expect(pdfOptions.margin).toHaveLength(4)
         expect(html2pdfMocks.from).toHaveBeenCalledWith('<p>Invoice</p>')
         expect(html2pdfMocks.save).toHaveBeenCalled()
+    })
+
+    it('allows caller options to override default pdf settings', async () => {
+
+        await expect(generatePDF('<p>Invoice</p>', 'custom.pdf', {
+            image: { type: 'png', quality: 1 },
+            jsPDF: { unit: 'pt', format: 'a4', orientation: 'landscape' }
+        })).resolves.toBeUndefined()
+
+        expect(html2pdfMocks.set).toHaveBeenCalledWith(expect.objectContaining({
+            filename: 'custom.pdf',
+            image: { type: 'png', quality: 1 },
+            jsPDF: { unit: 'pt', format: 'a4', orientation: 'landscape' }
+        }))
     })
 
     it('rejects when pdf generation fails', async () => {
