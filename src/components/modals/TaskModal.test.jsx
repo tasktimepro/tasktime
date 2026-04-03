@@ -175,12 +175,12 @@ describe('TaskModal', () => {
         expect(screen.getByText('Project is locked')).toBeInTheDocument()
     })
 
-    it('uses full-width mobile-safe controls for the schedule row and footer', () => {
+    it('keeps the schedule row full width while footer actions stay inline on mobile', () => {
 
         render(<TaskModal isOpen onClose={vi.fn()} />)
 
         expect(screen.getByLabelText(/Start Date/i).className).toContain('w-full')
-        expect(screen.getByRole('button', { name: 'Cancel' }).className).toContain('w-full')
-        expect(screen.getByRole('button', { name: 'Create' }).className).toContain('w-full')
+        expect(screen.getByRole('button', { name: 'Cancel' }).className).not.toContain('w-full')
+        expect(screen.getByRole('button', { name: 'Create' }).className).not.toContain('w-full')
     })
 })

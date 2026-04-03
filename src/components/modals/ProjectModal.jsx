@@ -301,12 +301,11 @@ const ProjectModal = ({
 
     // Footer content with action buttons
     const footer = (
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <div className="flex flex-row flex-wrap justify-end gap-2">
             <Button
                 type="button"
                 variant="outline"
                 onClick={handleClose}
-                className="w-full sm:w-auto"
             >
                 Cancel
             </Button>
@@ -314,7 +313,6 @@ const ProjectModal = ({
             <Button
                 type="submit"
                 form="project-form"
-                className="w-full sm:w-auto"
             >
                 {editingProject ? 'Update' : 'Create'} Project
             </Button>

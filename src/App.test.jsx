@@ -387,17 +387,17 @@ describe('App component', () => {
         expect(screen.getByRole('button', { name: 'Planner' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Projects' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Expenses' })).toBeInTheDocument()
+        expect(screen.queryByText('TaskTime')).not.toBeInTheDocument()
 
-        fireEvent.click(screen.getByRole('button', { name: 'Open more actions' }))
+        fireEvent.click(screen.getByRole('button', { name: 'More' }))
 
         const dialog = screen.getByRole('dialog')
 
-        expect(within(dialog).getByText('More')).toBeInTheDocument()
-        expect(within(dialog).getByText('Sync & appearance')).toBeInTheDocument()
         expect(within(dialog).getByText('Clients')).toBeInTheDocument()
         expect(within(dialog).getByText('Invoices')).toBeInTheDocument()
         expect(within(dialog).getByText('Account')).toBeInTheDocument()
-        expect(within(dialog).getByText('Sync Settings')).toBeInTheDocument()
+        expect(within(dialog).getByText(/Hide totals|Show totals/)).toBeInTheDocument()
+        expect(within(dialog).getByText(/Dark mode|Light mode/)).toBeInTheDocument()
     })
 
     it('navigates through more-sheet destinations and closes the sheet on mobile', async () => {
@@ -409,14 +409,14 @@ describe('App component', () => {
 
         render(<App />)
 
-        await user.click(screen.getByRole('button', { name: 'Open more actions' }))
+        await user.click(screen.getByRole('button', { name: 'More' }))
         await user.click(screen.getByRole('button', { name: /Clients/ }))
 
         expect(urlHookState.navigateToClients).toHaveBeenCalledTimes(1)
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
-    it('routes sync settings from the more sheet on mobile', async () => {
+    it('routes account from the more sheet on mobile', async () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
         })
@@ -425,13 +425,13 @@ describe('App component', () => {
 
         render(<App />)
 
-        await user.click(screen.getByRole('button', { name: 'Open more actions' }))
-        await user.click(screen.getByRole('button', { name: /Sync Settings/ }))
+        await user.click(screen.getByRole('button', { name: 'More' }))
+        await user.click(screen.getByRole('button', { name: 'Account' }))
 
-        expect(urlHookState.navigateToAccount).toHaveBeenCalledWith({ section: 'sync' })
+        expect(urlHookState.navigateToAccount).toHaveBeenCalledTimes(1)
     })
 
-    it('opens the task modal from the mobile top bar create action', async () => {
+    it('opens the task modal from the mobile floating action button', async () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
         })
@@ -445,23 +445,18 @@ describe('App component', () => {
         expect(screen.getByTestId('active-modal')).toHaveTextContent('task')
     })
 
-    it('shows a mobile back affordance for project detail routes', async () => {
+    it('does not render the removed mobile top bar on project detail routes', () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
         })
         projectsHookState.projects.push({ id: 'project-1', title: 'Launch Site', archived: false })
         urlHookState.urlParams = { view: 'projects', projectId: 'project-1', clientId: null }
 
-        const user = userEvent.setup()
-
         render(<App />)
 
-        expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
-        expect(screen.getByText('Launch Site')).toBeInTheDocument()
-
-        await user.click(screen.getByRole('button', { name: 'Back' }))
-
-        expect(urlHookState.navigateToProjects).toHaveBeenCalledTimes(1)
+        expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+        expect(screen.queryByText('Launch Site')).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Create new task' })).toBeInTheDocument()
     })
 
     it('generates pending recurring expenses on mount and day rollover', () => {

@@ -59,5 +59,38 @@ describe('Modal', () => {
         expect(dialog.className.includes('max-w-[calc(100vw-1rem)]')).toBe(true)
         expect(dialog.className.includes('sm:max-w-md')).toBe(true)
         expect(dialog.className.includes('overflow-hidden')).toBe(true)
+        expect(dialog.className.includes('rounded-lg')).toBe(true)
+    })
+
+    it('keeps the title aligned with the close button and footer actions on one row', () => {
+        render(
+            <Modal
+                isOpen
+                onClose={vi.fn()}
+                title="Edit Task"
+                footer={(
+                    <>
+                        <button type="button">Cancel</button>
+                        <button type="button">Save</button>
+                    </>
+                )}
+            >
+                <div>Content</div>
+            </Modal>
+        )
+
+        const title = screen.getByText('Edit Task')
+        const closeButton = screen.getByRole('button', { name: 'Close dialog' })
+        const footerButton = screen.getByText('Cancel')
+        const header = title.parentElement?.parentElement
+        const footer = footerButton.parentElement
+
+        expect(header?.className.includes('items-center')).toBe(true)
+        expect(header?.className.includes('gap-3')).toBe(true)
+        expect(title.parentElement?.className.includes('text-left')).toBe(true)
+        expect(closeButton.className.includes('rounded-full')).toBe(true)
+        expect(closeButton.className.includes('shadow-sm')).toBe(true)
+        expect(footer?.className.includes('flex-row')).toBe(true)
+        expect(footer?.className.includes('gap-2')).toBe(true)
     })
 })

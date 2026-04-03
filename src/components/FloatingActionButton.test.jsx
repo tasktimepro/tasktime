@@ -24,4 +24,18 @@ describe('FloatingActionButton', () => {
         await user.click(button)
         expect(onTaskClick).toHaveBeenCalled()
     })
+
+    it('accepts additional positioning classes for mobile reuse', () => {
+        render(
+            <FloatingActionButton
+                onTaskClick={vi.fn()}
+                className="bottom-safe-fab right-4"
+            />
+        )
+
+        const button = screen.getByRole('button', { name: 'Create new task' })
+
+        expect(button.className).toContain('bottom-safe-fab')
+        expect(button.className).toContain('right-4')
+    })
 })

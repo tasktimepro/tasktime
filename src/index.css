@@ -103,10 +103,10 @@ main,
         --status-info-border: 214 92% 88%;
         --status-info-foreground: 217 48% 32%;
         --status-info-accent: 217 91% 60%;
-        --status-success-surface: 138 76% 97%;
-        --status-success-border: 141 79% 85%;
-        --status-success-foreground: 142 48% 28%;
-        --status-success-accent: 142 71% 45%;
+        --status-success-surface: 138 68% 96%;
+        --status-success-border: 141 55% 78%;
+        --status-success-foreground: 142 45% 24%;
+        --status-success-accent: 142 63% 38%;
         --status-warning-surface: 48 100% 96%;
         --status-warning-border: 44 96% 83%;
         --status-warning-foreground: 28 58% 30%;
@@ -182,6 +182,22 @@ main,
 
     .pb-safe-sheet {
         padding-bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
+    }
+
+    .bottom-safe-nav {
+        bottom: calc(env(safe-area-inset-bottom) + 4.5rem);
+    }
+
+    .max-h-safe-nav {
+        max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 4.5rem);
+    }
+
+    .bottom-safe-fab {
+        bottom: calc(env(safe-area-inset-bottom) + 5.25rem);
+    }
+
+    .bottom-safe-fab-docked {
+        bottom: calc(env(safe-area-inset-bottom) + 9.5rem);
     }
 
     .bottom-safe-dock {

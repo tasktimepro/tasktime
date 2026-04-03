@@ -1,79 +1,30 @@
 import PropTypes from 'prop-types';
-import { CloudIcon, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, XMarkIcon } from '@/components/ui/icons';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import OfflineIndicator from '@/components/OfflineIndicator';
-import YjsSyncStatus from '@/components/sync/YjsSyncStatus';
+import { EyeIcon, EyeOffIcon, MoonIcon, SunIcon, UserCircleIcon } from '@/components/ui/icons';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import CloudSyncStatusPanel from '@/components/sync/CloudSyncStatusPanel';
 
 const MobileMoreSheet = ({
     darkMode,
     isOpen,
     items,
     onClose,
+    onOpenAccount,
     onOpenChange,
     onToggleDarkMode,
     onToggleTotals,
     totalsHidden,
 }) => {
-    const syncItem = items.find((item) => item.key === 'sync');
-
-    const handleSyncRowClick = (event) => {
-        if (!syncItem?.onClick) {
-            return;
-        }
-
-        if (event.target instanceof Element && event.target.closest('button')) {
-            return;
-        }
-
-        syncItem.onClick();
-    };
-
-    const handleSyncRowKeyDown = (event) => {
-        if (!syncItem?.onClick) {
-            return;
-        }
-
-        if (event.key !== 'Enter' && event.key !== ' ') {
-            return;
-        }
-
-        if (event.target instanceof Element && event.target.closest('button')) {
-            return;
-        }
-
-        event.preventDefault();
-        syncItem.onClick();
-    };
+    const actionTileClassName = 'flex min-h-24 flex-col items-center justify-center rounded-2xl border border-border bg-card px-3 py-4 text-center shadow-sm transition-colors hover:bg-accent cursor-pointer';
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent
                 hideCloseButton
-                className="left-0 right-0 top-auto bottom-0 grid max-h-[85vh] w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-t-[1.75rem] rounded-b-none border-x-0 border-b-0 p-0"
+                overlayClassName="bottom-safe-nav"
+                className="bottom-safe-nav left-0 right-0 top-auto flex min-h-0 w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-[1.75rem] rounded-b-none border-x-0 border-b-0 bg-card p-0 shadow-none max-h-safe-nav"
             >
-                <DialogHeader className="border-b border-border px-5 pb-4 pt-5 text-left">
-                    <div className="mb-4 flex justify-center">
-                        <div className="h-1.5 w-14 rounded-full bg-border" aria-hidden="true" />
-                    </div>
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <DialogTitle className="text-xl">More</DialogTitle>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Secondary navigation, sync, and display controls.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                            aria-label="Close more navigation"
-                        >
-                            <XMarkIcon className="h-5 w-5" />
-                        </button>
-                    </div>
-                </DialogHeader>
-
-                <div className="space-y-6 overflow-y-auto px-5 pb-safe-sheet pt-5">
+                <DialogTitle className="sr-only">More navigation</DialogTitle>
+                <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pb-safe-sheet pt-4">
                     <div className="grid gap-3">
                         {items.map(({ key, label, description, Icon, onClick }) => (
                             <button
@@ -93,61 +44,60 @@ const MobileMoreSheet = ({
                         ))}
                     </div>
 
-                    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-                        <h2 className="text-sm font-semibold text-foreground">Sync & appearance</h2>
-                        <div className="mt-3 space-y-3">
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={handleSyncRowClick}
-                                onKeyDown={handleSyncRowKeyDown}
-                                className="flex w-full items-center gap-3 rounded-xl border border-border bg-background px-3 py-3 text-left transition-colors hover:bg-accent cursor-pointer"
-                                aria-label="Open sync settings"
-                            >
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                                    <CloudIcon className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-foreground">Cloud sync</p>
-                                    <div className="mt-1">
-                                        <YjsSyncStatus />
-                                        <OfflineIndicator />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={onToggleTotals}
-                                className="flex w-full items-center justify-between rounded-xl border border-border bg-background px-3 py-3 text-left transition-colors hover:bg-accent cursor-pointer"
-                            >
-                                <div>
-                                    <p className="text-sm font-medium text-foreground">{totalsHidden ? 'Show totals' : 'Hide totals'}</p>
-                                    <p className="text-sm text-muted-foreground">Control sensitive values across the app.</p>
-                                </div>
+                    <div className="grid grid-cols-3 gap-3">
+                        <button
+                            type="button"
+                            onClick={onToggleTotals}
+                            className={actionTileClassName}
+                            aria-label={totalsHidden ? 'Show totals' : 'Hide totals'}
+                            title={totalsHidden ? 'Show totals' : 'Hide totals'}
+                        >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground">
                                 {totalsHidden ? (
-                                    <EyeIcon className="h-5 w-5 text-muted-foreground" />
+                                    <EyeIcon className="h-5 w-5" />
                                 ) : (
-                                    <EyeOffIcon className="h-5 w-5 text-muted-foreground" />
+                                    <EyeOffIcon className="h-5 w-5" />
                                 )}
-                            </button>
+                            </div>
+                            <span className="mt-2 text-sm font-medium text-foreground">
+                                {totalsHidden ? 'Show totals' : 'Hide totals'}
+                            </span>
+                        </button>
 
-                            <button
-                                type="button"
-                                onClick={onToggleDarkMode}
-                                className="flex w-full items-center justify-between rounded-xl border border-border bg-background px-3 py-3 text-left transition-colors hover:bg-accent cursor-pointer"
-                            >
-                                <div>
-                                    <p className="text-sm font-medium text-foreground">{darkMode ? 'Light mode' : 'Dark mode'}</p>
-                                    <p className="text-sm text-muted-foreground">Switch the app appearance for your environment.</p>
-                                </div>
+                        <button
+                            type="button"
+                            onClick={onToggleDarkMode}
+                            className={actionTileClassName}
+                            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                            title={darkMode ? 'Light mode' : 'Dark mode'}
+                        >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground">
                                 {darkMode ? (
-                                    <SunIcon className="h-5 w-5 text-muted-foreground" />
+                                    <SunIcon className="h-5 w-5" />
                                 ) : (
-                                    <MoonIcon className="h-5 w-5 text-muted-foreground" />
+                                    <MoonIcon className="h-5 w-5" />
                                 )}
-                            </button>
+                            </div>
+                            <span className="mt-2 text-sm font-medium text-foreground">
+                                {darkMode ? 'Light mode' : 'Dark mode'}
+                            </span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={onOpenAccount}
+                            className={actionTileClassName}
+                            aria-label="Account"
+                        >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                                <UserCircleIcon className="h-5 w-5" />
+                            </div>
+                            <span className="mt-2 text-sm font-medium text-foreground">Account</span>
+                        </button>
                         </div>
+
+                    <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
+                        <CloudSyncStatusPanel className="space-y-1" onActionComplete={onClose} />
                     </div>
                 </div>
             </DialogContent>
@@ -166,6 +116,7 @@ MobileMoreSheet.propTypes = {
         onClick: PropTypes.func.isRequired,
     })).isRequired,
     onClose: PropTypes.func.isRequired,
+    onOpenAccount: PropTypes.func.isRequired,
     onOpenChange: PropTypes.func.isRequired,
     onToggleDarkMode: PropTypes.func.isRequired,
     onToggleTotals: PropTypes.func.isRequired,

@@ -935,10 +935,7 @@ const Expenses = ({
 
             <Dialog open={isMobileFiltersOpen} onOpenChange={setIsMobileFiltersOpen}>
                 <DialogContent className="left-0 right-0 top-auto bottom-0 max-h-[85vh] w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-t-[1.75rem] rounded-b-none border-x-0 border-b-0 p-0 md:hidden">
-                    <DialogHeader className="border-b border-border px-5 pb-4 pt-5 text-left">
-                        <div className="mb-4 flex justify-center">
-                            <div className="h-1.5 w-14 rounded-full bg-border" aria-hidden="true" />
-                        </div>
+                    <DialogHeader className="border-b border-border px-4 pb-3 pt-4 text-left">
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <DialogTitle className="text-xl">Filters</DialogTitle>
@@ -957,7 +954,7 @@ const Expenses = ({
                         </div>
                     </DialogHeader>
 
-                    <div className="space-y-5 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-5">
+                    <div className="space-y-4 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
                         <ExpenseFilters
                             advancedOnly
                             search={search}

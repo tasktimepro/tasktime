@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ToDoToday from './ToDoToday'
-import { toStorageDate } from '../../utils/dateUtils.ts'
+import { formatDurationWithSeconds, toStorageDate } from '../../utils/dateUtils.ts'
 
 const hookMocks = {
     expenses: [],
@@ -193,6 +193,23 @@ describe('ToDoToday', () => {
         expect(secondaryRow.className.includes('justify-end')).toBe(true)
         expect(actionsRow.className.includes('justify-end')).toBe(true)
         expect(within(actionsRow).getByText('Start timer')).toBeInTheDocument()
+    })
+
+    it('hides recent time on mobile task rows', () => {
+        setMatchMedia(true)
+
+        const durationLabel = formatDurationWithSeconds(3661)
+
+        renderComponent({
+            overdueTasks: [{
+                ...overdueTask,
+                recentTime: 3661,
+            }],
+            tasksForToday: [],
+            upcomingTasks: [],
+        })
+
+        expect(screen.queryByText(durationLabel)).not.toBeInTheDocument()
     })
 
     it('deduplicates tasks appearing in both overdue and today lists', () => {

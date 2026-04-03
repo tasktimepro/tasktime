@@ -231,19 +231,17 @@ const TaskModal = ({
     };
 
     const modalFooter = (
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <div className="flex flex-row flex-wrap justify-end gap-2">
             <Button
                 variant="outline"
                 onClick={handleClose}
                 type="button"
-                className="w-full sm:w-auto"
             >
                 Cancel
             </Button>
             <Button
                 onClick={handleSubmit}
                 type="submit"
-                className="w-full sm:w-auto"
             >
                 {editingTask ? 'Save' : 'Create'}
             </Button>

@@ -4,19 +4,13 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MobileMoreSheet from './MobileMoreSheet'
 
-vi.mock('@/components/sync/YjsSyncStatus', () => ({
-    default: () => <button type="button">Sync status action</button>
-}))
-
-vi.mock('@/components/OfflineIndicator', () => ({
-    default: () => <div>Offline ready</div>
+vi.mock('@/components/sync/CloudSyncStatusPanel', () => ({
+    default: ({ onActionComplete }) => <button type="button" onClick={onActionComplete}>Cloud sync status</button>
 }))
 
 describe('MobileMoreSheet', () => {
     const renderComponent = (overrides = {}) => {
-        const syncClick = vi.fn()
-
-        const renderResult = render(
+        return render(
             <MobileMoreSheet
                 darkMode={false}
                 isOpen={true}
@@ -28,15 +22,9 @@ describe('MobileMoreSheet', () => {
                         Icon: () => <span>Clients icon</span>,
                         onClick: vi.fn(),
                     },
-                    {
-                        key: 'sync',
-                        label: 'Sync Settings',
-                        description: 'Open sync settings',
-                        Icon: () => <span>Sync icon</span>,
-                        onClick: syncClick,
-                    },
                 ]}
                 onClose={vi.fn()}
+                onOpenAccount={vi.fn()}
                 onOpenChange={vi.fn()}
                 onToggleDarkMode={vi.fn()}
                 onToggleTotals={vi.fn()}
@@ -44,22 +32,66 @@ describe('MobileMoreSheet', () => {
                 {...overrides}
             />
         )
-
-        return { syncClick, ...renderResult }
     }
 
     it('does not nest buttons inside the sync row', () => {
         const { container } = renderComponent()
 
-        expect(screen.getByRole('button', { name: 'Sync status action' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Cloud sync status' })).toBeInTheDocument()
         expect(container.querySelector('button button')).toBeNull()
     })
 
-    it('opens sync settings when the sync row itself is clicked', async () => {
+    it('closes after the cloud sync action runs', async () => {
         const user = userEvent.setup()
-        const { syncClick } = renderComponent()
+        const onClose = vi.fn()
 
-        await user.click(screen.getByRole('button', { name: 'Open sync settings' }))
-        expect(syncClick).toHaveBeenCalledTimes(1)
+        renderComponent({ onClose })
+
+        await user.click(screen.getByRole('button', { name: 'Cloud sync status' }))
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('opens account from the bottom action row', async () => {
+        const user = userEvent.setup()
+        const onOpenAccount = vi.fn()
+
+        renderComponent({ onOpenAccount })
+
+        expect(screen.queryByText('More')).not.toBeInTheDocument()
+        expect(screen.queryByText('Secondary navigation, sync, and display controls.')).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Account' }))
+        expect(onOpenAccount).toHaveBeenCalledTimes(1)
+    })
+
+    it('renders as a drawer above the mobile nav', () => {
+        renderComponent()
+
+        const dialog = screen.getByRole('dialog')
+
+        expect(dialog.className).toContain('bottom-safe-nav')
+        expect(dialog.className).toContain('top-auto')
+        expect(dialog.className).toContain('max-h-safe-nav')
+        expect(dialog.className).toContain('shadow-none')
+        expect(screen.queryByRole('button', { name: 'Close more navigation' })).not.toBeInTheDocument()
+    })
+
+    it('renders labeled top action tiles', () => {
+        renderComponent({ darkMode: true, totalsHidden: true })
+
+        expect(screen.getByRole('button', { name: 'Show totals' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Switch to light mode' })).toBeInTheDocument()
+        expect(screen.getByText('Show totals')).toBeInTheDocument()
+        expect(screen.getByText('Light mode')).toBeInTheDocument()
+        expect(screen.getByText('Account')).toBeInTheDocument()
+    })
+
+    it('renders sync in its own full-width tile', () => {
+        renderComponent()
+
+        const syncButton = screen.getByRole('button', { name: 'Cloud sync status' })
+
+        expect(syncButton).toBeInTheDocument()
+        expect(syncButton.closest('div')?.className).toContain('shadow-sm')
     })
 })

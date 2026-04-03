@@ -259,12 +259,11 @@ const ClientModal = ({
     };
 
     const footer = (
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <div className="flex flex-row flex-wrap justify-end gap-2">
             <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
-                className="w-full sm:w-auto"
             >
                 Cancel
             </Button>
@@ -272,7 +271,6 @@ const ClientModal = ({
             <Button
                 type="submit"
                 form="client-form"
-                className="w-full sm:w-auto"
             >
                 {editingClient ? 'Update' : 'Create'} Client
             </Button>

@@ -33,19 +33,17 @@ import GlobalTimerStack from './components/timer/GlobalTimerStack';
 import ModalManager from './components/modals/ModalManager';
 import FloatingActionButton from './components/FloatingActionButton';
 import ErrorBoundary from './components/ErrorBoundary';
-import OfflineIndicator from './components/OfflineIndicator';
 import InstallPrompt from './components/InstallPrompt';
-import YjsSyncStatus from './components/sync/YjsSyncStatus';
+import CloudSyncStatusPanel from './components/sync/CloudSyncStatusPanel';
 import MobileBottomNav from './components/app/MobileBottomNav';
 import MobileMoreSheet from './components/app/MobileMoreSheet';
-import MobileTopBar from './components/app/MobileTopBar';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { buildExpenseFromRecurrence } from './utils/expenseUtils.ts';
 import { getTaskIdsToDelete } from './utils/taskUtils.ts';
 import { useTodayString } from './hooks/useDayRollover';
-import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon, CloudIcon } from '@/components/ui/icons';
+import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
@@ -776,18 +774,6 @@ function AppContent() {
 
     const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'account'].includes(activeView);
     const isMoreViewActive = ['clients', 'invoices', 'account'].includes(activeView);
-    const mobileHeaderTitle = selectedProject?.title
-        || selectedClient?.title
-        || selectedClient?.name
-        || pageTitleMap[activeView]
-        || ORIGINAL_TITLE;
-    const mobileHeaderContext = selectedProject
-        ? 'Project'
-        : selectedClient
-            ? 'Client'
-            : activeView === 'auth-callback'
-                ? 'Authentication'
-                : 'TaskTime';
     const mobileTopPadding = showGlobalTimer && timerIsActive ? '1rem' : '0.75rem';
     const mobileBottomPadding = showGlobalTimer && timerIsActive ? '8.5rem' : '7rem';
     const desktopTopPadding = showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem';
@@ -837,31 +823,7 @@ function AppContent() {
             Icon: DocumentTextIcon,
             onClick: () => navigateToInvoices(),
         },
-        {
-            key: 'account',
-            label: 'Account',
-            description: 'Preferences, backup, and data management',
-            Icon: UserCircleIcon,
-            onClick: () => navigateToAccount(),
-        },
-        {
-            key: 'sync',
-            label: 'Sync Settings',
-            description: 'Jump directly to cloud sync settings',
-            Icon: CloudIcon,
-            onClick: () => navigateToAccount({ section: 'sync' }),
-        },
     ];
-    const handleMobileBack = () => {
-        if (selectedProject) {
-            navigateToProjects();
-            return;
-        }
-
-        if (selectedClient) {
-            navigateToClients();
-        }
-    };
     const handleMoreSheetAction = (action) => () => {
         setIsMoreMenuOpen(false);
         action();
@@ -1257,8 +1219,7 @@ function AppContent() {
                         </button>
                     )}
                     <div className={`${isSidebarCollapsed ? 'flex flex-col items-center' : ''}`}>
-                        <YjsSyncStatus isCompact={isSidebarCollapsed} />
-                        <OfflineIndicator isCompact={isSidebarCollapsed} />
+                        <CloudSyncStatusPanel isCompact={isSidebarCollapsed} />
                     </div>
                 </div>
             </TooltipProvider>
@@ -1267,19 +1228,6 @@ function AppContent() {
 
             {/* Main Content */}
             <main className={`main-content relative ${isMobileLayout ? 'min-h-screen' : 'flex-1'}`}>
-                {isMobileLayout && (
-                    <MobileTopBar
-                        canGoBack={Boolean(selectedProject || selectedClient)}
-                        headerContext={mobileHeaderContext}
-                        headerTitle={mobileHeaderTitle}
-                        isMoreViewActive={isMoreViewActive}
-                        onBack={handleMobileBack}
-                        onCreateTask={() => openTaskModal(null)}
-                        onOpenMore={() => setIsMoreMenuOpen(true)}
-                        onOpenDashboard={() => navigateToDashboard()}
-                        showCreateAction={activeView !== 'auth-callback'}
-                    />
-                )}
                 <div
                     className={isMobileLayout ? 'app-shell-content px-4' : 'app-shell-content pr-4'}
                     style={{
@@ -1465,9 +1413,10 @@ function AppContent() {
                         setModalOptions={setModalOptions}
                     />
 
-                    {!isMobileLayout && (
+                    {(!isMobileLayout || activeView !== 'auth-callback') && (
                         <FloatingActionButton
                             onTaskClick={() => openTaskModal(null)}
+                            className={isMobileLayout ? `${showGlobalTimer && timerIsActive ? 'bottom-safe-fab-docked' : 'bottom-safe-fab'} right-4` : ''}
                         />
                     )}
                 </div>
@@ -1515,7 +1464,7 @@ function AppContent() {
                 <MobileBottomNav
                     items={mobilePrimaryNavItems}
                     isMoreActive={isMoreViewActive || isMoreMenuOpen}
-                    onOpenMore={() => setIsMoreMenuOpen(true)}
+                    onOpenMore={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
                 />
 
                 <MobileMoreSheet
@@ -1525,6 +1474,7 @@ function AppContent() {
                         ...item,
                         onClick: handleMoreSheetAction(item.onClick),
                     }))}
+                    onOpenAccount={handleMoreSheetAction(() => navigateToAccount())}
                     onClose={() => setIsMoreMenuOpen(false)}
                     onOpenChange={setIsMoreMenuOpen}
                     onToggleDarkMode={() => setDarkMode(!darkMode)}

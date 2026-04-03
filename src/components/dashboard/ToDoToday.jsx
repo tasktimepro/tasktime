@@ -287,11 +287,6 @@ const ToDoToday = ({
                             >
                                 <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
                                     {dateBadgeNode}
-                                    {(task.recentTime || 0) > 0 && (
-                                        <div className={`text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                                            {formatDurationWithSeconds(task.recentTime || 0)}
-                                        </div>
-                                    )}
                                 </div>
                                 {(!shouldDisable || !hideActions) && (
                                     <div

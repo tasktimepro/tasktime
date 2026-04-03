@@ -799,23 +799,23 @@ const ExpenseModal = ({
 
     const modalFooter = (
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-row flex-wrap gap-2 sm:items-center">
                 {(isSubmittingRecurring || (editingExpense && !editingRecurrenceId)) && (
-                    <Button variant="destructive" type="button" onClick={handleDeleteInstance} className="w-full sm:w-auto">
+                    <Button variant="destructive" type="button" onClick={handleDeleteInstance}>
                         Delete Expense
                     </Button>
                 )}
                 {editingRecurrenceId && (
-                    <Button variant="destructive" type="button" onClick={handleDeleteTemplate} className="w-full sm:w-auto">
+                    <Button variant="destructive" type="button" onClick={handleDeleteTemplate}>
                         Delete Expense
                     </Button>
                 )}
             </div>
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <Button variant="outline" onClick={handleClose} type="button" className="w-full sm:w-auto">
+                    <div className="flex flex-row flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={handleClose} type="button">
                     Cancel
                 </Button>
-                <Button onClick={handleSubmit} type="submit" className="w-full sm:w-auto">
+                <Button onClick={handleSubmit} type="submit">
                     {submitLabel}
                 </Button>
             </div>
@@ -1250,11 +1250,11 @@ const ExpenseModal = ({
             title="Delete recurring expense?"
             size="md"
             footer={(
-                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                    <Button variant="outline" onClick={() => setConfirmDialog(null)} className="w-full sm:w-auto">
+                <div className="flex flex-row flex-wrap justify-end gap-2">
+                    <Button variant="outline" onClick={() => setConfirmDialog(null)}>
                         Cancel
                     </Button>
-                    <Button variant="destructive" onClick={confirmDeleteRecurrence} className="w-full sm:w-auto">
+                    <Button variant="destructive" onClick={confirmDeleteRecurrence}>
                         Delete
                     </Button>
                 </div>

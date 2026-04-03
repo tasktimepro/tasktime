@@ -260,19 +260,17 @@ const BusinessModal = ({
                 />
             </div>
 
-            <div className="flex flex-col-reverse gap-3 sm:flex-row">
+            <div className="flex flex-row flex-wrap justify-end gap-2">
                 <Button
                     type="button"
                     variant="outline"
                     onClick={handleCancel}
-                    className="w-full sm:w-auto"
                 >
                     Cancel
                 </Button>
                 <Button
                     type="submit"
                     form="business-form"
-                    className="w-full sm:w-auto"
                 >
                     {editingBusinessInfo ? 'Update' : 'Create'} Business
                 </Button>

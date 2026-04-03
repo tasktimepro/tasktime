@@ -297,7 +297,7 @@ const AddTimeEntryModal = ({
     };
 
     const modalFooter = (
-        <div className="flex justify-end space-x-3">
+        <div className="flex flex-row flex-wrap justify-end gap-2">
             <Button
                 variant="secondary"
                 size="sm"

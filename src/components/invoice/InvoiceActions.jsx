@@ -16,9 +16,11 @@ const InvoiceActions = ({ editingInvoice, handleCancel, onPreview }) => {
                     type="button"
                     variant="outline"
                     onClick={onPreview}
+                    aria-label="Preview invoice"
+                    className="gap-0 px-2.5 sm:gap-2 sm:px-4"
                     leadingIcon={EyeIcon}
                 >
-                    Preview
+                    <span className="hidden sm:inline">Preview</span>
                 </Button>
             ) : (
                 <div />
@@ -36,7 +38,7 @@ const InvoiceActions = ({ editingInvoice, handleCancel, onPreview }) => {
                     type="submit"
                     form="invoice-form"
                 >
-                    {editingInvoice ? 'Update Invoice' : 'Generate New Invoice'}
+                    {editingInvoice ? 'Update Invoice' : 'Generate Invoice'}
                 </Button>
             </div>
         </div>

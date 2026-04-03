@@ -46,10 +46,10 @@ describe('MetricsCards', () => {
         expect(screen.getByText('This Month')).toBeInTheDocument()
         expect(screen.getByText('~$120.00')).toBeInTheDocument()
         expect(screen.getByText('$50.00')).toBeInTheDocument()
-        expect(screen.getAllByText('paid').length).toBeGreaterThan(0)
+        expect(screen.getAllByText('spent').length).toBeGreaterThan(0)
     })
 
-    it('does not show paid tag for zero expense totals', () => {
+    it('does not show spent tag for zero expense totals', () => {
         render(
             <MetricsCards
                 thisMonthMetrics={baseMetrics}
@@ -73,7 +73,7 @@ describe('MetricsCards', () => {
         )
 
         expect(screen.queryByText('upcoming')).not.toBeInTheDocument()
-        expect(screen.queryByText('paid')).not.toBeInTheDocument()
+        expect(screen.queryByText('spent')).not.toBeInTheDocument()
     })
 
     it('does not render zero expense summary amounts', () => {
@@ -100,5 +100,37 @@ describe('MetricsCards', () => {
         )
 
         expect(screen.queryByText('$0.00')).not.toBeInTheDocument()
+    })
+
+    it('does not render zero earnings rows in any period when only expenses exist', () => {
+        render(
+            <MetricsCards
+                thisMonthMetrics={baseMetrics}
+                lastMonthMetrics={baseMetrics}
+                last90DaysMetrics={baseMetrics}
+                invoiceMetrics={invoiceMetrics}
+                thisMonthBillableHours={0}
+                thisMonthUnbilledDisplay="$0.00"
+                expenseThisMonthUpcomingTotal={179.73}
+                expenseThisMonthUpcomingHasEstimate={true}
+                expenseThisMonthPaidTotal={58.8}
+                expenseLastMonthPaidTotal={41.25}
+                expenseLast90DaysPaidTotal={122.4}
+                hasClients={true}
+                preferredCurrency="EUR"
+                formatDuration={() => '0m'}
+                needsExchangeRates={false}
+                exchangeRatesLoading={false}
+                navigateToInvoices={() => {}}
+            />
+        )
+
+        expect(screen.queryByText('EUR 0.00')).not.toBeInTheDocument()
+        expect(screen.queryByText('€0.00')).not.toBeInTheDocument()
+        expect(screen.getByText('~€179.73')).toBeInTheDocument()
+        expect(screen.getByText('€58.80')).toBeInTheDocument()
+        expect(screen.getByText('€41.25')).toBeInTheDocument()
+        expect(screen.getByText('€122.40')).toBeInTheDocument()
+        expect(screen.getAllByText('spent')).toHaveLength(3)
     })
 })

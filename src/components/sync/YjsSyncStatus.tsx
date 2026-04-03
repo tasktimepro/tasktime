@@ -15,9 +15,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 interface YjsSyncStatusProps {
     className?: string;
     isCompact?: boolean;
+    onActionComplete?: () => void;
 }
 
-export default function YjsSyncStatus({ className = '', isCompact = false }: YjsSyncStatusProps) {
+export default function YjsSyncStatus({ className = '', isCompact = false, onActionComplete }: YjsSyncStatusProps) {
 
     const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled } = useYjs();
     const { signIn, isLoading: authLoading, hadPreviousSession } = useGoogleAuth();
@@ -204,6 +205,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false }: Yjs
 
         try {
             await status.onClick();
+            onActionComplete?.();
         } catch (error) {
             console.error('[YjsSyncStatus] Status action failed:', error);
             showError(error instanceof Error ? error.message : 'Google Drive action failed.');

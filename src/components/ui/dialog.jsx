@@ -24,14 +24,14 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-const DialogContent = React.forwardRef(({ className, children, hideCloseButton = false, ...props }, ref) => (
+const DialogContent = React.forwardRef(({ className, children, hideCloseButton = false, overlayClassName, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay className={overlayClassName} />
     <DialogPrimitive.Content
       ref={ref}
       aria-describedby={undefined}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
         className
       )}
       {...props}>
@@ -39,9 +39,10 @@ const DialogContent = React.forwardRef(({ className, children, hideCloseButton =
       {!hideCloseButton && (
         <DialogPrimitive.Close asChild>
           <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-3 top-3 h-8 w-8 rounded-full opacity-70 hover:opacity-100"
+            variant="outline"
+            size="icon-sm"
+            className="absolute right-4 top-4 rounded-full bg-card shadow-sm"
+            aria-label="Close dialog"
           >
             <XMarkIcon className="h-5 w-5" />
             <span className="sr-only">Close</span>
@@ -58,7 +59,7 @@ const DialogHeader = ({
   ...props
 }) => (
   <div
-    className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)}
+    className={cn("flex flex-col space-y-1.5 text-left", className)}
     {...props} />
 )
 DialogHeader.displayName = "DialogHeader"
@@ -68,7 +69,7 @@ const DialogFooter = ({
   ...props
 }) => (
   <div
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
+    className={cn("flex flex-row flex-wrap justify-end gap-2", className)}
     {...props} />
 )
 DialogFooter.displayName = "DialogFooter"

@@ -12,6 +12,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '../../utils/currencyUtils.ts';
 
+const EXPENSE_SETTLED_LABEL = 'spent';
+
 /**
  * MetricsCards component - Reports overview and invoice metrics.
  * @param {Object} props
@@ -76,9 +78,9 @@ const MetricsCards = ({
         const paidTotal = Object.values(metrics.paidInvoices).reduce((sum, amount) => sum + amount, 0);
         const outstandingTotal = Object.values(metrics.outstandingInvoices).reduce((sum, amount) => sum + amount, 0);
 
-        // If no earnings at all, show zero
+        // Hide empty earnings states so expense-only periods do not show a misleading zero row.
         if (billableTotal === 0 && paidTotal === 0 && outstandingTotal === 0) {
-            return <span className="text-muted-foreground sensitive-data">{formatCurrency(0, preferredCurrency)}</span>;
+            return null;
         }
 
         const components = [];
@@ -160,6 +162,10 @@ const MetricsCards = ({
         );
     };
 
+    const thisMonthEarnings = renderEarningsByCurrency(thisMonthMetrics, 'blue');
+    const lastMonthEarnings = renderEarningsByCurrency(lastMonthMetrics, 'gray');
+    const last90DaysEarnings = renderEarningsByCurrency(last90DaysMetrics, 'green');
+
     return (
         <Card>
             <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
@@ -176,10 +182,10 @@ const MetricsCards = ({
                             <div>
                                 <h3 className="status-info-text text-sm font-medium">This Month</h3>
                                 <div className="mt-2">
-                                    {hasClients && (
+                                    {thisMonthEarnings && (
                                         <div className="flex items-center">
                                             <div className="status-info-text text-lg font-semibold">
-                                                {renderEarningsByCurrency(thisMonthMetrics, 'blue')}
+                                                {thisMonthEarnings}
                                             </div>
                                         </div>
                                     )}
@@ -191,7 +197,7 @@ const MetricsCards = ({
                                         })}
                                         {renderExpenseLine({
                                             amount: expenseThisMonthPaidTotal,
-                                            label: 'paid'
+                                            label: EXPENSE_SETTLED_LABEL
                                         })}
                                     </div>
                                     <div className="flex items-center mt-2">
@@ -212,17 +218,17 @@ const MetricsCards = ({
                             <div>
                                 <h3 className="text-sm font-medium text-foreground">Last Month</h3>
                                 <div className="mt-2">
-                                    {hasClients && (
+                                    {lastMonthEarnings && (
                                         <div className="flex items-center">
                                             <div className="text-lg font-semibold text-foreground">
-                                                {renderEarningsByCurrency(lastMonthMetrics, 'gray')}
+                                                {lastMonthEarnings}
                                             </div>
                                         </div>
                                     )}
                                     <div className="mt-2">
                                         {renderExpenseLine({
                                             amount: expenseLastMonthPaidTotal,
-                                            label: 'paid'
+                                            label: EXPENSE_SETTLED_LABEL
                                         })}
                                     </div>
                                     <div className="flex items-center mt-2">
@@ -243,17 +249,17 @@ const MetricsCards = ({
                             <div>
                                 <h3 className="status-success-text text-sm font-medium">Last 90 Days</h3>
                                 <div className="mt-2">
-                                    {hasClients && (
+                                    {last90DaysEarnings && (
                                         <div className="flex items-center">
                                             <div className="status-success-text text-lg font-semibold">
-                                                {renderEarningsByCurrency(last90DaysMetrics, 'green')}
+                                                {last90DaysEarnings}
                                             </div>
                                         </div>
                                     )}
                                     <div className="mt-2">
                                         {renderExpenseLine({
                                             amount: expenseLast90DaysPaidTotal,
-                                            label: 'paid'
+                                            label: EXPENSE_SETTLED_LABEL
                                         })}
                                     </div>
                                     <div className="flex items-center mt-2">
