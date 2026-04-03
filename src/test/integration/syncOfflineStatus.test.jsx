@@ -16,6 +16,11 @@ const urlStateMocks = vi.hoisted(() => ({
     navigateToAccount: vi.fn()
 }))
 
+const toastMocks = vi.hoisted(() => ({
+
+    showError: vi.fn()
+}))
+
 const setNavigatorOnline = (value) => {
 
     Object.defineProperty(navigator, 'onLine', {
@@ -42,6 +47,13 @@ vi.mock('../../hooks/useUrlState', () => ({
 
     useUrlState: () => ({
         navigateToAccount: urlStateMocks.navigateToAccount
+    })
+}))
+
+vi.mock('../../hooks/useToast', () => ({
+
+    useToast: () => ({
+        showError: toastMocks.showError
     })
 }))
 
