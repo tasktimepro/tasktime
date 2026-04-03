@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
-import { generatePDF, createInvoiceHTML } from '../utils/pdfUtils.ts';
+import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { parseStoredDate, toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
@@ -174,49 +174,7 @@ const InvoicesList = ({
      */
     const handleDownload = async (invoice) => {
         try {
-            // Check if htmlContent exists, if not, recreate it
-            let htmlContent = invoice.htmlContent;
-            if (!htmlContent) {
-                
-                const paymentMethod = invoice.paymentMethod;
-                const businessInfo = invoice.businessInfo;
-                
-                // Find the client if one is associated with this invoice
-                const foundClient = invoice.clientId ? 
-                    clients.find(ci => ci.id === invoice.clientId) : null;
-                
-                // Prepare client data for PDF generation
-                const clientData = foundClient ? {
-                    name: foundClient.clientName || '',
-                    contactPerson: foundClient.contactPerson || '',
-                    email: foundClient.email || '',
-                    address: foundClient.address || '',
-                    city: foundClient.city || '',
-                    state: foundClient.state || '',
-                    zip: foundClient.zip || '',
-                    country: foundClient.country || ''
-                } : invoice.client;
-                
-                // Recreate the HTML content from the invoice data
-                htmlContent = createInvoiceHTML({
-                    project: invoice.project,
-                    client: clientData,
-                    tasks: invoice.tasks,
-                    totalHours: invoice.totalHours,
-                    totalAmount: invoice.totalAmount,
-                    invoiceNumber: invoice.invoiceNumber,
-                    date: invoice.date,
-                    dueDate: invoice.dueDate,
-                    paymentMethod: paymentMethod,
-                    businessInfo: businessInfo,
-                    subtotal: invoice.subtotal,
-                    discount: invoice.discount,
-                    shipping: invoice.shipping,
-                    tax: invoice.tax,
-                    taxRate: invoice.taxRate,
-                    taxLabel: invoice.taxLabel
-                });
-            }
+            const htmlContent = getCurrentInvoiceHtmlContent(invoice, clients);
             
             const filename = `invoice-${invoice.invoiceNumber}.pdf`;
             
@@ -589,6 +547,7 @@ const InvoicesList = ({
                 onClose={() => setShowPreview(false)}
                 title={selectedInvoice ? `Invoice Preview - ${selectedInvoice.invoiceNumber}` : ''}
                 invoice={selectedInvoice}
+                htmlContent={selectedInvoice ? getCurrentInvoiceHtmlContent(selectedInvoice, clients) : ''}
                 footer={previewModalFooter}
             />
         );

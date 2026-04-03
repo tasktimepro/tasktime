@@ -1,7 +1,11 @@
 // @ts-nocheck
 // InvoiceHandler.js
 // Extracted handler functions from InvoiceGenerator for use in InvoiceModal and related invoice logic
-import { getInvoicesForProject, getLatestInvoiceForProject } from '../../utils/invoiceUtils.ts';
+import {
+    getInvoicesForProject,
+    getLatestInvoiceForProject,
+    resolveCurrentInvoiceTemplate,
+} from '../../utils/invoiceUtils.ts';
 
 // Handles selecting/deselecting tasks for billing
 export const handleTaskSelectionForBilling = (setSelectedTasksForBilling) => (taskId, selected) => {
@@ -410,8 +414,9 @@ export const handleProjectSelection = (
                 // PRIORITY 1: Look for last used template for this client across all invoices
                 if (setSelectedTemplate && invoiceTemplates) {
                     for (const invoice of clientInvoices) {
-                        if (invoice.template) {
-                            setSelectedTemplate(invoice.template);
+                        const latestTemplate = resolveCurrentInvoiceTemplate(invoice, invoiceTemplates);
+                        if (latestTemplate) {
+                            setSelectedTemplate(latestTemplate);
                             clientTemplateSet = true;
                             break;
                         }
@@ -434,8 +439,11 @@ export const handleProjectSelection = (
                 }
                 
                 // Only set template if not already set from client history
-                if (!clientTemplateSet && lastInvoice.template && setSelectedTemplate) {
-                    setSelectedTemplate(lastInvoice.template);
+                if (!clientTemplateSet && setSelectedTemplate) {
+                    const latestTemplate = resolveCurrentInvoiceTemplate(lastInvoice, invoiceTemplates);
+                    if (latestTemplate) {
+                        setSelectedTemplate(latestTemplate);
+                    }
                 }
             }
             

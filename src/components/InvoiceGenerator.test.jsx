@@ -13,6 +13,7 @@ const toastMocks = vi.hoisted(() => ({
 
 const invoiceHookMocks = vi.hoisted(() => ({
 
+    invoices: [],
     createInvoice: vi.fn((data) => ({ ...data, id: 'new-invoice-id' })),
     updateInvoice: vi.fn()
 }))
@@ -59,7 +60,7 @@ vi.mock('../hooks/useToast.ts', () => ({
 vi.mock('../hooks/useInvoices.ts', () => ({
 
     useInvoices: () => ({
-        invoices: [],
+        invoices: invoiceHookMocks.invoices,
         createInvoice: invoiceHookMocks.createInvoice,
         updateInvoice: invoiceHookMocks.updateInvoice
     })
@@ -228,6 +229,10 @@ describe('InvoiceGenerator', () => {
         toastMocks.showSuccess.mockClear()
         toastMocks.showError.mockClear()
         toastMocks.showWarning.mockClear()
+        invoiceHookMocks.invoices = []
+        invoiceHookMocks.createInvoice.mockClear()
+        invoiceHookMocks.updateInvoice.mockClear()
+        templateHookMocks.updateInvoiceTemplate.mockClear()
         timeEntryHookMocks.updateEntry.mockClear()
         timeEntryHookMocks.createEntry.mockClear()
         timeEntryHookMocks.deleteEntry.mockClear()
@@ -323,6 +328,53 @@ describe('InvoiceGenerator', () => {
         const [invoiceId, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
         expect(invoiceId).toBe('inv-1')
         expect(invoiceData.invoiceNumber).toBe('INV-OLD')
+    })
+
+    it('uses the live template sequence when history carries a stale template snapshot', async () => {
+
+        modalConfig.skipTemplateSelection = true
+        templateHookMocks.invoiceTemplates = [
+            {
+                id: 'tpl-1',
+                name: 'Template One',
+                isDefault: true,
+                invoiceNumberFormat: 'INV-{sequential}',
+                useSequentialNumbers: true,
+                currentSequentialNumber: 160,
+                dueDateType: 'none'
+            }
+        ]
+        invoiceHookMocks.invoices = [
+            {
+                id: 'inv-159',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                createdAt: 100,
+                invoiceNumber: 'INV-0159',
+                templateId: 'tpl-1',
+                template: {
+                    id: 'tpl-1',
+                    name: 'Template One',
+                    invoiceNumberFormat: 'INV-{sequential}',
+                    useSequentialNumbers: true,
+                    currentSequentialNumber: 159,
+                    dueDateType: 'none'
+                }
+            }
+        ]
+
+        const user = userEvent.setup()
+
+        renderGenerator()
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.invoiceNumber).toBe('INV-0160')
+        expect(invoiceData.template?.currentSequentialNumber).toBe(160)
+        expect(templateHookMocks.updateInvoiceTemplate).toHaveBeenCalledWith('tpl-1', { currentSequentialNumber: 161 })
     })
 
     it('refreshes payment method data when updating an invoice', async () => {

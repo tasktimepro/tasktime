@@ -87,6 +87,24 @@ type InvoiceData = {
     currency?: string;
 };
 
+type StoredInvoice = InvoiceData & {
+    clientId?: string | null;
+    invoiceNumber?: string;
+    htmlContent?: string | null;
+};
+
+type StoredClient = {
+    id: string;
+    clientName?: string;
+    contactPerson?: string;
+    email?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+};
+
 /**
  * Generate and download a PDF from HTML content
  * @param {string} htmlContent - The HTML content to convert to PDF
@@ -525,4 +543,67 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             ` : ''}
         </div>
     `;
+};
+
+/**
+ * Build invoice HTML from the current structured invoice data.
+ */
+export const buildInvoiceHtmlContent = (
+    invoice: StoredInvoice,
+    clients: StoredClient[] = []
+): string => {
+    const foundClient = invoice.clientId
+        ? clients.find((client) => client.id === invoice.clientId)
+        : null;
+
+    const clientData = foundClient ? {
+        name: foundClient.clientName || '',
+        contactPerson: foundClient.contactPerson || '',
+        email: foundClient.email || '',
+        address: foundClient.address || '',
+        city: foundClient.city || '',
+        state: foundClient.state || '',
+        zip: foundClient.zip || '',
+        country: foundClient.country || ''
+    } : (invoice.client || { name: '' });
+
+    return createInvoiceHTML({
+        project: invoice.project,
+        client: clientData,
+        tasks: invoice.tasks || [],
+        additionalTasks: invoice.additionalTasks || [],
+        expenseItems: invoice.expenseItems || [],
+        note: invoice.note,
+        totalHours: invoice.totalHours,
+        totalAmount: invoice.totalAmount,
+        invoiceNumber: invoice.invoiceNumber,
+        date: invoice.date,
+        dueDate: invoice.dueDate,
+        paymentMethod: invoice.paymentMethod,
+        businessInfo: invoice.businessInfo,
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        shipping: invoice.shipping,
+        tax: invoice.tax,
+        taxRate: invoice.taxRate,
+        taxLabel: invoice.taxLabel,
+        taskFlatRates: invoice.taskFlatRates,
+        taskHourlyRates: invoice.taskHourlyRates,
+        currency: invoice.currency,
+    });
+};
+
+/**
+ * Return stored invoice HTML when it matches the current invoice number, otherwise regenerate it.
+ */
+export const getCurrentInvoiceHtmlContent = (
+    invoice: StoredInvoice,
+    clients: StoredClient[] = []
+): string => {
+    const storedHtml = invoice?.htmlContent;
+    if (storedHtml && (!invoice?.invoiceNumber || storedHtml.includes(invoice.invoiceNumber))) {
+        return storedHtml;
+    }
+
+    return buildInvoiceHtmlContent(invoice, clients);
 };

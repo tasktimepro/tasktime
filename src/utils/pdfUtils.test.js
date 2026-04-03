@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import useInvoicePricing from '../components/invoice/hooks/useInvoicePricing'
-import { createInvoiceHTML, generatePDF } from './pdfUtils'
+import {
+    buildInvoiceHtmlContent,
+    createInvoiceHTML,
+    generatePDF,
+    getCurrentInvoiceHtmlContent,
+} from './pdfUtils'
 
 const html2pdfMocks = vi.hoisted(() => {
 
@@ -248,6 +253,34 @@ describe('createInvoiceHTML', () => {
         })
 
         expect(html).toContain('Due Date: 2026-02-01')
+    })
+
+    it('rebuilds invoice html from structured invoice data', () => {
+
+        const html = buildInvoiceHtmlContent({
+            invoiceNumber: 'INV-0160',
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Invoice: #INV-0160')
+    })
+
+    it('regenerates stale stored html when invoice number changed', () => {
+
+        const html = getCurrentInvoiceHtmlContent({
+            invoiceNumber: 'INV-0160',
+            htmlContent: '<div>Invoice: #INV-0159</div>',
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Invoice: #INV-0160')
+        expect(html).not.toContain('INV-0159')
     })
 
     it('renders business info, payment method, and note', () => {

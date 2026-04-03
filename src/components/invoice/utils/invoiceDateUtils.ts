@@ -4,6 +4,7 @@ type InvoiceTemplate = {
     invoiceNumberFormat: string;
     useSequentialNumbers?: boolean;
     currentSequentialNumber?: number;
+    sequentialNumberDigits?: number;
     dueDateType?: 'fixed-days' | 'fixed-weeks' | 'precise-date' | 'none' | string;
     dueDateDays?: number | string;
     dueDateWeeks?: number | string;
@@ -14,12 +15,19 @@ type ProjectInfo = {
     id: string;
 };
 
+type GenerateInvoiceNumberOptions = {
+    sequenceNumber?: number;
+    issuedAt?: Date | string | number | null;
+    timestamp?: number;
+};
+
 /**
  * generateInvoiceNumber - Generates an invoice number based on template.
  */
 export const generateInvoiceNumber = (
     template: InvoiceTemplate | null | undefined,
-    project?: ProjectInfo | null
+    project?: ProjectInfo | null,
+    options: GenerateInvoiceNumberOptions = {}
 ): string => {
 
     if (!template) {
@@ -29,16 +37,19 @@ export const generateInvoiceNumber = (
             : `INV-${Date.now()}`;
     }
 
-    const now = new Date();
+    const issuedAt = options.issuedAt ? new Date(options.issuedAt) : new Date();
+    const now = Number.isNaN(issuedAt.getTime()) ? new Date() : issuedAt;
+    const sequentialNumber = options.sequenceNumber ?? template.currentSequentialNumber ?? 0;
+    const sequentialDigits = template.sequentialNumberDigits || 4;
     const variables: Record<string, string> = {
         '{projectId}': project ? project.id.slice(-8) : 'NOPROJECT',
-        '{timestamp}': Date.now().toString(),
+        '{timestamp}': String(options.timestamp ?? Date.now()),
         '{date}': now.toISOString().slice(0, 10).replace(/-/g, ''),
         '{year}': now.getFullYear().toString(),
         '{month}': (now.getMonth() + 1).toString().padStart(2, '0'),
         '{day}': now.getDate().toString().padStart(2, '0'),
         '{sequential}': template.useSequentialNumbers
-            ? String(template.currentSequentialNumber || 0).padStart(4, '0')
+            ? String(sequentialNumber).padStart(sequentialDigits, '0')
             : '0001'
     };
 

@@ -18,7 +18,12 @@ import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 import { useTimers } from '../hooks/useTimers.ts';
-import { getInvoicesForProject, getLatestInvoiceForProject } from '../utils/invoiceUtils.ts';
+import {
+    getInvoicesForProject,
+    getLatestInvoiceForProject,
+    getNextSequentialNumberForTemplate,
+    resolveCurrentInvoiceTemplate,
+} from '../utils/invoiceUtils.ts';
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -511,17 +516,9 @@ const InvoiceGenerator = ({
 
         // If editing an invoice and it has a template reference, use latest template data
         if (editingInvoice) {
-            const invoiceTemplateId = editingInvoice.templateId || editingInvoice.template?.id;
-            if (invoiceTemplateId) {
-                const latestTemplate = invoiceTemplates.find(t => t.id === invoiceTemplateId);
-                if (latestTemplate) {
-                    setSelectedTemplate(latestTemplate);
-                    return;
-                }
-            }
-
-            if (editingInvoice.template) {
-                setSelectedTemplate(editingInvoice.template);
+            const latestTemplate = resolveCurrentInvoiceTemplate(editingInvoice, invoiceTemplates);
+            if (latestTemplate) {
+                setSelectedTemplate(latestTemplate);
                 return;
             }
         }
@@ -535,8 +532,9 @@ const InvoiceGenerator = ({
                     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
                 
                 for (const invoice of clientInvoices) {
-                    if (invoice.template) {
-                        setSelectedTemplate(invoice.template);
+                    const latestTemplate = resolveCurrentInvoiceTemplate(invoice, invoiceTemplates);
+                    if (latestTemplate) {
+                        setSelectedTemplate(latestTemplate);
                         return;
                     }
                 }
@@ -545,9 +543,10 @@ const InvoiceGenerator = ({
             // PRIORITY 2: Fall back to project-specific template history (only if no client-based history found)
             if (selectedProject?.id) {
                 const lastInvoice = getLatestInvoiceForProject(invoices, selectedProject.id);
+                const latestTemplate = resolveCurrentInvoiceTemplate(lastInvoice, invoiceTemplates);
 
-                if (lastInvoice?.template) {
-                    setSelectedTemplate(lastInvoice.template);
+                if (latestTemplate) {
+                    setSelectedTemplate(latestTemplate);
                     return;
                 }
             }
@@ -1057,7 +1056,8 @@ const InvoiceGenerator = ({
     const updateTemplateSequentialNumber = useCallback((template) => {
         if (!template || !template.useSequentialNumbers) return;
 
-        updateInvoiceTemplate(template.id, { currentSequentialNumber: template.currentSequentialNumber + 1 });
+        const nextSequentialNumber = (template.currentSequentialNumber || 1) + 1;
+        updateInvoiceTemplate(template.id, { currentSequentialNumber: nextSequentialNumber });
     }, [updateInvoiceTemplate]);
 
     /**
@@ -1101,18 +1101,6 @@ const InvoiceGenerator = ({
         const pricing = calculatePricing;
         const totalHours = pricing.totalHours;
 
-        // Generate invoice ID - use selected project or a generic format for standalone invoices
-        const invoiceId = editingInvoice 
-            ? editingInvoice.id 
-            : selectedProject 
-                ? `INV-${selectedProject.id.slice(-8)}-${Date.now()}` 
-                : `INV-${selectedClient?.id?.slice(-8) || 'STANDALONE'}-${Date.now()}`;
-
-        // Generate invoice number using template
-        const invoiceNumber = editingInvoice 
-            ? editingInvoice.invoiceNumber 
-            : generateInvoiceNumber(selectedTemplate, selectedProject);
-
         // Calculate due date using template - use override date if available (for both new and editing)
         // Priority: 1. Date override (if enabled), 2. Original date (if editing), 3. Today's date (for new)
         const invoiceDate = useInvoiceDateOverride && invoiceDateOverride
@@ -1120,11 +1108,45 @@ const InvoiceGenerator = ({
             : editingInvoice 
                 ? new Date(editingInvoice.date) 
                 : new Date();
-        const dueDate = calculateDueDate(selectedTemplate, invoiceDate);
+
+        const resolvedTemplate = selectedTemplate
+            ? resolveCurrentInvoiceTemplate(selectedTemplate, invoiceTemplates)
+            : (() => {
+                if (!editingInvoice) return null;
+                return resolveCurrentInvoiceTemplate(editingInvoice, invoiceTemplates);
+            })();
+
+        if (!resolvedTemplate) {
+            showError('Please select an invoice template');
+            return null;
+        }
+
+        const nextSequentialNumber = !editingInvoice
+            ? getNextSequentialNumberForTemplate(resolvedTemplate, invoices)
+            : null;
+        const templateForInvoiceNumber = nextSequentialNumber === null
+            ? resolvedTemplate
+            : {
+                ...resolvedTemplate,
+                currentSequentialNumber: nextSequentialNumber,
+            };
+
+        // Generate invoice ID - use selected project or a generic format for standalone invoices
+        const invoiceId = editingInvoice 
+            ? editingInvoice.id 
+            : selectedProject 
+                ? `INV-${selectedProject.id.slice(-8)}-${Date.now()}` 
+                : `INV-${selectedClient?.id?.slice(-8) || 'STANDALONE'}-${Date.now()}`;
+
+        // Generate invoice number using the latest template state
+        const invoiceNumber = editingInvoice 
+            ? editingInvoice.invoiceNumber 
+            : generateInvoiceNumber(templateForInvoiceNumber, selectedProject, { issuedAt: invoiceDate });
+        const dueDate = calculateDueDate(resolvedTemplate, invoiceDate);
 
         // Update template sequential number if creating new invoice
         if (applyTemplateSequentialUpdate && !editingInvoice) {
-            updateTemplateSequentialNumber(selectedTemplate);
+            updateTemplateSequentialNumber(templateForInvoiceNumber);
         }
 
         const resolvedPaymentMethod = selectedPaymentMethod || (() => {
@@ -1139,13 +1161,6 @@ const InvoiceGenerator = ({
             const businessInfoId = editingInvoice.businessInfoId || editingInvoice.businessInfo?.id;
             if (!businessInfoId) return editingInvoice.businessInfo || null;
             return businessInfos.find(bi => bi.id === businessInfoId) || editingInvoice.businessInfo || null;
-        })();
-
-        const resolvedTemplate = selectedTemplate || (() => {
-            if (!editingInvoice) return null;
-            const templateId = editingInvoice.templateId || editingInvoice.template?.id;
-            if (!templateId) return editingInvoice.template || null;
-            return invoiceTemplates.find(t => t.id === templateId) || editingInvoice.template || null;
         })();
 
         const selectedExpenseItems = availableExpensesWithConversion

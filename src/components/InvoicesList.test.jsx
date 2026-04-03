@@ -11,9 +11,23 @@ const invoiceHookMocks = vi.hoisted(() => ({
     updateInvoice: vi.fn()
 }))
 
-vi.mock('../utils/pdfUtils.ts', () => ({
+const pdfMocks = vi.hoisted(() => ({
+
     generatePDF: vi.fn(),
-    createInvoiceHTML: vi.fn(() => '<div />')
+    createInvoiceHTML: vi.fn((invoice) => `<div>Invoice: #${invoice.invoiceNumber}</div>`),
+    getCurrentInvoiceHtmlContent: vi.fn((invoice) => {
+        if (invoice.htmlContent && invoice.htmlContent.includes(invoice.invoiceNumber)) {
+            return invoice.htmlContent
+        }
+
+        return `<div>Invoice: #${invoice.invoiceNumber}</div>`
+    })
+}))
+
+vi.mock('../utils/pdfUtils.ts', () => ({
+    generatePDF: pdfMocks.generatePDF,
+    createInvoiceHTML: pdfMocks.createInvoiceHTML,
+    getCurrentInvoiceHtmlContent: pdfMocks.getCurrentInvoiceHtmlContent,
 }))
 
 vi.mock('../hooks/useUrlState.ts', () => ({
@@ -50,6 +64,9 @@ describe('InvoicesList', () => {
     beforeEach(() => {
 
         updateUrlMock.mockClear()
+        pdfMocks.generatePDF.mockClear()
+        pdfMocks.createInvoiceHTML.mockClear()
+        pdfMocks.getCurrentInvoiceHtmlContent.mockClear()
         setMatchMedia(false)
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
         user = userEvent.setup()
@@ -279,5 +296,31 @@ describe('InvoicesList', () => {
 
         expect(tablist.className.includes('flex-wrap')).toBe(true)
         expect(markPaidButton.parentElement?.className.includes('flex-wrap')).toBe(true)
+    })
+
+    it('uses current invoice html when stored html is stale', async () => {
+
+        render(
+            <InvoicesList
+                projectInvoices={[{
+                    ...baseInvoice,
+                    invoiceNumber: 'INV-0160',
+                    htmlContent: '<div>Invoice: #INV-0159</div>'
+                }]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await user.click(screen.getByTitle('Preview Invoice'))
+
+        expect(screen.getByText('Invoice: #INV-0160')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Download PDF' }))
+
+        expect(pdfMocks.generatePDF).toHaveBeenCalledWith('<div>Invoice: #INV-0160</div>', 'invoice-INV-0160.pdf')
     })
 })
