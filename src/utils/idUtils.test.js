@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateId, slugify, generateSlugId } from './idUtils'
+import { generateId, slugify, generateSlugId, generateRecurringExpenseId } from './idUtils'
 
 describe('idUtils', () => {
 
@@ -74,6 +74,36 @@ describe('idUtils', () => {
             const id1 = generateSlugId('Test')
             const id2 = generateSlugId('Test')
             expect(id1).not.toBe(id2)
+        })
+    })
+
+    describe('generateRecurringExpenseId', () => {
+
+        it('produces a valid UUID', () => {
+
+            const id = generateRecurringExpenseId('rec-1', '2025-03-01')
+            expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+        })
+
+        it('is deterministic for the same inputs', () => {
+
+            const a = generateRecurringExpenseId('rec-1', '2025-03-01')
+            const b = generateRecurringExpenseId('rec-1', '2025-03-01')
+            expect(a).toBe(b)
+        })
+
+        it('differs for different dates', () => {
+
+            const a = generateRecurringExpenseId('rec-1', '2025-03-01')
+            const b = generateRecurringExpenseId('rec-1', '2025-04-01')
+            expect(a).not.toBe(b)
+        })
+
+        it('differs for different recurrence IDs', () => {
+
+            const a = generateRecurringExpenseId('rec-1', '2025-03-01')
+            const b = generateRecurringExpenseId('rec-2', '2025-03-01')
+            expect(a).not.toBe(b)
         })
     })
 })

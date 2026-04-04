@@ -7,6 +7,7 @@ import {
     isExpenseInDateRange,
     isRecurringExpenseDueOnDate,
 } from './expenseUtils';
+import { generateRecurringExpenseId } from './idUtils';
 
 const recurrenceBase = {
     id: 'r1',
@@ -70,6 +71,7 @@ describe('expenseUtils', () => {
 
     it('buildExpenseFromRecurrence copies fields and defaults', () => {
         const expense = buildExpenseFromRecurrence(recurrenceBase, '2025-02-01');
+        expect(expense.id).toBe(generateRecurringExpenseId('r1', '2025-02-01'));
         expect(expense.title).toBe('Office Rent');
         expect(expense.amount).toBe(1200);
         expect(expense.amountType).toBe('fixed');
@@ -77,6 +79,19 @@ describe('expenseUtils', () => {
         expect(expense.billingStatus).toBe('unbilled');
         expect(expense.isRecurring).toBe(true);
         expect(expense.recurrenceId).toBe('r1');
+    });
+
+    it('buildExpenseFromRecurrence produces deterministic IDs', () => {
+        const expense1 = buildExpenseFromRecurrence(recurrenceBase, '2025-02-01');
+        const expense2 = buildExpenseFromRecurrence(recurrenceBase, '2025-02-01');
+        expect(expense1.id).toBe(expense2.id);
+
+        const expense3 = buildExpenseFromRecurrence(recurrenceBase, '2025-03-01');
+        expect(expense1.id).not.toBe(expense3.id);
+
+        const otherRecurrence = { ...recurrenceBase, id: 'r2' };
+        const expense4 = buildExpenseFromRecurrence(otherRecurrence, '2025-02-01');
+        expect(expense1.id).not.toBe(expense4.id);
     });
 
     it('buildExpenseFromRecurrence sets variable amount to 0', () => {

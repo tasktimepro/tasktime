@@ -1,4 +1,7 @@
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4, v5 as uuidv5 } from 'uuid';
+
+/** Namespace UUID for deterministic recurring-expense IDs */
+const RECURRING_EXPENSE_NAMESPACE = '7a3f8b2e-1d4c-4e5f-9a6b-0c8d7e2f3a1b';
 
 /**
  * Generate a unique UUID v4 identifier
@@ -6,6 +9,15 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export const generateId = (): string => {
     return uuidv4();
+};
+
+/**
+ * Generate a deterministic ID for a recurring expense instance.
+ * Same recurrenceId + date always produces the same UUID on every device,
+ * preventing duplicates when multiple devices generate the same occurrence.
+ */
+export const generateRecurringExpenseId = (recurrenceId: string, date: string): string => {
+    return uuidv5(`${recurrenceId}:${date}`, RECURRING_EXPENSE_NAMESPACE);
 };
 
 /**

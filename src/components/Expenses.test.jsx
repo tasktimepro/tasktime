@@ -3,6 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import Expenses from './Expenses';
 
+const toLocalStorageDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+};
+
 const expensesState = vi.hoisted(() => ({
     expenses: [],
     markAsPaid: vi.fn(),
@@ -82,6 +90,7 @@ vi.mock('@/components/BusinessInfo', () => ({
 describe('Expenses', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        expensesState.expenses = [];
     });
 
     it('opens the mobile filter sheet', () => {
@@ -104,5 +113,31 @@ describe('Expenses', () => {
         expect(within(dialog).getByText('Reset filters')).toBeInTheDocument();
         expect(within(dialog).getByText('Apply filters')).toBeInTheDocument();
         expect(within(dialog).getByText('Paid status')).toBeInTheDocument();
+    });
+
+    it('uses neutral styling for the outstanding expenses tab', () => {
+        expensesState.expenses = [
+            {
+                id: 'expense-1',
+                title: 'Hosting',
+                amount: 25,
+                date: toLocalStorageDate(new Date()),
+                paymentStatus: 'unpaid',
+                archived: false,
+            },
+        ];
+
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        );
+
+        expect(screen.getByRole('tab', { name: 'Outstanding (1)' }).className.includes('status-warning-tab')).toBe(false);
     });
 });

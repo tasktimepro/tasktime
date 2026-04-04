@@ -1,5 +1,6 @@
 import { endOfMonth } from 'date-fns';
 import { parseStoredDate, toStorageDate } from './dateUtils';
+import { generateRecurringExpenseId } from './idUtils';
 import type { Expense, ExpenseRecurrence } from '@/stores/yjs/types';
 
 type RepeatInterval = 'monthly' | 'yearly';
@@ -132,7 +133,7 @@ export const buildExpenseFromRecurrence = (recurrence: ExpenseRecurrence, dateVa
     const resolvedAmount = isVariable ? (recurrence.amount || 0) : recurrence.amount;
 
     return {
-        id: '',
+        id: generateRecurringExpenseId(recurrence.id, resolvedDate),
         title: recurrence.title,
         note: recurrence.note ?? null,
         date: resolvedDate,

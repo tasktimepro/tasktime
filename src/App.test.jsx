@@ -463,7 +463,10 @@ describe('App component', () => {
         const { rerender } = render(<App />)
 
         expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledTimes(1)
-        expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledWith(expenseHookState.createExpense)
+        expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledWith(
+            expenseHookState.createExpense,
+            expect.any(Set),
+        )
 
         rerender(<App />)
         expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledTimes(1)
@@ -512,6 +515,8 @@ describe('App component', () => {
             paymentStatus: 'unpaid',
         }))
         expect(recurrenceHookState.updateRecurrence).toHaveBeenCalledWith('rec-office', { lastGeneratedDate: '2026-02-25' })
-        expect(screen.getByTestId('expense-view-modal')).toHaveTextContent('created-expense:Office:actual')
+        const modalText = screen.getByTestId('expense-view-modal').textContent
+        expect(modalText).toContain(':Office:actual')
+        expect(modalText).not.toContain('created-expense')
     })
 })

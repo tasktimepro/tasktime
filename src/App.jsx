@@ -162,9 +162,9 @@ function AppContent() {
             return;
         }
 
-        generatePendingExpenses(createExpense);
+        generatePendingExpenses(createExpense, new Set(expenses.map((e) => e.id)));
         lastExpenseGenerationDayRef.current = todayStr;
-    }, [isReady, expenseRecurrencesLoading, todayStr, generatePendingExpenses, createExpense]);
+    }, [isReady, expenseRecurrencesLoading, todayStr, generatePendingExpenses, createExpense, expenses]);
 
     const isPaused = focusedTimer?.isPaused || false;
     const timerTaskId = focusedTimer?.taskId || null;

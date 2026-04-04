@@ -59,7 +59,7 @@ describe('useExpenseRecurrences', () => {
 
         getPendingPeriods.mockReturnValue(['2025-02-01', '2025-03-01'])
         buildExpenseFromRecurrence.mockImplementation((recurrence, dateValue) => ({
-            id: '',
+            id: `det-${recurrence.id}-${dateValue}`,
             title: recurrence.title,
             date: dateValue,
         }))
@@ -80,6 +80,41 @@ describe('useExpenseRecurrences', () => {
         })
 
         expect(createExpense).toHaveBeenCalledTimes(2)
+        expect(update).toHaveBeenCalledWith('r1', { lastGeneratedDate: '2025-03-01' })
+    })
+
+    it('skips expenses that already exist when existingExpenseIds provided', () => {
+        const update = vi.fn()
+        const createExpense = vi.fn()
+
+        getPendingPeriods.mockReturnValue(['2025-02-01', '2025-03-01'])
+        buildExpenseFromRecurrence.mockImplementation((recurrence, dateValue) => ({
+            id: `det-${recurrence.id}-${dateValue}`,
+            title: recurrence.title,
+            date: dateValue,
+        }))
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [baseRecurrence],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useExpenseRecurrences())
+
+        const existingIds = new Set(['det-r1-2025-02-01'])
+
+        act(() => {
+            result.current.generatePendingExpenses(createExpense, existingIds)
+        })
+
+        expect(createExpense).toHaveBeenCalledTimes(1)
+        expect(createExpense).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'det-r1-2025-03-01' })
+        )
         expect(update).toHaveBeenCalledWith('r1', { lastGeneratedDate: '2025-03-01' })
     })
 

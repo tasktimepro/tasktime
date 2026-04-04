@@ -721,10 +721,7 @@ const Expenses = ({
                                 <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto whitespace-nowrap rounded-none border-b border-border bg-transparent p-0">
                                     <TabsTrigger
                                         value="outstanding"
-                                        className={`shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border ${outstandingExpenses.length > 0
-                                            ? 'status-warning-tab'
-                                            : 'data-[state=active]:text-foreground data-[state=active]:border-foreground'
-                                        }`}
+                                        className="shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
                                     >
                                         Outstanding ({outstandingExpenses.length})
                                     </TabsTrigger>
