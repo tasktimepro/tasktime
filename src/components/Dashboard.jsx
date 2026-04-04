@@ -47,7 +47,7 @@ const Dashboard = ({
     const { showWarning, showSuccess } = useToast();
     
     // Use Yjs hooks directly
-    const { tasks, updateTask, deleteTask, archiveTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus } = useTasks();
+    const { tasks, updateTask, deleteTask, archiveTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus, resetExpiredSkips } = useTasks();
     const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
     const { expenses } = useExpenses();
@@ -63,6 +63,11 @@ const Dashboard = ({
     const [showAddEntryModal, setShowAddEntryModal] = useState(false);
     const [addEntryTask, setAddEntryTask] = useState(null);
     const [addEntryDateStr, setAddEntryDateStr] = useState(null);
+
+    // Reset stale skip flags once on mount / when date changes
+    useEffect(() => {
+        resetExpiredSkips();
+    }, [todayStr]); // eslint-disable-line react-hooks/exhaustive-deps
     const [isMobileLayout, setIsMobileLayout] = useState(() => {
         if (typeof window === 'undefined' || !window.matchMedia) {
             return false;

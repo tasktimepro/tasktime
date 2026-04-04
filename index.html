@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://sync.tasktime.pro https://cdn.jsdelivr.net https://open.er-api.com; img-src 'self' data: blob:; font-src 'self'; frame-src https://accounts.google.com; worker-src 'self'; manifest-src 'self';" />
+    
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#2563eb" />
     <meta name="description" content="Track your time by the task. Invoice without the mess." />

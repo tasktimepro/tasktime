@@ -6,33 +6,13 @@ import { useYjs } from '@/contexts/YjsContext'
 import { useYjsCollection } from './useYjsCollection'
 import * as recurringUtils from '@/utils/recurringUtils.ts'
 import * as dateUtils from '@/utils/dateUtils.ts'
+import { createTestYMap } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 vi.mock('./useYjsCollection', () => ({ useYjsCollection: vi.fn() }))
 
 const mockUseYjs = useYjs
 const mockUseYjsCollection = useYjsCollection
-
-function createObservableMap(initial = {}) {
-    const map = new Map(Object.entries(initial))
-    const observers = new Set()
-
-    return {
-        get: (key) => map.get(key),
-        set: (key, value) => {
-            map.set(key, value)
-            observers.forEach((fn) => fn())
-        },
-        delete: (key) => {
-            const deleted = map.delete(key)
-            observers.forEach((fn) => fn())
-            return deleted
-        },
-        forEach: (cb) => map.forEach((value, key) => cb(value, key)),
-        observe: (fn) => observers.add(fn),
-        unobserve: (fn) => observers.delete(fn),
-    }
-}
 
 describe('useTasks', () => {
     beforeEach(() => {
@@ -44,7 +24,7 @@ describe('useTasks', () => {
     })
 
     it('loads archived tasks, filters by project, and exposes helpers', async () => {
-        const archivedMap = createObservableMap({
+        const archivedMap = createTestYMap({
             t3: { id: 't3', projectId: 'p1', archived: true, parentTaskId: null },
             t4: { id: 't4', projectId: 'p2', archived: true, parentTaskId: null },
         })
@@ -92,7 +72,7 @@ describe('useTasks', () => {
     it('triggers archived load when includeArchived is true', async () => {
         const loadArchivedTasks = vi.fn(async () => {})
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks,
         })
@@ -116,7 +96,7 @@ describe('useTasks', () => {
         vi.setSystemTime(new Date('2025-01-06T09:00:00Z'))
 
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -154,7 +134,7 @@ describe('useTasks', () => {
         vi.setSystemTime(new Date('2025-01-07T09:00:00Z'))
 
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -201,7 +181,7 @@ describe('useTasks', () => {
         ]
 
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -252,7 +232,7 @@ describe('useTasks', () => {
         ]
 
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -276,7 +256,7 @@ describe('useTasks', () => {
 
     it('returns non-recurring status defaults', () => {
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -314,7 +294,7 @@ describe('useTasks', () => {
         ]
 
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -349,7 +329,7 @@ describe('useTasks', () => {
         ]
 
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -376,7 +356,7 @@ describe('useTasks', () => {
         const todaySpy = vi.spyOn(dateUtils, 'getTodayString').mockReturnValue(null)
 
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -401,7 +381,7 @@ describe('useTasks', () => {
 
     it('returns undefined when toggling completion for missing task', () => {
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -448,7 +428,7 @@ describe('useTasks', () => {
         })
 
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createObservableMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks: vi.fn(async () => {}),
         })
@@ -488,6 +468,12 @@ describe('useTasks', () => {
         expect(status.isOverdue).toBe(false)
         expect(status.effectiveDateStr).toBe('2025-01-13')
         expect(status.isSkipped).toBe(false)
+
+        // Side-effect write removed — skip reset is now handled by resetExpiredSkips()
+        // called from Dashboard, not automatically inside getRecurringStatus
+        act(() => {
+            result.current.resetExpiredSkips()
+        })
 
         expect(update).toHaveBeenCalledWith(
             'recurring-overdue',

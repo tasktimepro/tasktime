@@ -75,6 +75,33 @@ export class YjsDocManager {
 
     private docs: Map<DocName, ManagedDoc> = new Map();
     private loadPromises: Map<DocName, Promise<Y.Doc>> = new Map();
+    private errorListeners: Set<(error: Error, docName: DocName) => void> = new Set();
+
+    /**
+     * Subscribe to persistence errors (e.g., IndexedDB quota exceeded)
+     */
+    onPersistenceError(callback: (error: Error, docName: DocName) => void): () => void {
+        this.errorListeners.add(callback);
+        return () => this.errorListeners.delete(callback);
+    }
+
+    private emitPersistenceError(error: Error, docName: DocName): void {
+        for (const callback of this.errorListeners) {
+            callback(error, docName);
+        }
+    }
+
+    /**
+     * Check if an error is a storage quota exceeded error
+     */
+    static isQuotaError(error: unknown): boolean {
+        if (error instanceof DOMException) {
+            return error.name === 'QuotaExceededError' || error.code === 22;
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+        return message.includes('QuotaExceededError') || message.includes('storage quota');
+    }
 
     /**
      * Get or create a document (lazy initialization)
@@ -179,7 +206,7 @@ export class YjsDocManager {
         await new Promise<void>((resolve, reject) => {
             // Set a timeout in case synced event never fires
             const timeout = setTimeout(() => {
-                console.warn(`[YjsDocManager] Timeout waiting for sync: ${name}`);
+                console.warn(`[YjsDocManager] Timeout waiting for sync: ${name} — proceeding with potentially incomplete data`);
                 resolve(); // Resolve anyway to not block the app
             }, 10_000);
 
@@ -189,12 +216,18 @@ export class YjsDocManager {
                 resolve();
             });
 
-            // Handle errors
+            // Handle errors during initial load
             persistence.on('error', (error: Error) => {
                 clearTimeout(timeout);
                 console.error(`[YjsDocManager] Error loading ${name}:`, error);
                 reject(error);
             });
+        });
+
+        // Subscribe to ongoing persistence errors (e.g., quota exceeded on subsequent writes)
+        persistence.on('error', (error: Error) => {
+            console.error(`[YjsDocManager] Persistence error for ${name}:`, error);
+            this.emitPersistenceError(error, name);
         });
 
         this.docs.set(name, { doc, persistence, broadcast, loaded: true });

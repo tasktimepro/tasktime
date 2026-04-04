@@ -12,6 +12,7 @@ import type { Task } from '@/stores/yjs/types';
 import { getTodayString, toStorageDate } from '@/utils/dateUtils.ts';
 import { findNextRecurringDueDate, findPreviousRecurringDueDate, isRecurringTaskDueOnDate } from '@/utils/recurringUtils.ts';
 import { isRecurringCompletedOnDate, toggleRecurringCompletionDate } from '@/utils/recurringCompletionUtils.ts';
+import { collectEntities } from '@/stores/yjs/entityUtils';
 
 export interface UseTasksOptions {
     /** Filter to a specific project */
@@ -44,9 +45,7 @@ export function useTasks(options: UseTasksOptions = {}) {
                 if (!mounted) return;
                 const archivedMap = store.archivedTasks;
                 if (archivedMap) {
-                    const tasks: Task[] = [];
-                    archivedMap.forEach((task) => tasks.push(task));
-                    setArchivedTasks(tasks);
+                    setArchivedTasks(collectEntities<Task>(archivedMap as any));
                 }
                 setArchivedLoaded(true);
             })
@@ -64,14 +63,12 @@ export function useTasks(options: UseTasksOptions = {}) {
         const handler = () => {
             const archivedMap = store.archivedTasks;
             if (archivedMap) {
-                const tasks: Task[] = [];
-                archivedMap.forEach((task) => tasks.push(task));
-                setArchivedTasks(tasks);
+                setArchivedTasks(collectEntities<Task>(archivedMap as any));
             }
         };
 
-        store.archivedTasks.observe(handler);
-        return () => store.archivedTasks?.unobserve(handler);
+        store.archivedTasks.observeDeep(handler);
+        return () => store.archivedTasks?.unobserveDeep(handler);
     }, [archivedLoaded, store]);
 
     // Combined tasks (if archived are loaded)
@@ -313,20 +310,18 @@ export function useTasks(options: UseTasksOptions = {}) {
         }
 
         if (isRecurringTaskDueOnDate(todayDate, task.recurring)) {
-            const shouldResetSkipped = Boolean(
+            // Determine if skip flag is stale (from a past occurrence) — pure read, no writes
+            const skipIsStale = Boolean(
                 task.skipUntilNextRecurring
                 && task.skippedOccurrenceDate
                 && task.skippedOccurrenceDate !== resolvedToday
             );
 
-            if (shouldResetSkipped) {
-                update(task.id, {
-                    skipUntilNextRecurring: false,
-                    skippedOccurrenceDate: null,
-                });
-            }
-
-            const isSkipped = Boolean(task.skipUntilNextRecurring && task.skippedOccurrenceDate === resolvedToday);
+            const isSkipped = Boolean(
+                task.skipUntilNextRecurring
+                && task.skippedOccurrenceDate === resolvedToday
+                && !skipIsStale
+            );
 
             return {
                 isDueToday: true,
@@ -335,6 +330,7 @@ export function useTasks(options: UseTasksOptions = {}) {
                 nextDueDateStr: null as string | null,
                 effectiveDateStr: resolvedToday,
                 isSkipped,
+                _needsSkipReset: skipIsStale,
             };
         }
 
@@ -345,19 +341,21 @@ export function useTasks(options: UseTasksOptions = {}) {
 
         const isBeforeRecurringStart = Boolean(recurringStartStr && previousDueStr && previousDueStr < recurringStartStr);
         const wasCompleted = previousDueStr ? isCompletedOnDate(task, previousDueStr) : false;
+
+        const skipIsStaleForOccurrence = Boolean(
+            task.skipUntilNextRecurring
+            && task.skippedOccurrenceDate
+            && previousDueStr
+            && task.skippedOccurrenceDate !== previousDueStr
+        );
+
         const isSkippedForOccurrence = Boolean(
             previousDueStr
             && task.skipUntilNextRecurring
             && task.skippedOccurrenceDate
             && task.skippedOccurrenceDate === previousDueStr
+            && !skipIsStaleForOccurrence
         );
-
-        if (task.skipUntilNextRecurring && task.skippedOccurrenceDate && previousDueStr && task.skippedOccurrenceDate !== previousDueStr) {
-            update(task.id, {
-                skipUntilNextRecurring: false,
-                skippedOccurrenceDate: null,
-            });
-        }
 
         const isOverdue = Boolean(
             previousDueStr
@@ -375,8 +373,28 @@ export function useTasks(options: UseTasksOptions = {}) {
             nextDueDateStr: nextDueStr,
             effectiveDateStr: isOverdue ? previousDueStr : null,
             isSkipped: isSkippedForOccurrence,
+            _needsSkipReset: skipIsStaleForOccurrence,
         };
-    }, [isCompletedOnDate, update]);
+    }, [isCompletedOnDate]);
+
+    /**
+     * Reset stale skip flags for recurring tasks.
+     * Call this explicitly (e.g., on mount or user action), not during render/status checks.
+     */
+    const resetExpiredSkips = useCallback(() => {
+        const today = getTodayString();
+        if (!today) return;
+
+        for (const task of projectActiveTasks) {
+            if (!task.recurring || !task.skipUntilNextRecurring || !task.skippedOccurrenceDate) continue;
+            if (task.skippedOccurrenceDate === today) continue;
+
+            update(task.id, {
+                skipUntilNextRecurring: false,
+                skippedOccurrenceDate: null,
+            });
+        }
+    }, [projectActiveTasks, update]);
 
     return {
         // Data
@@ -411,5 +429,6 @@ export function useTasks(options: UseTasksOptions = {}) {
         toggleRecurringCompletion,
         skipRecurringOccurrence,
         getRecurringStatus,
+        resetExpiredSkips,
     };
 }

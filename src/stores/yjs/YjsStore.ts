@@ -12,7 +12,10 @@
 import * as Y from 'yjs';
 import { YjsDocManager } from './YjsDocManager';
 import { YjsDriveProvider } from './providers/GoogleDriveProvider';
+import { BackupManager } from './providers/BackupManager';
+import type { BackupInfo } from './providers/BackupManager';
 import { parseStoredDate } from '@/utils/dateUtils';
+import { readEntity, objectToYMap, collectEntities } from './entityUtils';
 import type {
     DocName,
     SyncState,
@@ -41,6 +44,7 @@ export class YjsStore {
 
     private docManager: YjsDocManager;
     private driveProvider: YjsDriveProvider | null = null;
+    private backupManager: BackupManager | null = null;
     private _isReady: boolean = false;
     private driveSyncMode: DriveSyncMode = 'manual';
 
@@ -232,15 +236,11 @@ export class YjsStore {
         const allTasks: Task[] = [];
 
         // Active tasks (always available)
-        for (const task of this.tasks.values()) {
-            allTasks.push(task);
-        }
+        allTasks.push(...collectEntities<Task>(this.tasks as any));
 
         // Archived tasks (load if needed)
         const archivedMap = await this.loadArchivedTasks();
-        for (const task of archivedMap.values()) {
-            allTasks.push(task);
-        }
+        allTasks.push(...collectEntities<Task>(archivedMap as any));
 
         return allTasks;
     }
@@ -286,18 +286,19 @@ export class YjsStore {
      * Archive a task (move from active to archived doc)
      */
     async archiveTask(taskId: string): Promise<void> {
-        const task = this.tasks.get(taskId);
+        const task = readEntity<Task>(this.tasks.get(taskId));
         if (!task) return;
 
         const archivedMap = await this.loadArchivedTasks();
         const archivedOnDate = new Date().toISOString().slice(0, 10);
 
-        // Add to archived doc
-        archivedMap.set(taskId, {
+        // Add to archived doc as nested Y.Map
+        const entityMap = objectToYMap({
             ...task,
             archived: true,
             archivedOnDate,
-        });
+        } as unknown as Record<string, unknown>);
+        (archivedMap as any).set(taskId, entityMap);
 
         // Remove from active
         this.tasks.delete(taskId);
@@ -310,15 +311,16 @@ export class YjsStore {
      */
     async unarchiveTask(taskId: string): Promise<void> {
         const archivedMap = await this.loadArchivedTasks();
-        const task = archivedMap.get(taskId);
+        const task = readEntity<Task>(archivedMap.get(taskId));
         if (!task) return;
 
-        // Add back to active doc
-        this.tasks.set(taskId, {
+        // Add back to active doc as nested Y.Map
+        const entityMap = objectToYMap({
             ...task,
             archived: false,
             archivedOnDate: null,
-        });
+        } as unknown as Record<string, unknown>);
+        (this.tasks as any).set(taskId, entityMap);
 
         // Remove from archived
         archivedMap.delete(taskId);
@@ -338,19 +340,15 @@ export class YjsStore {
         const entries: TimeEntry[] = [];
 
         // Active entries
-        for (const entry of this.activeTimeEntries.values()) {
-            entries.push(entry);
-        }
+        entries.push(...collectEntities<TimeEntry>(this.activeTimeEntries as any));
 
         // Archived entries (from loaded year docs)
         for (const docName of this.docManager.getLoadedDocs()) {
             if (docName.startsWith('entries-') && docName !== 'entries-active') {
                 const doc = this.docManager.getDocSync(docName);
                 if (doc) {
-                    const yearEntries = doc.getMap<TimeEntry>('timeEntries');
-                    for (const entry of yearEntries.values()) {
-                        entries.push(entry);
-                    }
+                    const yearEntries = doc.getMap('timeEntries');
+                    entries.push(...collectEntities<TimeEntry>(yearEntries as any));
                 }
             }
         }
@@ -388,9 +386,7 @@ export class YjsStore {
         const entries: TimeEntry[] = [];
 
         // Active entries
-        for (const entry of this.activeTimeEntries.values()) {
-            entries.push(entry);
-        }
+        entries.push(...collectEntities<TimeEntry>(this.activeTimeEntries as any));
 
         // Get all years from local docs
         const years = this.getLocalYears();
@@ -398,9 +394,7 @@ export class YjsStore {
         // Load each year's entries
         for (const year of years) {
             const yearEntries = await this.loadEntriesForYear(year);
-            for (const entry of yearEntries.values()) {
-                entries.push(entry);
-            }
+            entries.push(...collectEntities<TimeEntry>(yearEntries as any));
         }
 
         return entries;
@@ -468,15 +462,11 @@ export class YjsStore {
         const allInvoices: Invoice[] = [];
 
         // Active invoices (always available)
-        for (const invoice of this.invoices.values()) {
-            allInvoices.push(invoice);
-        }
+        allInvoices.push(...collectEntities<Invoice>(this.invoices as any));
 
         // Archived invoices (load if needed)
         const archivedMap = await this.loadArchivedInvoices();
-        for (const invoice of archivedMap.values()) {
-            allInvoices.push(invoice);
-        }
+        allInvoices.push(...collectEntities<Invoice>(archivedMap as any));
 
         return allInvoices;
     }
@@ -494,10 +484,16 @@ export class YjsStore {
         const toArchive: Map<number, TimeEntry[]> = new Map();
 
         // Access doc directly (not via getter, since we're in initialization)
-        const activeEntries = this._activeEntriesDoc!.getMap<TimeEntry>('timeEntries');
+        const activeEntries = this._activeEntriesDoc!.getMap('timeEntries');
 
-        // Find entries to archive
-        for (const [id, entry] of activeEntries) {
+        // Find entries to archive (handle both nested Y.Map and plain object formats)
+        const entriesToProcess: Array<{ id: string; entry: TimeEntry }> = [];
+        activeEntries.forEach((value: unknown, id: string) => {
+            const entry = readEntity<TimeEntry>(value);
+            if (entry) entriesToProcess.push({ id, entry });
+        });
+
+        for (const { id, entry } of entriesToProcess) {
             if (entry.start < cutoff) {
                 const year = new Date(entry.start).getFullYear();
                 if (!toArchive.has(year)) {
@@ -510,10 +506,11 @@ export class YjsStore {
         // Move entries to year documents
         for (const [year, entries] of toArchive) {
             const yearDoc = await this.docManager.getDoc(`entries-${year}` as DocName);
-            const yearEntries = yearDoc.getMap<TimeEntry>('timeEntries');
+            const yearEntries = yearDoc.getMap('timeEntries');
 
             for (const entry of entries) {
-                yearEntries.set(entry.id, entry);
+                const entityMap = objectToYMap(entry as unknown as Record<string, unknown>);
+                (yearEntries as any).set(entry.id, entityMap);
                 activeEntries.delete(entry.id);
             }
 
@@ -530,10 +527,16 @@ export class YjsStore {
         const toArchive: Invoice[] = [];
 
         // Access doc directly (not via getter, since we're in initialization)
-        const invoicesMap = this._coreDoc!.getMap<Invoice>('invoices');
+        const invoicesMap = this._coreDoc!.getMap('invoices');
 
         // Find paid invoices from previous years
-        for (const [id, invoice] of invoicesMap) {
+        const invoicesToCheck: Array<{ id: string; invoice: Invoice }> = [];
+        invoicesMap.forEach((value: unknown, id: string) => {
+            const invoice = readEntity<Invoice>(value);
+            if (invoice) invoicesToCheck.push({ id, invoice });
+        });
+
+        for (const { invoice } of invoicesToCheck) {
             if (invoice.status === 'paid' && invoice.paidAt) {
                 const paidYear = new Date(invoice.paidAt).getFullYear();
                 if (paidYear < currentYear) {
@@ -548,7 +551,8 @@ export class YjsStore {
         const archivedMap = await this.loadArchivedInvoices();
 
         for (const invoice of toArchive) {
-            archivedMap.set(invoice.id, invoice);
+            const entityMap = objectToYMap(invoice as unknown as Record<string, unknown>);
+            (archivedMap as any).set(invoice.id, entityMap);
             invoicesMap.delete(invoice.id);
         }
 
@@ -564,9 +568,15 @@ export class YjsStore {
         const toArchive: Expense[] = [];
 
         // Access doc directly (not via getter, since we're in initialization)
-        const expensesMap = this._coreDoc!.getMap<Expense>('expenses');
+        const expensesMap = this._coreDoc!.getMap('expenses');
 
-        for (const [, expense] of expensesMap) {
+        const expensesToCheck: Array<{ id: string; expense: Expense }> = [];
+        expensesMap.forEach((value: unknown, id: string) => {
+            const expense = readEntity<Expense>(value);
+            if (expense) expensesToCheck.push({ id, expense });
+        });
+
+        for (const { expense } of expensesToCheck) {
             if (!expense?.date) continue;
 
             const parsedDate = parseStoredDate(expense.date);
@@ -587,7 +597,8 @@ export class YjsStore {
         const archivedMap = await this.loadArchivedExpenses();
 
         for (const expense of toArchive) {
-            archivedMap.set(expense.id, expense);
+            const entityMap = objectToYMap(expense as unknown as Record<string, unknown>);
+            (archivedMap as any).set(expense.id, entityMap);
             expensesMap.delete(expense.id);
         }
 
@@ -610,6 +621,19 @@ export class YjsStore {
 
         this.driveProvider = new YjsDriveProvider(this.docManager, accessToken, sessionId);
         this.driveProvider.setSyncMode(this.driveSyncMode);
+
+        // Set up backup manager with access to the provider's manifest
+        this.backupManager = new BackupManager(this.driveProvider.getManifest(), this);
+
+        // After each successful sync, maybe create a backup
+        this.driveProvider.onSyncComplete(() => {
+            const enabled = this.preferences.get('backupEnabled') ?? true;
+            if (!enabled || !this.backupManager) return;
+
+            const frequencyHours = (this.preferences.get('backupFrequencyHours') as number) ?? 24;
+            this.backupManager.maybeCreateBackup(frequencyHours).catch(console.error);
+        });
+
         await this.driveProvider.connect(this.driveSyncMode);
     }
 
@@ -619,6 +643,7 @@ export class YjsStore {
     disconnectDrive(): void {
         this.driveProvider?.disconnect();
         this.driveProvider = null;
+        this.backupManager = null;
     }
 
     /**
@@ -677,6 +702,13 @@ export class YjsStore {
     onPendingSyncChange(callback: (hasPending: boolean) => void): () => void {
         if (!this.driveProvider) return () => {};
         return this.driveProvider.onPendingChange(callback);
+    }
+
+    /**
+     * Subscribe to IndexedDB persistence errors (e.g., quota exceeded)
+     */
+    onPersistenceError(callback: (error: Error, docName: string) => void): () => void {
+        return this.docManager.onPersistenceError(callback);
     }
 
     /**
@@ -744,6 +776,46 @@ export class YjsStore {
     }
 
     // =========================================================================
+    // Backups
+    // =========================================================================
+
+    /**
+     * List all available backups from Google Drive
+     */
+    async listBackups(): Promise<BackupInfo[]> {
+        if (!this.backupManager) return [];
+        return this.backupManager.listBackups();
+    }
+
+    /**
+     * Create a backup on demand
+     */
+    async createBackup(): Promise<string | null> {
+        if (!this.backupManager) {
+            throw new Error('Drive not connected');
+        }
+        return this.backupManager.createBackup();
+    }
+
+    /**
+     * Download a specific backup's data
+     */
+    async downloadBackup(fileId: string): Promise<unknown> {
+        if (!this.backupManager) {
+            throw new Error('Drive not connected');
+        }
+        return this.backupManager.downloadBackup(fileId);
+    }
+
+    /**
+     * Delete all backup files from Google Drive
+     */
+    async deleteAllBackups(): Promise<void> {
+        if (!this.backupManager) return;
+        return this.backupManager.deleteAllBackups();
+    }
+
+    // =========================================================================
     // Cleanup
     // =========================================================================
 
@@ -801,6 +873,7 @@ export class YjsStore {
         console.log('[YjsStore] Destroying...');
         this.driveProvider?.disconnect();
         this.driveProvider = null;
+        this.backupManager = null;
         this.docManager.destroy();
         this._coreDoc = null;
         this._activeEntriesDoc = null;

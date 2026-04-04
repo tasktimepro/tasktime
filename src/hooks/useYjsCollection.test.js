@@ -3,32 +3,12 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import { useYjsCollection } from './useYjsCollection'
 import { useYjs } from '@/contexts/YjsContext'
+import { createTestYMap } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 vi.mock('@/utils/idUtils', () => ({ generateId: vi.fn(() => 'generated-id') }))
 
 const mockUseYjs = useYjs
-
-function createMockYMap(initial = {}) {
-    const map = new Map(Object.entries(initial))
-    const observers = new Set()
-
-    return {
-        get: (key) => map.get(key),
-        set: (key, value) => {
-            map.set(key, value)
-            observers.forEach((fn) => fn())
-        },
-        delete: (key) => {
-            const deleted = map.delete(key)
-            observers.forEach((fn) => fn())
-            return deleted
-        },
-        forEach: (cb) => map.forEach((value, key) => cb(value, key)),
-        observe: (fn) => observers.add(fn),
-        unobserve: (fn) => observers.delete(fn),
-    }
-}
 
 describe('useYjsCollection', () => {
     beforeEach(() => {
@@ -36,7 +16,7 @@ describe('useYjsCollection', () => {
     })
 
     it('performs CRUD operations and syncs updates', async () => {
-        const mockMap = createMockYMap()
+        const mockMap = createTestYMap()
         mockUseYjs.mockReturnValue({ store: { test: mockMap }, isReady: true })
 
         const { result } = renderHook(() => useYjsCollection((store) => store.test))
@@ -64,7 +44,7 @@ describe('useYjsCollection', () => {
     })
 
     it('subscribes to map changes', async () => {
-        const mockMap = createMockYMap({ a: { id: 'a', name: 'Alpha' } })
+        const mockMap = createTestYMap({ a: { id: 'a', name: 'Alpha' } })
         mockUseYjs.mockReturnValue({ store: { test: mockMap }, isReady: true })
 
         const { result } = renderHook(() => useYjsCollection((store) => store.test))
@@ -79,7 +59,7 @@ describe('useYjsCollection', () => {
 
     it('handles missing readiness and prevents operations', () => {
 
-        const mockMap = createMockYMap()
+        const mockMap = createTestYMap()
         mockUseYjs.mockReturnValue({ store: { test: mockMap }, isReady: false })
 
         const { result } = renderHook(() => useYjsCollection((store) => store.test))
@@ -110,7 +90,7 @@ describe('useYjsCollection', () => {
 
     it('uses generated IDs and preserves timestamps', async () => {
 
-        const mockMap = createMockYMap()
+        const mockMap = createTestYMap()
         mockUseYjs.mockReturnValue({ store: { test: mockMap }, isReady: true })
 
         const { result } = renderHook(() => useYjsCollection((store) => store.test))

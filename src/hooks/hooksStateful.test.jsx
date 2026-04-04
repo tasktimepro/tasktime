@@ -1,36 +1,16 @@
 // @ts-nocheck
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
+import * as Y from 'yjs'
 import { usePreferences } from './usePreferences'
 import { useTimeEntries } from './useTimeEntries'
 import { useTimers } from './useTimers'
 import { useYjs } from '@/contexts/YjsContext'
+import { createTestYMap, readStored } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 
 const mockUseYjs = useYjs
-
-function createObservableMap(initial = {}) {
-    const map = new Map(Object.entries(initial))
-    const observers = new Set()
-
-    return {
-        get: (key) => map.get(key),
-        set: (key, value) => {
-            map.set(key, value)
-            observers.forEach((fn) => fn())
-        },
-        delete: (key) => {
-            const deleted = map.delete(key)
-            observers.forEach((fn) => fn())
-            return deleted
-        },
-        forEach: (cb) => map.forEach((value, key) => cb(value, key)),
-        values: () => Array.from(map.values()),
-        observe: (fn) => observers.add(fn),
-        unobserve: (fn) => observers.delete(fn),
-    }
-}
 
 describe('stateful hooks', () => {
     beforeEach(() => {
@@ -39,8 +19,8 @@ describe('stateful hooks', () => {
     })
 
     it('syncs and updates preferences', async () => {
-        const prefMap = createObservableMap({ theme: 'dark' })
-        const originalSet = prefMap.set
+        const prefMap = createTestYMap({ theme: 'dark' })
+        const originalSet = prefMap.set.bind(prefMap)
         const setSpy = vi.fn((key, value) => originalSet(key, value))
         prefMap.set = setSpy
 
@@ -71,14 +51,14 @@ describe('stateful hooks', () => {
             { id: 'b', taskId: 't1', start: end + 1000, end: end + 2000, note: '' },
         ]
 
-        const activeMap = createObservableMap(entries.reduce((acc, e) => ({ ...acc, [e.id]: e }), {}))
+        const activeMap = createTestYMap(entries.reduce((acc, e) => ({ ...acc, [e.id]: e }), {}))
         const loadEntriesForYear = vi.fn(async () => {})
         const store = {
             activeTimeEntries: activeMap,
-            getAllTimeEntries: vi.fn(() => activeMap.values()),
+            getAllTimeEntries: vi.fn(() => [...activeMap.values()]),
             isYearLoaded: vi.fn(() => false),
-            activeEntriesDoc: { transact: (fn) => fn() },
-            coreDoc: { transact: (fn) => fn() },
+            activeEntriesDoc: activeMap.doc,
+            coreDoc: new Y.Doc(),
         }
 
         mockUseYjs.mockReturnValue({
@@ -106,17 +86,20 @@ describe('stateful hooks', () => {
     })
 
     it('runs timer lifecycle', async () => {
-        const timersMap = createObservableMap()
-        const tasksMap = createObservableMap({
+        const coreDoc = new Y.Doc()
+        const activeEntriesDoc = new Y.Doc()
+
+        const timersMap = createTestYMap({}, coreDoc, 'timers')
+        const tasksMap = createTestYMap({
             'task-1': { id: 'task-1', projectId: 'project-1' }
-        })
-        const entriesMap = createObservableMap()
+        }, coreDoc, 'tasks')
+        const entriesMap = createTestYMap({}, activeEntriesDoc, 'entries')
         const store = {
             timers: timersMap,
             tasks: tasksMap,
             activeTimeEntries: entriesMap,
-            coreDoc: { transact: (fn) => fn() },
-            activeEntriesDoc: { transact: (fn) => fn() },
+            coreDoc,
+            activeEntriesDoc,
         }
 
         mockUseYjs.mockReturnValue({ store, isReady: true })
@@ -129,24 +112,24 @@ describe('stateful hooks', () => {
             result.current.startTimer('task-1', 'Note')
         })
         expect(result.current.timers.length).toBe(1)
-        expect(timersMap.get('project-1')?.note).toBe('Note')
+        expect(readStored(timersMap, 'project-1')?.note).toBe('Note')
 
         await act(async () => {
             result.current.pauseTimer('project-1')
         })
-        expect(timersMap.get('project-1')?.paused).toBe(true)
+        expect(readStored(timersMap, 'project-1')?.paused).toBe(true)
 
         await act(async () => {
             result.current.resumeTimer('project-1')
         })
-        expect(timersMap.get('project-1')?.paused).toBe(false)
+        expect(readStored(timersMap, 'project-1')?.paused).toBe(false)
 
         let entry
         await act(async () => {
             entry = result.current.stopTimer('project-1')
         })
         expect(entry?.taskId).toBe('task-1')
-        expect(entriesMap.get(entry.id)?.taskId).toBe('task-1')
+        expect(readStored(entriesMap, entry.id)?.taskId).toBe('task-1')
         await act(async () => {})
         expect(result.current.timers.length).toBe(0)
     })

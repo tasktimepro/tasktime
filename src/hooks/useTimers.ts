@@ -9,6 +9,7 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useMasterClock } from '@/hooks/useMasterClock';
 import type { MultiTimerState, TimeEntry } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
+import { readEntity, objectToYMap, collectEntities } from '@/stores/yjs/entityUtils';
 
 export interface ActiveTimer extends MultiTimerState {
     elapsedTime: number;
@@ -57,14 +58,7 @@ export function useTimers(): UseTimersResult {
     const syncTimerStates = useCallback(() => {
         if (!isReady) return;
 
-        const nextStates: MultiTimerState[] = [];
-        store.timers.forEach((value) => {
-            if (value) {
-                nextStates.push(value);
-            }
-        });
-
-        setTimerStates(nextStates);
+        setTimerStates(collectEntities<MultiTimerState>(store.timers as any));
         setIsLoading(false);
     }, [isReady, store]);
 
@@ -74,9 +68,9 @@ export function useTimers(): UseTimersResult {
         syncTimerStates();
 
         const handler = () => syncTimerStates();
-        store.timers.observe(handler);
+        store.timers.observeDeep(handler);
 
-        return () => store.timers.unobserve(handler);
+        return () => store.timers.unobserveDeep(handler);
     }, [isReady, store, syncTimerStates]);
 
     // Timer elapsed time is now calculated using master clock (no individual interval needed)
@@ -121,7 +115,7 @@ export function useTimers(): UseTimersResult {
     const startTimer = useCallback((taskId: string, note?: string) => {
         if (!isReady) return;
 
-        const task = store.tasks.get(taskId);
+        const task = readEntity<{ id: string; projectId?: string }>(store.tasks.get(taskId));
         if (!task) return;
 
         const timerKey = task.projectId || task.id;
@@ -143,32 +137,34 @@ export function useTimers(): UseTimersResult {
         };
 
         store.coreDoc.transact(() => {
-            store.timers.set(timerKey, timer);
+            const entityMap = objectToYMap(timer as unknown as Record<string, unknown>);
+            (store.timers as any).set(timerKey, entityMap);
         });
     }, [isReady, store]);
 
     const pauseTimer = useCallback((projectId: string) => {
         if (!isReady) return;
 
-        const timer = store.timers.get(projectId);
+        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
         if (!timer || timer.paused) return;
 
         const elapsed = Date.now() - timer.startTime;
 
         store.coreDoc.transact(() => {
-            store.timers.set(projectId, {
+            const entityMap = objectToYMap({
                 ...timer,
                 paused: true,
                 pausedElapsedTime: elapsed,
                 lastActive: Date.now(),
-            });
+            } as unknown as Record<string, unknown>);
+            (store.timers as any).set(projectId, entityMap);
         });
     }, [isReady, store]);
 
     const resumeTimer = useCallback((projectId: string) => {
         if (!isReady) return;
 
-        const timer = store.timers.get(projectId);
+        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
         if (!timer || !timer.paused) return;
 
         const pausedTime = timer.pausedElapsedTime || 0;
@@ -182,20 +178,21 @@ export function useTimers(): UseTimersResult {
         const alignedStartTime = alignedNow - (pausedSeconds * 1000);
 
         store.coreDoc.transact(() => {
-            store.timers.set(projectId, {
+            const entityMap = objectToYMap({
                 ...timer,
                 startTime: alignedStartTime,
                 paused: false,
                 pausedElapsedTime: 0,
                 lastActive: now,
-            });
+            } as unknown as Record<string, unknown>);
+            (store.timers as any).set(projectId, entityMap);
         });
     }, [isReady, store]);
 
     const stopTimer = useCallback((projectId: string): TimeEntry | null => {
         if (!isReady) return null;
 
-        const timer = store.timers.get(projectId);
+        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
         if (!timer) return null;
 
         const now = Date.now();
@@ -212,7 +209,8 @@ export function useTimers(): UseTimersResult {
         };
 
         store.activeEntriesDoc.transact(() => {
-            store.activeTimeEntries.set(entry.id, entry);
+            const entryMap = objectToYMap(entry as unknown as Record<string, unknown>);
+            (store.activeTimeEntries as any).set(entry.id, entryMap);
         });
 
         store.coreDoc.transact(() => {
@@ -233,30 +231,32 @@ export function useTimers(): UseTimersResult {
     const updateTimer = useCallback((projectId: string, updates: { startTime?: number; note?: string }) => {
         if (!isReady) return;
 
-        const timer = store.timers.get(projectId);
+        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
         if (!timer) return;
 
         store.coreDoc.transact(() => {
-            store.timers.set(projectId, {
+            const entityMap = objectToYMap({
                 ...timer,
                 startTime: updates.startTime !== undefined ? updates.startTime : timer.startTime,
                 note: updates.note !== undefined ? updates.note : timer.note,
                 lastActive: Date.now(),
-            });
+            } as unknown as Record<string, unknown>);
+            (store.timers as any).set(projectId, entityMap);
         });
     }, [isReady, store]);
 
     const focusTimer = useCallback((projectId: string) => {
         if (!isReady) return;
 
-        const timer = store.timers.get(projectId);
+        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
         if (!timer) return;
 
         store.coreDoc.transact(() => {
-            store.timers.set(projectId, {
+            const entityMap = objectToYMap({
                 ...timer,
                 lastActive: Date.now(),
-            });
+            } as unknown as Record<string, unknown>);
+            (store.timers as any).set(projectId, entityMap);
         });
     }, [isReady, store]);
 

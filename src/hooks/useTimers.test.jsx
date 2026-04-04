@@ -1,37 +1,17 @@
 // @ts-nocheck
 import { renderHook, act } from '@testing-library/react'
 import { vi } from 'vitest'
+import * as Y from 'yjs'
 import { useTimers } from './useTimers'
 import { useYjs } from '@/contexts/YjsContext'
 import { useMasterClock } from './useMasterClock'
+import { createTestYMap, readStored } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 vi.mock('./useMasterClock', () => ({ useMasterClock: vi.fn() }))
 
 const mockUseYjs = useYjs
 const mockUseMasterClock = useMasterClock
-
-function createObservableMap(initial = {}) {
-    const map = new Map(Object.entries(initial))
-    const observers = new Set()
-
-    return {
-        get: (key) => map.get(key),
-        set: (key, value) => {
-            map.set(key, value)
-            observers.forEach((fn) => fn())
-        },
-        delete: (key) => {
-            const deleted = map.delete(key)
-            observers.forEach((fn) => fn())
-            return deleted
-        },
-        has: (key) => map.has(key),
-        forEach: (cb) => map.forEach((value, key) => cb(value, key)),
-        observe: (fn) => observers.add(fn),
-        unobserve: (fn) => observers.delete(fn),
-    }
-}
 
 describe('useTimers', () => {
     beforeEach(() => {
@@ -46,18 +26,21 @@ describe('useTimers', () => {
     })
 
     it('starts timers and exposes lookups', async () => {
-        const timers = createObservableMap()
-        const tasks = createObservableMap({
+        const coreDoc = new Y.Doc()
+        const activeEntriesDoc = new Y.Doc()
+
+        const timers = createTestYMap({}, coreDoc, 'timers')
+        const tasks = createTestYMap({
             t1: { id: 't1', projectId: 'p1' },
-        })
-        const activeTimeEntries = createObservableMap()
+        }, coreDoc, 'tasks')
+        const activeTimeEntries = createTestYMap({}, activeEntriesDoc, 'activeTimeEntries')
 
         const store = {
             timers,
             tasks,
             activeTimeEntries,
-            coreDoc: { transact: (fn) => fn() },
-            activeEntriesDoc: { transact: (fn) => fn() },
+            coreDoc,
+            activeEntriesDoc,
         }
 
         mockUseYjs.mockReturnValue({ store, isReady: true })
@@ -79,7 +62,10 @@ describe('useTimers', () => {
     })
 
     it('pauses, resumes, updates, focuses, and stops timers', async () => {
-        const timers = createObservableMap({
+        const coreDoc = new Y.Doc()
+        const activeEntriesDoc = new Y.Doc()
+
+        const timers = createTestYMap({
             p1: {
                 projectId: 'p1',
                 taskId: 't1',
@@ -89,16 +75,16 @@ describe('useTimers', () => {
                 note: '',
                 lastActive: Date.now(),
             }
-        })
-        const tasks = createObservableMap({ t1: { id: 't1', projectId: 'p1' } })
-        const activeTimeEntries = createObservableMap()
+        }, coreDoc, 'timers')
+        const tasks = createTestYMap({ t1: { id: 't1', projectId: 'p1' } }, coreDoc, 'tasks')
+        const activeTimeEntries = createTestYMap({}, activeEntriesDoc, 'activeTimeEntries')
 
         const store = {
             timers,
             tasks,
             activeTimeEntries,
-            coreDoc: { transact: (fn) => fn() },
-            activeEntriesDoc: { transact: (fn) => fn() },
+            coreDoc,
+            activeEntriesDoc,
         }
 
         mockUseYjs.mockReturnValue({ store, isReady: true })
@@ -109,20 +95,20 @@ describe('useTimers', () => {
             result.current.pauseTimer('p1')
         })
 
-        expect(store.timers.get('p1').paused).toBe(true)
+        expect(readStored(store.timers, 'p1').paused).toBe(true)
 
         act(() => {
             result.current.resumeTimer('p1')
         })
 
-        expect(store.timers.get('p1').paused).toBe(false)
+        expect(readStored(store.timers, 'p1').paused).toBe(false)
 
         act(() => {
             result.current.updateTimer('p1', { note: 'Updated' })
             result.current.focusTimer('p1')
         })
 
-        expect(store.timers.get('p1').note).toBe('Updated')
+        expect(readStored(store.timers, 'p1').note).toBe('Updated')
 
         const entry = result.current.stopTimer('p1')
         expect(entry).toBeTruthy()
@@ -131,18 +117,21 @@ describe('useTimers', () => {
     })
 
     it('clears timers without creating entries', () => {
-        const timers = createObservableMap({
+        const coreDoc = new Y.Doc()
+        const activeEntriesDoc = new Y.Doc()
+
+        const timers = createTestYMap({
             p1: { projectId: 'p1', taskId: 't1', startTime: Date.now(), paused: false, pausedElapsedTime: 0, note: '', lastActive: Date.now() }
-        })
-        const tasks = createObservableMap({ t1: { id: 't1', projectId: 'p1' } })
-        const activeTimeEntries = createObservableMap()
+        }, coreDoc, 'timers')
+        const tasks = createTestYMap({ t1: { id: 't1', projectId: 'p1' } }, coreDoc, 'tasks')
+        const activeTimeEntries = createTestYMap({}, activeEntriesDoc, 'activeTimeEntries')
 
         const store = {
             timers,
             tasks,
             activeTimeEntries,
-            coreDoc: { transact: (fn) => fn() },
-            activeEntriesDoc: { transact: (fn) => fn() },
+            coreDoc,
+            activeEntriesDoc,
         }
 
         mockUseYjs.mockReturnValue({ store, isReady: true })

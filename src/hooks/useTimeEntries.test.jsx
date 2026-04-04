@@ -1,34 +1,14 @@
 // @ts-nocheck
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
+import * as Y from 'yjs'
 import { useTimeEntries } from './useTimeEntries'
 import { useYjs } from '@/contexts/YjsContext'
+import { createTestYMap, readStored } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 
 const mockUseYjs = useYjs
-
-function createObservableMap(initial = {}) {
-    const map = new Map(Object.entries(initial))
-    const observers = new Set()
-
-    return {
-        get: (key) => map.get(key),
-        set: (key, value) => {
-            map.set(key, value)
-            observers.forEach((fn) => fn())
-        },
-        delete: (key) => {
-            const deleted = map.delete(key)
-            observers.forEach((fn) => fn())
-            return deleted
-        },
-        forEach: (cb) => map.forEach((value, key) => cb(value, key)),
-        observe: (fn) => observers.add(fn),
-        unobserve: (fn) => observers.delete(fn),
-        values: () => Array.from(map.values()),
-    }
-}
 
 describe('useTimeEntries', () => {
     beforeEach(() => {
@@ -36,7 +16,7 @@ describe('useTimeEntries', () => {
     })
 
     it('filters entries by task and date range', async () => {
-        const activeTimeEntries = createObservableMap({
+        const activeTimeEntries = createTestYMap({
             e1: { id: 'e1', taskId: 't1', start: 10, end: 20 },
             e2: { id: 'e2', taskId: 't2', start: 30, end: 40 },
             e3: { id: 'e3', taskId: 't1', start: 50, end: 60 },
@@ -44,7 +24,7 @@ describe('useTimeEntries', () => {
 
         const store = {
             activeTimeEntries,
-            getAllTimeEntries: () => activeTimeEntries.values(),
+            getAllTimeEntries: () => [...activeTimeEntries.values()],
             isYearLoaded: vi.fn(() => true),
         }
 
@@ -62,10 +42,10 @@ describe('useTimeEntries', () => {
     })
 
     it('creates, updates, and deletes entries', () => {
-        const activeTimeEntries = createObservableMap()
+        const activeTimeEntries = createTestYMap()
         const store = {
             activeTimeEntries,
-            getAllTimeEntries: () => activeTimeEntries.values(),
+            getAllTimeEntries: () => [...activeTimeEntries.values()],
             isYearLoaded: vi.fn(() => true),
         }
 
@@ -92,7 +72,7 @@ describe('useTimeEntries', () => {
 
     it('throws when creating entries and store is not ready', () => {
         const store = {
-            activeTimeEntries: createObservableMap(),
+            activeTimeEntries: createTestYMap(),
             getAllTimeEntries: () => [],
             isYearLoaded: vi.fn(() => true),
         }
@@ -113,10 +93,10 @@ describe('useTimeEntries', () => {
 
     it('loads year when requested', async () => {
         const loadEntriesForYear = vi.fn(async () => {})
-        const activeTimeEntries = createObservableMap()
+        const activeTimeEntries = createTestYMap()
         const store = {
             activeTimeEntries,
-            getAllTimeEntries: () => activeTimeEntries.values(),
+            getAllTimeEntries: () => [...activeTimeEntries.values()],
             isYearLoaded: vi.fn(() => false),
         }
 

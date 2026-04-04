@@ -41,6 +41,10 @@ vi.mock('../hooks/useInvoices.ts', () => ({
     })
 }))
 
+vi.mock('../hooks/useToast.ts', () => ({
+    useToast: () => ({ showToast: vi.fn() })
+}))
+
 describe('InvoicesList', () => {
 
     let user

@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { useInvoices } from './useInvoices'
 import { useYjs } from '@/contexts/YjsContext'
 import { useYjsCollection } from './useYjsCollection'
+import { createTestYMap } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 vi.mock('./useYjsCollection', () => ({ useYjsCollection: vi.fn() }))
@@ -11,34 +12,13 @@ vi.mock('./useYjsCollection', () => ({ useYjsCollection: vi.fn() }))
 const mockUseYjs = useYjs
 const mockUseYjsCollection = useYjsCollection
 
-function createObservableMap(initial = {}) {
-    const map = new Map(Object.entries(initial))
-    const observers = new Set()
-
-    return {
-        get: (key) => map.get(key),
-        set: (key, value) => {
-            map.set(key, value)
-            observers.forEach((fn) => fn())
-        },
-        delete: (key) => {
-            const deleted = map.delete(key)
-            observers.forEach((fn) => fn())
-            return deleted
-        },
-        forEach: (cb) => map.forEach((value, key) => cb(value, key)),
-        observe: (fn) => observers.add(fn),
-        unobserve: (fn) => observers.delete(fn),
-    }
-}
-
 describe('useInvoices', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
     it('combines active and archived invoices, sorts, filters, and updates status', async () => {
-        const archivedMap = createObservableMap({
+        const archivedMap = createTestYMap({
             c: { id: 'c', status: 'paid', date: '2024-12-31', total: 50, clientId: 'c1', projectId: 'p1' },
         })
         const loadArchivedInvoices = vi.fn(async () => {})
@@ -84,7 +64,7 @@ describe('useInvoices', () => {
     it('requests archived invoices when includeArchived is true', async () => {
         const loadArchivedInvoices = vi.fn(async () => {})
         mockUseYjs.mockReturnValue({
-            store: { archivedInvoicesSync: createObservableMap() },
+            store: { archivedInvoicesSync: createTestYMap() },
             isReady: true,
             loadArchivedInvoices,
         })
@@ -140,7 +120,7 @@ describe('useInvoices', () => {
     })
 
     it('does not include archived invoices when includeArchived is false', () => {
-        const archivedMap = createObservableMap({
+        const archivedMap = createTestYMap({
             x: { id: 'x', status: 'paid', date: '2024-12-31', total: 75, clientId: 'c1', projectId: 'p1' },
         })
 
@@ -168,7 +148,7 @@ describe('useInvoices', () => {
 
     it('filters by client/project and computes totals with mixed statuses', () => {
         mockUseYjs.mockReturnValue({
-            store: { archivedInvoicesSync: createObservableMap() },
+            store: { archivedInvoicesSync: createTestYMap() },
             isReady: true,
             loadArchivedInvoices: vi.fn(async () => {}),
         })
@@ -198,7 +178,7 @@ describe('useInvoices', () => {
         const loadArchivedInvoices = vi.fn(async () => {})
 
         mockUseYjs.mockReturnValue({
-            store: { archivedInvoicesSync: createObservableMap() },
+            store: { archivedInvoicesSync: createTestYMap() },
             isReady: false,
             loadArchivedInvoices,
         })
@@ -219,7 +199,7 @@ describe('useInvoices', () => {
     })
 
     it('uses archived invoices when already available in store', async () => {
-        const archivedMap = createObservableMap({
+        const archivedMap = createTestYMap({
             x: { id: 'x', status: 'paid', date: '2024-12-31', total: 75, clientId: 'c1', projectId: 'p1' },
         })
 

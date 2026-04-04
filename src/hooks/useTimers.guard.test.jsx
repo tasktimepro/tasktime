@@ -1,34 +1,14 @@
 // @ts-nocheck
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as Y from 'yjs';
 import { useTimers } from './useTimers';
 import { useYjs } from '@/contexts/YjsContext';
+import { createTestYMap, readStored } from '@/test/yjs-test-helpers';
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }));
 
 const mockUseYjs = useYjs;
-
-function createObservableMap(initial = {}) {
-    const map = new Map(Object.entries(initial));
-    const observers = new Set();
-
-    return {
-        get: (key) => map.get(key),
-        set: (key, value) => {
-            map.set(key, value);
-            observers.forEach((fn) => fn());
-        },
-        delete: (key) => {
-            const deleted = map.delete(key);
-            observers.forEach((fn) => fn());
-            return deleted;
-        },
-        forEach: (cb) => map.forEach((value, key) => cb(value, key)),
-        values: () => Array.from(map.values()),
-        observe: (fn) => observers.add(fn),
-        unobserve: (fn) => observers.delete(fn),
-    };
-}
 
 describe('useTimers guard paths', () => {
     beforeEach(() => {
@@ -36,17 +16,20 @@ describe('useTimers guard paths', () => {
     });
 
     it('no-ops when store is not ready', () => {
-        const timersMap = createObservableMap();
-        const tasksMap = createObservableMap();
-        const entriesMap = createObservableMap();
+        const coreDoc = new Y.Doc();
+        const activeEntriesDoc = new Y.Doc();
+
+        const timersMap = createTestYMap({}, coreDoc, 'timers');
+        const tasksMap = createTestYMap({}, coreDoc, 'tasks');
+        const entriesMap = createTestYMap({}, activeEntriesDoc, 'entries');
 
         mockUseYjs.mockReturnValue({
             store: {
                 timers: timersMap,
                 tasks: tasksMap,
                 activeTimeEntries: entriesMap,
-                coreDoc: { transact: (fn) => fn() },
-                activeEntriesDoc: { transact: (fn) => fn() },
+                coreDoc,
+                activeEntriesDoc,
             },
             isReady: false,
         });
@@ -63,24 +46,27 @@ describe('useTimers guard paths', () => {
             result.current.focusTimer('project-1');
         });
 
-        expect(timersMap.values().length).toBe(0);
-        expect(entriesMap.values().length).toBe(0);
+        expect(timersMap.toJSON()).toEqual({});
+        expect(entriesMap.toJSON()).toEqual({});
     });
 
     it('guards when data is missing or not in expected state', () => {
-        const timersMap = createObservableMap();
-        const tasksMap = createObservableMap({
+        const coreDoc = new Y.Doc();
+        const activeEntriesDoc = new Y.Doc();
+
+        const timersMap = createTestYMap({}, coreDoc, 'timers');
+        const tasksMap = createTestYMap({
             'task-no-project': { id: 'task-no-project', projectId: null },
-        });
-        const entriesMap = createObservableMap();
+        }, coreDoc, 'tasks');
+        const entriesMap = createTestYMap({}, activeEntriesDoc, 'entries');
 
         mockUseYjs.mockReturnValue({
             store: {
                 timers: timersMap,
                 tasks: tasksMap,
                 activeTimeEntries: entriesMap,
-                coreDoc: { transact: (fn) => fn() },
-                activeEntriesDoc: { transact: (fn) => fn() },
+                coreDoc,
+                activeEntriesDoc,
             },
             isReady: true,
         });
@@ -92,8 +78,8 @@ describe('useTimers guard paths', () => {
             result.current.startTimer('task-no-project');
         });
 
-        expect(timersMap.values().length).toBe(1);
-        expect(timersMap.get('task-no-project')).toEqual(expect.objectContaining({
+        expect(Object.keys(timersMap.toJSON()).length).toBe(1);
+        expect(readStored(timersMap, 'task-no-project')).toEqual(expect.objectContaining({
             taskId: 'task-no-project',
             projectId: 'task-no-project'
         }));
@@ -108,7 +94,7 @@ describe('useTimers guard paths', () => {
             result.current.clearTimer('project-1');
         });
 
-        expect(timersMap.values().length).toBe(1);
+        expect(Object.keys(timersMap.toJSON()).length).toBe(1);
 
         act(() => {
             timersMap.set('project-1', {
@@ -126,7 +112,7 @@ describe('useTimers guard paths', () => {
             result.current.pauseTimer('project-1');
         });
 
-        expect(timersMap.get('project-1')?.paused).toBe(true);
+        expect(readStored(timersMap, 'project-1')?.paused).toBe(true);
 
         act(() => {
             timersMap.set('project-2', {
@@ -144,6 +130,6 @@ describe('useTimers guard paths', () => {
             result.current.resumeTimer('project-2');
         });
 
-        expect(timersMap.get('project-2')?.paused).toBe(false);
+        expect(readStored(timersMap, 'project-2')?.paused).toBe(false);
     });
 });

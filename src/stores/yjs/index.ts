@@ -25,7 +25,8 @@ export { YjsDocManager } from './YjsDocManager';
 // Providers
 export { YjsDriveProvider, AuthorizationError } from './providers';
 export { ManifestManager } from './providers';
-export type { Manifest, DocManifest, DeltaInfo } from './providers';
+export { BackupManager } from './providers';
+export type { Manifest, DocManifest, DeltaInfo, BackupInfo } from './providers';
 
 // Types
 export type {

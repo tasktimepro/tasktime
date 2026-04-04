@@ -3,31 +3,11 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { useDailyGoals } from './useDailyGoals';
 import { useYjs } from '@/contexts/YjsContext';
+import { createTestYMap } from '@/test/yjs-test-helpers';
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }));
 
 const mockUseYjs = useYjs;
-
-function createMockYMap(initial = {}) {
-    const map = new Map(Object.entries(initial));
-    const observers = new Set();
-
-    return {
-        get: (key) => map.get(key),
-        set: (key, value) => {
-            map.set(key, value);
-            observers.forEach((fn) => fn());
-        },
-        delete: (key) => {
-            const deleted = map.delete(key);
-            observers.forEach((fn) => fn());
-            return deleted;
-        },
-        forEach: (cb) => map.forEach((value, key) => cb(value, key)),
-        observe: (fn) => observers.add(fn),
-        unobserve: (fn) => observers.delete(fn),
-    };
-}
 
 describe('useDailyGoals', () => {
     beforeEach(() => {
@@ -35,7 +15,7 @@ describe('useDailyGoals', () => {
     });
 
     it('creates and retrieves a goal by weekday', async () => {
-        const mockMap = createMockYMap();
+        const mockMap = createTestYMap();
         mockUseYjs.mockReturnValue({ store: { dailyGoals: mockMap }, isReady: true });
 
         const { result } = renderHook(() => useDailyGoals());
@@ -53,7 +33,7 @@ describe('useDailyGoals', () => {
     });
 
     it('retrieves a goal by date string', async () => {
-        const mockMap = createMockYMap({
+        const mockMap = createTestYMap({
             '1': { id: '1', weekday: 1, targetHours: 4, targetEarnings: 200, createdAt: Date.now() },
         });
         mockUseYjs.mockReturnValue({ store: { dailyGoals: mockMap }, isReady: true });
@@ -67,7 +47,7 @@ describe('useDailyGoals', () => {
     });
 
     it('removes a goal by weekday', async () => {
-        const mockMap = createMockYMap({
+        const mockMap = createTestYMap({
             '2': { id: '2', weekday: 2, targetHours: 5, targetEarnings: 0, createdAt: Date.now() },
         });
         mockUseYjs.mockReturnValue({ store: { dailyGoals: mockMap }, isReady: true });
@@ -83,7 +63,7 @@ describe('useDailyGoals', () => {
     });
 
     it('returns null for invalid weekday and empty date', async () => {
-        const mockMap = createMockYMap({
+        const mockMap = createTestYMap({
             '0': { id: '0', weekday: 0, targetHours: 2, targetEarnings: 50, createdAt: Date.now() },
         });
         mockUseYjs.mockReturnValue({ store: { dailyGoals: mockMap }, isReady: true });
@@ -97,7 +77,7 @@ describe('useDailyGoals', () => {
     });
 
     it('updates an existing goal when setting the same weekday', async () => {
-        const mockMap = createMockYMap({
+        const mockMap = createTestYMap({
             '3': { id: '3', weekday: 3, targetHours: 2, targetEarnings: 80, createdAt: Date.now() },
         });
         mockUseYjs.mockReturnValue({ store: { dailyGoals: mockMap }, isReady: true });

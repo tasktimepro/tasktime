@@ -15,6 +15,7 @@ import { usePreferences } from './hooks/usePreferences.ts';
 import { useTimers } from './hooks/useTimers.ts';
 import { useUrlState } from './hooks/useUrlState.ts';
 import { usePlannerAttachments } from './hooks/usePlannerAttachments.ts';
+import { useDailyGoals } from './hooks/useDailyGoals.ts';
 import ProjectList from './components/ProjectList';
 import ProjectDashboard from './components/ProjectDashboard';
 import ClientList from './components/ClientList';
@@ -86,7 +87,7 @@ function AppContent() {
         isLoading: tasksLoading 
     } = useTasks();
 
-    const { updateAttachment } = usePlannerAttachments();
+    const { updateAttachment, attachments: plannerAttachments, createAttachment } = usePlannerAttachments();
 
     const { 
         entries: timeEntries, 
@@ -117,6 +118,7 @@ function AppContent() {
         isLoading: expenseRecurrencesLoading,
         generatePendingExpenses,
         updateRecurrence,
+        createRecurrence,
     } = useExpenseRecurrences();
 
     const { 
@@ -144,6 +146,7 @@ function AppContent() {
     } = usePreferences();
 
     const { timers, clearTimer, isLoading: timerLoading } = useTimers();
+    const { goals: dailyGoals, setGoal: setDailyGoal } = useDailyGoals();
     const focusedTimer = timers[0] || null;
     const timerIsActive = !!focusedTimer;
     const todayStr = useTodayString();
@@ -716,6 +719,10 @@ function AppContent() {
         (pendingImport.businessInfos || []).forEach((info) => createBusinessInfo(info));
         (pendingImport.clients || []).forEach((client) => createClient(client));
         (pendingImport.invoiceTemplates || []).forEach((template) => createInvoiceTemplate(template));
+        (pendingImport.expenses || []).forEach((expense) => createExpense(expense));
+        (pendingImport.expenseRecurrences || []).forEach((rec) => createRecurrence(rec));
+        (pendingImport.dailyGoals || []).forEach((goal) => setDailyGoal(goal.weekday, goal));
+        (pendingImport.plannerAttachments || []).forEach((att) => createAttachment(att));
 
         updatePreferences(pendingImport.preferences || {});
         timers.forEach(timer => {
@@ -733,6 +740,10 @@ function AppContent() {
         createBusinessInfo,
         createClient,
         createInvoiceTemplate,
+        createExpense,
+        createRecurrence,
+        setDailyGoal,
+        createAttachment,
         updatePreferences,
         clearTimer,
         timers,
@@ -1398,6 +1409,10 @@ function AppContent() {
                                 businessInfos={businessInfos}
                                 clients={clients}
                                 invoiceTemplates={invoiceTemplates}
+                                expenses={expenses}
+                                expenseRecurrences={recurrences}
+                                dailyGoals={dailyGoals}
+                                plannerAttachments={plannerAttachments}
                                 onImport={handleImport}
                             />
                             </ErrorBoundary>

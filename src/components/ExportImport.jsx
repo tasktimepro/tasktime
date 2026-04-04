@@ -17,6 +17,9 @@ import { Card, CardContent } from '@/components/ui/card';
  * 
  * Note: Timer state is intentionally excluded from export/import
  */
+const SUPPORTED_VERSIONS = ['1.0', '1.1'];
+const CURRENT_VERSION = '1.1';
+
 function ExportImport({ 
     projects, 
     tasks = [], 
@@ -26,6 +29,10 @@ function ExportImport({
     businessInfos = [],
     clients = [],
     invoiceTemplates = [],
+    expenses = [],
+    expenseRecurrences = [],
+    dailyGoals = [],
+    plannerAttachments = [],
     preferences = {},
     onImport 
 }) {
@@ -62,7 +69,7 @@ function ExportImport({
      */
     const handleExport = () => {
         const exportData = {
-            version: '1.0',
+            version: CURRENT_VERSION,
             exportDate: new Date().toISOString(),
             projects: projects,
             tasks: tasks,
@@ -72,6 +79,10 @@ function ExportImport({
             businessInfos: businessInfos,
             clients: clients,
             invoiceTemplates: invoiceTemplates,
+            expenses: expenses,
+            expenseRecurrences: expenseRecurrences,
+            dailyGoals: dailyGoals,
+            plannerAttachments: plannerAttachments,
             preferences: preferences
         };
 
@@ -97,31 +108,102 @@ function ExportImport({
         try {
             const parsedData = JSON.parse(importData);
             
+            // Version check
+            if (parsedData.version && !SUPPORTED_VERSIONS.includes(parsedData.version)) {
+                throw new Error(`Unsupported export version "${parsedData.version}". Supported: ${SUPPORTED_VERSIONS.join(', ')}. You may need to update TaskTime.`);
+            }
+
             // Validate data structure
             if (!parsedData.projects || !Array.isArray(parsedData.projects)) {
                 throw new Error('Invalid data format: projects array not found');
             }
 
-            // Basic validation of project structure
+            // Deep validation of projects
+            const projectIds = new Set();
             for (const project of parsedData.projects) {
-                if (!project.id || !project.title) {
-                    throw new Error('Invalid project structure: missing id or title');
+                if (!project.id || typeof project.id !== 'string') {
+                    throw new Error('Invalid project: missing or non-string id');
                 }
+                if (!project.title || typeof project.title !== 'string') {
+                    throw new Error(`Invalid project "${project.id}": missing or non-string title`);
+                }
+                if (projectIds.has(project.id)) {
+                    throw new Error(`Duplicate project id: ${project.id}`);
+                }
+                projectIds.add(project.id);
             }
 
             // Validate tasks if present
             if (parsedData.tasks && !Array.isArray(parsedData.tasks)) {
                 throw new Error('Invalid data format: tasks must be an array');
             }
+            if (parsedData.tasks) {
+                const taskIds = new Set();
+                for (const task of parsedData.tasks) {
+                    if (!task.id || typeof task.id !== 'string') {
+                        throw new Error('Invalid task: missing or non-string id');
+                    }
+                    if (!task.title || typeof task.title !== 'string') {
+                        throw new Error(`Invalid task "${task.id}": missing or non-string title`);
+                    }
+                    if (taskIds.has(task.id)) {
+                        throw new Error(`Duplicate task id: ${task.id}`);
+                    }
+                    taskIds.add(task.id);
+                }
+
+                // Validate task hierarchy: parentTaskId must reference an existing task
+                for (const task of parsedData.tasks) {
+                    if (task.parentTaskId && !taskIds.has(task.parentTaskId)) {
+                        throw new Error(`Task "${task.id}" references non-existent parent task "${task.parentTaskId}"`);
+                    }
+                }
+
+                // Validate task→project linkage
+                for (const task of parsedData.tasks) {
+                    if (task.projectId && !projectIds.has(task.projectId)) {
+                        throw new Error(`Task "${task.id}" references non-existent project "${task.projectId}"`);
+                    }
+                }
+            }
 
             // Validate timeEntries if present
             if (parsedData.timeEntries && !Array.isArray(parsedData.timeEntries)) {
                 throw new Error('Invalid data format: timeEntries must be an array');
             }
+            const taskIds = parsedData.tasks ? new Set(parsedData.tasks.map(t => t.id)) : new Set();
+            if (parsedData.timeEntries) {
+                for (const entry of parsedData.timeEntries) {
+                    if (!entry.id || typeof entry.id !== 'string') {
+                        throw new Error('Invalid time entry: missing or non-string id');
+                    }
+                    if (typeof entry.start !== 'number' || typeof entry.end !== 'number') {
+                        throw new Error(`Invalid time entry "${entry.id}": start and end must be numbers`);
+                    }
+                    if (entry.start > entry.end) {
+                        throw new Error(`Invalid time entry "${entry.id}": start time is after end time`);
+                    }
+                    if (entry.taskId && !taskIds.has(entry.taskId)) {
+                        throw new Error(`Time entry "${entry.id}" references non-existent task "${entry.taskId}"`);
+                    }
+                }
+            }
 
             // Validate invoices if present
             if (parsedData.invoices && !Array.isArray(parsedData.invoices)) {
                 throw new Error('Invalid data format: invoices must be an array');
+            }
+            const invoiceIds = new Set((parsedData.invoices || []).map(i => i.id).filter(Boolean));
+
+            // Validate project invoiceIds references
+            for (const project of parsedData.projects) {
+                if (project.invoiceIds && Array.isArray(project.invoiceIds)) {
+                    for (const invId of project.invoiceIds) {
+                        if (!invoiceIds.has(invId)) {
+                            throw new Error(`Project "${project.id}" references non-existent invoice "${invId}"`);
+                        }
+                    }
+                }
             }
 
             // Validate paymentMethods if present
@@ -144,6 +226,26 @@ function ExportImport({
                 throw new Error('Invalid data format: invoiceTemplates must be an array');
             }
 
+            // Validate expenses if present
+            if (parsedData.expenses && !Array.isArray(parsedData.expenses)) {
+                throw new Error('Invalid data format: expenses must be an array');
+            }
+
+            // Validate expenseRecurrences if present
+            if (parsedData.expenseRecurrences && !Array.isArray(parsedData.expenseRecurrences)) {
+                throw new Error('Invalid data format: expenseRecurrences must be an array');
+            }
+
+            // Validate dailyGoals if present
+            if (parsedData.dailyGoals && !Array.isArray(parsedData.dailyGoals)) {
+                throw new Error('Invalid data format: dailyGoals must be an array');
+            }
+
+            // Validate plannerAttachments if present
+            if (parsedData.plannerAttachments && !Array.isArray(parsedData.plannerAttachments)) {
+                throw new Error('Invalid data format: plannerAttachments must be an array');
+            }
+
             // Validate preferences if present
             if (parsedData.preferences && typeof parsedData.preferences !== 'object') {
                 throw new Error('Invalid data format: preferences must be an object');
@@ -159,6 +261,10 @@ function ExportImport({
                 businessInfos: parsedData.businessInfos || [],
                 clients: parsedData.clients || [],
                 invoiceTemplates: parsedData.invoiceTemplates || [],
+                expenses: parsedData.expenses || [],
+                expenseRecurrences: parsedData.expenseRecurrences || [],
+                dailyGoals: parsedData.dailyGoals || [],
+                plannerAttachments: parsedData.plannerAttachments || [],
                 preferences: parsedData.preferences || {}
             });
             setShowImportModal(false);

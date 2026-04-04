@@ -30,6 +30,10 @@ const Account = ({
     businessInfos,
     clients,
     invoiceTemplates,
+    expenses,
+    expenseRecurrences,
+    dailyGoals,
+    plannerAttachments,
     onImport,
 }) => {
     const isMobileLayout = useIsMobileLayout();
@@ -166,6 +170,10 @@ const Account = ({
                             businessInfos={businessInfos}
                             clients={clients}
                             invoiceTemplates={invoiceTemplates}
+                            expenses={expenses}
+                            expenseRecurrences={expenseRecurrences}
+                            dailyGoals={dailyGoals}
+                            plannerAttachments={plannerAttachments}
                             preferences={preferences}
                             onImport={onImport}
                         />

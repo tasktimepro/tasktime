@@ -32,6 +32,7 @@ vi.mock('../hooks/useTasks', () => ({
         getUpcomingTasks: vi.fn(() => []),
         toggleRecurringCompletion: vi.fn(),
         isCompletedOnDate: vi.fn(() => false),
+        resetExpiredSkips: vi.fn(),
         getRecurringStatus: vi.fn(() => ({
             effectiveDateStr: null,
             isDueToday: false,

@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as Y from 'yjs';
 import { useYjs } from '@/contexts/YjsContext';
 import { generateId } from '@/utils/idUtils';
+import { readEntity, objectToYMap, yMapToObject, collectEntities } from '@/stores/yjs/entityUtils';
 
 export interface UseYjsCollectionResult<T extends { id: string }> {
     /** All items in the collection */
@@ -42,11 +43,7 @@ export function useYjsCollection<T extends { id: string }>(
 
         try {
             const map = getMap(store);
-            const allItems: T[] = [];
-            map.forEach((value) => {
-                allItems.push(value);
-            });
-            return allItems;
+            return collectEntities<T>(map as unknown as Y.Map<string, unknown>);
         } catch {
             return [] as T[];
         }
@@ -70,14 +67,11 @@ export function useYjsCollection<T extends { id: string }>(
     const syncState = useCallback(() => {
         if (!yMap) return;
         
-        const allItems: T[] = [];
-        yMap.forEach((value) => {
-            allItems.push(value);
-        });
-        setItems(allItems);
+        setItems(collectEntities<T>(yMap as unknown as Y.Map<string, unknown>));
     }, [yMap]);
 
     // Initial load and subscribe to changes
+    // Uses observeDeep to detect field-level changes in nested Y.Maps
     useEffect(() => {
         if (!yMap) return;
 
@@ -85,16 +79,17 @@ export function useYjsCollection<T extends { id: string }>(
         syncState();
         setIsLoading(false);
 
-        // Subscribe to changes
+        // Subscribe to changes (observeDeep catches nested Y.Map field updates)
         const handler = () => syncState();
-        yMap.observe(handler);
+        yMap.observeDeep(handler);
 
-        return () => yMap.unobserve(handler);
+        return () => yMap.unobserveDeep(handler);
     }, [yMap, syncState]);
 
     // CRUD operations
     const get = useCallback((id: string): T | undefined => {
-        return yMap?.get(id);
+        if (!yMap) return undefined;
+        return readEntity<T>(yMap.get(id));
     }, [yMap]);
 
     const create = useCallback((data: Omit<T, 'id'> & { id?: string }): T => {
@@ -114,24 +109,38 @@ export function useYjsCollection<T extends { id: string }>(
             id,
             createdAt,
             updatedAt,
-        } as unknown as T;
-        yMap.set(id, item);
-        return item;
+        } as unknown as Record<string, unknown>;
+
+        const entityMap = objectToYMap(item);
+        (yMap as unknown as Y.Map<string, unknown>).set(id, entityMap);
+
+        return item as unknown as T;
     }, [yMap]);
 
     const update = useCallback((id: string, updates: Partial<T>): T | undefined => {
         if (!yMap) return undefined;
         
-        const existing = yMap.get(id);
-        if (!existing) return undefined;
+        const rawMap = yMap as unknown as Y.Map<string, unknown>;
+        const existing = rawMap.get(id);
+        if (existing == null) return undefined;
 
-        const updated = { 
-            ...existing, 
-            ...updates,
-            updatedAt: Date.now(),
-        };
-        yMap.set(id, updated);
-        return updated;
+        const updatesWithTimestamp = { ...updates, updatedAt: Date.now() } as Record<string, unknown>;
+
+        if (existing instanceof Y.Map) {
+            // New format: field-level CRDT update
+            for (const [key, value] of Object.entries(updatesWithTimestamp)) {
+                existing.set(key, value);
+            }
+
+            return yMapToObject<T>(existing);
+        }
+
+        // Old format: merge and convert to nested Y.Map
+        const merged = { ...(existing as Record<string, unknown>), ...updatesWithTimestamp };
+        const entityMap = objectToYMap(merged);
+        rawMap.set(id, entityMap);
+
+        return merged as unknown as T;
     }, [yMap]);
 
     const remove = useCallback((id: string): boolean => {

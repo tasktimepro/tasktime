@@ -154,6 +154,10 @@ describe('Import/Export integration', () => {
             businessInfos: [],
             clients: [],
             invoiceTemplates: [],
+            expenses: [],
+            expenseRecurrences: [],
+            dailyGoals: [],
+            plannerAttachments: [],
             preferences: payload.preferences
         })
     })

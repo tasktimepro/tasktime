@@ -11,6 +11,7 @@ import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.
 import { parseStoredDate, toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
+import { useToast } from '../hooks/useToast.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
@@ -53,6 +54,7 @@ const InvoicesList = ({
     selectedTab = null // New prop to preselect a tab
 }) => {
     const isMobileLayout = useIsMobileLayout();
+    const { showToast } = useToast();
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
     const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
@@ -181,7 +183,7 @@ const InvoicesList = ({
             await generatePDF(htmlContent, filename);
         } catch (error) {
             console.error('Error downloading invoice:', error);
-            alert('Error downloading invoice: ' + error.message);
+            showToast('Failed to generate PDF: ' + error.message, 'error');
         }
     };
 

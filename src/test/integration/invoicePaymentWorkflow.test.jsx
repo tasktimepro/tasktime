@@ -28,6 +28,10 @@ vi.mock('../../hooks/useUrlState.ts', () => ({
     })
 }))
 
+vi.mock('../../hooks/useToast.ts', () => ({
+    useToast: () => ({ showToast: vi.fn() })
+}))
+
 describe('Invoice payment workflow integration', () => {
 
     beforeEach(() => {

@@ -8,8 +8,10 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { YjsStore, getYjsStore, SyncState, SyncPhase, AutoSyncMode, AuthorizationError } from '@/stores/yjs';
+import { YjsStore, getYjsStore, YjsDocManager, SyncState, SyncPhase, AutoSyncMode, AuthorizationError } from '@/stores/yjs';
+import type { BackupInfo } from '@/stores/yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { useToast } from '@/hooks/useToast';
 import { shouldSyncOnLoad, wasSyncInterrupted, hasPersistedPendingChanges } from '@/utils/syncPersistence';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/ui/button';
@@ -68,6 +70,14 @@ export interface YjsContextValue {
     getAvailableYears: () => Promise<number[]>;
     /** Clear all data from all collections and IndexedDB databases */
     clearAllData: () => Promise<void>;
+    /** List all available backups from Google Drive */
+    listBackups: () => Promise<BackupInfo[]>;
+    /** Create a backup on demand */
+    createBackup: () => Promise<string | null>;
+    /** Download a specific backup's data */
+    downloadBackup: (fileId: string) => Promise<unknown>;
+    /** Delete all backup files from Google Drive */
+    deleteAllBackups: () => Promise<void>;
 }
 
 const YjsContext = createContext<YjsContextValue | null>(null);
@@ -80,6 +90,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
     // Get singleton store
     const store = useMemo(() => getYjsStore(), []);
+    const { showError, showWarning } = useToast();
 
     useEffect(() => {
         if (!import.meta.env.DEV) return;
@@ -107,6 +118,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const [reconnectDialogMessage, setReconnectDialogMessage] = useState('Google authorization expired. Reconnect Google Drive to continue syncing.');
     const [isReconnectProcessing, setIsReconnectProcessing] = useState(false);
     const hasCheckedPersistedState = useRef(false);
+    const consecutiveSyncErrors = useRef(0);
     
     // Auth hook for Google Drive connection
     const { isSignedIn, accessToken, sessionId, isLoading: authLoading, signIn, signOut } = useGoogleAuth();
@@ -164,6 +176,24 @@ export function YjsProvider({ children }: YjsProviderProps) {
             mounted = false;
         };
     }, [store]);
+
+    // Listen for IndexedDB persistence errors (e.g., quota exceeded)
+    useEffect(() => {
+        const hasWarned = { current: false };
+
+        const unsub = store.onPersistenceError((error) => {
+            if (hasWarned.current) return;
+
+            if (YjsDocManager.isQuotaError(error)) {
+                hasWarned.current = true;
+                showError('Storage is full. Clear browser data to free space or your changes may not be saved.');
+            } else {
+                showWarning('A storage error occurred. Your data may not persist across page reloads.');
+            }
+        });
+
+        return unsub;
+    }, [store, showError, showWarning]);
 
     // Sync auto-sync preferences from Yjs
     useEffect(() => {
@@ -259,8 +289,22 @@ export function YjsProvider({ children }: YjsProviderProps) {
         if (syncState === 'idle' && isDriveConnected) {
             setHasSynced(true);
             setLastSyncedAt(store.getLastSyncedAt());
+            consecutiveSyncErrors.current = 0;
         }
     }, [syncState, isDriveConnected, store]);
+
+    // Notify user on repeated sync failures
+    useEffect(() => {
+        if (syncState !== 'error' || !isDriveConnected) return;
+
+        consecutiveSyncErrors.current += 1;
+
+        if (consecutiveSyncErrors.current === 2) {
+            showWarning('Cloud sync is having trouble. Your data is safe locally.');
+        } else if (consecutiveSyncErrors.current >= 5) {
+            showError('Cloud sync has failed multiple times. Check your connection or reconnect Google Drive.');
+        }
+    }, [syncState, isDriveConnected, showWarning, showError]);
 
     // Subscribe to sync state/phase/pending changes
     // Re-subscribe when isDriveConnected changes because that's when provider is created
@@ -444,6 +488,22 @@ export function YjsProvider({ children }: YjsProviderProps) {
         return store.hasPendingSyncChanges();
     }, [store]);
 
+    const listBackups = useCallback(async () => {
+        return store.listBackups();
+    }, [store]);
+
+    const createBackup = useCallback(async () => {
+        return store.createBackup();
+    }, [store]);
+
+    const downloadBackup = useCallback(async (fileId: string) => {
+        return store.downloadBackup(fileId);
+    }, [store]);
+
+    const deleteAllBackups = useCallback(async () => {
+        return store.deleteAllBackups();
+    }, [store]);
+
     // --- Context value ---
 
     const value: YjsContextValue = useMemo(() => ({
@@ -470,6 +530,10 @@ export function YjsProvider({ children }: YjsProviderProps) {
         loadArchivedExpenses,
         getAvailableYears,
         clearAllData,
+        listBackups,
+        createBackup,
+        downloadBackup,
+        deleteAllBackups,
     }), [
         store,
         isReady,
@@ -493,6 +557,10 @@ export function YjsProvider({ children }: YjsProviderProps) {
         loadArchivedExpenses,
         getAvailableYears,
         clearAllData,
+        listBackups,
+        createBackup,
+        downloadBackup,
+        deleteAllBackups,
     ]);
 
     return (

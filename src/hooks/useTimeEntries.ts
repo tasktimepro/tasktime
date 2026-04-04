@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import type { TimeEntry } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
+import { readEntity, objectToYMap } from '@/stores/yjs/entityUtils';
 
 export interface UseTimeEntriesOptions {
     /** Filter to a specific task */
@@ -68,9 +69,9 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
 
         // Subscribe to active entries
         const handler = () => syncEntries();
-        store.activeTimeEntries.observe(handler);
+        store.activeTimeEntries.observeDeep(handler);
 
-        return () => store.activeTimeEntries.unobserve(handler);
+        return () => store.activeTimeEntries.unobserveDeep(handler);
     }, [isReady, store, syncEntries]);
 
     // Auto-load years for date range
@@ -114,7 +115,8 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
             id: generateId(),
             ...data,
         };
-        store.activeTimeEntries.set(entry.id, entry);
+        const entityMap = objectToYMap(entry as unknown as Record<string, unknown>);
+        (store.activeTimeEntries as any).set(entry.id, entityMap);
         return entry;
     }, [isReady, store]);
 
@@ -122,10 +124,11 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         if (!isReady) return undefined;
         
         // Check active entries first
-        const activeEntry = store.activeTimeEntries.get(id);
+        const activeEntry = readEntity<TimeEntry>(store.activeTimeEntries.get(id));
         if (activeEntry) {
             const updated = { ...activeEntry, ...updates };
-            store.activeTimeEntries.set(id, updated);
+            const entityMap = objectToYMap(updated as unknown as Record<string, unknown>);
+            (store.activeTimeEntries as any).set(id, entityMap);
             return updated;
         }
         
@@ -136,7 +139,9 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
 
     const deleteEntry = useCallback((id: string): boolean => {
         if (!isReady) return false;
-        return store.activeTimeEntries.delete(id);
+        if (!store.activeTimeEntries.has(id)) return false;
+        store.activeTimeEntries.delete(id);
+        return true;
     }, [isReady, store]);
 
     // Get entries for a specific task

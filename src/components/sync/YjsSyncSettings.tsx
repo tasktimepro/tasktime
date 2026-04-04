@@ -4,7 +4,7 @@
  * Shows connection status and allows managing Google Drive sync
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { usePreferences } from '@/hooks/usePreferences';
@@ -18,7 +18,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import Modal from '@/components/Modal';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
+import type { BackupInfo } from '@/stores/yjs';
 
 type ConfirmDialogType = 'disconnect' | 'wipe' | null;
 
@@ -29,8 +30,13 @@ export default function YjsSyncSettings() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [wipeConfirmText, setWipeConfirmText] = useState('');
+    const [backups, setBackups] = useState<BackupInfo[]>([]);
+    const [backupsLoading, setBackupsLoading] = useState(false);
+    const [backupCreating, setBackupCreating] = useState(false);
+    const [restoreConfirmBackup, setRestoreConfirmBackup] = useState<BackupInfo | null>(null);
+    const [isRestoring, setIsRestoring] = useState(false);
 
-    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive, wipeDriveData } = useYjs();
+    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive, wipeDriveData, listBackups, createBackup, downloadBackup } = useYjs();
     const { isSignedIn, isLoading: authLoading, user, signIn, signOut } = useGoogleAuth();
     const { preferences, updatePreferences } = usePreferences();
     const { showSuccess, showError } = useToast();
@@ -39,6 +45,8 @@ export default function YjsSyncSettings() {
 
     const autoSyncEnabled = preferences.autoSyncEnabled ?? false;
     const autoSyncMode = preferences.autoSyncMode ?? 'backup';
+    const backupEnabled = preferences.backupEnabled ?? true;
+    const backupFrequencyHours = preferences.backupFrequencyHours ?? 24;
 
     // Update "time ago" display
     useEffect(() => {
@@ -265,6 +273,74 @@ export default function YjsSyncSettings() {
         }
     };
 
+    const loadBackups = useCallback(async () => {
+        if (!isDriveConnected) return;
+        setBackupsLoading(true);
+        try {
+            const result = await listBackups();
+            setBackups(result);
+        } catch (error) {
+            console.error('[YjsSyncSettings] Failed to load backups:', error);
+        } finally {
+            setBackupsLoading(false);
+        }
+    }, [isDriveConnected, listBackups]);
+
+    // Load backups when connected
+    useEffect(() => {
+        if (isDriveConnected && hasSynced) {
+            loadBackups();
+        } else {
+            setBackups([]);
+        }
+    }, [isDriveConnected, hasSynced, loadBackups]);
+
+    const handleCreateBackup = async () => {
+        setBackupCreating(true);
+        try {
+            await createBackup();
+            showSuccess('Backup created successfully');
+            await loadBackups();
+        } catch (error) {
+            console.error('[YjsSyncSettings] Create backup failed:', error);
+            showError('Failed to create backup');
+        } finally {
+            setBackupCreating(false);
+        }
+    };
+
+    const handleBackupEnabledToggle = (checked: boolean | 'indeterminate') => {
+        updatePreferences({ backupEnabled: checked === true });
+    };
+
+    const handleBackupFrequencyChange = (value: string) => {
+        updatePreferences({ backupFrequencyHours: parseInt(value, 10) });
+    };
+
+    const handleRestoreBackup = async () => {
+        if (!restoreConfirmBackup) return;
+        setIsRestoring(true);
+        try {
+            const data = await downloadBackup(restoreConfirmBackup.id) as Record<string, unknown>;
+            // Trigger the import flow in the parent (ExportImport)
+            // For now, download as a file so the user can import via the existing flow
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = restoreConfirmBackup.name;
+            a.click();
+            URL.revokeObjectURL(url);
+            showSuccess(`Downloaded ${restoreConfirmBackup.name}. Use Import to restore.`);
+        } catch (error) {
+            console.error('[YjsSyncSettings] Restore failed:', error);
+            showError('Failed to download backup');
+        } finally {
+            setIsRestoring(false);
+            setRestoreConfirmBackup(null);
+        }
+    };
+
     const StatusIcon = status.icon;
 
     return (
@@ -378,6 +454,137 @@ export default function YjsSyncSettings() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Backup Settings Card */}
+            {showAuthActions && isSignedIn && isDriveConnected && (
+                <Card className="mt-4">
+                    <CardHeader>
+                        <CardTitle>Automatic Backups</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3">
+                            <div className="flex items-center gap-3">
+                                <Checkbox
+                                    id="backup-enabled"
+                                    checked={backupEnabled}
+                                    onCheckedChange={handleBackupEnabledToggle}
+                                />
+                                <div>
+                                    <Label htmlFor="backup-enabled" className="text-sm font-medium">
+                                        Enable automatic backups
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Creates snapshots of your data on Google Drive after each sync.
+                                    </p>
+                                </div>
+                            </div>
+                            {backupEnabled && (
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Backup frequency</Label>
+                                    <Select value={String(backupFrequencyHours)} onValueChange={handleBackupFrequencyChange}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="1">Every hour</SelectItem>
+                                            <SelectItem value="4">Every 4 hours</SelectItem>
+                                            <SelectItem value="8">Every 8 hours</SelectItem>
+                                            <SelectItem value="12">Every 12 hours</SelectItem>
+                                            <SelectItem value="24">Every 24 hours</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground">
+                                        Keeps up to 7 daily and 4 weekly snapshots (~11 files max).
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Backup list */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm font-medium">Available backups</Label>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={loadBackups}
+                                        disabled={backupsLoading}
+                                    >
+                                        {backupsLoading ? 'Loading...' : 'Refresh'}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleCreateBackup}
+                                        disabled={backupCreating || isSyncing}
+                                    >
+                                        {backupCreating ? 'Creating...' : 'Backup Now'}
+                                    </Button>
+                                </div>
+                            </div>
+                            {backups.length === 0 ? (
+                                <p className="text-xs text-muted-foreground py-2">
+                                    {backupsLoading ? 'Loading backups...' : 'No backups yet. Backups are created automatically after sync.'}
+                                </p>
+                            ) : (
+                                <div className="rounded-md border border-border divide-y divide-border max-h-64 overflow-y-auto">
+                                    {backups.map((backup) => (
+                                        <div key={backup.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                                            <div>
+                                                <div className="font-medium text-foreground">
+                                                    {format(new Date(backup.modifiedTime), 'MMM d, yyyy h:mm a')}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {formatDistanceToNow(new Date(backup.modifiedTime), { addSuffix: true })}
+                                                </div>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setRestoreConfirmBackup(backup)}
+                                            >
+                                                Download
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Restore Confirmation Modal */}
+            <Modal
+                isOpen={restoreConfirmBackup !== null}
+                onClose={() => !isRestoring && setRestoreConfirmBackup(null)}
+                title="Download backup?"
+                size="md"
+                footer={
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setRestoreConfirmBackup(null)}
+                            disabled={isRestoring}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleRestoreBackup}
+                            disabled={isRestoring}
+                        >
+                            {isRestoring ? 'Downloading...' : 'Download'}
+                        </Button>
+                    </div>
+                }
+            >
+                <p className="text-sm text-muted-foreground">
+                    This will download the backup from{' '}
+                    {restoreConfirmBackup && format(new Date(restoreConfirmBackup.modifiedTime), 'MMM d, yyyy h:mm a')}.
+                    To restore, use the Import feature in the Export & Import section.
+                </p>
+            </Modal>
 
             {/* Disconnect Confirmation Modal */}
             <Modal

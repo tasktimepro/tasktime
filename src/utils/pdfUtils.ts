@@ -1,4 +1,5 @@
 import html2pdf from 'html2pdf.js';
+import DOMPurify from 'dompurify';
 import { getCurrencySymbol, getPreferredCurrency } from './currencyUtils';
 
 type InvoiceTask = {
@@ -133,9 +134,15 @@ export const generatePDF = (
 
             const finalOptions = { ...defaultOptions, ...options };
 
+            // Sanitize HTML to prevent XSS via user-provided content in invoices
+            const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
+                USE_PROFILES: { html: true },
+                ADD_TAGS: ['style'],
+            });
+
             html2pdf()
                 .set(finalOptions)
-                .from(htmlContent)
+                .from(sanitizedHtml)
                 .save()
                 .then(() => {
                     resolve();

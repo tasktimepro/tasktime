@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
 import type { Invoice } from '@/stores/yjs/types';
+import { collectEntities } from '@/stores/yjs/entityUtils';
 
 export interface UseInvoicesOptions {
     /** Filter to a specific project */
@@ -33,9 +34,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
     useEffect(() => {
         if (!options.includeArchived || archivedLoaded || !store.archivedInvoicesSync) return;
 
-        const invoices: Invoice[] = [];
-        store.archivedInvoicesSync.forEach((invoice) => invoices.push(invoice));
-        setArchivedInvoices(invoices);
+        setArchivedInvoices(collectEntities<Invoice>(store.archivedInvoicesSync as any));
         setArchivedLoaded(true);
     }, [options.includeArchived, archivedLoaded, store]);
 
@@ -51,9 +50,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
                 if (!mounted) return;
                 const archivedMap = store.archivedInvoicesSync;
                 if (archivedMap) {
-                    const invoices: Invoice[] = [];
-                    archivedMap.forEach((invoice) => invoices.push(invoice));
-                    setArchivedInvoices(invoices);
+                    setArchivedInvoices(collectEntities<Invoice>(archivedMap as any));
                 }
                 setArchivedLoaded(true);
             })
@@ -71,14 +68,12 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         const handler = () => {
             const archivedMap = store.archivedInvoicesSync;
             if (archivedMap) {
-                const invoices: Invoice[] = [];
-                archivedMap.forEach((invoice) => invoices.push(invoice));
-                setArchivedInvoices(invoices);
+                setArchivedInvoices(collectEntities<Invoice>(archivedMap as any));
             }
         };
 
-        store.archivedInvoicesSync.observe(handler);
-        return () => store.archivedInvoicesSync?.unobserve(handler);
+        store.archivedInvoicesSync.observeDeep(handler);
+        return () => store.archivedInvoicesSync?.unobserveDeep(handler);
     }, [archivedLoaded, store]);
 
     // Combined invoices

@@ -13,6 +13,7 @@ import * as Y from 'yjs';
 import { encodeStateAsUpdate, applyUpdate, mergeUpdates } from 'yjs';
 import { YjsDocManager } from '../YjsDocManager';
 import { ManifestManager, AuthorizationError } from './ManifestManager';
+import { BackupManager } from './BackupManager';
 import type { DocName, SyncState, DriveSyncMode, SyncPhase } from '../types';
 import {
     markPendingChanges,
@@ -23,6 +24,7 @@ import {
     hasPersistedPendingChanges,
     wasSyncInterrupted,
     clearSyncPersistence,
+    getSyncPersistenceState,
 } from '@/utils/syncPersistence';
 
 export { AuthorizationError };
@@ -31,6 +33,32 @@ const COMPACTION_THRESHOLD = 10; // Compact after 10 deltas
 const SYNC_INTERVAL_MS = 900_000; // 15 minutes (reduced periodic checks)
 const SYNC_DEBOUNCE_MS = 100; // Small debounce to batch rapid changes
 const PULL_THROTTLE_MS = 30_000; // Skip pull if no local changes and last pull was < 30s ago
+const CROSS_TAB_SYNC_RECENCY_MS = 60_000; // Skip periodic sync if another tab synced in last 60s
+const SYNC_LOCK_NAME = 'tasktime-drive-sync';
+
+/**
+ * Acquire a Web Lock to coordinate sync across browser tabs.
+ * - ifAvailable=true: return immediately if lock not available (for periodic/debounced syncs)
+ * - ifAvailable=false: wait for lock (for force/manual syncs)
+ * Falls back to no-op on browsers without Web Locks API.
+ */
+async function withSyncLock<T>(fn: () => Promise<T>, wait: boolean = false): Promise<T | undefined> {
+    if (typeof navigator === 'undefined' || !navigator.locks) {
+        return fn();
+    }
+
+    return navigator.locks.request(
+        SYNC_LOCK_NAME,
+        { ifAvailable: !wait },
+        async (lock) => {
+            if (!lock) {
+                return undefined; // Another tab holds the lock
+            }
+
+            return fn();
+        },
+    );
+}
 
 export class YjsDriveProvider {
 
@@ -47,6 +75,7 @@ export class YjsDriveProvider {
     private syncMode: DriveSyncMode = 'sync';
     private pendingChanges: boolean = false;
     private pendingChangeListeners: Set<(hasPending: boolean) => void> = new Set();
+    private onSyncCompleteCallback: (() => void) | null = null;
 
     private pendingDeltas: Map<DocName, Uint8Array[]> = new Map();
     private docUpdateHandlers: Map<DocName, (update: Uint8Array, origin: unknown) => void> = new Map();
@@ -117,6 +146,20 @@ export class YjsDriveProvider {
         this.manifest = new ManifestManager(accessToken, sessionId);
     }
 
+    /**
+     * Register a callback to run after each successful sync
+     */
+    onSyncComplete(callback: () => void): void {
+        this.onSyncCompleteCallback = callback;
+    }
+
+    /**
+     * Get the manifest manager (for BackupManager access)
+     */
+    getManifest(): ManifestManager {
+        return this.manifest;
+    }
+
     // =========================================================================
     // Connection Management
     // =========================================================================
@@ -162,11 +205,36 @@ export class YjsDriveProvider {
                     this.log('connect: manifest saved');
                 }
             } else {
-                // Backup & Manual: no network requests on connect.
-                // Just subscribe to doc updates so changes are captured.
-                // Manifest will be loaded lazily on the first actual sync.
-                for (const docName of this.docManager.getLoadedDocs()) {
-                    this.subscribeToDoc(docName);
+                // Backup & Manual: normally no network requests on connect.
+                // But on FIRST-EVER sync, check for existing remote data and pull it.
+                // This prevents a new device from pushing empty state and wiping remote data.
+                this.setState('syncing');
+                this.setPhase('checking');
+
+                await this.manifest.load();
+                this.lastPullAt = Date.now();
+
+                const remoteManifest = this.manifest.getManifest();
+                const hasRemoteData = remoteManifest && Object.keys(remoteManifest.documents).length > 0;
+
+                if (hasRemoteData) {
+                    // Remote data exists — pull it before subscribing to local changes
+                    this.log('connect: first-sync pull for backup/manual mode');
+                    this.setPhase('downloading');
+
+                    for (const docName of this.docManager.getLoadedDocs()) {
+                        await this.syncDoc(docName, true);
+                        this.subscribeToDoc(docName);
+                    }
+
+                    if (this.manifest.isDirty()) {
+                        await this.manifest.save();
+                    }
+                } else {
+                    // No remote data — just subscribe to doc updates
+                    for (const docName of this.docManager.getLoadedDocs()) {
+                        this.subscribeToDoc(docName);
+                    }
                 }
             }
 
@@ -247,6 +315,8 @@ export class YjsDriveProvider {
 
         const files = await this.manifest.listAppDataFiles();
         for (const file of files) {
+            // Backup files are preserved — only deletable via "delete all account data"
+            if (BackupManager.isBackupFile(file.name)) continue;
             await this.manifest.deleteFileById(file.id);
         }
 
@@ -339,6 +409,32 @@ export class YjsDriveProvider {
             return;
         }
 
+        // Cross-tab recency check: if another tab completed a sync recently, skip periodic syncs
+        if (!force) {
+            const { lastSyncCompletedAt } = getSyncPersistenceState();
+
+            if (lastSyncCompletedAt && (Date.now() - lastSyncCompletedAt) < CROSS_TAB_SYNC_RECENCY_MS) {
+                const hasPendingLocal = this.hasLocalChangesToPush();
+
+                if (!hasPendingLocal) {
+                    this.log('sync: skipped, another tab synced recently', { msSince: Date.now() - lastSyncCompletedAt });
+                    return;
+                }
+            }
+        }
+
+        // Acquire cross-tab lock (skip if another tab is syncing, unless force)
+        const result = await withSyncLock(() => this.syncInner(force, options), force);
+
+        if (result === undefined && !force) {
+            this.log('sync: skipped, another tab holds the sync lock');
+        }
+    }
+
+    /**
+     * Inner sync implementation (runs under the Web Lock)
+     */
+    private async syncInner(force: boolean, options: { allowPull?: boolean }): Promise<void> {
         // Wait for current sync to finish if forcing
         if (this.isSyncing && force) {
             this.log('sync(force): waiting for current sync to complete...');
@@ -421,6 +517,13 @@ export class YjsDriveProvider {
 
             this.setState('idle');
             markSyncCompleted(); // Persist successful sync completion
+
+            // Trigger post-sync callback (e.g., backup)
+            try {
+                this.onSyncCompleteCallback?.();
+            } catch (cbErr) {
+                console.error('[YjsDriveProvider] onSyncComplete callback error:', cbErr);
+            }
 
         } catch (error) {
             console.error('[YjsDriveProvider] Sync failed:', error);

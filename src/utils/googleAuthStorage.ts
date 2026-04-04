@@ -54,6 +54,15 @@ export const getStoredToken = async (): Promise<StoredToken | null> => {
     }
 };
 
+const isQuotaError = (error: unknown): boolean => {
+    if (error instanceof DOMException) {
+        return error.name === 'QuotaExceededError' || error.code === 22;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes('QuotaExceededError') || message.includes('storage quota');
+};
+
 export const storeToken = async (token: StoredToken): Promise<void> => {
 
     try {
@@ -63,7 +72,11 @@ export const storeToken = async (token: StoredToken): Promise<void> => {
 
     } catch (error) {
 
-        console.error('Error saving Google auth token to IndexedDB:', error);
+        if (isQuotaError(error)) {
+            console.error('IndexedDB storage quota exceeded while saving auth token. Clear browser data to free space.');
+        } else {
+            console.error('Error saving Google auth token to IndexedDB:', error);
+        }
     }
 };
 

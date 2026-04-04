@@ -327,6 +327,8 @@ export interface Preferences {
     autoSyncMode?: 'backup' | 'sync';
     weeklyGoalTargetHours?: number | null;
     weeklyGoalTargetEarnings?: number | null;
+    backupEnabled?: boolean;
+    backupFrequencyHours?: number;
 }
 
 export interface MultiTimerState {

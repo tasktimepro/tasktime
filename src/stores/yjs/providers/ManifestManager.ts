@@ -455,6 +455,30 @@ export class ManifestManager {
     // Drive API Helpers
     // =========================================================================
 
+    private static readonly REQUEST_TIMEOUT_MS = 30_000;
+    private static readonly UPLOAD_TIMEOUT_MS = 60_000;
+    private static readonly MAX_RETRIES = 3;
+
+    /**
+     * Compute retry delay: honor Retry-After header, otherwise exponential backoff (max 30s)
+     */
+    private static getRetryDelay(response: Response, retryCount: number): number {
+        const retryAfter = response.headers.get('Retry-After');
+
+        if (retryAfter) {
+            const seconds = Number(retryAfter);
+
+            if (!Number.isNaN(seconds) && seconds > 0) {
+                // Cap at 60s to avoid extremely long waits
+                return Math.min(seconds * 1000, 60_000);
+            }
+
+            // Could be an HTTP-date; fall through to exponential backoff
+        }
+
+        return Math.min(1000 * Math.pow(2, retryCount), 30_000);
+    }
+
     /**
      * Make an authenticated request to Drive API
      */
@@ -463,13 +487,35 @@ export class ManifestManager {
         options: RequestInit = {},
         retryCount = 0
     ): Promise<Response> {
-        const response = await fetch(`${this.driveBaseUrl}${endpoint}`, {
-            ...options,
-            headers: {
-                ...this.getAuthHeaders(),
-                ...options.headers,
-            },
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), ManifestManager.REQUEST_TIMEOUT_MS);
+
+        let response: Response;
+
+        try {
+            response = await fetch(`${this.driveBaseUrl}${endpoint}`, {
+                ...options,
+                signal: options.signal ?? controller.signal,
+                headers: {
+                    ...this.getAuthHeaders(),
+                    ...options.headers,
+                },
+            });
+        } catch (error) {
+            clearTimeout(timeoutId);
+
+            // Retry on network / timeout errors
+            if (retryCount < ManifestManager.MAX_RETRIES) {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
+                console.warn(`[ManifestManager] request ${endpoint} failed (${error instanceof Error ? error.message : error}), retrying in ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
+                return this.request(endpoint, options, retryCount + 1);
+            }
+
+            throw error;
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         if (!response.ok) {
             if (response.status === 401 || response.status === 403) {
@@ -508,9 +554,11 @@ export class ManifestManager {
                 throw new AuthorizationError(errorMessage);
             }
 
-            // Retry transient errors once
-            if ((response.status >= 500 || response.status === 429) && retryCount < 1) {
-                await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
+            // Retry transient errors with exponential backoff (honors Retry-After)
+            if ((response.status >= 500 || response.status === 429) && retryCount < ManifestManager.MAX_RETRIES) {
+                const delay = ManifestManager.getRetryDelay(response, retryCount);
+                console.warn(`[ManifestManager] request ${endpoint} failed with ${response.status}, retrying in ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
                 return this.request(endpoint, options, retryCount + 1);
             }
 
@@ -569,20 +617,41 @@ export class ManifestManager {
             ? `${SYNC_WORKER_CONFIG.endpoints.drive}/files?uploadType=multipart`
             : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
 
-        const response = await fetch(uploadUrl, {
-            method: 'POST',
-            headers: this.getAuthHeaders(),
-            body: form,
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), ManifestManager.UPLOAD_TIMEOUT_MS);
+
+        let response: Response;
+
+        try {
+            response = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: this.getAuthHeaders(),
+                body: form,
+                signal: controller.signal,
+            });
+        } catch (error) {
+            clearTimeout(timeoutId);
+
+            if (retryCount < ManifestManager.MAX_RETRIES) {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
+                console.warn(`[ManifestManager] createFile ${name} failed (${error instanceof Error ? error.message : error}), retrying in ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
+                return this.createFile(name, blob, retryCount + 1);
+            }
+
+            throw error;
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         if (!response.ok) {
             if (response.status === 401 || response.status === 403) {
                 throw new AuthorizationError('Google authorization expired.');
             }
 
-            // Retry transient errors with exponential backoff
-            if ((response.status >= 500 || response.status === 429) && retryCount < 3) {
-                const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
+            // Retry transient errors with exponential backoff (honors Retry-After)
+            if ((response.status >= 500 || response.status === 429) && retryCount < ManifestManager.MAX_RETRIES) {
+                const delay = ManifestManager.getRetryDelay(response, retryCount);
                 console.warn(`[ManifestManager] createFile ${name} failed with ${response.status}, retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
                 return this.createFile(name, blob, retryCount + 1);
@@ -618,20 +687,41 @@ export class ManifestManager {
             ? `${SYNC_WORKER_CONFIG.endpoints.drive}/files/${fileId}?uploadType=multipart&fields=modifiedTime`
             : `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart&fields=modifiedTime`;
 
-        const response = await fetch(uploadUrl, {
-            method: 'PATCH',
-            headers: this.getAuthHeaders(),
-            body: form,
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), ManifestManager.UPLOAD_TIMEOUT_MS);
+
+        let response: Response;
+
+        try {
+            response = await fetch(uploadUrl, {
+                method: 'PATCH',
+                headers: this.getAuthHeaders(),
+                body: form,
+                signal: controller.signal,
+            });
+        } catch (error) {
+            clearTimeout(timeoutId);
+
+            if (retryCount < ManifestManager.MAX_RETRIES) {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
+                console.warn(`[ManifestManager] updateFile ${name} failed (${error instanceof Error ? error.message : error}), retrying in ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
+                return this.updateFile(fileId, name, blob, retryCount + 1);
+            }
+
+            throw error;
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         if (!response.ok) {
             if (response.status === 401 || response.status === 403) {
                 throw new AuthorizationError('Google authorization expired.');
             }
 
-            // Retry transient errors with exponential backoff
-            if ((response.status >= 500 || response.status === 429) && retryCount < 3) {
-                const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
+            // Retry transient errors with exponential backoff (honors Retry-After)
+            if ((response.status >= 500 || response.status === 429) && retryCount < ManifestManager.MAX_RETRIES) {
+                const delay = ManifestManager.getRetryDelay(response, retryCount);
                 console.warn(`[ManifestManager] updateFile ${name} failed with ${response.status}, retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
                 return this.updateFile(fileId, name, blob, retryCount + 1);

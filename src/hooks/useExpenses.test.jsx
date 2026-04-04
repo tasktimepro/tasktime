@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import * as Y from 'yjs'
 import { useExpenses } from './useExpenses'
 import { useYjs } from '@/contexts/YjsContext'
+import { readStored } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 
@@ -124,7 +125,7 @@ describe('useExpenses', () => {
             result.current.markAsPaid('v2', { amount: 147.23, paidBy: 'Card' })
         })
 
-        const updated = store.expenses.get('v2')
+        const updated = readStored(store.expenses, 'v2')
         expect(updated).toEqual(expect.objectContaining({
             amount: 147.23,
             paidBy: 'Card',
@@ -188,9 +189,9 @@ describe('useExpenses', () => {
             result.current.markAsUnbilled('exp-3')
         })
 
-        expect(store.expenses.get('exp-1')).toEqual(expect.objectContaining({ paymentStatus: 'unpaid' }))
-        expect(store.expenses.get('exp-2')).toEqual(expect.objectContaining({ billingStatus: 'billed', invoiceId: 'inv-1' }))
-        expect(store.expenses.get('exp-3')).toEqual(expect.objectContaining({ billingStatus: 'unbilled', invoiceId: null, billedAt: null }))
+        expect(readStored(store.expenses, 'exp-1')).toEqual(expect.objectContaining({ paymentStatus: 'unpaid' }))
+        expect(readStored(store.expenses, 'exp-2')).toEqual(expect.objectContaining({ billingStatus: 'billed', invoiceId: 'inv-1' }))
+        expect(readStored(store.expenses, 'exp-3')).toEqual(expect.objectContaining({ billingStatus: 'unbilled', invoiceId: null, billedAt: null }))
     })
 
     it('unbills all expenses for an invoice', () => {
@@ -214,8 +215,8 @@ describe('useExpenses', () => {
             result.current.unbillExpensesForInvoice('inv-1')
         })
 
-        expect(store.expenses.get('exp-1')).toEqual(expect.objectContaining({ billingStatus: 'unbilled', invoiceId: null, billedAt: null }))
-        expect(store.expenses.get('exp-2')).toEqual(expect.objectContaining({ billingStatus: 'unbilled', invoiceId: null, billedAt: null }))
+        expect(readStored(store.expenses, 'exp-1')).toEqual(expect.objectContaining({ billingStatus: 'unbilled', invoiceId: null, billedAt: null }))
+        expect(readStored(store.expenses, 'exp-2')).toEqual(expect.objectContaining({ billingStatus: 'unbilled', invoiceId: null, billedAt: null }))
     })
 
     it('returns client/project scoped lists and billable-unbilled helpers', () => {

@@ -20,7 +20,7 @@ interface YjsSyncStatusProps {
 
 export default function YjsSyncStatus({ className = '', isCompact = false, onActionComplete }: YjsSyncStatusProps) {
 
-    const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled } = useYjs();
+    const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled, lastSyncedAt } = useYjs();
     const { signIn, isLoading: authLoading, hadPreviousSession } = useGoogleAuth();
     const { showError } = useToast();
     const { navigateToAccount } = useUrlState();
@@ -113,8 +113,23 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
 
         // Error state
         if (syncState === 'error') {
+            let errorText = 'Sync Error';
+
+            if (lastSyncedAt) {
+                const minutesAgo = Math.round((Date.now() - lastSyncedAt) / 60_000);
+
+                if (minutesAgo < 1) {
+                    errorText = 'Sync error — synced just now';
+                } else if (minutesAgo < 60) {
+                    errorText = `Sync error — ${minutesAgo}m ago`;
+                } else {
+                    const hoursAgo = Math.round(minutesAgo / 60);
+                    errorText = `Sync error — ${hoursAgo}h ago`;
+                }
+            }
+
             return {
-                text: 'Sync Error',
+                text: errorText,
                 icon: ExclamationTriangleIcon,
                 tone: 'status-danger-text-strong',
                 onClick: handleCloudOptions,
@@ -191,7 +206,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
             hoverIcon: CloudCogIcon,
             hoverText: 'Cloud Options',
         };
-    }, [isReady, authLoading, isDriveConnected, isConnecting, isSyncing, hasSynced, manualSyncInProgress, syncPhase, syncState, isManualMode, hasPendingChanges, hadPreviousSession, handleConnect, handleCloudOptions, handleManualSync]);
+    }, [isReady, authLoading, isDriveConnected, isConnecting, isSyncing, hasSynced, manualSyncInProgress, syncPhase, syncState, isManualMode, hasPendingChanges, hadPreviousSession, lastSyncedAt, isOffline, handleConnect, handleCloudOptions, handleManualSync]);
 
     const IconComponent = (isHovered && status.hoverIcon) ? status.hoverIcon : status.icon;
     const displayText = (isHovered && status.hoverText) ? status.hoverText : status.text;
