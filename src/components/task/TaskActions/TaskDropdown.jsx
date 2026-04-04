@@ -28,14 +28,14 @@ const TaskDropdown = ({ onEdit, onDelete }) => {
             <DropdownMenuContent align="end">
                 <DropdownMenuItem
                     onClick={onEdit}
-                    className="flex items-center space-x-2 hover:bg-accent"
+                    className="flex items-center space-x-2"
                 >
                     <PencilIcon className="h-4 w-4" />
                     <span>Edit</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onClick={onDelete}
-                    className="flex items-center space-x-2 hover:bg-accent"
+                    className="status-danger-action flex items-center space-x-2"
                 >
                     <TrashIcon className="h-4 w-4" />
                     <span>Delete</span>

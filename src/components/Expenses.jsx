@@ -869,7 +869,10 @@ const Expenses = ({
                                                                 )}
                                                                 <span>{recurrence.active ? 'Pause' : 'Resume'}</span>
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleDeleteTemplate(recurrence)}>
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleDeleteTemplate(recurrence)}
+                                                                className="status-danger-action"
+                                                            >
                                                                 <TrashIcon className="h-4 w-4" />
                                                                 <span>Delete</span>
                                                             </DropdownMenuItem>

@@ -332,20 +332,20 @@ main,
 
     .status-info-action:hover,
     .status-info-action:focus {
-        background-color: hsl(var(--status-info-surface));
-        color: hsl(var(--status-info-accent));
+        background-color: hsl(var(--accent));
+        color: hsl(var(--accent-foreground));
     }
 
     .status-success-action:hover,
     .status-success-action:focus {
-        background-color: hsl(var(--status-success-surface));
-        color: hsl(var(--status-success-accent));
+        background-color: hsl(var(--accent));
+        color: hsl(var(--accent-foreground));
     }
 
     .status-warning-action:hover,
     .status-warning-action:focus {
-        background-color: hsl(var(--status-warning-surface));
-        color: hsl(var(--status-warning-accent));
+        background-color: hsl(var(--accent));
+        color: hsl(var(--accent-foreground));
     }
 
     .status-danger-action:hover,

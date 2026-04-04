@@ -74,7 +74,7 @@ const TaskActionsMenu = ({ task, onEdit, onDelete, onArchive = null }) => {
                     )}
                     <DropdownMenuItem
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="cursor-pointer hover:bg-accent focus:bg-accent"
+                        className="status-danger-action cursor-pointer"
                     >
                         <TrashIcon className="h-4 w-4 mr-2" />
                         <span>Delete</span>

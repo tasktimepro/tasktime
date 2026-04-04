@@ -152,6 +152,38 @@ describe('InvoicesList', () => {
         expect(matches.length).toBeGreaterThan(0)
     })
 
+    it('uses neutral styling for overdue and outstanding tabs', () => {
+
+        const invoices = [
+            {
+                ...baseInvoice,
+                id: 'inv-overdue',
+                invoiceNumber: 'INV-OVERDUE',
+                dueDate: '2000-01-01'
+            },
+            {
+                ...baseInvoice,
+                id: 'inv-outstanding',
+                invoiceNumber: 'INV-OUTSTANDING',
+                dueDate: '2099-01-01'
+            }
+        ]
+
+        render(
+            <InvoicesList
+                projectInvoices={invoices}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        expect(screen.getByRole('tab', { name: 'Overdue (1)' }).className.includes('status-danger-tab')).toBe(false)
+        expect(screen.getByRole('tab', { name: 'Outstanding (2)' }).className.includes('status-warning-tab')).toBe(false)
+    })
+
     it('shows paid badge for processed invoices', () => {
 
         const paidInvoice = {

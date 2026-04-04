@@ -39,6 +39,22 @@ describe('TaskActionsMenu', () => {
         expect(onDelete).toHaveBeenCalledWith(task)
     })
 
+    it('keeps delete destructive while other menu items stay neutral', async () => {
+
+        const task = { id: 't1', title: 'Task' }
+        const user = userEvent.setup()
+
+        render(<TaskActionsMenu task={task} onEdit={vi.fn()} onDelete={vi.fn()} />)
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+
+        const editItem = screen.getByRole('menuitem', { name: 'Edit' })
+        const deleteItem = screen.getByRole('menuitem', { name: 'Delete' })
+
+        expect(editItem.className.includes('status-warning-action')).toBe(false)
+        expect(deleteItem.className.includes('status-danger-action')).toBe(true)
+    })
+
     it('allows canceling delete confirmation', async () => {
 
         const onEdit = vi.fn()

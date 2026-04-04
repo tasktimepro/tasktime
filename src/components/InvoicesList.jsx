@@ -584,8 +584,8 @@ const InvoicesList = ({
                             value="overdue"
                             className={cn(
                                 isMobileLayout
-                                    ? 'status-danger-tab rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:shadow-none'
-                                    : 'status-danger-tab -mb-px rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 font-medium text-sm transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
+                                    ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
+                                    : 'px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
                             )}
                         >
                             Overdue ({overdueInvoices.length})
@@ -595,11 +595,8 @@ const InvoicesList = ({
                         value="outstanding"
                         className={cn(
                             isMobileLayout
-                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:shadow-none'
-                                : 'px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border',
-                            outstandingInvoices.length > 0
-                                ? 'status-warning-tab'
-                                : 'data-[state=active]:text-foreground data-[state=active]:border-foreground'
+                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
+                                : 'px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
                         )}
                     >
                         Outstanding ({outstandingInvoices.length})
