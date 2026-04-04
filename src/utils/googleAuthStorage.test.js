@@ -123,6 +123,27 @@ describe('googleAuthStorage', () => {
             // Should not throw
             await expect(storeToken({ accessToken: 'abc', expiresAt: 1234 })).resolves.toBeUndefined();
         });
+
+        it('logs a quota warning for QuotaExceededError DOMExceptions', async () => {
+            const error = new DOMException('Quota hit', 'QuotaExceededError');
+            mockDb.put.mockRejectedValue(error);
+
+            await expect(storeToken({ accessToken: 'abc', expiresAt: 1234 })).resolves.toBeUndefined();
+
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                'IndexedDB storage quota exceeded while saving auth token. Clear browser data to free space.'
+            );
+        });
+
+        it('logs a quota warning for storage quota error messages', async () => {
+            mockDb.put.mockRejectedValue(new Error('storage quota exceeded'));
+
+            await expect(storeToken({ accessToken: 'abc', expiresAt: 1234 })).resolves.toBeUndefined();
+
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                'IndexedDB storage quota exceeded while saving auth token. Clear browser data to free space.'
+            );
+        });
     });
 
     describe('clearStoredToken', () => {
@@ -220,10 +241,37 @@ describe('googleAuthStorage', () => {
             expect(mockDb.put).toHaveBeenCalledWith('app-data', session, 'google-auth-session');
         });
 
+        it('handles session write errors gracefully', async () => {
+            mockDb.put.mockRejectedValue(new Error('session write failed'));
+
+            await expect(storeSession({
+                sessionId: 'session-3',
+                userId: 'user-3',
+                email: 'person3@example.com',
+                createdAt: new Date('2026-01-21T12:00:00Z').toISOString(),
+            })).resolves.toBeUndefined();
+
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                'Error saving session to IndexedDB:',
+                expect.any(Error)
+            );
+        });
+
         it('clears session in IndexedDB', async () => {
             await clearStoredSession();
 
             expect(mockDb.delete).toHaveBeenCalledWith('app-data', 'google-auth-session');
+        });
+
+        it('handles session clear errors gracefully', async () => {
+            mockDb.delete.mockRejectedValue(new Error('session clear failed'));
+
+            await expect(clearStoredSession()).resolves.toBeUndefined();
+
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                'Error clearing session from IndexedDB:',
+                expect.any(Error)
+            );
         });
     });
 });

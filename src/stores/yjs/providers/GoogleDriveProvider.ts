@@ -60,6 +60,8 @@ async function withSyncLock<T>(fn: () => Promise<T>, wait: boolean = false): Pro
     );
 }
 
+type DocUpdateHandler = (...args: unknown[]) => void;
+
 export class YjsDriveProvider {
 
     private docManager: YjsDocManager;
@@ -78,7 +80,7 @@ export class YjsDriveProvider {
     private onSyncCompleteCallback: (() => void) | null = null;
 
     private pendingDeltas: Map<DocName, Uint8Array[]> = new Map();
-    private docUpdateHandlers: Map<DocName, (update: Uint8Array, origin: unknown) => void> = new Map();
+    private docUpdateHandlers: Map<DocName, DocUpdateHandler> = new Map();
     private syncInterval: ReturnType<typeof setInterval> | null = null;
     private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     private isSyncing: boolean = false;
@@ -588,18 +590,19 @@ export class YjsDriveProvider {
     /**
      * Sync a single document
      * @param shouldPull - Whether to pull remote changes (false if manifest unchanged)
+     * @param silent - If true, don't update global sync phase (for on-demand doc loads)
      */
-    private async syncDoc(docName: DocName, shouldPull: boolean = true): Promise<void> {
+    private async syncDoc(docName: DocName, shouldPull: boolean = true, silent: boolean = false): Promise<void> {
         const doc = this.docManager.getDocSync(docName);
         if (!doc) return;
 
         // Ensure doc has a manifest entry
         const docManifest = this.manifest.ensureDocManifest(docName);
-        this.log('syncDoc: start', { docName, stateVersion: docManifest.stateVersion, deltas: docManifest.deltas.length, shouldPull });
+        this.log('syncDoc: start', { docName, stateVersion: docManifest.stateVersion, deltas: docManifest.deltas.length, shouldPull, silent });
 
         // 1. Pull remote state and deltas (only if manifest changed)
         if (shouldPull) {
-            this.setPhase('downloading');
+            if (!silent) this.setPhase('downloading');
             await this.pullDoc(docName, doc);
         }
 
@@ -609,7 +612,7 @@ export class YjsDriveProvider {
         const shouldUpload = this.forceFullStateDocs.has(docName) || pendingCount > 0 || needsInitialState;
 
         if (shouldUpload) {
-            this.setPhase('uploading');
+            if (!silent) this.setPhase('uploading');
         }
 
         if (this.forceFullStateDocs.has(docName)) {
@@ -900,7 +903,13 @@ export class YjsDriveProvider {
         const doc = this.docManager.getDocSync(docName);
         if (!doc || this.docUpdateHandlers.has(docName)) return;
 
-        const handler = (update: Uint8Array, origin: unknown) => {
+        const handler: DocUpdateHandler = (...args) => {
+            const [update, origin] = args;
+
+            if (!(update instanceof Uint8Array)) {
+                return;
+            }
+
             if (origin === 'remote') return; // Don't re-sync remote updates
 
             // Queue delta for upload
@@ -1080,9 +1089,9 @@ export class YjsDriveProvider {
             this.log('syncAndSubscribeDoc: manifest loaded');
         }
 
-        // Sync the document
+        // Sync the document silently (don't show global "Fetching updates" for on-demand loads)
         const shouldPull = this.syncMode === 'sync';
-        await this.syncDoc(docName, shouldPull);
+        await this.syncDoc(docName, shouldPull, true);
 
         // Subscribe to future updates
         this.subscribeToDoc(docName);
