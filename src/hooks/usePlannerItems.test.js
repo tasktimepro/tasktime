@@ -304,7 +304,6 @@ describe('usePlannerItems', () => {
     });
 
     it('includes timer-only tasks for today', () => {
-        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
         const todayStr = format(new Date(), 'yyyy-MM-dd');
 
         mockTasks.push({ id: 't-timer', title: 'Timer Task', projectId: 'p1', completed: false });

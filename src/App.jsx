@@ -26,6 +26,7 @@ import Expenses from './components/Expenses';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
 import AuthCallback from './components/AuthCallback';
+import OnboardingModal from './components/OnboardingModal';
 import TaskViewModal from './components/modals/TaskViewModal';
 import ExpenseViewModal from './components/modals/ExpenseViewModal';
 import TimeEntriesModal from './components/TimeEntriesModal';
@@ -38,24 +39,44 @@ import InstallPrompt from './components/InstallPrompt';
 import CloudSyncStatusPanel from './components/sync/CloudSyncStatusPanel';
 import MobileBottomNav from './components/app/MobileBottomNav';
 import MobileMoreSheet from './components/app/MobileMoreSheet';
+import PublicLegalRouter from './components/legal/PublicLegalRouter';
+import { isPublicLegalPath } from './components/legal/legalRoutes';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { buildExpenseFromRecurrence } from './utils/expenseUtils.ts';
+import { normalizeInvoiceRecord } from './utils/invoiceUtils.ts';
+import { hasCompletedOnboarding, setOnboardingCompleted } from './utils/onboardingUtils.ts';
 import { getTaskIdsToDelete } from './utils/taskUtils.ts';
 import { useTodayString } from './hooks/useDayRollover';
+import { useDarkModePreference } from './hooks/useDarkModePreference.ts';
 import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
 /** Original browser tab title */
 const ORIGINAL_TITLE = "TaskTime";
+const PAGE_TITLE_MAP = {
+    dashboard: 'Dashboard',
+    planner: 'Planner',
+    clients: 'Clients',
+    projects: 'Projects',
+    invoices: 'Invoices',
+    expenses: 'Expenses',
+    account: 'Account',
+    privacy: 'Privacy Policy',
+    terms: 'Terms & Conditions'
+};
 
 /**
  * Main App component - Entry point for TaskTime
  * Now powered by Yjs for conflict-free sync
  */
 function App() {
+    if (typeof window !== 'undefined' && isPublicLegalPath(window.location.pathname)) {
+        return <PublicLegalRouter />;
+    }
+
     return (
         <ToastProvider>
             <YjsProvider>
@@ -234,14 +255,7 @@ function AppContent() {
     }, [isSyncing, manualSyncInProgress, hasPendingSyncChanges, toast]);
 
     // === Dark Mode ===
-    const [darkMode, setDarkMode] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('tasktime-dark-mode');
-            if (saved !== null) return saved === 'true';
-            return window.matchMedia('(prefers-color-scheme: dark)').matches;
-        }
-        return false;
-    });
+    const [darkMode, setDarkMode] = useDarkModePreference();
 
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -250,16 +264,9 @@ function AppContent() {
         }
         return false;
     });
+    const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(() => hasCompletedOnboarding());
+    const [showOnboarding, setShowOnboarding] = useState(false);
     
-    useEffect(() => {
-        if (darkMode) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-        localStorage.setItem('tasktime-dark-mode', String(darkMode));
-    }, [darkMode]);
-
     useEffect(() => {
         if (typeof window === 'undefined') {
             return;
@@ -382,17 +389,17 @@ function AppContent() {
         setEditingItem(businessInfo);
     };
 
-    const openTaskModal = (task = null, options = null) => {
+    const openTaskModal = useCallback((task = null, options = null) => {
         setActiveModal('task');
         setEditingItem(task);
         setModalOptions(options || null);
-    };
+    }, []);
 
-    const openExpenseModal = (expense = null, options = null) => {
+    const openExpenseModal = useCallback((expense = null, options = null) => {
         setActiveModal('expense');
         setEditingItem(expense);
         setModalOptions(options || null);
-    };
+    }, []);
 
     const openExpenseView = useCallback((expense) => {
         if (!expense) return;
@@ -660,15 +667,20 @@ function AppContent() {
     const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToPlanner, updateUrl } = useUrlState();
     
     const activeView = urlParams.view;
-    const pageTitleMap = {
-        dashboard: 'Dashboard',
-        planner: 'Planner',
-        clients: 'Clients',
-        projects: 'Projects',
-        invoices: 'Invoices',
-        expenses: 'Expenses',
-        account: 'Account'
-    };
+    const hasPersistedWorkspaceData = (
+        projects.length > 0
+        || activeTasks.length > 0
+        || timeEntries.length > 0
+        || clients.length > 0
+        || invoices.length > 0
+        || businessInfos.length > 0
+        || invoiceTemplates.length > 0
+        || paymentMethods.length > 0
+        || expenses.length > 0
+        || recurrences.length > 0
+        || dailyGoals.length > 0
+        || plannerAttachments.length > 0
+    );
     const selectedProject = urlParams.projectId 
         ? projects.find(p => p.id === urlParams.projectId) 
         : null;
@@ -679,7 +691,7 @@ function AppContent() {
     useEffect(() => {
         if (timerIsActive && timerTaskId) return;
 
-        const pageTitle = pageTitleMap[activeView] || ORIGINAL_TITLE;
+        const pageTitle = PAGE_TITLE_MAP[activeView] || ORIGINAL_TITLE;
         document.title = pageTitle === ORIGINAL_TITLE ? ORIGINAL_TITLE : `${pageTitle} | TaskTime`;
     }, [activeView, timerIsActive, timerTaskId]);
 
@@ -698,6 +710,35 @@ function AppContent() {
         }
     }, [urlParams.clientId, urlParams.view, selectedClient, navigateToClients, isLoading]);
 
+    useEffect(() => {
+        if (isLoading) {
+            return;
+        }
+
+        if (activeView !== 'dashboard') {
+            setShowOnboarding(false);
+            return;
+        }
+
+        if (hasPersistedWorkspaceData) {
+            if (!showOnboarding && !isOnboardingCompleted) {
+                setOnboardingCompleted(true);
+                setIsOnboardingCompleted(true);
+            }
+            return;
+        }
+
+        if (!isOnboardingCompleted) {
+            setShowOnboarding(true);
+        }
+    }, [activeView, hasPersistedWorkspaceData, isLoading, isOnboardingCompleted, showOnboarding]);
+
+    const handleCompleteOnboarding = useCallback(() => {
+        setOnboardingCompleted(true);
+        setIsOnboardingCompleted(true);
+        setShowOnboarding(false);
+    }, []);
+
     const handleNavigateToProjects = () => {
         navigateToProjects({ create: 'project' });
     };
@@ -714,7 +755,7 @@ function AppContent() {
         (pendingImport.projects || []).forEach((project) => createProject(project));
         (pendingImport.tasks || []).forEach((task) => createTask(task));
         (pendingImport.timeEntries || []).forEach((entry) => createTimeEntry(entry));
-        (pendingImport.invoices || []).forEach((invoice) => createInvoice(invoice));
+        (pendingImport.invoices || []).forEach((invoice) => createInvoice(normalizeInvoiceRecord(invoice)));
         (pendingImport.paymentMethods || []).forEach((method) => createPaymentMethod(method));
         (pendingImport.businessInfos || []).forEach((info) => createBusinessInfo(info));
         (pendingImport.clients || []).forEach((client) => createClient(client));
@@ -785,8 +826,8 @@ function AppContent() {
 
     const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'account'].includes(activeView);
     const isMoreViewActive = ['clients', 'invoices', 'account'].includes(activeView);
-    const mobileTopPadding = showGlobalTimer && timerIsActive ? '1rem' : '0.75rem';
-    const mobileBottomPadding = showGlobalTimer && timerIsActive ? '8.5rem' : '7rem';
+    const mobileTopPadding = showGlobalTimer && timerIsActive ? '5.75rem' : '0.75rem';
+    const mobileBottomPadding = '7rem';
     const desktopTopPadding = showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem';
     const desktopBottomPadding = '1.5rem';
     const mobilePrimaryNavItems = [
@@ -1431,7 +1472,7 @@ function AppContent() {
                     {(!isMobileLayout || activeView !== 'auth-callback') && (
                         <FloatingActionButton
                             onTaskClick={() => openTaskModal(null)}
-                            className={isMobileLayout ? `${showGlobalTimer && timerIsActive ? 'bottom-safe-fab-docked' : 'bottom-safe-fab'} right-4` : ''}
+                            className={isMobileLayout ? 'bottom-safe-fab right-4' : ''}
                         />
                     )}
                 </div>
@@ -1452,20 +1493,24 @@ function AppContent() {
                                 onClose={() => {
                                     setShowGlobalTimer(false);
                                 }}
+                                enableHoverExpansion={true}
+                                enableManualToggle={false}
                             />
                         </div>
                     </div>
                 )}
 
                 {isMobileLayout && showGlobalTimer && timerIsActive && (
-                    <div className="bottom-safe-dock fixed inset-x-0 z-50 px-4 md:hidden">
-                        <div className="mx-auto max-w-xl rounded-2xl border border-border bg-background/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/85">
+                    <div className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-safe-top pointer-events-none md:hidden">
+                        <div className="pointer-events-auto mt-3 w-full max-w-2xl">
                             <GlobalTimerStack
                                 navigateToProject={navigateToProject}
                                 onOpenTaskView={openTaskView}
                                 onClose={() => {
                                     setShowGlobalTimer(false);
                                 }}
+                                enableHoverExpansion={false}
+                                enableManualToggle={true}
                             />
                         </div>
                     </div>
@@ -1546,6 +1591,12 @@ function AppContent() {
                 initialTargetHours={taskViewOverlay.attachment.estimatedHours ?? null}
             />
         )}
+
+        <OnboardingModal
+            key={`onboarding-${showOnboarding ? 'open' : 'closed'}`}
+            isOpen={showOnboarding}
+            onComplete={handleCompleteOnboarding}
+        />
         
         {/* PWA Components */}
         <InstallPrompt />

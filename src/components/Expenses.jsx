@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { endOfMonth, endOfYear, startOfMonth, startOfYear } from 'date-fns';
 import {
     ArrowPathIcon,
@@ -394,15 +394,15 @@ const Expenses = ({
         return expense.paymentStatus;
     };
 
-    const getDateMs = (value) => parseStoredDate(value)?.getTime() || 0;
+    const getDateMs = useCallback((value) => parseStoredDate(value)?.getTime() || 0, []);
 
-    const compareByDueDateAscThenTitle = (a, b) => {
+    const compareByDueDateAscThenTitle = useCallback((a, b) => {
         const dateDiff = getDateMs(a.date) - getDateMs(b.date);
         if (dateDiff !== 0) return dateDiff;
         return (a.title || '').localeCompare(b.title || '');
-    };
+    }, [getDateMs]);
 
-    const comparePaidByMostRecent = (a, b) => {
+    const comparePaidByMostRecent = useCallback((a, b) => {
         const paidDiff = getDateMs(b.paidOn) - getDateMs(a.paidOn);
         if (paidDiff !== 0) return paidDiff;
 
@@ -410,7 +410,7 @@ const Expenses = ({
         if (dateDiff !== 0) return dateDiff;
 
         return (a.title || '').localeCompare(b.title || '');
-    };
+    }, [getDateMs]);
 
     const outstandingExpenses = useMemo(() => {
         return commonFilteredExpenses
@@ -422,7 +422,7 @@ const Expenses = ({
                 return expenseDate <= todayDate;
             })
             .sort(compareByDueDateAscThenTitle);
-    }, [commonFilteredExpenses, todayDate]);
+    }, [commonFilteredExpenses, todayDate, compareByDueDateAscThenTitle]);
 
     const upcomingExpenses = useMemo(() => {
         return upcomingPeriodExpenses
@@ -434,13 +434,13 @@ const Expenses = ({
                 return expenseDate > todayDate;
             })
             .sort(compareByDueDateAscThenTitle);
-    }, [upcomingPeriodExpenses, todayDate]);
+    }, [upcomingPeriodExpenses, todayDate, compareByDueDateAscThenTitle]);
 
     const paidExpenses = useMemo(() => {
         return historicalPeriodExpenses
             .filter((expense) => getEffectivePaymentStatus(expense) === 'paid')
             .sort(comparePaidByMostRecent);
-    }, [historicalPeriodExpenses]);
+    }, [historicalPeriodExpenses, comparePaidByMostRecent]);
 
     const totalVisibleExpenseCount = outstandingExpenses.length + upcomingExpenses.length + paidExpenses.length;
 

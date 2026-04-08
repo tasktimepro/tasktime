@@ -56,9 +56,9 @@ describe('Invoice payment workflow integration', () => {
             date: '2026-02-01',
             dueDate: '2026-02-10',
             totalHours: 2,
-            totalAmount: 200,
+            total: 200,
             currency: 'USD',
-            paymentProcessed: false,
+            status: 'sent',
             clientId: 'client-1',
             project: { id: 'project-1', title: 'Project Alpha' }
         }
@@ -79,7 +79,7 @@ describe('Invoice payment workflow integration', () => {
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith(
             'inv-1',
             expect.objectContaining({
-                paymentProcessed: true,
+                status: 'paid',
                 paidAt: 1700000000000
             })
         )

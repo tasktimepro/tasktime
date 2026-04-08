@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InlineFieldHeader } from '@/components/ui/inline-field-header';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Notice } from '@/components/ui/notice';
@@ -12,6 +13,34 @@ import { useProjects } from '../../hooks/useProjects.ts';
 import { useClients } from '../../hooks/useClients.ts';
 import CustomCheckbox from '../CustomCheckbox';
 import { ColorPicker } from '@/components/ui/color-picker';
+import { parseOptionalNumberInput, parseOptionalPositiveNumberInput } from '@/utils/numberInputUtils.ts';
+
+function buildProjectUpdatePayload(formData) {
+    return {
+        title: formData.title,
+        hourlyRate: parseOptionalNumberInput(formData.hourlyRate),
+        flatRate: formData.flatRate || false,
+        preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
+        isPersonal: formData.isPersonal || false,
+        color: formData.color || null,
+    };
+}
+
+function buildChangedProjectUpdates(editingProject, formData) {
+    const nextProject = buildProjectUpdatePayload(formData);
+    const previousProject = {
+        title: editingProject.title,
+        hourlyRate: editingProject.hourlyRate ?? null,
+        flatRate: editingProject.flatRate || false,
+        preferredClientId: editingProject.isPersonal ? null : (editingProject.preferredClientId || null),
+        isPersonal: editingProject.isPersonal || false,
+        color: editingProject.color || null,
+    };
+
+    return Object.fromEntries(
+        Object.entries(nextProject).filter(([key, value]) => previousProject[key] !== value)
+    );
+}
 
 /**
  * ProjectModal component - Modal for creating and editing projects
@@ -29,7 +58,7 @@ const ProjectModal = ({
     const [selectedClientRate, setSelectedClientRate] = useState(null);
     const lastInitKeyRef = useRef(null);
     const { showSuccess } = useToast();
-    const { projects, createProject, updateProject } = useProjects();
+    const { createProject, updateProject } = useProjects();
     const { clients } = useClients();
     const activeClients = clients.filter(client => !client.archived);
     const isClientSelectDisabled = !!modalOptions?.preselectedClientId || activeClients.length === 0;
@@ -132,7 +161,7 @@ const ProjectModal = ({
                         flatRate: false,
                         preferredClientId: '',
                         overrideRate: false,
-                        isPersonal: false,
+                        isPersonal: Boolean(modalOptions?.defaultPersonalProject),
                         color: ''
                     });
                     setSelectedClientRate(null);
@@ -223,18 +252,13 @@ const ProjectModal = ({
         }
         
         // If not flat rate and not personal, hourly rate is required (either from client or override)
-        if (!formData.isPersonal && !formData.flatRate && !formData.hourlyRate) {
+        if (!formData.isPersonal && !formData.flatRate && parseOptionalPositiveNumberInput(formData.hourlyRate) === null) {
             return; // Hourly rate is required when not using flat rate for billable projects
         }
 
-        createProject({
+        const createdProject = createProject({
             id: generateSlugId(formData.title),
-            title: formData.title,
-            hourlyRate: formData.hourlyRate !== '' ? parseFloat(formData.hourlyRate) : null,
-            flatRate: formData.flatRate || false,
-            preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
-            isPersonal: formData.isPersonal || false,
-            color: formData.color || null,
+            ...buildProjectUpdatePayload(formData),
             lastBilledAt: null,
             archived: false
         });
@@ -248,6 +272,7 @@ const ProjectModal = ({
             clearSavedState();
         }
 
+        modalOptions?.onCreate?.(createdProject);
         showSuccess('Project created successfully!');
         onClose();
     };
@@ -267,18 +292,15 @@ const ProjectModal = ({
         }
         
         // If not flat rate and not personal, hourly rate is required (either from client or override)
-        if (!formData.isPersonal && !formData.flatRate && !formData.hourlyRate) {
+        if (!formData.isPersonal && !formData.flatRate && parseOptionalPositiveNumberInput(formData.hourlyRate) === null) {
             return; // Hourly rate is required when not using flat rate for billable projects
         }
 
-        updateProject(editingProject.id, {
-            title: formData.title,
-            hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-            flatRate: formData.flatRate || false,
-            preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
-            isPersonal: formData.isPersonal || false,
-            color: formData.color || null
-        });
+        const changedUpdates = buildChangedProjectUpdates(editingProject, formData);
+
+        if (Object.keys(changedUpdates).length > 0) {
+            updateProject(editingProject.id, changedUpdates);
+        }
 
         // Clear saved state since project was successfully updated  
         if (clearSavedState) {
@@ -382,11 +404,8 @@ const ProjectModal = ({
                 {/* Client Selection - Only show for non-personal projects */}
                 {!formData.isPersonal && (
                     <div>
-                        <div className="mb-1 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <Label htmlFor="preferredClientId">
-                                Client <span className="text-destructive-strong">*</span>
-                            </Label>
-                            {openClientModal && !modalOptions?.preselectedClientId && (
+                        <InlineFieldHeader
+                            action={openClientModal && !modalOptions?.preselectedClientId ? (
                                 <Button
                                     type="button"
                                     variant="link"
@@ -405,8 +424,12 @@ const ProjectModal = ({
                                 >
                                     + New Client
                                 </Button>
-                            )}
-                        </div>
+                            ) : null}
+                        >
+                            <Label htmlFor="preferredClientId">
+                                Client <span className="text-destructive-strong">*</span>
+                            </Label>
+                        </InlineFieldHeader>
                         <Select
                             value={formData.preferredClientId}
                             onValueChange={(value) => {

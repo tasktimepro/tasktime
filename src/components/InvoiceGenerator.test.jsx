@@ -132,13 +132,20 @@ vi.mock('./invoice/InvoiceGeneratorButton', () => ({
     )
 }))
 
-vi.mock('./invoice/InvoiceModal', () => ({
+vi.mock('./invoice/InvoiceModal', () => {
 
-    default: (props) => {
+    function MockInvoiceModal({
+        showInvoiceForm,
+        handleHoursChange,
+        handleSaveInvoice,
+        handleTemplateSelection,
+        setInvoiceDateOverride,
+        setUseInvoiceDateOverride,
+    }) {
         const didApplyAdjustments = React.useRef(false)
 
         React.useEffect(() => {
-            if (!props.showInvoiceForm) {
+            if (!showInvoiceForm) {
                 didApplyAdjustments.current = false
                 return
             }
@@ -148,21 +155,24 @@ vi.mock('./invoice/InvoiceModal', () => ({
             }
 
             didApplyAdjustments.current = true
-            props.handleHoursChange(
+            handleHoursChange(
                 modalConfig.adjustTaskHours.taskId,
                 modalConfig.adjustTaskHours.hours
             )
-        }, [props.showInvoiceForm, props.handleHoursChange])
+        }, [showInvoiceForm, handleHoursChange])
+
+        if (!showInvoiceForm) {
+            return null
+        }
 
         return (
-            props.showInvoiceForm ? (
             <div>
                 {modalConfig.applyDateOverride && (
                     <button
                         type="button"
                         onClick={() => {
-                            props.setUseInvoiceDateOverride(true)
-                            props.setInvoiceDateOverride('2026-01-10')
+                            setUseInvoiceDateOverride(true)
+                            setInvoiceDateOverride('2026-01-10')
                         }}
                     >
                         Set Override
@@ -172,18 +182,21 @@ vi.mock('./invoice/InvoiceModal', () => ({
                     type="button"
                     onClick={() => {
                         if (!modalConfig.skipTemplateSelection) {
-                            props.handleTemplateSelection('tpl-1')
+                            handleTemplateSelection('tpl-1')
                         }
-                        props.handleSaveInvoice({ preventDefault: () => {} })
+                        handleSaveInvoice({ preventDefault: () => {} })
                     }}
                 >
                     Save Invoice
                 </button>
             </div>
-            ) : null
         )
     }
-}))
+
+    return {
+        default: MockInvoiceModal
+    }
+})
 
 vi.mock('../utils/pdfUtils.ts', () => ({
 
@@ -312,7 +325,7 @@ describe('InvoiceGenerator', () => {
             tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
             date: '2026-01-05',
             createdAt: 111,
-            paymentProcessed: false,
+            status: 'sent',
             template: { id: 'tpl-1', name: 'Template One' }
         }
 

@@ -111,19 +111,6 @@ const TaskViewModal = ({
         ) || 'Today';
     }, [effectiveDateStr, todayStr]);
 
-    const overdueActionDateLabel = useMemo(() => {
-        if (!effectiveDateStr) return '';
-        const currentYear = todayStr ? Number(todayStr.split('-')[0]) : null;
-        const effectiveYear = Number(effectiveDateStr.split('-')[0]);
-        const includeYear = !currentYear || effectiveYear !== currentYear;
-        return toDisplayDate(
-            effectiveDateStr,
-            includeYear
-                ? { month: 'short', day: 'numeric', year: 'numeric' }
-                : { month: 'short', day: 'numeric' }
-        ) || '';
-    }, [effectiveDateStr, todayStr]);
-
     const recurringActionDateLabel = useMemo(() => {
         if (!effectiveDateStr) return '';
         if (todayStr && effectiveDateStr === todayStr) return '';

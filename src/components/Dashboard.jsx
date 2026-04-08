@@ -28,6 +28,37 @@ import { useTodayString } from '@/hooks/useDayRollover';
 import { linkifyNodes } from '@/utils/linkifyUtils';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
 import AddTimeEntryModal from '@/components/modals/AddTimeEntryModal';
+import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
+
+const STALE_EXCHANGE_RATES_WARNING_DATE_KEY = 'tasktime-stale-exchange-rates-warning-date';
+
+const getStaleExchangeRatesWarningDate = (todayStr) => {
+    return todayStr || toStorageDate(new Date()) || null;
+};
+
+const hasShownStaleExchangeRatesWarningOnDate = (dateStr) => {
+    if (typeof window === 'undefined' || !dateStr) {
+        return false;
+    }
+
+    try {
+        return localStorage.getItem(STALE_EXCHANGE_RATES_WARNING_DATE_KEY) === dateStr;
+    } catch {
+        return false;
+    }
+};
+
+const markStaleExchangeRatesWarningShown = (dateStr) => {
+    if (typeof window === 'undefined' || !dateStr) {
+        return;
+    }
+
+    try {
+        localStorage.setItem(STALE_EXCHANGE_RATES_WARNING_DATE_KEY, dateStr);
+    } catch {
+        // Ignore localStorage failures and continue showing the warning.
+    }
+};
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -167,7 +198,6 @@ const Dashboard = ({
         const lastMonthEnd = endOfMonth(subMonths(todayDate, 1));
         const last90Start = subDays(todayDate, 89);
 
-        const monthStartStr = toStorageDate(monthStart) || '';
         const monthEndStr = toStorageDate(monthEnd) || '';
         const upcomingStart = addDays(todayDate, 1);
         const upcomingStartStr = toStorageDate(upcomingStart) || '';
@@ -303,10 +333,24 @@ const Dashboard = ({
         }
 
         if (exchangeRatesError) {
-            const warningKey = `error:${exchangeRatesError}`;
+            const staleWarningDate = getStaleExchangeRatesWarningDate(todayStr);
+            const isStaleExchangeRatesError = exchangeRatesError === STALE_EXCHANGE_RATES_ERROR;
+            const warningKey = isStaleExchangeRatesError
+                ? `error:${exchangeRatesError}:${staleWarningDate || 'unknown-date'}`
+                : `error:${exchangeRatesError}`;
+
+            if (isStaleExchangeRatesError && hasShownStaleExchangeRatesWarningOnDate(staleWarningDate)) {
+                return;
+            }
+
             if (!conversionWarningShown && lastWarningKeyRef.current !== warningKey) {
                 lastWarningKeyRef.current = warningKey;
                 showWarning(exchangeRatesError);
+
+                if (isStaleExchangeRatesError) {
+                    markStaleExchangeRatesWarningShown(staleWarningDate);
+                }
+
                 setConversionWarningShown(true);
             }
             return;
@@ -344,6 +388,7 @@ const Dashboard = ({
         exchangeRatesLoading,
         exchangeRates,
         exchangeRatesError,
+        todayStr,
         missingExchangeRates,
         showWarning
     ]);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ExclamationTriangleIcon, ArrowPathIcon } from '@/components/ui/icons';
+/* eslint-disable react-refresh/only-export-components */
 
 /**
  * Error Fallback component - Displayed when an error occurs
@@ -20,7 +21,7 @@ const ErrorFallback = ({ error, resetError }) => {
                     An unexpected error occurred. You can try refreshing the component or reloading the page.
                 </p>
                 
-                {process.env.NODE_ENV === 'development' && error && (
+                {import.meta.env.DEV && error && (
                     <details className="text-left mb-4 p-3 bg-muted rounded-md">
                         <summary className="text-xs font-medium text-foreground cursor-pointer">
                             Error Details (Dev Only)
@@ -80,7 +81,7 @@ class ErrorBoundary extends React.Component {
 
     componentDidCatch(error, errorInfo) {
         // Log the error to console in development
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
             console.error('ErrorBoundary caught an error:', error, errorInfo);
         }
         

@@ -2,7 +2,7 @@
  * DailyGoalModal - Modal for setting weekday-based goals
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { getDay } from 'date-fns';
 import {
     Dialog,
@@ -20,6 +20,11 @@ import { ClockIcon } from '@/components/ui/icons';
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+const createInitialGoalValues = (goal) => ({
+    targetHours: goal?.targetHours ? String(goal.targetHours) : '',
+    targetEarnings: goal?.targetEarnings ? String(goal.targetEarnings) : ''
+});
+
 /**
  * @param {Object} props
  * @param {boolean} props.isOpen
@@ -29,8 +34,6 @@ const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', '
 const DailyGoalModal = ({ isOpen, onClose, dateStr }) => {
     const { setGoal, removeGoal, getGoalForDate } = useDailyGoals();
     const { preferences } = usePreferences();
-    const [targetHours, setTargetHours] = useState('');
-    const [targetEarnings, setTargetEarnings] = useState('');
 
     const weekday = useMemo(() => {
         if (!dateStr) return 0;
@@ -43,16 +46,10 @@ const DailyGoalModal = ({ isOpen, onClose, dateStr }) => {
     const weekdayNamePlural = `${weekdayName}s`;
 
     const goal = useMemo(() => getGoalForDate(dateStr), [getGoalForDate, dateStr]);
+    const [{ targetHours, targetEarnings }, setGoalValues] = useState(() => createInitialGoalValues(goal));
 
     const currencyCode = normalizeCurrencyCode(preferences.currency);
     const currencySymbol = getCurrencySymbol(currencyCode);
-
-    useEffect(() => {
-        if (!isOpen) return;
-
-        setTargetHours(goal?.targetHours ? String(goal.targetHours) : '');
-        setTargetEarnings(goal?.targetEarnings ? String(goal.targetEarnings) : '');
-    }, [isOpen, goal]);
 
     const handleSave = () => {
         const hoursValue = targetHours === '' ? null : Number(targetHours);
@@ -102,7 +99,7 @@ const DailyGoalModal = ({ isOpen, onClose, dateStr }) => {
                                 value={targetHours}
                                 onChange={(e) => {
                                     if (e.target.value === '') {
-                                        setTargetHours('');
+                                        setGoalValues((prev) => ({ ...prev, targetHours: '' }));
                                         return;
                                     }
 
@@ -110,7 +107,7 @@ const DailyGoalModal = ({ isOpen, onClose, dateStr }) => {
                                     if (!Number.isFinite(parsed)) return;
 
                                     const clamped = Math.min(Math.max(parsed, 0.5), 24);
-                                    setTargetHours(String(clamped));
+                                    setGoalValues((prev) => ({ ...prev, targetHours: String(clamped) }));
                                 }}
                                 className="pl-9"
                             />
@@ -130,7 +127,7 @@ const DailyGoalModal = ({ isOpen, onClose, dateStr }) => {
                                 step="1"
                                 placeholder="e.g., 500"
                                 value={targetEarnings}
-                                onChange={(e) => setTargetEarnings(e.target.value)}
+                                onChange={(e) => setGoalValues((prev) => ({ ...prev, targetEarnings: e.target.value }))}
                                 className="pl-7"
                             />
                         </div>

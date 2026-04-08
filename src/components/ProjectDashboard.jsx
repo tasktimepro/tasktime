@@ -9,6 +9,7 @@ import InvoicesList from './InvoicesList';
 import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { getInvoiceTotal, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
@@ -171,7 +172,7 @@ const ProjectDashboard = ({
         const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
         const invoiceMessage = shouldDeleteInvoices ? ' Associated invoices were also deleted.' : '';
         showSuccess(baseMessage + invoiceMessage);
-    }, [tasks, timeEntries, getTimerForProject, clearTimer, invoices, deleteInvoice, deleteProject, deleteTask, deleteEntry, showSuccess]);
+    }, [tasks, timeEntries, expenses, recurrences, getTimerForProject, clearTimer, invoices, deleteInvoice, deleteProject, deleteTask, deleteEntry, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showSuccess]);
 
     const handleEditProject = () => {
         openProjectModal?.(project);
@@ -221,18 +222,16 @@ const ProjectDashboard = ({
     const projectMetrics = useMemo(() => {
         // Total revenue from paid invoices only
         const totalRevenue = projectInvoices.reduce((total, invoice) => {
-            // Only include invoices that have been marked as paid
-            if (invoice.paymentProcessed) {
-                return total + (invoice.totalAmount || invoice.total || 0);
+            if (isInvoicePaid(invoice)) {
+                return total + getInvoiceTotal(invoice);
             }
             return total;
         }, 0);
 
         // Calculate pending amount from unpaid invoices
         const pendingAmount = projectInvoices.reduce((total, invoice) => {
-            // Only include invoices that have NOT been marked as paid
-            if (!invoice.paymentProcessed) {
-                return total + (invoice.totalAmount || invoice.total || 0);
+            if (!isInvoicePaid(invoice)) {
+                return total + getInvoiceTotal(invoice);
             }
             return total;
         }, 0);

@@ -8,7 +8,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import type { TimeEntry } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
-import { readEntity, objectToYMap } from '@/stores/yjs/entityUtils';
+import { objectToYMap } from '@/stores/yjs/entityUtils';
+import { readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 
 export interface UseTimeEntriesOptions {
     /** Filter to a specific task */
@@ -74,20 +75,6 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         return () => store.activeTimeEntries.unobserveDeep(handler);
     }, [isReady, store, syncEntries]);
 
-    // Auto-load years for date range
-    useEffect(() => {
-        if (!isReady || options.startDate === undefined || options.endDate === undefined) return;
-
-        const startYear = new Date(options.startDate).getFullYear();
-        const endYear = new Date(options.endDate).getFullYear();
-
-        for (let year = startYear; year <= endYear; year++) {
-            if (!store.isYearLoaded(year) && !loadingYears.has(year) && !loadedYears.has(year)) {
-                loadYear(year);
-            }
-        }
-    }, [isReady, options.startDate, options.endDate, store, loadingYears, loadedYears]);
-
     // Load entries for a specific year
     const loadYear = useCallback(async (year: number) => {
         if (loadingYears.has(year) || loadedYears.has(year)) return;
@@ -107,14 +94,28 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         }
     }, [loadEntriesForYear, loadingYears, loadedYears, syncEntries]);
 
+    // Auto-load years for date range
+    useEffect(() => {
+        if (!isReady || options.startDate === undefined || options.endDate === undefined) return;
+
+        const startYear = new Date(options.startDate).getFullYear();
+        const endYear = new Date(options.endDate).getFullYear();
+
+        for (let year = startYear; year <= endYear; year++) {
+            if (!store.isYearLoaded(year) && !loadingYears.has(year) && !loadedYears.has(year)) {
+                loadYear(year);
+            }
+        }
+    }, [isReady, options.startDate, options.endDate, store, loadingYears, loadedYears, loadYear]);
+
     // CRUD operations
     const createEntry = useCallback((data: Omit<TimeEntry, 'id'>): TimeEntry => {
         if (!isReady) throw new Error('Store not ready');
         
-        const entry: TimeEntry = {
+        const entry = validateCollectionEntity<TimeEntry>('timeEntries', {
             id: generateId(),
             ...data,
-        };
+        }, 'create time entry');
         const entityMap = objectToYMap(entry as unknown as Record<string, unknown>);
         (store.activeTimeEntries as any).set(entry.id, entityMap);
         return entry;
@@ -124,9 +125,9 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         if (!isReady) return undefined;
         
         // Check active entries first
-        const activeEntry = readEntity<TimeEntry>(store.activeTimeEntries.get(id));
+        const activeEntry = readValidatedEntity<TimeEntry>('timeEntries', store.activeTimeEntries.get(id), `update time entry ${id}`);
         if (activeEntry) {
-            const updated = { ...activeEntry, ...updates };
+            const updated = validateCollectionEntity<TimeEntry>('timeEntries', { ...activeEntry, ...updates }, `update time entry ${id}`);
             const entityMap = objectToYMap(updated as unknown as Record<string, unknown>);
             (store.activeTimeEntries as any).set(id, entityMap);
             return updated;

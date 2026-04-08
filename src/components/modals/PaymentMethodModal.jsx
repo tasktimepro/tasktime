@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../Modal';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
 import { useToast } from '../../hooks/useToast.ts';
@@ -9,6 +9,36 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import CustomCheckbox from '../CustomCheckbox';
 
+const createEmptyFormData = () => ({
+    title: '',
+    fullName: '',
+    bank: '',
+    iban: '',
+    swift: '',
+    bankAddress: '',
+    paypal: '',
+    custom: [],
+    isDefault: false
+});
+
+const createInitialFormData = (paymentMethod) => {
+    if (!paymentMethod) {
+        return createEmptyFormData();
+    }
+
+    return {
+        title: paymentMethod.title || '',
+        fullName: paymentMethod.fullName || '',
+        bank: paymentMethod.bank || '',
+        iban: paymentMethod.iban || '',
+        swift: paymentMethod.swift || '',
+        bankAddress: paymentMethod.bankAddress || '',
+        paypal: paymentMethod.paypal || '',
+        custom: [...(paymentMethod.custom || [])],
+        isDefault: paymentMethod.isDefault || false
+    };
+};
+
 /**
  * PaymentMethodModal - Modal for creating and editing payment methods
  */
@@ -18,48 +48,9 @@ const PaymentMethodModal = ({
     editingPaymentMethod = null
 }) => {
     const { showSuccess } = useToast();
-    const { paymentMethods, createPaymentMethod, updatePaymentMethod, setDefault } = usePaymentMethods();
+    const { createPaymentMethod, updatePaymentMethod, setDefault } = usePaymentMethods();
     
-    const [formData, setFormData] = useState({
-        title: '',
-        fullName: '',
-        bank: '',
-        iban: '',
-        swift: '',
-        bankAddress: '',
-        paypal: '',
-        custom: [],
-        isDefault: false
-    });
-
-    // Initialize form data when editing
-    useEffect(() => {
-        if (editingPaymentMethod) {
-            setFormData({
-                title: editingPaymentMethod.title || '',
-                fullName: editingPaymentMethod.fullName || '',
-                bank: editingPaymentMethod.bank || '',
-                iban: editingPaymentMethod.iban || '',
-                swift: editingPaymentMethod.swift || '',
-                bankAddress: editingPaymentMethod.bankAddress || '',
-                paypal: editingPaymentMethod.paypal || '',
-                custom: [...(editingPaymentMethod.custom || [])],
-                isDefault: editingPaymentMethod.isDefault || false
-            });
-        } else {
-            setFormData({
-                title: '',
-                fullName: '',
-                bank: '',
-                iban: '',
-                swift: '',
-                bankAddress: '',
-                paypal: '',
-                custom: [],
-                isDefault: false
-            });
-        }
-    }, [editingPaymentMethod, isOpen]);
+    const [formData, setFormData] = useState(() => createInitialFormData(editingPaymentMethod));
 
     /**
      * Handle form input changes

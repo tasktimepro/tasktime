@@ -39,6 +39,7 @@ describe('useGoogleAuth', () => {
     beforeEach(() => {
         vi.restoreAllMocks()
         vi.clearAllMocks()
+        window.sessionStorage.clear()
         vi.stubGlobal('fetch', vi.fn())
         vi.spyOn(window, 'open').mockImplementation(() => createPopupStub())
     })
@@ -72,6 +73,41 @@ describe('useGoogleAuth', () => {
         expect(result.current.hadPreviousSession).toBe(true)
         expect(clearStoredSession).toHaveBeenCalledTimes(1)
         expect(fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('keeps hadPreviousSession true after an invalid stored session is cleared and auth re-checks run again', async () => {
+        getStoredSession
+            .mockResolvedValueOnce({
+                sessionId: 'session-123',
+                userId: 'user-1',
+                email: 'user@example.com',
+                createdAt: new Date().toISOString(),
+            })
+            .mockResolvedValue(null)
+
+        fetch.mockResolvedValueOnce({
+            ok: false,
+            status: 401,
+            json: async () => ({ authenticated: false }),
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        expect(result.current.hadPreviousSession).toBe(true)
+
+        act(() => {
+            window.dispatchEvent(new Event('online'))
+        })
+
+        await waitFor(() => {
+            expect(getStoredSession).toHaveBeenCalledTimes(2)
+        })
+
+        expect(result.current.hadPreviousSession).toBe(true)
     })
 
     it('restores signed-in state when session and Drive access are valid', async () => {

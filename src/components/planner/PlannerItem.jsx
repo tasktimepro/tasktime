@@ -33,7 +33,6 @@ import { formatCurrency } from '@/utils/currencyUtils.ts';
  * @param {'client' | 'project' | 'task' | 'expense'} props.type - Type of item
  * @param {string} props.title - Display title
  * @param {boolean} props.isCompleted - Whether item is completed (tasks only)
- * @param {boolean} props.isStatic - Whether item is pinned (static/weekday mode)
  * @param {'recurring' | 'due' | 'attached' | 'timer' | 'worked'} props.subtype - Task subtype (tasks only)
  * @param {string | null} props.color - Color tag (hex color)
  * @param {number | null} props.estimatedHours - Estimated hours for this item
@@ -56,7 +55,6 @@ const PlannerItem = ({
     type,
     title,
     isCompleted = false,
-    isStatic = false,
     subtype,
     color,
     estimatedHours,
@@ -154,7 +152,7 @@ const PlannerItem = ({
             : [taskSubtypeLabel, hasTarget ? `${estimatedHours}h plan` : null, actualTimeMs > 0 ? `${formatTime(actualTimeMs)} worked` : null].filter(Boolean))
         : [];
     
-    const handleClick = (e) => {
+    const handleClick = () => {
         // Don't trigger click if menu is open
         if (menuOpen) {
             if (!canShowMenu) {

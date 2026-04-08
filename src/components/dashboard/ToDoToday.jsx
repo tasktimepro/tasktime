@@ -30,7 +30,6 @@ import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
  * @param {Function} props.getTaskCompletedStatus
  * @param {Function} props.renderTaskTitle
  * @param {Function} props.renderTaskControls
- * @param {Function} props.handleProjectTitleClick
  * @param {Function} props.onTaskTitleClick
  * @param {Function} props.onEditTask
  * @param {Function} props.onDeleteTask
@@ -45,7 +44,6 @@ const ToDoToday = ({
     getTaskCompletedStatus,
     renderTaskTitle,
     renderTaskControls,
-    handleProjectTitleClick,
     onTaskTitleClick,
     onEditTask,
     onDeleteTask,
@@ -424,7 +422,7 @@ const ToDoToday = ({
                             icon={ListTodoIcon}
                             title="Nothing due today"
                             description="You're all caught up."
-                            className="pt-0 pb-6"
+                            className="pt-4 pb-6"
                         />
                     )}
 

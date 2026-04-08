@@ -31,6 +31,59 @@ const NO_BUSINESS_VALUE = 'no-business';
 const DEFAULT_REPEAT = 'monthly';
 const DEFAULT_AMOUNT_TYPE = 'fixed';
 
+const buildEmptyFormData = (todayString, currency) => ({
+    title: '',
+    note: '',
+    date: todayString,
+    supplierName: '',
+    receiptNumber: '',
+    amount: '',
+    currency,
+    paidOn: '',
+    paidBy: '',
+    paymentMode: 'manual',
+    clientId: NO_CLIENT_VALUE,
+    projectId: NO_PROJECT_VALUE,
+    businessId: '',
+    isPersonal: true,
+    billable: false,
+    isRecurring: false,
+    repeat: DEFAULT_REPEAT,
+    startDate: todayString,
+    endDate: '',
+    amountType: DEFAULT_AMOUNT_TYPE,
+    monthlyType: 'first',
+    monthlyDay: 1,
+    taxNumber: '',
+    isTaxExempt: false,
+});
+
+const applyScopedProjectContext = (nextFormData, scopedProject, businessInfos, defaultBusinessInfo) => {
+    if (!scopedProject) {
+        return nextFormData;
+    }
+
+    const nextIsPersonal = scopedProject.isPersonal !== false;
+    const nextBusinessId = nextIsPersonal
+        ? ''
+        : (nextFormData.businessId || defaultBusinessInfo?.id || '');
+    const selectedBusinessInfo = businessInfos.find((info) => info.id === nextBusinessId);
+
+    return {
+        ...nextFormData,
+        clientId: nextIsPersonal
+            ? NO_CLIENT_VALUE
+            : (scopedProject.preferredClientId || NO_CLIENT_VALUE),
+        projectId: scopedProject.id,
+        businessId: nextBusinessId,
+        isPersonal: nextIsPersonal,
+        billable: nextIsPersonal ? false : nextFormData.billable,
+        taxNumber: nextIsPersonal
+            ? ''
+            : (selectedBusinessInfo?.taxNumber || nextFormData.taxNumber || ''),
+    };
+};
+
 /**
  * @param {Object} props
  * @param {boolean} props.isOpen
@@ -69,97 +122,99 @@ const ExpenseModal = ({
         return projects.filter((project) => !project.archived);
     }, [projects]);
 
-    const [formData, setFormData] = useState({
-        title: '',
-        note: '',
-        date: todayString,
-        supplierName: '',
-        receiptNumber: '',
-        amount: '',
-        currency: preferences.currency || DEFAULT_CURRENCY,
-        paidOn: '',
-        paidBy: '',
-        paymentMode: 'manual',
-        clientId: NO_CLIENT_VALUE,
-        projectId: NO_PROJECT_VALUE,
-        businessId: '',
-        isPersonal: true,
-        billable: false,
-        isRecurring: false,
-        repeat: DEFAULT_REPEAT,
-        startDate: todayString,
-        endDate: '',
-        amountType: DEFAULT_AMOUNT_TYPE,
-        monthlyType: 'first',
-        monthlyDay: 1,
-        taxNumber: '',
-        isTaxExempt: false,
-    });
+    const scopedProjectId = !editingExpense && !modalOptions?.recurrenceId
+        ? (modalOptions?.projectId || null)
+        : null;
 
-    const [editingRecurrenceId, setEditingRecurrenceId] = useState(null);
-    const [confirmDialog, setConfirmDialog] = useState(null);
-
-    const isEditingTemplate = Boolean(editingRecurrenceId);
-    const isEditingInstance = Boolean(editingExpense) && !isEditingTemplate;
-    const isSubmittingRecurring = Boolean(editingExpense?.isRecurring && !editingRecurrenceId);
-    const showOneTimeFields = !formData.isRecurring || isEditingInstance;
-    const showRecurringFields = formData.isRecurring && !isEditingInstance;
-    const typeSelectionLocked = Boolean(editingExpense?.isRecurring || editingRecurrenceId);
-    const recurringFieldsLocked = Boolean(editingExpense?.isRecurring && !editingRecurrenceId);
-
-    const lastInitializedRef = useRef({ initialized: false, expenseId: undefined, recurrenceId: undefined });
-    const titleInputRef = useRef(null);
-
-    useEffect(() => {
-        if (!isOpen) {
-            lastInitializedRef.current = { initialized: false, expenseId: undefined, recurrenceId: undefined };
-            setEditingRecurrenceId(null);
-            return;
+    const scopedProject = useMemo(() => {
+        if (!scopedProjectId) {
+            return null;
         }
 
-        const focusTimer = setTimeout(() => {
-            titleInputRef.current?.focus();
-        }, 0);
+        const matchingProject = projects.find((project) => project.id === scopedProjectId);
+        if (matchingProject) {
+            return matchingProject;
+        }
 
-        return () => clearTimeout(focusTimer);
-    }, [isOpen]);
+        return {
+            id: scopedProjectId,
+            preferredClientId: modalOptions?.clientId || null,
+            isPersonal: !modalOptions?.clientId,
+        };
+    }, [modalOptions?.clientId, projects, scopedProjectId]);
 
-    useEffect(() => {
+    const isProjectContextFixed = Boolean(scopedProjectId);
+    const defaultCurrency = preferences.currency || DEFAULT_CURRENCY;
+    const emptyFormData = useMemo(() => buildEmptyFormData(todayString, defaultCurrency), [defaultCurrency, todayString]);
+    const [confirmDialog, setConfirmDialog] = useState(null);
+    const titleInputRef = useRef(null);
+
+    const draftStateKey = useMemo(() => {
         if (!isOpen) {
-            return;
+            return 'closed';
+        }
+
+        return JSON.stringify({
+            expenseId: editingExpense?.id || null,
+            recurrenceId: modalOptions?.recurrenceId || null,
+            modalClientId: modalOptions?.clientId || null,
+            modalProjectId: modalOptions?.projectId || null,
+            modalDate: modalOptions?.date || null,
+            modalIsRecurring: Boolean(modalOptions?.isRecurring),
+            projectId: scopedProject?.id || null,
+            projectIsPersonal: scopedProject ? scopedProject.isPersonal !== false : null,
+            projectClientId: scopedProject?.preferredClientId || null,
+            defaultBusinessId: defaultBusinessInfo?.id || null,
+            defaultPaymentMethodId: defaultPaymentMethod?.id || null,
+            defaultCurrency,
+        });
+    }, [
+        defaultBusinessInfo?.id,
+        defaultCurrency,
+        defaultPaymentMethod?.id,
+        editingExpense?.id,
+        isOpen,
+        modalOptions?.clientId,
+        modalOptions?.date,
+        modalOptions?.isRecurring,
+        modalOptions?.projectId,
+        modalOptions?.recurrenceId,
+        scopedProject,
+    ]);
+
+    const initialDraftState = useMemo(() => {
+        if (!isOpen) {
+            return {
+                key: draftStateKey,
+                formData: emptyFormData,
+                editingRecurrenceId: null,
+                missingRecurrenceId: null,
+            };
         }
 
         const currentEditingExpenseId = editingExpense?.id || null;
         const currentEditingRecurrenceId = modalOptions?.recurrenceId || null;
-
-        if (
-            lastInitializedRef.current.initialized
-            && lastInitializedRef.current.expenseId === currentEditingExpenseId
-            && lastInitializedRef.current.recurrenceId === currentEditingRecurrenceId
-        ) {
-            return;
-        }
-
-        lastInitializedRef.current = {
-            initialized: true,
-            expenseId: currentEditingExpenseId,
-            recurrenceId: currentEditingRecurrenceId,
-        };
-
         const savedState = getSavedState ? getSavedState() : null;
         const savedEditingExpenseId = savedState?.editingExpenseId || null;
 
         if (savedState && savedEditingExpenseId === currentEditingExpenseId) {
-            const { editingExpenseId, ...rest } = savedState;
-            setFormData((prev) => ({
-                ...prev,
-                ...rest,
-            }));
-            return;
+            const restoredFormData = { ...savedState };
+            delete restoredFormData.editingExpenseId;
+
+            return {
+                key: draftStateKey,
+                formData: applyScopedProjectContext(
+                    restoredFormData,
+                    scopedProject,
+                    businessInfos,
+                    defaultBusinessInfo,
+                ),
+                editingRecurrenceId: currentEditingRecurrenceId,
+                missingRecurrenceId: null,
+            };
         }
 
         if (editingExpense) {
-            setEditingRecurrenceId(null);
             const recurrenceTemplate = editingExpense.recurrenceId
                 ? getRecurrence(editingExpense.recurrenceId)
                 : null;
@@ -173,10 +228,11 @@ const ExpenseModal = ({
                 ? recurrenceTemplate?.amount
                 : editingExpense.amount;
             const isPersonal = editingExpense.isPersonal !== false;
-            const resolvedPaidBy = isSubmittingRecurring
+            const isRecurringSubmission = Boolean(editingExpense.isRecurring);
+            const initialPaidBy = isRecurringSubmission
                 ? (recurrencePaidBy || editingExpense.paidBy || '')
                 : (editingExpense.paidBy || recurrencePaidBy || '');
-            const resolvedPaidOn = isSubmittingRecurring
+            const initialPaidOn = isRecurringSubmission
                 ? (editingExpense.paidOn || todayString)
                 : (editingExpense.paidOn || '');
             const resolvedBusinessId = isPersonal
@@ -186,43 +242,52 @@ const ExpenseModal = ({
             const resolvedTaxNumber = isPersonal
                 ? ''
                 : (resolvedBusiness?.taxNumber || editingExpense.taxNumber || '');
-            setFormData({
-                title: editingExpense.title || '',
-                note: editingExpense.note || '',
-                date: editingExpense.date || todayString,
-                supplierName: editingExpense.supplierName || '',
-                receiptNumber: editingExpense.receiptNumber || '',
-                amount: resolvedAmount != null ? String(resolvedAmount) : '',
-                currency: editingExpense.currency || preferences.currency || DEFAULT_CURRENCY,
-                paidOn: resolvedPaidOn,
-                paidBy: resolvedPaidBy,
-                paymentMode: resolvedPaymentMode,
-                clientId: editingExpense.clientId || NO_CLIENT_VALUE,
-                projectId: editingExpense.projectId || NO_PROJECT_VALUE,
-                businessId: resolvedBusinessId,
-                isPersonal,
-                billable: editingExpense.billable === true,
-                isRecurring: Boolean(editingExpense.isRecurring),
-                repeat: DEFAULT_REPEAT,
-                startDate: editingExpense.date || todayString,
-                endDate: '',
-                amountType: editingExpense.amountType || DEFAULT_AMOUNT_TYPE,
-                monthlyType: (editingExpense.date || todayString).split('-')[2] === '01' ? 'first' : 'specific',
-                monthlyDay: Number((editingExpense.date || todayString).split('-')[2]) || 1,
-                taxNumber: resolvedTaxNumber,
-                isTaxExempt: editingExpense.isTaxExempt === true,
-            });
-            return;
+
+            return {
+                key: draftStateKey,
+                formData: {
+                    title: editingExpense.title || '',
+                    note: editingExpense.note || '',
+                    date: editingExpense.date || todayString,
+                    supplierName: editingExpense.supplierName || '',
+                    receiptNumber: editingExpense.receiptNumber || '',
+                    amount: resolvedAmount != null ? String(resolvedAmount) : '',
+                    currency: editingExpense.currency || defaultCurrency,
+                    paidOn: initialPaidOn,
+                    paidBy: initialPaidBy,
+                    paymentMode: resolvedPaymentMode,
+                    clientId: editingExpense.clientId || NO_CLIENT_VALUE,
+                    projectId: editingExpense.projectId || NO_PROJECT_VALUE,
+                    businessId: resolvedBusinessId,
+                    isPersonal,
+                    billable: editingExpense.billable === true,
+                    isRecurring: Boolean(editingExpense.isRecurring),
+                    repeat: DEFAULT_REPEAT,
+                    startDate: editingExpense.date || todayString,
+                    endDate: '',
+                    amountType: editingExpense.amountType || DEFAULT_AMOUNT_TYPE,
+                    monthlyType: (editingExpense.date || todayString).split('-')[2] === '01' ? 'first' : 'specific',
+                    monthlyDay: Number((editingExpense.date || todayString).split('-')[2]) || 1,
+                    taxNumber: resolvedTaxNumber,
+                    isTaxExempt: editingExpense.isTaxExempt === true,
+                },
+                editingRecurrenceId: null,
+                missingRecurrenceId: null,
+            };
         }
 
         if (currentEditingRecurrenceId) {
             const recurrence = getRecurrence(currentEditingRecurrenceId);
+
             if (!recurrence) {
-                showError('Recurring expense not found');
-                return;
+                return {
+                    key: draftStateKey,
+                    formData: emptyFormData,
+                    editingRecurrenceId: null,
+                    missingRecurrenceId: currentEditingRecurrenceId,
+                };
             }
 
-            setEditingRecurrenceId(recurrence.id);
             const isPersonal = recurrence.isPersonal !== false;
             const resolvedBusinessId = isPersonal
                 ? ''
@@ -231,86 +296,142 @@ const ExpenseModal = ({
             const resolvedTaxNumber = isPersonal
                 ? ''
                 : (resolvedBusiness?.taxNumber || recurrence.taxNumber || '');
-            setFormData({
-                title: recurrence.title || '',
-                note: recurrence.note || '',
-                date: recurrence.startDate || todayString,
-                supplierName: recurrence.supplierName || '',
-                receiptNumber: '',
-                amount: recurrence.amount != null ? String(recurrence.amount) : '',
-                currency: recurrence.currency || preferences.currency || DEFAULT_CURRENCY,
-                paidOn: '',
-                paidBy: recurrence.paidBy || '',
-                paymentMode: recurrence.paymentMode || 'manual',
-                clientId: recurrence.clientId || NO_CLIENT_VALUE,
-                projectId: recurrence.projectId || NO_PROJECT_VALUE,
-                businessId: resolvedBusinessId,
-                isPersonal,
-                billable: recurrence.billable === true,
-                isRecurring: true,
-                repeat: recurrence.repeat || DEFAULT_REPEAT,
-                startDate: recurrence.startDate || todayString,
-                endDate: recurrence.endDate || '',
-                amountType: recurrence.amountType || DEFAULT_AMOUNT_TYPE,
-                monthlyType: recurrence.monthlyType
-                    || ((recurrence.startDate || todayString).split('-')[2] === '01' ? 'first' : 'specific'),
-                monthlyDay: recurrence.monthlyDay
-                    || Number((recurrence.startDate || todayString).split('-')[2])
-                    || 1,
-                taxNumber: resolvedTaxNumber,
-                isTaxExempt: recurrence.isTaxExempt === true,
-            });
-            return;
+
+            return {
+                key: draftStateKey,
+                formData: {
+                    title: recurrence.title || '',
+                    note: recurrence.note || '',
+                    date: recurrence.startDate || todayString,
+                    supplierName: recurrence.supplierName || '',
+                    receiptNumber: '',
+                    amount: recurrence.amount != null ? String(recurrence.amount) : '',
+                    currency: recurrence.currency || defaultCurrency,
+                    paidOn: '',
+                    paidBy: recurrence.paidBy || '',
+                    paymentMode: recurrence.paymentMode || 'manual',
+                    clientId: recurrence.clientId || NO_CLIENT_VALUE,
+                    projectId: recurrence.projectId || NO_PROJECT_VALUE,
+                    businessId: resolvedBusinessId,
+                    isPersonal,
+                    billable: recurrence.billable === true,
+                    isRecurring: true,
+                    repeat: recurrence.repeat || DEFAULT_REPEAT,
+                    startDate: recurrence.startDate || todayString,
+                    endDate: recurrence.endDate || '',
+                    amountType: recurrence.amountType || DEFAULT_AMOUNT_TYPE,
+                    monthlyType: recurrence.monthlyType
+                        || ((recurrence.startDate || todayString).split('-')[2] === '01' ? 'first' : 'specific'),
+                    monthlyDay: recurrence.monthlyDay
+                        || Number((recurrence.startDate || todayString).split('-')[2])
+                        || 1,
+                    taxNumber: resolvedTaxNumber,
+                    isTaxExempt: recurrence.isTaxExempt === true,
+                },
+                editingRecurrenceId: recurrence.id,
+                missingRecurrenceId: null,
+            };
         }
 
-        const defaultCurrency = preferences.currency || DEFAULT_CURRENCY;
-        const initialClientId = modalOptions?.clientId || NO_CLIENT_VALUE;
-        const initialProjectId = modalOptions?.projectId || NO_PROJECT_VALUE;
-        const isPersonal = !modalOptions?.clientId && !modalOptions?.projectId;
+        const scopedProjectIsPersonal = scopedProject ? scopedProject.isPersonal !== false : null;
+        const isPersonal = scopedProjectIsPersonal ?? (!modalOptions?.clientId && !modalOptions?.projectId);
+        const initialClientId = scopedProjectIsPersonal === true
+            ? NO_CLIENT_VALUE
+            : (scopedProject?.preferredClientId || modalOptions?.clientId || NO_CLIENT_VALUE);
+        const initialProjectId = scopedProject?.id || modalOptions?.projectId || NO_PROJECT_VALUE;
         const shouldStartRecurring = Boolean(modalOptions?.isRecurring);
         const defaultPaidBy = defaultPaymentMethod?.id || '';
         const defaultBusinessId = isPersonal ? '' : (defaultBusinessInfo?.id || '');
         const defaultBusiness = businessInfos.find((info) => info.id === defaultBusinessId);
         const defaultTaxNumber = isPersonal ? '' : (defaultBusiness?.taxNumber || '');
 
-        setFormData({
-            title: '',
-            note: '',
-            date: modalOptions?.date || todayString,
-            supplierName: '',
-            receiptNumber: '',
-            amount: '',
-            currency: defaultCurrency,
-            paidOn: '',
-            paidBy: defaultPaidBy,
-            paymentMode: 'manual',
-            clientId: initialClientId,
-            projectId: initialProjectId,
-            businessId: defaultBusinessId,
-            isPersonal,
-            billable: false,
-            isRecurring: shouldStartRecurring,
-            repeat: DEFAULT_REPEAT,
-            startDate: modalOptions?.date || todayString,
-            endDate: '',
-            amountType: DEFAULT_AMOUNT_TYPE,
-            monthlyType: 'first',
-            monthlyDay: 1,
-            taxNumber: defaultTaxNumber,
-            isTaxExempt: false,
-        });
+        return {
+            key: draftStateKey,
+            formData: applyScopedProjectContext({
+                ...emptyFormData,
+                date: modalOptions?.date || todayString,
+                currency: defaultCurrency,
+                paidBy: defaultPaidBy,
+                clientId: initialClientId,
+                projectId: initialProjectId,
+                businessId: defaultBusinessId,
+                isPersonal,
+                isRecurring: shouldStartRecurring,
+                startDate: modalOptions?.date || todayString,
+                taxNumber: defaultTaxNumber,
+            }, scopedProject, businessInfos, defaultBusinessInfo),
+            editingRecurrenceId: null,
+            missingRecurrenceId: null,
+        };
     }, [
-        isOpen,
+        businessInfos,
+        defaultBusinessInfo,
+        defaultCurrency,
+        defaultPaymentMethod?.id,
+        draftStateKey,
         editingExpense,
+        emptyFormData,
         getRecurrence,
         getSavedState,
+        isOpen,
         modalOptions,
-        preferences.currency,
+        scopedProject,
         todayString,
-        businessInfos,
-        defaultBusinessInfo?.id,
-        defaultPaymentMethod?.id
     ]);
+
+    const [draftState, setDraftState] = useState(initialDraftState);
+
+    if (draftState.key !== initialDraftState.key) {
+        setDraftState(initialDraftState);
+    }
+
+    const activeDraftState = draftState.key === initialDraftState.key ? draftState : initialDraftState;
+    const { formData, editingRecurrenceId, missingRecurrenceId } = activeDraftState;
+    const isEditingTemplate = Boolean(editingRecurrenceId);
+    const isEditingInstance = Boolean(editingExpense) && !isEditingTemplate;
+    const isSubmittingRecurring = Boolean(editingExpense?.isRecurring && !editingRecurrenceId);
+    const showOneTimeFields = !formData.isRecurring || isEditingInstance;
+    const showRecurringFields = formData.isRecurring && !isEditingInstance;
+    const typeSelectionLocked = Boolean(editingExpense?.isRecurring || editingRecurrenceId);
+    const recurringFieldsLocked = Boolean(editingExpense?.isRecurring && !editingRecurrenceId);
+
+    const setFormData = (updater) => {
+        setDraftState((prevState) => {
+            const baseState = prevState.key === initialDraftState.key ? prevState : initialDraftState;
+            const nextFormData = typeof updater === 'function'
+                ? updater(baseState.formData)
+                : updater;
+
+            if (nextFormData === baseState.formData) {
+                return baseState;
+            }
+
+            return {
+                ...baseState,
+                formData: nextFormData,
+            };
+        });
+    };
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        const focusTimer = setTimeout(() => {
+            titleInputRef.current?.focus();
+        }, 0);
+
+        return () => clearTimeout(focusTimer);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen || !missingRecurrenceId) {
+            return;
+        }
+
+        showError('Recurring expense not found');
+    }, [isOpen, missingRecurrenceId, showError]);
 
     useEffect(() => {
         if (!saveFormState || !isOpen) {
@@ -327,36 +448,9 @@ const ExpenseModal = ({
         return () => clearTimeout(timeoutId);
     }, [formData, saveFormState, editingExpense, isOpen]);
 
-    useEffect(() => {
-        if (!isOpen || editingExpense || editingRecurrenceId) {
-            return;
-        }
-
-        if (formData.paidBy || !defaultPaymentMethod?.id) {
-            return;
-        }
-
-        setFormData((prev) => ({
-            ...prev,
-            paidBy: defaultPaymentMethod.id
-        }));
-    }, [defaultPaymentMethod?.id, editingExpense, editingRecurrenceId, formData.paidBy, isOpen]);
-
-    useEffect(() => {
-        if (!isOpen || formData.isPersonal || !formData.businessId) {
-            return;
-        }
-
-        const nextBusiness = businessInfos.find((info) => info.id === formData.businessId);
-        const nextTaxNumber = nextBusiness?.taxNumber || '';
-
-        if (formData.taxNumber !== nextTaxNumber) {
-            setFormData((prev) => ({
-                ...prev,
-                taxNumber: nextTaxNumber
-            }));
-        }
-    }, [businessInfos, formData.businessId, formData.isPersonal, formData.taxNumber, isOpen]);
+    const resolvedPaidBy = formData.paidBy || (!editingExpense && !editingRecurrenceId
+        ? (defaultPaymentMethod?.id || '')
+        : '');
 
     const handleChange = (field, value) => {
         setFormData((prev) => ({
@@ -616,7 +710,7 @@ const ExpenseModal = ({
             currency: formData.currency || DEFAULT_CURRENCY,
             amount: amountValue || 0,
             paidOn: resolvedPaidOn,
-            paidBy: formData.paidBy ? formData.paidBy : null,
+            paidBy: resolvedPaidBy || null,
             paymentStatus: isAutoPayment
                 ? 'paid'
                 : (showOneTimeFields && formData.paidOn ? 'paid' : 'unpaid'),
@@ -735,13 +829,9 @@ const ExpenseModal = ({
         onClose();
     };
 
-    const selectedBusiness = useMemo(() => {
-        if (formData.isPersonal || !formData.businessId) {
-            return null;
-        }
-
-        return businessInfos.find((info) => info.id === formData.businessId) || null;
-    }, [businessInfos, formData.businessId, formData.isPersonal]);
+    const selectedBusiness = formData.isPersonal || !formData.businessId
+        ? null
+        : (businessInfos.find((info) => info.id === formData.businessId) || null);
 
     const availableProjects = useMemo(() => {
         if (formData.isPersonal) {
@@ -950,7 +1040,7 @@ const ExpenseModal = ({
                         <div className="space-y-2">
                             <Label htmlFor="expense-paid-by-recurring">Payment Method</Label>
                             <Select
-                                value={formData.paidBy}
+                                value={resolvedPaidBy}
                                 onValueChange={(value) => handleChange('paidBy', value)}
                             >
                                 <SelectTrigger id="expense-paid-by-recurring">
@@ -1089,7 +1179,7 @@ const ExpenseModal = ({
                             <div className="space-y-2">
                                 <Label htmlFor="expense-paid-by">Payment Method</Label>
                                 <Select
-                                    value={formData.paidBy}
+                                    value={resolvedPaidBy}
                                     onValueChange={(value) => handleChange('paidBy', value)}
                                 >
                                     <SelectTrigger id="expense-paid-by">
@@ -1131,6 +1221,7 @@ const ExpenseModal = ({
                             <CustomCheckbox
                                 checked={!formData.isPersonal}
                                 onChange={handleBusinessToggle}
+                                disabled={isProjectContextFixed}
                                 label="Business Expense"
                             />
                             {!formData.isPersonal && (
@@ -1144,12 +1235,13 @@ const ExpenseModal = ({
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             {!formData.isPersonal && (
                                 <div className="space-y-2">
-                                    <Label>Client</Label>
+                                    <Label htmlFor="expense-client">Client</Label>
                                     <Select
                                         value={formData.clientId === NO_CLIENT_VALUE ? '' : formData.clientId}
                                         onValueChange={handleClientChange}
+                                        disabled={isProjectContextFixed}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger id="expense-client">
                                             <SelectValue placeholder="Select client" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -1166,12 +1258,13 @@ const ExpenseModal = ({
                                 </div>
                             )}
                             <div className="space-y-2">
-                                <Label>Project</Label>
+                                <Label htmlFor="expense-project">Project</Label>
                                 <Select
                                     value={formData.projectId === NO_PROJECT_VALUE ? '' : formData.projectId}
                                     onValueChange={handleProjectChange}
+                                    disabled={isProjectContextFixed}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger id="expense-project">
                                         <SelectValue placeholder="Select project" />
                                     </SelectTrigger>
                                     <SelectContent>

@@ -41,6 +41,7 @@ import { cn } from '@/lib/utils.ts';
  * @param {string} props.description - Modal description for accessibility (optional)
  * @param {string} props.size - Modal size (sm, md, lg, xl, 2xl, 3xl, 4xl, 5xl, 6xl, 7xl, full)
  * @param {boolean} props.showCloseButton - Whether to show the close button (default: true)
+ * @param {boolean} props.hideHeader - Whether to visually hide the modal header while preserving accessible title/description
  * @param {string} props.className - Additional class names for the modal content wrapper
  * @param {React.ReactNode} props.footer - Footer content (optional) - USE THIS FOR ACTION BUTTONS
  */
@@ -52,8 +53,10 @@ const Modal = ({
     description,
     size = 'md',
     showCloseButton = true,
+    hideHeader = false,
     className = '',
     footer,
+    contentRef,
 }) => {
 
     // Map size prop to max-width classes
@@ -84,33 +87,42 @@ const Modal = ({
                 hideCloseButton
             >
                 {/* Header */}
-                {(title || description || showCloseButton) && (
-                    <div className={cn('flex flex-shrink-0 items-center gap-3 px-4 py-2 md:px-6 md:py-4', !(title || description) && 'justify-end')}>
-                        {(title || description) && (
-                            <DialogHeader className="min-w-0 flex-1 py-0">
-                                {title && <DialogTitle>{title}</DialogTitle>}
-                                {description && <DialogDescription>{description}</DialogDescription>}
-                            </DialogHeader>
-                        )}
+                {hideHeader ? (
+                    (title || description) ? (
+                        <DialogHeader className="sr-only">
+                            {title && <DialogTitle>{title}</DialogTitle>}
+                            {description && <DialogDescription>{description}</DialogDescription>}
+                        </DialogHeader>
+                    ) : null
+                ) : (
+                    (title || description || showCloseButton) && (
+                        <div className={cn('flex flex-shrink-0 items-center gap-3 px-4 py-2 md:px-6 md:py-4', !(title || description) && 'justify-end')}>
+                            {(title || description) && (
+                                <DialogHeader className="min-w-0 flex-1 py-0">
+                                    {title && <DialogTitle>{title}</DialogTitle>}
+                                    {description && <DialogDescription>{description}</DialogDescription>}
+                                </DialogHeader>
+                            )}
 
-                        {showCloseButton && (
-                            <DialogClose asChild>
-                                <Button
-                                    variant="outline"
-                                    size="icon-sm"
-                                    className="rounded-full"
-                                    aria-label="Close dialog"
-                                >
-                                    <XMarkIcon className="h-5 w-5" />
-                                    <span className="sr-only">Close</span>
-                                </Button>
-                            </DialogClose>
-                        )}
-                    </div>
+                            {showCloseButton && (
+                                <DialogClose asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="icon-sm"
+                                        className="rounded-full"
+                                        aria-label="Close dialog"
+                                    >
+                                        <XMarkIcon className="h-5 w-5" />
+                                        <span className="sr-only">Close</span>
+                                    </Button>
+                                </DialogClose>
+                            )}
+                        </div>
+                    )
                 )}
                 
                 {/* Scrollable Content */}
-                <div className="flex-1 overflow-x-hidden overflow-y-auto px-4 py-3.5 sm:px-6 sm:py-4">
+                <div ref={contentRef} className="flex-1 overflow-x-hidden overflow-y-auto px-4 py-3.5 sm:px-6 sm:py-4">
                     {children}
                 </div>
 
@@ -133,8 +145,13 @@ Modal.propTypes = {
     description: PropTypes.string,
     size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', 'full']),
     showCloseButton: PropTypes.bool,
+    hideHeader: PropTypes.bool,
     className: PropTypes.string,
     footer: PropTypes.node,
+    contentRef: PropTypes.oneOfType([
+        PropTypes.func,
+        PropTypes.shape({ current: PropTypes.any }),
+    ]),
 };
 
 export default Modal;

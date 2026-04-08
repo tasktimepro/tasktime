@@ -4,6 +4,7 @@ import CustomCheckbox from '../CustomCheckbox';
 import Modal from '../Modal';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { InlineFieldHeader } from '@/components/ui/inline-field-header';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -244,11 +245,8 @@ const InvoiceModal = ({
                         <div className="p-4 space-y-4">
                             {/* Client Info Selection */}
                             <div className="mb-6">
-                                <div className="flex justify-between items-center mb-1">
-                                    <h4 className="text-sm font-medium text-foreground">
-                                        Client <span className="text-destructive-strong">*</span>
-                                    </h4>
-                                    {openClientModal && !isClientContextFixed && !editingInvoice && !(selectedProject && selectedProject.preferredClientId) && (
+                                <InlineFieldHeader
+                                    action={openClientModal && !isClientContextFixed && !editingInvoice && !(selectedProject && selectedProject.preferredClientId) ? (
                                         <Button
                                             type="button"
                                             variant="link"
@@ -264,8 +262,12 @@ const InvoiceModal = ({
                                         >
                                             + New Client
                                         </Button>
-                                    )}
-                                </div>
+                                    ) : null}
+                                >
+                                    <h4 className="text-sm font-medium text-foreground">
+                                        Client <span className="text-destructive-strong">*</span>
+                                    </h4>
+                                </InlineFieldHeader>
 
                                 {clients.length === 0 ? (
                                     <Notice
@@ -308,11 +310,8 @@ const InvoiceModal = ({
 
                             {/* Project selection */}
                             <div className="mb-6">
-                                <div className="flex justify-between items-center mb-1">
-                                    <h4 className="text-sm font-medium text-foreground">
-                                        Project
-                                    </h4>
-                                    {openProjectModal && !(isProjectContextFixed && !isClientContextFixed) && !editingInvoice && (
+                                <InlineFieldHeader
+                                    action={openProjectModal && !(isProjectContextFixed && !isClientContextFixed) && !editingInvoice ? (
                                         <Button
                                             type="button"
                                             variant="link"
@@ -332,8 +331,12 @@ const InvoiceModal = ({
                                         >
                                             + New Project
                                         </Button>
-                                    )}
-                                </div>
+                                    ) : null}
+                                >
+                                    <h4 className="text-sm font-medium text-foreground">
+                                        Project
+                                    </h4>
+                                </InlineFieldHeader>
 
                                 {projects.length === 0 ? (
                                     <Notice
@@ -530,26 +533,29 @@ const InvoiceModal = ({
                         <div className="p-4 space-y-4">
                             {/* Business information */}
                             <div className="mb-6">
-                                <div className="flex justify-between items-center mb-1">
+                                <InlineFieldHeader
+                                    action={(
+                                        <Button
+                                            type="button"
+                                            variant="link"
+                                            size="sm"
+                                            className="h-auto p-0"
+                                            onClick={() => {
+                                                if (openBusinessModal) {
+                                                    // Save current form state before opening nested modal
+                                                    saveCurrentFormState();
+                                                    openBusinessModal();
+                                                }
+                                            }}
+                                        >
+                                            + New Business
+                                        </Button>
+                                    )}
+                                >
                                     <h4 className="text-sm font-medium text-foreground">
                                         Business
                                     </h4>
-                                    <Button
-                                        type="button"
-                                        variant="link"
-                                        size="sm"
-                                        className="h-auto p-0"
-                                        onClick={() => {
-                                            if (openBusinessModal) {
-                                                // Save current form state before opening nested modal
-                                                saveCurrentFormState();
-                                                openBusinessModal();
-                                            }
-                                        }}
-                                    >
-                                        + New Business
-                                    </Button>
-                                </div>
+                                </InlineFieldHeader>
 
                                 {businessInfos.length === 0 ? (
                                     <Notice
@@ -596,26 +602,29 @@ const InvoiceModal = ({
 
                             {/* Payment method */}
                             <div className="mb-6">
-                                <div className="flex justify-between items-center mb-1">
+                                <InlineFieldHeader
+                                    action={(
+                                        <Button
+                                            type="button"
+                                            variant="link"
+                                            size="sm"
+                                            className="h-auto p-0"
+                                            onClick={() => {
+                                                if (openPaymentMethodModal) {
+                                                    // Save current form state before opening nested modal
+                                                    saveCurrentFormState();
+                                                    openPaymentMethodModal();
+                                                }
+                                            }}
+                                        >
+                                            + New Payment Method
+                                        </Button>
+                                    )}
+                                >
                                     <h4 className="text-sm font-medium text-foreground">
                                         Payment Method
                                     </h4>
-                                    <Button
-                                        type="button"
-                                        variant="link"
-                                        size="sm"
-                                        className="h-auto p-0"
-                                        onClick={() => {
-                                            if (openPaymentMethodModal) {
-                                                // Save current form state before opening nested modal
-                                                saveCurrentFormState();
-                                                openPaymentMethodModal();
-                                            }
-                                        }}
-                                    >
-                                        + New Payment Method
-                                    </Button>
-                                </div>
+                                </InlineFieldHeader>
 
                                 {paymentMethods.length === 0 ? (
                                     <Notice
@@ -686,26 +695,29 @@ const InvoiceModal = ({
                         <div className="p-4 space-y-4">
                             {/* Template selection */}
                             <div className="mb-6">
-                                <div className="flex justify-between items-center mb-1">
+                                <InlineFieldHeader
+                                    action={(
+                                        <Button
+                                            type="button"
+                                            variant="link"
+                                            size="sm"
+                                            className="h-auto p-0"
+                                            onClick={() => {
+                                                if (openTemplateModal) {
+                                                    // Save current form state before opening nested modal
+                                                    saveCurrentFormState();
+                                                    openTemplateModal();
+                                                }
+                                            }}
+                                        >
+                                            + New Template
+                                        </Button>
+                                    )}
+                                >
                                     <h4 className="text-sm font-medium text-foreground">
                                         Invoice Template <span className="text-destructive-strong">*</span>
                                     </h4>
-                                    <Button
-                                        type="button"
-                                        variant="link"
-                                        size="sm"
-                                        className="h-auto p-0"
-                                        onClick={() => {
-                                            if (openTemplateModal) {
-                                                // Save current form state before opening nested modal
-                                                saveCurrentFormState();
-                                                openTemplateModal();
-                                            }
-                                        }}
-                                    >
-                                        + New Template
-                                    </Button>
-                                </div>
+                                </InlineFieldHeader>
 
                                 {invoiceTemplates.length === 0 ? (
                                     <Notice

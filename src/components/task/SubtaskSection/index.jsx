@@ -66,10 +66,6 @@ const SubtaskSection = ({
             || null;
     }, [tasks, subtasks, pendingDeleteSubtaskId]);
     
-    if (isArchived || (subtasks.length === 0 && !onCreateSubtask)) {
-        return null;
-    }
-
     /**
      * Handle subtask deletion with cleanup
      */
@@ -105,6 +101,10 @@ const SubtaskSection = ({
         showSuccess(`Subtask "${subtaskTitle}" deleted successfully`);
         setPendingDeleteSubtaskId(null);
     }, [pendingDeleteSubtaskId, pendingDeleteSubtask, subtasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);
+
+    if (isArchived || (subtasks.length === 0 && !onCreateSubtask)) {
+        return null;
+    }
 
     return (
         <div className="border-t border-border bg-muted/40 rounded-b-lg">

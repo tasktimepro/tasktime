@@ -91,26 +91,34 @@ describe('useTimers', () => {
 
         const { result } = renderHook(() => useTimers())
 
-        act(() => {
+        await act(async () => {
+            await Promise.resolve()
+        })
+
+        await act(async () => {
             result.current.pauseTimer('p1')
         })
 
         expect(readStored(store.timers, 'p1').paused).toBe(true)
 
-        act(() => {
+        await act(async () => {
             result.current.resumeTimer('p1')
         })
 
         expect(readStored(store.timers, 'p1').paused).toBe(false)
 
-        act(() => {
+        await act(async () => {
             result.current.updateTimer('p1', { note: 'Updated' })
             result.current.focusTimer('p1')
         })
 
         expect(readStored(store.timers, 'p1').note).toBe('Updated')
 
-        const entry = result.current.stopTimer('p1')
+        let entry
+        await act(async () => {
+            entry = result.current.stopTimer('p1')
+        })
+
         expect(entry).toBeTruthy()
         expect(store.timers.has('p1')).toBe(false)
         expect(store.activeTimeEntries.has(entry.id)).toBe(true)

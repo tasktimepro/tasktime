@@ -85,10 +85,10 @@ describe('InvoicesList', () => {
         id: 'inv-1',
         invoiceNumber: 'INV-001',
         date: '2026-01-05',
-        dueDate: '2026-01-20',
-        totalAmount: 100,
+        dueDate: '2099-01-20',
+        total: 100,
         totalHours: 2,
-        paymentProcessed: false,
+        status: 'sent',
         currency: 'USD',
         project: { title: 'Project' },
         client: { name: 'Client' }
@@ -181,7 +181,40 @@ describe('InvoicesList', () => {
         )
 
         expect(screen.getByRole('tab', { name: 'Overdue (1)' }).className.includes('status-danger-tab')).toBe(false)
-        expect(screen.getByRole('tab', { name: 'Outstanding (2)' }).className.includes('status-warning-tab')).toBe(false)
+        expect(screen.getByRole('tab', { name: 'Outstanding (1)' }).className.includes('status-warning-tab')).toBe(false)
+    })
+
+    it('keeps overdue invoices out of the outstanding tab', () => {
+
+        const invoices = [
+            {
+                ...baseInvoice,
+                id: 'inv-overdue',
+                invoiceNumber: 'INV-OVERDUE',
+                dueDate: '2000-01-01'
+            },
+            {
+                ...baseInvoice,
+                id: 'inv-outstanding',
+                invoiceNumber: 'INV-OUTSTANDING',
+                dueDate: '2099-01-01'
+            }
+        ]
+
+        render(
+            <InvoicesList
+                projectInvoices={invoices}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="outstanding"
+            />
+        )
+
+        expect(screen.getByText('INV-OUTSTANDING')).toBeInTheDocument()
+        expect(screen.queryByText('INV-OVERDUE')).not.toBeInTheDocument()
     })
 
     it('shows paid badge for processed invoices', () => {
@@ -190,7 +223,7 @@ describe('InvoicesList', () => {
             ...baseInvoice,
             id: 'inv-paid',
             invoiceNumber: 'INV-PAID',
-            paymentProcessed: true
+            status: 'paid'
         }
 
         render(
@@ -234,14 +267,14 @@ describe('InvoicesList', () => {
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith(
             'inv-1',
-            expect.objectContaining({ paymentProcessed: true, paidAt: expect.any(Number) })
+            expect.objectContaining({ status: 'paid', paidAt: expect.any(Number) })
         )
     })
 
     it('warns before editing paid invoices', async () => {
 
         const onEditInvoice = vi.fn()
-        const paidInvoice = { ...baseInvoice, id: 'inv-paid', paymentProcessed: true }
+        const paidInvoice = { ...baseInvoice, id: 'inv-paid', status: 'paid' }
 
         render(
             <InvoicesList

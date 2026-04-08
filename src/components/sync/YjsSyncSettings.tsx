@@ -18,8 +18,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import Modal from '@/components/Modal';
-import { formatDistanceToNow, format } from 'date-fns';
+import { format, formatDistance, formatDistanceToNow } from 'date-fns';
 import type { BackupInfo } from '@/stores/yjs';
+import { parseIntegerInputWithFallback } from '@/utils/numberInputUtils';
 
 type ConfirmDialogType = 'disconnect' | 'wipe' | null;
 
@@ -157,7 +158,7 @@ export default function YjsSyncSettings() {
 
         return {
             text: lastSyncedAt
-                ? `Synced ${formatDistanceToNow(lastSyncedAt, { addSuffix: true, includeSeconds: true })}`
+                ? `Synced ${formatDistance(lastSyncedAt, now, { addSuffix: true, includeSeconds: true })}`
                 : 'Connected',
             tone: 'status-success-text-strong',
             icon: CheckIcon
@@ -314,7 +315,9 @@ export default function YjsSyncSettings() {
     };
 
     const handleBackupFrequencyChange = (value: string) => {
-        updatePreferences({ backupFrequencyHours: parseInt(value, 10) });
+        updatePreferences({
+            backupFrequencyHours: parseIntegerInputWithFallback(value, backupFrequencyHours, { min: 1 }),
+        });
     };
 
     const handleRestoreBackup = async () => {

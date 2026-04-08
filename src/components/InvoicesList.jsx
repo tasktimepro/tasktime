@@ -8,36 +8,16 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
 import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
-import { parseStoredDate, toDisplayDate } from '../utils/dateUtils.ts';
+import { toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { getInvoiceStatus, getInvoiceStatusAfterMarkingUnpaid, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
-
-/**
- * Helper function to determine if an invoice is overdue
- */
-const isInvoiceOverdue = (invoice) => {
-    if (!invoice.dueDate || invoice.paymentProcessed) {
-        return false;
-    }
-    
-    const today = new Date();
-    // parseStoredDate handles ISO date strings and timestamps
-    const dueDate = parseStoredDate(invoice.dueDate);
-    
-    if (!dueDate) return false;
-    
-    // Set times to start of day for accurate date comparison
-    today.setHours(0, 0, 0, 0);
-    dueDate.setHours(0, 0, 0, 0);
-    
-    return today > dueDate;
-};
 
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
@@ -66,19 +46,19 @@ const InvoicesList = ({
     // Filter out soft-deleted invoices (projectInvoices already filtered by parent)
     const activeInvoices = useMemo(() => projectInvoices, [projectInvoices]);
 
-    // Filter invoices by payment status (using activeInvoices which excludes deleted)
+    // Keep tabs mutually exclusive: overdue invoices are not also listed as outstanding.
     const outstandingInvoices = useMemo(() => 
-        activeInvoices.filter(invoice => !invoice.paymentProcessed),
+        activeInvoices.filter((invoice) => !isInvoicePaid(invoice) && !isInvoiceOverdue(invoice)),
     [activeInvoices]);
 
     const paidInvoices = useMemo(() => 
-        activeInvoices.filter(invoice => invoice.paymentProcessed),
+        activeInvoices.filter((invoice) => isInvoicePaid(invoice)),
     [activeInvoices]);
 
-    // Filter overdue invoices (subset of outstanding)
+    // Overdue invoices are shown in their own bucket.
     const overdueInvoices = useMemo(() => 
-        outstandingInvoices.filter(invoice => isInvoiceOverdue(invoice)),
-    [outstandingInvoices]);
+        activeInvoices.filter((invoice) => !isInvoicePaid(invoice) && isInvoiceOverdue(invoice)),
+    [activeInvoices]);
     
     // Default to first non-empty tab (overdue -> outstanding -> paid), with optional override via selectedTab
     const defaultTab = useMemo(() => {
@@ -201,7 +181,7 @@ const InvoicesList = ({
     const handleEdit = (invoice) => {
         if (onEditInvoice) {
             // Show warning for paid invoices
-            if (invoice.paymentProcessed) {
+            if (isInvoicePaid(invoice)) {
                 setPendingPaidEditInvoice(invoice);
                 return;
             }
@@ -232,25 +212,24 @@ const InvoicesList = ({
     /**
      * Handle payment processed toggle
      */
-    const handlePaymentProcessedToggle = (invoice) => {
-        const nextPaidState = !invoice.paymentProcessed;
-        // Update the invoice with the new payment processed status using Yjs hook
+    const handleInvoiceStatusToggle = (invoice) => {
+        const nextPaidState = !isInvoicePaid(invoice);
         updateInvoice(invoice.id, {
-            paymentProcessed: nextPaidState,
+            status: nextPaidState ? 'paid' : getInvoiceStatusAfterMarkingUnpaid(invoice),
             paidAt: nextPaidState ? Date.now() : null
         });
 
         // If marking as paid and we're on outstanding or overdue tab, and it's the last item on the page,
         // go to previous page if available
-        if (!invoice.paymentProcessed && (activeTab === 'outstanding' || activeTab === 'overdue')) {
+        if (!isInvoicePaid(invoice) && (activeTab === 'outstanding' || activeTab === 'overdue')) {
             let remainingInvoices, setPage;
             
             if (activeTab === 'overdue') {
                 remainingInvoices = overdueInvoices.filter(inv => inv.id !== invoice.id);
                 setPage = setOverduePage;
-                // If no more overdue invoices, switch to outstanding tab
+                // If no more overdue invoices, fall back to the next available unpaid tab.
                 if (remainingInvoices.length === 0) {
-                    setActiveTab('outstanding');
+                    setActiveTab(outstandingInvoices.length > 0 ? 'outstanding' : 'paid');
                     return;
                 }
             } else {
@@ -277,7 +256,7 @@ const InvoicesList = ({
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
                 {tabType === 'outstanding' 
-                    ? 'All your invoices have been paid.'
+                    ? 'You have no current invoices awaiting payment.'
                     : tabType === 'overdue'
                     ? 'All your invoices are up to date.'
                     : 'No invoices have been marked as paid yet.'
@@ -319,11 +298,15 @@ const InvoicesList = ({
                 <div className="space-y-4">
                     {currentInvoices.map((invoice) => {
                         const invoiceCurrency = invoice.currency || getPreferredCurrency();
-                        const invoiceTotal = `${getCurrencySymbol(invoiceCurrency)}${(invoice.totalAmount || 0).toFixed(2)}`;
+                        const invoiceTotalValue = getInvoiceTotal(invoice);
+                        const invoiceTotal = `${getCurrencySymbol(invoiceCurrency)}${invoiceTotalValue.toFixed(2)}`;
                         const clientForColor = invoice.clientId
                             ? clients.find((client) => client.id === invoice.clientId)
                             : null;
                         const borderColor = invoice.project?.color || clientForColor?.color || null;
+                        const invoiceStatus = getInvoiceStatus(invoice);
+                        const invoiceIsPaid = isInvoicePaid(invoice);
+                        const invoiceIsOverdue = isInvoiceOverdue(invoice);
 
                         return (
                             <Card
@@ -342,15 +325,20 @@ const InvoicesList = ({
                                             </h3>
                                         </div>
                                         <div className={cn(isMobileLayout && 'w-full')}>
-                                            {invoice.paymentProcessed ? (
+                                            {invoiceIsPaid ? (
                                                 <Badge variant="success">
                                                     <CheckIcon className="h-3 w-3 mr-1" />
                                                     Paid <span className="mx-1">•</span>
                                                     <span className="sensitive-data">{invoiceTotal}</span>
                                                 </Badge>
-                                            ) : isInvoiceOverdue(invoice) ? (
+                                            ) : invoiceIsOverdue ? (
                                                 <Badge variant="error">
                                                     Overdue <span className="mx-1">•</span>
+                                                    <span className="sensitive-data">{invoiceTotal}</span>
+                                                </Badge>
+                                            ) : invoiceStatus === 'draft' ? (
+                                                <Badge variant="secondary">
+                                                    Draft <span className="mx-1">•</span>
                                                     <span className="sensitive-data">{invoiceTotal}</span>
                                                 </Badge>
                                             ) : (
@@ -375,12 +363,12 @@ const InvoicesList = ({
                                             )}
                                             <span className="mx-1">•</span>
                                             <span className="sensitive-data">
-                                                {getCurrencySymbol(invoice.currency || getPreferredCurrency())}{invoice.totalAmount.toFixed(2)}
+                                                {getCurrencySymbol(invoice.currency || getPreferredCurrency())}{invoiceTotalValue.toFixed(2)}
                                             </span>
                                         </p>
-                                        {invoice.dueDate && !invoice.paymentProcessed && (
+                                        {invoice.dueDate && !invoiceIsPaid && (
                                             <p className={`text-sm mt-1 ${
-                                                isInvoiceOverdue(invoice) 
+                                                invoiceIsOverdue 
                                                     ? 'status-danger-text-strong font-medium' 
                                                     : 'text-muted-foreground'
                                             }`}>
@@ -464,9 +452,9 @@ const InvoicesList = ({
 
                                     {/* Action buttons - right side */}
                                     <div className={cn('flex items-center gap-2', isMobileLayout ? 'w-full flex-wrap justify-end' : 'justify-end')}>
-                                        {!invoice.paymentProcessed && (
+                                        {!invoiceIsPaid && (
                                             <Button
-                                                onClick={() => handlePaymentProcessedToggle(invoice)}
+                                                onClick={() => handleInvoiceStatusToggle(invoice)}
                                                 size="sm"
                                                 leadingIcon={CheckIcon}
                                             >

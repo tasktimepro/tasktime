@@ -53,9 +53,18 @@ html {
     overflow: hidden;
 }
 
+html.public-legal-page {
+    overflow-y: auto;
+}
+
 /* When modals are open, prevent background scrolling */
 html.modal-open {
     overflow: hidden;
+}
+
+body.public-legal-page {
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 /* Apply scrollbar gutter to body and main content sections */

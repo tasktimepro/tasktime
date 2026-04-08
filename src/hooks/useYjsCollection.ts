@@ -12,6 +12,7 @@ import * as Y from 'yjs';
 import { useYjs } from '@/contexts/YjsContext';
 import { generateId } from '@/utils/idUtils';
 import { readEntity, objectToYMap, yMapToObject, collectEntities } from '@/stores/yjs/entityUtils';
+import { validateCollectionEntity, safeValidateCollectionEntity, type YjsCollectionName } from '@/stores/yjs/validation';
 
 export interface UseYjsCollectionResult<T extends { id: string }> {
     /** All items in the collection */
@@ -28,6 +29,10 @@ export interface UseYjsCollectionResult<T extends { id: string }> {
     remove: (id: string) => boolean;
 }
 
+export interface UseYjsCollectionOptions {
+    collectionName?: YjsCollectionName;
+}
+
 /**
  * Generic hook for accessing a Yjs collection
  * 
@@ -35,19 +40,41 @@ export interface UseYjsCollectionResult<T extends { id: string }> {
  * @returns Reactive items array and CRUD operations
  */
 export function useYjsCollection<T extends { id: string }>(
-    getMap: (store: ReturnType<typeof useYjs>['store']) => Y.Map<string, T>
+    getMap: (store: ReturnType<typeof useYjs>['store']) => Y.Map<string, T>,
+    options: UseYjsCollectionOptions = {}
 ): UseYjsCollectionResult<T> {
     const { store, isReady } = useYjs();
+
+    const readValidItems = useCallback((map: Y.Map<string, unknown>, context: string) => {
+        const entities = collectEntities<unknown>(map);
+
+        if (!options.collectionName) {
+            return entities as T[];
+        }
+
+        const items: T[] = [];
+
+        for (const entity of entities) {
+            const validated = safeValidateCollectionEntity<T>(options.collectionName, entity, context);
+
+            if (validated) {
+                items.push(validated);
+            }
+        }
+
+        return items;
+    }, [options.collectionName]);
+
     const getInitialItems = useCallback(() => {
         if (!isReady) return [] as T[];
 
         try {
             const map = getMap(store);
-            return collectEntities<T>(map as unknown as Y.Map<string, unknown>);
+            return readValidItems(map as unknown as Y.Map<string, unknown>, 'initial collection read');
         } catch {
             return [] as T[];
         }
-    }, [getMap, isReady, store]);
+    }, [getMap, isReady, readValidItems, store]);
 
     // Start with a snapshot if the store is already ready to avoid empty-state flicker on mount
     const [items, setItems] = useState<T[]>(getInitialItems);
@@ -67,8 +94,8 @@ export function useYjsCollection<T extends { id: string }>(
     const syncState = useCallback(() => {
         if (!yMap) return;
         
-        setItems(collectEntities<T>(yMap as unknown as Y.Map<string, unknown>));
-    }, [yMap]);
+        setItems(readValidItems(yMap as unknown as Y.Map<string, unknown>, 'collection sync'));
+    }, [readValidItems, yMap]);
 
     // Initial load and subscribe to changes
     // Uses observeDeep to detect field-level changes in nested Y.Maps
@@ -89,8 +116,14 @@ export function useYjsCollection<T extends { id: string }>(
     // CRUD operations
     const get = useCallback((id: string): T | undefined => {
         if (!yMap) return undefined;
-        return readEntity<T>(yMap.get(id));
-    }, [yMap]);
+        const entity = readEntity<unknown>(yMap.get(id));
+
+        if (entity == null || !options.collectionName) {
+            return entity as T | undefined;
+        }
+
+        return safeValidateCollectionEntity<T>(options.collectionName, entity, `read ${options.collectionName}.${id}`);
+    }, [options.collectionName, yMap]);
 
     const create = useCallback((data: Omit<T, 'id'> & { id?: string }): T => {
         if (!yMap) {
@@ -111,11 +144,15 @@ export function useYjsCollection<T extends { id: string }>(
             updatedAt,
         } as unknown as Record<string, unknown>;
 
-        const entityMap = objectToYMap(item);
+        const validatedItem = options.collectionName
+            ? validateCollectionEntity<T>(options.collectionName, item, `create ${options.collectionName}.${id}`)
+            : item as unknown as T;
+
+        const entityMap = objectToYMap(validatedItem as unknown as Record<string, unknown>);
         (yMap as unknown as Y.Map<string, unknown>).set(id, entityMap);
 
-        return item as unknown as T;
-    }, [yMap]);
+        return validatedItem;
+    }, [options.collectionName, yMap]);
 
     const update = useCallback((id: string, updates: Partial<T>): T | undefined => {
         if (!yMap) return undefined;
@@ -126,22 +163,30 @@ export function useYjsCollection<T extends { id: string }>(
 
         const updatesWithTimestamp = { ...updates, updatedAt: Date.now() } as Record<string, unknown>;
 
+        const existingEntity = existing instanceof Y.Map
+            ? yMapToObject<Record<string, unknown>>(existing)
+            : existing as Record<string, unknown>;
+
+        const mergedEntity = { ...existingEntity, ...updatesWithTimestamp };
+        const validatedEntity = options.collectionName
+            ? validateCollectionEntity<T>(options.collectionName, mergedEntity, `update ${options.collectionName}.${id}`)
+            : mergedEntity as unknown as T;
+
         if (existing instanceof Y.Map) {
             // New format: field-level CRDT update
-            for (const [key, value] of Object.entries(updatesWithTimestamp)) {
-                existing.set(key, value);
+            for (const key of Object.keys(updatesWithTimestamp)) {
+                existing.set(key, (validatedEntity as Record<string, unknown>)[key]);
             }
 
-            return yMapToObject<T>(existing);
+            return validatedEntity;
         }
 
         // Old format: merge and convert to nested Y.Map
-        const merged = { ...(existing as Record<string, unknown>), ...updatesWithTimestamp };
-        const entityMap = objectToYMap(merged);
+        const entityMap = objectToYMap(validatedEntity as unknown as Record<string, unknown>);
         rawMap.set(id, entityMap);
 
-        return merged as unknown as T;
-    }, [yMap]);
+        return validatedEntity;
+    }, [options.collectionName, yMap]);
 
     const remove = useCallback((id: string): boolean => {
         if (!yMap) return false;

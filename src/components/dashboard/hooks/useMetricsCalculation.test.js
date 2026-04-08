@@ -29,8 +29,8 @@ describe('useMetricsCalculation', () => {
             { taskId: 'task-1', start: baseDate.getTime() - 3600000, end: baseDate.getTime() }
         ]
         const invoices = [
-            { date: '2026-01-10', totalAmount: 120, currency: 'USD', paymentProcessed: true },
-            { date: '2026-01-11', totalAmount: 80, currency: 'USD', paymentProcessed: false }
+            { date: '2026-01-10', total: 120, currency: 'USD', status: 'paid' },
+            { date: '2026-01-11', total: 80, currency: 'USD', status: 'sent' }
         ]
 
         const { result } = renderHook(() => useMetricsCalculation({
@@ -46,6 +46,31 @@ describe('useMetricsCalculation', () => {
         expect(result.current.thisMonthMetrics.time).toBe(3600000)
         expect(result.current.thisMonthMetrics.paidInvoices.USD).toBe(120)
         expect(result.current.thisMonthMetrics.outstandingInvoices.USD).toBe(80)
+    })
+
+    it('keeps outstanding and past due invoice metrics mutually exclusive', () => {
+
+        const { result } = renderHook(() => useMetricsCalculation({
+            timeEntries: [],
+            tasks: [],
+            projects: [],
+            invoices: [
+                { date: '2026-01-10', total: 120, currency: 'USD', status: 'paid' },
+                { date: '2026-01-11', total: 80, currency: 'USD', status: 'sent', dueDate: '2026-01-25' },
+                { date: '2026-01-12', total: 90, currency: 'USD', status: 'sent', dueDate: '2026-01-01' },
+            ],
+            clients: [],
+            preferredCurrency: 'USD',
+            convertToCurrency
+        }))
+
+        expect(result.current.invoiceMetrics).toEqual({
+            outstanding: 1,
+            outstandingTotal: 80,
+            pastDue: 1,
+            pastDueTotal: 90,
+            hadConversionError: false,
+        })
     })
 
     it('excludes non-billable tasks from unbilled totals', () => {

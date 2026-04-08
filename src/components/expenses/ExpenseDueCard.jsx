@@ -17,7 +17,6 @@ const ExpenseDueCard = ({
     onView,
     onMarkPaid,
     isOverdue = false,
-    isToday = false,
     isPreview = false,
     recurrence = null,
 }) => {

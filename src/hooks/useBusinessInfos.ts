@@ -10,7 +10,8 @@ import type { BusinessInfo } from '@/stores/yjs/types';
 
 export function useBusinessInfos() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<BusinessInfo>(
-        (store) => store.businessInfos
+        (store) => store.businessInfos,
+        { collectionName: 'businessInfos' }
     );
 
     // Get the default business info

@@ -15,9 +15,10 @@ import { YjsDocManager } from '../YjsDocManager';
 import { ManifestManager, AuthorizationError } from './ManifestManager';
 import { BackupManager } from './BackupManager';
 import type { DocName, SyncState, DriveSyncMode, SyncPhase } from '../types';
+import { migrateInvoicesInDoc } from '../invoiceMigration';
+import { validateDocManagerState } from '../validation';
 import {
     markPendingChanges,
-    clearPendingChanges,
     markSyncStarted,
     markSyncCompleted,
     markSyncFailed,
@@ -141,6 +142,48 @@ export class YjsDriveProvider {
         }
     }
 
+    private promotePersistedLocalChangesToFullState(loadedDocs: DocName[]): void {
+        const hasOnlyPersistedLocalChanges = (hasPersistedPendingChanges() || wasSyncInterrupted()) && !this.hasPendingDeltas();
+
+        if (!hasOnlyPersistedLocalChanges || loadedDocs.length === 0) {
+            return;
+        }
+
+        let added = false;
+
+        for (const docName of loadedDocs) {
+            if (!this.forceFullStateDocs.has(docName)) {
+                this.forceFullStateDocs.add(docName);
+                added = true;
+            }
+        }
+
+        if (added) {
+            this.log('sync: promoting persisted local changes to full-state upload', { docs: loadedDocs });
+        }
+    }
+
+    private applyValidatedRemoteUpdate(docName: DocName, doc: Y.Doc, update: Uint8Array, source: string): boolean {
+        const projectedDoc = new Y.Doc();
+
+        applyUpdate(projectedDoc, encodeStateAsUpdate(doc));
+        applyUpdate(projectedDoc, update, 'remote');
+        migrateInvoicesInDoc(projectedDoc);
+
+        try {
+            validateDocManagerState(this.docManager, docName, projectedDoc);
+        } catch (error) {
+            console.warn(`[YjsDriveProvider] Rejected remote ${source} for ${docName}:`, error);
+            projectedDoc.destroy();
+            return false;
+        }
+
+        applyUpdate(doc, update, 'remote');
+        migrateInvoicesInDoc(doc);
+        projectedDoc.destroy();
+        return true;
+    }
+
     constructor(docManager: YjsDocManager, accessToken: string, sessionId?: string | null) {
         this.docManager = docManager;
         this.accessToken = accessToken;
@@ -196,6 +239,8 @@ export class YjsDriveProvider {
                 this.lastPullAt = Date.now();
                 this.log('connect: manifest loaded');
 
+                this.promotePersistedLocalChangesToFullState(this.docManager.getLoadedDocs());
+
                 for (const docName of this.docManager.getLoadedDocs()) {
                     await this.syncDoc(docName);
                     this.subscribeToDoc(docName);
@@ -218,6 +263,8 @@ export class YjsDriveProvider {
 
                 const remoteManifest = this.manifest.getManifest();
                 const hasRemoteData = remoteManifest && Object.keys(remoteManifest.documents).length > 0;
+
+                this.promotePersistedLocalChangesToFullState(this.docManager.getLoadedDocs());
 
                 if (hasRemoteData) {
                     // Remote data exists — pull it before subscribing to local changes
@@ -476,6 +523,7 @@ export class YjsDriveProvider {
         this.setState('syncing');
         markSyncStarted(); // Persist that sync is in progress
         const loadedDocs = this.docManager.getLoadedDocs();
+        this.promotePersistedLocalChangesToFullState(loadedDocs);
         this.log('sync: started', { docs: loadedDocs, force, hasPendingLocal, allowPull });
 
         try {
@@ -664,16 +712,22 @@ export class YjsDriveProvider {
                 try {
                     const stateBuffer = await this.manifest.downloadFileAsArrayBuffer(stateFileId);
                     const stateArray = new Uint8Array(stateBuffer);
+                    let applied = true;
 
                     if (stateArray.length > 0) {
-                        applyUpdate(doc, stateArray, 'remote');
-                        this.log(`pull: applied base state v${docManifest.stateVersion} for ${docName}`, { bytes: stateArray.length });
+                        applied = this.applyValidatedRemoteUpdate(docName, doc, stateArray, `base state v${docManifest.stateVersion}`);
+
+                        if (applied) {
+                            this.log(`pull: applied base state v${docManifest.stateVersion} for ${docName}`, { bytes: stateArray.length });
+                        }
                     }
 
-                    // Mark as applied and clear old deltas (they're included in the new state)
-                    this.appliedStateVersions.set(docName, docManifest.stateVersion);
-                    appliedDeltas.clear();
-                    this.appliedDeltaIds.set(docName, appliedDeltas);
+                    if (applied) {
+                        // Mark as applied and clear old deltas (they're included in the new state)
+                        this.appliedStateVersions.set(docName, docManifest.stateVersion);
+                        appliedDeltas.clear();
+                        this.appliedDeltaIds.set(docName, appliedDeltas);
+                    }
                 } catch (error) {
                     console.warn(`[YjsDriveProvider] Could not pull base state for ${docName}:`, error);
                 }
@@ -705,7 +759,12 @@ export class YjsDriveProvider {
                     const deltaArray = new Uint8Array(deltaBuffer);
 
                     if (deltaArray.length > 0) {
-                        applyUpdate(doc, deltaArray, 'remote');
+                        const applied = this.applyValidatedRemoteUpdate(docName, doc, deltaArray, `delta ${delta.id}`);
+
+                        if (!applied) {
+                            continue;
+                        }
+
                         this.log(`pull: applied delta ${delta.id} for ${docName}`);
                     }
 

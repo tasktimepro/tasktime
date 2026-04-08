@@ -6,7 +6,7 @@
  * Includes schedule selection: "This day only" or "Every {weekday}"
  */
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { addDays, format, getDay } from 'date-fns';
 import {
     Dialog,
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { InlineFieldHeader } from '@/components/ui/inline-field-header';
 import { Label } from '@/components/ui/label';
 import { 
     Select,
@@ -40,6 +41,22 @@ import CustomCheckbox from '@/components/CustomCheckbox';
  */
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const createInitialModalState = ({
+    isEditMode,
+    lockedEntityId,
+    lockedScheduleMode,
+    initialTargetHours,
+    scope,
+}) => ({
+    selectedEntityId: isEditMode ? (lockedEntityId || '') : '',
+    scheduleMode: isEditMode ? (lockedScheduleMode || 'date') : (scope === 'week' ? 'week' : 'date'),
+    taskSearch: '',
+    targetHours: isEditMode && initialTargetHours !== null && initialTargetHours !== undefined
+        ? String(initialTargetHours)
+        : '',
+    includeWeekends: true,
+});
 
 /**
  * @param {Object} props
@@ -74,18 +91,27 @@ const EntityPickerModal = ({
     lockedWeekday = null,
     initialTargetHours = null,
 }) => {
-
-    const [selectedEntityId, setSelectedEntityId] = useState('');
-    const [scheduleMode, setScheduleMode] = useState('date'); // 'date' | 'weekday' | 'week' | 'every-week'
-    const [taskSearch, setTaskSearch] = useState('');
-    const [targetHours, setTargetHours] = useState('');
-    const [includeWeekends, setIncludeWeekends] = useState(true);
-
     const { clients } = useClients();
     const { projects } = useProjects();
     const { tasks } = useTasks({ includeArchived: mode === 'edit' });
 
     const isEditMode = mode === 'edit';
+
+    const [modalState, setModalState] = useState(() => createInitialModalState({
+        isEditMode,
+        lockedEntityId,
+        lockedScheduleMode,
+        initialTargetHours,
+        scope,
+    }));
+
+    const {
+        selectedEntityId,
+        scheduleMode,
+        taskSearch,
+        targetHours,
+        includeWeekends,
+    } = modalState;
 
     // Calculate the weekday for the selected date
     const weekday = useMemo(() => {
@@ -103,28 +129,6 @@ const EntityPickerModal = ({
     }, [isEditMode, lockedWeekday, weekday]);
 
     const weekdayName = WEEKDAY_NAMES[effectiveWeekday];
-
-    // Reset state when modal opens
-    useEffect(() => {
-        if (!isOpen) return;
-
-        if (isEditMode) {
-            setSelectedEntityId(lockedEntityId || '');
-            setScheduleMode(lockedScheduleMode || 'date');
-            setTaskSearch('');
-            setTargetHours(initialTargetHours !== null && initialTargetHours !== undefined
-                ? String(initialTargetHours)
-                : ''
-            );
-            return;
-        }
-
-        setSelectedEntityId('');
-        setScheduleMode(scope === 'week' ? 'week' : 'date');
-        setTaskSearch('');
-        setTargetHours('');
-        setIncludeWeekends(true);
-    }, [isOpen, entityType, isEditMode, lockedEntityId, lockedScheduleMode, initialTargetHours, scope]);
 
     const weekRangeLabel = useMemo(() => {
         if (!weekStart) return '';
@@ -231,7 +235,7 @@ const EntityPickerModal = ({
     }, [onCreateNew, onClose]);
 
     const handleTaskSelect = useCallback((entity) => {
-        setSelectedEntityId(entity.id);
+        setModalState((prev) => ({ ...prev, selectedEntityId: entity.id }));
     }, []);
 
     // For tasks, we need the scrollable list; for clients/projects, use dropdown
@@ -250,11 +254,8 @@ const EntityPickerModal = ({
                     {/* Entity Selection - Dropdown for clients/projects */}
                     {showDropdown && !isEditMode && (
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between mb-1">
-                                <Label htmlFor="entity-select">
-                                    {typeLabel} <span className="text-destructive-strong">*</span>
-                                </Label>
-                                {onCreateNew && (
+                            <InlineFieldHeader
+                                action={onCreateNew ? (
                                     <Button
                                         type="button"
                                         variant="link"
@@ -264,11 +265,15 @@ const EntityPickerModal = ({
                                     >
                                         + New {typeLabel}
                                     </Button>
-                                )}
-                            </div>
+                                ) : null}
+                            >
+                                <Label htmlFor="entity-select">
+                                    {typeLabel} <span className="text-destructive-strong">*</span>
+                                </Label>
+                            </InlineFieldHeader>
                             <Select
                                 value={selectedEntityId}
-                                onValueChange={setSelectedEntityId}
+                                onValueChange={(value) => setModalState((prev) => ({ ...prev, selectedEntityId: value }))}
                             >
                                 <SelectTrigger id="entity-select">
                                     <SelectValue placeholder={`Select a ${typeLabel.toLowerCase()}...`}>
@@ -302,11 +307,8 @@ const EntityPickerModal = ({
                     {/* Task Selection - Searchable list */}
                     {entityType === 'task' && !isEditMode && (
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between mb-1">
-                                <Label>
-                                    Task <span className="text-destructive-strong">*</span>
-                                </Label>
-                                {onCreateNew && (
+                            <InlineFieldHeader
+                                action={onCreateNew ? (
                                     <Button
                                         type="button"
                                         variant="link"
@@ -316,14 +318,18 @@ const EntityPickerModal = ({
                                     >
                                         + New Task
                                     </Button>
-                                )}
-                            </div>
+                                ) : null}
+                            >
+                                <Label>
+                                    Task <span className="text-destructive-strong">*</span>
+                                </Label>
+                            </InlineFieldHeader>
                             <div className="relative">
                                 <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
                                 <Input
                                     placeholder="Search tasks"
                                     value={taskSearch}
-                                    onChange={(e) => setTaskSearch(e.target.value)}
+                                    onChange={(e) => setModalState((prev) => ({ ...prev, taskSearch: e.target.value }))}
                                     autoFocus
                                     className="pl-9"
                                 />
@@ -403,7 +409,7 @@ const EntityPickerModal = ({
                         ) : (
                             <Select
                                 value={scheduleMode}
-                                onValueChange={setScheduleMode}
+                                onValueChange={(value) => setModalState((prev) => ({ ...prev, scheduleMode: value }))}
                             >
                                 <SelectTrigger id="schedule-select">
                                     <SelectValue />
@@ -447,7 +453,7 @@ const EntityPickerModal = ({
                     {scope === 'week' && (
                         <CustomCheckbox
                             checked={includeWeekends}
-                            onChange={setIncludeWeekends}
+                            onChange={(checked) => setModalState((prev) => ({ ...prev, includeWeekends: checked }))}
                             label="Include weekends"
                         />
                     )}
@@ -472,7 +478,7 @@ const EntityPickerModal = ({
                             onChange={(e) => {
                                 const nextValue = e.target.value;
                                 if (nextValue === '') {
-                                    setTargetHours('');
+                                    setModalState((prev) => ({ ...prev, targetHours: '' }));
                                     return;
                                 }
                                 const parsedValue = Number(nextValue);
@@ -481,7 +487,7 @@ const EntityPickerModal = ({
                                 }
                                 const maxValue = scope === 'week' ? 168 : 24;
                                 const clampedValue = Math.min(maxValue, Math.max(0.5, parsedValue));
-                                setTargetHours(String(clampedValue));
+                                setModalState((prev) => ({ ...prev, targetHours: String(clampedValue) }));
                             }}
                         />
                         <p className="text-xs text-muted-foreground">

@@ -14,6 +14,7 @@ export interface Project {
     id: string;
     title: string;
     description?: string;
+    invoiceIds?: string[];
     hourlyRate?: number | null;
     flatRate?: boolean;
     preferredClientId?: string | null;
@@ -108,13 +109,26 @@ export interface Client {
 
 export interface BusinessInfo {
     id: string;
-    name: string;
+    title?: string;
+    name?: string;
+    businessName?: string;
     email?: string;
     phone?: string;
     address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+    registrationNumber?: string;
+    vat?: string;
+    taxNumber?: string;
+    custom?: Array<{ label: string; value: string }>;
     taxId?: string;
     logo?: string;
     isDefault?: boolean;
+    taxEnabled?: boolean;
+    taxLabel?: string;
+    taxRate?: number;
 }
 
 export interface InvoiceItem {
@@ -124,7 +138,7 @@ export interface InvoiceItem {
     amount: number;
     taskId?: string;
     expenseId?: string;
-    supplierName?: string;
+    supplierName?: string | null;
     originalAmount?: number;
     originalCurrency?: string;
     exchangeRate?: number;
@@ -134,10 +148,10 @@ export interface Invoice {
     id: string;
     projectId: string;
     clientId: string;
-    businessInfoId?: string;
+    businessInfoId?: string | null;
     invoiceNumber: string;
     date: string;
-    dueDate?: string;
+    dueDate?: string | null;
     status: 'draft' | 'sent' | 'paid' | 'overdue';
     items: InvoiceItem[];
     subtotal: number;
@@ -145,9 +159,9 @@ export interface Invoice {
     taxRate?: number;
     total: number;
     notes?: string;
-    paymentMethodId?: string;
+    paymentMethodId?: string | null;
     currency?: string;
-    paidAt?: number;
+    paidAt?: number | null;
 }
 
 export interface InvoiceTemplate {
@@ -164,9 +178,19 @@ export interface InvoiceTemplate {
 
 export interface PaymentMethod {
     id: string;
-    name: string;
-    instructions?: string;
+    title: string;
+    fullName?: string;
+    bank?: string;
+    iban?: string;
+    swift?: string;
+    bankAddress?: string;
+    paypal?: string;
+    custom: Array<{ label: string; value: string }>;
     isDefault?: boolean;
+    createdAt?: number;
+    updatedAt?: number;
+    name?: string;
+    instructions?: string;
 }
 
 export interface Expense {
@@ -192,7 +216,7 @@ export interface Expense {
     billedAt?: number | null;
     isRecurring: boolean;
     recurrenceId?: string | null;
-    amountType?: 'fixed' | 'variable';
+    amountType?: 'fixed' | 'variable' | null;
     taxNumber?: string | null;
     isTaxExempt: boolean;
     isPreview?: boolean;

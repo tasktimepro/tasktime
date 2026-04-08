@@ -121,7 +121,7 @@ describe('useTasks', () => {
             remove: vi.fn(),
         })
 
-        const { result, rerender } = renderHook(() => useTasks())
+        const { result } = renderHook(() => useTasks())
 
         expect(result.current.getStandaloneTasks().map((t) => t.id)).toEqual(['standalone'])
         expect(result.current.getOverdueTasks().map((t) => t.id).sort()).toEqual(['completed-today', 'overdue'])
@@ -154,7 +154,7 @@ describe('useTasks', () => {
             remove: vi.fn(),
         })
 
-        const { result, rerender } = renderHook(() => useTasks())
+        const { result } = renderHook(() => useTasks())
 
         expect(result.current.getTasksForToday().map((t) => t.id).sort()).toEqual([
             'recurring-completed-today',
@@ -195,7 +195,7 @@ describe('useTasks', () => {
             remove: vi.fn(),
         })
 
-        const { result, rerender } = renderHook(() => useTasks())
+        const { result } = renderHook(() => useTasks())
 
         const statusDue = result.current.getRecurringStatus(activeTasks[0], '2025-01-06')
         expect(statusDue.isDueToday).toBe(true)
@@ -246,7 +246,7 @@ describe('useTasks', () => {
             remove: vi.fn(),
         })
 
-        const { result, rerender } = renderHook(() => useTasks())
+        const { result } = renderHook(() => useTasks())
 
         const status = result.current.getRecurringStatus(activeTasks[0], '2025-01-07')
         expect(status.isDueToday).toBe(false)

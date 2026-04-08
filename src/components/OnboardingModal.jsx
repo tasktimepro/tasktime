@@ -1,16 +1,135 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChartBarIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, DocumentTextIcon, RocketLaunchIcon } from '@/components/ui/icons';
+import { Notice } from '@/components/ui/notice';
+import {
+    ArrowUpTrayIcon,
+    CheckIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    ClipboardDocumentCheckIcon,
+    ClockIcon,
+    TimerIcon,
+    CloudCheckIcon,
+    CloudUploadIcon,
+    DocumentTextIcon,
+    GoalIcon,
+    HandCoinsIcon,
+    KanbanIcon,
+    LayoutDashboardIcon,
+    ListTodoIcon,
+    UserCircleIcon,
+    UserGroupIcon,
+} from '@/components/ui/icons';
 import Modal from './Modal';
-import { useToast } from '../hooks/useToast.ts';
-import { useProjects } from '../hooks/useProjects.ts';
-import { useTasks } from '../hooks/useTasks.ts';
-import { CURRENCY_NAMES, CURRENCY_SYMBOLS, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import LegalInlineLinks from './legal/LegalInlineLinks';
+import { Layers3 as LayersIcon, RocketIcon, ShieldCheck as ShieldIcon } from 'lucide-react';
 
-const CURRENCY_OPTIONS = Object.keys(CURRENCY_NAMES);
+const STEPS = [
+    { id: 'welcome', label: 'Welcome' },
+    { id: 'sync', label: 'Sync' },
+    { id: 'workflow', label: 'How it works' },
+    { id: 'finish', label: 'Start' },
+];
+
+const BENEFIT_CARDS = [
+    {
+        icon: ShieldIcon,
+        title: 'Privacy first',
+        description: 'You own the data. TaskTime can never access or see your data.',
+    },
+    {
+        icon: CloudCheckIcon,
+        title: 'Local-first',
+        description: 'Keep working offline. Everything saves locally right away, even without a connection.',
+    },
+    {
+        icon: TimerIcon,
+        title: 'Multi-timer support',
+        description: 'Track time across multiple projects and hand off tasks to agents.',
+    },
+    {
+        icon: KanbanIcon,
+        title: 'Planner view',
+        description: 'Map out work across the week and keep tasks visible before they become urgent.',
+    },
+    {
+        icon: GoalIcon,
+        title: 'Track goals & expenses',
+        description: 'Track daily and weekly goals alongside expenses and recurring costs so progress stays visible.',
+    },
+    {
+        icon: DocumentTextIcon,
+        title: 'Invoices',
+        description: 'Turn tracked work and costs into invoices when you are ready to bill.',
+    },
+];
+
+const WORKFLOW_CARDS = [
+    {
+        icon: LayoutDashboardIcon,
+        title: 'Dashboard',
+        description: 'The dashboard gives you a quick view of what’s pending today, your recent activity, and key report metrics.',
+    },
+    {
+        icon: ClipboardDocumentCheckIcon,
+        title: 'Projects',
+        description: 'Projects group work, rates, and billing setup so time and invoices stay tied to the right workstream.',
+    },
+    {
+        icon: ListTodoIcon,
+        title: 'Tasks',
+        description: 'Tasks are where planning and tracking meet. Add one-off or recurring work, then run timers or log entries against it.',
+    },
+    {
+        icon: UserGroupIcon,
+        title: 'Clients',
+        description: 'Clients help you organize billable work, store contact details, and keep projects and invoices connected to the right customer.',
+    },
+    {
+        icon: HandCoinsIcon,
+        title: 'Expenses',
+        description: 'Track one-time and recurring costs alongside your work so they are visible before you invoice.',
+    },
+    {
+        icon: DocumentTextIcon,
+        title: 'Invoices',
+        description: 'Invoices pull together tracked work, expenses, payment methods, and business details when you are ready to bill.',
+    },
+];
+
+function FeatureCard({ icon, title, description }) {
+
+    const Icon = icon;
+
+    return (
+        <div className="flex items-start gap-3 rounded-2xl border border-border bg-card px-4 py-4 shadow-sm">
+            <div className="mt-0.5 flex h-10 w-10 flex-none items-center justify-center rounded-2xl bg-muted">
+                <Icon className="h-5 w-5 text-foreground" />
+            </div>
+            <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+                <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+            </div>
+        </div>
+    );
+}
+
+function DetailRow({ icon, title, description }) {
+
+    const Icon = icon;
+
+    return (
+        <div className="flex items-start gap-3 rounded-2xl border border-border bg-card px-4 py-4 shadow-sm">
+            <div className="mt-0.5 flex h-10 w-10 flex-none items-center justify-center rounded-2xl bg-muted">
+                <Icon className="h-5 w-5 text-foreground" />
+            </div>
+            <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+                <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+            </div>
+        </div>
+    );
+}
 
 /**
  * OnboardingModal component - Guided setup for first-time users.
@@ -20,467 +139,236 @@ const CURRENCY_OPTIONS = Object.keys(CURRENCY_NAMES);
  */
 const OnboardingModal = ({
     isOpen,
-    onComplete
+    onComplete,
 }) => {
+    const [currentStep, setCurrentStep] = useState(0);
+    const contentRef = useRef(null);
+    const shouldResetScrollRef = useRef(false);
 
-    const { showSuccess, showWarning, showError } = useToast();
-    const { createProject } = useProjects();
-    const { createTask } = useTasks();
+    const isFirstStep = currentStep === 0;
+    const isLastStep = currentStep === STEPS.length - 1;
+    const currentStepMeta = STEPS[currentStep];
 
-    const [currentSlide, setCurrentSlide] = useState(0);
-    const [createdProjectId, setCreatedProjectId] = useState(null);
-    const [projectFormData, setProjectFormData] = useState({
-        title: '',
-        hourlyRate: '',
-        currency: getPreferredCurrency()
-    });
-    const [taskFormData, setTaskFormData] = useState({
-        title: ''
-    });
+    const goToStep = (nextStep) => {
+        setCurrentStep(Math.min(Math.max(nextStep, 0), STEPS.length - 1));
+    };
 
-    useEffect(() => {
-        if (!isOpen) {
+    const handlePrimaryAction = () => {
+        if (!isLastStep) {
+            shouldResetScrollRef.current = true;
+            goToStep(currentStep + 1);
             return;
         }
 
-        setCurrentSlide(0);
-        setCreatedProjectId(null);
-        setProjectFormData({
-            title: '',
-            hourlyRate: '',
-            currency: getPreferredCurrency()
-        });
-        setTaskFormData({
-            title: ''
-        });
-    }, [isOpen]);
-
-    /**
-     * Handle project form input change.
-     */
-    const handleProjectInputChange = (e) => {
-        const { name, value } = e.target;
-
-        setProjectFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        onComplete();
     };
 
-    /**
-     * Handle project currency selection.
-     */
-    const handleProjectCurrencyChange = (value) => {
-        setProjectFormData(prev => ({
-            ...prev,
-            currency: value
-        }));
-    };
-
-    /**
-     * Handle task form input change.
-     */
-    const handleTaskInputChange = (e) => {
-        const { name, value } = e.target;
-
-        setTaskFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
-
-    const slides = [
-        {
-            id: 'welcome',
-            title: '👋 Welcome to TaskTime',
-            content: (
-                <div className="space-y-6">
-                    <div className="text-center space-y-4">
-                        <div className="flex justify-center">
-                            <div className="bg-muted p-4 rounded-full">
-                                <RocketLaunchIcon className="h-10 w-10 text-foreground" />
-                            </div>
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-semibold text-foreground mb-2">
-                                Let’s get you set up in minutes
-                            </h3>
-                            <p className="text-muted-foreground">
-                                We’ll create your first project and task so you can start tracking time right away.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="border border-border rounded-lg p-4 space-y-2">
-                            <div className="text-sm font-medium text-foreground">What you’ll do</div>
-                            <ul className="text-sm text-muted-foreground space-y-1">
-                                <li>• Create a project</li>
-                                <li>• Add your first task</li>
-                                <li>• Review dashboard insights</li>
-                            </ul>
-                        </div>
-                        <div className="border border-border rounded-lg p-4 space-y-2">
-                            <div className="text-sm font-medium text-foreground">Why it matters</div>
-                            <p className="text-sm text-muted-foreground">
-                                Your setup helps TaskTime auto-fill invoices and keep your data organized.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )
-        },
-        {
-            id: 'project',
-            title: '🗂️ Create Your First Project',
-            content: (
-                <div className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="onboarding-project-title">Project name</Label>
-                        <Input
-                            id="onboarding-project-title"
-                            name="title"
-                            value={projectFormData.title}
-                            onChange={handleProjectInputChange}
-                            placeholder="Client website redesign"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="onboarding-project-rate">Hourly rate (optional)</Label>
-                            <Input
-                                id="onboarding-project-rate"
-                                name="hourlyRate"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={projectFormData.hourlyRate}
-                                onChange={handleProjectInputChange}
-                                placeholder="0.00"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="onboarding-project-currency">Currency</Label>
-                            <Select
-                                value={projectFormData.currency}
-                                onValueChange={handleProjectCurrencyChange}
-                            >
-                                <SelectTrigger id="onboarding-project-currency">
-                                    <SelectValue placeholder="Select currency" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {CURRENCY_OPTIONS.map(code => (
-                                        <SelectItem key={code} value={code}>
-                                            {code} — {CURRENCY_NAMES[code]} ({CURRENCY_SYMBOLS[code] || code})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground">
-                        You can adjust project details later in Projects.
-                    </p>
-                </div>
-            )
-        },
-        {
-            id: 'task',
-            title: '✅ Add Your First Task',
-            content: (
-                <div className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="onboarding-task-title">Task name</Label>
-                        <Input
-                            id="onboarding-task-title"
-                            name="title"
-                            value={taskFormData.title}
-                            onChange={handleTaskInputChange}
-                            placeholder="Design homepage mockups"
-                        />
-                    </div>
-
-                    <div className="border border-border rounded-lg p-4 text-sm text-muted-foreground">
-                        This task will be linked to the project you just created.
-                    </div>
-                </div>
-            )
-        },
-        {
-            id: 'dashboard',
-            title: '📊 Your Dashboard',
-            content: (
-                <div className="space-y-6">
-                    <div className="text-center space-y-4">
-                        <div className="flex justify-center">
-                            <div className="bg-indigo-100 p-3 rounded-full">
-                                <ChartBarIcon className="h-8 w-8 text-indigo-600" />
-                            </div>
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-semibold text-foreground mb-2">
-                                Keep track of everything
-                            </h3>
-                            <p className="text-muted-foreground">
-                                Your dashboard gives you a bird's-eye view of your work and earnings.
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                            <h4 className="font-medium text-foreground">Quick access to:</h4>
-                            <div className="space-y-3">
-                                <div className="flex items-start space-x-3">
-                                    <ClockIcon className="h-5 w-5 text-foreground mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <div className="font-medium text-foreground">Recent Tasks</div>
-                                        <div className="text-sm text-muted-foreground">Continue where you left off</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-start space-x-3">
-                                    <ChartBarIcon className="h-5 w-5 text-foreground mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <div className="font-medium text-foreground">Time & Earnings</div>
-                                        <div className="text-sm text-muted-foreground">This month, last month, this year</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-start space-x-3">
-                                    <DocumentTextIcon className="h-5 w-5 text-foreground mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <div className="font-medium text-foreground">Invoice Status</div>
-                                        <div className="text-sm text-muted-foreground">Outstanding and overdue tracking</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="space-y-4">
-                            <h4 className="font-medium text-foreground">Smart features:</h4>
-                            <div className="space-y-2">
-                                <div className="flex items-center space-x-2">
-                                    <CheckIcon className="h-4 w-4 text-foreground" />
-                                    <span className="text-sm text-muted-foreground">Global timer for any task</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <CheckIcon className="h-4 w-4 text-foreground" />
-                                    <span className="text-sm text-muted-foreground">Quick task completion</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <CheckIcon className="h-4 w-4 text-foreground" />
-                                    <span className="text-sm text-muted-foreground">Project navigation</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <CheckIcon className="h-4 w-4 text-foreground" />
-                                    <span className="text-sm text-muted-foreground">Search and filter</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-muted border border-border rounded-lg p-4">
-                        <div className="text-center">
-                            <div className="status-info-text mb-1 font-medium">🏠 Always just a click away</div>
-                            <div className="text-sm text-muted-foreground">
-                                Click the TaskTime logo or "Dashboard" tab to return here anytime
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )
-        },
-        {
-            id: 'complete',
-            title: '🚀 You\'re All Set!',
-            content: (
-                <div className="text-center space-y-6">
-                    <div className="flex justify-center">
-                        <div className="bg-muted p-4 rounded-full">
-                            <RocketLaunchIcon className="h-12 w-12 text-foreground" />
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <h3 className="text-xl font-semibold text-foreground">
-                            Welcome to TaskTime!
-                        </h3>
-                        <p className="text-muted-foreground leading-relaxed">
-                            You now have everything you need to start tracking time and creating professional invoices. 
-                            Remember, you can always access help and settings from the Account section.
-                        </p>
-                        
-                        <div className="bg-muted border border-border rounded-lg p-6 mt-6">
-                            <h4 className="font-semibold text-foreground mb-3">Quick tips to get started:</h4>
-                            <div className="text-left space-y-2">
-                                <div className="flex items-center space-x-2">
-                                    <span className="text-foreground">1.</span>
-                                    <span className="text-sm text-foreground">Start a timer on your first task</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <span className="text-foreground">2.</span>
-                                    <span className="text-sm text-foreground">Set up your business info in Invoices → Your Business</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <span className="text-foreground">3.</span>
-                                    <span className="text-sm text-foreground">Add client information for invoicing</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <span className="text-foreground">4.</span>
-                                    <span className="text-sm text-foreground">Create your first invoice when ready</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <p className="text-foreground font-medium">
-                            Happy time tracking! 🎯
-                        </p>
-                    </div>
-                </div>
-            )
-        }
-    ];
-
-    const currentSlideData = slides[currentSlide];
-    const isLastSlide = currentSlide === slides.length - 1;
-    const isFirstSlide = currentSlide === 0;
-
-    /**
-     * Handle forward navigation.
-     */
-    const handleNext = () => {
-        if (currentSlide === 1) {
-            if (!projectFormData.title.trim()) {
-                showWarning('Please enter a project name to continue');
-                return;
-            }
-            
-            const newProject = createProject({
-                title: projectFormData.title,
-                hourlyRate: projectFormData.hourlyRate ? parseFloat(projectFormData.hourlyRate) : null,
-                currency: projectFormData.currency,
-                flatRate: false,
-                archived: false,
-                isPersonal: false
-            });
-            
-            setCreatedProjectId(newProject.id);
-            showSuccess('Project created successfully!');
-        } else if (currentSlide === 2) {
-            if (!taskFormData.title.trim()) {
-                showWarning('Please enter a task name to continue');
-                return;
-            }
-            
-            if (!createdProjectId) {
-                showError('Project not found. Please go back and create a project first.');
-                return;
-            }
-            
-            createTask({
-                title: taskFormData.title,
-                projectId: createdProjectId,
-                completed: false,
-                archived: false,
-                billable: true
-            });
-            
-            showSuccess('Task created successfully!');
-        }
-        
-        if (isLastSlide) {
-            onComplete();
-        } else {
-            setCurrentSlide(prev => prev + 1);
-        }
-    };
-
-    /**
-     * Handle back navigation.
-     */
     const handlePrevious = () => {
-        if (!isFirstSlide) {
-            setCurrentSlide(prev => prev - 1);
+        if (!isFirstStep) {
+            goToStep(currentStep - 1);
         }
     };
 
-    /**
-     * Handle skipping onboarding.
-     */
     const handleSkip = () => {
         onComplete();
     };
 
-    /**
-     * Determine whether current step can proceed.
-     */
-    const canProceed = () => {
-        if (currentSlide === 1) {
-            return projectFormData.title.trim();
+    useEffect(() => {
+        if (!isOpen) {
+            shouldResetScrollRef.current = false;
+            return;
         }
-        if (currentSlide === 2) {
-            return taskFormData.title.trim();
-        }
-        return true;
-    };
 
-    const footer = (
-        <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-                <div className="flex space-x-2">
-                    {slides.map((_, index) => (
-                        <div
-                            key={index}
-                            className={`w-2 h-2 rounded-full transition-colors ${
-                                index === currentSlide
-                                    ? 'bg-primary'
-                                    : index < currentSlide
-                                    ? 'bg-muted0'
-                                    : 'bg-muted'
-                            }`}
-                        />
-                    ))}
+        if (!shouldResetScrollRef.current || !contentRef.current) {
+            return;
+        }
+
+        if (typeof contentRef.current.scrollTo === 'function') {
+            contentRef.current.scrollTo({ top: 0, behavior: 'auto' });
+        }
+
+        contentRef.current.scrollTop = 0;
+        shouldResetScrollRef.current = false;
+    }, [currentStep, isOpen]);
+
+    const primaryActionLabel = isLastStep ? 'Start Using TaskTime' : 'Next';
+
+    const currentStepContent = (() => {
+        if (currentStepMeta?.id === 'welcome') {
+            return (
+                <div className="space-y-6">
+                    <div className="flex flex-col items-center space-y-4 text-center">
+                        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                            <ClockIcon className="h-6 w-6 text-foreground" />
+                        </div>
+                        <div className="space-y-3">
+                            <h3 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                                Welcome to TaskTime.
+                            </h3>
+                            <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                                TaskTime is a local-first task and time management app that helps you plan your work, track your time and expenses, and easily generate invoices.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {BENEFIT_CARDS.map((card) => (
+                            <FeatureCard key={card.title} {...card} />
+                        ))}
+                    </div>
+
+                    <Notice
+                        title="Built for solo freelancers"
+                        description="TaskTime was made for privacy-conscious solo freelancers who want something simple but complete enough for planning, tracking, expenses, and invoicing."
+                    />
+
+                    <LegalInlineLinks className="text-center" />
                 </div>
-                <span className="text-sm text-muted-foreground">
-                    {currentSlide + 1} of {slides.length}
+            );
+        }
+
+        if (currentStepMeta?.id === 'sync') {
+            return (
+                <div className="space-y-6">
+                    <div className="flex flex-col items-center space-y-3 text-center">
+                        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                            <CloudUploadIcon className="h-6 w-6 text-foreground" />
+                        </div>
+                        <h3 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                            Sync with Google Drive
+                        </h3>
+                        <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                            TaskTime saves changes locally first. If you connect Google Drive, files sync in the background to your app folder so your workspace stays available across sessions and devices, while remaining private.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <DetailRow
+                            icon={CloudCheckIcon}
+                            title="Work keeps going offline"
+                            description="No connection is required to keep tracking. Local saves happen immediately and uploads resume when you are online again."
+                        />
+                        <DetailRow
+                            icon={ArrowUpTrayIcon}
+                            title="Uploads run quietly"
+                            description="Sync happens in the background and may still finish after you close and reopen the app."
+                        />
+                        <DetailRow
+                            icon={CheckIcon}
+                            title="Status stays visible"
+                            description="Use the sync badge and Account > Sync to see whether you are idle, syncing, offline, or need to reconnect."
+                        />
+                        <DetailRow
+                            icon={DocumentTextIcon}
+                            title="Automatic backups"
+                            description="Separate Drive backups keep up to 7 recent daily snapshots and 4 weekly Sunday backups."
+                        />
+                    </div>
+
+                    <Notice
+                        title="Optional by design"
+                        description="Connect Drive when you want backup and multi-device continuity. Skip it if you prefer to stay fully local."
+                    />
+                </div>
+            );
+        }
+
+        if (currentStepMeta?.id === 'workflow') {
+            return (
+                <div className="space-y-6">
+                    <div className="flex flex-col items-center space-y-3 text-center">
+                        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                            <LayersIcon className="h-6 w-6 text-foreground" />
+                        </div>
+                        <h3 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                            Working with TaskTime
+                        </h3>
+                        <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                            Projects, tasks, clients, and expenses work together so you can plan, track time, and bill without jumping between tools.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {WORKFLOW_CARDS.map((card) => (
+                            <DetailRow key={card.title} {...card} />
+                        ))}
+                    </div>
+
+                    <Notice
+                        title="Start simple"
+                        description="You can begin with one project and a few tasks, then add clients, expenses, and recurring work as your setup grows."
+                    />
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex min-h-[16rem] flex-col items-center justify-center px-2 py-2 text-center sm:px-4">
+                <div className="w-full max-w-lg space-y-2">
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                        <ClockIcon className="h-6 w-6 text-foreground" />
+                    </div>
+                    <h3 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                        It's TaskTime!
+                    </h3>
+                    <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                        Get started by creating a task, start a timer, and shape your week in the planner.
+                    </p>
+                    <div className="flex justify-center pt-2">
+                        <Button
+                            onClick={handlePrimaryAction}
+                            leadingIcon={RocketIcon}
+                            className="w-full sm:w-auto"
+                        >
+                            {primaryActionLabel}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    })();
+
+    const footer = isLastStep ? null : (
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+                <span>
+                    {currentStep + 1} of {STEPS.length}
                 </span>
             </div>
-            
-            <div className="flex space-x-3">
-                {!isFirstSlide && (
+
+            <div className="flex gap-2 sm:justify-end md:flex-none">
+                {isFirstStep ? (
+                    <Button
+                        variant="secondary"
+                        onClick={handleSkip}
+                        className="flex-1 sm:flex-none"
+                    >
+                        Skip Onboarding
+                    </Button>
+                ) : (
                     <Button
                         variant="secondary"
                         onClick={handlePrevious}
                         leadingIcon={ChevronLeftIcon}
+                        className="flex-1 sm:flex-none"
                     >
                         Back
                     </Button>
                 )}
-                
+
                 <Button
-                    variant="ghost"
-                    onClick={handleSkip}
+                    onClick={handlePrimaryAction}
+                    trailingIcon={ChevronRightIcon}
+                    autoFocus={isFirstStep}
+                    className="flex-1 sm:flex-none"
                 >
-                    Skip Setup
-                </Button>
-                
-                <Button
-                    onClick={handleNext}
-                    disabled={!canProceed()}
-                    trailingIcon={isLastSlide ? undefined : ChevronRightIcon}
-                    leadingIcon={isLastSlide ? RocketLaunchIcon : undefined}
-                >
-                    {isLastSlide ? (
-                        'Start Using TaskTime'
-                    ) : (
-                        currentSlide === 1 ? 'Create Project' : currentSlide === 2 ? 'Create Task' : 'Next'
-                    )}
+                    {primaryActionLabel}
                 </Button>
             </div>
         </div>
     );
 
-    if (!currentSlideData) {
+    if (!currentStepMeta) {
         return null;
     }
 
@@ -488,13 +376,17 @@ const OnboardingModal = ({
         <Modal
             isOpen={isOpen}
             onClose={handleSkip}
-            title={currentSlideData.title}
+            title="TaskTime setup"
+            hideHeader
             size="4xl"
-            footer={footer}
             showCloseButton={false}
+            footer={footer}
+            contentRef={contentRef}
         >
-            <div className="min-h-[400px]">
-                {currentSlideData.content}
+            <div>
+                <div className={isLastStep ? 'min-h-[16rem]' : 'min-h-[22rem]'}>
+                    {currentStepContent}
+                </div>
             </div>
         </Modal>
     );

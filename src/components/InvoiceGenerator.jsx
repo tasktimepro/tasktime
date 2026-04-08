@@ -1254,8 +1254,8 @@ const InvoiceGenerator = ({
             mergedSubtasks: mergedSubtasks, // Save merged subtasks state
             note: invoiceNote,
             totalHours: totalHours,
-            totalAmount: pricing.total,
             subtotal: pricing.subtotal,
+            total: pricing.total,
             discount: pricing.discount,
             discountType: discountType,
             discountValue: discountValue,
@@ -1273,6 +1273,7 @@ const InvoiceGenerator = ({
             template: resolvedTemplate ? { ...resolvedTemplate } : null,
             templateId: resolvedTemplate?.id || null,
             invoiceNumber: invoiceNumber,
+            status: editingInvoice?.status || 'sent',
             // Store dates in ISO format (YYYY-MM-DD) for portability
             date: useInvoiceDateOverride && invoiceDateOverride 
                 ? toStorageDate(new Date(invoiceDateOverride))
@@ -1282,7 +1283,6 @@ const InvoiceGenerator = ({
                 : null,
             dueDate: dueDate,
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
-            paymentProcessed: editingInvoice ? editingInvoice.paymentProcessed || false : false,
             htmlContent: createInvoiceHTML({
                 id: editingInvoice ? editingInvoice.id : `INV-${selectedProject?.id?.slice(-8) || Date.now()}-${Date.now()}`,
                 project: selectedProject,
@@ -1325,7 +1325,7 @@ const InvoiceGenerator = ({
                 mergedSubtasks: mergedSubtasks, // Include merged subtasks in PDF data
                 note: invoiceNote,
                 totalHours: totalHours,
-                totalAmount: pricing.total,
+                total: pricing.total,
                 subtotal: pricing.subtotal,
                 discount: pricing.discount,
                 shipping: pricing.shipping,

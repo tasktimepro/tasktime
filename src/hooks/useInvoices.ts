@@ -9,6 +9,7 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
 import type { Invoice } from '@/stores/yjs/types';
 import { collectEntities } from '@/stores/yjs/entityUtils';
+import { getInvoiceStatus, getInvoiceTotal, isInvoicePaid } from '@/utils/invoiceUtils';
 
 export interface UseInvoicesOptions {
     /** Filter to a specific project */
@@ -24,7 +25,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
     
     // Active invoices from core doc
     const { items: activeInvoices, isLoading: activeLoading, get, create, update, remove } = 
-        useYjsCollection<Invoice>((store) => store.invoices);
+        useYjsCollection<Invoice>((store) => store.invoices, { collectionName: 'invoices' });
 
     // Archived invoices state
     const [archivedInvoices, setArchivedInvoices] = useState<Invoice[]>([]);
@@ -102,28 +103,28 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
 
     // Status filters
     const draftInvoices = useMemo(
-        () => filteredInvoices.filter(i => i.status === 'draft'),
+        () => filteredInvoices.filter((invoice) => getInvoiceStatus(invoice) === 'draft'),
         [filteredInvoices]
     );
 
     const sentInvoices = useMemo(
-        () => filteredInvoices.filter(i => i.status === 'sent'),
+        () => filteredInvoices.filter((invoice) => getInvoiceStatus(invoice) === 'sent'),
         [filteredInvoices]
     );
 
     const paidInvoices = useMemo(
-        () => filteredInvoices.filter(i => i.status === 'paid'),
+        () => filteredInvoices.filter((invoice) => isInvoicePaid(invoice)),
         [filteredInvoices]
     );
 
     const overdueInvoices = useMemo(
-        () => filteredInvoices.filter(i => i.status === 'overdue'),
+        () => filteredInvoices.filter((invoice) => getInvoiceStatus(invoice) === 'overdue'),
         [filteredInvoices]
     );
 
     // Status update helpers
     const markAsSent = useCallback((id: string) => {
-        return update(id, { status: 'sent' });
+        return update(id, { status: 'sent', paidAt: null });
     }, [update]);
 
     const markAsPaid = useCallback((id: string) => {
@@ -136,12 +137,12 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
     // Get total amounts
     const totals = useMemo(() => {
         const outstanding = filteredInvoices
-            .filter(i => i.status !== 'paid')
-            .reduce((sum, i) => sum + i.total, 0);
+            .filter((invoice) => !isInvoicePaid(invoice))
+            .reduce((sum, invoice) => sum + getInvoiceTotal(invoice), 0);
             
         const paid = filteredInvoices
-            .filter(i => i.status === 'paid')
-            .reduce((sum, i) => sum + i.total, 0);
+            .filter((invoice) => isInvoicePaid(invoice))
+            .reduce((sum, invoice) => sum + getInvoiceTotal(invoice), 0);
             
         return { outstanding, paid, total: outstanding + paid };
     }, [filteredInvoices]);

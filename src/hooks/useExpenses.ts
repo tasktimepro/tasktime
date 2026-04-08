@@ -9,7 +9,8 @@ import { useYjs } from '@/contexts/YjsContext';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils';
 import type { Expense } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
-import { readEntity, objectToYMap, collectEntities } from '@/stores/yjs/entityUtils';
+import { objectToYMap } from '@/stores/yjs/entityUtils';
+import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 
 export interface UseExpensesOptions {
     clientId?: string;
@@ -39,13 +40,13 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         const seenIds = new Set<string>();
 
         // Active expenses take precedence over archived
-        for (const expense of collectEntities<Expense>(store.expenses as any)) {
+        for (const expense of collectValidatedEntities<Expense>('expenses', store.expenses as any, 'active expenses sync')) {
             collected.push(expense);
             seenIds.add(expense.id);
         }
 
         if (options.includeArchived && store.archivedExpenses) {
-            for (const expense of collectEntities<Expense>(store.archivedExpenses as any)) {
+            for (const expense of collectValidatedEntities<Expense>('expenses', store.archivedExpenses as any, 'archived expenses sync')) {
                 if (!seenIds.has(expense.id)) {
                     collected.push(expense);
                 }
@@ -154,10 +155,10 @@ export function useExpenses(options: UseExpensesOptions = {}) {
     }, [filteredExpenses, unpaidExpenses, paidExpenses, unbilledExpenses]);
 
     const getExpense = useCallback((id: string): Expense | undefined => {
-        const active = readEntity<Expense>(store.expenses.get(id));
+        const active = readValidatedEntity<Expense>('expenses', store.expenses.get(id), `read expense ${id}`);
         if (active) return active;
         if (options.includeArchived && store.archivedExpenses) {
-            return readEntity<Expense>(store.archivedExpenses.get(id));
+            return readValidatedEntity<Expense>('expenses', store.archivedExpenses.get(id), `read archived expense ${id}`);
         }
         return undefined;
     }, [store, options.includeArchived]);
@@ -189,9 +190,11 @@ export function useExpenses(options: UseExpensesOptions = {}) {
             updatedAt,
         } as Expense;
 
-        const entityMap = objectToYMap(expense as unknown as Record<string, unknown>);
+        const validatedExpense = validateCollectionEntity<Expense>('expenses', expense, `create expense ${id}`);
+
+        const entityMap = objectToYMap(validatedExpense as unknown as Record<string, unknown>);
         (store.expenses as any).set(id, entityMap);
-        return expense;
+        return validatedExpense;
     }, [isReady, store]);
 
     const updateExpense = useCallback((id: string, updates: Partial<Expense>): Expense | undefined => {
@@ -200,14 +203,14 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         const map = findExpenseMap(id);
         if (!map) return undefined;
 
-        const existing = readEntity<Expense>(map.get(id));
+        const existing = readValidatedEntity<Expense>('expenses', map.get(id), `update expense ${id}`);
         if (!existing) return undefined;
 
-        const updated: Expense = {
+        const updated = validateCollectionEntity<Expense>('expenses', {
             ...existing,
             ...updates,
             updatedAt: Date.now(),
-        } as Expense;
+        }, `update expense ${id}`);
 
         const entityMap = objectToYMap(updated as unknown as Record<string, unknown>);
         (map as any).set(id, entityMap);

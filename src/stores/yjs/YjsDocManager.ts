@@ -156,7 +156,7 @@ export class YjsDocManager {
      */
     getLoadedDocs(): DocName[] {
         return Array.from(this.docs.entries())
-            .filter(([_, managed]) => managed.loaded)
+            .filter(([, managed]) => managed.loaded)
             .map(([name]) => name);
     }
 

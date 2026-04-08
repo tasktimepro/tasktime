@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../Modal';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
 import { useToast } from '../../hooks/useToast.ts';
@@ -8,6 +8,57 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
+import { parseOptionalNumberInput } from '@/utils/numberInputUtils.ts';
+
+const createDefaultFormData = () => ({
+    title: '',
+    businessName: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: '',
+    registrationNumber: '',
+    vat: '',
+    taxNumber: '',
+    email: '',
+    phone: '',
+    custom: [],
+    isDefault: false,
+    taxEnabled: false,
+    taxLabel: 'Tax',
+    taxRate: 0
+});
+
+const createInitialFormData = (businessInfo) => {
+    if (!businessInfo) {
+        return createDefaultFormData();
+    }
+
+    return {
+        title: businessInfo.title || '',
+        businessName: businessInfo.businessName || '',
+        address: businessInfo.address || '',
+        city: businessInfo.city || '',
+        state: businessInfo.state || '',
+        zip: businessInfo.zip || '',
+        country: businessInfo.country || '',
+        registrationNumber: businessInfo.registrationNumber || '',
+        vat: businessInfo.vat || '',
+        taxNumber: businessInfo.taxNumber || '',
+        email: businessInfo.email || '',
+        phone: businessInfo.phone || '',
+        custom: [...(businessInfo.custom || [])],
+        isDefault: businessInfo.isDefault || false,
+        taxEnabled: businessInfo.taxEnabled || false,
+        taxLabel: businessInfo.taxLabel || 'Tax',
+        taxRate: businessInfo.taxRate || 0
+    };
+};
+
+const createInitialExpandedSections = () => ({
+    businessInfo: false
+});
 
 /**
  * BusinessModal - Modal for creating and editing business information
@@ -18,84 +69,11 @@ const BusinessModal = ({
     editingBusinessInfo = null
 }) => {
     const { showSuccess } = useToast();
-    const { businessInfos, createBusinessInfo, updateBusinessInfo, setDefault } = useBusinessInfos();
+    const { createBusinessInfo, updateBusinessInfo, setDefault } = useBusinessInfos();
     
-    const [formData, setFormData] = useState({
-        title: '',
-        businessName: '',
-        address: '',
-        city: '',
-        state: '',
-        zip: '',
-        country: '',
-        registrationNumber: '',
-        vat: '',
-        taxNumber: '',
-        email: '',
-        phone: '',
-        custom: [],
-        isDefault: false,
-        taxEnabled: false,
-        taxLabel: 'Tax',
-        taxRate: 0
-    });
+    const [formData, setFormData] = useState(() => createInitialFormData(editingBusinessInfo));
 
-    const [expandedSections, setExpandedSections] = useState({
-        businessInfo: false
-    });
-
-    // Initialize form data when editing
-    useEffect(() => {
-        if (editingBusinessInfo) {
-            setFormData({
-                title: editingBusinessInfo.title || '',
-                businessName: editingBusinessInfo.businessName || '',
-                address: editingBusinessInfo.address || '',
-                city: editingBusinessInfo.city || '',
-                state: editingBusinessInfo.state || '',
-                zip: editingBusinessInfo.zip || '',
-                country: editingBusinessInfo.country || '',
-                registrationNumber: editingBusinessInfo.registrationNumber || '',
-                vat: editingBusinessInfo.vat || '',
-                taxNumber: editingBusinessInfo.taxNumber || '',
-                email: editingBusinessInfo.email || '',
-                phone: editingBusinessInfo.phone || '',
-                custom: [...(editingBusinessInfo.custom || [])],
-                isDefault: editingBusinessInfo.isDefault || false,
-                taxEnabled: editingBusinessInfo.taxEnabled || false,
-                taxLabel: editingBusinessInfo.taxLabel || 'Tax',
-                taxRate: editingBusinessInfo.taxRate || 0
-            });
-        } else {
-            setFormData({
-                title: '',
-                businessName: '',
-                address: '',
-                city: '',
-                state: '',
-                zip: '',
-                country: '',
-                registrationNumber: '',
-                vat: '',
-                taxNumber: '',
-                email: '',
-                phone: '',
-                custom: [],
-                isDefault: false,
-                taxEnabled: false,
-                taxLabel: 'Tax',
-                taxRate: 0
-            });
-        }
-    }, [editingBusinessInfo, isOpen]);
-
-    useEffect(() => {
-        if (isOpen) {
-            setExpandedSections({
-                businessInfo: false
-            });
-        }
-    }, [isOpen, editingBusinessInfo]);
+    const [expandedSections, setExpandedSections] = useState(() => createInitialExpandedSections());
 
     /**
      * Handle form input changes
@@ -197,7 +175,7 @@ const BusinessModal = ({
                 isDefault: formData.isDefault,
                 taxEnabled: formData.taxEnabled,
                 taxLabel: formData.taxLabel,
-                taxRate: parseFloat(formData.taxRate) || 0
+                taxRate: parseOptionalNumberInput(formData.taxRate) ?? 0
             });
 
             // If this business info is set as default, remove default from others
@@ -225,7 +203,7 @@ const BusinessModal = ({
                 isDefault: formData.isDefault,
                 taxEnabled: formData.taxEnabled,
                 taxLabel: formData.taxLabel,
-                taxRate: parseFloat(formData.taxRate) || 0
+                taxRate: parseOptionalNumberInput(formData.taxRate) ?? 0
             });
 
             // If this business info is set as default, remove default from others

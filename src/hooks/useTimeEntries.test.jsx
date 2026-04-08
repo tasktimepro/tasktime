@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
-import * as Y from 'yjs'
 import { useTimeEntries } from './useTimeEntries'
 import { useYjs } from '@/contexts/YjsContext'
 import { createTestYMap, readStored } from '@/test/yjs-test-helpers'
@@ -41,7 +40,7 @@ describe('useTimeEntries', () => {
         expect(result.current.entries.map((e) => e.id)).toEqual(['e3', 'e1'])
     })
 
-    it('creates, updates, and deletes entries', () => {
+    it('creates, updates, and deletes entries', async () => {
         const activeTimeEntries = createTestYMap()
         const store = {
             activeTimeEntries,
@@ -58,16 +57,31 @@ describe('useTimeEntries', () => {
 
         const { result } = renderHook(() => useTimeEntries())
 
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
         let createdEntry
-        act(() => {
+        await act(async () => {
             createdEntry = result.current.createEntry({ taskId: 't1', start: 1, end: 2 })
-            result.current.updateEntry(createdEntry.id, { note: 'Updated' })
         })
+
+        await waitFor(() => expect(result.current.entries).toHaveLength(1))
+
+        let updatedEntry
+        await act(async () => {
+            updatedEntry = result.current.updateEntry(createdEntry.id, { note: 'Updated' })
+        })
+
+        expect(updatedEntry?.note).toBe('Updated')
 
         const created = store.activeTimeEntries.get(createdEntry.id)
         expect(created).toBeTruthy()
+        expect(readStored(store.activeTimeEntries, createdEntry.id)?.note).toBe('Updated')
 
-        expect(result.current.deleteEntry(createdEntry.id)).toBe(true)
+        await act(async () => {
+            expect(result.current.deleteEntry(createdEntry.id)).toBe(true)
+        })
+
+        await waitFor(() => expect(result.current.entries).toHaveLength(0))
     })
 
     it('throws when creating entries and store is not ready', () => {

@@ -30,6 +30,38 @@ interface AuthState {
     hadPreviousSession: boolean;
 }
 
+const HAD_PREVIOUS_SESSION_KEY = 'google-auth-had-previous-session';
+
+function readHadPreviousSessionFlag(): boolean {
+
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    try {
+        return window.sessionStorage.getItem(HAD_PREVIOUS_SESSION_KEY) === 'true';
+    } catch {
+        return false;
+    }
+}
+
+function writeHadPreviousSessionFlag(value: boolean): void {
+
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        if (value) {
+            window.sessionStorage.setItem(HAD_PREVIOUS_SESSION_KEY, 'true');
+        } else {
+            window.sessionStorage.removeItem(HAD_PREVIOUS_SESSION_KEY);
+        }
+    } catch {
+        // Ignore sessionStorage failures and keep the in-memory state usable.
+    }
+}
+
 // Verify Worker mode is enabled
 if (!SYNC_WORKER_CONFIG.isEnabled) {
     console.error('[useGoogleAuth] VITE_SYNC_WORKER_URL not configured - Google Drive sync will not work');
@@ -91,7 +123,7 @@ export const useGoogleAuth = () => {
         accessToken: null,
         sessionId: null,
         error: null,
-        hadPreviousSession: false,
+        hadPreviousSession: readHadPreviousSessionFlag(),
     });
 
     // ============================================
@@ -214,6 +246,8 @@ export const useGoogleAuth = () => {
                 hadPreviousSession: true,
             });
 
+            writeHadPreviousSessionFlag(true);
+
             notifyAuthSubscribers();
 
         } catch (error) {
@@ -253,6 +287,7 @@ export const useGoogleAuth = () => {
         }
 
         await clearStoredSession();
+        writeHadPreviousSessionFlag(false);
 
         setState({
             isSignedIn: false,
@@ -275,12 +310,19 @@ export const useGoogleAuth = () => {
 
         if (!SYNC_WORKER_CONFIG.isEnabled) {
             console.error('[useGoogleAuth] Worker URL not configured');
-            setState(prev => ({ ...prev, isLoading: false, error: 'Sync Worker not configured' }));
+            setState(prev => ({
+                ...prev,
+                isLoading: false,
+                error: 'Sync Worker not configured',
+                hadPreviousSession: readHadPreviousSessionFlag(),
+            }));
             return;
         }
 
         const session = await getStoredSession();
         if (session) {
+            writeHadPreviousSessionFlag(true);
+
             if (!isOnline()) {
                 setState({
                     isSignedIn: true,
@@ -320,7 +362,11 @@ export const useGoogleAuth = () => {
             }));
             return;
         }
-        setState(prev => ({ ...prev, isLoading: false, hadPreviousSession: false }));
+        setState(prev => ({
+            ...prev,
+            isLoading: false,
+            hadPreviousSession: readHadPreviousSessionFlag(),
+        }));
     }, [validateWorkerSession, isOnline]);
 
     // ============================================

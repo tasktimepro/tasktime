@@ -106,4 +106,26 @@ describe('useYjsCollection', () => {
         expect(created.createdAt).toBe(123)
         expect(created.updatedAt).toBe(456)
     })
+
+    it('skips invalid stored entities and rejects invalid writes when validation is enabled', async () => {
+        const mockMap = createTestYMap({
+            good: { id: 'good', title: 'Valid Project' },
+            bad: { id: 'bad', title: '   ' },
+        })
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        mockUseYjs.mockReturnValue({ store: { projects: mockMap }, isReady: true })
+
+        const { result } = renderHook(() => useYjsCollection((store) => store.projects, { collectionName: 'projects' }))
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        expect(result.current.items).toEqual([{ id: 'good', title: 'Valid Project' }])
+        expect(result.current.get('bad')).toBeUndefined()
+        expect(warnSpy).toHaveBeenCalled()
+
+        expect(() => result.current.create({ id: 'invalid', title: '   ' })).toThrow(/Invalid projects entity/)
+
+        warnSpy.mockRestore()
+    })
 })

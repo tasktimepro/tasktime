@@ -694,7 +694,6 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         });
 
-        const dailyGoal = getGoalForDate(dateStr);
         const dayTargetHours = 24;
 
         const projectItemsById = new Map<string, PlannerProjectItem>();
@@ -793,7 +792,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
                 isActualBased: base.isActualBased,
             };
         });
-    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, expenses, recurrences, expenseDatesByRecurrence, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getTaskColor, getExpenseColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs, getGoalForDate, projectClientMap, defaultCurrency]);
+    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, expenses, recurrences, expenseDatesByRecurrence, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getProjectColor, getTaskColor, getExpenseColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs, projectClientMap, defaultCurrency]);
 
     // Build the full week
     const weekDays = useMemo((): PlannerDay[] => {

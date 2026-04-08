@@ -1,5 +1,8 @@
 import { EXCHANGE_RATE_CACHE_MS } from '../constants/app';
 
+export const EXCHANGE_RATES_API_URL = 'https://open.er-api.com/v6/latest/USD';
+export const STALE_EXCHANGE_RATES_ERROR = 'Using stale cached exchange rates.';
+
 /**
  * Map of currency codes to their symbols
  */
@@ -182,7 +185,7 @@ export const fetchExchangeRates = async (): Promise<{ rates: Record<string, numb
         try {
             const fallbackCache = JSON.parse(localStorage.getItem('exchangeRatesCache') || 'null') as ExchangeRateCache | null;
             if (fallbackCache && fallbackCache.rates) {
-                return { rates: fallbackCache.rates, error: 'Using cached exchange rates (may be outdated).' };
+                return { rates: fallbackCache.rates, error: STALE_EXCHANGE_RATES_ERROR };
             }
         } catch {
             // Ignore cache parse errors when offline
@@ -192,9 +195,8 @@ export const fetchExchangeRates = async (): Promise<{ rates: Record<string, numb
     }
 
     // If no valid cache, fetch from API
-    const API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
     try {
-        const response = await fetch(API_URL);
+        const response = await fetch(EXCHANGE_RATES_API_URL);
         if (!response.ok) {
             throw new Error(`API request failed: ${response.status}`);
         }
@@ -212,7 +214,7 @@ export const fetchExchangeRates = async (): Promise<{ rates: Record<string, numb
             const fallbackCache = JSON.parse(localStorage.getItem('exchangeRatesCache') || 'null') as ExchangeRateCache | null;
             if (fallbackCache && fallbackCache.rates) {
                 console.warn('Using expired cached rates as fallback');
-                return { rates: fallbackCache.rates, error: 'Using cached exchange rates (may be outdated).' };
+                return { rates: fallbackCache.rates, error: STALE_EXCHANGE_RATES_ERROR };
             }
         } catch {
             console.warn('No fallback rates available');

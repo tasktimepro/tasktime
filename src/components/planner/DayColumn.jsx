@@ -23,7 +23,6 @@ import {
  * @param {Object} props
  * @param {Date} props.date - The date for this column
  * @param {string} props.dateStr - ISO date string (YYYY-MM-DD)
- * @param {number} props.dayOfWeek - Day of week (0=Sun, 6=Sat)
  * @param {boolean} props.isLastColumn - Whether this is the last column in the week
  * @param {boolean} props.isToday - Whether this is today's column
  * @param {Array} props.items - Items to display in this column
@@ -42,7 +41,6 @@ import {
 const DayColumn = ({
     date,
     dateStr,
-    dayOfWeek,
     isLastColumn = false,
     isToday = false,
     items = [],

@@ -10,7 +10,8 @@ import type { Client } from '@/stores/yjs/types';
 
 export function useClients() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<Client>(
-        (store) => store.clients
+        (store) => store.clients,
+        { collectionName: 'clients' }
     );
 
     // Sorted by title

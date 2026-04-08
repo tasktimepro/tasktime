@@ -10,7 +10,8 @@ import type { PaymentMethod } from '@/stores/yjs/types';
 
 export function usePaymentMethods() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<PaymentMethod>(
-        (store) => store.paymentMethods
+        (store) => store.paymentMethods,
+        { collectionName: 'paymentMethods' }
     );
 
     // Get the default payment method

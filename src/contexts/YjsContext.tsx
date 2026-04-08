@@ -9,6 +9,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { YjsStore, getYjsStore, YjsDocManager, SyncState, SyncPhase, AutoSyncMode, AuthorizationError } from '@/stores/yjs';
+/* eslint-disable react-refresh/only-export-components */
 import type { BackupInfo } from '@/stores/yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useToast } from '@/hooks/useToast';
@@ -268,7 +269,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             setManualSyncInProgress(false);
             setDriveBindingVersion(previous => previous + 1);
         }
-    }, [isReady, isSignedIn, accessToken, sessionId, authLoading, store]);
+    }, [isReady, isSignedIn, accessToken, sessionId, authLoading, store, handleAuthorizationFailure]);
 
     // Update access token when it changes
     useEffect(() => {

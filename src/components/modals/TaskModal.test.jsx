@@ -103,6 +103,42 @@ describe('TaskModal', () => {
         expect(onClose).toHaveBeenCalled()
     })
 
+    it('preselects a project and reports the created task through modal options', async () => {
+
+        const onClose = vi.fn()
+        const onCreate = vi.fn()
+        const user = userEvent.setup()
+
+        taskMocks.createTask.mockImplementationOnce((payload) => ({
+            id: 'created-task',
+            ...payload,
+        }))
+
+        render(
+            <TaskModal
+                isOpen
+                onClose={onClose}
+                modalOptions={{
+                    onCreate,
+                    preselectedProjectId: 'p1',
+                }}
+            />
+        )
+
+        await user.type(screen.getByLabelText(/Task Title/i), 'Project-linked task')
+        await user.click(screen.getByRole('button', { name: 'Create' }))
+
+        expect(taskMocks.createTask).toHaveBeenCalledWith(expect.objectContaining({
+            projectId: 'p1',
+            title: 'Project-linked task',
+        }))
+        expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+            id: 'created-task',
+            projectId: 'p1',
+        }))
+        expect(onClose).toHaveBeenCalled()
+    })
+
     it('validates required title', async () => {
 
         const user = userEvent.setup()

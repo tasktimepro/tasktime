@@ -43,6 +43,10 @@ const clientsHookState = vi.hoisted(() => ({
     clients: [],
 }))
 
+const timersHookState = vi.hoisted(() => ({
+    timers: [],
+}))
+
 const urlHookState = vi.hoisted(() => ({
     urlParams: { view: 'dashboard', projectId: null, clientId: null },
     navigateToProjects: vi.fn(),
@@ -237,7 +241,7 @@ vi.mock('./hooks/usePreferences.ts', () => ({
 
 vi.mock('./hooks/useTimers.ts', () => ({
     useTimers: () => ({
-        timers: [],
+        timers: timersHookState.timers,
         clearTimer: vi.fn(),
         getTimerForTask: () => null,
         isLoading: false,
@@ -312,6 +316,7 @@ vi.mock('./components/modals/ModalManager', () => ({
 vi.mock('./components/modals/ExpenseViewModal', () => ({
     default: ({ isOpen, expense }) => (isOpen ? <div data-testid="expense-view-modal">{expense?.id}:{expense?.title}:{expense?.isPreview ? 'preview' : 'actual'}</div> : null)
 }))
+vi.mock('./components/OnboardingModal.jsx', () => ({ default: () => null }))
 vi.mock('./components/ErrorBoundary', () => ({ default: ({ children }) => children }))
 vi.mock('./components/OfflineIndicator', () => ({ default: () => <div data-testid="offline-indicator" /> }))
 vi.mock('./components/InstallPrompt', () => ({ default: () => <div data-testid="install-prompt" /> }))
@@ -324,6 +329,14 @@ describe('App component', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        window.history.pushState({}, '', '/')
+        localStorage.getItem.mockImplementation((key) => {
+            if (key === 'tasktime-onboarding-completed') {
+                return 'true'
+            }
+
+            return null
+        })
         window.matchMedia = createMatchMedia()
         expenseHookState.expenses.length = 0
         expenseHookState.createExpense.mockReset()
@@ -336,6 +349,7 @@ describe('App component', () => {
         recurrenceHookState.updateRecurrence.mockReset()
         projectsHookState.projects.length = 0
         clientsHookState.clients.length = 0
+        timersHookState.timers.length = 0
         urlHookState.urlParams = { view: 'dashboard', projectId: null, clientId: null }
         urlHookState.navigateToProjects.mockReset()
         urlHookState.navigateToProject.mockReset()
@@ -357,6 +371,27 @@ describe('App component', () => {
     it('renders the dashboard view by default', async () => {
         render(<App />)
         expect(await screen.findByTestId('dashboard')).toBeInTheDocument()
+    })
+
+    it('renders the privacy policy as a public page without the app shell', () => {
+        window.history.pushState({}, '', '/privacy')
+
+        render(<App />)
+
+        expect(screen.getByRole('heading', { name: 'Privacy Policy' })).toBeInTheDocument()
+        expect(screen.getAllByText(/Sync is entirely optional/i).length).toBeGreaterThan(0)
+        expect(screen.queryByTestId('dashboard')).not.toBeInTheDocument()
+        expect(screen.queryByText('Clients')).not.toBeInTheDocument()
+    })
+
+    it('renders the terms page for the terms alias route', () => {
+        window.history.pushState({}, '', '/terms-and-conditions')
+
+        render(<App />)
+
+        expect(screen.getByRole('heading', { name: 'Terms & Conditions' })).toBeInTheDocument()
+        expect(screen.getByText(/provided as-is and as-available/i)).toBeInTheDocument()
+        expect(screen.queryByTestId('dashboard')).not.toBeInTheDocument()
     })
 
     it('renders the desktop sidebar and not the mobile dock on larger screens', () => {
@@ -443,6 +478,27 @@ describe('App component', () => {
         await user.click(screen.getByRole('button', { name: 'Create new task' }))
 
         expect(screen.getByTestId('active-modal')).toHaveTextContent('task')
+    })
+
+    it('pins the mobile global timer at the top of the viewport', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        timersHookState.timers.push({
+            projectId: 'project-1',
+            taskId: 'task-1',
+            startTime: Date.now(),
+            isPaused: false,
+            elapsedTime: 1000,
+        })
+
+        render(<App />)
+
+        const timer = screen.getByTestId('global-timer')
+        const timerShell = timer.parentElement?.parentElement
+
+        expect(timerShell?.className).toContain('top-0')
+        expect(timerShell?.className).not.toContain('bottom-safe-dock')
     })
 
     it('does not render the removed mobile top bar on project detail routes', () => {

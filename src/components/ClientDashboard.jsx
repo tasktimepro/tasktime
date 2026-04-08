@@ -10,6 +10,7 @@ import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurr
 import { millisecondsToHours, formatDuration, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useToast } from '../hooks/useToast.ts';
+import { getInvoiceTotal, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
@@ -155,9 +156,8 @@ const ClientDashboard = ({
     const clientMetrics = useMemo(() => {
         // Total revenue from paid invoices only
         const totalRevenue = clientInvoices.reduce((total, invoice) => {
-            // Only include invoices that have been marked as paid
-            if (invoice.paymentProcessed) {
-                return total + (invoice.totalAmount || invoice.total || 0);
+            if (isInvoicePaid(invoice)) {
+                return total + getInvoiceTotal(invoice);
             }
             return total;
         }, 0);
@@ -203,9 +203,8 @@ const ClientDashboard = ({
 
         // Calculate pending amount from unpaid invoices
         const pendingAmount = clientInvoices.reduce((total, invoice) => {
-            // Only include invoices that have NOT been marked as paid
-            if (!invoice.paymentProcessed) {
-                return total + (invoice.totalAmount || invoice.total || 0);
+            if (!isInvoicePaid(invoice)) {
+                return total + getInvoiceTotal(invoice);
             }
             return total;
         }, 0);
@@ -404,7 +403,7 @@ const ClientDashboard = ({
             ? `Client and ${related.length} related project(s) deleted successfully.`
             : 'Client deleted successfully.';
         showSuccess(message);
-    }, [projects, tasks, timeEntries, invoices, deleteProject, deleteTask, deleteEntry, deleteInvoice, updateProject, deleteClient, showSuccess]);
+    }, [projects, tasks, timeEntries, invoices, expenses, recurrences, deleteProject, deleteTask, deleteEntry, deleteInvoice, updateProject, deleteClient, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showSuccess]);
 
     const handleEditClient = () => {
         openClientModal?.(client);

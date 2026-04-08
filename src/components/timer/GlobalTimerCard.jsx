@@ -5,7 +5,6 @@ import GlobalTimer from '../GlobalTimer';
  * GlobalTimerCard component - Single timer card for the stack
  * @param {Object} props
  * @param {Object} props.timer - Timer data
- * @param {boolean} props.isFocused - Whether this is the focused timer
  * @param {Function} props.onFocus - Focus handler
  * @param {Function} props.navigateToProject - Navigate to project handler
  * @param {(task: Object) => void} props.onOpenTaskView - Open task view modal
@@ -13,7 +12,6 @@ import GlobalTimer from '../GlobalTimer';
  */
 const GlobalTimerCard = ({
     timer,
-    isFocused = false,
     onFocus,
     isExpanded = false,
     onToggleExpanded,
@@ -61,6 +59,7 @@ const GlobalTimerCard = ({
             }}
         >
             <GlobalTimer
+                key={`${timer?.projectId || 'none'}-${timer?.startTime || 'none'}-${timer?.note || ''}`}
                 timer={timer}
                 navigateToProject={navigateToProject}
                 onOpenTaskView={onOpenTaskView}

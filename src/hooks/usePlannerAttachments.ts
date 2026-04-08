@@ -10,7 +10,8 @@ import type { PlannerAttachment } from '@/stores/yjs/types';
 
 export function usePlannerAttachments() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<PlannerAttachment>(
-        (store) => store.plannerAttachments
+        (store) => store.plannerAttachments,
+        { collectionName: 'plannerAttachments' }
     );
 
     /**

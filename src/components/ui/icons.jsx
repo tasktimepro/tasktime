@@ -62,6 +62,7 @@ export {
     Settings as CogIcon,
     Square as StopIcon,
     Sun as SunIcon,
+    Timer as TimerIcon,
     Trash2 as TrashIcon,
     Upload as ArrowUpTrayIcon,
     User as UserIcon,

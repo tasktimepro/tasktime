@@ -9,7 +9,8 @@ import type { Expense, ExpenseRecurrence } from '@/stores/yjs/types';
 
 export function useExpenseRecurrences() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<ExpenseRecurrence>(
-        (store) => store.expenseRecurrences
+        (store) => store.expenseRecurrences,
+        { collectionName: 'expenseRecurrences' }
     );
 
     const activeRecurrences = useMemo(

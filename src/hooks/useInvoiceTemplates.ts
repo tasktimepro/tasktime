@@ -10,7 +10,8 @@ import type { InvoiceTemplate } from '@/stores/yjs/types';
 
 export function useInvoiceTemplates() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<InvoiceTemplate>(
-        (store) => store.invoiceTemplates
+        (store) => store.invoiceTemplates,
+        { collectionName: 'invoiceTemplates' }
     );
 
     // Sorted by name

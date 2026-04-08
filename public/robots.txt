@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /auth/callback
+
+Sitemap: https://tasktime.pro/sitemap.xml

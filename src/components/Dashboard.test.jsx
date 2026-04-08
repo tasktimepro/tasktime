@@ -2,6 +2,17 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import Dashboard from './Dashboard';
+import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
+
+const {
+    mockShowWarning,
+    mockShowSuccess,
+    mockUseCurrencyConversion,
+} = vi.hoisted(() => ({
+    mockShowWarning: vi.fn(),
+    mockShowSuccess: vi.fn(),
+    mockUseCurrencyConversion: vi.fn(),
+}));
 
 const createMatchMedia = (matchesByQuery = {}) => vi.fn().mockImplementation((query) => ({
     matches: Boolean(matchesByQuery[query]),
@@ -16,8 +27,8 @@ const createMatchMedia = (matchesByQuery = {}) => vi.fn().mockImplementation((qu
 
 vi.mock('../hooks/useToast', () => ({
     useToast: () => ({
-        showWarning: vi.fn(),
-        showSuccess: vi.fn(),
+        showWarning: mockShowWarning,
+        showSuccess: mockShowSuccess,
     }),
 }));
 
@@ -86,15 +97,7 @@ vi.mock('@/hooks/useDayRollover', () => ({
 }));
 
 vi.mock('./dashboard/hooks/useCurrencyConversion', () => ({
-    default: () => ({
-        preferredCurrency: 'USD',
-        exchangeRates: null,
-        exchangeRatesLoading: false,
-        exchangeRatesError: null,
-        needsExchangeRates: false,
-        missingExchangeRates: [],
-        convertToCurrency: (amounts) => ({ amounts }),
-    }),
+    default: (...args) => mockUseCurrencyConversion(...args),
 }));
 
 vi.mock('./dashboard/hooks/useMetricsCalculation', () => ({
@@ -130,27 +133,55 @@ vi.mock('@/components/modals/AddTimeEntryModal', () => ({
 
 describe('Dashboard', () => {
     beforeEach(() => {
+        const storage = new Map();
+
+        localStorage.getItem.mockImplementation((key) => {
+            return storage.has(key) ? storage.get(key) : null;
+        });
+        localStorage.setItem.mockImplementation((key, value) => {
+            storage.set(key, value);
+        });
+        localStorage.removeItem.mockImplementation((key) => {
+            storage.delete(key);
+        });
+        localStorage.clear.mockImplementation(() => {
+            storage.clear();
+        });
+        localStorage.clear();
         window.matchMedia = createMatchMedia();
+        mockShowWarning.mockReset();
+        mockShowSuccess.mockReset();
+        mockUseCurrencyConversion.mockReturnValue({
+            preferredCurrency: 'USD',
+            exchangeRates: null,
+            exchangeRatesLoading: false,
+            exchangeRatesError: null,
+            needsExchangeRates: false,
+            missingExchangeRates: [],
+            convertToCurrency: (amounts) => ({ amounts }),
+        });
     });
+
+    const renderDashboard = () => render(
+        <Dashboard
+            projects={[]}
+            invoices={[]}
+            clients={[]}
+            navigateToProject={vi.fn()}
+            navigateToClient={vi.fn()}
+            navigateToInvoices={vi.fn()}
+            onEditTask={vi.fn()}
+            onViewTask={vi.fn()}
+            openExpenseView={vi.fn()}
+        />
+    );
 
     it('renders reports overview before recent sections on mobile', () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
         });
 
-        render(
-            <Dashboard
-                projects={[]}
-                invoices={[]}
-                clients={[]}
-                navigateToProject={vi.fn()}
-                navigateToClient={vi.fn()}
-                navigateToInvoices={vi.fn()}
-                onEditTask={vi.fn()}
-                onViewTask={vi.fn()}
-                openExpenseView={vi.fn()}
-            />
-        );
+        renderDashboard();
 
         const todo = screen.getByTestId('todo-today');
         const metrics = screen.getByTestId('metrics-cards');
@@ -161,23 +192,52 @@ describe('Dashboard', () => {
     });
 
     it('keeps reports overview after recent sections on desktop', () => {
-        render(
-            <Dashboard
-                projects={[]}
-                invoices={[]}
-                clients={[]}
-                navigateToProject={vi.fn()}
-                navigateToClient={vi.fn()}
-                navigateToInvoices={vi.fn()}
-                onEditTask={vi.fn()}
-                onViewTask={vi.fn()}
-                openExpenseView={vi.fn()}
-            />
-        );
+        renderDashboard();
 
         const recent = screen.getByTestId('recent-tasks');
         const metrics = screen.getByTestId('metrics-cards');
 
         expect(recent.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('shows the stale exchange rates warning once per day', () => {
+        mockUseCurrencyConversion.mockReturnValue({
+            preferredCurrency: 'USD',
+            exchangeRates: { EUR: 0.9 },
+            exchangeRatesLoading: false,
+            exchangeRatesError: STALE_EXCHANGE_RATES_ERROR,
+            needsExchangeRates: true,
+            missingExchangeRates: [],
+            convertToCurrency: (amounts) => ({ amounts, hadConversionError: false }),
+        });
+
+        const firstRender = renderDashboard();
+
+        expect(mockShowWarning).toHaveBeenCalledTimes(1);
+        expect(mockShowWarning).toHaveBeenCalledWith(STALE_EXCHANGE_RATES_ERROR);
+
+        firstRender.unmount();
+
+        renderDashboard();
+
+        expect(mockShowWarning).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the stale exchange rates warning again on a later day', () => {
+        localStorage.setItem('tasktime-stale-exchange-rates-warning-date', '2026-03-23');
+        mockUseCurrencyConversion.mockReturnValue({
+            preferredCurrency: 'USD',
+            exchangeRates: { EUR: 0.9 },
+            exchangeRatesLoading: false,
+            exchangeRatesError: STALE_EXCHANGE_RATES_ERROR,
+            needsExchangeRates: true,
+            missingExchangeRates: [],
+            convertToCurrency: (amounts) => ({ amounts, hadConversionError: false }),
+        });
+
+        renderDashboard();
+
+        expect(mockShowWarning).toHaveBeenCalledTimes(1);
+        expect(localStorage.getItem('tasktime-stale-exchange-rates-warning-date')).toBe('2026-03-24');
     });
 });

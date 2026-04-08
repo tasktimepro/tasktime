@@ -10,6 +10,35 @@ vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 
 const mockUseYjs = useYjs
 
+const buildExpense = (overrides = {}) => ({
+    id: 'expense-default',
+    title: 'Test Expense',
+    date: '2025-01-01',
+    supplierName: null,
+    receiptNumber: null,
+    currency: 'EUR',
+    amount: 10,
+    paidOn: null,
+    paidBy: null,
+    paymentStatus: 'unpaid',
+    paymentMode: 'manual',
+    clientId: null,
+    projectId: null,
+    businessId: null,
+    isPersonal: true,
+    billable: false,
+    billingStatus: 'unbilled',
+    invoiceId: null,
+    billedAt: null,
+    isRecurring: false,
+    recurrenceId: null,
+    amountType: 'fixed',
+    taxNumber: null,
+    isTaxExempt: false,
+    note: null,
+    ...overrides,
+})
+
 const buildStore = ({ active = [], archived = [] } = {}) => {
     const activeDoc = new Y.Doc()
     const archivedDoc = new Y.Doc()
@@ -45,9 +74,9 @@ describe('useExpenses', () => {
     it('filters and sorts expenses by date desc', () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [
-                { id: '1', date: '2025-01-01', amount: 10, paymentStatus: 'paid', billingStatus: 'unbilled', billable: false, isPersonal: true },
-                { id: '2', date: '2025-02-01', amount: 20, paymentStatus: 'unpaid', billingStatus: 'unbilled', billable: false, isPersonal: true, clientId: 'c1' },
-                { id: '3', date: '2024-12-01', amount: 5, paymentStatus: 'unpaid', billingStatus: 'billed', billable: true, isPersonal: false, clientId: 'c2' },
+                buildExpense({ id: '1', date: '2025-01-01', amount: 10, paymentStatus: 'paid' }),
+                buildExpense({ id: '2', date: '2025-02-01', amount: 20, clientId: 'c1' }),
+                buildExpense({ id: '3', date: '2024-12-01', amount: 5, billingStatus: 'billed', billable: true, isPersonal: false, clientId: 'c2' }),
             ]
         })
 
@@ -64,9 +93,9 @@ describe('useExpenses', () => {
     it('computes totals correctly', () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [
-                { id: '1', date: '2025-01-01', amount: 10, paymentStatus: 'paid', billingStatus: 'unbilled', billable: true, isPersonal: true },
-                { id: '2', date: '2025-02-01', amount: 20, paymentStatus: 'unpaid', billingStatus: 'unbilled', billable: true, isPersonal: true },
-                { id: '3', date: '2024-12-01', amount: 5, paymentStatus: 'unpaid', billingStatus: 'billed', billable: true, isPersonal: true },
+                buildExpense({ id: '1', date: '2025-01-01', amount: 10, paymentStatus: 'paid', billable: true }),
+                buildExpense({ id: '2', date: '2025-02-01', amount: 20, billable: true }),
+                buildExpense({ id: '3', date: '2024-12-01', amount: 5, billingStatus: 'billed', billable: true }),
             ]
         })
 
@@ -82,13 +111,11 @@ describe('useExpenses', () => {
 
     it('markAsPaid requires amount for variable expenses', () => {
         const { store, loadArchivedExpenses } = buildStore({
-            active: [{
+            active: [buildExpense({
                 id: 'v1',
                 amount: 0,
                 amountType: 'variable',
-                paymentStatus: 'unpaid',
-                paidBy: null,
-            }]
+            })]
         })
 
         mockUseYjs.mockReturnValue({
@@ -104,13 +131,11 @@ describe('useExpenses', () => {
 
     it('markAsPaid updates amount and status', () => {
         const { store, loadArchivedExpenses } = buildStore({
-            active: [{
+            active: [buildExpense({
                 id: 'v2',
                 amount: 0,
                 amountType: 'variable',
-                paymentStatus: 'unpaid',
-                paidBy: null,
-            }]
+            })]
         })
 
         mockUseYjs.mockReturnValue({
@@ -149,9 +174,9 @@ describe('useExpenses', () => {
     it('filters by project, personal, and billable options', () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [
-                { id: '1', date: '2025-02-01', amount: 10, paymentStatus: 'unpaid', billingStatus: 'unbilled', billable: true, isPersonal: true, projectId: 'p1' },
-                { id: '2', date: '2025-02-02', amount: 20, paymentStatus: 'unpaid', billingStatus: 'unbilled', billable: false, isPersonal: true, projectId: 'p1' },
-                { id: '3', date: '2025-02-03', amount: 30, paymentStatus: 'unpaid', billingStatus: 'unbilled', billable: true, isPersonal: false, projectId: 'p2' },
+                buildExpense({ id: '1', date: '2025-02-01', amount: 10, billable: true, projectId: 'p1' }),
+                buildExpense({ id: '2', date: '2025-02-02', amount: 20, billable: false, projectId: 'p1' }),
+                buildExpense({ id: '3', date: '2025-02-03', amount: 30, billable: true, isPersonal: false, projectId: 'p2' }),
             ]
         })
 
@@ -172,7 +197,11 @@ describe('useExpenses', () => {
 
     it('updates payment and billing statuses', () => {
         const { store, loadArchivedExpenses } = buildStore({
-            active: [{ id: 'exp-1' }, { id: 'exp-2' }, { id: 'exp-3' }]
+            active: [
+                buildExpense({ id: 'exp-1', paymentStatus: 'paid' }),
+                buildExpense({ id: 'exp-2' }),
+                buildExpense({ id: 'exp-3', billingStatus: 'billed', invoiceId: 'inv-2', billedAt: 100 }),
+            ]
         })
 
         mockUseYjs.mockReturnValue({
@@ -197,9 +226,9 @@ describe('useExpenses', () => {
     it('unbills all expenses for an invoice', () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [
-                { id: 'exp-1', invoiceId: 'inv-1' },
-                { id: 'exp-2', invoiceId: 'inv-1' },
-                { id: 'exp-3', invoiceId: 'inv-2' },
+                buildExpense({ id: 'exp-1', billingStatus: 'billed', invoiceId: 'inv-1', billedAt: 100 }),
+                buildExpense({ id: 'exp-2', billingStatus: 'billed', invoiceId: 'inv-1', billedAt: 200 }),
+                buildExpense({ id: 'exp-3', billingStatus: 'billed', invoiceId: 'inv-2', billedAt: 300 }),
             ]
         })
 
@@ -222,9 +251,9 @@ describe('useExpenses', () => {
     it('returns client/project scoped lists and billable-unbilled helpers', () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [
-                { id: 'exp-1', clientId: 'c1', projectId: 'p1', billable: true, billingStatus: 'unbilled' },
-                { id: 'exp-2', clientId: 'c1', projectId: 'p1', billable: true, billingStatus: 'billed' },
-                { id: 'exp-3', clientId: 'c2', projectId: 'p2', billable: true, billingStatus: 'unbilled' },
+                buildExpense({ id: 'exp-1', clientId: 'c1', projectId: 'p1', billable: true, billingStatus: 'unbilled' }),
+                buildExpense({ id: 'exp-2', clientId: 'c1', projectId: 'p1', billable: true, billingStatus: 'billed' }),
+                buildExpense({ id: 'exp-3', clientId: 'c2', projectId: 'p2', billable: true, billingStatus: 'unbilled' }),
             ]
         })
 
@@ -244,8 +273,8 @@ describe('useExpenses', () => {
 
     it('includes archived expenses when requested', async () => {
         const { store, loadArchivedExpenses } = buildStore({
-            active: [{ id: 'exp-1', date: '2025-02-01', paymentStatus: 'paid', billingStatus: 'billed', billable: true, isPersonal: false }],
-            archived: [{ id: 'exp-2', date: '2024-02-01', paymentStatus: 'paid', billingStatus: 'billed', billable: true, isPersonal: false }]
+            active: [buildExpense({ id: 'exp-1', date: '2025-02-01', paymentStatus: 'paid', billingStatus: 'billed', billable: true, isPersonal: false })],
+            archived: [buildExpense({ id: 'exp-2', date: '2024-02-01', paymentStatus: 'paid', billingStatus: 'billed', billable: true, isPersonal: false })]
         })
 
         mockUseYjs.mockReturnValue({
@@ -262,17 +291,18 @@ describe('useExpenses', () => {
     it('returns overdue and upcoming expenses based on today', () => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-02-06T12:00:00Z'))
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
         const { store, loadArchivedExpenses } = buildStore({
             active: [
-                { id: 'exp-1', date: '2026-02-05', paymentStatus: 'unpaid' },
-                { id: 'exp-2', date: '2026-02-06', paymentStatus: 'unpaid' },
-                { id: 'exp-3', date: '2026-02-10', paymentStatus: 'unpaid' },
-                { id: 'exp-4', date: '2026-02-20', paymentStatus: 'unpaid' },
-                { id: 'exp-5', date: '2026-02-04', paymentStatus: 'paid' },
-                { id: 'exp-6', date: '2026-02-05', paymentStatus: 'paid', paymentMode: 'auto' },
-                { id: 'exp-7', date: '2026-02-10', paymentStatus: 'paid', paymentMode: 'auto' },
-                { id: 'exp-8', date: 'invalid', paymentStatus: 'unpaid' },
+                buildExpense({ id: 'exp-1', date: '2026-02-05' }),
+                buildExpense({ id: 'exp-2', date: '2026-02-06' }),
+                buildExpense({ id: 'exp-3', date: '2026-02-10' }),
+                buildExpense({ id: 'exp-4', date: '2026-02-20' }),
+                buildExpense({ id: 'exp-5', date: '2026-02-04', paymentStatus: 'paid' }),
+                buildExpense({ id: 'exp-6', date: '2026-02-05', paymentStatus: 'paid', paymentMode: 'auto' }),
+                buildExpense({ id: 'exp-7', date: '2026-02-10', paymentStatus: 'paid', paymentMode: 'auto' }),
+                buildExpense({ id: 'exp-8', date: 'invalid' }),
             ]
         })
 
@@ -286,14 +316,16 @@ describe('useExpenses', () => {
 
         expect(result.current.getOverdueExpenses().map((e) => e.id)).toEqual(['exp-1'])
         expect(result.current.getUpcomingDueExpenses(7).map((e) => e.id)).toEqual(['exp-2', 'exp-3', 'exp-7'])
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid expenses entity in active expenses sync'))
 
+        warnSpy.mockRestore()
         vi.useRealTimers()
     })
 
     it('returns archived expense when includeArchived is true', () => {
         const { store, loadArchivedExpenses } = buildStore({
-            active: [{ id: 'exp-1' }],
-            archived: [{ id: 'exp-2' }]
+            active: [buildExpense({ id: 'exp-1' })],
+            archived: [buildExpense({ id: 'exp-2' })]
         })
 
         mockUseYjs.mockReturnValue({
@@ -304,7 +336,91 @@ describe('useExpenses', () => {
 
         const { result } = renderHook(() => useExpenses({ includeArchived: true }))
 
-        expect(result.current.getExpense('exp-2')).toEqual({ id: 'exp-2' })
+        expect(result.current.getExpense('exp-2')).toEqual(expect.objectContaining({ id: 'exp-2' }))
+    })
+
+    it('creates expenses with explicit timestamps preserved', () => {
+        const { store, loadArchivedExpenses } = buildStore()
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        act(() => {
+            result.current.createExpense(buildExpense({
+                id: 'exp-custom-time',
+                createdAt: 111,
+                updatedAt: 222,
+            }))
+        })
+
+        expect(readStored(store.expenses, 'exp-custom-time')).toEqual(expect.objectContaining({
+            createdAt: 111,
+            updatedAt: 222,
+        }))
+    })
+
+    it('updates and deletes archived expenses when includeArchived is enabled', () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            archived: [buildExpense({ id: 'arch-1', amount: 15 })],
+        })
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses({ includeArchived: true }))
+
+        act(() => {
+            result.current.updateExpense('arch-1', { amount: 25 })
+        })
+
+        expect(readStored(store.archivedExpenses, 'arch-1')).toEqual(expect.objectContaining({ amount: 25 }))
+
+        act(() => {
+            result.current.deleteExpense('arch-1')
+        })
+
+        expect(store.archivedExpenses.has('arch-1')).toBe(false)
+    })
+
+    it('returns empty upcoming expenses when the current date cannot be derived', () => {
+        const realDate = global.Date
+
+        class InvalidDate extends Date {
+            constructor(...args) {
+                if (args.length > 0) {
+                    super(...args)
+                    return
+                }
+
+                super('invalid')
+            }
+        }
+
+        global.Date = InvalidDate
+
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({ id: 'exp-1' })],
+        })
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        expect(result.current.getUpcomingDueExpenses()).toEqual([])
+
+        global.Date = realDate
     })
 
     it('handles create/update/delete when store is not ready', () => {

@@ -116,65 +116,86 @@ vi.mock('../invoice/InvoiceGeneratorButton', () => ({
     )
 }))
 
-vi.mock('../invoice/InvoiceModal', () => ({
+vi.mock('../invoice/InvoiceModal', () => {
 
-    default: (props) => {
+    function MockInvoiceModal({
+        availableExpenses = [],
+        handleAddAdditionalExpense,
+        handleSaveInvoice,
+        handleTemplateSelection,
+        newExpenseTitle,
+        setNewExpenseAmount,
+        setNewExpenseCurrency,
+        setNewExpenseSupplierName,
+        setNewExpenseTitle,
+        setSelectedExpensesForBilling,
+        selectedTemplate,
+        showInvoiceForm,
+    }) {
         const didSelectExpenses = React.useRef(false)
         const didAddInvoiceOnly = React.useRef(false)
 
         React.useEffect(() => {
-            if (!props.showInvoiceForm) {
+            if (!showInvoiceForm) {
                 didSelectExpenses.current = false
+                didAddInvoiceOnly.current = false
                 return
             }
 
-            if (!props.selectedTemplate) {
-                props.handleTemplateSelection('tpl-1')
+            if (!selectedTemplate) {
+                handleTemplateSelection('tpl-1')
                 return
             }
 
-            // Auto-select all convertible available expenses (only once)
             if (!didSelectExpenses.current) {
                 didSelectExpenses.current = true
-                const available = props.availableExpenses || []
                 const selection = {}
-                available.forEach((exp) => {
-                    if (exp.isConvertible !== false) {
-                        selection[exp.id] = true
+                availableExpenses.forEach((expense) => {
+                    if (expense.isConvertible !== false) {
+                        selection[expense.id] = true
                     }
                 })
-                props.setSelectedExpensesForBilling(selection)
+                setSelectedExpensesForBilling(selection)
                 return
             }
 
             if (invoiceOnlyTestState.enabled && !didAddInvoiceOnly.current) {
-                if (!props.newExpenseTitle) {
-                    props.setNewExpenseTitle('Invoice-only expense')
-                    props.setNewExpenseAmount('80')
-                    props.setNewExpenseCurrency('EUR')
-                    props.setNewExpenseSupplierName('Vendor')
+                if (!newExpenseTitle) {
+                    setNewExpenseTitle('Invoice-only expense')
+                    setNewExpenseAmount('80')
+                    setNewExpenseCurrency('EUR')
+                    setNewExpenseSupplierName('Vendor')
                     return
                 }
 
                 didAddInvoiceOnly.current = true
-                props.handleAddAdditionalExpense()
+                handleAddAdditionalExpense()
                 return
             }
 
-            props.handleSaveInvoice({ preventDefault: () => {} })
+            handleSaveInvoice({ preventDefault: () => {} })
         }, [
-            props.showInvoiceForm,
-            props.selectedTemplate,
-            props.selectedExpensesForBilling,
-            props.availableExpenses,
-            props.newExpenseTitle,
-            props.newExpenseAmount,
-            props.newExpenseCurrency
+            availableExpenses,
+            handleAddAdditionalExpense,
+            handleSaveInvoice,
+            handleTemplateSelection,
+            newExpenseTitle,
+            selectedTemplate,
+            setNewExpenseAmount,
+            setNewExpenseCurrency,
+            setNewExpenseSupplierName,
+            setNewExpenseTitle,
+            setSelectedExpensesForBilling,
+            showInvoiceForm,
         ])
 
-        return props.showInvoiceForm ? <div>Invoice Modal</div> : null
+        return showInvoiceForm ? <div>Invoice Modal</div> : null
     }
-}))
+
+    return {
+        default: MockInvoiceModal
+    }
+})
 
 vi.mock('../../utils/pdfUtils.ts', () => ({
 

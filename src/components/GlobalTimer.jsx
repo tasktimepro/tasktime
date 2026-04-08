@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronDownIcon, ChevronUpIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,18 +13,31 @@ import { useTasks } from '../hooks/useTasks';
 import { useProjects } from '../hooks/useProjects';
 import { useTimeEntries } from '../hooks/useTimeEntries';
 
+const createInitialDraftState = (isActive, startTime, note) => {
+    if (!isActive || !startTime) {
+        return {
+            startTimeInput: '',
+            noteInput: '',
+        };
+    }
+
+    const startDate = new Date(startTime);
+    return {
+        startTimeInput: startDate.toTimeString().slice(0, 8),
+        noteInput: note || '',
+    };
+};
+
 /**
  * GlobalTimer component - Shows active timer in the header
  * Uses Yjs hooks for all state management
  * @param {Object} props - Component props
  * @param {Function} props.navigateToProject - Function to navigate to project page
  * @param {(task: Object) => void} props.onOpenTaskView - Open task view modal
- * @param {Function} props.onClose - Function called when timer is closed
  */
 const GlobalTimer = ({
     navigateToProject,
      onOpenTaskView,
-    onClose,
     timer = null,
     isExpanded: isExpandedProp,
     onToggleExpanded
@@ -54,8 +67,7 @@ const GlobalTimer = ({
     
     const [isExpandedInternal, setIsExpandedInternal] = useState(false);
     const isExpanded = typeof isExpandedProp === 'boolean' ? isExpandedProp : isExpandedInternal;
-    const [startTimeInput, setStartTimeInput] = useState('');
-    const [noteInput, setNoteInput] = useState('');
+    const [{ startTimeInput, noteInput }, setDraftState] = useState(() => createInitialDraftState(isActive, startTime, note));
 
     // Find the task associated with the current timer
     const currentTask = tasks.find(task => task.id === taskId);
@@ -76,20 +88,6 @@ const GlobalTimer = ({
             navigateToProject(currentProject.id);
         }
     };
-
-    /**
-     * Initialize start time input when timer changes
-     */
-    useEffect(() => {
-        if (isActive && startTime) {
-            const startDate = new Date(startTime);
-            const timeString = startDate.toTimeString().slice(0, 8); // HH:MM:SS format
-            setStartTimeInput(timeString);
-            
-            // Initialize note from timer if it exists
-            setNoteInput(note || '');
-        }
-    }, [isActive, startTime, note]);
 
     /**
      * Handle form submission (update both start time and note)
@@ -163,11 +161,11 @@ const GlobalTimer = ({
     const timeColor = isPaused ? 'status-warning-text status-warning-surface' : 'status-danger-text status-danger-surface';
 
     return (
-        <div className={`border ${borderColor} rounded-lg px-4 py-2 ${isExpanded ? 'space-y-3 min-w-[26rem] max-w-full' : ''}`}>
+        <div className={`min-w-0 rounded-lg border px-4 py-2 ${borderColor} ${isExpanded ? 'space-y-3 max-w-full md:min-w-[26rem]' : ''}`}>
             {/* Main timer row */}
             <div className="flex items-center justify-between gap-4">
                 {/* Left column: dot + task title */}
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
                     <div className={`w-3 h-3 ${dotColor} rounded-full ${dotAnimation}`}></div>
                     <button
                         onClick={handleTaskTitleClick}
@@ -179,7 +177,7 @@ const GlobalTimer = ({
                 </div>
 
                 {/* Right column: time + controls + options toggle */}
-                <div className="flex items-center gap-2 justify-end">
+                <div className="flex items-center justify-end gap-2">
                     <span className={`text-sm font-mono ${timeColor} px-2 py-1 rounded-md min-w-[32px] inline-block text-center`}>
                         {displayTime}
                     </span>
@@ -220,7 +218,7 @@ const GlobalTimer = ({
             {/* Expanded options */}
             {isExpanded && (
                 <div className="border-t border-border pt-3 pb-2 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-[120px_minmax(0,1fr)] gap-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
                         {/* Start Time Input */}
                         <div>
                             <Label className="text-xs text-foreground" htmlFor="global-timer-start-time">
@@ -229,7 +227,7 @@ const GlobalTimer = ({
                             <TimePicker
                                 id="global-timer-start-time"
                                 value={startTimeInput}
-                                onChange={(e) => setStartTimeInput(e.target.value)}
+                                onChange={(e) => setDraftState((prev) => ({ ...prev, startTimeInput: e.target.value }))}
                                 className="mt-1 h-8 text-sm"
                             />
                         </div>
@@ -243,7 +241,7 @@ const GlobalTimer = ({
                                 id="global-timer-note"
                                 type="text"
                                 value={noteInput}
-                                onChange={(e) => setNoteInput(e.target.value)}
+                                onChange={(e) => setDraftState((prev) => ({ ...prev, noteInput: e.target.value }))}
                                 placeholder="What are you working on..."
                                 className="mt-1 h-8 text-sm"
                             />

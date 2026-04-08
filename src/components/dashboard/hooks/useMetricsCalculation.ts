@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
-import { getLastMonthRange, getThisMonthRange, getThisYearRange, millisecondsToHours, parseStoredDate } from '../../../utils/dateUtils';
+import { getLastMonthRange, getThisMonthRange, millisecondsToHours, parseStoredDate } from '../../../utils/dateUtils';
 import { formatCurrency, getProjectCurrency } from '../../../utils/currencyUtils';
+import { getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '../../../utils/invoiceUtils';
 
 type TimeEntry = {
     taskId: string;
@@ -31,9 +32,10 @@ type ClientItem = {
 type InvoiceItem = {
     date?: string;
     createdAt?: number;
-    totalAmount?: number;
+    total?: number;
     currency?: string;
-    paymentProcessed?: boolean;
+    status?: 'draft' | 'sent' | 'paid' | 'overdue';
+    paidAt?: number | null;
     dueDate?: string;
     clientId?: string;
 };
@@ -134,10 +136,10 @@ const useMetricsCalculation = ({
         const paidInvoicesByCurrency: Record<string, number> = {};
         const outstandingInvoicesByCurrency: Record<string, number> = {};
         invoicesInRange.forEach(invoice => {
-            const amount = invoice.totalAmount || 0;
+            const amount = getInvoiceTotal(invoice);
             const currency = invoice.currency || preferredCurrency;
 
-            if (invoice.paymentProcessed) {
+            if (isInvoicePaid(invoice)) {
                 if (!paidInvoicesByCurrency[currency]) {
                     paidInvoicesByCurrency[currency] = 0;
                 }
@@ -191,19 +193,13 @@ const useMetricsCalculation = ({
      * Calculate outstanding invoices metrics
      */
     const invoiceMetrics = useMemo(() => {
-        const outstanding = invoices.filter(invoice => !invoice.paymentProcessed);
-        const pastDue = outstanding.filter(invoice => {
-            if (!invoice.dueDate) return false;
-            // parseStoredDate handles ISO date strings and timestamps
-            const dueDate = parseStoredDate(invoice.dueDate);
-            if (!dueDate) return false;
-            return dueDate < new Date();
-        });
+        const pastDue = invoices.filter((invoice) => !isInvoicePaid(invoice) && isInvoiceOverdue(invoice));
+        const outstanding = invoices.filter((invoice) => !isInvoicePaid(invoice) && !isInvoiceOverdue(invoice));
 
         // Group outstanding invoices by currency first
         const outstandingByCurrency: Record<string, number> = {};
         outstanding.forEach(invoice => {
-            const amount = invoice.totalAmount || 0;
+            const amount = getInvoiceTotal(invoice);
             // Invoices store their currency directly - use it, or fall back to preferred currency
             const currency = invoice.currency || preferredCurrency;
 
@@ -216,7 +212,7 @@ const useMetricsCalculation = ({
         // Group past due invoices by currency first
         const pastDueByCurrency: Record<string, number> = {};
         pastDue.forEach(invoice => {
-            const amount = invoice.totalAmount || 0;
+            const amount = getInvoiceTotal(invoice);
             // Invoices store their currency directly - use it, or fall back to preferred currency
             const currency = invoice.currency || preferredCurrency;
 

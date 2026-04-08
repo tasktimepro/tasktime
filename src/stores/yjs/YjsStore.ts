@@ -14,6 +14,7 @@ import { YjsDocManager } from './YjsDocManager';
 import { YjsDriveProvider } from './providers/GoogleDriveProvider';
 import { BackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
+import { migrateInvoicesInDoc } from './invoiceMigration';
 import { parseStoredDate } from '@/utils/dateUtils';
 import { readEntity, objectToYMap, collectEntities } from './entityUtils';
 import type {
@@ -77,6 +78,11 @@ export class YjsStore {
         // Load always-needed documents
         this._coreDoc = await this.docManager.getDoc('core');
         this._activeEntriesDoc = await this.docManager.getDoc('entries-active');
+
+        const migratedCoreInvoices = migrateInvoicesInDoc(this._coreDoc);
+        if (migratedCoreInvoices > 0) {
+            console.log(`[YjsStore] Migrated ${migratedCoreInvoices} active invoices to canonical shape`);
+        }
 
         // Run automatic archival of old data
         await this.archiveOldEntries();
@@ -432,6 +438,11 @@ export class YjsStore {
             this._archivedInvoicesDoc = await this._archivedInvoicesLoading;
             this._archivedInvoicesLoading = null;
 
+            const migratedArchivedInvoices = migrateInvoicesInDoc(this._archivedInvoicesDoc);
+            if (migratedArchivedInvoices > 0) {
+                console.log(`[YjsStore] Migrated ${migratedArchivedInvoices} archived invoices to canonical shape`);
+            }
+
             // Sync with Drive if connected
             if (this.driveProvider?.isConnected()) {
                 await this.driveProvider.syncAndSubscribeDoc('invoices-archived');
@@ -487,13 +498,13 @@ export class YjsStore {
         const activeEntries = this._activeEntriesDoc!.getMap('timeEntries');
 
         // Find entries to archive (handle both nested Y.Map and plain object formats)
-        const entriesToProcess: Array<{ id: string; entry: TimeEntry }> = [];
-        activeEntries.forEach((value: unknown, id: string) => {
+        const entriesToProcess: TimeEntry[] = [];
+        activeEntries.forEach((value: unknown) => {
             const entry = readEntity<TimeEntry>(value);
-            if (entry) entriesToProcess.push({ id, entry });
+            if (entry) entriesToProcess.push(entry);
         });
 
-        for (const { id, entry } of entriesToProcess) {
+        for (const entry of entriesToProcess) {
             if (entry.start < cutoff) {
                 const year = new Date(entry.start).getFullYear();
                 if (!toArchive.has(year)) {

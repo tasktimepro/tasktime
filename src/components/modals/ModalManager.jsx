@@ -86,6 +86,7 @@ const ModalManager = ({
             {/* Client Modal */}
             {activeModal === 'client' && (
                 <ClientModal
+                    key={`client-${editingItem?.id || 'new'}`}
                     isOpen={true}
                     onClose={closeModal}
                     editingClient={editingItem}
@@ -118,6 +119,7 @@ const ModalManager = ({
             {/* Payment Method Modal */}
             {activeModal === 'payment-method' && (
                 <PaymentMethodModal
+                    key={`payment-method-${editingItem?.id || 'new'}`}
                     isOpen={true}
                     onClose={closeModal}
                     editingPaymentMethod={editingItem}
@@ -127,6 +129,7 @@ const ModalManager = ({
             {/* Business Modal */}
             {activeModal === 'business' && (
                 <BusinessModal
+                    key={`business-${editingItem?.id || 'new'}`}
                     isOpen={true}
                     onClose={closeModal}
                     editingBusinessInfo={editingItem}

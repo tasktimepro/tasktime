@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
 import { generateSlugId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
@@ -12,6 +12,62 @@ import { getPreferredCurrency } from '../../utils/currencyUtils.ts';
 import Modal from '../Modal';
 import { ColorPicker } from '@/components/ui/color-picker';
 import CurrencySelect from '@/components/ui/currency-select';
+import { parseOptionalNumberInput, parseOptionalPositiveNumberInput } from '@/utils/numberInputUtils.ts';
+
+const createDefaultFormData = () => ({
+    title: '',
+    clientName: '',
+    contactPerson: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: '',
+    registrationNumber: '',
+    vat: '',
+    taxNumber: '',
+    email: '',
+    phone: '',
+    custom: [],
+    disableTax: false,
+    defaultCurrency: getPreferredCurrency(),
+    hourlyRate: '',
+    flatRate: false,
+    color: ''
+});
+
+const createInitialFormData = (client) => {
+    if (!client) {
+        return createDefaultFormData();
+    }
+
+    return {
+        title: client.title,
+        clientName: client.clientName || '',
+        contactPerson: client.contactPerson || '',
+        address: client.address || '',
+        city: client.city || '',
+        state: client.state || '',
+        zip: client.zip || '',
+        country: client.country || '',
+        registrationNumber: client.registrationNumber || '',
+        vat: client.vat || '',
+        taxNumber: client.taxNumber || '',
+        email: client.email || '',
+        phone: client.phone || '',
+        custom: client.custom || [],
+        disableTax: client.disableTax || false,
+        defaultCurrency: client.defaultCurrency || getPreferredCurrency(),
+        hourlyRate: client.hourlyRate ? client.hourlyRate.toString() : '',
+        flatRate: client.flatRate || false,
+        color: client.color || ''
+    };
+};
+
+const createInitialExpandedSections = () => ({
+    companyInfo: false,
+    pricingTaxes: false
+});
 
 /**
  * ClientModal component - Modal for creating and editing clients
@@ -22,84 +78,11 @@ const ClientModal = ({
     editingClient
 }) => {
     const { showSuccess } = useToast();
-    const { clients, createClient, updateClient } = useClients();
+    const { createClient, updateClient } = useClients();
 
-    const [formData, setFormData] = useState({
-        title: '',
-        clientName: '',
-        contactPerson: '',
-        address: '',
-        city: '',
-        state: '',
-        zip: '',
-        country: '',
-        registrationNumber: '',
-        vat: '',
-        taxNumber: '',
-        email: '',
-        phone: '',
-        custom: [],
-        disableTax: false,
-        defaultCurrency: getPreferredCurrency(),
-        hourlyRate: '',
-        flatRate: false,
-        color: ''
-    });
+    const [formData, setFormData] = useState(() => createInitialFormData(editingClient));
 
-    const [expandedSections, setExpandedSections] = useState({
-        companyInfo: false,
-        pricingTaxes: false
-    });
-
-    // Initialize form data when editing
-    useEffect(() => {
-        if (editingClient) {
-            setFormData({
-                title: editingClient.title,
-                clientName: editingClient.clientName || '',
-                contactPerson: editingClient.contactPerson || '',
-                address: editingClient.address || '',
-                city: editingClient.city || '',
-                state: editingClient.state || '',
-                zip: editingClient.zip || '',
-                country: editingClient.country || '',
-                registrationNumber: editingClient.registrationNumber || '',
-                vat: editingClient.vat || '',
-                taxNumber: editingClient.taxNumber || '',
-                email: editingClient.email || '',
-                phone: editingClient.phone || '',
-                custom: editingClient.custom || [],
-                disableTax: editingClient.disableTax || false,
-                defaultCurrency: editingClient.defaultCurrency || getPreferredCurrency(),
-                hourlyRate: editingClient.hourlyRate ? editingClient.hourlyRate.toString() : '',
-                flatRate: editingClient.flatRate || false,
-                color: editingClient.color || ''
-            });
-        } else {
-            // Reset form for new client
-            setFormData({
-                title: '',
-                clientName: '',
-                contactPerson: '',
-                address: '',
-                city: '',
-                state: '',
-                zip: '',
-                country: '',
-                registrationNumber: '',
-                vat: '',
-                taxNumber: '',
-                email: '',
-                phone: '',
-                custom: [],
-                disableTax: false,
-                defaultCurrency: getPreferredCurrency(),
-                hourlyRate: '',
-                flatRate: false,
-                color: ''
-            });
-        }
-    }, [editingClient]);
+    const [expandedSections, setExpandedSections] = useState(() => createInitialExpandedSections());
 
     /**
      * Handle form input changes
@@ -118,15 +101,6 @@ const ClientModal = ({
             [section]: !prev[section]
         }));
     };
-
-    useEffect(() => {
-        if (isOpen) {
-            setExpandedSections({
-                companyInfo: false,
-                pricingTaxes: false
-            });
-        }
-    }, [isOpen, editingClient]);
 
     /**
      * Add a new custom field
@@ -174,7 +148,7 @@ const ClientModal = ({
             return; // Business name is required
         }
 
-        if (!formData.flatRate && (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0)) {
+        if (!formData.flatRate && parseOptionalPositiveNumberInput(formData.hourlyRate) === null) {
             setExpandedSections(prev => ({
                 ...prev,
                 pricingTaxes: true
@@ -200,7 +174,7 @@ const ClientModal = ({
             custom: formData.custom,
             disableTax: formData.disableTax,
             defaultCurrency: formData.defaultCurrency,
-            hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+            hourlyRate: parseOptionalNumberInput(formData.hourlyRate),
             flatRate: formData.flatRate || false,
             color: formData.color || null,
             archived: false
@@ -224,7 +198,7 @@ const ClientModal = ({
             return; // Business name is required
         }
 
-        if (!formData.flatRate && (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0)) {
+        if (!formData.flatRate && parseOptionalPositiveNumberInput(formData.hourlyRate) === null) {
             setExpandedSections(prev => ({
                 ...prev,
                 pricingTaxes: true
@@ -249,7 +223,7 @@ const ClientModal = ({
             custom: formData.custom,
             disableTax: formData.disableTax,
             defaultCurrency: formData.defaultCurrency,
-            hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+            hourlyRate: parseOptionalNumberInput(formData.hourlyRate),
             flatRate: formData.flatRate || false,
             color: formData.color || null
         });

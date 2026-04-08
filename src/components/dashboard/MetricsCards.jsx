@@ -137,9 +137,9 @@ const MetricsCards = ({
             ];
         };
 
-        // Add paid invoices (highest priority)
+        // Add earned invoice totals (highest priority)
         if (paidTotal > 0) {
-            const paidLines = renderAmountLine(metrics.paidInvoices, 'paid', BanknotesIcon, colors.icon, 'paid');
+            const paidLines = renderAmountLine(metrics.paidInvoices, 'earned', BanknotesIcon, colors.icon, 'paid');
             components.push(...paidLines);
         }
 
@@ -346,7 +346,7 @@ const MetricsCards = ({
                                         </span>
                                     </div>
                                     <div className="status-success-text mt-1 text-sm">
-                                        No outstanding payments
+                                        No current invoices awaiting payment
                                     </div>
                                 </div>
                                 <DocumentTextIcon className="status-success-text-strong h-8 w-8" />

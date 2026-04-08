@@ -9,7 +9,8 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useMasterClock } from '@/hooks/useMasterClock';
 import type { MultiTimerState, TimeEntry } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
-import { readEntity, objectToYMap, collectEntities } from '@/stores/yjs/entityUtils';
+import { readEntity, objectToYMap } from '@/stores/yjs/entityUtils';
+import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 
 export interface ActiveTimer extends MultiTimerState {
     elapsedTime: number;
@@ -58,7 +59,7 @@ export function useTimers(): UseTimersResult {
     const syncTimerStates = useCallback(() => {
         if (!isReady) return;
 
-        setTimerStates(collectEntities<MultiTimerState>(store.timers as any));
+        setTimerStates(collectValidatedEntities<MultiTimerState>('timers', store.timers as any, 'sync timers'));
         setIsLoading(false);
     }, [isReady, store]);
 
@@ -126,7 +127,7 @@ export function useTimers(): UseTimersResult {
         // e.g., if now is 14:30:15.432, startTime becomes 14:30:16.000
         const alignedStartTime = Math.ceil(now / 1000) * 1000;
         
-        const timer: MultiTimerState = {
+        const timer = validateCollectionEntity<MultiTimerState>('timers', {
             projectId: timerKey,
             taskId,
             startTime: alignedStartTime,
@@ -134,7 +135,7 @@ export function useTimers(): UseTimersResult {
             pausedElapsedTime: 0,
             note: note || '',
             lastActive: now,
-        };
+        }, `start timer ${timerKey}`);
 
         store.coreDoc.transact(() => {
             const entityMap = objectToYMap(timer as unknown as Record<string, unknown>);
@@ -145,7 +146,7 @@ export function useTimers(): UseTimersResult {
     const pauseTimer = useCallback((projectId: string) => {
         if (!isReady) return;
 
-        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
+        const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `pause timer ${projectId}`);
         if (!timer || timer.paused) return;
 
         const elapsed = Date.now() - timer.startTime;
@@ -164,7 +165,7 @@ export function useTimers(): UseTimersResult {
     const resumeTimer = useCallback((projectId: string) => {
         if (!isReady) return;
 
-        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
+        const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `resume timer ${projectId}`);
         if (!timer || !timer.paused) return;
 
         const pausedTime = timer.pausedElapsedTime || 0;
@@ -192,7 +193,7 @@ export function useTimers(): UseTimersResult {
     const stopTimer = useCallback((projectId: string): TimeEntry | null => {
         if (!isReady) return null;
 
-        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
+        const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `stop timer ${projectId}`);
         if (!timer) return null;
 
         const now = Date.now();
@@ -200,13 +201,13 @@ export function useTimers(): UseTimersResult {
             ? (now - (timer.pausedElapsedTime || 0))
             : timer.startTime;
 
-        const entry: TimeEntry = {
+        const entry = validateCollectionEntity<TimeEntry>('timeEntries', {
             id: generateId(),
             taskId: timer.taskId,
             start: startTime,
             end: now,
             note: timer.note,
-        };
+        }, `stop timer entry ${projectId}`);
 
         store.activeEntriesDoc.transact(() => {
             const entryMap = objectToYMap(entry as unknown as Record<string, unknown>);
@@ -231,15 +232,19 @@ export function useTimers(): UseTimersResult {
     const updateTimer = useCallback((projectId: string, updates: { startTime?: number; note?: string }) => {
         if (!isReady) return;
 
-        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
+        const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `update timer ${projectId}`);
         if (!timer) return;
 
         store.coreDoc.transact(() => {
-            const entityMap = objectToYMap({
+            const nextTimer = validateCollectionEntity<MultiTimerState>('timers', {
                 ...timer,
                 startTime: updates.startTime !== undefined ? updates.startTime : timer.startTime,
                 note: updates.note !== undefined ? updates.note : timer.note,
                 lastActive: Date.now(),
+            }, `update timer ${projectId}`);
+
+            const entityMap = objectToYMap({
+                ...nextTimer,
             } as unknown as Record<string, unknown>);
             (store.timers as any).set(projectId, entityMap);
         });
@@ -248,7 +253,7 @@ export function useTimers(): UseTimersResult {
     const focusTimer = useCallback((projectId: string) => {
         if (!isReady) return;
 
-        const timer = readEntity<MultiTimerState>(store.timers.get(projectId));
+        const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `focus timer ${projectId}`);
         if (!timer) return;
 
         store.coreDoc.transact(() => {

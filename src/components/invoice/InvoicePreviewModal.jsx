@@ -3,6 +3,7 @@ import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { toDisplayDate } from '../../utils/dateUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../../utils/currencyUtils.ts';
+import { getInvoiceTotal } from '../../utils/invoiceUtils.ts';
 
 /**
  * InvoicePreviewModal component - Displays invoice preview HTML or fallback summary.
@@ -101,7 +102,7 @@ const InvoicePreviewModal = ({
                     <div className="border-t pt-2">
                         <div className="flex justify-between text-sm font-medium">
                             <span>Total: {invoice?.totalHours?.toFixed(2) || 0} hours</span>
-                            <span className="sensitive-data">{getCurrencySymbol(invoice?.currency || getPreferredCurrency())}{invoice?.totalAmount?.toFixed(2) || 0}</span>
+                            <span className="sensitive-data">{getCurrencySymbol(invoice?.currency || getPreferredCurrency())}{getInvoiceTotal(invoice).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>

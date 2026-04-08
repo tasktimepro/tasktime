@@ -2,7 +2,231 @@
  * Invoice utility helpers.
  */
 
+import { parseStoredDate } from './dateUtils';
+
 const SIMPLE_SEQUENTIAL_TOKEN = '{sequential}';
+
+const PAID_INVOICE_STATUS = 'paid';
+const DRAFT_INVOICE_STATUS = 'draft';
+const SENT_INVOICE_STATUS = 'sent';
+const OVERDUE_INVOICE_STATUS = 'overdue';
+
+const INVOICE_STATUS_VALUES = new Set([
+    DRAFT_INVOICE_STATUS,
+    SENT_INVOICE_STATUS,
+    PAID_INVOICE_STATUS,
+    OVERDUE_INVOICE_STATUS,
+]);
+
+const getStartOfToday = (referenceDate?: Date) => {
+    const today = referenceDate ? new Date(referenceDate) : new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+};
+
+const isStoredInvoicePaid = (invoice: any) => {
+    return invoice?.status === PAID_INVOICE_STATUS
+        || invoice?.paymentProcessed === true
+        || typeof invoice?.paidAt === 'number';
+};
+
+const getFiniteNumber = (value: any, fallback = 0) => {
+    return typeof value === 'number' && Number.isFinite(value)
+        ? value
+        : fallback;
+};
+
+const getTrimmedString = (value: any) => {
+    return typeof value === 'string' ? value.trim() : '';
+};
+
+const normalizeExistingInvoiceItem = (item: any, index: number) => {
+    const description = getTrimmedString(item?.description)
+        || getTrimmedString(item?.title)
+        || `Invoice Item ${index + 1}`;
+    const quantity = getFiniteNumber(item?.quantity, 1);
+    const amount = getFiniteNumber(item?.amount, 0);
+    const rate = getFiniteNumber(item?.rate, quantity !== 0 ? amount / quantity : amount);
+
+    return {
+        ...item,
+        description,
+        quantity,
+        rate,
+        amount,
+        supplierName: item?.supplierName ?? null,
+    };
+};
+
+const buildExpenseInvoiceItem = (expense: any, index: number) => {
+    const amount = getFiniteNumber(expense?.amount, 0);
+
+    return {
+        description: getTrimmedString(expense?.title) || `Expense Item ${index + 1}`,
+        quantity: 1,
+        rate: amount,
+        amount,
+        expenseId: getTrimmedString(expense?.id) || undefined,
+        supplierName: expense?.supplierName ?? null,
+        originalAmount: typeof expense?.originalAmount === 'number' ? expense.originalAmount : undefined,
+        originalCurrency: getTrimmedString(expense?.originalCurrency) || undefined,
+        exchangeRate: typeof expense?.exchangeRate === 'number' ? expense.exchangeRate : undefined,
+    };
+};
+
+const buildTaskInvoiceItem = (task: any, index: number) => {
+    const useFlatRate = task?.useFlatRate === true;
+    const quantity = useFlatRate
+        ? getFiniteNumber(task?.quantity, 1)
+        : getFiniteNumber(task?.hours, 0);
+    const rate = useFlatRate
+        ? getFiniteNumber(task?.flatRate, 0)
+        : getFiniteNumber(task?.hourlyRate, 0);
+    const amount = getFiniteNumber(task?.amount, quantity * rate);
+
+    return {
+        description: getTrimmedString(task?.title)
+            || getTrimmedString(task?.description)
+            || `Task Item ${index + 1}`,
+        quantity,
+        rate,
+        amount,
+        taskId: getTrimmedString(task?.id) || undefined,
+    };
+};
+
+const getNormalizedInvoiceItems = (invoice: any) => {
+    if (Array.isArray(invoice?.items)) {
+        return invoice.items
+            .filter((item: any) => item && typeof item === 'object')
+            .map((item: any, index: number) => normalizeExistingInvoiceItem(item, index));
+    }
+
+    const items = [];
+
+    if (Array.isArray(invoice?.expenseItems)) {
+        items.push(...invoice.expenseItems
+            .filter((expense: any) => expense && typeof expense === 'object')
+            .map((expense: any, index: number) => buildExpenseInvoiceItem(expense, index)));
+    }
+
+    const taskItems = [
+        ...(Array.isArray(invoice?.tasks) ? invoice.tasks : []),
+        ...(Array.isArray(invoice?.additionalTasks) ? invoice.additionalTasks : []),
+    ];
+
+    items.push(...taskItems
+        .filter((task: any) => task && typeof task === 'object')
+        .map((task: any, index: number) => buildTaskInvoiceItem(task, index)));
+
+    return items;
+};
+
+const resolveBaseInvoiceStatus = (invoice: any) => {
+    if (typeof invoice?.status === 'string' && INVOICE_STATUS_VALUES.has(invoice.status)) {
+        return invoice.status;
+    }
+
+    if (isStoredInvoicePaid(invoice)) {
+        return PAID_INVOICE_STATUS;
+    }
+
+    return SENT_INVOICE_STATUS;
+};
+
+export const getInvoiceTotal = (invoice: any): number => {
+    const total = invoice?.total;
+    if (typeof total === 'number' && Number.isFinite(total)) {
+        return total;
+    }
+
+    const legacyTotal = invoice?.totalAmount;
+    if (typeof legacyTotal === 'number' && Number.isFinite(legacyTotal)) {
+        return legacyTotal;
+    }
+
+    const subtotal = invoice?.subtotal;
+    if (typeof subtotal === 'number' && Number.isFinite(subtotal)) {
+        return subtotal;
+    }
+
+    return 0;
+};
+
+export const getInvoiceSubtotal = (invoice: any): number => {
+    const subtotal = invoice?.subtotal;
+    if (typeof subtotal === 'number' && Number.isFinite(subtotal)) {
+        return subtotal;
+    }
+
+    return getInvoiceTotal(invoice);
+};
+
+export const getInvoiceStatus = (invoice: any, referenceDate?: Date) => {
+    const baseStatus = resolveBaseInvoiceStatus(invoice);
+
+    if (baseStatus === PAID_INVOICE_STATUS || baseStatus === DRAFT_INVOICE_STATUS) {
+        return baseStatus;
+    }
+
+    const dueDate = invoice?.dueDate ? parseStoredDate(invoice.dueDate) : null;
+    if (!dueDate) {
+        return SENT_INVOICE_STATUS;
+    }
+
+    return dueDate < getStartOfToday(referenceDate)
+        ? OVERDUE_INVOICE_STATUS
+        : SENT_INVOICE_STATUS;
+};
+
+export const isInvoicePaid = (invoice: any) => getInvoiceStatus(invoice) === PAID_INVOICE_STATUS;
+
+export const isInvoiceOverdue = (invoice: any, referenceDate?: Date) => getInvoiceStatus(invoice, referenceDate) === OVERDUE_INVOICE_STATUS;
+
+export const normalizeInvoiceRecord = (invoice: any, referenceDate?: Date) => {
+    if (!invoice || typeof invoice !== 'object') {
+        return invoice;
+    }
+
+    const items = getNormalizedInvoiceItems(invoice);
+    const subtotal = getInvoiceSubtotal(invoice);
+    const total = getInvoiceTotal(invoice);
+    const status = getInvoiceStatus({
+        ...invoice,
+        items,
+        subtotal,
+        total,
+    }, referenceDate);
+
+    const normalized = {
+        ...invoice,
+        projectId: invoice.projectId ?? invoice.project?.id ?? null,
+        clientId: invoice.clientId ?? invoice.client?.id ?? null,
+        items,
+        subtotal,
+        total,
+        status,
+        paidAt: typeof invoice.paidAt === 'number' ? invoice.paidAt : null,
+        businessInfoId: invoice.businessInfoId ?? invoice.businessInfo?.id ?? null,
+        paymentMethodId: invoice.paymentMethodId ?? invoice.paymentMethod?.id ?? null,
+        dueDate: invoice.dueDate ?? null,
+    };
+
+    delete normalized.totalAmount;
+    delete normalized.paymentProcessed;
+
+    return normalized;
+};
+
+export const getInvoiceStatusAfterMarkingUnpaid = (invoice: any, referenceDate?: Date) => {
+    if (resolveBaseInvoiceStatus(invoice) === DRAFT_INVOICE_STATUS) {
+        return DRAFT_INVOICE_STATUS;
+    }
+
+    return isInvoiceOverdue(invoice, referenceDate)
+        ? OVERDUE_INVOICE_STATUS
+        : SENT_INVOICE_STATUS;
+};
 
 const getInvoiceSortValue = (invoice: any) => {
 

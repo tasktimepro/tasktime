@@ -33,7 +33,7 @@ describe('useInvoices', () => {
         mockUseYjsCollection.mockReturnValue({
             items: [
                 { id: 'a', status: 'draft', date: '2025-01-02', total: 100, clientId: 'c1', projectId: 'p1' },
-                { id: 'b', status: 'overdue', date: '2025-01-01', total: 200, clientId: 'c2', projectId: 'p2' },
+                { id: 'b', status: 'sent', date: '2025-01-01', dueDate: '2025-01-01', total: 200, clientId: 'c2', projectId: 'p2' },
             ],
             isLoading: false,
             get: vi.fn((id) => ({ id })),
@@ -57,7 +57,7 @@ describe('useInvoices', () => {
             result.current.markAsPaid('c')
         })
 
-        expect(update).toHaveBeenCalledWith('a', { status: 'sent' })
+        expect(update).toHaveBeenCalledWith('a', { status: 'sent', paidAt: null })
         expect(update).toHaveBeenCalledWith('c', expect.objectContaining({ status: 'paid' }))
     })
 

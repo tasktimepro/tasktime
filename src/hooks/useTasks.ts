@@ -26,7 +26,7 @@ export function useTasks(options: UseTasksOptions = {}) {
     
     // Active tasks from core doc
     const { items: activeTasks, isLoading: activeLoading, get, create, update, remove } = 
-        useYjsCollection<Task>((store) => store.tasks);
+        useYjsCollection<Task>((store) => store.tasks, { collectionName: 'tasks' });
 
     // Archived tasks state
     const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);

@@ -3,6 +3,7 @@
  * 
  * Designed to work well in both light and dark modes.
  */
+/* eslint-disable react-refresh/only-export-components */
 
 import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';

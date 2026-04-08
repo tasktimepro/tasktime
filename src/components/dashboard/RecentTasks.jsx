@@ -22,7 +22,6 @@ const RecentTasks = ({
     handleCompleteTask,
     getTaskCompletedStatus,
     renderTaskTitle,
-    handleProjectTitleClick,
     renderTaskControls,
     onEditTask,
     onDeleteTask,

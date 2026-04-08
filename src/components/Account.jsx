@@ -16,7 +16,9 @@ import { useToast } from '../hooks/useToast.ts';
 import { useYjs } from '../contexts/YjsContext';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { usePreferences } from '../hooks/usePreferences.ts';
+import { resetOnboardingCompleted } from '../utils/onboardingUtils.ts';
 import YjsSyncSettings from './sync/YjsSyncSettings';
+import AccountFooter from './account/AccountFooter';
 
 /**
  * Account component - Main account management page with side navigation
@@ -107,6 +109,7 @@ const Account = ({
 
             // Clear all data via Yjs store (disconnects Drive locally)
             await clearAllData();
+            resetOnboardingCompleted();
             
             // Close modal and reset state
             setShowDeleteModal(false);
@@ -136,6 +139,7 @@ const Account = ({
             disconnectDrive();
             await signOut();
             await clearAllData();
+            resetOnboardingCompleted();
             showSuccess('Signed out and local data cleared');
             window.location.reload();
         } catch (error) {
@@ -274,6 +278,8 @@ const Account = ({
             <div>
                 {renderContent()}
             </div>
+
+            <AccountFooter />
 
             {/* Delete All Data Confirmation Modal */}
             <Modal

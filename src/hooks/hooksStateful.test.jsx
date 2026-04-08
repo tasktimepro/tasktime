@@ -86,6 +86,9 @@ describe('stateful hooks', () => {
     })
 
     it('runs timer lifecycle', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-04-07T12:00:00.000Z'))
+
         const coreDoc = new Y.Doc()
         const activeEntriesDoc = new Y.Doc()
 
@@ -115,9 +118,17 @@ describe('stateful hooks', () => {
         expect(readStored(timersMap, 'project-1')?.note).toBe('Note')
 
         await act(async () => {
+            vi.advanceTimersByTime(1_500)
+        })
+
+        await act(async () => {
             result.current.pauseTimer('project-1')
         })
         expect(readStored(timersMap, 'project-1')?.paused).toBe(true)
+
+        await act(async () => {
+            vi.advanceTimersByTime(2_000)
+        })
 
         await act(async () => {
             result.current.resumeTimer('project-1')
@@ -132,5 +143,7 @@ describe('stateful hooks', () => {
         expect(readStored(entriesMap, entry.id)?.taskId).toBe('task-1')
         await act(async () => {})
         expect(result.current.timers.length).toBe(0)
+
+        vi.useRealTimers()
     })
 })

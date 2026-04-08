@@ -17,8 +17,6 @@ import InvoiceTemplates from './InvoiceTemplates';
  * Invoices component - Main invoices management page with side navigation
  */
 const Invoices = ({ 
-    projects, 
-    tasks,
     timeEntries,
     invoices,
     paymentMethods,
@@ -26,8 +24,6 @@ const Invoices = ({
     clients,
     invoiceTemplates,
     updateUrl,
-    navigateToProjects,
-    navigateToClients,
     // Modal functions
     openTemplateModal,
     editTemplateModal,

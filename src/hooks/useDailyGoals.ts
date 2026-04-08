@@ -12,7 +12,8 @@ const WEEKDAY_COUNT = 7;
 
 export function useDailyGoals() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<DailyGoal>(
-        (store) => store.dailyGoals
+        (store) => store.dailyGoals,
+        { collectionName: 'dailyGoals' }
     );
 
     const goalsByWeekday = useMemo(() => {

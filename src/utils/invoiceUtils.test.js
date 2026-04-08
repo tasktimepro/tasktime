@@ -1,9 +1,10 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
     extractSequentialNumber,
     getInvoicesForProject,
     getLatestInvoiceForProject,
     getNextSequentialNumberForTemplate,
+    normalizeInvoiceRecord,
     resolveCurrentInvoiceTemplate,
 } from './invoiceUtils'
 
@@ -121,5 +122,57 @@ describe('invoiceUtils', () => {
             projectId: 'p1',
             date: '2026-02-15'
         })
+    })
+
+    it('normalizes legacy invoices without items into canonical invoice items', () => {
+
+        const normalized = normalizeInvoiceRecord({
+            id: 'inv-1',
+            project: { id: 'project-1' },
+            client: { id: 'client-1' },
+            status: 'sent',
+            subtotal: 250,
+            totalAmount: 250,
+            tasks: [
+                { id: 'task-1', title: 'Development', hours: 2, hourlyRate: 100 },
+            ],
+            additionalTasks: [
+                { title: 'Rush fee', useFlatRate: true, flatRate: 50, quantity: 1 },
+            ],
+            expenseItems: [
+                { id: 'exp-1', title: 'Hosting', amount: 25, supplierName: 'AWS' },
+            ],
+        })
+
+        expect(normalized.projectId).toBe('project-1')
+        expect(normalized.clientId).toBe('client-1')
+        expect(normalized.total).toBe(250)
+        expect(normalized.items).toEqual([
+            {
+                description: 'Hosting',
+                quantity: 1,
+                rate: 25,
+                amount: 25,
+                expenseId: 'exp-1',
+                supplierName: 'AWS',
+                originalAmount: undefined,
+                originalCurrency: undefined,
+                exchangeRate: undefined,
+            },
+            {
+                description: 'Development',
+                quantity: 2,
+                rate: 100,
+                amount: 200,
+                taskId: 'task-1',
+            },
+            {
+                description: 'Rush fee',
+                quantity: 1,
+                rate: 50,
+                amount: 50,
+                taskId: undefined,
+            }
+        ])
     })
 })

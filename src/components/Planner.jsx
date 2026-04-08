@@ -9,13 +9,11 @@
  * Responsive: Shows day tabs + single day on mobile, full grid on desktop.
  */
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { addDays, differenceInCalendarWeeks, getWeek, getWeekYear, setWeek, startOfWeek } from 'date-fns';
 import { useUrlState } from '@/hooks/useUrlState';
 import { usePlannerItems } from '@/hooks/usePlannerItems';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
-import { useTasks } from '@/hooks/useTasks';
-import { useTimers } from '@/hooks/useTimers';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useTodayDate } from '@/hooks/useDayRollover';
 import { usePreferences } from '@/hooks/usePreferences';
@@ -131,10 +129,6 @@ const Planner = ({
     // Planner attachment operations
     const { attachments, createAttachment, updateAttachment, deleteAttachment, isAttached } = usePlannerAttachments();
 
-    // Task operations for toggling completion and deletion
-    const { deleteTask, archiveTask } = useTasks();
-    const { timers, clearTimer } = useTimers();
-
     // Calculate week end (Sunday)
     const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
     const weekNumber = useMemo(
@@ -209,8 +203,6 @@ const Planner = ({
     const [dailyGoalDateStr, setDailyGoalDateStr] = useState(null);
     const [weeklyGoalsOpen, setWeeklyGoalsOpen] = useState(false);
     const [weeklyAttachWarning, setWeeklyAttachWarning] = useState(null);
-
-    const prevActiveModalRef = useRef(activeModal);
 
     // Navigation handlers
     const navigateWeek = useCallback((direction) => {
@@ -401,7 +393,7 @@ const Planner = ({
             case 'project':
                 navigateToProject(item.entity.id);
                 break;
-            case 'task':
+            case 'task': {
                 // Open task preview modal
                 const dateMatch = item.key.match(/\d{4}-\d{2}-\d{2}/);
                 onViewTask?.(item.entity, {
@@ -409,6 +401,7 @@ const Planner = ({
                     attachment: item.attachment || null
                 });
                 break;
+            }
             case 'expense':
                 openExpenseView?.(item.expense);
                 break;
@@ -422,27 +415,6 @@ const Planner = ({
             showError(error?.message || 'Unable to mark expense as paid');
         }
     }, [markAsPaid, showSuccess, showError]);
-
-    // Delete task from preview
-    const handleDeleteTask = useCallback((task) => {
-        if (window.confirm(`Delete "${task.title}"?`)) {
-            deleteTask(task.id);
-            showSuccess('Task deleted');
-        }
-    }, [deleteTask, showSuccess]);
-
-    const handleArchiveTask = useCallback((task) => {
-        if (!task || task.projectId) return;
-
-        timers.forEach((timer) => {
-            if (timer.taskId === task.id) {
-                clearTimer(timer.projectId || task.id);
-            }
-        });
-
-        archiveTask(task.id);
-        showSuccess('Task archived');
-    }, [archiveTask, timers, clearTimer, showSuccess]);
 
     // Remove item from planner (delete attachment)
     const handleRemoveItem = useCallback((item) => {
@@ -796,6 +768,7 @@ const Planner = ({
 
             {/* Entity Picker Modal */}
             <EntityPickerModal
+                key={`entity-picker-${pickerState.isOpen ? 'open' : 'closed'}-${pickerState.entityType}-${pickerState.mode}-${pickerState.dateStr || 'none'}-${pickerState.lockedEntityId || 'none'}-${pickerState.lockedScheduleMode || 'none'}`}
                 isOpen={pickerState.isOpen}
                 onClose={closeEntityPicker}
                 entityType={pickerState.entityType}
@@ -813,6 +786,7 @@ const Planner = ({
             />
 
             <DailyGoalModal
+                key={`daily-goal-${dailyGoalDateStr || 'closed'}`}
                 isOpen={!!dailyGoalDateStr}
                 onClose={handleCloseDailyGoals}
                 dateStr={dailyGoalDateStr}

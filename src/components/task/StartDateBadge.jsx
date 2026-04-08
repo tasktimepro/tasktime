@@ -2,7 +2,6 @@
  * StartDateBadge - Shows task start date or recurring schedule.
  */
 
-import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { ArrowPathIcon } from '@/components/ui/icons';
 import { Badge } from '@/components/ui/badge';
 import { getTodayString, toDisplayDate } from '@/utils/dateUtils.ts';
@@ -57,9 +56,6 @@ const StartDateBadge = ({ startDate, recurring, completed, recurringOverdue = fa
     }
 
     const isOverdue = startDate < today && !completed;
-    const dayDiff = differenceInCalendarDays(parseISO(startDate), parseISO(today));
-    const isSoon = dayDiff > 0 && dayDiff <= 3;
-
     let variant = 'secondary';
     if (isOverdue) {
         variant = 'warning';

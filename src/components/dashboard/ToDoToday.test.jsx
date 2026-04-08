@@ -161,6 +161,7 @@ describe('ToDoToday', () => {
 
         expect(screen.getByText('Nothing due today')).toBeInTheDocument()
         expect(screen.getByText("You're all caught up.")).toBeInTheDocument()
+        expect(screen.getByText('Nothing due today').closest('div')?.className).toContain('pt-4')
     })
 
     it('renders tasks and toggles upcoming section', async () => {

@@ -13,14 +13,12 @@ import { useTasks } from '../hooks/useTasks.ts';
  * @param {Object} props - Component props
  * @param {Object} props.task - Task object for this timer
  * @param {string} props.size - Size variant ('sm' or normal)
- * @param {boolean} props.isGlobalTimer - Whether this is being used in global timer (affects styling)
  * @param {Function} props.onComplete - Function called when timer is completely stopped
  * @param {Function} props.onStart - Function called when timer is started or resumed
  */
 function TimerControls({
     task,
     size = 'normal',
-    isGlobalTimer = false,
     onComplete = null,
     onStart = null
 }) {

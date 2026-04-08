@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
+import { InlineFieldHeader } from '@/components/ui/inline-field-header';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -122,7 +123,7 @@ const TaskModal = ({
 
         setFormData({
             title: '',
-            projectId: NO_PROJECT_VALUE,
+            projectId: modalOptions?.preselectedProjectId || NO_PROJECT_VALUE,
             startDate: modalOptions?.startDate || '',
             recurring: null,
             promptTimeEntry: false,
@@ -206,12 +207,13 @@ const TaskModal = ({
             });
             showSuccess('Task updated');
         } else {
-            createTask({
+            const createdTask = createTask({
                 ...payload,
                 parentTaskId: null,
                 completed: false,
                 archived: false
             });
+            modalOptions?.onCreate?.(createdTask);
             showSuccess('Task created');
         }
 
@@ -321,9 +323,8 @@ const TaskModal = ({
                 </div>
 
                 <div className="space-y-2">
-                    <div className="mb-1 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <Label>Project</Label>
-                        {openProjectModal && (
+                    <InlineFieldHeader
+                        action={openProjectModal ? (
                             <Button
                                 type="button"
                                 variant="link"
@@ -341,8 +342,10 @@ const TaskModal = ({
                             >
                                 + New Project
                             </Button>
-                        )}
-                    </div>
+                        ) : null}
+                    >
+                        <Label>Project</Label>
+                    </InlineFieldHeader>
                     <Select
                         value={formData.projectId}
                         onValueChange={handleProjectChange}

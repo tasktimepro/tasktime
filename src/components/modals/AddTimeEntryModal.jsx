@@ -60,7 +60,7 @@ const AddTimeEntryModal = ({
         return showSeconds ? time : time.slice(0, 5);
     };
 
-    const formatDurationForInput = (durationMs, showSeconds = false) => {
+    const formatDurationForInput = useCallback((durationMs, showSeconds = false) => {
         if (!durationMs || durationMs <= 0) return '';
 
         let remainingMs = durationMs;
@@ -96,7 +96,7 @@ const AddTimeEntryModal = ({
         }
 
         return parts.join(' ');
-    };
+    }, [MINUTES_PER_DAY, MINUTES_PER_HOUR, MINUTES_PER_WEEK]);
 
     const resetForm = useCallback(() => {
         if (entry) {
@@ -118,7 +118,7 @@ const AddTimeEntryModal = ({
             timeSpent: '',
             note: ''
         });
-    }, [entry, initialDateStr]);
+    }, [entry, initialDateStr, formatDurationForInput]);
 
     useEffect(() => {
         if (isOpen) {

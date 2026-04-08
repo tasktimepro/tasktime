@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 coverage
+playwright-report
+test-results
+
+# Local lint/report scratch files
+.lint-*.txt
+.lint-*.json
+.unused-vars*.txt
+.set-state-in-effect.txt
 
 # Editor directories and files
 .vscode/*

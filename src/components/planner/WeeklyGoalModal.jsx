@@ -2,8 +2,7 @@
  * WeeklyGoalModal - Modal for setting weekly goals
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import { useEffect, useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -22,25 +21,13 @@ import { ClockIcon } from '@/components/ui/icons';
  * @param {Object} props
  * @param {boolean} props.isOpen
  * @param {() => void} props.onClose
- * @param {Date} props.weekStart
  */
-const WeeklyGoalModal = ({ isOpen, onClose, weekStart }) => {
+const WeeklyGoalModal = ({ isOpen, onClose }) => {
     const { weeklyGoals, setWeeklyGoals, clearWeeklyGoals } = useWeeklyGoals();
     const { preferences } = usePreferences();
 
     const [targetHours, setTargetHours] = useState('');
     const [targetEarnings, setTargetEarnings] = useState('');
-    const weekStartStr = useMemo(() => {
-        if (!weekStart) return null;
-        return format(weekStart, 'yyyy-MM-dd');
-    }, [weekStart]);
-
-    const weekRangeLabel = useMemo(() => {
-        if (!weekStart) return '';
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
-        return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')}`;
-    }, [weekStart]);
 
     const currencyCode = normalizeCurrencyCode(preferences.currency);
     const currencySymbol = getCurrencySymbol(currencyCode);

@@ -6,13 +6,13 @@
 
 import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
-import { createProjectHelpers } from '@/stores/yjs/collections/projects';
 import { toStorageDate } from '@/utils/dateUtils';
 import type { Project } from '@/stores/yjs/types';
 
 export function useProjects() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<Project>(
-        (store) => store.projects
+        (store) => store.projects,
+        { collectionName: 'projects' }
     );
 
     // Derived data

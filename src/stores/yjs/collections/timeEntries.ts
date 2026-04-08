@@ -69,28 +69,6 @@ export interface TimeEntryHelpers {
  */
 export function createTimeEntryHelpers(store: YjsStore): TimeEntryHelpers {
 
-    /**
-     * Find which Y.Map contains an entry
-     */
-    const findDocForEntry = (id: string): Y.Map<string, TimeEntry> | null => {
-        // Check active first (most common)
-        if (store.activeTimeEntries.has(id)) {
-            return store.activeTimeEntries;
-        }
-
-        // Search in other loaded entries
-        const allEntries = store.getAllTimeEntries();
-        const entry = allEntries.find(e => e.id === id);
-        if (entry) {
-            // The entry exists in some loaded doc, but we need to find which one
-            // For now, return activeTimeEntries as fallback - in practice, updates
-            // to archived entries should be rare
-            return store.activeTimeEntries;
-        }
-
-        return null;
-    };
-
     return {
 
         getAll(): TimeEntry[] {

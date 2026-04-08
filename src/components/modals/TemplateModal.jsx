@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
+import { parseIntegerInputWithFallback } from '@/utils/numberInputUtils.ts';
 
 /**
  * TemplateModal - Modal for creating and editing invoice templates
@@ -108,7 +109,7 @@ const TemplateModal = ({
                 if (!template.dueDateDays || template.dueDateDays === 0) {
                     return 'Due date: Not specified';
                 }
-                const days = parseInt(template.dueDateDays) || 0;
+                const days = parseIntegerInputWithFallback(template.dueDateDays, 0, { min: 0 });
                 const daysDate = new Date(today);
                 daysDate.setDate(daysDate.getDate() + days);
                 return `Due date: ${toDisplayDate(daysDate)} (${days} ${days === 1 ? 'day' : 'days'} from invoice date)`;
@@ -118,7 +119,7 @@ const TemplateModal = ({
                 if (!template.dueDateWeeks || template.dueDateWeeks === 0) {
                     return 'Due date: Not specified';
                 }
-                const weeks = parseInt(template.dueDateWeeks) || 0;
+                const weeks = parseIntegerInputWithFallback(template.dueDateWeeks, 0, { min: 0 });
                 const weeksDate = new Date(today);
                 weeksDate.setDate(weeksDate.getDate() + (weeks * 7));
                 return `Due date: ${toDisplayDate(weeksDate)} (${weeks} ${weeks === 1 ? 'week' : 'weeks'} from invoice date)`;
@@ -346,7 +347,7 @@ const TemplateModal = ({
                                         type="number"
                                         min="1"
                                         value={formData.sequentialNumberStart}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberStart: parseInt(e.target.value) || 1 }))}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberStart: parseIntegerInputWithFallback(e.target.value, 1, { min: 1 }) }))}
                                     />
                                 </div>
 
@@ -359,7 +360,7 @@ const TemplateModal = ({
                                         min="1"
                                         max="10"
                                         value={formData.sequentialNumberDigits}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberDigits: parseInt(e.target.value) || 4 }))}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberDigits: parseIntegerInputWithFallback(e.target.value, 4, { min: 1, max: 10 }) }))}
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         Preview: {(formData.sequentialNumberStart).toString().padStart(formData.sequentialNumberDigits || 4, '0')}
@@ -426,7 +427,7 @@ const TemplateModal = ({
                                     type="number"
                                     min="0"
                                     value={formData.dueDateDays}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, dueDateDays: parseInt(e.target.value) || 0 }))}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, dueDateDays: parseIntegerInputWithFallback(e.target.value, 0, { min: 0 }) }))}
                                     className="w-24"
                                 />
                             </div>
@@ -442,7 +443,7 @@ const TemplateModal = ({
                                     type="number"
                                     min="1"
                                     value={formData.dueDateWeeks || 1}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, dueDateWeeks: parseInt(e.target.value) || 1 }))}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, dueDateWeeks: parseIntegerInputWithFallback(e.target.value, 1, { min: 1 }) }))}
                                     className="w-24"
                                 />
                             </div>

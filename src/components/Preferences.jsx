@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useToast } from '../hooks/useToast.ts';
 import { DEFAULT_CURRENCY } from '../utils/currencyUtils.ts';
 import CurrencySelect from '@/components/ui/currency-select';
@@ -10,16 +10,10 @@ import CustomCheckbox from './CustomCheckbox';
  * Preferences component - Manages user preferences including preferred currency
  */
 const Preferences = ({ preferences = {}, updatePreferences }) => {
-    const [preferredCurrency, setPreferredCurrency] = useState(DEFAULT_CURRENCY);
+    const [preferredCurrency, setPreferredCurrency] = useState(preferences.currency || DEFAULT_CURRENCY);
     const { showSuccess } = useToast();
     const weekStartsOnSunday = (preferences.weekStartsOn ?? 1) === 0;
     const autoHideTotalsOnRevisit = preferences.autoHideTotalsOnRevisit === true;
-
-    // Load preferred currency from preferences prop on mount
-    useEffect(() => {
-        const currency = preferences.currency || DEFAULT_CURRENCY;
-        setPreferredCurrency(currency);
-    }, [preferences]);
 
     // Save preferred currency to preferences state
     const handleCurrencyChange = (newCurrency) => {

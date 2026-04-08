@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import type { Preferences } from '@/stores/yjs/types';
+import { validatePreferencesRecord } from '@/stores/yjs/validation';
 
 const DEFAULT_PREFERENCES: Preferences = {
     currency: 'EUR',
@@ -39,7 +40,7 @@ export function usePreferences() {
         store.preferences.forEach((value, key) => {
             (prefs as Record<string, unknown>)[key] = value;
         });
-        setPreferences(prefs);
+        setPreferences(validatePreferencesRecord(prefs as Record<string, unknown>, 'sync preferences'));
         setIsLoading(false);
     }, [isReady, store]);
 
@@ -61,25 +62,36 @@ export function usePreferences() {
         value: Preferences[K]
     ) => {
         if (!isReady) return;
-        store.preferences.set(key, value);
-    }, [isReady, store]);
+        const nextPreferences = validatePreferencesRecord({
+            ...preferences,
+            [key]: value,
+        } as Record<string, unknown>, `set preference ${String(key)}`);
+        store.preferences.set(key, nextPreferences[key]);
+    }, [isReady, preferences, store]);
 
     // Update multiple preferences
     const updatePreferences = useCallback((updates: Partial<Preferences>) => {
         if (!isReady) return;
+
+        const nextPreferences = validatePreferencesRecord({
+            ...preferences,
+            ...updates,
+        } as Record<string, unknown>, 'update preferences');
         
         Object.entries(updates).forEach(([key, value]) => {
             if (value !== undefined) {
-                store.preferences.set(key, value);
+                store.preferences.set(key, (nextPreferences as Record<string, unknown>)[key]);
             }
         });
-    }, [isReady, store]);
+    }, [isReady, preferences, store]);
 
     // Reset to defaults
     const resetPreferences = useCallback(() => {
         if (!isReady) return;
         
-        Object.entries(DEFAULT_PREFERENCES).forEach(([key, value]) => {
+        const nextPreferences = validatePreferencesRecord(DEFAULT_PREFERENCES as Record<string, unknown>, 'reset preferences');
+
+        Object.entries(nextPreferences).forEach(([key, value]) => {
             store.preferences.set(key, value);
         });
     }, [isReady, store]);

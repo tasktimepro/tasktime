@@ -1,7 +1,9 @@
 # TaskTime Makefile
 # Shorthand commands for common Docker operations
 
-.PHONY: help dev stop build install lint clean logs shell test test-run test-coverage release-gate
+APP_RUN = docker compose run --rm app
+
+.PHONY: help dev stop build install lint clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-pwa-smoke release-gate
 
 # Default target - show help
 help:
@@ -20,7 +22,10 @@ help:
 	@echo "  make test     - Run vitest in watch mode"
 	@echo "  make test-run - Run vitest once"
 	@echo "  make test-coverage - Run vitest with coverage"
-	@echo "  make release-gate - Run coverage and build"
+	@echo "  make test-e2e - Run Playwright E2E tests"
+	@echo "  make test-e2e-smoke - Run critical Playwright smoke tests"
+	@echo "  make test-e2e-pwa-smoke - Run production-preview PWA offline boot smoke test"
+	@echo "  make release-gate - Run coverage, browser smoke, and build"
 	@echo ""
 
 # Start development server
@@ -51,7 +56,24 @@ add:
 
 # Run linter
 lint:
-	docker compose run --rm app npm run lint
+	@attempt=1; \
+	while [ $$attempt -le 3 ]; do \
+		output_file=$$(mktemp); \
+		if $(APP_RUN) sh -lc 'find src -maxdepth 4 -type d >/dev/null && npm run lint' >"$$output_file" 2>&1; then \
+			cat "$$output_file"; \
+			rm -f "$$output_file"; \
+			exit 0; \
+		fi; \
+		cat "$$output_file"; \
+		if grep -q "ENOENT: no such file or directory, scandir '/app/src/" "$$output_file" && [ $$attempt -lt 3 ]; then \
+			rm -f "$$output_file"; \
+			echo "Retrying lint after Docker bind mount settles..."; \
+			attempt=$$((attempt + 1)); \
+			continue; \
+		fi; \
+		rm -f "$$output_file"; \
+		exit 1; \
+	done
 
 # Run tests
 test:
@@ -63,9 +85,21 @@ test-run:
 test-coverage:
 	docker compose run --rm app npm run test:coverage
 
-# Release gate checks (coverage + build)
+test-e2e:
+	docker compose run --rm app npm run test:e2e
+
+test-e2e-smoke:
+	docker compose run --rm app npm run test:e2e:smoke
+
+test-e2e-pwa-smoke:
+	docker compose run --rm app npm run test:e2e:pwa:smoke
+
+# Release gate checks (coverage + browser smoke + build)
 release-gate:
+	$(MAKE) lint
 	docker compose run --rm app npm run test:coverage
+	docker compose run --rm app npm run test:e2e:smoke
+	docker compose run --rm app npm run test:e2e:pwa:smoke
 	docker compose run --rm app npm run build
 
 # View logs

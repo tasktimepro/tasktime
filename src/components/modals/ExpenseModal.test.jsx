@@ -123,6 +123,13 @@ describe('ExpenseModal', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         recurrencesMocks.createRecurrence.mockImplementation((data) => ({ id: 'r1', ...data }))
+        clientsMocks.clients = []
+        projectsMocks.projects = []
+        projectsMocks.getProjectsByClient.mockReturnValue([])
+        businessInfosMocks.businessInfos = []
+        businessInfosMocks.defaultBusinessInfo = null
+        paymentMethodsMocks.paymentMethods = []
+        paymentMethodsMocks.defaultPaymentMethod = null
     })
 
     it('creates a one-time expense', async () => {
@@ -258,5 +265,73 @@ describe('ExpenseModal', () => {
 
         expect(screen.getByRole('button', { name: 'Cancel' }).className).not.toContain('w-full')
         expect(screen.getByRole('button', { name: 'Create Expense' }).className).not.toContain('w-full')
+    })
+
+    it('locks a personal project context and keeps the expense personal', () => {
+        projectsMocks.projects = [
+            {
+                id: 'project-personal',
+                title: 'Studio admin',
+                isPersonal: true,
+                archived: false,
+                preferredClientId: null
+            }
+        ]
+
+        render(
+            <ExpenseModal
+                isOpen
+                onClose={vi.fn()}
+                modalOptions={{ projectId: 'project-personal' }}
+            />
+        )
+
+        const businessCheckbox = screen.getByRole('checkbox', { name: 'Business Expense' })
+        const projectSelect = screen.getByLabelText('Project')
+
+        expect(businessCheckbox).not.toBeChecked()
+        expect(businessCheckbox).toBeDisabled()
+        expect(projectSelect).toBeDisabled()
+        expect(projectSelect.textContent).toContain('Studio admin')
+        expect(screen.queryByLabelText('Client')).not.toBeInTheDocument()
+    })
+
+    it('locks a client project context and derives the business assignment from the project', () => {
+        clientsMocks.clients = [
+            { id: 'client-1', title: 'Acme Co', archived: false }
+        ]
+        projectsMocks.projects = [
+            {
+                id: 'project-client',
+                title: 'Website refresh',
+                isPersonal: false,
+                archived: false,
+                preferredClientId: 'client-1'
+            }
+        ]
+        businessInfosMocks.businessInfos = [
+            { id: 'business-1', title: 'TaskTime LLC', taxNumber: 'TAX-123' }
+        ]
+        businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
+        projectsMocks.getProjectsByClient.mockReturnValue(projectsMocks.projects)
+
+        render(
+            <ExpenseModal
+                isOpen
+                onClose={vi.fn()}
+                modalOptions={{ projectId: 'project-client' }}
+            />
+        )
+
+        const businessCheckbox = screen.getByRole('checkbox', { name: 'Business Expense' })
+        const clientSelect = screen.getByLabelText('Client')
+        const projectSelect = screen.getByLabelText('Project')
+
+        expect(businessCheckbox).toBeChecked()
+        expect(businessCheckbox).toBeDisabled()
+        expect(clientSelect).toBeDisabled()
+        expect(projectSelect).toBeDisabled()
+        expect(clientSelect.textContent).toContain('Acme Co')
+        expect(projectSelect.textContent).toContain('Website refresh')
     })
 })

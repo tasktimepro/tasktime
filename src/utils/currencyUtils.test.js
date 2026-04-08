@@ -15,9 +15,11 @@ import {
     DEFAULT_CURRENCY,
     setPreferredCurrency,
     getPreferredCurrency,
+    EXCHANGE_RATES_API_URL,
     fetchExchangeRates,
     hasAllRequiredRates,
-    getCurrencyOptions
+    getCurrencyOptions,
+    STALE_EXCHANGE_RATES_ERROR
 } from './currencyUtils'
 import { EXCHANGE_RATE_CACHE_MS } from '../constants/app'
 
@@ -312,7 +314,7 @@ describe('currencyUtils', () => {
             const result = await fetchExchangeRates()
 
             expect(result.rates).toEqual({ GBP: 0.8 })
-            expect(result.error).toMatch(/cached/)
+            expect(result.error).toBe(STALE_EXCHANGE_RATES_ERROR)
         })
 
         it('fetches and caches rates when no valid cache', async () => {
@@ -326,6 +328,7 @@ describe('currencyUtils', () => {
             const result = await fetchExchangeRates()
 
             expect(result.rates).toEqual({ USD: 1, EUR: 0.9 })
+            expect(global.fetch).toHaveBeenCalledWith(EXCHANGE_RATES_API_URL)
             expect(localStorage.setItem).toHaveBeenCalled()
         })
     })

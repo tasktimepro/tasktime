@@ -71,7 +71,8 @@ type InvoiceData = {
     expenseItems?: InvoiceExpenseItem[];
     note?: string;
     totalHours?: number | string;
-    totalAmount: number;
+    total?: number;
+    totalAmount?: number;
     invoiceNumber?: string;
     date?: string;
     dueDate?: string;
@@ -172,6 +173,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         expenseItems = [],
         note = '',
         totalHours,
+        total,
         totalAmount,
         invoiceNumber,
         date,
@@ -188,6 +190,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         taskHourlyRates = {},
         currency = getPreferredCurrency()
     } = invoiceData;
+    const resolvedTotal = typeof total === 'number' ? total : (typeof totalAmount === 'number' ? totalAmount : 0);
 
     // Filter out subtasks that are already merged into parent tasks
     const mergedTaskIds = new Set<string>();
@@ -515,9 +518,9 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                             <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(currency)}${tax.toFixed(2)}</strong></p>
                         ` : ''}
                         
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333; border-top: 1px solid #ddd; padding-top: 10px;"><strong>Total: ${getCurrencySymbol(currency)}${totalAmount.toFixed(2)}</strong></p>
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333; border-top: 1px solid #ddd; padding-top: 10px;"><strong>Total: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
                     ` : `
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333;"><strong>Total${totalHours && parseFloat(String(totalHours)) > 0 ? ` (${parseFloat(String(totalHours)).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(currency)}${totalAmount.toFixed(2)}</strong></p>
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: #333;"><strong>Total${totalHours && parseFloat(String(totalHours)) > 0 ? ` (${parseFloat(String(totalHours)).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
                     `}
                 </div>
             </div>
@@ -582,7 +585,7 @@ export const buildInvoiceHtmlContent = (
         expenseItems: invoice.expenseItems || [],
         note: invoice.note,
         totalHours: invoice.totalHours,
-        totalAmount: invoice.totalAmount,
+        total: invoice.total,
         invoiceNumber: invoice.invoiceNumber,
         date: invoice.date,
         dueDate: invoice.dueDate,

@@ -26,22 +26,26 @@ const MobileMoreSheet = ({
                 <DialogTitle className="sr-only">More navigation</DialogTitle>
                 <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pb-safe-sheet pt-4">
                     <div className="grid gap-3">
-                        {items.map(({ key, label, description, Icon, onClick }) => (
+                        {items.map((item) => {
+                            const ItemIcon = item.Icon;
+
+                            return (
                             <button
-                                key={key}
+                                key={item.key}
                                 type="button"
-                                onClick={onClick}
+                                onClick={item.onClick}
                                 className="flex items-start gap-3 rounded-2xl border border-border bg-card px-4 py-4 text-left shadow-sm transition-colors hover:bg-accent cursor-pointer"
                             >
                                 <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                                    <Icon className="h-5 w-5" />
+                                    <ItemIcon className="h-5 w-5" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-semibold text-foreground">{label}</p>
-                                    <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+                                    <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                                    <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
                                 </div>
                             </button>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
