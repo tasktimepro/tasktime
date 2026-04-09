@@ -4,7 +4,7 @@
  * Handles active invoices and on-demand loading of archived invoices
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
 import type { Invoice } from '@/stores/yjs/types';
@@ -31,6 +31,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
     const [archivedInvoices, setArchivedInvoices] = useState<Invoice[]>([]);
     const [archivedLoading, setArchivedLoading] = useState(false);
     const [archivedLoaded, setArchivedLoaded] = useState(false);
+    const archivedLoadTriggered = useRef(false);
 
     useEffect(() => {
         if (!options.includeArchived || archivedLoaded || !store.archivedInvoicesSync) return;
@@ -41,14 +42,13 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
 
     // Load archived invoices when requested
     useEffect(() => {
-        if (!options.includeArchived || !isReady || archivedLoaded || archivedLoading) return;
+        if (!options.includeArchived || !isReady || archivedLoaded || archivedLoadTriggered.current) return;
 
-        let mounted = true;
+        archivedLoadTriggered.current = true;
         setArchivedLoading(true);
 
         loadArchived()
             .then(() => {
-                if (!mounted) return;
                 const archivedMap = store.archivedInvoicesSync;
                 if (archivedMap) {
                     setArchivedInvoices(collectEntities<Invoice>(archivedMap as any));
@@ -56,11 +56,9 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
                 setArchivedLoaded(true);
             })
             .finally(() => {
-                if (mounted) setArchivedLoading(false);
+                setArchivedLoading(false);
             });
-
-        return () => { mounted = false; };
-    }, [options.includeArchived, isReady, archivedLoaded, archivedLoading, loadArchived, store]);
+    }, [options.includeArchived, isReady, archivedLoaded, loadArchived, store]);
 
     // Subscribe to archived invoices changes
     useEffect(() => {

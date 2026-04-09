@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import type { TimeEntry } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
+import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { objectToYMap } from '@/stores/yjs/entityUtils';
 import { readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 
@@ -118,6 +119,7 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         }, 'create time entry');
         const entityMap = objectToYMap(entry as unknown as Record<string, unknown>);
         (store.activeTimeEntries as any).set(entry.id, entityMap);
+        markMeaningfulActivity();
         return entry;
     }, [isReady, store]);
 
@@ -130,6 +132,7 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
             const updated = validateCollectionEntity<TimeEntry>('timeEntries', { ...activeEntry, ...updates }, `update time entry ${id}`);
             const entityMap = objectToYMap(updated as unknown as Record<string, unknown>);
             (store.activeTimeEntries as any).set(id, entityMap);
+            markMeaningfulActivity();
             return updated;
         }
         
@@ -142,6 +145,7 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         if (!isReady) return false;
         if (!store.activeTimeEntries.has(id)) return false;
         store.activeTimeEntries.delete(id);
+        markMeaningfulActivity();
         return true;
     }, [isReady, store]);
 

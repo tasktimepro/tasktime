@@ -48,11 +48,13 @@ import { buildExpenseFromRecurrence } from './utils/expenseUtils.ts';
 import { normalizeInvoiceRecord } from './utils/invoiceUtils.ts';
 import { hasCompletedOnboarding, setOnboardingCompleted } from './utils/onboardingUtils.ts';
 import { getTaskIdsToDelete } from './utils/taskUtils.ts';
+import { setUsageMetricsSessionId, startUsageMetrics } from './utils/usageMetrics.ts';
 import { useTodayString } from './hooks/useDayRollover';
 import { useDarkModePreference } from './hooks/useDarkModePreference.ts';
+import { SYNC_WORKER_CONFIG } from './config/google.ts';
 import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
+import { APP_VERSION, TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
 /** Original browser tab title */
 const ORIGINAL_TITLE = "TaskTime";
@@ -90,8 +92,19 @@ function App() {
  * Inner app content that consumes Yjs hooks
  */
 function AppContent() {
-    const { isReady, isSyncing, manualSyncInProgress, hasPendingSyncChanges, clearAllData } = useYjs();
+    const { isReady, isSyncing, manualSyncInProgress, hasPendingSyncChanges, clearAllData, driveSessionId } = useYjs();
     const toast = useContext(ToastContext);
+
+    useEffect(() => {
+        return startUsageMetrics({
+            endpoint: SYNC_WORKER_CONFIG.isEnabled ? SYNC_WORKER_CONFIG.endpoints.metricsBatch : null,
+            appVersion: APP_VERSION,
+        });
+    }, []);
+
+    useEffect(() => {
+        setUsageMetricsSessionId(driveSessionId);
+    }, [driveSessionId]);
 
     // === Yjs Data Hooks ===
     const { 
@@ -687,6 +700,12 @@ function AppContent() {
     const selectedClient = urlParams.clientId 
         ? clients.find(c => c.id === urlParams.clientId) 
         : null;
+    const handleQuickCreateTask = useCallback(() => {
+        openTaskModal(null);
+    }, [openTaskModal]);
+    const handleQuickCreateExpense = useCallback(() => {
+        openExpenseModal(null);
+    }, [openExpenseModal]);
 
     useEffect(() => {
         if (timerIsActive && timerTaskId) return;
@@ -884,7 +903,7 @@ function AppContent() {
     // === Loading Screen ===
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="app-viewport-shell flex items-center justify-center">
                 <div className="text-center">
                     <ClockIcon className="h-12 w-12 text-foreground mx-auto mb-4 animate-pulse" />
                     <h1 className="text-xl font-semibold text-foreground">Task<span>Time</span></h1>
@@ -901,12 +920,12 @@ function AppContent() {
 
     // === Main Render ===
     return (
-        <div className={`min-h-screen ${totalsHidden ? 'totals-hidden' : ''}`}>
+        <div className={`app-viewport-shell ${totalsHidden ? 'totals-hidden' : ''}`}>
             <div className={isMobileLayout ? 'w-full' : 'mx-auto w-full max-w-[100rem] px-6 pr-2'}>
-            <div className={isMobileLayout ? 'min-h-screen' : 'flex gap-6'}>
+            <div className={isMobileLayout ? 'app-viewport-shell' : 'flex gap-6'}>
             {/* Sidebar Navigation */}
             {!isMobileLayout && (
-            <aside className={`${isSidebarCollapsed ? 'w-18' : 'w-64'} bg-card shadow-sm border border-border rounded-xl flex flex-col h-[calc(100vh-3rem)] sidebar my-6 transition-[width] duration-200`}>
+            <aside className={`${isSidebarCollapsed ? 'w-18' : 'w-64'} bg-card shadow-sm border border-border rounded-xl flex flex-col h-[calc(var(--viewport-height)-3rem)] sidebar my-6 transition-[width] duration-200`}>
             <TooltipProvider>
                 {/* Sidebar Header */}
                 <div className={`${isSidebarCollapsed ? 'p-4' : 'p-6'} flex-shrink-0`}>
@@ -1279,7 +1298,7 @@ function AppContent() {
             )}
 
             {/* Main Content */}
-            <main className={`main-content relative ${isMobileLayout ? 'min-h-screen' : 'flex-1'}`}>
+            <main className={`main-content relative ${isMobileLayout ? 'app-viewport-shell' : 'flex-1'}`}>
                 <div
                     className={isMobileLayout ? 'app-shell-content px-4' : 'app-shell-content pr-4'}
                     style={{
@@ -1471,7 +1490,8 @@ function AppContent() {
 
                     {(!isMobileLayout || activeView !== 'auth-callback') && (
                         <FloatingActionButton
-                            onTaskClick={() => openTaskModal(null)}
+                            onTaskClick={handleQuickCreateTask}
+                            onExpenseClick={handleQuickCreateExpense}
                             className={isMobileLayout ? 'bottom-safe-fab right-4' : ''}
                         />
                     )}

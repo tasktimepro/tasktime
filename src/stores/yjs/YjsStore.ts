@@ -665,11 +665,23 @@ export class YjsStore {
     }
 
     /**
+     * Trigger Drive sync with optional force control.
+     */
+    async syncDrive(options?: { allowPull?: boolean; force?: boolean }): Promise<void> {
+        await this.driveProvider?.sync(options?.force ?? false, {
+            allowPull: options?.allowPull,
+        });
+    }
+
+    /**
      * Force immediate sync with Google Drive
      * @param options - Optional sync options (e.g., allowPull: false for backup mode)
      */
     async forceDriveSync(options?: { allowPull?: boolean }): Promise<void> {
-        await this.driveProvider?.sync(true, options);
+        await this.syncDrive({
+            ...options,
+            force: true,
+        });
     }
 
     /**

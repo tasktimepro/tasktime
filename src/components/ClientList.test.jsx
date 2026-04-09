@@ -151,4 +151,23 @@ describe('ClientList', () => {
         expect(recurrencesHookMocks.deleteRecurrence).toHaveBeenCalledWith('recurrence-1')
         expect(clientsHookMocks.deleteClient).toHaveBeenCalledWith('client-1')
     })
+
+    it('keeps the header actions inline with flexible wrapping instead of forcing a mobile stack', () => {
+        render(
+            <ClientList
+                onSelectClient={vi.fn()}
+                openClientModal={vi.fn()}
+                editClientModal={vi.fn()}
+            />
+        )
+
+        const header = screen.getByText(/Clients/).parentElement
+        const actions = screen.getByRole('button', { name: 'New Client' }).parentElement
+
+        expect(header?.className).toContain('flex-wrap')
+        expect(header?.className).toContain('items-center')
+        expect(header?.className).not.toContain('flex-col')
+        expect(actions?.className).toContain('ml-auto')
+        expect(actions?.className).toContain('flex-wrap')
+    })
 })

@@ -57,6 +57,7 @@ describe('Modal', () => {
 
         expect(dialog.className.includes('w-[calc(100vw-1rem)]')).toBe(true)
         expect(dialog.className.includes('max-w-[calc(100vw-1rem)]')).toBe(true)
+        expect(dialog.className.includes('max-h-[calc(var(--viewport-height)-var(--safe-area-top)-var(--safe-area-bottom)-1rem)]')).toBe(true)
         expect(dialog.className.includes('sm:max-w-md')).toBe(true)
         expect(dialog.className.includes('overflow-hidden')).toBe(true)
         expect(dialog.className.includes('rounded-lg')).toBe(true)
@@ -87,10 +88,12 @@ describe('Modal', () => {
 
         expect(header?.className.includes('items-center')).toBe(true)
         expect(header?.className.includes('gap-3')).toBe(true)
+        expect(header?.className.includes('pt-[max(0.75rem,var(--safe-area-top))]')).toBe(true)
         expect(title.parentElement?.className.includes('text-left')).toBe(true)
         expect(closeButton.className.includes('rounded-full')).toBe(true)
         expect(closeButton.className.includes('shadow-sm')).toBe(true)
         expect(footer?.className.includes('flex-row')).toBe(true)
         expect(footer?.className.includes('gap-2')).toBe(true)
+        expect(footer?.className.includes('pb-[max(0.75rem,var(--safe-area-bottom))]')).toBe(true)
     })
 })

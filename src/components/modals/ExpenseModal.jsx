@@ -2,7 +2,7 @@
  * ExpenseModal component - Modal for creating and editing expenses
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -182,7 +182,7 @@ const ExpenseModal = ({
         scopedProject,
     ]);
 
-    const initialDraftState = useMemo(() => {
+    const buildDraftState = useCallback(() => {
         if (!isOpen) {
             return {
                 key: draftStateKey,
@@ -379,13 +379,31 @@ const ExpenseModal = ({
         todayString,
     ]);
 
-    const [draftState, setDraftState] = useState(initialDraftState);
+    const buildDraftStateRef = useRef(buildDraftState);
+    buildDraftStateRef.current = buildDraftState;
 
-    if (draftState.key !== initialDraftState.key) {
-        setDraftState(initialDraftState);
-    }
+    const [draftState, setDraftState] = useState(() => ({
+        key: 'closed',
+        formData: emptyFormData,
+        editingRecurrenceId: null,
+        missingRecurrenceId: null,
+    }));
 
-    const activeDraftState = draftState.key === initialDraftState.key ? draftState : initialDraftState;
+    useEffect(() => {
+        if (!isOpen) {
+            setDraftState({
+                key: 'closed',
+                formData: emptyFormData,
+                editingRecurrenceId: null,
+                missingRecurrenceId: null,
+            });
+            return;
+        }
+
+        setDraftState(buildDraftStateRef.current());
+    }, [draftStateKey, emptyFormData, isOpen]);
+
+    const activeDraftState = draftState;
     const { formData, editingRecurrenceId, missingRecurrenceId } = activeDraftState;
     const isEditingTemplate = Boolean(editingRecurrenceId);
     const isEditingInstance = Boolean(editingExpense) && !isEditingTemplate;
@@ -397,17 +415,16 @@ const ExpenseModal = ({
 
     const setFormData = (updater) => {
         setDraftState((prevState) => {
-            const baseState = prevState.key === initialDraftState.key ? prevState : initialDraftState;
             const nextFormData = typeof updater === 'function'
-                ? updater(baseState.formData)
+                ? updater(prevState.formData)
                 : updater;
 
-            if (nextFormData === baseState.formData) {
-                return baseState;
+            if (nextFormData === prevState.formData) {
+                return prevState;
             }
 
             return {
-                ...baseState,
+                ...prevState,
                 formData: nextFormData,
             };
         });
@@ -901,7 +918,7 @@ const ExpenseModal = ({
                     </Button>
                 )}
             </div>
-                    <div className="flex flex-row flex-wrap justify-end gap-2">
+            <div className="flex flex-row flex-wrap justify-end gap-2">
                 <Button variant="outline" onClick={handleClose} type="button">
                     Cancel
                 </Button>

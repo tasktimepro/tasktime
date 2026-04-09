@@ -83,6 +83,9 @@ main,
 
 @layer base {
     :root {
+        --viewport-height: 100vh;
+        --safe-area-top: env(safe-area-inset-top, 0px);
+        --safe-area-bottom: env(safe-area-inset-bottom, 0px);
         --background: 0 0% 99.5%;
         --foreground: 0 0% 3.9%;
         --card: 0 0% 100%;
@@ -167,6 +170,12 @@ main,
         --status-danger-border: 0 51% 34%;
         --status-danger-foreground: 0 100% 92%;
         --status-danger-accent: 0 91% 71%;
+    }
+
+    @supports (height: 100dvh) {
+        :root {
+            --viewport-height: 100dvh;
+        }
     }
 }
 

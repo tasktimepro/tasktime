@@ -441,9 +441,9 @@ const TaskViewModal = ({
             </Button>
         </div>
     ) : (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+        <div className="flex w-full flex-wrap items-center gap-3">
             {shouldShowCompleteAction ? (
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                     <Button
                         variant={isCompleted ? 'secondary' : 'default'}
                         onClick={handleToggleComplete}
@@ -463,11 +463,11 @@ const TaskViewModal = ({
                     )}
                 </div>
             ) : (
-                <div className="text-sm font-medium text-muted-foreground">
+                <div className="min-w-0 flex-1 text-sm font-medium text-muted-foreground">
                     {dueInLabel}
                 </div>
             )}
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex flex-wrap items-center gap-2">
                 <TimerControls
                     task={currentTask}
                     size="sm"
@@ -510,7 +510,7 @@ const TaskViewModal = ({
                         </div>
                     )}
 
-                    <div className={`grid gap-4 ${shouldShowBillableTotal ? 'sm:grid-cols-[minmax(0,1fr)_auto] items-start' : ''}`}>
+                    <div className={`flex flex-wrap items-start gap-4 ${shouldShowBillableTotal ? 'justify-between' : ''}`}>
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Time</p>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -556,7 +556,7 @@ const TaskViewModal = ({
                     </div>
 
                     {(project || parentTask) && (
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-4">
                             {project && (
                                 <div className="space-y-1">
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Project</p>

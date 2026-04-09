@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as Y from 'yjs';
 import { useYjs } from '@/contexts/YjsContext';
 import { generateId } from '@/utils/idUtils';
+import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { readEntity, objectToYMap, yMapToObject, collectEntities } from '@/stores/yjs/entityUtils';
 import { validateCollectionEntity, safeValidateCollectionEntity, type YjsCollectionName } from '@/stores/yjs/validation';
 
@@ -150,6 +151,7 @@ export function useYjsCollection<T extends { id: string }>(
 
         const entityMap = objectToYMap(validatedItem as unknown as Record<string, unknown>);
         (yMap as unknown as Y.Map<string, unknown>).set(id, entityMap);
+        markMeaningfulActivity();
 
         return validatedItem;
     }, [options.collectionName, yMap]);
@@ -178,19 +180,28 @@ export function useYjsCollection<T extends { id: string }>(
                 existing.set(key, (validatedEntity as Record<string, unknown>)[key]);
             }
 
+            markMeaningfulActivity();
+
             return validatedEntity;
         }
 
         // Old format: merge and convert to nested Y.Map
         const entityMap = objectToYMap(validatedEntity as unknown as Record<string, unknown>);
         rawMap.set(id, entityMap);
+        markMeaningfulActivity();
 
         return validatedEntity;
     }, [options.collectionName, yMap]);
 
     const remove = useCallback((id: string): boolean => {
         if (!yMap) return false;
-        return yMap.delete(id);
+        const removed = yMap.delete(id);
+
+        if (removed) {
+            markMeaningfulActivity();
+        }
+
+        return removed;
     }, [yMap]);
 
     return {

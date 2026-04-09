@@ -559,8 +559,8 @@ const ProjectList = ({
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-2xl font-bold text-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="min-w-0 flex-1 text-2xl font-bold text-foreground">
                     Projects {activeProjects.length > 0 && (
                         <span>
                             ({activeProjects.length})
@@ -568,7 +568,7 @@ const ProjectList = ({
                     )}
                 </h2>
 
-                <div className="flex items-center justify-between gap-3 sm:justify-start">
+                <div className="ml-auto flex flex-wrap items-center gap-3">
                     <Select value={projectSort} onValueChange={handleSortChange}>
                         <SelectTrigger
                             className="h-9 w-9"
@@ -591,7 +591,6 @@ const ProjectList = ({
                     </Select>
 
                     <Button 
-                        className="sm:w-auto"
                         onClick={() => openProjectModal()} 
                         leadingIcon={PlusIcon}
                     >

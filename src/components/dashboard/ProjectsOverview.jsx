@@ -1,7 +1,10 @@
-import { ClipboardDocumentCheckIcon, MagnifyingGlassIcon } from '@/components/ui/icons';
+import { ClipboardDocumentCheckIcon, ListFilterIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 import { formatCurrency, getProjectCurrency } from '../../utils/currencyUtils.ts';
+import { PROJECT_FILTER_OPTIONS } from './dashboardOverviewUtils.ts';
+import CardSearchControl from './CardSearchControl';
 
 /**
  * ProjectsOverview component - Recent projects list with search.
@@ -9,30 +12,62 @@ import { formatCurrency, getProjectCurrency } from '../../utils/currencyUtils.ts
  */
 const ProjectsOverview = ({
     recentProjects,
+    projectFilter,
+    setProjectFilter,
     projectSearchQuery,
     setProjectSearchQuery,
     navigateToProject,
     handleClientTitleClick,
     clients
 }) => {
+    const isMobileLayout = useIsMobileLayout();
+    const emptyStateMessage = projectSearchQuery
+        ? 'No projects found matching your search'
+        : projectFilter === 'unbilled'
+            ? 'No unbilled projects found'
+            : 'No recent projects found';
+
     return (
         <Card>
             <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle className="flex items-center text-lg">
+                <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle className="order-1 mr-auto flex items-center text-lg">
                         <ClipboardDocumentCheckIcon className="status-info-text-strong mr-2 h-5 w-5" />
-                        Recent Projects
+                        Projects
                     </CardTitle>
-                    <div className="relative w-full sm:w-auto sm:min-w-56">
-                        <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
-                        <Input
-                            type="text"
-                            placeholder="Search projects"
-                            value={projectSearchQuery}
-                            onChange={(e) => setProjectSearchQuery(e.target.value)}
-                            className="pl-9"
-                        />
-                    </div>
+                    <CardSearchControl
+                        value={projectSearchQuery}
+                        onChange={setProjectSearchQuery}
+                        placeholder="Search projects"
+                        buttonLabel="Search projects"
+                        inputAriaLabel="Search projects"
+                        buttonClassName="order-2"
+                        inputClassName="order-4 basis-full sm:order-3 sm:basis-auto"
+                    />
+                    <Select value={projectFilter} onValueChange={setProjectFilter}>
+                            <SelectTrigger
+                                className={isMobileLayout ? 'order-3 h-9 w-9' : 'order-4 w-[132px]'}
+                                aria-label="Filter projects"
+                                leadingIcon={ListFilterIcon}
+                                hideCaret={isMobileLayout}
+                                iconOnly={isMobileLayout}
+                            >
+                                {isMobileLayout ? (
+                                    <span className="sr-only">
+                                        <SelectValue placeholder="Filter projects" />
+                                    </span>
+                                ) : (
+                                    <SelectValue placeholder="Filter projects" />
+                                )}
+                            </SelectTrigger>
+                            <SelectContent>
+                                {PROJECT_FILTER_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                 </div>
             </CardHeader>
             <CardContent className="px-3 pb-2.5 pt-0 sm:px-5 sm:pb-4 max-h-96 overflow-y-auto">
@@ -91,7 +126,7 @@ const ProjectsOverview = ({
                     <div className="px-6 py-8 text-center text-muted-foreground">
                         <ClipboardDocumentCheckIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm">
-                            {projectSearchQuery ? 'No projects found matching your search' : 'No recent projects found'}
+                            {emptyStateMessage}
                         </p>
                     </div>
                 )}

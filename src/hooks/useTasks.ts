@@ -4,9 +4,10 @@
  * Handles both active and archived tasks with on-demand loading
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { addDays } from 'date-fns';
 import { useYjs } from '@/contexts/YjsContext';
+import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { useYjsCollection } from './useYjsCollection';
 import type { Task } from '@/stores/yjs/types';
 import { getTodayString, toStorageDate } from '@/utils/dateUtils.ts';
@@ -32,17 +33,24 @@ export function useTasks(options: UseTasksOptions = {}) {
     const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
     const [archivedLoading, setArchivedLoading] = useState(false);
     const [archivedLoaded, setArchivedLoaded] = useState(false);
+    const archivedLoadTriggered = useRef(false);
+
+    useEffect(() => {
+        if (!options.includeArchived || archivedLoaded || !store.archivedTasks) return;
+
+        setArchivedTasks(collectEntities<Task>(store.archivedTasks as any));
+        setArchivedLoaded(true);
+    }, [options.includeArchived, archivedLoaded, store]);
 
     // Load archived tasks when requested
     useEffect(() => {
-        if (!options.includeArchived || !isReady || archivedLoaded || archivedLoading) return;
+        if (!options.includeArchived || !isReady || archivedLoaded || archivedLoadTriggered.current || store.archivedTasks) return;
 
-        let mounted = true;
+        archivedLoadTriggered.current = true;
         setArchivedLoading(true);
 
         loadArchived()
             .then(() => {
-                if (!mounted) return;
                 const archivedMap = store.archivedTasks;
                 if (archivedMap) {
                     setArchivedTasks(collectEntities<Task>(archivedMap as any));
@@ -50,11 +58,9 @@ export function useTasks(options: UseTasksOptions = {}) {
                 setArchivedLoaded(true);
             })
             .finally(() => {
-                if (mounted) setArchivedLoading(false);
+                setArchivedLoading(false);
             });
-
-        return () => { mounted = false; };
-    }, [options.includeArchived, isReady, archivedLoaded, archivedLoading, loadArchived, store]);
+    }, [options.includeArchived, isReady, archivedLoaded, loadArchived, store]);
 
     // Subscribe to archived tasks changes
     useEffect(() => {
@@ -102,21 +108,50 @@ export function useTasks(options: UseTasksOptions = {}) {
     // Archive/unarchive operations
     const archiveTask = useCallback(async (id: string) => {
         await store.archiveTask(id);
+        markMeaningfulActivity();
         // Reload archived if they were loaded
         if (archivedLoaded) {
             const archivedMap = store.archivedTasks;
             if (archivedMap) {
-                const tasks: Task[] = [];
-                archivedMap.forEach((task) => tasks.push(task));
-                setArchivedTasks(tasks);
+                setArchivedTasks(collectEntities<Task>(archivedMap as any));
             }
         }
     }, [store, archivedLoaded]);
 
     const unarchiveTask = useCallback(async (id: string) => {
         await store.unarchiveTask(id);
+        markMeaningfulActivity();
         setArchivedTasks(prev => prev.filter(t => t.id !== id));
     }, [store]);
+
+    const deleteTask = useCallback(async (id: string) => {
+        const removedFromActive = remove(id);
+
+        if (removedFromActive) {
+            return true;
+        }
+
+        let archivedMap = store.archivedTasks;
+
+        if (!archivedMap) {
+            await loadArchived();
+            archivedMap = store.archivedTasks;
+        }
+
+        if (!archivedMap) {
+            return false;
+        }
+
+        const removedFromArchive = archivedMap.delete(id);
+
+        if (removedFromArchive) {
+            markMeaningfulActivity();
+            setArchivedLoaded(true);
+            setArchivedTasks(collectEntities<Task>(archivedMap as any));
+        }
+
+        return removedFromArchive;
+    }, [remove, store, loadArchived]);
 
     // Get task hierarchy
     const getRootTasks = useCallback((projectId?: string) => {
@@ -402,13 +437,14 @@ export function useTasks(options: UseTasksOptions = {}) {
         activeTasks: projectActiveTasks,
         archivedTasks: projectArchivedTasks,
         isLoading: activeLoading || archivedLoading,
+        archivedLoading,
         archivedLoaded,
         
         // CRUD
         getTask: get,
         createTask: create,
         updateTask: update,
-        deleteTask: remove,
+        deleteTask,
         
         // Archive operations
         archiveTask,

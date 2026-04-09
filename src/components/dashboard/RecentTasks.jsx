@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ClockIcon, LayoutListIcon, MagnifyingGlassIcon } from '@/components/ui/icons';
+import { ClockIcon, LayoutListIcon, ListFilterIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
 import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
 import { useTimers } from '../../hooks/useTimers';
@@ -10,6 +10,8 @@ import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 import StartDateBadge from '../task/StartDateBadge';
 import TaskActionsMenu from '../task/TaskActionsMenu';
 import TimeEntriesModal from '../TimeEntriesModal';
+import { TASK_FILTER_OPTIONS } from './dashboardOverviewUtils.ts';
+import CardSearchControl from './CardSearchControl';
 
 /**
  * RecentTasks component - Recent task list with search and controls.
@@ -17,8 +19,11 @@ import TimeEntriesModal from '../TimeEntriesModal';
  */
 const RecentTasks = ({
     recentTasks,
+    taskFilter,
+    setTaskFilter,
     taskSearchQuery,
     setTaskSearchQuery,
+    isLoading = false,
     handleCompleteTask,
     getTaskCompletedStatus,
     renderTaskTitle,
@@ -31,6 +36,14 @@ const RecentTasks = ({
     const isMobileLayout = useIsMobileLayout();
     const [selectedTask, setSelectedTask] = useState(null);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
+    const emptyStateMessage = taskSearchQuery
+        ? 'No tasks found matching your search'
+        : {
+            recent: 'No recent tasks found',
+            recurring: 'No recurring tasks found',
+            completed: 'No completed tasks found',
+            archived: 'No archived tasks found',
+        }[taskFilter];
 
     const handleOpenTimeEntries = (task) => {
         setSelectedTask(task);
@@ -162,25 +175,53 @@ const RecentTasks = ({
     return (
         <Card>
             <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle className="flex items-center text-lg">
+                <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle className="order-1 mr-auto flex items-center text-lg">
                         <LayoutListIcon className="status-info-text-strong mr-2 h-5 w-5" />
-                        Recent Tasks
+                        Tasks
                     </CardTitle>
-                    <div className="relative w-full sm:w-auto sm:min-w-56">
-                        <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
-                        <Input
-                            type="text"
-                            placeholder="Search tasks"
-                            value={taskSearchQuery}
-                            onChange={(e) => setTaskSearchQuery(e.target.value)}
-                            className="pl-9"
-                        />
-                    </div>
+                    <CardSearchControl
+                        value={taskSearchQuery}
+                        onChange={setTaskSearchQuery}
+                        placeholder="Search tasks"
+                        buttonLabel="Search tasks"
+                        inputAriaLabel="Search tasks"
+                        buttonClassName="order-2"
+                        inputClassName="order-4 basis-full sm:order-3 sm:basis-auto"
+                    />
+                    <Select value={taskFilter} onValueChange={setTaskFilter}>
+                            <SelectTrigger
+                                className={isMobileLayout ? 'order-3 h-9 w-9' : 'order-4 w-[148px]'}
+                                aria-label="Filter tasks"
+                                leadingIcon={ListFilterIcon}
+                                hideCaret={isMobileLayout}
+                                iconOnly={isMobileLayout}
+                            >
+                                {isMobileLayout ? (
+                                    <span className="sr-only">
+                                        <SelectValue placeholder="Filter tasks" />
+                                    </span>
+                                ) : (
+                                    <SelectValue placeholder="Filter tasks" />
+                                )}
+                            </SelectTrigger>
+                            <SelectContent>
+                                {TASK_FILTER_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                 </div>
             </CardHeader>
             <CardContent className="px-3 pb-2.5 pt-0 sm:px-5 sm:pb-4 max-h-96 overflow-y-auto">
-                {recentTasks.length > 0 ? (
+                {isLoading ? (
+                    <div className="px-6 py-8 text-center text-muted-foreground">
+                        <LayoutListIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm">Loading archived tasks</p>
+                    </div>
+                ) : recentTasks.length > 0 ? (
                     <div className="divide-y divide-border">
                         {recentTasks.map((task) => {
                             const projectTimer = getTimerForTask(task.id, task.projectId);
@@ -213,7 +254,7 @@ const RecentTasks = ({
                     <div className="px-6 py-8 text-center text-muted-foreground">
                         <LayoutListIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm">
-                            {taskSearchQuery ? 'No tasks found matching your search' : 'No recent tasks found'}
+                            {emptyStateMessage}
                         </p>
                     </div>
                 )}

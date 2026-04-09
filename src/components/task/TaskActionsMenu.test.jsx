@@ -4,7 +4,51 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TaskActionsMenu from './TaskActionsMenu'
 
+const hookState = vi.hoisted(() => ({
+
+    tasks: [],
+    entries: []
+}))
+
+vi.mock('@/hooks/useTasks', () => ({
+
+    useTasks: () => ({
+        tasks: hookState.tasks
+    })
+}))
+
+vi.mock('@/hooks/useTimeEntries', () => ({
+
+    useTimeEntries: () => ({
+        entries: hookState.entries
+    })
+}))
+
 describe('TaskActionsMenu', () => {
+
+    it('shows billed and unbilled warnings in delete confirmation when applicable', async () => {
+
+        const onDelete = vi.fn()
+        const task = { id: 't1', title: 'Task', billable: true, lastBilledAt: 1000 }
+        const user = userEvent.setup()
+
+        hookState.tasks = [
+            task,
+            { id: 't2', title: 'Subtask', parentTaskId: 't1', billable: true, lastBilledAt: null }
+        ]
+        hookState.entries = [
+            { taskId: 't1', start: 500, end: 900, billedInvoiceId: 'inv-1' },
+            { taskId: 't2', start: 2000, end: 5600000 }
+        ]
+
+        render(<TaskActionsMenu task={task} onEdit={vi.fn()} onDelete={onDelete} />)
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByText('Delete'))
+
+        expect(screen.getByText('This task and its subtasks include 1.55 unbilled hours.')).toBeInTheDocument()
+        expect(screen.getByText('This task and its subtasks include time that is already recorded on an invoice.')).toBeInTheDocument()
+    })
 
     it('calls onEdit when edit is selected', async () => {
 
@@ -12,6 +56,9 @@ describe('TaskActionsMenu', () => {
         const onDelete = vi.fn()
         const task = { id: 't1', title: 'Task' }
         const user = userEvent.setup()
+
+        hookState.tasks = [task]
+        hookState.entries = []
 
         render(<TaskActionsMenu task={task} onEdit={onEdit} onDelete={onDelete} />)
 
@@ -28,6 +75,9 @@ describe('TaskActionsMenu', () => {
         const task = { id: 't1', title: 'Task' }
         const user = userEvent.setup()
 
+        hookState.tasks = [task]
+        hookState.entries = []
+
         render(<TaskActionsMenu task={task} onEdit={onEdit} onDelete={onDelete} />)
 
         await user.click(screen.getByRole('button', { name: 'More actions' }))
@@ -43,6 +93,9 @@ describe('TaskActionsMenu', () => {
 
         const task = { id: 't1', title: 'Task' }
         const user = userEvent.setup()
+
+        hookState.tasks = [task]
+        hookState.entries = []
 
         render(<TaskActionsMenu task={task} onEdit={vi.fn()} onDelete={vi.fn()} />)
 
@@ -61,6 +114,9 @@ describe('TaskActionsMenu', () => {
         const onDelete = vi.fn()
         const task = { id: 't1', title: 'Task' }
         const user = userEvent.setup()
+
+        hookState.tasks = [task]
+        hookState.entries = []
 
         render(<TaskActionsMenu task={task} onEdit={onEdit} onDelete={onDelete} />)
 

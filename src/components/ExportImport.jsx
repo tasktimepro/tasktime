@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
+import { markMeaningfulActivity } from '../utils/usageMetrics.ts';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -97,6 +98,7 @@ function ExportImport({
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+        markMeaningfulActivity();
     };
 
     /**

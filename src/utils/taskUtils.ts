@@ -6,6 +6,27 @@ type Task = {
     id: string;
     title?: string;
     parentTaskId?: string | null;
+    billable?: boolean;
+    createdAt?: number;
+    lastBilledAt?: number | null;
+};
+
+type TimeEntry = {
+    taskId: string;
+    start: number;
+    end?: number;
+    source?: string;
+    billedAt?: number | null;
+    billedInvoiceId?: string | null;
+    billedHourlyRate?: number | null;
+};
+
+type TaskDeletionBillingSummary = {
+    hasUnbilledTime: boolean;
+    unbilledEntryCount: number;
+    unbilledTimeMs: number;
+    hasBilledTime: boolean;
+    billedEntryCount: number;
 };
 
 /**
@@ -43,4 +64,67 @@ export const hasSubtasks = (taskId: string, allTasks: Task[]): boolean => {
  */
 export const getSubtasks = (taskId: string, allTasks: Task[]): Task[] => {
     return allTasks.filter(task => task.parentTaskId === taskId);
+};
+
+/**
+ * Summarize billed and unbilled time that would be removed by deleting tasks.
+ * @param {Array} taskIds - Task IDs that will be deleted
+ * @param {Array} allTasks - All tasks available in the current scope
+ * @param {Array} timeEntries - All time entries available in the current scope
+ * @returns {Object} Summary of billed and unbilled time state
+ */
+export const getTaskDeletionBillingSummary = (
+    taskIds: string[],
+    allTasks: Task[],
+    timeEntries: TimeEntry[]
+): TaskDeletionBillingSummary => {
+    if (taskIds.length === 0) {
+        return {
+            hasUnbilledTime: false,
+            unbilledEntryCount: 0,
+            unbilledTimeMs: 0,
+            hasBilledTime: false,
+            billedEntryCount: 0
+        };
+    }
+
+    const taskIdSet = new Set(taskIds);
+    const taskMap = new Map(
+        allTasks
+            .filter((task) => taskIdSet.has(task.id))
+            .map((task) => [task.id, task])
+    );
+
+    let unbilledEntryCount = 0;
+    let unbilledTimeMs = 0;
+    let billedEntryCount = 0;
+
+    timeEntries.forEach((entry) => {
+        const task = taskMap.get(entry.taskId);
+        if (!task) return;
+        if (typeof entry.end !== 'number' || entry.end <= entry.start) return;
+
+        const billingCutoff = task.lastBilledAt || task.createdAt || 0;
+        const isExplicitlyBilled = Boolean(
+            entry.billedInvoiceId || entry.billedAt || entry.billedHourlyRate
+        );
+        const isBeforeOrAtBillingCutoff = Boolean(task.lastBilledAt) && entry.start <= billingCutoff;
+
+        if (isExplicitlyBilled || isBeforeOrAtBillingCutoff) {
+            billedEntryCount += 1;
+        }
+
+        if (task.billable === true && entry.source !== 'invoice-adjustment' && entry.start > billingCutoff) {
+            unbilledEntryCount += 1;
+            unbilledTimeMs += (entry.end - entry.start);
+        }
+    });
+
+    return {
+        hasUnbilledTime: unbilledEntryCount > 0,
+        unbilledEntryCount,
+        unbilledTimeMs,
+        hasBilledTime: billedEntryCount > 0,
+        billedEntryCount
+    };
 };

@@ -46,6 +46,9 @@ const PrivacyPage = () => {
                 <p className="text-sm leading-7 text-muted-foreground sm:text-base">
                     TaskTime does not use cookies, advertising pixels, or any form of cross-site tracking. The app uses your browser&apos;s local storage (localStorage and IndexedDB) only to keep your workspace available and to remember your preferences.
                 </p>
+                <p className="text-sm leading-7 text-muted-foreground sm:text-base">
+                    The app does send anonymous, aggregate usage counters — things like &ldquo;a session happened today&rdquo; or &ldquo;N tasks were created.&rdquo; These are plain numeric tallies with no content, no identifiers, and no way to reconstruct what you were working on. They help us understand whether features are being used at all.
+                </p>
             </section>
 
             <section className="space-y-3">
@@ -54,7 +57,10 @@ const PrivacyPage = () => {
                     The only thing stored outside your browser is the encrypted OAuth refresh token used to keep your Google Drive sync session alive. It is held on a Cloudflare Worker with no access to your Drive files. If you disconnect sync, the token is discarded.
                 </p>
                 <p className="text-sm leading-7 text-muted-foreground sm:text-base">
-                    That is the complete list. There is no user database, no email list, and no analytics pipeline.
+                    Additionally, the anonymous usage counters described in section 3 are stored in aggregate form. They contain no user-identifiable information — only daily numeric totals.
+                </p>
+                <p className="text-sm leading-7 text-muted-foreground sm:text-base">
+                    That is the complete list. There is no user database, no email list, and no third-party analytics.
                 </p>
             </section>
 

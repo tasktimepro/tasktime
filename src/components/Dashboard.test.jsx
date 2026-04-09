@@ -8,10 +8,33 @@ const {
     mockShowWarning,
     mockShowSuccess,
     mockUseCurrencyConversion,
+    mockUseTasks,
 } = vi.hoisted(() => ({
     mockShowWarning: vi.fn(),
     mockShowSuccess: vi.fn(),
     mockUseCurrencyConversion: vi.fn(),
+    mockUseTasks: vi.fn(() => ({
+        activeTasks: [],
+        archivedTasks: [],
+        updateTask: vi.fn(),
+        deleteTask: vi.fn(),
+        archiveTask: vi.fn(),
+        getOverdueTasks: vi.fn(() => []),
+        getTasksForToday: vi.fn(() => []),
+        getUpcomingTasks: vi.fn(() => []),
+        toggleRecurringCompletion: vi.fn(),
+        isCompletedOnDate: vi.fn(() => false),
+        resetExpiredSkips: vi.fn(),
+        isLoading: false,
+        archivedLoading: false,
+        archivedLoaded: true,
+        getRecurringStatus: vi.fn(() => ({
+            effectiveDateStr: null,
+            isDueToday: false,
+            isOverdue: false,
+            lastDueDateStr: null,
+        })),
+    })),
 }));
 
 const createMatchMedia = (matchesByQuery = {}) => vi.fn().mockImplementation((query) => ({
@@ -33,24 +56,7 @@ vi.mock('../hooks/useToast', () => ({
 }));
 
 vi.mock('../hooks/useTasks', () => ({
-    useTasks: () => ({
-        tasks: [],
-        updateTask: vi.fn(),
-        deleteTask: vi.fn(),
-        archiveTask: vi.fn(),
-        getOverdueTasks: vi.fn(() => []),
-        getTasksForToday: vi.fn(() => []),
-        getUpcomingTasks: vi.fn(() => []),
-        toggleRecurringCompletion: vi.fn(),
-        isCompletedOnDate: vi.fn(() => false),
-        resetExpiredSkips: vi.fn(),
-        getRecurringStatus: vi.fn(() => ({
-            effectiveDateStr: null,
-            isDueToday: false,
-            isOverdue: false,
-            lastDueDateStr: null,
-        })),
-    }),
+    useTasks: (...args) => mockUseTasks(...args),
 }));
 
 vi.mock('../hooks/useTimeEntries', () => ({
@@ -116,11 +122,11 @@ vi.mock('./dashboard/ToDoToday', () => ({
 }));
 
 vi.mock('./dashboard/RecentTasks', () => ({
-    default: () => <div data-testid="recent-tasks">Recent tasks</div>,
+    default: ({ taskFilter }) => <div data-testid="recent-tasks">Recent tasks {taskFilter}</div>,
 }));
 
 vi.mock('./dashboard/ProjectsOverview', () => ({
-    default: () => <div data-testid="projects-overview">Projects overview</div>,
+    default: ({ projectFilter }) => <div data-testid="projects-overview">Projects overview {projectFilter}</div>,
 }));
 
 vi.mock('./dashboard/MetricsCards', () => ({
@@ -151,6 +157,7 @@ describe('Dashboard', () => {
         window.matchMedia = createMatchMedia();
         mockShowWarning.mockReset();
         mockShowSuccess.mockReset();
+        mockUseTasks.mockClear();
         mockUseCurrencyConversion.mockReturnValue({
             preferredCurrency: 'USD',
             exchangeRates: null,
@@ -198,6 +205,19 @@ describe('Dashboard', () => {
         const metrics = screen.getByTestId('metrics-cards');
 
         expect(recent.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('passes the default dashboard filters to the overview cards', () => {
+        renderDashboard();
+
+        expect(screen.getByTestId('recent-tasks').textContent).toContain('recent');
+        expect(screen.getByTestId('projects-overview').textContent).toContain('recent');
+    });
+
+    it('preloads archived tasks for the dashboard filters', () => {
+        renderDashboard();
+
+        expect(mockUseTasks).toHaveBeenCalledWith({ includeArchived: true });
     });
 
     it('shows the stale exchange rates warning once per day', () => {

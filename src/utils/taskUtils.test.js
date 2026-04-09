@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getTaskIdsToDelete, hasSubtasks, getSubtasks } from './taskUtils'
+import { getTaskIdsToDelete, getTaskDeletionBillingSummary, hasSubtasks, getSubtasks } from './taskUtils'
 
 describe('taskUtils', () => {
 
@@ -63,6 +63,79 @@ describe('taskUtils', () => {
 
             const subtasks = getSubtasks('task-2', mockTasks)
             expect(subtasks).toEqual([])
+        })
+    })
+
+    describe('getTaskDeletionBillingSummary', () => {
+
+        it('detects billable unbilled time after the billing cutoff', () => {
+
+            const summary = getTaskDeletionBillingSummary(
+                ['task-1'],
+                [{ id: 'task-1', billable: true, lastBilledAt: 1000 }],
+                [
+                    { taskId: 'task-1', start: 900, end: 1200, billedInvoiceId: 'inv-1' },
+                    { taskId: 'task-1', start: 2000, end: 5600 },
+                    { taskId: 'task-1', start: 2500, end: 3500, source: 'invoice-adjustment' }
+                ]
+            )
+
+            expect(summary).toEqual({
+                hasUnbilledTime: true,
+                unbilledEntryCount: 1,
+                unbilledTimeMs: 3600,
+                hasBilledTime: true,
+                billedEntryCount: 1
+            })
+        })
+
+        it('includes billable subtasks when deleting a parent task', () => {
+
+            const summary = getTaskDeletionBillingSummary(
+                ['task-1', 'task-2'],
+                [
+                    { id: 'task-1', billable: false, lastBilledAt: null },
+                    { id: 'task-2', parentTaskId: 'task-1', billable: true, lastBilledAt: null }
+                ],
+                [
+                    { taskId: 'task-2', start: 1000, end: 4600 }
+                ]
+            )
+
+            expect(summary.hasUnbilledTime).toBe(true)
+            expect(summary.unbilledTimeMs).toBe(3600)
+        })
+
+        it('does not treat non-billable time as unbilled invoice time', () => {
+
+            const summary = getTaskDeletionBillingSummary(
+                ['task-1'],
+                [{ id: 'task-1', billable: false, lastBilledAt: null }],
+                [
+                    { taskId: 'task-1', start: 1000, end: 4600 }
+                ]
+            )
+
+            expect(summary.hasUnbilledTime).toBe(false)
+            expect(summary.unbilledTimeMs).toBe(0)
+            expect(summary.hasBilledTime).toBe(false)
+        })
+
+        it('treats entries before lastBilledAt as billed history even without explicit invoice markers', () => {
+
+            const summary = getTaskDeletionBillingSummary(
+                ['task-1'],
+                [{ id: 'task-1', billable: true, lastBilledAt: 5000 }],
+                [
+                    { taskId: 'task-1', start: 1000, end: 2000 },
+                    { taskId: 'task-1', start: 6000, end: 7000 }
+                ]
+            )
+
+            expect(summary.hasBilledTime).toBe(true)
+            expect(summary.billedEntryCount).toBe(1)
+            expect(summary.hasUnbilledTime).toBe(true)
+            expect(summary.unbilledEntryCount).toBe(1)
         })
     })
 })

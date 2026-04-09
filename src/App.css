@@ -1,7 +1,7 @@
 /* Task. Time. Track. App Styles */
 #root {
   width: 100%;
-  min-height: 100vh;
+  min-height: var(--viewport-height);
   max-width: 100%;
   box-sizing: border-box;
   --app-content-padding-top: 1.5rem;
@@ -16,13 +16,19 @@ body {
 
 /* Main content area should have max height and handle its own scrolling */
 .main-content {
-  max-height: 100vh;
+  max-height: var(--viewport-height);
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .app-shell-content {
-  padding-top: var(--app-content-padding-top);
-  padding-bottom: var(--app-content-padding-bottom);
+  padding-top: calc(var(--app-content-padding-top) + var(--safe-area-top));
+  padding-bottom: calc(var(--app-content-padding-bottom) + var(--safe-area-bottom));
+}
+
+.app-viewport-shell {
+  min-height: var(--viewport-height);
 }
 
 /* For components that have their own scrolling areas */

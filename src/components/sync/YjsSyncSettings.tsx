@@ -38,7 +38,7 @@ export default function YjsSyncSettings() {
     const [isRestoring, setIsRestoring] = useState(false);
 
     const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive, wipeDriveData, listBackups, createBackup, downloadBackup } = useYjs();
-    const { isSignedIn, isLoading: authLoading, user, signIn, signOut } = useGoogleAuth();
+    const { isSignedIn, isLoading: authLoading, user, signIn, signOut, hadPreviousSession } = useGoogleAuth();
     const { preferences, updatePreferences } = usePreferences();
     const { showSuccess, showError } = useToast();
 
@@ -372,7 +372,7 @@ export default function YjsSyncSettings() {
                         </div>
                         <div className="flex items-center gap-2">
                             {showAuthActions && !isOffline && (
-                                isSignedIn ? (
+                                isSignedIn && isDriveConnected ? (
                                     <>
                                         <Button
                                             variant="ghost"
@@ -412,14 +412,14 @@ export default function YjsSyncSettings() {
                                         </DropdownMenu>
                                     </>
                                 ) : (
-                                    <Button onClick={handleConnect} leadingIcon={CloudIcon}>
+                                    <Button onClick={handleConnect} leadingIcon={CloudIcon} title={hadPreviousSession ? 'Reconnect to Drive' : 'Connect Google Drive'}>
                                         Connect Google Drive
                                     </Button>
                                 )
                             )}
                         </div>
                     </div>
-                    {showAuthActions && isSignedIn && (
+                    {showAuthActions && isSignedIn && isDriveConnected && (
                         <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3">
                             <div className="flex items-center gap-3">
                                 <Checkbox

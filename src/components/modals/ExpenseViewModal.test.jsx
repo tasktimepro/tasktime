@@ -176,4 +176,44 @@ describe('ExpenseViewModal', () => {
 
         vi.useRealTimers()
     })
+
+    it('uses flexible footer and detail layouts instead of forced small-screen stacking', () => {
+        const expense = {
+            id: 'exp-3',
+            title: 'AWS',
+            date: '2026-03-02',
+            amount: 68.13,
+            currency: 'EUR',
+            paymentStatus: 'paid',
+            billingStatus: 'unbilled',
+            billable: false,
+            isRecurring: true,
+            paidBy: 'pm-2',
+            supplierName: 'Amazon',
+            projectId: 'project-1',
+            paidOn: '2026-03-03',
+        }
+
+        expensesMock.push(expense)
+        paymentMethodsMock.push({ id: 'pm-2', title: 'Wise' })
+        projectsMock.push({ id: 'project-1', title: 'Sava OS' })
+
+        render(
+            <ExpenseViewModal
+                isOpen
+                onClose={vi.fn()}
+                expense={expense}
+                onEdit={vi.fn()}
+            />
+        )
+
+        const amountSection = screen.getByText('Amount').parentElement?.parentElement
+        const footer = screen.getByTitle('Edit expense').parentElement
+
+        expect(amountSection?.className).toContain('grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))]')
+        expect(amountSection?.className).not.toContain('sm:grid-cols-2')
+        expect(footer?.className).toContain('flex-wrap')
+        expect(footer?.className).not.toContain('flex-col')
+        expect(screen.getByText('Wise')).toBeInTheDocument()
+    })
 })

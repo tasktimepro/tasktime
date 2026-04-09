@@ -42,6 +42,7 @@ export const SYNC_WORKER_CONFIG = {
             authRevoke: `${base}/auth/revoke`,
             authStatus: `${base}/auth/status`,
             drive: `${base}/drive`,
+            metricsBatch: `${base}/metrics/batch`,
         };
     },
 };

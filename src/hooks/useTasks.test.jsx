@@ -72,7 +72,7 @@ describe('useTasks', () => {
     it('triggers archived load when includeArchived is true', async () => {
         const loadArchivedTasks = vi.fn(async () => {})
         mockUseYjs.mockReturnValue({
-            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            store: { archivedTasks: null, archiveTask: vi.fn(), unarchiveTask: vi.fn() },
             isReady: true,
             loadArchivedTasks,
         })
@@ -89,6 +89,71 @@ describe('useTasks', () => {
         renderHook(() => useTasks({ includeArchived: true }))
 
         await waitFor(() => expect(loadArchivedTasks).toHaveBeenCalled())
+    })
+
+    it('hydrates archived tasks immediately when the archived doc is already loaded', async () => {
+        const archivedMap = createTestYMap({
+            t9: { id: 't9', projectId: null, archived: true, parentTaskId: null },
+        })
+
+        const loadArchivedTasks = vi.fn(async () => {})
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: archivedMap, archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks,
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useTasks({ includeArchived: true }))
+
+        await waitFor(() => expect(result.current.archivedLoaded).toBe(true))
+        expect(result.current.archivedTasks.map((task) => task.id)).toEqual(['t9'])
+        expect(loadArchivedTasks).not.toHaveBeenCalled()
+    })
+
+    it('deletes archived tasks from the archived doc and updates archived state', async () => {
+        const archivedMap = createTestYMap({
+            archivedTask: { id: 'archivedTask', projectId: null, archived: true, parentTaskId: null },
+        })
+
+        const remove = vi.fn(() => false)
+        const loadArchivedTasks = vi.fn(async () => {})
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: archivedMap, archiveTask: vi.fn(), unarchiveTask: vi.fn() },
+            isReady: true,
+            loadArchivedTasks,
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove,
+        })
+
+        const { result } = renderHook(() => useTasks({ includeArchived: true }))
+
+        await waitFor(() => expect(result.current.archivedLoaded).toBe(true))
+
+        await act(async () => {
+            await result.current.deleteTask('archivedTask')
+        })
+
+        expect(remove).toHaveBeenCalledWith('archivedTask')
+        expect(loadArchivedTasks).not.toHaveBeenCalled()
+        await waitFor(() => expect(result.current.archivedTasks).toEqual([]))
     })
 
     it('filters standalone, overdue, today, and upcoming tasks', () => {

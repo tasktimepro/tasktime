@@ -12,7 +12,8 @@ import { useToast } from '../hooks/useToast.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTimers } from '../hooks/useTimers.ts';
-import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import DeleteTaskWarnings from './task/DeleteTaskWarnings';
+import { getTaskDeletionBillingSummary, getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { isRecurringTaskDueOnDate } from '../utils/recurringUtils.ts';
 import { useTodayDate, useTodayString } from '../hooks/useDayRollover';
@@ -123,6 +124,20 @@ const TaskTree = ({
     const pendingDeleteTask = pendingDeleteTaskId
         ? tasks.find(task => task.id === pendingDeleteTaskId)
         : null;
+
+    const pendingDeleteTaskIds = useMemo(() => {
+        if (!pendingDeleteTaskId || !pendingDeleteTask) {
+            return [];
+        }
+
+        return pendingDeleteTask.parentTaskId
+            ? [pendingDeleteTaskId]
+            : getTaskIdsToDelete(pendingDeleteTaskId, tasks);
+    }, [pendingDeleteTaskId, pendingDeleteTask, tasks]);
+
+    const deleteBillingSummary = useMemo(() => {
+        return getTaskDeletionBillingSummary(pendingDeleteTaskIds, tasks, timeEntries);
+    }, [pendingDeleteTaskIds, tasks, timeEntries]);
 
     /**
      * Create a new task
@@ -529,12 +544,18 @@ const TaskTree = ({
                     </div>
                 )}
             >
-                <Notice
-                    title={pendingDeleteTask
-                        ? `Deleting "${pendingDeleteTask.title}" cannot be undone.`
-                        : 'Deleting this task cannot be undone.'}
-                    variant="destructive"
-                />
+                <div className="space-y-3">
+                    <Notice
+                        title={pendingDeleteTask
+                            ? `Deleting "${pendingDeleteTask.title}" cannot be undone.`
+                            : 'Deleting this task cannot be undone.'}
+                        variant="destructive"
+                    />
+                    <DeleteTaskWarnings
+                        summary={deleteBillingSummary}
+                        taskCount={pendingDeleteTaskIds.length}
+                    />
+                </div>
             </Modal>
         </div>
     );

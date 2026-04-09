@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
+import DeleteTaskWarnings from '../DeleteTaskWarnings';
+import { getTaskDeletionBillingSummary } from '../../../utils/taskUtils.ts';
 
 /**
  * SubtaskSection component - Renders subtasks list and create form.
@@ -65,6 +67,14 @@ const SubtaskSection = ({
             || subtasks.find((item) => item.id === pendingDeleteSubtaskId)
             || null;
     }, [tasks, subtasks, pendingDeleteSubtaskId]);
+
+    const deleteBillingSummary = useMemo(() => {
+        if (!pendingDeleteSubtaskId) {
+            return getTaskDeletionBillingSummary([], tasks, timeEntries);
+        }
+
+        return getTaskDeletionBillingSummary([pendingDeleteSubtaskId], tasks, timeEntries);
+    }, [pendingDeleteSubtaskId, tasks, timeEntries]);
     
     /**
      * Handle subtask deletion with cleanup
@@ -171,12 +181,18 @@ const SubtaskSection = ({
                     </div>
                 )}
             >
-                <Notice
-                    title={pendingDeleteSubtask
-                        ? `Deleting "${pendingDeleteSubtask.title}" cannot be undone.`
-                        : 'Deleting this task cannot be undone.'}
-                    variant="destructive"
-                />
+                <div className="space-y-3">
+                    <Notice
+                        title={pendingDeleteSubtask
+                            ? `Deleting "${pendingDeleteSubtask.title}" cannot be undone.`
+                            : 'Deleting this task cannot be undone.'}
+                        variant="destructive"
+                    />
+                    <DeleteTaskWarnings
+                        summary={deleteBillingSummary}
+                        taskCount={pendingDeleteSubtaskId ? 1 : 0}
+                    />
+                </div>
             </Modal>
         </div>
     );

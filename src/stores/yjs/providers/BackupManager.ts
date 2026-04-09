@@ -38,6 +38,7 @@ export class BackupManager {
 
     private manifest: ManifestManager;
     private store: YjsStore;
+    private lastBackupAt: number | null = null;
 
     constructor(manifest: ManifestManager, store: YjsStore) {
         this.manifest = manifest;
@@ -59,11 +60,18 @@ export class BackupManager {
      */
     async maybeCreateBackup(frequencyHours: number): Promise<boolean> {
         try {
+            // Fast path: skip Drive listing if we know it's too soon
+            const frequencyMs = frequencyHours * 60 * 60 * 1000;
+            if (this.lastBackupAt != null && (Date.now() - this.lastBackupAt) < frequencyMs) {
+                return false;
+            }
+
             const backups = await this.listBackups();
 
             if (backups.length > 0) {
                 const latest = backups[0]; // sorted newest first
                 const latestTime = new Date(latest.modifiedTime).getTime();
+                this.lastBackupAt = latestTime;
                 const hoursSince = (Date.now() - latestTime) / (1000 * 60 * 60);
 
                 if (hoursSince < frequencyHours) {
@@ -72,6 +80,7 @@ export class BackupManager {
             }
 
             await this.createBackup();
+            this.lastBackupAt = Date.now();
             await this.pruneBackups();
             return true;
         } catch (error) {

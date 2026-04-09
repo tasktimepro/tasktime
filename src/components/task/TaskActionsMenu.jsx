@@ -2,12 +2,16 @@
  * TaskActionsMenu - Three-dot menu for task edit/delete actions.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArchiveBoxIcon, MoreHorizontalIcon, PencilIcon, TrashIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import Modal from '@/components/Modal';
+import { useTasks } from '@/hooks/useTasks';
+import { useTimeEntries } from '@/hooks/useTimeEntries';
+import { getTaskDeletionBillingSummary, getTaskIdsToDelete } from '@/utils/taskUtils.ts';
+import DeleteTaskWarnings from './DeleteTaskWarnings';
 
 /**
  * @param {Object} props
@@ -19,7 +23,18 @@ import Modal from '@/components/Modal';
 const TaskActionsMenu = ({ task, onEdit, onDelete, onArchive = null }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+    const { tasks } = useTasks({ includeArchived: Boolean(task?.archived) });
+    const { entries: timeEntries } = useTimeEntries();
     const canArchive = Boolean(onArchive) && !task.projectId && !task.archived;
+
+    const taskIdsToDelete = useMemo(() => {
+        if (!task?.id) return [];
+        return task.parentTaskId ? [task.id] : getTaskIdsToDelete(task.id, tasks);
+    }, [task, tasks]);
+
+    const deleteBillingSummary = useMemo(() => {
+        return getTaskDeletionBillingSummary(taskIdsToDelete, tasks, timeEntries);
+    }, [taskIdsToDelete, tasks, timeEntries]);
 
     const closeDeleteModal = () => {
         setShowDeleteConfirm(false);
@@ -130,10 +145,16 @@ const TaskActionsMenu = ({ task, onEdit, onDelete, onArchive = null }) => {
                     </div>
                 )}
             >
-                <Notice
-                    title={`Deleting "${task.title}" cannot be undone.`}
-                    variant="destructive"
-                />
+                <div className="space-y-3">
+                    <Notice
+                        title={`Deleting "${task.title}" cannot be undone.`}
+                        variant="destructive"
+                    />
+                    <DeleteTaskWarnings
+                        summary={deleteBillingSummary}
+                        taskCount={taskIdsToDelete.length}
+                    />
+                </div>
             </Modal>
         </>
     );

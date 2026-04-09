@@ -37,6 +37,8 @@ export interface YjsContextValue {
     syncPhase: SyncPhase;
     /** Whether connected to Google Drive */
     isDriveConnected: boolean;
+    /** Current Drive session ID in Worker mode */
+    driveSessionId: string | null;
     /** Whether a Drive connection is in progress */
     isConnecting: boolean;
     /** Whether at least one sync completed */
@@ -87,6 +89,9 @@ interface YjsProviderProps {
     children: React.ReactNode;
 }
 
+const VISIBILITY_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
+const ONLINE_SYNC_COOLDOWN_MS = 60 * 1000;
+
 export function YjsProvider({ children }: YjsProviderProps) {
 
     // Get singleton store
@@ -122,12 +127,14 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const consecutiveSyncErrors = useRef(0);
     
     // Auth hook for Google Drive connection
-    const { isSignedIn, accessToken, sessionId, isLoading: authLoading, signIn, signOut } = useGoogleAuth();
+    const { isSignedIn, accessToken, sessionId, isLoading: authLoading, signIn, signOut, invalidateSession } = useGoogleAuth();
 
-    const handleAuthorizationFailure = useCallback((error: unknown): boolean => {
+    const handleAuthorizationFailure = useCallback(async (error: unknown): Promise<boolean> => {
         if (!(error instanceof AuthorizationError)) {
             return false;
         }
+
+        await invalidateSession();
 
         store.disconnectDrive();
         setIsDriveConnected(false);
@@ -141,13 +148,13 @@ export function YjsProvider({ children }: YjsProviderProps) {
         setReconnectDialogMessage(error.message || 'Google authorization expired. Reconnect Google Drive to continue syncing.');
         setShowReconnectDialog(true);
         return true;
-    }, [store]);
+    }, [store, invalidateSession]);
 
-    const runSyncWithAuthHandling = useCallback(async (options?: { allowPull?: boolean }) => {
+    const runSyncWithAuthHandling = useCallback(async (options?: { allowPull?: boolean; force?: boolean }) => {
         try {
-            await store.forceDriveSync(options);
+            await store.syncDrive(options);
         } catch (error) {
-            if (handleAuthorizationFailure(error)) {
+            if (await handleAuthorizationFailure(error)) {
                 return;
             }
 
@@ -245,8 +252,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
                     // connect() already handles initial sync based on the sync mode,
                     // no need for a follow-up forceDriveSync
                 })
-                .catch((error) => {
-                    if (handleAuthorizationFailure(error)) {
+                .catch(async (error) => {
+                    if (await handleAuthorizationFailure(error)) {
                         return;
                     }
 
@@ -342,7 +349,10 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const forceSyncDrive = useCallback(async (options?: { allowPull?: boolean }) => {
         setManualSyncInProgress(true);
         try {
-            await runSyncWithAuthHandling(options);
+            await runSyncWithAuthHandling({
+                ...options,
+                force: true,
+            });
         } finally {
             setManualSyncInProgress(false);
         }
@@ -352,11 +362,28 @@ export function YjsProvider({ children }: YjsProviderProps) {
     useEffect(() => {
         if (!isDriveConnected) return;
 
+        const shouldTriggerForegroundSync = (cooldownMs: number) => {
+            if (store.hasPendingSyncChanges()) {
+                return true;
+            }
+
+            const lastSuccessfulSyncAt = store.getLastSyncedAt();
+            if (lastSuccessfulSyncAt == null) {
+                return true;
+            }
+
+            return (Date.now() - lastSuccessfulSyncAt) >= cooldownMs;
+        };
+
         const handleVisibility = () => {
             if (document.visibilityState !== 'visible') return;
 
             if (autoSyncEnabled && autoSyncMode === 'sync') {
-                runSyncWithAuthHandling().catch(console.error);
+                if (!shouldTriggerForegroundSync(VISIBILITY_SYNC_COOLDOWN_MS)) {
+                    return;
+                }
+
+                runSyncWithAuthHandling({ force: false }).catch(console.error);
             }
         };
 
@@ -366,12 +393,16 @@ export function YjsProvider({ children }: YjsProviderProps) {
             }
 
             if (autoSyncMode === 'sync') {
-                runSyncWithAuthHandling().catch(console.error);
+                if (!shouldTriggerForegroundSync(ONLINE_SYNC_COOLDOWN_MS)) {
+                    return;
+                }
+
+                runSyncWithAuthHandling({ force: false }).catch(console.error);
                 return;
             }
 
             if (autoSyncMode === 'backup' && store.hasPendingSyncChanges()) {
-                runSyncWithAuthHandling({ allowPull: false }).catch(console.error);
+                runSyncWithAuthHandling({ allowPull: false, force: false }).catch(console.error);
             }
         };
 
@@ -408,9 +439,9 @@ export function YjsProvider({ children }: YjsProviderProps) {
             console.log('[YjsContext] Auto-triggering sync for persisted pending changes', { autoSyncMode });
             if (autoSyncMode === 'backup') {
                 // Backup mode: only push, don't pull
-                runSyncWithAuthHandling({ allowPull: false }).catch(console.error);
+                runSyncWithAuthHandling({ allowPull: false, force: false }).catch(console.error);
             } else {
-                runSyncWithAuthHandling().catch(console.error);
+                runSyncWithAuthHandling({ force: false }).catch(console.error);
             }
         }
         // For manual mode: pendingSyncChanges will show "Sync changes" in UI
@@ -514,6 +545,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         syncState,
         syncPhase,
         isDriveConnected,
+        driveSessionId: sessionId,
         isConnecting,
         hasSynced,
         manualSyncInProgress,
@@ -541,6 +573,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         syncState,
         syncPhase,
         isDriveConnected,
+        sessionId,
         isConnecting,
         hasSynced,
         manualSyncInProgress,

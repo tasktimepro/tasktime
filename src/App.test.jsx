@@ -307,8 +307,8 @@ vi.mock('./components/Account', () => ({ default: () => <div data-testid="accoun
 vi.mock('./components/Invoices', () => ({ default: () => <div data-testid="invoices" /> }))
 vi.mock('./components/timer/GlobalTimerStack', () => ({ default: () => <div data-testid="global-timer" /> }))
 vi.mock('./components/modals/ModalManager', () => ({
-    default: ({ activeModal }) => (
-        <div data-testid="modal-manager" data-active-modal={activeModal || ''}>
+    default: ({ activeModal, modalOptions }) => (
+        <div data-testid="modal-manager" data-active-modal={activeModal || ''} data-modal-options={JSON.stringify(modalOptions || null)}>
             {activeModal ? <div data-testid="active-modal">{activeModal}</div> : null}
         </div>
     )
@@ -379,6 +379,8 @@ describe('App component', () => {
         render(<App />)
 
         expect(screen.getByRole('heading', { name: 'Privacy Policy' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /No cookies, no tracking/i })).toBeInTheDocument()
+        expect(screen.getByText(/anonymous usage counters described in section 3 are stored in aggregate form/i)).toBeInTheDocument()
         expect(screen.getAllByText(/Sync is entirely optional/i).length).toBeGreaterThan(0)
         expect(screen.queryByTestId('dashboard')).not.toBeInTheDocument()
         expect(screen.queryByText('Clients')).not.toBeInTheDocument()
@@ -466,7 +468,7 @@ describe('App component', () => {
         expect(urlHookState.navigateToAccount).toHaveBeenCalledTimes(1)
     })
 
-    it('opens the task modal from the mobile floating action button', async () => {
+    it('opens the task modal from the mobile floating action button menu', async () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
         })
@@ -475,9 +477,74 @@ describe('App component', () => {
 
         render(<App />)
 
-        await user.click(screen.getByRole('button', { name: 'Create new task' }))
+        await user.click(screen.getByRole('button', { name: 'Open quick create menu' }))
+        await user.click(screen.getByRole('menuitem', { name: 'New Task' }))
 
         expect(screen.getByTestId('active-modal')).toHaveTextContent('task')
+    })
+
+    it('keeps quick-create task blank on project detail routes', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        const user = userEvent.setup()
+
+        projectsHookState.projects.push({
+            id: 'project-1',
+            title: 'Launch Site',
+            archived: false,
+            preferredClientId: 'client-1',
+        })
+        urlHookState.urlParams = { view: 'projects', projectId: 'project-1', clientId: null }
+
+        render(<App />)
+
+        await user.click(screen.getByRole('button', { name: 'Open quick create menu' }))
+        await user.click(screen.getByRole('menuitem', { name: 'New Task' }))
+
+        expect(screen.getByTestId('active-modal')).toHaveTextContent('task')
+        expect(screen.getByTestId('modal-manager').dataset.modalOptions).toBe(JSON.stringify(null))
+    })
+
+    it('keeps quick-create expense blank on project detail routes', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        const user = userEvent.setup()
+
+        projectsHookState.projects.push({
+            id: 'project-1',
+            title: 'Launch Site',
+            archived: false,
+            preferredClientId: 'client-1',
+        })
+        urlHookState.urlParams = { view: 'projects', projectId: 'project-1', clientId: null }
+
+        render(<App />)
+
+        await user.click(screen.getByRole('button', { name: 'Open quick create menu' }))
+        await user.click(screen.getByRole('menuitem', { name: 'New Expense' }))
+
+        expect(screen.getByTestId('active-modal')).toHaveTextContent('expense')
+        expect(screen.getByTestId('modal-manager').dataset.modalOptions).toBe(JSON.stringify(null))
+    })
+
+    it('keeps quick-create expense blank on client detail routes', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        const user = userEvent.setup()
+
+        clientsHookState.clients.push({ id: 'client-1', title: 'Acme Co', archived: false })
+        urlHookState.urlParams = { view: 'clients', projectId: null, clientId: 'client-1' }
+
+        render(<App />)
+
+        await user.click(screen.getByRole('button', { name: 'Open quick create menu' }))
+        await user.click(screen.getByRole('menuitem', { name: 'New Expense' }))
+
+        expect(screen.getByTestId('active-modal')).toHaveTextContent('expense')
+        expect(screen.getByTestId('modal-manager').dataset.modalOptions).toBe(JSON.stringify(null))
     })
 
     it('pins the mobile global timer at the top of the viewport', () => {
@@ -501,6 +568,20 @@ describe('App component', () => {
         expect(timerShell?.className).not.toContain('bottom-safe-dock')
     })
 
+    it('uses the viewport-safe shell for the mobile app layout', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+
+        const { container } = render(<App />)
+
+        const main = container.querySelector('main')
+
+        expect(main).not.toBeNull()
+        expect(main?.className).toContain('app-viewport-shell')
+        expect(main?.className).not.toContain('min-h-screen')
+    })
+
     it('does not render the removed mobile top bar on project detail routes', () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
@@ -512,7 +593,7 @@ describe('App component', () => {
 
         expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
         expect(screen.queryByText('Launch Site')).not.toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Create new task' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Open quick create menu' })).toBeInTheDocument()
     })
 
     it('generates pending recurring expenses on mount and day rollover', () => {

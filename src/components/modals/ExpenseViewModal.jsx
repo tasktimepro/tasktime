@@ -171,8 +171,8 @@ const ExpenseViewModal = ({
         ));
 
     const modalFooter = (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
-            <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                 {footerLeft}
                 {showPrimaryAction && (
                     <Button onClick={primaryAction} type="button">
@@ -184,7 +184,7 @@ const ExpenseViewModal = ({
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                    className="ml-auto h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
                     title="Edit expense"
                     onClick={handleEdit}
                     type="button"
@@ -223,7 +223,7 @@ const ExpenseViewModal = ({
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-4">
                     <div className="space-y-1">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Amount</p>
                         <p className="text-sm font-medium text-foreground sensitive-data">
@@ -251,7 +251,7 @@ const ExpenseViewModal = ({
                 </div>
 
                 {(client || project || business) && (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-4">
                         {client && (
                             <div className="space-y-1">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Client</p>
@@ -290,7 +290,7 @@ const ExpenseViewModal = ({
                             </div>
                         )}
                         {(paidByLabel || showAutoPayment) && (
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-4">
                                 {paidByLabel && (
                                     <div className="space-y-1">
                                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Paid by</p>

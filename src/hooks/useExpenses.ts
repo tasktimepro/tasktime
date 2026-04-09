@@ -4,11 +4,12 @@
  * Provides reactive expense data, filtering helpers, and status actions.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils';
 import type { Expense } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
+import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { objectToYMap } from '@/stores/yjs/entityUtils';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 
@@ -32,6 +33,7 @@ export function useExpenses(options: UseExpensesOptions = {}) {
     const [isLoading, setIsLoading] = useState(true);
     const [archivedLoading, setArchivedLoading] = useState(false);
     const [archivedLoaded, setArchivedLoaded] = useState(false);
+    const archivedLoadTriggered = useRef(false);
 
     const syncExpenses = useCallback(() => {
         if (!isReady) return;
@@ -69,26 +71,20 @@ export function useExpenses(options: UseExpensesOptions = {}) {
     }, [isReady, store, syncExpenses]);
 
     useEffect(() => {
-        if (!options.includeArchived || !isReady || archivedLoaded || archivedLoading) return;
+        if (!options.includeArchived || !isReady || archivedLoaded || archivedLoadTriggered.current) return;
 
-        let mounted = true;
+        archivedLoadTriggered.current = true;
         setArchivedLoading(true);
 
         loadArchivedExpenses()
             .then(() => {
-                if (!mounted) return;
                 setArchivedLoaded(true);
                 syncExpenses();
             })
             .finally(() => {
-                if (!mounted) return;
                 setArchivedLoading(false);
             });
-
-        return () => {
-            mounted = false;
-        };
-    }, [options.includeArchived, isReady, archivedLoaded, archivedLoading, loadArchivedExpenses, syncExpenses]);
+    }, [options.includeArchived, isReady, archivedLoaded, loadArchivedExpenses, syncExpenses]);
 
     useEffect(() => {
         if (!options.includeArchived || !archivedLoaded || !store.archivedExpenses) return;
@@ -194,6 +190,7 @@ export function useExpenses(options: UseExpensesOptions = {}) {
 
         const entityMap = objectToYMap(validatedExpense as unknown as Record<string, unknown>);
         (store.expenses as any).set(id, entityMap);
+        markMeaningfulActivity();
         return validatedExpense;
     }, [isReady, store]);
 
@@ -214,6 +211,7 @@ export function useExpenses(options: UseExpensesOptions = {}) {
 
         const entityMap = objectToYMap(updated as unknown as Record<string, unknown>);
         (map as any).set(id, entityMap);
+        markMeaningfulActivity();
         return updated;
     }, [isReady, findExpenseMap]);
 
@@ -221,7 +219,13 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         if (!isReady) return false;
         const map = findExpenseMap(id);
         if (!map) return false;
-        return map.delete(id);
+        const removed = map.delete(id);
+
+        if (removed) {
+            markMeaningfulActivity();
+        }
+
+        return removed;
     }, [isReady, findExpenseMap]);
 
     const markAsPaid = useCallback((id: string, options: MarkAsPaidOptions = {}) => {

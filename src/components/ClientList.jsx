@@ -374,8 +374,8 @@ const ClientList = ({
     return (
         <div className={cn('space-y-8', isMobileLayout && 'space-y-6 overflow-x-hidden')}>
             {/* Header */}
-            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
-                <h2 className="text-2xl font-bold text-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="min-w-0 flex-1 text-2xl font-bold text-foreground">
                     Clients {activeClients.length > 0 && (
                         <span>
                             ({activeClients.length})
@@ -383,7 +383,7 @@ const ClientList = ({
                     )}
                 </h2>
 
-                <div className={cn('flex items-center space-x-3', isMobileLayout && 'w-full justify-between')}>
+                <div className="ml-auto flex flex-wrap items-center gap-3">
                     <Select value={clientSort} onValueChange={handleSortChange}>
                         <SelectTrigger
                             className="h-9 w-9"

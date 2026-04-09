@@ -381,6 +381,9 @@ test.describe('Cloud sync smoke', () => {
         expireDriveRequests = true;
 
         await page.goto('/account?section=sync');
+        await expect(page.getByRole('dialog', { name: 'Reconnect Google Drive' })).toBeVisible();
+        await page.getByRole('button', { name: 'Not now' }).click();
+        await expect(page.getByRole('dialog', { name: 'Reconnect Google Drive' })).toHaveCount(0);
         await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
         await expect(page.getByText('Not connected')).toBeVisible();
         await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();

@@ -6,6 +6,7 @@ import { toDisplayDate } from '@/utils/dateUtils'
 
 const hookMocks = vi.hoisted(() => ({
 
+    projects: [],
     tasks: [],
     recurringStatus: null,
     isCompleted: false,
@@ -69,7 +70,7 @@ vi.mock('@/hooks/useToast', () => ({
 vi.mock('@/hooks/useProjects', () => ({
 
     useProjects: () => ({
-        projects: [],
+        projects: hookMocks.projects,
     })
 }))
 
@@ -150,6 +151,7 @@ describe('TaskViewModal recurring actions', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.projects = []
         hookMocks.tasks = [recurringTask]
         hookMocks.isCompleted = false
         hookMocks.recurringStatus = {
@@ -218,5 +220,25 @@ describe('TaskViewModal recurring actions', () => {
         const expectedDateLabel = toDisplayDate('2026-02-17', { month: 'short', day: 'numeric' })
         expect(screen.getByRole('button', { name: `Done for ${expectedDateLabel}` })).toBeInTheDocument()
         expect(screen.getByTitle('Skip until next recurring')).toBeInTheDocument()
+    })
+
+    it('keeps footer actions and linked details in flexible wrap layouts', () => {
+        hookMocks.projects = [{ id: 'project-1', title: 'Client Work' }]
+        hookMocks.tasks = [
+            {
+                ...recurringTask,
+                projectId: 'project-1',
+            },
+        ]
+
+        renderModal({ task: hookMocks.tasks[0] })
+
+        const projectSection = screen.getByText('Project').parentElement?.parentElement
+        const footer = screen.getByText('Timer controls').parentElement
+
+        expect(projectSection?.className).toContain('grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))]')
+        expect(projectSection?.className).not.toContain('sm:grid-cols-2')
+        expect(footer?.className).toContain('flex-wrap')
+        expect(footer?.className).not.toContain('flex-col')
     })
 })

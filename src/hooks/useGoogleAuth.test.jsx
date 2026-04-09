@@ -52,16 +52,10 @@ describe('useGoogleAuth', () => {
             createdAt: new Date().toISOString(),
         })
 
-        fetch
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ authenticated: true }),
-            })
-            .mockResolvedValueOnce({
-                ok: false,
-                status: 403,
-                json: async () => ({ error: 'DRIVE_ACCESS_DENIED' }),
-            })
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ authenticated: false, error: 'DRIVE_ACCESS_DENIED' }),
+        })
 
         const { result } = renderHook(() => useGoogleAuth())
 
@@ -72,7 +66,7 @@ describe('useGoogleAuth', () => {
         expect(result.current.isSignedIn).toBe(false)
         expect(result.current.hadPreviousSession).toBe(true)
         expect(clearStoredSession).toHaveBeenCalledTimes(1)
-        expect(fetch).toHaveBeenCalledTimes(2)
+        expect(fetch).toHaveBeenCalledTimes(1)
     })
 
     it('keeps hadPreviousSession true after an invalid stored session is cleared and auth re-checks run again', async () => {
@@ -118,15 +112,10 @@ describe('useGoogleAuth', () => {
             createdAt: new Date().toISOString(),
         })
 
-        fetch
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ authenticated: true }),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ files: [] }),
-            })
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ authenticated: true }),
+        })
 
         const { result } = renderHook(() => useGoogleAuth())
 
@@ -208,13 +197,6 @@ describe('useGoogleAuth', () => {
                 }
             }
 
-            if (typeof input === 'string' && input.startsWith('https://worker.example/drive/files')) {
-                return {
-                    ok: true,
-                    json: async () => ({ files: [] }),
-                }
-            }
-
             throw new Error(`Unexpected fetch: ${String(input)}`)
         })
 
@@ -253,5 +235,37 @@ describe('useGoogleAuth', () => {
 
         expect(result.current.isSignedIn).toBe(true)
         expect(popup.focus).toHaveBeenCalledTimes(1)
+    })
+
+    it('invalidates the local session into reconnect state without revoking access', async () => {
+        getStoredSession
+            .mockResolvedValueOnce({
+                sessionId: 'session-999',
+                userId: 'user-999',
+                email: 'recover@example.com',
+                createdAt: new Date().toISOString(),
+            })
+            .mockResolvedValue(null)
+
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ authenticated: true }),
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        await act(async () => {
+            await result.current.invalidateSession()
+        })
+
+        expect(result.current.isSignedIn).toBe(false)
+        expect(result.current.sessionId).toBeNull()
+        expect(result.current.hadPreviousSession).toBe(true)
+        expect(clearStoredSession).toHaveBeenCalledTimes(1)
+        expect(fetch).toHaveBeenCalledTimes(1)
     })
 })

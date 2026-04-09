@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import TaskTimer from './TaskTimer';
 import {
     formatDuration,
-    millisecondsToHours,
     parseStoredDate,
     toStorageDate
 } from '../utils/dateUtils';
@@ -21,6 +20,12 @@ import MetricsCards from './dashboard/MetricsCards';
 import RecentTasks from './dashboard/RecentTasks';
 import ProjectsOverview from './dashboard/ProjectsOverview';
 import ToDoToday from './dashboard/ToDoToday';
+import {
+    buildDashboardProjects,
+    buildDashboardTasks,
+    DEFAULT_PROJECT_FILTER,
+    DEFAULT_TASK_FILTER,
+} from './dashboard/dashboardOverviewUtils.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { CornerDownRightIcon } from '@/components/ui/icons';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
@@ -76,18 +81,34 @@ const Dashboard = ({
 }) => {
     const hasClients = clients.length > 0;
     const { showWarning, showSuccess } = useToast();
+    const [taskSearchQuery, setTaskSearchQuery] = useState('');
+    const [taskFilter, setTaskFilter] = useState(DEFAULT_TASK_FILTER);
+    const [projectSearchQuery, setProjectSearchQuery] = useState('');
+    const [projectFilter, setProjectFilter] = useState(DEFAULT_PROJECT_FILTER);
     
     // Use Yjs hooks directly
-    const { tasks, updateTask, deleteTask, archiveTask, getOverdueTasks, getTasksForToday, getUpcomingTasks, toggleRecurringCompletion, isCompletedOnDate, getRecurringStatus, resetExpiredSkips } = useTasks();
+    const {
+        activeTasks,
+        archivedTasks,
+        updateTask,
+        deleteTask,
+        archiveTask,
+        getOverdueTasks,
+        getTasksForToday,
+        getUpcomingTasks,
+        toggleRecurringCompletion,
+        isCompletedOnDate,
+        getRecurringStatus,
+        resetExpiredSkips,
+        archivedLoading,
+        archivedLoaded,
+    } = useTasks({ includeArchived: true });
     const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
     const { expenses } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
     const { preferences } = usePreferences();
     const { getForDate } = usePlannerAttachments();
-    
-    const [taskSearchQuery, setTaskSearchQuery] = useState('');
-    const [projectSearchQuery, setProjectSearchQuery] = useState('');
     const [conversionWarningShown, setConversionWarningShown] = useState(false);
     const lastWarningKeyRef = useRef(null);
     const todayStr = useTodayString();
@@ -182,7 +203,7 @@ const Dashboard = ({
         thisMonthUnbilledDisplay
     } = useMetricsCalculation({
         timeEntries,
-        tasks,
+        tasks: activeTasks,
         projects,
         invoices,
         clients,
@@ -394,195 +415,35 @@ const Dashboard = ({
     ]);
 
     /**
-     * Get recent active tasks sorted by their most recent activity (any interaction)
-     * Tasks completed in current session remain visible until next render
+     * Get dashboard task list for the selected filter.
      */
     const recentTasks = useMemo(() => {
-        const activeTasks = tasks.filter(task => {
-            if (task.archived) return false;
-            if (task.recurring) return true;
-            return !getTaskCompletedStatus(task) || task.completedOnDate === todayStr;
+        return buildDashboardTasks({
+            activeTasks,
+            archivedTasks,
+            projects,
+            timeEntries,
+            timers,
+            taskFilter,
+            taskSearchQuery,
+            todayStr,
+            getTaskCompletedStatus,
         });
-
-        const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
-        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
-
-        // Calculate task activity data
-        const taskActivity = {};
-
-        // First pass: collect total time for display purposes
-        recentEntries.forEach(entry => {
-            if (!taskActivity[entry.taskId]) {
-                taskActivity[entry.taskId] = {
-                    totalTime: 0  // Just for display purposes
-                };
-            }
-
-            // Track time for display
-            taskActivity[entry.taskId].totalTime += (entry.end - entry.start);
-        });
-
-        // For currently running timers, calculate display time
-        // Note: timer.elapsedTime is already synchronized via master clock from useTimers
-        if (timers.length > 0) {
-            timers.forEach(timer => {
-                if (!taskActivity[timer.taskId]) {
-                    taskActivity[timer.taskId] = {
-                        totalTime: 0
-                    };
-                }
-
-                // Use the pre-computed elapsedTime from useTimers (synchronized via master clock)
-                taskActivity[timer.taskId].totalTime += timer.elapsedTime;
-            });
-        }
-
-        // Enhance tasks with project information and activity data
-        const enhancedTasks = activeTasks.map(task => {
-            const project = projects.find(p => p.id === task.projectId);
-            const totalTime = taskActivity[task.id]?.totalTime || 0;
-            const hours = Math.floor(millisecondsToHours(totalTime));
-            const minutes = Math.floor((totalTime % ONE_HOUR_MS) / ONE_MINUTE_MS);
-
-            // Add parent task information for subtasks
-            let parentTask = null;
-            if (task.parentTaskId) {
-                parentTask = tasks.find(t => t.id === task.parentTaskId);
-                if (parentTask) {
-                    const parentProject = projects.find(p => p.id === parentTask.projectId);
-                    parentTask = { ...parentTask, project: parentProject };
-                }
-            }
-
-            // For sorting, use the task's built-in lastActive property,
-            // or fall back to createdAt if it doesn't exist yet
-            const activityTimestamp = task.lastActive || task.createdAt || 0;
-
-            return {
-                ...task,
-                // For sorting - any task activity timestamp
-                lastActive: activityTimestamp,
-                // Just for display
-                recentTime: totalTime,
-                project: project,
-                displayTime: `${hours}h ${minutes}m`,
-                parentTask
-            };
-        });
-
-        // If a task has a running timer, make it appear at the top
-        if (timers.length > 0) {
-            const currentTime = Date.now();
-            enhancedTasks.forEach(task => {
-                const hasRunningTimer = timers.some(timer =>
-                    timer.taskId === task.id && !timer.isPaused
-                );
-                if (hasRunningTimer) {
-                    task.lastActive = currentTime;
-                }
-            });
-        }
-
-        // Sort by the lastActive property (most recent activity first)
-        const sortedTasks = enhancedTasks
-            .sort((a, b) => {
-                // Pure chronological sort by last activity time - highest (most recent) first
-                return b.lastActive - a.lastActive;
-            })
-            .slice(0, 10);
-
-        // Apply search filter if there's a query
-        if (taskSearchQuery.trim()) {
-            return sortedTasks.filter(task =>
-                task.title.toLowerCase().includes(taskSearchQuery.toLowerCase())
-            );
-        }
-
-        return sortedTasks;
-    }, [tasks, timeEntries, projects, taskSearchQuery, timers, getTaskCompletedStatus, todayStr]);
+    }, [activeTasks, archivedTasks, projects, timeEntries, timers, taskFilter, taskSearchQuery, todayStr, getTaskCompletedStatus]);
 
     /**
-     * Get recent projects with total time and pending billable amount
+     * Get dashboard project list for the selected filter.
      */
     const recentProjects = useMemo(() => {
-        const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
-        const recentEntries = timeEntries.filter(entry => entry.start > thirtyDaysAgo);
-
-        // Group by project
-        const projectActivity = {};
-        recentEntries.forEach(entry => {
-            const task = tasks.find(t => t.id === entry.taskId);
-            if (!task) return;
-
-            if (!projectActivity[task.projectId]) {
-                projectActivity[task.projectId] = {
-                    totalTime: 0,
-                    lastActivity: 0,
-                    taskPendingTime: {}
-                };
-            }
-            projectActivity[task.projectId].totalTime += (entry.end - entry.start);
-            projectActivity[task.projectId].lastActivity = Math.max(
-                projectActivity[task.projectId].lastActivity,
-                entry.end
-            );
-
-            // Calculate pending billable time with task-by-task rounding (consistent with invoice calculation)
-            // Use task.lastBilledAt only - if never billed, all entries are pending
-            const taskLastBilledAt = task.lastBilledAt || 0;
-            if (entry.start > taskLastBilledAt && task.billable === true && entry.source !== 'invoice-adjustment') {
-                if (!projectActivity[task.projectId].taskPendingTime) {
-                    projectActivity[task.projectId].taskPendingTime = {};
-                }
-                if (!projectActivity[task.projectId].taskPendingTime[task.id]) {
-                    projectActivity[task.projectId].taskPendingTime[task.id] = 0;
-                }
-                projectActivity[task.projectId].taskPendingTime[task.id] += (entry.end - entry.start);
-            }
+        return buildDashboardProjects({
+            projects,
+            activeTasks,
+            timeEntries,
+            clients,
+            projectFilter,
+            projectSearchQuery,
         });
-
-        const projectsWithActivity = projects
-            .filter(project => !project.archived) // Exclude archived
-            .map(project => {
-                // Use project activity if it exists, otherwise use defaults
-                const activity = projectActivity[project.id] || { totalTime: 0, lastActivity: 0, taskPendingTime: {} };
-
-                // Calculate pending hours using task-by-task rounding (consistent with invoice calculation)
-                let pendingTimeHours = 0;
-                if (activity.taskPendingTime) {
-                    pendingTimeHours = Object.values(activity.taskPendingTime).reduce((total, taskTime) => {
-                        const taskHours = millisecondsToHours(taskTime);
-                        const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
-                        return total + roundedTaskHours;
-                    }, 0);
-                }
-
-                // For recent projects, always use original currency and rate - no conversion
-                const pendingAmount = project.hourlyRate ? pendingTimeHours * project.hourlyRate : 0;
-
-                // Get client information if project has a client
-                const client = project.preferredClientId ? clients.find(c => c.id === project.preferredClientId) : null;
-
-                return {
-                    ...project,
-                    totalTime: activity.totalTime,
-                    lastActivity: activity.lastActivity,
-                    pendingHours: pendingTimeHours,
-                    pendingAmount,
-                    client
-                };
-            })
-            .sort((a, b) => b.lastActivity - a.lastActivity)
-            .slice(0, 10);
-
-        if (projectSearchQuery.trim()) {
-            return projectsWithActivity.filter(project =>
-                project.title.toLowerCase().includes(projectSearchQuery.toLowerCase())
-            );
-        }
-
-        return projectsWithActivity;
-    }, [projects, tasks, timeEntries, projectSearchQuery, clients]);
+    }, [projects, activeTasks, timeEntries, clients, projectFilter, projectSearchQuery]);
 
     const taskTimeTotals = useMemo(() => {
         const totals = {};
@@ -767,7 +628,7 @@ const Dashboard = ({
     const enhanceTaskList = useCallback((list) => {
         return list.map((task) => {
             const project = task.projectId ? projects.find(p => p.id === task.projectId) : null;
-            const parentTask = task.parentTaskId ? tasks.find(t => t.id === task.parentTaskId) : null;
+            const parentTask = task.parentTaskId ? activeTasks.find(t => t.id === task.parentTaskId) : null;
             const recurringStatus = task.recurring && todayStr ? getRecurringStatus(task, todayStr) : null;
 
             return {
@@ -778,7 +639,7 @@ const Dashboard = ({
                 recurringStatus
             };
         });
-    }, [projects, tasks, taskTimeTotals, getRecurringStatus, todayStr]);
+    }, [projects, activeTasks, taskTimeTotals, getRecurringStatus, todayStr]);
 
     const overdueTasks = useMemo(() => {
         return enhanceTaskList(getOverdueTasks());
@@ -788,12 +649,12 @@ const Dashboard = ({
         if (!todayStr) return [];
 
         const attachments = getForDate(todayStr).filter((attachment) => attachment.type === 'task');
-        const tasksById = new Map(tasks.map((task) => [task.id, task]));
+        const tasksById = new Map(activeTasks.map((task) => [task.id, task]));
 
         return attachments
             .map((attachment) => tasksById.get(attachment.referenceId))
             .filter(Boolean);
-    }, [getForDate, todayStr, tasks]);
+    }, [getForDate, todayStr, activeTasks]);
 
     const tasksForToday = useMemo(() => {
         const baseTasks = getTasksForToday();
@@ -813,9 +674,13 @@ const Dashboard = ({
     const handleDeleteTask = useCallback((task) => {
         if (!task) return;
 
+        const availableTasks = task.archived
+            ? [...activeTasks, ...archivedTasks]
+            : activeTasks;
+
         const taskIdsToDelete = task.parentTaskId
             ? [task.id]
-            : getTaskIdsToDelete(task.id, tasks);
+            : getTaskIdsToDelete(task.id, availableTasks);
 
         const entriesToDelete = timeEntries.filter(entry => taskIdsToDelete.includes(entry.taskId));
         entriesToDelete.forEach(entry => deleteEntry(entry.id));
@@ -826,9 +691,10 @@ const Dashboard = ({
             }
         });
 
-        taskIdsToDelete.forEach(id => deleteTask(id));
-        showSuccess('Task deleted');
-    }, [tasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);
+        Promise.all(taskIdsToDelete.map(id => deleteTask(id))).then(() => {
+            showSuccess('Task deleted');
+        });
+    }, [activeTasks, archivedTasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);
 
     const handleArchiveTask = useCallback((task) => {
         if (!task || task.projectId) return;
@@ -890,8 +756,11 @@ const Dashboard = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <RecentTasks
                     recentTasks={recentTasks}
+                    taskFilter={taskFilter}
+                    setTaskFilter={setTaskFilter}
                     taskSearchQuery={taskSearchQuery}
                     setTaskSearchQuery={setTaskSearchQuery}
+                    isLoading={taskFilter === 'archived' && archivedLoading && !archivedLoaded}
                     handleCompleteTask={handleCompleteTask}
                     getTaskCompletedStatus={getTaskCompletedStatus}
                     renderTaskTitle={renderTaskTitle}
@@ -904,6 +773,8 @@ const Dashboard = ({
 
                 <ProjectsOverview
                     recentProjects={recentProjects}
+                    projectFilter={projectFilter}
+                    setProjectFilter={setProjectFilter}
                     projectSearchQuery={projectSearchQuery}
                     setProjectSearchQuery={setProjectSearchQuery}
                     navigateToProject={navigateToProject}

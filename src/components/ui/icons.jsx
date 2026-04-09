@@ -44,6 +44,7 @@ export {
     Kanban as KanbanIcon,
     LayoutDashboard as LayoutDashboardIcon,
     LayoutList as LayoutListIcon,
+    ListFilter as ListFilterIcon,
     Moon as MoonIcon,
     MoreHorizontal as MoreHorizontalIcon,
     Search as MagnifyingGlassIcon,

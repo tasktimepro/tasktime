@@ -184,4 +184,24 @@ describe('ProjectList', () => {
 
         expect(onSelectProject).toHaveBeenCalledWith(expect.objectContaining({ id: 'project-1' }))
     })
+
+    it('keeps the header actions inline with flexible wrapping instead of forcing a mobile stack', () => {
+        render(
+            <ProjectList
+                onSelectProject={vi.fn()}
+                clients={[]}
+                openProjectModal={vi.fn()}
+                editProjectModal={vi.fn()}
+            />
+        )
+
+        const header = screen.getByText(/Projects/).parentElement
+        const actions = screen.getByRole('button', { name: 'New Project' }).parentElement
+
+        expect(header?.className).toContain('flex-wrap')
+        expect(header?.className).toContain('items-center')
+        expect(header?.className).not.toContain('flex-col')
+        expect(actions?.className).toContain('ml-auto')
+        expect(actions?.className).toContain('flex-wrap')
+    })
 })

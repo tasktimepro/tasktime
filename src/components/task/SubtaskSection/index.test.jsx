@@ -128,6 +128,26 @@ describe('SubtaskSection sorting', () => {
         expect(showSuccess).toHaveBeenCalledWith('Subtask "Subtask 1" deleted successfully');
     });
 
+    it('shows billed and unbilled warnings for subtask deletion when applicable', () => {
+        const subtasks = [
+            { id: 's1', title: 'Subtask 1', completed: false, lastActive: 200, billable: true, lastBilledAt: 1000 },
+        ];
+
+        hookState.tasks = subtasks;
+        hookState.entries = [
+            { id: 'e1', taskId: 's1', start: 500, end: 900, billedInvoiceId: 'inv-1' },
+            { id: 'e2', taskId: 's1', start: 2000, end: 5600000 },
+        ];
+        hookState.timers = [];
+
+        renderSubtaskSection({ subtasks });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete Subtask 1' }));
+
+        expect(screen.getByText('This task includes 1.55 unbilled hours.')).toBeInTheDocument();
+        expect(screen.getByText('This task includes time that is already recorded on an invoice.')).toBeInTheDocument();
+    });
+
     it('sorts subtasks by lastActive descending and places completed at the bottom', () => {
         hookState.tasks = [];
         hookState.entries = [];

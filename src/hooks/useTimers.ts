@@ -9,6 +9,7 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useMasterClock } from '@/hooks/useMasterClock';
 import type { MultiTimerState, TimeEntry } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
+import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { readEntity, objectToYMap } from '@/stores/yjs/entityUtils';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 
@@ -141,6 +142,8 @@ export function useTimers(): UseTimersResult {
             const entityMap = objectToYMap(timer as unknown as Record<string, unknown>);
             (store.timers as any).set(timerKey, entityMap);
         });
+
+        markMeaningfulActivity();
     }, [isReady, store]);
 
     const pauseTimer = useCallback((projectId: string) => {
@@ -160,6 +163,8 @@ export function useTimers(): UseTimersResult {
             } as unknown as Record<string, unknown>);
             (store.timers as any).set(projectId, entityMap);
         });
+
+        markMeaningfulActivity();
     }, [isReady, store]);
 
     const resumeTimer = useCallback((projectId: string) => {
@@ -188,6 +193,8 @@ export function useTimers(): UseTimersResult {
             } as unknown as Record<string, unknown>);
             (store.timers as any).set(projectId, entityMap);
         });
+
+        markMeaningfulActivity();
     }, [isReady, store]);
 
     const stopTimer = useCallback((projectId: string): TimeEntry | null => {
@@ -218,6 +225,8 @@ export function useTimers(): UseTimersResult {
             store.timers.delete(projectId);
         });
 
+        markMeaningfulActivity();
+
         return entry;
     }, [isReady, store]);
 
@@ -227,6 +236,8 @@ export function useTimers(): UseTimersResult {
         store.coreDoc.transact(() => {
             store.timers.delete(projectId);
         });
+
+        markMeaningfulActivity();
     }, [isReady, store]);
 
     const updateTimer = useCallback((projectId: string, updates: { startTime?: number; note?: string }) => {
@@ -248,6 +259,8 @@ export function useTimers(): UseTimersResult {
             } as unknown as Record<string, unknown>);
             (store.timers as any).set(projectId, entityMap);
         });
+
+        markMeaningfulActivity();
     }, [isReady, store]);
 
     const focusTimer = useCallback((projectId: string) => {

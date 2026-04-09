@@ -69,6 +69,8 @@ if (!SYNC_WORKER_CONFIG.isEnabled) {
 
 // Simple pub/sub so multiple hook instances stay in sync without reloads
 const authSubscribers = new Set<() => void>();
+let forceReconnectState = false;
+
 const notifyAuthSubscribers = () => {
     authSubscribers.forEach(subscriber => {
         try {
@@ -152,19 +154,7 @@ export const useGoogleAuth = () => {
             if (!response.ok) return false;
             const data = await response.json();
 
-            if (data.authenticated !== true) {
-                return false;
-            }
-
-            const driveProbeResponse = await fetch(
-                `${SYNC_WORKER_CONFIG.endpoints.drive}/files?spaces=appDataFolder&pageSize=1&fields=files(id)`,
-                {
-                    method: 'GET',
-                    headers: { 'X-Session-Id': session.sessionId },
-                }
-            );
-
-            return driveProbeResponse.ok;
+            return data.authenticated === true;
         } catch {
             return false;
         }
@@ -246,6 +236,7 @@ export const useGoogleAuth = () => {
                 hadPreviousSession: true,
             });
 
+            forceReconnectState = false;
             writeHadPreviousSessionFlag(true);
 
             notifyAuthSubscribers();
@@ -287,6 +278,7 @@ export const useGoogleAuth = () => {
         }
 
         await clearStoredSession();
+        forceReconnectState = false;
         writeHadPreviousSessionFlag(false);
 
         setState({
@@ -302,6 +294,31 @@ export const useGoogleAuth = () => {
         notifyAuthSubscribers();
     }, [state.sessionId]);
 
+    const invalidateStoredSession = useCallback(async (): Promise<void> => {
+
+        forceReconnectState = true;
+
+        try {
+            await clearStoredSession();
+        } catch {
+            // Ignore storage cleanup failures and still move UI into reconnect state.
+        }
+
+        writeHadPreviousSessionFlag(true);
+
+        setState({
+            isSignedIn: false,
+            isLoading: false,
+            user: null,
+            accessToken: null,
+            sessionId: null,
+            error: null,
+            hadPreviousSession: true,
+        });
+
+        notifyAuthSubscribers();
+    }, []);
+
     // ============================================
     // RESTORE SESSION FROM STORAGE
     // ============================================
@@ -316,6 +333,19 @@ export const useGoogleAuth = () => {
                 error: 'Sync Worker not configured',
                 hadPreviousSession: readHadPreviousSessionFlag(),
             }));
+            return;
+        }
+
+        if (forceReconnectState) {
+            setState({
+                isSignedIn: false,
+                isLoading: false,
+                user: null,
+                accessToken: null,
+                sessionId: null,
+                error: null,
+                hadPreviousSession: true,
+            });
             return;
         }
 
@@ -338,6 +368,7 @@ export const useGoogleAuth = () => {
 
             const isValid = await validateWorkerSession(session);
             if (isValid) {
+                forceReconnectState = false;
                 setState({
                     isSignedIn: true,
                     isLoading: false,
@@ -406,6 +437,7 @@ export const useGoogleAuth = () => {
         signIn: signInWithWorker,
         signOut: () => signOutFromWorker({ revoke: false }),
         revokeAccess: () => signOutFromWorker({ revoke: true }),
+        invalidateSession: invalidateStoredSession,
     };
 };
 

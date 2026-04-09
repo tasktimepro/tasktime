@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
+import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import type { Preferences } from '@/stores/yjs/types';
 import { validatePreferencesRecord } from '@/stores/yjs/validation';
 
@@ -67,6 +68,7 @@ export function usePreferences() {
             [key]: value,
         } as Record<string, unknown>, `set preference ${String(key)}`);
         store.preferences.set(key, nextPreferences[key]);
+        markMeaningfulActivity();
     }, [isReady, preferences, store]);
 
     // Update multiple preferences
@@ -83,6 +85,8 @@ export function usePreferences() {
                 store.preferences.set(key, (nextPreferences as Record<string, unknown>)[key]);
             }
         });
+
+        markMeaningfulActivity();
     }, [isReady, preferences, store]);
 
     // Reset to defaults
@@ -94,6 +98,8 @@ export function usePreferences() {
         Object.entries(nextPreferences).forEach(([key, value]) => {
             store.preferences.set(key, value);
         });
+
+        markMeaningfulActivity();
     }, [isReady, store]);
 
     return {

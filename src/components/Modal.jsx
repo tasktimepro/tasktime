@@ -79,7 +79,7 @@ const Modal = ({
             <DialogContent
                 className={cn(
                     sizeClasses[size],
-                    'flex w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden max-h-[calc(100vh-1rem)] gap-0 p-0 sm:w-full sm:max-h-[calc(100vh-2rem)]',
+                    'flex w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden gap-0 p-0 max-h-[calc(var(--viewport-height)-var(--safe-area-top)-var(--safe-area-bottom)-1rem)] sm:w-full sm:max-h-[calc(var(--viewport-height)-2rem)]',
                     className
                 )}
                 // Hide default close button if showCloseButton is false
@@ -96,7 +96,7 @@ const Modal = ({
                     ) : null
                 ) : (
                     (title || description || showCloseButton) && (
-                        <div className={cn('flex flex-shrink-0 items-center gap-3 px-4 py-2 md:px-6 md:py-4', !(title || description) && 'justify-end')}>
+                        <div className={cn('flex flex-shrink-0 items-center gap-3 px-4 pb-2 pt-[max(0.75rem,var(--safe-area-top))] md:px-6 md:py-4', !(title || description) && 'justify-end')}>
                             {(title || description) && (
                                 <DialogHeader className="min-w-0 flex-1 py-0">
                                     {title && <DialogTitle>{title}</DialogTitle>}
@@ -122,13 +122,13 @@ const Modal = ({
                 )}
                 
                 {/* Scrollable Content */}
-                <div ref={contentRef} className="flex-1 overflow-x-hidden overflow-y-auto px-4 py-3.5 sm:px-6 sm:py-4">
+                <div ref={contentRef} className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-3.5 sm:px-6 sm:py-4">
                     {children}
                 </div>
 
                 {/* Footer */}
                 {footer && (
-                    <DialogFooter className="flex-shrink-0 border-t border-border px-4 py-3 sm:px-6 sm:py-4">
+                    <DialogFooter className="flex-shrink-0 border-t border-border px-4 pb-[max(0.75rem,var(--safe-area-bottom))] pt-3 sm:px-6 sm:py-4">
                         {footer}
                     </DialogFooter>
                 )}

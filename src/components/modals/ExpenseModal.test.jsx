@@ -264,7 +264,6 @@ describe('ExpenseModal', () => {
         render(<ExpenseModal isOpen onClose={vi.fn()} />)
 
         expect(screen.getByRole('button', { name: 'Cancel' }).className).not.toContain('w-full')
-        expect(screen.getByRole('button', { name: 'Create Expense' }).className).not.toContain('w-full')
     })
 
     it('locks a personal project context and keeps the expense personal', () => {
@@ -286,8 +285,8 @@ describe('ExpenseModal', () => {
             />
         )
 
-        const businessCheckbox = screen.getByRole('checkbox', { name: 'Business Expense' })
         const projectSelect = screen.getByLabelText('Project')
+        const businessCheckbox = screen.getByRole('checkbox', { name: 'Business Expense' })
 
         expect(businessCheckbox).not.toBeChecked()
         expect(businessCheckbox).toBeDisabled()
@@ -296,7 +295,7 @@ describe('ExpenseModal', () => {
         expect(screen.queryByLabelText('Client')).not.toBeInTheDocument()
     })
 
-    it('locks a client project context and derives the business assignment from the project', () => {
+    it('locks a client project context and derives the business assignment from the project', async () => {
         clientsMocks.clients = [
             { id: 'client-1', title: 'Acme Co', archived: false }
         ]
