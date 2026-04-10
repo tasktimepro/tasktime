@@ -21,10 +21,13 @@ import Modal from '@/components/Modal';
 import { format, formatDistance, formatDistanceToNow } from 'date-fns';
 import type { BackupInfo } from '@/stores/yjs';
 import { parseIntegerInputWithFallback } from '@/utils/numberInputUtils';
+import useIsMobileLayout from '@/hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 type ConfirmDialogType = 'disconnect' | 'wipe' | null;
 
 export default function YjsSyncSettings() {
+    const isMobileLayout = useIsMobileLayout();
 
     const [now, setNow] = useState(Date.now());
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogType>(null);
@@ -356,27 +359,54 @@ export default function YjsSyncSettings() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
                     <CardTitle>Google Drive</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <StatusIcon className={`h-5 w-5 ${status.tone} ${status.spinning ? 'animate-spin' : ''}`} />
-                            <div>
-                                <div className={`text-sm font-medium ${status.tone}`}>{status.text}</div>
-                                {isSignedIn && user?.email && (
-                                    <div className="text-xs text-muted-foreground">{user.email}</div>
-                                )}
+                <CardContent className={cn('space-y-4', isMobileLayout && 'px-3 pb-3 pt-0')}>
+                    <div className={cn('flex gap-4', isMobileLayout ? 'flex-col' : 'items-center justify-between')}>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <StatusIcon className={`h-5 w-5 flex-shrink-0 ${status.tone} ${status.spinning ? 'animate-spin' : ''}`} />
+                                <div className="min-w-0">
+                                    <div className={`text-sm font-medium ${status.tone}`}>{status.text}</div>
+                                    {isSignedIn && user?.email && (
+                                        <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+                                    )}
+                                </div>
                             </div>
+                            {showAuthActions && !isOffline && isSignedIn && isDriveConnected && isMobileLayout && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="rounded-full text-muted-foreground hover:bg-muted"
+                                            title="More actions"
+                                            aria-label="More actions"
+                                        >
+                                            <MoreHorizontalIcon className="h-5 w-5" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                                        <DropdownMenuItem
+                                            onClick={handleWipeAndDisconnect}
+                                            className="status-danger-action flex items-center space-x-2"
+                                        >
+                                            <TrashIcon className="h-4 w-4" />
+                                            <span>Wipe & Disconnect</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className={cn('flex items-center gap-2', isMobileLayout && 'w-full flex-wrap')}>
                             {showAuthActions && !isOffline && (
                                 isSignedIn && isDriveConnected ? (
                                     <>
                                         <Button
                                             variant="ghost"
                                             onClick={handleDisconnect}
+                                            className={cn(isMobileLayout && 'flex-1')}
                                         >
                                             Disconnect
                                         </Button>
@@ -385,34 +415,42 @@ export default function YjsSyncSettings() {
                                             onClick={handleForceSync}
                                             disabled={!isDriveConnected || isSyncing}
                                             leadingIcon={ArrowPathIcon}
+                                            className={cn(isMobileLayout && 'flex-1')}
                                         >
                                             Sync Now
                                         </Button>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-muted-foreground hover:bg-muted rounded-full"
-                                                    title="More actions"
-                                                    aria-label="More actions"
-                                                >
-                                                    <MoreHorizontalIcon className="h-5 w-5" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
-                                                <DropdownMenuItem
-                                                    onClick={handleWipeAndDisconnect}
-                                                    className="status-danger-action flex items-center space-x-2"
-                                                >
-                                                    <TrashIcon className="h-4 w-4" />
-                                                    <span>Wipe & Disconnect</span>
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        {!isMobileLayout && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="rounded-full text-muted-foreground hover:bg-muted"
+                                                        title="More actions"
+                                                        aria-label="More actions"
+                                                    >
+                                                        <MoreHorizontalIcon className="h-5 w-5" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                                                    <DropdownMenuItem
+                                                        onClick={handleWipeAndDisconnect}
+                                                        className="status-danger-action flex items-center space-x-2"
+                                                    >
+                                                        <TrashIcon className="h-4 w-4" />
+                                                        <span>Wipe & Disconnect</span>
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
                                     </>
                                 ) : (
-                                    <Button onClick={handleConnect} leadingIcon={CloudIcon} title={hadPreviousSession ? 'Reconnect to Drive' : 'Connect Google Drive'}>
+                                    <Button
+                                        onClick={handleConnect}
+                                        leadingIcon={CloudIcon}
+                                        title={hadPreviousSession ? 'Reconnect to Drive' : 'Connect Google Drive'}
+                                        className={cn(isMobileLayout && 'w-full')}
+                                    >
                                         Connect Google Drive
                                     </Button>
                                 )
@@ -420,7 +458,7 @@ export default function YjsSyncSettings() {
                         </div>
                     </div>
                     {showAuthActions && isSignedIn && isDriveConnected && (
-                        <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3">
+                        <div className={cn('space-y-3 rounded-md border border-border bg-muted/30', isMobileLayout ? 'p-3' : 'p-4')}>
                             <div className="flex items-center gap-3">
                                 <Checkbox
                                     id="auto-sync-enabled"
@@ -461,11 +499,11 @@ export default function YjsSyncSettings() {
             {/* Backup Settings Card */}
             {showAuthActions && isSignedIn && isDriveConnected && (
                 <Card className="mt-4">
-                    <CardHeader>
+                    <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
                         <CardTitle>Automatic Backups</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3">
+                    <CardContent className={cn('space-y-4', isMobileLayout && 'px-3 pb-3 pt-0')}>
+                        <div className={cn('space-y-3 rounded-md border border-border bg-muted/30', isMobileLayout ? 'p-3' : 'p-4')}>
                             <div className="flex items-center gap-3">
                                 <Checkbox
                                     id="backup-enabled"

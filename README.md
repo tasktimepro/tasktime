@@ -27,10 +27,38 @@ make dev
 
 App runs at http://localhost:3101
 
+During normal local development, the Astro blog is also proxied through the same origin, so you can open http://localhost:3101/blog without switching to preview mode.
+
 ### Build
 
 ```bash
 make build
+```
+
+### Prod-Like Local Preview
+
+To test the merged app plus static blog locally using the same build path as production:
+
+```bash
+make preview
+```
+
+This builds the main app, builds the Astro blog, merges the blog output into `dist/blog`, and serves the combined artifact locally.
+
+Default preview URL: `http://localhost:3101`
+
+The default preview port is `3101` so it matches the normal local app URL. `make preview` stops the existing dev container first so you do not have to do that manually.
+
+If you want to run the preview without stopping anything automatically first:
+
+```bash
+make preview-build
+```
+
+If you want to reuse a different port:
+
+```bash
+make preview PREVIEW_PORT=4173
 ```
 
 ## Data Storage

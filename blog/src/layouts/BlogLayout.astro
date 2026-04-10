@@ -1,0 +1,113 @@
+---
+import '../styles/global.css';
+import { DEFAULT_SOCIAL_IMAGE, DEFAULT_SOCIAL_IMAGE_ALT, SITE_URL } from '../config/site.js';
+import { THEME_INIT_SCRIPT, THEME_TOGGLE_SCRIPT } from '../config/theme.js';
+
+const {
+    title,
+    description,
+    canonicalPath = Astro.url.pathname,
+    pageType = 'website',
+    keywords = [],
+    publishedAt,
+    updatedAt,
+    socialTitle,
+    socialDescription,
+    socialImage = DEFAULT_SOCIAL_IMAGE,
+    socialImageAlt = DEFAULT_SOCIAL_IMAGE_ALT,
+    articleSection,
+} = Astro.props;
+
+const siteUrl = Astro.site ?? new URL(SITE_URL);
+const canonicalUrl = new URL(canonicalPath, siteUrl).toString();
+const pageTitle = title === 'TaskTime Blog' ? title : `${title} | TaskTime Blog`;
+const resolvedSocialTitle = socialTitle ?? pageTitle;
+const resolvedSocialDescription = socialDescription ?? description;
+const socialImageUrl = new URL(socialImage, SITE_URL).toString();
+const keywordsContent = keywords.join(', ');
+const currentYear = new Date().getFullYear();
+---
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script is:inline set:html={THEME_INIT_SCRIPT}></script>
+        <title>{pageTitle}</title>
+        <meta name="description" content={description} />
+        <meta name="robots" content="index,follow" />
+        {keywords.length > 0 && <meta name="keywords" content={keywordsContent} />}
+        <link rel="canonical" href={canonicalUrl} />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="alternate" type="application/rss+xml" title="TaskTime Blog" href="/blog/rss.xml" />
+        <meta property="og:type" content={pageType} />
+        <meta property="og:title" content={resolvedSocialTitle} />
+        <meta property="og:description" content={resolvedSocialDescription} />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:image" content={socialImageUrl} />
+        <meta property="og:image:alt" content={socialImageAlt} />
+        <meta property="og:site_name" content="TaskTime" />
+        <meta property="og:locale" content="en_US" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={resolvedSocialTitle} />
+        <meta name="twitter:description" content={resolvedSocialDescription} />
+        <meta name="twitter:image" content={socialImageUrl} />
+        <meta name="twitter:image:alt" content={socialImageAlt} />
+        {publishedAt && <meta property="article:published_time" content={publishedAt.toISOString()} />}
+        {updatedAt && <meta property="article:modified_time" content={updatedAt.toISOString()} />}
+        {articleSection && <meta property="article:section" content={articleSection} />}
+    </head>
+    <body>
+        <div class="page-shell">
+            <header class="site-header">
+                <a class="brand" href="/blog">
+                    <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
+                    <span class="brand-label">TaskTime Blog</span>
+                </a>
+                <nav class="site-nav" aria-label="Primary">
+                    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle color theme">
+                        <span class="sr-only">Toggle color theme</span>
+                        <svg class="theme-toggle__icon theme-toggle__icon--moon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"></path>
+                        </svg>
+                        <svg class="theme-toggle__icon theme-toggle__icon--sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                            <circle cx="12" cy="12" r="4"></circle>
+                            <path d="M12 2v2"></path>
+                            <path d="M12 20v2"></path>
+                            <path d="m4.93 4.93 1.41 1.41"></path>
+                            <path d="m17.66 17.66 1.41 1.41"></path>
+                            <path d="M2 12h2"></path>
+                            <path d="M20 12h2"></path>
+                            <path d="m6.34 17.66-1.41 1.41"></path>
+                            <path d="m19.07 4.93-1.41 1.41"></path>
+                        </svg>
+                    </button>
+                    <a href="/" class="cta-button">Open TaskTime</a>
+                </nav>
+            </header>
+
+            <main class="site-main">
+                <slot />
+            </main>
+
+            <footer class="site-footer">
+                <p class="footer-copyright">
+                    <span class="footer-copyright-icon" aria-hidden="true">&copy;</span>
+                    <span>{currentYear} TaskTime. All rights reserved.</span>
+                </p>
+                <div class="footer-links">
+                    <a href="/blog">Blog</a>
+                    <a href="/contact">Contact</a>
+                    <a href="/blog/rss.xml">RSS</a>
+                    <a href="/privacy">Privacy</a>
+                    <a href="/terms">Terms</a>
+                </div>
+            </footer>
+        </div>
+        <script is:inline set:html={THEME_TOGGLE_SCRIPT}></script>
+    </body>
+</html>

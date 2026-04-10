@@ -4,7 +4,12 @@
     [ ] This must be a simple journey/timeline task view that reuses the same tasks functionality, but applies a nicer workflow
     [ ] All tasks are still placed and visible under the Tasks section
 
-[ ] Must create a blog with trending and popular words and titles used for our kind of app. Such as privacy invoicing tool, privacy expense tracker, privacy tasks and time manager, freelancer task & invoice, and much much more
-    [ ] Do planning first which blog to use (e.g. from Fumadocs) and how it will be implemented
-
 [ ] I also think we should have a notes section for each project so that we’re able to jot down quick notes or details/thoughts about the project
+
+---
+
+[ ] Add Logged Hours and Expenses sections in the dashboard at the bottom
+    [ ] Logged Hours can have projects as filters but All is default
+    [ ] Expenses can have Paid (default), Upcoming, Recurring filters
+
+[ ] Under new expenses modal it would be nice that Title & Supplier when focused should show a list of matching previous saved ones. Latest on top by default, but once you start typing most matching pattern is suggested at the top of the dropdown items below this input

@@ -161,12 +161,29 @@ const { preferences, updatePreferences } = usePreferences();
 - `src/components/sync/YjsSyncStatus.tsx` - Status indicator
 - `src/components/sync/YjsSyncSettings.tsx` - Settings panel
 
-**Sync Behavior (Jan 22, 2026 optimizations):**
-- **Sync interval:** 15 minutes (reduced periodic checks)
-- **Pull throttle:** 30 seconds - skips manifest reload if no local changes and last pull was recent
-- **Manifest change check:** Before full download, checks `modifiedTime` via metadata request
-- **Force sync triggers:** Tab visibility change, network online event (always bypass throttle)
-- **Fallback file lookup:** If delta file not in cache, searches Drive directly
+**Sync Behavior Rules (definitive):**
+
+Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigger behavior:
+
+| Trigger | Manual | Backup | Sync |
+|---------|--------|--------|------|
+| **Local edit** | No auto-sync | Push-only (debounced 100ms) | Push-only (debounced 100ms) |
+| **Tab focus** | No auto-sync | Push pending local changes only | Full pull+push (60s cooldown) |
+| **Network online** | No auto-sync | Push pending local changes only | Full pull+push (60s cooldown) |
+| **Periodic interval** | None | None | Every 15 minutes (pull+push) |
+| **Page reload** | Full pull+push on connect | Full pull+push on connect | Full pull+push on connect |
+| **"Sync Now" button** | Full pull+push (force) | Full pull+push (force) | Full pull+push (force) |
+| **Reconnect after disconnect** | Push dirty docs on connect | Push dirty docs on connect | Push dirty docs on connect |
+
+**Key rules:**
+- **Backup = push-only by default.** No automatic pulling of remote changes. Users must click "Sync Now" or reload to get remote changes.
+- **Sync = full bidirectional.** Pulls + pushes on all triggers with cooldowns.
+- **Manual = user-controlled.** Only "Sync Now" and page reload trigger sync.
+- **Pull efficiency:** Before downloading, a lightweight `modifiedTime` metadata check determines if the manifest changed. No download if unchanged.
+- **Pull throttle:** 30 seconds — skips manifest reload if no local changes and last pull was recent.
+- **Cross-tab lock:** Web Locks API prevents duplicate syncs across tabs.
+- **Reconnect push:** Dirty docs tracked in localStorage; pushed as full-state on next connect regardless of mode.
+- **Never auto-sync destructive resets across devices** — e.g., `resetExpiredSkips` must not undo a valid skip from another device.
 
 ### 🔐 Google Drive Auth - Cloudflare Worker
 

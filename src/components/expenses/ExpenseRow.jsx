@@ -104,7 +104,7 @@ const ExpenseRow = ({
                 }
             } : undefined}
         >
-            <CardContent className="p-4">
+            <CardContent className={compact ? 'p-3 sm:p-4' : 'p-4'}>
                 <div className="flex flex-col space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center space-x-3">

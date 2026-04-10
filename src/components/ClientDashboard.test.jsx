@@ -112,5 +112,44 @@ describe('ClientDashboard', () => {
         const metricsRow = screen.getByTestId('client-metrics-row');
         expect(metricsRow.className.includes('overflow-x-auto')).toBe(true);
         expect(metricsRow.className.includes('flex')).toBe(true);
+        expect(screen.queryByRole('button', { name: 'New Invoice' })).toBeNull();
+    });
+
+    it('keeps the projects title and new project action inline on mobile until wrapping is needed', () => {
+        setMatchMedia(true);
+
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }}
+                projects={[]}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        const newProjectButton = screen.getByRole('button', { name: 'New Project' });
+        const headerRow = newProjectButton.parentElement;
+        const menuButton = screen.getByRole('button', { name: 'More actions' });
+        const topHeaderRow = menuButton.parentElement?.parentElement;
+
+        expect(newProjectButton.className.includes('shrink-0')).toBe(true);
+        expect(headerRow?.className.includes('flex-wrap')).toBe(true);
+        expect(headerRow?.className.includes('flex-col')).toBe(false);
+        expect(topHeaderRow?.className.includes('flex-col')).toBe(false);
     });
 });

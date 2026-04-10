@@ -1,0 +1,64 @@
+---
+import { getCollection, render } from 'astro:content';
+import { BLOG_CATEGORY_LABELS } from '../../config/site.js';
+import BlogLayout from '../../layouts/BlogLayout.astro';
+
+export async function getStaticPaths() {
+    const posts = await getCollection('blog', ({ data }) => !data.draft);
+
+    return posts.map((post) => ({
+        params: { slug: post.slug },
+        props: { post },
+    }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+
+function formatDate(value) {
+    return new Intl.DateTimeFormat('en', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    }).format(value);
+}
+---
+
+<BlogLayout
+    title={post.data.title}
+    description={post.data.description}
+    canonicalPath={Astro.url.pathname}
+    pageType="article"
+    keywords={post.data.keywords}
+    publishedAt={post.data.publishedAt}
+    updatedAt={post.data.updatedAt}
+    socialTitle={post.data.socialTitle}
+    socialDescription={post.data.socialDescription}
+    socialImage={post.data.ogImage}
+    socialImageAlt={post.data.ogImageAlt}
+    articleSection={BLOG_CATEGORY_LABELS[post.data.category]}
+>
+    <article class="article">
+        <header class="article-header">
+            <p class="eyebrow">Article</p>
+            <h1>{post.data.title}</h1>
+            <p class="article-summary">{post.data.excerpt}</p>
+            <div class="article-meta">
+                <span class="category-pill">{BLOG_CATEGORY_LABELS[post.data.category]}</span>
+                <time datetime={post.data.publishedAt.toISOString()}>{formatDate(post.data.publishedAt)}</time>
+                {post.data.updatedAt && (
+                    <span>Updated {formatDate(post.data.updatedAt)}</span>
+                )}
+            </div>
+            <ul class="tag-list" aria-label={`Tags for ${post.data.title}`}>
+                {post.data.tags.map((tag) => (
+                    <li>{tag}</li>
+                ))}
+            </ul>
+        </header>
+
+        <div class="article-content">
+            <Content />
+        </div>
+    </article>
+</BlogLayout>

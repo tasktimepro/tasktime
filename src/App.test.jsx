@@ -373,29 +373,6 @@ describe('App component', () => {
         expect(await screen.findByTestId('dashboard')).toBeInTheDocument()
     })
 
-    it('renders the privacy policy as a public page without the app shell', () => {
-        window.history.pushState({}, '', '/privacy')
-
-        render(<App />)
-
-        expect(screen.getByRole('heading', { name: 'Privacy Policy' })).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: /No cookies, no tracking/i })).toBeInTheDocument()
-        expect(screen.getByText(/anonymous usage counters described in section 3 are stored in aggregate form/i)).toBeInTheDocument()
-        expect(screen.getAllByText(/Sync is entirely optional/i).length).toBeGreaterThan(0)
-        expect(screen.queryByTestId('dashboard')).not.toBeInTheDocument()
-        expect(screen.queryByText('Clients')).not.toBeInTheDocument()
-    })
-
-    it('renders the terms page for the terms alias route', () => {
-        window.history.pushState({}, '', '/terms-and-conditions')
-
-        render(<App />)
-
-        expect(screen.getByRole('heading', { name: 'Terms & Conditions' })).toBeInTheDocument()
-        expect(screen.getByText(/provided as-is and as-available/i)).toBeInTheDocument()
-        expect(screen.queryByTestId('dashboard')).not.toBeInTheDocument()
-    })
-
     it('renders the desktop sidebar and not the mobile dock on larger screens', () => {
         render(<App />)
         expect(screen.getByText('TaskTime')).toBeInTheDocument()

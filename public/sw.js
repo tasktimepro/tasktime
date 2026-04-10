@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tasktime-cache-v1';
+const CACHE_NAME = 'tasktime-cache-v2';
 const APP_SHELL = [
     '/',
     '/index.html',
@@ -10,6 +10,20 @@ const APP_SHELL = [
     '/icons/web-app-manifest-192x192.png',
     '/icons/web-app-manifest-512x512.png'
 ];
+const STATIC_PUBLIC_PATHS = [
+    '/blog',
+    '/contact',
+    '/privacy',
+    '/terms',
+];
+
+function getRequestUrl(request) {
+    if (typeof request?.url !== 'string' || request.url.length === 0) {
+        return null;
+    }
+
+    return new URL(request.url, self.location?.origin ?? 'http://localhost');
+}
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -37,8 +51,20 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
     const { request } = event;
+    const requestUrl = getRequestUrl(request);
+    const appOrigin = typeof self.location?.origin === 'string' ? self.location.origin : requestUrl?.origin;
 
     if (request.method !== 'GET') {
+        return;
+    }
+
+    // Keep blog pages outside the app shell cache/fallback behavior.
+    if (
+        requestUrl
+        && appOrigin
+        && requestUrl.origin === appOrigin
+        && STATIC_PUBLIC_PATHS.some((pathname) => requestUrl.pathname === pathname || requestUrl.pathname.startsWith(`${pathname}/`))
+    ) {
         return;
     }
 

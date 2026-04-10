@@ -46,6 +46,32 @@ export default defineConfig({
     port: 5173,
     strictPort: true, // Exit if port is already in use instead of automatically trying the next available port
     host: 'localhost',
+    proxy: {
+      '/blog': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '/privacy': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '/contact': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '/terms': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '/src/styles/global.css': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '^/@fs/app/blog/': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+    },
     // Handle SPA routing - redirect all requests to index.html
     historyApiFallback: true
   },

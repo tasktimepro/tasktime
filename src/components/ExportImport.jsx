@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 /**
  * ExportImport component for backing up and restoring application data
@@ -37,6 +39,7 @@ function ExportImport({
     preferences = {},
     onImport 
 }) {
+    const isMobileLayout = useIsMobileLayout();
     const { timers } = useTimers();
     const isTimerActive = timers.length > 0;
     const [showImportModal, setShowImportModal] = useState(false);
@@ -316,10 +319,10 @@ function ExportImport({
 
     return (
         <Card>
-            <CardContent className="pt-6">
+            <CardContent className={cn(isMobileLayout ? 'p-3' : 'pt-6')}>
                 <div className="space-y-4">
                     {/* Export Section */}
-                    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                    <div className={cn('flex items-center justify-between rounded-lg bg-muted', isMobileLayout ? 'p-3' : 'p-4')}>
                     <div>
                         <h4 className="font-medium text-foreground">Export Data</h4>
                         <p className="text-sm text-muted-foreground">Download all your data including projects, tasks, invoices, settings, and more as JSON</p>
@@ -335,7 +338,7 @@ function ExportImport({
                 </div>
 
                 {/* Import Section */}
-                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                <div className={cn('flex items-center justify-between rounded-lg bg-muted', isMobileLayout ? 'p-3' : 'p-4')}>
                     <div>
                         <h4 className="font-medium text-foreground">Import Data</h4>
                         <p className="text-sm text-muted-foreground">Restore all data including projects, tasks, invoices, settings, and more from JSON backup</p>
@@ -352,7 +355,7 @@ function ExportImport({
 
                 {/* Data Summary */}
                 {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clients.length > 0 || invoiceTemplates.length > 0) && (
-                    <div className="p-4 bg-muted rounded-lg">
+                    <div className={cn('rounded-lg bg-muted', isMobileLayout ? 'p-3' : 'p-4')}>
                         <h4 className="font-medium text-foreground mb-2">Current Data</h4>
                         <div className="text-sm text-muted-foreground space-y-1">
                             <p>Clients: <span className="font-medium">{clients.length}</span></p>

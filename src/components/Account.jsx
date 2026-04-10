@@ -196,10 +196,10 @@ const Account = ({
                         <div className="space-y-6">
                             {/* Delete All Account Data */}
                             <Card>
-                                <CardHeader>
+                                <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
                                     <CardTitle>Delete All Account Data</CardTitle>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
                                     <Notice
                                         title="Danger Zone"
                                         description="This action will permanently delete all your data including projects, tasks, time entries, invoices, invoice configurations, and settings. This action cannot be undone."
@@ -227,10 +227,12 @@ const Account = ({
     return (
         <div className={cn('space-y-6', isMobileLayout && 'space-y-4 overflow-x-hidden')}>
             {/* Header */}
-            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
-                <div>
+            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'items-start' : 'items-center')}>
+                <div className="min-w-0 flex-1">
                     <h1 className="text-2xl font-bold text-foreground">Account</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">Manage your account settings</p>
+                    {!isMobileLayout && (
+                        <p className="mt-1 text-sm text-muted-foreground">Manage your account settings</p>
+                    )}
                 </div>
                 {isDriveConnected && (
                     <Button
@@ -238,7 +240,7 @@ const Account = ({
                         onClick={() => setShowSignOutModal(true)}
                         disabled={isSigningOut}
                         leadingIcon={SignOutIcon}
-                        className={cn(isMobileLayout && 'w-full sm:w-auto')}
+                        className="shrink-0"
                     >
                         {isSigningOut ? 'Signing out...' : 'Sign out'}
                     </Button>

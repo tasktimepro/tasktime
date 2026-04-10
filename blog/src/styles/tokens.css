@@ -1,0 +1,45 @@
+:root {
+    --background: hsl(0 0% 99.5%);
+    --foreground: hsl(0 0% 3.9%);
+    --card: hsl(0 0% 100%);
+    --muted: hsl(0 0% 96.1%);
+    --muted-foreground: hsl(0 0% 45.1%);
+    --border: hsl(0 0% 89.8%);
+    --primary: hsl(0 0% 9%);
+    --primary-foreground: hsl(0 0% 98%);
+    --ring: hsl(0 0% 3.9%);
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.06);
+    --content-width: 44rem;
+    --shell-width: 72rem;
+}
+
+:root[data-theme='dark'] {
+    --background: hsl(0 0% 3.9%);
+    --foreground: hsl(0 0% 98%);
+    --card: hsl(0 0% 7.8%);
+    --muted: hsl(0 0% 14.9%);
+    --muted-foreground: hsl(0 0% 63.9%);
+    --border: hsl(0 0% 14.9%);
+    --primary: hsl(0 0% 98%);
+    --primary-foreground: hsl(0 0% 9%);
+    --ring: hsl(0 0% 83.1%);
+    --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        --background: hsl(0 0% 3.9%);
+        --foreground: hsl(0 0% 98%);
+        --card: hsl(0 0% 7.8%);
+        --muted: hsl(0 0% 14.9%);
+        --muted-foreground: hsl(0 0% 63.9%);
+        --border: hsl(0 0% 14.9%);
+        --primary: hsl(0 0% 98%);
+        --primary-foreground: hsl(0 0% 9%);
+        --ring: hsl(0 0% 83.1%);
+        --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.28);
+    }
+}

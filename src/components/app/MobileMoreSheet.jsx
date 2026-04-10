@@ -14,14 +14,14 @@ const MobileMoreSheet = ({
     onToggleTotals,
     totalsHidden,
 }) => {
-    const actionTileClassName = 'flex min-h-24 flex-col items-center justify-center rounded-2xl border border-border bg-card px-3 py-4 text-center shadow-sm transition-colors hover:bg-accent cursor-pointer';
+    const actionTileClassName = 'flex min-h-24 flex-col items-center justify-center rounded-2xl border border-border/60 bg-muted/50 px-3 py-4 text-center shadow-sm transition-colors hover:bg-accent cursor-pointer';
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent
                 hideCloseButton
                 overlayClassName="bottom-safe-nav"
-                className="bottom-safe-nav left-0 right-0 top-auto flex min-h-0 w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-[1.75rem] rounded-b-none border-x-0 border-b-0 bg-card p-0 shadow-none max-h-safe-nav"
+                className="bottom-safe-nav left-0 right-0 top-auto flex min-h-0 w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-[1.75rem] rounded-b-none border-x-0 border-b-0 bg-background p-0 shadow-none max-h-safe-nav"
             >
                 <DialogTitle className="sr-only">More navigation</DialogTitle>
                 <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pb-safe-sheet pt-4">
@@ -34,7 +34,7 @@ const MobileMoreSheet = ({
                                 key={item.key}
                                 type="button"
                                 onClick={item.onClick}
-                                className="flex items-start gap-3 rounded-2xl border border-border bg-card px-4 py-4 text-left shadow-sm transition-colors hover:bg-accent cursor-pointer"
+                                className="flex items-start gap-3 rounded-2xl border border-border/60 bg-muted/50 px-4 py-4 text-left shadow-sm transition-colors hover:bg-accent cursor-pointer"
                             >
                                 <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground">
                                     <ItemIcon className="h-5 w-5" />
@@ -100,7 +100,7 @@ const MobileMoreSheet = ({
                         </button>
                         </div>
 
-                    <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
+                    <div className="rounded-2xl border border-border/60 bg-muted/50 p-3 shadow-sm">
                         <CloudSyncStatusPanel className="space-y-1" onActionComplete={onClose} />
                     </div>
                 </div>

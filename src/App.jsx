@@ -39,8 +39,6 @@ import InstallPrompt from './components/InstallPrompt';
 import CloudSyncStatusPanel from './components/sync/CloudSyncStatusPanel';
 import MobileBottomNav from './components/app/MobileBottomNav';
 import MobileMoreSheet from './components/app/MobileMoreSheet';
-import PublicLegalRouter from './components/legal/PublicLegalRouter';
-import { isPublicLegalPath } from './components/legal/legalRoutes';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
@@ -65,9 +63,7 @@ const PAGE_TITLE_MAP = {
     projects: 'Projects',
     invoices: 'Invoices',
     expenses: 'Expenses',
-    account: 'Account',
-    privacy: 'Privacy Policy',
-    terms: 'Terms & Conditions'
+    account: 'Account'
 };
 
 /**
@@ -75,10 +71,6 @@ const PAGE_TITLE_MAP = {
  * Now powered by Yjs for conflict-free sync
  */
 function App() {
-    if (typeof window !== 'undefined' && isPublicLegalPath(window.location.pathname)) {
-        return <PublicLegalRouter />;
-    }
-
     return (
         <ToastProvider>
             <YjsProvider>
@@ -845,7 +837,7 @@ function AppContent() {
 
     const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'account'].includes(activeView);
     const isMoreViewActive = ['clients', 'invoices', 'account'].includes(activeView);
-    const mobileTopPadding = showGlobalTimer && timerIsActive ? '5.75rem' : '0.75rem';
+    const mobileTopPadding = showGlobalTimer && timerIsActive ? '5.75rem' : '1rem';
     const mobileBottomPadding = '7rem';
     const desktopTopPadding = showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem';
     const desktopBottomPadding = '1.5rem';

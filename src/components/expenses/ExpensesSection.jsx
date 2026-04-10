@@ -12,6 +12,8 @@ import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
 import ExpenseList from './ExpenseList';
+import useIsMobileLayout from '@/hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 const ExpensesSection = ({
     clientId,
@@ -19,6 +21,7 @@ const ExpensesSection = ({
     openExpenseModal,
     openExpenseView,
 }) => {
+    const isMobileLayout = useIsMobileLayout();
 
     const { expenses, markAsPaid, markAsUnpaid } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
@@ -140,7 +143,7 @@ const ExpensesSection = ({
 
     return (
         <Card>
-            <CardHeader>
+            <CardHeader className={cn(isMobileLayout && 'px-3 py-3')}>
                 <div className="flex items-center justify-between">
                     <button
                         type="button"
@@ -162,7 +165,7 @@ const ExpensesSection = ({
             </CardHeader>
 
             {isExpanded && (
-                <CardContent className="space-y-4">
+                <CardContent className={cn('space-y-4', isMobileLayout && 'px-3 pb-3 pt-0')}>
                     <ExpenseList
                         expenses={displayedExpenses}
                         clientsById={new Map()}

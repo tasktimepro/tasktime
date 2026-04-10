@@ -1,0 +1,25 @@
+---
+import PublicPageLayout from '../layouts/PublicPageLayout.astro';
+
+const canonicalPath = '/contact';
+const currentYear = new Date().getFullYear();
+---
+
+<PublicPageLayout
+    pageKey="contact"
+    title="Contact"
+    summary="If you have any questions, issues, or feedback, feel free to reach out by clicking the button below."
+    lastUpdated={`10 April ${currentYear}`}
+    canonicalPath={canonicalPath}
+    highlights={[
+        'Questions, issues, or feedback — we\'d love to hear from you.',
+    ]}
+>
+    <section>
+        <p>
+            <a class="contact-button" href="mailto:contact@tasktime.pro">
+                Contact us here
+            </a>
+        </p>
+    </section>
+</PublicPageLayout>

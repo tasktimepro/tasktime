@@ -7,6 +7,15 @@ import YjsSyncSettings from './YjsSyncSettings'
 const signInMock = vi.hoisted(() => vi.fn())
 const showSuccessMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
+const yjsSyncSettingsMocks = vi.hoisted(() => ({
+    isDriveConnected: false,
+    isSignedIn: false,
+    isMobileLayout: false,
+    user: null,
+    forceSyncDrive: vi.fn(),
+    disconnectDrive: vi.fn(),
+    signOut: vi.fn(),
+}))
 let consoleErrorSpy
 
 vi.mock('@/contexts/YjsContext', () => ({
@@ -16,24 +25,24 @@ vi.mock('@/contexts/YjsContext', () => ({
         isSyncing: false,
         syncState: 'idle',
         syncPhase: 'idle',
-        isDriveConnected: false,
+        isDriveConnected: yjsSyncSettingsMocks.isDriveConnected,
         isConnecting: false,
         hasSynced: false,
         manualSyncInProgress: false,
         lastSyncedAt: null,
-        forceSyncDrive: vi.fn(),
-        disconnectDrive: vi.fn(),
+        forceSyncDrive: yjsSyncSettingsMocks.forceSyncDrive,
+        disconnectDrive: yjsSyncSettingsMocks.disconnectDrive,
         wipeDriveData: vi.fn(),
     }),
 }))
 
 vi.mock('@/hooks/useGoogleAuth', () => ({
     useGoogleAuth: () => ({
-        isSignedIn: false,
+        isSignedIn: yjsSyncSettingsMocks.isSignedIn,
         isLoading: false,
-        user: null,
+        user: yjsSyncSettingsMocks.user,
         signIn: signInMock,
-        signOut: vi.fn(),
+        signOut: yjsSyncSettingsMocks.signOut,
     }),
 }))
 
@@ -54,10 +63,18 @@ vi.mock('@/hooks/useToast', () => ({
     }),
 }))
 
+vi.mock('@/hooks/useIsMobileLayout', () => ({
+    default: () => yjsSyncSettingsMocks.isMobileLayout,
+}))
+
 describe('YjsSyncSettings', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        yjsSyncSettingsMocks.isDriveConnected = false
+        yjsSyncSettingsMocks.isSignedIn = false
+        yjsSyncSettingsMocks.isMobileLayout = false
+        yjsSyncSettingsMocks.user = null
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     })
 
@@ -74,5 +91,17 @@ describe('YjsSyncSettings', () => {
 
         expect(showErrorMock).toHaveBeenCalledWith('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
         expect(showSuccessMock).not.toHaveBeenCalled()
+    })
+
+    it('uses a full-width action row for disconnect and sync on mobile', () => {
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.isMobileLayout = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.getByRole('button', { name: 'Disconnect' }).className.includes('flex-1')).toBe(true)
+        expect(screen.getByRole('button', { name: 'Sync Now' }).className.includes('flex-1')).toBe(true)
     })
 })

@@ -5,11 +5,14 @@ import CurrencySelect from '@/components/ui/currency-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import CustomCheckbox from './CustomCheckbox';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 /**
  * Preferences component - Manages user preferences including preferred currency
  */
 const Preferences = ({ preferences = {}, updatePreferences }) => {
+    const isMobileLayout = useIsMobileLayout();
     const [preferredCurrency, setPreferredCurrency] = useState(preferences.currency || DEFAULT_CURRENCY);
     const { showSuccess } = useToast();
     const weekStartsOnSunday = (preferences.weekStartsOn ?? 1) === 0;
@@ -56,10 +59,10 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
                     <CardTitle>Currency Settings</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
                     <div className="max-w-sm space-y-2">
                         <Label htmlFor="preferredCurrency">
                             Preferred Currency
@@ -76,11 +79,11 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
                 </CardContent>
             </Card>
 
-            <Card className="mt-6">
-                <CardHeader>
+            <Card className={cn('mt-6', isMobileLayout && 'mt-4')}>
+                <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
                     <CardTitle>General Settings</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <CustomCheckbox

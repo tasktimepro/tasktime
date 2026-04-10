@@ -1,0 +1,91 @@
+---
+import PublicPageLayout from './PublicPageLayout.astro';
+
+const { canonicalPath = '/terms' } = Astro.props;
+const LAST_UPDATED = '10 April 2026';
+---
+
+<PublicPageLayout
+    pageKey="terms"
+    title="Terms & Conditions"
+    summary="These are the ground rules for using TaskTime. The short version: your data is yours, the app is provided as-is, and you are responsible for your own records and backups."
+    lastUpdated={LAST_UPDATED}
+    highlights={[
+        'TaskTime is a local-first tool — your data lives in your browser, not on our servers.',
+        'The app is provided as-is without warranties. Keep your own backups.',
+        'Liability is limited to the fullest extent permitted by law.',
+    ]}
+    canonicalPath={canonicalPath}
+>
+    <section>
+        <h2>1. Acceptance</h2>
+        <p>
+            By using TaskTime you agree to these terms. If you don&apos;t agree, don&apos;t use the app.
+        </p>
+    </section>
+
+    <section>
+        <h2>2. What TaskTime is</h2>
+        <p>
+            TaskTime is a local-first productivity app for freelancers. It helps you track time, manage tasks and expenses, and generate invoices. Everything runs in your browser and is stored on your device. There is no account, no server-side database, and no way for us to see what you put in the app.
+        </p>
+        <p>
+            TaskTime is a tool, not professional advice. You are responsible for reviewing anything you create, export, or send &mdash; including invoices, time records, and expense reports.
+        </p>
+    </section>
+
+    <section>
+        <h2>3. Your data, your responsibility</h2>
+        <p>
+            Because your data lives entirely in your browser (and optionally in your own Google Drive), you are responsible for keeping backups, maintaining accurate records, and securing your devices and accounts. If you clear your browser data and have no sync or export, that data is gone &mdash; we cannot recover it for you because we never had it.
+        </p>
+    </section>
+
+    <section>
+        <h2>4. Google Drive sync</h2>
+        <p>
+            Google Drive sync is optional. When enabled, it stores your data in <strong>your own</strong> Google Drive account. The sync feature depends on Google&apos;s services and is governed by Google&apos;s own terms and privacy policies. We are not responsible for Google&apos;s availability, outages, or policy changes.
+        </p>
+    </section>
+
+    <section>
+        <h2>5. No warranties</h2>
+        <p>
+            TaskTime is provided as-is and as-available. To the fullest extent permitted by law, we disclaim all warranties &mdash; express, implied, or statutory &mdash; including warranties of merchantability, fitness for a particular purpose, accuracy, reliability, and uninterrupted operation.
+        </p>
+    </section>
+
+    <section>
+        <h2>6. Limitation of liability</h2>
+        <p>
+            To the fullest extent permitted by law, TaskTime and its operator will not be liable for data loss, sync failures, corrupted records, interrupted business, lost profits, or any indirect, incidental, special, or consequential damages arising from your use of the app.
+        </p>
+        <p>
+            Where liability cannot be fully excluded by law, total liability is limited to the amount you paid for TaskTime in the twelve months before the event &mdash; which may be zero.
+        </p>
+    </section>
+
+    <section>
+        <h2>7. Changes and availability</h2>
+        <p>
+            TaskTime may be updated, changed, or discontinued at any time. Features &mdash; including sync behavior and supported integrations &mdash; may evolve. Keep your own backups of anything important.
+        </p>
+        <p>
+            We may also introduce paid plans, subscription options, or other payment tiers in the future at our discretion. If we do, the applicable pricing and terms will be presented to you at that time.
+        </p>
+    </section>
+
+    <section>
+        <h2>8. Termination</h2>
+        <p>
+            You can stop using TaskTime at any time. Access to connected features may be restricted or suspended if necessary for security, abuse prevention, or legal reasons.
+        </p>
+    </section>
+
+    <section>
+        <h2>9. Changes to these terms</h2>
+        <p>
+            These terms may be updated as TaskTime evolves. The current version will always be posted here with the date it was last changed. Continued use after an update means you accept the new terms.
+        </p>
+    </section>
+</PublicPageLayout>

@@ -10,6 +10,11 @@ const hookState = vi.hoisted(() => ({
     deleteTask: vi.fn(),
     deleteEntry: vi.fn(),
     clearTimer: vi.fn(),
+    isMobileLayout: false,
+}));
+
+vi.mock('../../../hooks/useIsMobileLayout', () => ({
+    default: () => hookState.isMobileLayout,
 }));
 
 vi.mock('./SubtaskItem', () => ({
@@ -91,6 +96,26 @@ const renderSubtaskSection = ({ subtasks, showSuccess = vi.fn() }) => {
 };
 
 describe('SubtaskSection sorting', () => {
+    it('removes extra left indentation for subtasks on mobile', () => {
+        hookState.tasks = [];
+        hookState.entries = [];
+        hookState.timers = [];
+        hookState.isMobileLayout = true;
+
+        const subtasks = [
+            { id: 's1', title: 'Subtask 1', completed: false, lastActive: 200 },
+        ];
+
+        const { container } = renderSubtaskSection({ subtasks });
+        const wrapper = container.querySelector('.border-t.border-border');
+        const inner = wrapper?.firstElementChild;
+
+        expect(inner?.className.includes('px-2')).toBe(true);
+        expect(inner?.className.includes('pl-8')).toBe(false);
+
+        hookState.isMobileLayout = false;
+    });
+
     it('opens a confirmation modal for subtask delete and only deletes on confirm', () => {
         const showSuccess = vi.fn();
         const subtasks = [

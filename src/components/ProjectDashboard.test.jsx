@@ -120,5 +120,11 @@ describe('ProjectDashboard', () => {
         expect(metricsRow.className.includes('overflow-x-auto')).toBe(true);
         expect(metricsRow.className.includes('flex')).toBe(true);
         expect(screen.getByText('Task tree')).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'New Invoice' })).toHaveLength(1);
+
+        const menuButton = screen.getByRole('button', { name: 'More actions' });
+        const topHeaderRow = menuButton.parentElement?.parentElement;
+
+        expect(topHeaderRow?.className.includes('flex-col')).toBe(false);
     });
 });

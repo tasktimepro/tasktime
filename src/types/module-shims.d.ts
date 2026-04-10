@@ -1,41 +1,3 @@
-declare module 'react' {
-    export type SetStateAction<T> = T | ((prev: T) => T);
-    export type Dispatch<T> = (value: T) => void;
-    export type EffectCallback = () => void | (() => void);
-    export type DependencyList = ReadonlyArray<unknown>;
-    
-    export interface ProviderProps<T> {
-        value: T;
-        children?: ReactNode;
-    }
-    
-    export interface Context<T> {
-        Provider: (props: ProviderProps<T>) => ReactNode;
-        Consumer: unknown;
-        displayName?: string;
-    }
-
-    export function useState<T>(initialState: T | (() => T)):
-        [T, Dispatch<SetStateAction<T>>];
-    export function useEffect(effect: EffectCallback, deps?: DependencyList): void;
-    export function useMemo<T>(factory: () => T, deps?: DependencyList): T;
-    export function useCallback<T extends (...args: unknown[]) => unknown>(
-        callback: T,
-        deps?: DependencyList
-    ): T;
-    export function useRef<T>(initialValue: T): { current: T };
-    export function createContext<T>(defaultValue: T): Context<T>;
-    export function useContext<T>(context: Context<T>): T;
-
-    export type ReactNode = unknown;
-}
-
-declare module 'react/jsx-runtime' {
-    export const jsx: unknown;
-    export const jsxs: unknown;
-    export const Fragment: unknown;
-}
-
 declare module 'idb' {
     export type IDBPDatabase = {
         get: (storeName: string, key: string) => Promise<unknown>;
@@ -83,6 +45,27 @@ declare module '@/components/Modal' {
     
     const Modal: (props: ModalProps) => JSX.Element;
     export default Modal;
+}
+
+declare module '@/components/ui/button' {
+    import { ButtonHTMLAttributes, ElementType, ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react';
+
+    interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+        variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+        size?: 'default' | 'xs' | 'sm' | 'lg' | 'xl' | 'icon' | 'icon-sm' | 'icon-xs';
+        asChild?: boolean;
+        leadingIcon?: ElementType;
+        trailingIcon?: ElementType;
+        loading?: boolean;
+        loadingText?: string;
+        iconOnly?: boolean;
+        fullWidth?: boolean;
+        iconClassName?: string;
+        children?: ReactNode;
+    }
+
+    export const Button: ForwardRefExoticComponent<ButtonProps & RefAttributes<HTMLButtonElement>>;
+    export const buttonVariants: (...args: unknown[]) => string;
 }
 
 declare module 'html2pdf.js' {

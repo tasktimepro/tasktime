@@ -10,12 +10,15 @@ import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.
 import { ClockIcon, CurrencyDollarIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePreferences } from '@/hooks/usePreferences';
+import useIsMobileLayout from '@/hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 /**
  * MetricsDisplay component - Shows time and earnings metrics for different periods
  */
 const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitle = true, title = "Project Metrics" }) => {
     const { preferences } = usePreferences();
+    const isMobileLayout = useIsMobileLayout();
     const weekStartsOn = typeof preferences.weekStartsOn === 'number' ? preferences.weekStartsOn : 1;
     
     // Helper function to get currency for display
@@ -148,17 +151,17 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
     return (
         <Card>
             {showTitle && (
-                <CardHeader className="pb-0">
+                <CardHeader className={cn('pb-0', isMobileLayout && 'px-3 py-3')}>
                     <CardTitle>{title}</CardTitle>
                 </CardHeader>
             )}
             
-            <CardContent className={showTitle ? "pt-6" : "pt-6"}>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <CardContent className={cn(showTitle ? 'pt-6' : 'pt-6', isMobileLayout && (showTitle ? 'px-3 pb-3 pt-0' : 'p-3'))}>
+                <div className={cn('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6', isMobileLayout && 'gap-4')}>
                     {metrics.map((metric) => {
                         return (
                             <Card key={metric.label}>
-                                <CardContent className="pt-5">
+                                <CardContent className={cn(isMobileLayout ? 'p-3' : 'pt-5')}>
                                     <div className="flex flex-col">
                                         <dt className="text-sm font-medium text-muted-foreground truncate mb-3">
                                             {metric.label}

@@ -1,0 +1,52 @@
+---
+import { getCollection } from 'astro:content';
+import { BLOG_CATEGORY_LABELS } from '../../config/site.js';
+import BlogLayout from '../../layouts/BlogLayout.astro';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+    (left, right) => right.data.publishedAt.valueOf() - left.data.publishedAt.valueOf()
+);
+
+function formatDate(value) {
+    return new Intl.DateTimeFormat('en', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    }).format(value);
+}
+---
+
+<BlogLayout
+    title="TaskTime Blog"
+    description="Tips, guides, and honest takes on privacy-first freelancing — from invoicing and expense tracking to time management and staying in control of your data."
+    pageType="website"
+>
+    <section class="hero">
+        <p class="eyebrow">The TaskTime Blog</p>
+        <h1>Our Blog</h1>
+        <p class="hero-copy">
+            Tips, comparisons, and honest guides for freelancers who want to track time, manage expenses,
+            send invoices, and keep their data private — all without the usual SaaS headaches.
+        </p>
+    </section>
+
+    <section class="post-list" aria-label="Blog posts">
+        {posts.map((post) => (
+            <article class="post-card">
+                <p class="post-meta">
+                    <span class="category-pill">{BLOG_CATEGORY_LABELS[post.data.category]}</span>
+                    <time datetime={post.data.publishedAt.toISOString()}>{formatDate(post.data.publishedAt)}</time>
+                </p>
+                <h2>
+                    <a href={`/blog/${post.slug}`}>{post.data.title}</a>
+                </h2>
+                <p>{post.data.excerpt}</p>
+                <ul class="tag-list" aria-label={`Tags for ${post.data.title}`}>
+                    {post.data.tags.map((tag) => (
+                        <li>{tag}</li>
+                    ))}
+                </ul>
+            </article>
+        ))}
+    </section>
+</BlogLayout>

@@ -541,8 +541,8 @@ const ClientDashboard = ({
     return (
         <div className={cn('space-y-6', isMobileLayout && 'space-y-4')}>
             {/* Header */}
-            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
-                <div className={cn('flex items-center', isMobileLayout ? 'gap-3' : 'space-x-4')}>
+            <div className={cn('flex justify-between gap-3 items-center')}>
+                <div className={cn('flex items-center min-w-0', isMobileLayout ? 'flex-1 gap-3' : 'space-x-4')}>
                     <Button
                         type="button"
                         variant="ghost"
@@ -582,7 +582,7 @@ const ClientDashboard = ({
                     </div>
                 </div>
 
-                <div className={cn('flex items-center gap-3', isMobileLayout && 'w-full justify-end')}>
+                <div className={cn('flex items-center gap-3', isMobileLayout && 'shrink-0')}>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
@@ -631,23 +631,25 @@ const ClientDashboard = ({
                     </DropdownMenu>
 
                     {/* Create Invoice Button */}
-                    <InvoiceGenerator
-                        client={client}
-                        timeEntries={clientTimeEntries}
-                        editingInvoice={editingInvoice}
-                        onInvoiceSaved={() => setEditingInvoice(null)}
-                        paymentMethods={paymentMethods}
-                        businessInfos={businessInfos}
-                        clients={clients}
-                        activeModal={activeModal}
-                        showButton={true}
-                        // Modal functions
-                        openClientModal={openClientModal}
-                        openProjectModal={openProjectModal}
-                        openBusinessModal={openBusinessModal}
-                        openPaymentMethodModal={openPaymentMethodModal}
-                        openTemplateModal={openTemplateModal}
-                    />
+                    {!isMobileLayout && (
+                        <InvoiceGenerator
+                            client={client}
+                            timeEntries={clientTimeEntries}
+                            editingInvoice={editingInvoice}
+                            onInvoiceSaved={() => setEditingInvoice(null)}
+                            paymentMethods={paymentMethods}
+                            businessInfos={businessInfos}
+                            clients={clients}
+                            activeModal={activeModal}
+                            showButton={true}
+                            // Modal functions
+                            openClientModal={openClientModal}
+                            openProjectModal={openProjectModal}
+                            openBusinessModal={openBusinessModal}
+                            openPaymentMethodModal={openPaymentMethodModal}
+                            openTemplateModal={openTemplateModal}
+                        />
+                    )}
                 </div>
             </div>
 
@@ -684,27 +686,35 @@ const ClientDashboard = ({
             >
 
                 <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
-                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
+                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
                         <div className="flex items-center w-full">
-                            <div className="flex-shrink-0">
-                                <BanknotesIcon className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div className="ml-4 w-0 flex-1">
+                            <div className="w-full">
                                 <dl>
-                                    <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
-                                    <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
-                                        <span className="sensitive-data">
-                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.totalRevenue.toFixed(2)}
-                                        </span>
-                                    </dd>
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
                                 </dl>
+                                <div className="mt-2 space-y-1">
+                                    <div className="flex items-center text-sm text-muted-foreground">
+                                        <CurrencyDollarIcon className="h-4 w-4 mr-2" />
+                                        <span className="sensitive-data text-foreground font-semibold">
+                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
+                                        </span>
+                                    </div>
+                                    {clientExpenses.length > 0 && (
+                                        <div className="flex items-center text-sm text-muted-foreground">
+                                            <HandCoinsIcon className="h-4 w-4 mr-2" />
+                                            <span className="sensitive-data text-foreground font-semibold">
+                                                {formatAmounts(unbilledExpenseTotalsByCurrency)}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
-                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
+                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
                         <div className="flex items-center w-full">
                             <div className="flex-shrink-0">
                                 <DocumentTextIcon className="h-5 w-5 text-muted-foreground" />
@@ -723,47 +733,43 @@ const ClientDashboard = ({
                     </CardContent>
                 </Card>
 
+                {clientExpenses.length > 0 && (
+                    <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                        <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
+                            <div className="flex items-center w-full">
+                                <div className="flex-shrink-0">
+                                    <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <div className="ml-4 w-0 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-muted-foreground truncate">Expenses</dt>
+                                        <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
+                                            <span className="sensitive-data">
+                                                {formatAmounts(expenseTotalsByCurrency)}
+                                            </span>
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
-                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
+                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
                         <div className="flex items-center w-full">
                             <div className="flex-shrink-0">
-                                <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                                <BanknotesIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div className="ml-4 w-0 flex-1">
                                 <dl>
-                                    <dt className="text-sm font-medium text-muted-foreground truncate">Expenses</dt>
+                                    <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
                                     <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                         <span className="sensitive-data">
-                                            {formatAmounts(expenseTotalsByCurrency)}
+                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.totalRevenue.toFixed(2)}
                                         </span>
                                     </dd>
                                 </dl>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
-                    <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-4' : 'p-5')}>
-                        <div className="flex items-center w-full">
-                            <div className="w-full">
-                                <dl>
-                                    <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
-                                </dl>
-                                <div className="mt-2 space-y-1">
-                                    <div className="flex items-center text-sm text-muted-foreground">
-                                        <CurrencyDollarIcon className="h-4 w-4 mr-2" />
-                                        <span className="sensitive-data text-foreground font-semibold">
-                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center text-sm text-muted-foreground">
-                                        <HandCoinsIcon className="h-4 w-4 mr-2" />
-                                        <span className="sensitive-data text-foreground font-semibold">
-                                            {formatAmounts(unbilledExpenseTotalsByCurrency)}
-                                        </span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </CardContent>
@@ -772,15 +778,16 @@ const ClientDashboard = ({
 
             {/* Projects Section */}
             <Card>
-                <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
-                    <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
-                        <CardTitle className="text-lg">
+                <CardHeader className={cn(isMobileLayout && 'px-3 py-3')}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <CardTitle className="min-w-0 flex-1 text-lg">
                             Projects ({clientProjects.length})
                         </CardTitle>
                         <Button
                             onClick={handleCreateProject}
                             variant="outline"
                             leadingIcon={PlusIcon}
+                            className="shrink-0"
                         >
                             New Project
                         </Button>
@@ -841,8 +848,8 @@ const ClientDashboard = ({
 
             {/* Invoices Section */}
             <Card>
-                <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
-                    <div className="flex items-center justify-between">
+                <CardHeader className={cn(isMobileLayout && 'px-3 py-3')}>
+                    <div className="flex items-center gap-3">
                         <button
                             type="button"
                             onClick={toggleInvoicesExpanded}
@@ -883,7 +890,7 @@ const ClientDashboard = ({
                 />
             ) : (
                 <Card>
-                    <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
+                    <CardHeader className={cn(isMobileLayout && 'px-3 py-3')}>
                         <CardTitle className="text-lg">Time Analytics</CardTitle>
                     </CardHeader>
                     <CardContent className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>

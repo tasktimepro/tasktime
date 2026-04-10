@@ -681,9 +681,13 @@ const Expenses = ({
                                     </SelectContent>
                                 </Select>
 
-                                <Button variant="outline" onClick={() => setIsMobileFiltersOpen(true)}>
-                                    <FilterIcon className="h-4 w-4" />
-                                    <span>Filters</span>
+                                <Button
+                                    variant="outline"
+                                    leadingIcon={FilterIcon}
+                                    className="shrink-0"
+                                    onClick={() => setIsMobileFiltersOpen(true)}
+                                >
+                                    Filters
                                     {activeFilterCount > 0 && (
                                         <Badge variant="secondary" className="ml-1 min-w-5 justify-center px-1.5 py-0 text-[11px]">
                                             {activeFilterCount}

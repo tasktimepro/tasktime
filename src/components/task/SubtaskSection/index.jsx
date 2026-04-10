@@ -9,6 +9,8 @@ import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
 import DeleteTaskWarnings from '../DeleteTaskWarnings';
 import { getTaskDeletionBillingSummary } from '../../../utils/taskUtils.ts';
+import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 
 /**
  * SubtaskSection component - Renders subtasks list and create form.
@@ -37,6 +39,7 @@ const SubtaskSection = ({
     onEditTask,
     onViewTask
 }) => {
+    const isMobileLayout = useIsMobileLayout();
     // Yjs hooks for state
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
@@ -118,7 +121,7 @@ const SubtaskSection = ({
 
     return (
         <div className="border-t border-border bg-muted/40 rounded-b-lg">
-            <div className="pl-8 pr-2 py-2 space-y-2">
+            <div className={cn('space-y-2 py-2 pr-2', isMobileLayout ? 'px-2' : 'pl-8')}>
                 {sortedSubtasks.map((subtask) => (
                     <SubtaskItem
                         key={subtask.id}

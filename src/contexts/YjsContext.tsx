@@ -89,6 +89,13 @@ interface YjsProviderProps {
     children: React.ReactNode;
 }
 
+type DriveSyncOptions = {
+    allowPull?: boolean;
+    force?: boolean;
+};
+
+type RunSyncWithAuthHandling = (options?: DriveSyncOptions) => Promise<void>;
+
 const VISIBILITY_SYNC_COOLDOWN_MS = 60 * 1000;
 const ONLINE_SYNC_COOLDOWN_MS = 60 * 1000;
 
@@ -150,7 +157,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         return true;
     }, [store, invalidateSession]);
 
-    const runSyncWithAuthHandling = useCallback(async (options?: { allowPull?: boolean; force?: boolean }) => {
+    const runSyncWithAuthHandling = useCallback<RunSyncWithAuthHandling>(async (options) => {
         try {
             await store.syncDrive(options);
         } catch (error) {
@@ -346,7 +353,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
     // --- Callbacks ---
 
-    const forceSyncDrive = useCallback(async (options?: { allowPull?: boolean }) => {
+    const forceSyncDrive = useCallback<YjsContextValue['forceSyncDrive']>(async (options) => {
         setManualSyncInProgress(true);
         try {
             await runSyncWithAuthHandling({
@@ -379,16 +386,15 @@ export function YjsProvider({ children }: YjsProviderProps) {
             if (document.visibilityState !== 'visible') return;
             if (!autoSyncEnabled) return;
 
-            if (!shouldTriggerForegroundSync(VISIBILITY_SYNC_COOLDOWN_MS)) {
-                return;
-            }
-
             if (autoSyncMode === 'sync') {
+                if (!shouldTriggerForegroundSync(VISIBILITY_SYNC_COOLDOWN_MS)) {
+                    return;
+                }
+
                 runSyncWithAuthHandling({ force: false }).catch(console.error);
-            } else if (autoSyncMode === 'backup') {
-                // Backup mode: also check for remote changes on tab focus so
-                // cross-device edits show up without requiring a manual refresh.
-                runSyncWithAuthHandling({ force: false }).catch(console.error);
+            } else if (autoSyncMode === 'backup' && store.hasPendingSyncChanges()) {
+                // Backup mode: only push pending local changes on tab focus
+                runSyncWithAuthHandling({ allowPull: false, force: false }).catch(console.error);
             }
         };
 
@@ -484,7 +490,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         await store.wipeDriveData();
     }, [store]);
 
-    const loadEntriesForYear = useCallback(async (year: number) => {
+    const loadEntriesForYear = useCallback<YjsContextValue['loadEntriesForYear']>(async (year) => {
         await store.loadEntriesForYear(year);
     }, [store]);
 
@@ -533,7 +539,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         return store.createBackup();
     }, [store]);
 
-    const downloadBackup = useCallback(async (fileId: string) => {
+    const downloadBackup = useCallback<YjsContextValue['downloadBackup']>(async (fileId) => {
         return store.downloadBackup(fileId);
     }, [store]);
 

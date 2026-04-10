@@ -299,12 +299,12 @@ const TaskTree = ({
 
     return (
         <div className="space-y-4">
-            <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
-                <h3 className="text-lg font-semibold text-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="min-w-0 flex-1 text-lg font-semibold text-foreground">
                     Tasks ({visibleTasksCount})
                 </h3>
 
-                <div className={cn('flex items-center space-x-3', isMobileLayout && 'w-full justify-between')}>
+                <div className="flex shrink-0 items-center gap-3">
                     <Select value={taskSort} onValueChange={setTaskSort}>
                         <SelectTrigger
                             className="h-9 w-9"
