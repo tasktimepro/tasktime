@@ -26,6 +26,33 @@ function createProviderWithCoreDoc(coreDoc) {
 }
 
 describe('YjsDriveProvider', () => {
+    it('pushes queued reconnect changes during manual-mode connect when Drive is empty', async () => {
+        const liveDoc = new Y.Doc()
+        liveDoc.getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Offline edit',
+        }))
+
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: {} })),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async () => {})
+        provider.subscribeToDoc = vi.fn()
+
+        provider.markDocsForFullStateUpload(['core'])
+
+        await provider.connect('manual')
+
+        expect(provider.syncDoc).toHaveBeenCalledWith('core', false)
+        expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
+    })
+
     it('rejects remote updates that would break validated references', () => {
         const liveDoc = new Y.Doc()
 

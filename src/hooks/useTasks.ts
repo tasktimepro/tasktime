@@ -420,9 +420,21 @@ export function useTasks(options: UseTasksOptions = {}) {
         const today = getTodayString();
         if (!today) return;
 
+        const todayDate = new Date();
+
         for (const task of projectActiveTasks) {
             if (!task.recurring || !task.skipUntilNextRecurring || !task.skippedOccurrenceDate) continue;
             if (task.skippedOccurrenceDate === today) continue;
+
+            // Don't reset if the skip matches the current overdue occurrence —
+            // it's still valid until the next recurrence cycle arrives.
+            const previousDueDate = findPreviousRecurringDueDate(todayDate, task.recurring);
+            if (previousDueDate) {
+                const previousDueStr = toStorageDate(previousDueDate);
+                if (previousDueStr && task.skippedOccurrenceDate === previousDueStr) {
+                    continue;
+                }
+            }
 
             update(task.id, {
                 skipUntilNextRecurring: false,

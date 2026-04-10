@@ -154,6 +154,150 @@ describe('useGoogleAuth', () => {
         expect(result.current.error).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
     })
 
+    it('surfaces worker callback details when the auth exchange fails', async () => {
+        getStoredSession.mockResolvedValue(null)
+
+        const popup = createPopupStub()
+
+        window.open.mockImplementation(() => popup)
+
+        fetch.mockImplementation(async (input) => {
+            if (input === 'https://worker.example/auth/init') {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                        state: 'oauth-state',
+                    }),
+                }
+            }
+
+            if (input === 'https://worker.example/auth/callback') {
+                return {
+                    ok: false,
+                    headers: {
+                        get: (name) => name === 'Content-Type' ? 'application/json' : null,
+                    },
+                    json: async () => ({
+                        error: 'Authentication failed',
+                        details: 'Token exchange failed: {"error":"invalid_grant"}',
+                    }),
+                    text: async () => '',
+                }
+            }
+
+            throw new Error(`Unexpected fetch: ${String(input)}`)
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let thrownError
+
+        act(() => {
+            void result.current.signIn().catch(error => {
+                thrownError = error
+            })
+        })
+
+        await waitFor(() => {
+            expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+        })
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: {
+                    type: 'google-auth-callback',
+                    code: 'bad-auth-code',
+                    state: 'oauth-state',
+                },
+            }))
+        })
+
+        await waitFor(() => {
+            expect(thrownError).toBeInstanceOf(Error)
+        })
+
+        expect(thrownError.message).toBe('Token exchange failed: {"error":"invalid_grant"}')
+        expect(result.current.error).toBe('Token exchange failed: {"error":"invalid_grant"}')
+    })
+
+    it('shows a friendly message when the sync service hits the daily sign-in limit', async () => {
+        getStoredSession.mockResolvedValue(null)
+
+        const popup = createPopupStub()
+
+        window.open.mockImplementation(() => popup)
+
+        fetch.mockImplementation(async (input) => {
+            if (input === 'https://worker.example/auth/init') {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                        state: 'oauth-state',
+                    }),
+                }
+            }
+
+            if (input === 'https://worker.example/auth/callback') {
+                return {
+                    ok: false,
+                    headers: {
+                        get: (name) => name === 'Content-Type' ? 'application/json' : null,
+                    },
+                    json: async () => ({
+                        error: 'Authentication failed',
+                        details: 'Error: KV put() limit exceeded for the day',
+                    }),
+                    text: async () => '',
+                }
+            }
+
+            throw new Error(`Unexpected fetch: ${String(input)}`)
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let thrownError
+
+        act(() => {
+            void result.current.signIn().catch(error => {
+                thrownError = error
+            })
+        })
+
+        await waitFor(() => {
+            expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+        })
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: {
+                    type: 'google-auth-callback',
+                    code: 'quota-hit-code',
+                    state: 'oauth-state',
+                },
+            }))
+        })
+
+        await waitFor(() => {
+            expect(thrownError).toBeInstanceOf(Error)
+        })
+
+        expect(thrownError.message).toBe('Google Drive sign-in is temporarily unavailable because the sync service reached its daily sign-in limit. Please try again tomorrow.')
+        expect(result.current.error).toBe('Google Drive sign-in is temporarily unavailable because the sync service reached its daily sign-in limit. Please try again tomorrow.')
+    })
+
     it('opens the auth popup before initializing the auth request so mobile browsers keep the user gesture', async () => {
         getStoredSession.mockResolvedValue(null)
 

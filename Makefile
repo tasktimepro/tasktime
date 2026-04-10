@@ -142,6 +142,8 @@ npm:
 # Set CLOUDFLARE_API_TOKEN in your environment or .env.worker.local
 # Create token at: https://dash.cloudflare.com/profile/api-tokens
 # Required permissions: Account Settings (Read), D1 (Edit), Workers KV Storage (Edit), Workers Scripts (Edit)
+# If deploying the custom domain route in cloudflare/wrangler.toml, also add Zone: Workers Routes (Edit)
+# and ensure the token can access the zone that hosts sync.tasktime.pro.
 # Also ensure the token's Account Resources include the target Cloudflare account.
 # Example .env.worker.local contents:
 # CLOUDFLARE_API_TOKEN=your-token-here

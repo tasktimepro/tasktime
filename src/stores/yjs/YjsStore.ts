@@ -40,6 +40,9 @@ import type {
 } from './types';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+const DISCONNECTED_DIRTY_DOCS_STORAGE_KEY = 'tasktime-disconnected-dirty-docs';
+
+type DocUpdateHandler = (update: Uint8Array, origin: unknown) => void;
 
 export class YjsStore {
 
@@ -60,9 +63,12 @@ export class YjsStore {
     private _archivedInvoicesLoading: Promise<Y.Doc> | null = null;
     private _archivedExpensesDoc: Y.Doc | null = null;
     private _archivedExpensesLoading: Promise<Y.Doc> | null = null;
+    private disconnectedDirtyDocs: Set<DocName>;
+    private disconnectedDirtyDocHandlers: Map<DocName, DocUpdateHandler> = new Map();
 
     constructor() {
         this.docManager = new YjsDocManager();
+        this.disconnectedDirtyDocs = this.readDisconnectedDirtyDocs();
     }
 
     // =========================================================================
@@ -78,6 +84,9 @@ export class YjsStore {
         // Load always-needed documents
         this._coreDoc = await this.docManager.getDoc('core');
         this._activeEntriesDoc = await this.docManager.getDoc('entries-active');
+
+        this.trackDocForDisconnectedChanges('core', this._coreDoc);
+        this.trackDocForDisconnectedChanges('entries-active', this._activeEntriesDoc);
 
         const migratedCoreInvoices = migrateInvoicesInDoc(this._coreDoc);
         if (migratedCoreInvoices > 0) {
@@ -212,9 +221,16 @@ export class YjsStore {
             this._archivedTasksDoc = await this._archivedTasksLoading;
             this._archivedTasksLoading = null;
 
+            this.trackDocForDisconnectedChanges('tasks-archived', this._archivedTasksDoc);
+
             // Sync with Drive if connected
             if (this.driveProvider?.isConnected()) {
+                if (this.isDisconnectedDirtyDoc('tasks-archived')) {
+                    this.driveProvider.markDocsForFullStateUpload(['tasks-archived']);
+                }
+
                 await this.driveProvider.syncAndSubscribeDoc('tasks-archived');
+                this.clearDisconnectedDirtyDocs(['tasks-archived']);
             }
         }
         return this._archivedTasksDoc.getMap('tasks');
@@ -266,9 +282,16 @@ export class YjsStore {
             this._archivedExpensesDoc = await this._archivedExpensesLoading;
             this._archivedExpensesLoading = null;
 
+            this.trackDocForDisconnectedChanges('expenses-archived', this._archivedExpensesDoc);
+
             // Sync with Drive if connected
             if (this.driveProvider?.isConnected()) {
+                if (this.isDisconnectedDirtyDoc('expenses-archived')) {
+                    this.driveProvider.markDocsForFullStateUpload(['expenses-archived']);
+                }
+
                 await this.driveProvider.syncAndSubscribeDoc('expenses-archived');
+                this.clearDisconnectedDirtyDocs(['expenses-archived']);
             }
         }
         return this._archivedExpensesDoc.getMap('expenses');
@@ -370,9 +393,16 @@ export class YjsStore {
         const wasLoaded = this.docManager.isLoaded(docName);
         const doc = await this.docManager.getDoc(docName);
 
+        this.trackDocForDisconnectedChanges(docName, doc);
+
         // Sync with Drive if this is a newly loaded doc
         if (!wasLoaded && this.driveProvider?.isConnected()) {
+            if (this.isDisconnectedDirtyDoc(docName)) {
+                this.driveProvider.markDocsForFullStateUpload([docName]);
+            }
+
             await this.driveProvider.syncAndSubscribeDoc(docName);
+            this.clearDisconnectedDirtyDocs([docName]);
         }
 
         return doc.getMap('timeEntries');
@@ -438,6 +468,8 @@ export class YjsStore {
             this._archivedInvoicesDoc = await this._archivedInvoicesLoading;
             this._archivedInvoicesLoading = null;
 
+            this.trackDocForDisconnectedChanges('invoices-archived', this._archivedInvoicesDoc);
+
             const migratedArchivedInvoices = migrateInvoicesInDoc(this._archivedInvoicesDoc);
             if (migratedArchivedInvoices > 0) {
                 console.log(`[YjsStore] Migrated ${migratedArchivedInvoices} archived invoices to canonical shape`);
@@ -445,7 +477,12 @@ export class YjsStore {
 
             // Sync with Drive if connected
             if (this.driveProvider?.isConnected()) {
+                if (this.isDisconnectedDirtyDoc('invoices-archived')) {
+                    this.driveProvider.markDocsForFullStateUpload(['invoices-archived']);
+                }
+
                 await this.driveProvider.syncAndSubscribeDoc('invoices-archived');
+                this.clearDisconnectedDirtyDocs(['invoices-archived']);
             }
         }
         return this._archivedInvoicesDoc.getMap('invoices');
@@ -517,6 +554,7 @@ export class YjsStore {
         // Move entries to year documents
         for (const [year, entries] of toArchive) {
             const yearDoc = await this.docManager.getDoc(`entries-${year}` as DocName);
+            this.trackDocForDisconnectedChanges(`entries-${year}` as DocName, yearDoc);
             const yearEntries = yearDoc.getMap('timeEntries');
 
             for (const entry of entries) {
@@ -633,6 +671,11 @@ export class YjsStore {
         this.driveProvider = new YjsDriveProvider(this.docManager, accessToken, sessionId);
         this.driveProvider.setSyncMode(this.driveSyncMode);
 
+        const disconnectedDirtyDocs = this.getDisconnectedDirtyDocs();
+        if (disconnectedDirtyDocs.length > 0) {
+            this.driveProvider.markDocsForFullStateUpload(disconnectedDirtyDocs);
+        }
+
         // Set up backup manager with access to the provider's manifest
         this.backupManager = new BackupManager(this.driveProvider.getManifest(), this);
 
@@ -646,6 +689,10 @@ export class YjsStore {
         });
 
         await this.driveProvider.connect(this.driveSyncMode);
+
+        this.clearDisconnectedDirtyDocs(
+            disconnectedDirtyDocs.filter((docName) => this.docManager.isLoaded(docName)),
+        );
     }
 
     /**
@@ -884,6 +931,8 @@ export class YjsStore {
         this._archivedInvoicesLoading = null;
         this._archivedExpensesDoc = null;
         this._archivedExpensesLoading = null;
+        this.disconnectedDirtyDocHandlers.clear();
+        this.clearDisconnectedDirtyDocs();
         this._isReady = false;
 
         console.log('[YjsStore] All data cleared');
@@ -903,6 +952,8 @@ export class YjsStore {
         this._archivedTasksDoc = null;
         this._archivedInvoicesDoc = null;
         this._archivedExpensesDoc = null;
+        this.disconnectedDirtyDocHandlers.clear();
+        this.clearDisconnectedDirtyDocs();
         this._isReady = false;
     }
 
@@ -913,6 +964,111 @@ export class YjsStore {
     private assertReady(): void {
         if (!this._isReady) {
             throw new Error('[YjsStore] Store not initialized. Call initialize() first.');
+        }
+    }
+
+    private trackDocForDisconnectedChanges(docName: DocName, doc: Y.Doc): void {
+        if (this.disconnectedDirtyDocHandlers.has(docName)) {
+            return;
+        }
+
+        const handler: DocUpdateHandler = (_update, origin) => {
+            if (origin === 'remote') {
+                return;
+            }
+
+            if (this.driveProvider?.isConnected()) {
+                return;
+            }
+
+            this.markDisconnectedDirtyDoc(docName);
+        };
+
+        doc.on('update', handler);
+        this.disconnectedDirtyDocHandlers.set(docName, handler);
+    }
+
+    private markDisconnectedDirtyDoc(docName: DocName): void {
+        if (this.disconnectedDirtyDocs.has(docName)) {
+            return;
+        }
+
+        this.disconnectedDirtyDocs.add(docName);
+        this.persistDisconnectedDirtyDocs();
+    }
+
+    private getDisconnectedDirtyDocs(): DocName[] {
+        return Array.from(this.disconnectedDirtyDocs);
+    }
+
+    private isDisconnectedDirtyDoc(docName: DocName): boolean {
+        return this.disconnectedDirtyDocs.has(docName);
+    }
+
+    private clearDisconnectedDirtyDocs(docNames?: DocName[]): void {
+        if (!docNames) {
+            this.disconnectedDirtyDocs.clear();
+            this.persistDisconnectedDirtyDocs();
+            return;
+        }
+
+        if (docNames.length === 0) {
+            return;
+        }
+
+        let changed = false;
+
+        for (const docName of docNames) {
+            if (this.disconnectedDirtyDocs.delete(docName)) {
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            this.persistDisconnectedDirtyDocs();
+        }
+    }
+
+    private readDisconnectedDirtyDocs(): Set<DocName> {
+        if (typeof localStorage === 'undefined') {
+            return new Set();
+        }
+
+        try {
+            const stored = localStorage.getItem(DISCONNECTED_DIRTY_DOCS_STORAGE_KEY);
+            if (!stored) {
+                return new Set();
+            }
+
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed)) {
+                return new Set();
+            }
+
+            return new Set(parsed as DocName[]);
+        } catch (error) {
+            console.warn('[YjsStore] Failed to read disconnected dirty docs:', error);
+            return new Set();
+        }
+    }
+
+    private persistDisconnectedDirtyDocs(): void {
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
+
+        try {
+            if (this.disconnectedDirtyDocs.size === 0) {
+                localStorage.removeItem(DISCONNECTED_DIRTY_DOCS_STORAGE_KEY);
+                return;
+            }
+
+            localStorage.setItem(
+                DISCONNECTED_DIRTY_DOCS_STORAGE_KEY,
+                JSON.stringify(Array.from(this.disconnectedDirtyDocs)),
+            );
+        } catch (error) {
+            console.warn('[YjsStore] Failed to persist disconnected dirty docs:', error);
         }
     }
 }

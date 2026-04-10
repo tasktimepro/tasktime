@@ -95,6 +95,22 @@ export class YjsDriveProvider {
     private lastPullAt: number = 0;
     private lastManifestModifiedTime: string | null = null;
 
+    markDocsForFullStateUpload(docNames: DocName[]): void {
+        let added = false;
+
+        for (const docName of docNames) {
+            if (!this.forceFullStateDocs.has(docName)) {
+                this.forceFullStateDocs.add(docName);
+                added = true;
+            }
+        }
+
+        if (added) {
+            this.log('sync: queued full-state upload for reconnect docs', { docs: docNames });
+            this.updatePendingState();
+        }
+    }
+
     private isOnline(): boolean {
         if (typeof navigator === 'undefined') {
             return true;
@@ -266,6 +282,8 @@ export class YjsDriveProvider {
 
                 this.promotePersistedLocalChangesToFullState(this.docManager.getLoadedDocs());
 
+                const shouldPushLocalChanges = this.hasLocalChangesToPush();
+
                 if (hasRemoteData) {
                     // Remote data exists — pull it before subscribing to local changes
                     this.log('connect: first-sync pull for backup/manual mode');
@@ -273,6 +291,17 @@ export class YjsDriveProvider {
 
                     for (const docName of this.docManager.getLoadedDocs()) {
                         await this.syncDoc(docName, true);
+                        this.subscribeToDoc(docName);
+                    }
+
+                    if (this.manifest.isDirty()) {
+                        await this.manifest.save();
+                    }
+                } else if (shouldPushLocalChanges) {
+                    this.log('connect: first-sync push for local reconnect changes', { mode });
+
+                    for (const docName of this.docManager.getLoadedDocs()) {
+                        await this.syncDoc(docName, false);
                         this.subscribeToDoc(docName);
                     }
 

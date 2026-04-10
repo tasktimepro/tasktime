@@ -89,7 +89,7 @@ interface YjsProviderProps {
     children: React.ReactNode;
 }
 
-const VISIBILITY_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
+const VISIBILITY_SYNC_COOLDOWN_MS = 60 * 1000;
 const ONLINE_SYNC_COOLDOWN_MS = 60 * 1000;
 
 export function YjsProvider({ children }: YjsProviderProps) {
@@ -377,12 +377,17 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
         const handleVisibility = () => {
             if (document.visibilityState !== 'visible') return;
+            if (!autoSyncEnabled) return;
 
-            if (autoSyncEnabled && autoSyncMode === 'sync') {
-                if (!shouldTriggerForegroundSync(VISIBILITY_SYNC_COOLDOWN_MS)) {
-                    return;
-                }
+            if (!shouldTriggerForegroundSync(VISIBILITY_SYNC_COOLDOWN_MS)) {
+                return;
+            }
 
+            if (autoSyncMode === 'sync') {
+                runSyncWithAuthHandling({ force: false }).catch(console.error);
+            } else if (autoSyncMode === 'backup') {
+                // Backup mode: also check for remote changes on tab focus so
+                // cross-device edits show up without requiring a manual refresh.
                 runSyncWithAuthHandling({ force: false }).catch(console.error);
             }
         };

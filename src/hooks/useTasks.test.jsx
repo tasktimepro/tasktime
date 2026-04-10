@@ -534,8 +534,22 @@ describe('useTasks', () => {
         expect(status.effectiveDateStr).toBe('2025-01-13')
         expect(status.isSkipped).toBe(false)
 
-        // Side-effect write removed — skip reset is now handled by resetExpiredSkips()
-        // called from Dashboard, not automatically inside getRecurringStatus
+        // On Monday Jan 13, the skip for Jan 6 is still for the previous
+        // overdue occurrence, so resetExpiredSkips must NOT reset it yet.
+        act(() => {
+            result.current.resetExpiredSkips()
+        })
+
+        expect(update).not.toHaveBeenCalledWith(
+            'recurring-overdue',
+            { skipUntilNextRecurring: false, skippedOccurrenceDate: null }
+        )
+
+        // Advance past this recurrence cycle — on Jan 14 (Tuesday) the
+        // previous due date is now Jan 13, so the Jan 6 skip is truly expired.
+        update.mockClear()
+        vi.setSystemTime(new Date('2025-01-14T09:00:00Z'))
+
         act(() => {
             result.current.resetExpiredSkips()
         })

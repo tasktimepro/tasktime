@@ -3,6 +3,7 @@ import {
     createRemoteDriveFixture,
     createStatefulDriveFixture,
     createPersonalProject,
+    disconnectDriveFromAccount,
     editProjectFromList,
     getProjectCard,
     installMockDriveRoutes,
@@ -59,7 +60,161 @@ test.describe('Cloud sync smoke', () => {
         }
     });
 
+    test('pushes local changes on later Drive reconnect without requiring Sync Now', async ({ page }) => {
+        const projectTitle = `Playwright Reconnect Project ${Date.now()}`;
+        const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
+
+        await installMockDriveRoutes(page, driveFixture);
+
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
+
+        await createPersonalProject(page, projectTitle);
+
+        expect(driveFixture.readCurrentSyncedCoreProjectTitles()).not.toContain(projectTitle);
+
+        await seedStoredGoogleSession(page, {
+            sessionId: `playwright-reconnect-session-${Date.now()}`,
+            userId: 'playwright-reconnect-user',
+            email: 'playwright-reconnect@example.com',
+        });
+
+        await page.reload();
+
+        await expect(page.getByRole('heading', { name: projectTitle, exact: true })).toBeVisible();
+        await expect.poll(() => {
+            return driveFixture.readCurrentSyncedCoreProjectTitles().includes(projectTitle);
+        }).toBe(true);
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Sync changes' })).toHaveCount(0);
+    });
+
+    test('merges remote data with disconnected local edits on reconnect without requiring Sync Now', async ({ page }) => {
+        const remoteProjectTitle = `Playwright Remote Reconnect Project ${Date.now()}`;
+        const localProjectTitle = `Playwright Local Reconnect Project ${Date.now()}`;
+        const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({
+            projects: [
+                {
+                    id: 'playwright-remote-reconnect-project',
+                    title: remoteProjectTitle,
+                    isPersonal: true,
+                    archived: false,
+                },
+            ],
+        }));
+
+        await installMockDriveRoutes(page, driveFixture);
+
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
+
+        await createPersonalProject(page, localProjectTitle);
+
+        expect(driveFixture.readCurrentSyncedCoreProjectTitles()).toContain(remoteProjectTitle);
+        expect(driveFixture.readCurrentSyncedCoreProjectTitles()).not.toContain(localProjectTitle);
+
+        await seedStoredGoogleSession(page, {
+            sessionId: `playwright-reconnect-merge-session-${Date.now()}`,
+            userId: 'playwright-reconnect-merge-user',
+            email: 'playwright-reconnect-merge@example.com',
+        });
+
+        await page.reload();
+
+        await expect(page.getByRole('heading', { name: localProjectTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: remoteProjectTitle, exact: true })).toBeVisible();
+        await expect.poll(() => {
+            const titles = driveFixture.readCurrentSyncedCoreProjectTitles();
+            return titles.includes(localProjectTitle) && titles.includes(remoteProjectTitle);
+        }).toBe(true);
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Sync changes' })).toHaveCount(0);
+
+        await page.reload();
+
+        await expect(page.getByRole('heading', { name: localProjectTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: remoteProjectTitle, exact: true })).toBeVisible();
+    });
+
+    test('converges same-project remote and disconnected local edits on reconnect without requiring Sync Now', async ({ page }) => {
+        const originalTitle = `Playwright Reconnect Shared Project ${Date.now()}`;
+        const localTitle = `Playwright Reconnect Local Title ${Date.now()}`;
+        const mergedColorValue = 'rgb(59, 130, 246)';
+        const baseProject = {
+            id: 'playwright-reconnect-shared-project',
+            title: originalTitle,
+            isPersonal: true,
+            archived: false,
+        };
+        const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({
+            projects: [baseProject],
+        }));
+
+        await installMockDriveRoutes(page, driveFixture);
+
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+
+        await seedStoredGoogleSession(page, {
+            sessionId: `playwright-reconnect-conflict-session-${Date.now()}`,
+            userId: 'playwright-reconnect-conflict-user',
+            email: 'playwright-reconnect-conflict@example.com',
+        });
+
+        await page.reload();
+
+        await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
+
+        await disconnectDriveFromAccount(page);
+
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: /Connect Google Drive|Reconnect to Drive/ })).toBeVisible();
+
+        await editProjectFromList(page, {
+            currentTitle: originalTitle,
+            nextTitle: localTitle,
+        });
+
+        await expect(page.getByRole('heading', { name: localTitle, exact: true })).toBeVisible();
+        await expect(driveFixture.readCurrentSyncedCoreProjects().find((project) => project.id === baseProject.id)?.title).toBe(originalTitle);
+
+        driveFixture.appendRemoteProjectPatch({
+            baseProject,
+            changes: { color: '#3b82f6' },
+        });
+
+        await seedStoredGoogleSession(page, {
+            sessionId: `playwright-reconnect-conflict-session-restored-${Date.now()}`,
+            userId: 'playwright-reconnect-conflict-user',
+            email: 'playwright-reconnect-conflict@example.com',
+        });
+
+        await page.reload();
+
+        await expect(page.getByRole('heading', { name: localTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toHaveCount(0);
+        await expect(getProjectCard(page, localTitle)).toHaveCSS('border-left-color', mergedColorValue);
+        await expect.poll(() => {
+            const project = driveFixture.readCurrentSyncedCoreProjects().find((item) => item.id === baseProject.id);
+            return project?.title === localTitle && project?.color === '#3b82f6';
+        }).toBe(true);
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Sync changes' })).toHaveCount(0);
+
+        await page.reload();
+
+        await expect(page.getByRole('heading', { name: localTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toHaveCount(0);
+        await expect(getProjectCard(page, localTitle)).toHaveCSS('border-left-color', mergedColorValue);
+    });
+
     test('syncs projects across two connected browser contexts without losing either change', async ({ browser }) => {
+        test.slow();
+
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
         const contextA = await browser.newContext();
         const contextB = await browser.newContext();
@@ -144,6 +299,8 @@ test.describe('Cloud sync smoke', () => {
     });
 
     test('converges same-project edits across devices after one device reloads before syncing', async ({ browser }) => {
+        test.slow();
+
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
         const contextA = await browser.newContext();
         const contextB = await browser.newContext();

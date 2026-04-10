@@ -62,24 +62,35 @@ function encodeCoreDelta({
     return Buffer.from(Y.encodeStateAsUpdate(doc, stateVector));
 }
 
-function encodeProjectPatchDelta({ baseProject, changes }) {
+function buildCurrentSyncedCoreDoc(state, getFileByName) {
+    const manifestFile = getFileByName('tasktime-yjs-manifest.json');
+
+    if (!manifestFile) {
+        return null;
+    }
+
+    const manifest = parseManifestBody(state.fileBodies.get(manifestFile.id));
+    const coreDocManifest = manifest?.documents?.core;
+    const coreFile = getFileByName('tasktime-yjs-core.bin');
+
+    if (!coreDocManifest || !coreFile) {
+        return null;
+    }
+
     const doc = new Y.Doc();
-    const projectsMap = doc.getMap('projects');
-    const projectMap = objectToYMap(baseProject);
+    Y.applyUpdate(doc, new Uint8Array(state.fileBodies.get(coreFile.id)));
 
-    projectsMap.set(baseProject.id, projectMap);
+    for (const delta of coreDocManifest.deltas || []) {
+        const deltaFile = getFileByName(`tasktime-yjs-core-delta-${delta.id}.bin`);
 
-    const stateVector = Y.encodeStateVector(doc);
-
-    for (const [key, value] of Object.entries(changes)) {
-        if (value === undefined) {
+        if (!deltaFile) {
             continue;
         }
 
-        projectMap.set(key, value);
+        Y.applyUpdate(doc, new Uint8Array(state.fileBodies.get(deltaFile.id)));
     }
 
-    return Buffer.from(Y.encodeStateAsUpdate(doc, stateVector));
+    return doc;
 }
 
 function encodeEntriesActiveState({ timeEntries = [] }) {
@@ -386,61 +397,19 @@ export function createStatefulDriveFixture(initialFixture) {
             return readProjectTitlesFromCoreState(state.fileBodies.get(coreFile.id));
         },
         readCurrentSyncedCoreProjectTitles() {
-            const manifestFile = getFileByName('tasktime-yjs-manifest.json');
+            const doc = buildCurrentSyncedCoreDoc(state, getFileByName);
 
-            if (!manifestFile) {
+            if (!doc) {
                 return [];
-            }
-
-            const manifest = parseManifestBody(state.fileBodies.get(manifestFile.id));
-            const coreDocManifest = manifest?.documents?.core;
-            const coreFile = getFileByName('tasktime-yjs-core.bin');
-
-            if (!coreDocManifest || !coreFile) {
-                return [];
-            }
-
-            const doc = new Y.Doc();
-            Y.applyUpdate(doc, new Uint8Array(state.fileBodies.get(coreFile.id)));
-
-            for (const delta of coreDocManifest.deltas || []) {
-                const deltaFile = getFileByName(`tasktime-yjs-core-delta-${delta.id}.bin`);
-
-                if (!deltaFile) {
-                    continue;
-                }
-
-                Y.applyUpdate(doc, new Uint8Array(state.fileBodies.get(deltaFile.id)));
             }
 
             return readProjectTitlesFromCoreDoc(doc);
         },
         readCurrentSyncedCoreProjects() {
-            const manifestFile = getFileByName('tasktime-yjs-manifest.json');
+            const doc = buildCurrentSyncedCoreDoc(state, getFileByName);
 
-            if (!manifestFile) {
+            if (!doc) {
                 return [];
-            }
-
-            const manifest = parseManifestBody(state.fileBodies.get(manifestFile.id));
-            const coreDocManifest = manifest?.documents?.core;
-            const coreFile = getFileByName('tasktime-yjs-core.bin');
-
-            if (!coreDocManifest || !coreFile) {
-                return [];
-            }
-
-            const doc = new Y.Doc();
-            Y.applyUpdate(doc, new Uint8Array(state.fileBodies.get(coreFile.id)));
-
-            for (const delta of coreDocManifest.deltas || []) {
-                const deltaFile = getFileByName(`tasktime-yjs-core-delta-${delta.id}.bin`);
-
-                if (!deltaFile) {
-                    continue;
-                }
-
-                Y.applyUpdate(doc, new Uint8Array(state.fileBodies.get(deltaFile.id)));
             }
 
             return readProjectsFromCoreDoc(doc);
@@ -542,6 +511,29 @@ export function createStatefulDriveFixture(initialFixture) {
                 throw new Error('Remote manifest is missing the core document.');
             }
 
+            const currentDoc = buildCurrentSyncedCoreDoc(state, getFileByName);
+
+            if (!currentDoc) {
+                throw new Error('Remote core state fixture is not initialized.');
+            }
+
+            const projectsMap = currentDoc.getMap('projects');
+            const currentProjectMap = projectsMap.get(baseProject.id);
+
+            if (!(currentProjectMap instanceof Y.Map)) {
+                throw new Error(`Remote core project ${baseProject.id} is missing.`);
+            }
+
+            const stateVector = Y.encodeStateVector(currentDoc);
+
+            for (const [key, value] of Object.entries(changes)) {
+                if (value === undefined) {
+                    continue;
+                }
+
+                currentProjectMap.set(key, value);
+            }
+
             const deltaId = `playwright-${nextFileId++}`;
 
             coreManifest.deltas.push({
@@ -552,7 +544,7 @@ export function createStatefulDriveFixture(initialFixture) {
 
             upsertFile({
                 name: `tasktime-yjs-core-delta-${deltaId}.bin`,
-                body: encodeProjectPatchDelta({ baseProject, changes }),
+                body: Buffer.from(Y.encodeStateAsUpdate(currentDoc, stateVector)),
             });
             upsertFile({
                 fileId: manifestFile.id,
@@ -661,6 +653,25 @@ export async function syncNowFromAccount(page) {
     await expect(syncNowButton).toBeVisible();
     await expect(syncNowButton).toBeEnabled({ timeout: 20000 });
     await syncNowButton.click();
+}
+
+export async function disconnectDriveFromAccount(page) {
+    await page.goto('/account?section=sync');
+    await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
+
+    const disconnectButton = page.getByRole('button', { name: 'Disconnect' });
+
+    await expect(disconnectButton).toBeVisible();
+    await disconnectButton.click();
+
+    const dialog = page.getByRole('dialog', { name: 'Disconnect from Google Drive?' });
+
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Sync & Disconnect' }).click();
+
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText('Disconnected from Google Drive')).toBeVisible();
+    await expect(page.getByText('Not connected')).toBeVisible();
 }
 
 export function getProjectCard(page, projectTitle) {

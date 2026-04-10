@@ -30,6 +30,10 @@ interface AuthState {
     hadPreviousSession: boolean;
 }
 
+type ValidateWorkerSession = (session: StoredSession) => Promise<boolean>;
+type SignOutFromWorker = (options?: { revoke?: boolean }) => Promise<void>;
+const SIGN_IN_CAPACITY_EXCEEDED_ERROR = 'Google Drive sign-in is temporarily unavailable because the sync service reached its daily sign-in limit. Please try again tomorrow.';
+
 const HAD_PREVIOUS_SESSION_KEY = 'google-auth-had-previous-session';
 
 function readHadPreviousSessionFlag(): boolean {
@@ -107,10 +111,58 @@ function toAuthError(error: unknown, endpoint?: string): Error {
     }
 
     if (error instanceof Error) {
-        return error;
+        return new Error(normalizeAuthErrorMessage(error.message));
     }
 
     return new Error('Sign in failed');
+}
+
+function normalizeAuthErrorMessage(message: string): string {
+
+    if (/kv put\(\) limit exceeded for the day/i.test(message)) {
+        return SIGN_IN_CAPACITY_EXCEEDED_ERROR;
+    }
+
+    return message;
+}
+
+async function readResponseError(response: Response, fallbackMessage: string): Promise<string> {
+
+    try {
+        const contentType = response.headers?.get?.('Content-Type') || '';
+
+        if (contentType.includes('application/json')) {
+            const data = await response.json();
+            const errorMessage = typeof data?.error === 'string' ? data.error.trim() : '';
+            const detailMessage = typeof data?.details === 'string' ? data.details.trim() : '';
+
+            if (detailMessage && (!errorMessage || errorMessage === 'Authentication failed')) {
+                return normalizeAuthErrorMessage(detailMessage);
+            }
+
+            if (errorMessage && detailMessage && errorMessage !== detailMessage) {
+                return normalizeAuthErrorMessage(`${errorMessage}: ${detailMessage}`);
+            }
+
+            if (errorMessage) {
+                return normalizeAuthErrorMessage(errorMessage);
+            }
+
+            if (detailMessage) {
+                return normalizeAuthErrorMessage(detailMessage);
+            }
+        }
+
+        const text = await response.text();
+
+        if (text.trim()) {
+            return normalizeAuthErrorMessage(text.trim());
+        }
+    } catch {
+        // Fall back to the generic message when the error body cannot be read.
+    }
+
+    return fallbackMessage;
 }
 
 /**
@@ -140,7 +192,8 @@ export const useGoogleAuth = () => {
         return navigator.onLine;
     }, []);
 
-    const validateWorkerSession = useCallback(async (session: StoredSession): Promise<boolean> => {
+    const validateWorkerSession: ValidateWorkerSession = useCallback(async (...args: unknown[]) => {
+        const [session] = args as Parameters<ValidateWorkerSession>;
 
         if (!isOnline()) {
             return false;
@@ -201,8 +254,8 @@ export const useGoogleAuth = () => {
             });
 
             if (!callbackResponse.ok) {
-                const error = await callbackResponse.json();
-                throw new Error(error.error || 'Authentication failed');
+                const errorMessage = await readResponseError(callbackResponse, 'Authentication failed');
+                throw new Error(errorMessage);
             }
 
             const { sessionId, user } = await callbackResponse.json();
@@ -262,7 +315,8 @@ export const useGoogleAuth = () => {
         }
     }, [validateWorkerSession]);
 
-    const signOutFromWorker = useCallback(async (options?: { revoke?: boolean }): Promise<void> => {
+    const signOutFromWorker: SignOutFromWorker = useCallback(async (...args: unknown[]) => {
+        const [options] = args as Parameters<SignOutFromWorker>;
 
         const revoke = options?.revoke ?? false;
 
