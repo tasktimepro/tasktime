@@ -8,11 +8,11 @@ test.describe('Onboarding smoke', () => {
         const onboardingDialog = page.getByRole('dialog', { name: 'TaskTime setup' });
         await expect(onboardingDialog).toBeVisible();
         await expect(onboardingDialog.getByText('Welcome to TaskTime.')).toBeVisible();
-        await expect(onboardingDialog.getByText('1 of 4')).toBeVisible();
+        await expect(onboardingDialog.getByText('1 of 3')).toBeVisible();
 
         await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
         await expect(onboardingDialog.getByRole('heading', { name: 'Sync with Google Drive' })).toBeVisible();
-        await expect(onboardingDialog.getByText('2 of 4')).toBeVisible();
+        await expect(onboardingDialog.getByText('2 of 3')).toBeVisible();
 
         await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
         await expect(onboardingDialog.getByRole('heading', { name: 'Working with TaskTime' })).toBeVisible();
@@ -22,13 +22,11 @@ test.describe('Onboarding smoke', () => {
         await expect(onboardingDialog.getByRole('heading', { name: 'Clients' })).toBeVisible();
         await expect(onboardingDialog.getByRole('heading', { name: 'Expenses' })).toBeVisible();
         await expect(onboardingDialog.getByRole('heading', { name: 'Invoices' })).toBeVisible();
-        await expect(onboardingDialog.getByText('3 of 4')).toBeVisible();
+        await expect(onboardingDialog.getByText('3 of 3')).toBeVisible();
 
-        await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
-        await expect(onboardingDialog.getByRole('heading', { name: "It's TaskTime!" })).toBeVisible();
-        await expect(onboardingDialog.getByRole('button', { name: 'Start Using TaskTime', exact: true })).toBeVisible();
+        await expect(onboardingDialog.getByRole('button', { name: 'Get Started', exact: true })).toBeVisible();
 
-        await onboardingDialog.getByRole('button', { name: 'Start Using TaskTime', exact: true }).click();
+        await onboardingDialog.getByRole('button', { name: 'Get Started', exact: true }).click();
 
         await expect(onboardingDialog).not.toBeVisible();
 

@@ -9,8 +9,8 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useToast } from '@/hooks/useToast';
 import { useUrlState } from '@/hooks/useUrlState';
-import { CloudIcon, CloudSyncIcon, CloudCheckIcon, CloudCogIcon, CloudOffIcon, CloudUploadIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { getYjsSyncStatusDescriptor } from '@/components/sync/syncStatusDescriptor';
 
 interface YjsSyncStatusProps {
     className?: string;
@@ -68,145 +68,45 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
         await forceSyncDrive({ allowPull: false });
     }, [forceSyncDrive]);
 
-    // NOTE: Sidebar cloud icon should never spin.
-
-    const isManualMode = !autoSyncEnabled;
-    const hasPendingChanges = pendingSyncChanges;
-
     const status = useMemo(() => {
-        // Loading state (store not ready or auth loading)
-        if (!isReady || authLoading) {
-            return {
-                text: 'Loading...',
-                icon: CloudSyncIcon,
-                tone: 'text-muted-foreground',
-            };
-        }
-
-        // Offline
-        if (isOffline) {
-            return {
-                text: 'Currently offline',
-                icon: CloudOffIcon,
-                tone: 'status-warning-text-strong',
-            };
-        }
-
-        // Not connected (or signed out) - show connect button
-        if (!isDriveConnected && !isConnecting) {
-            return {
-                text: hadPreviousSession ? 'Reconnect to Drive' : 'Connect Google Drive',
-                icon: CloudIcon,
-                tone: 'text-muted-foreground',
-                onClick: handleConnect,
-            };
-        }
-
-        // Connecting/initial sync in progress
-        if (isConnecting || !isDriveConnected) {
-            return {
-                text: 'Syncing...',
-                icon: CloudSyncIcon,
-                tone: 'status-warning-text-strong',
-            };
-        }
-
-        // Error state
-        if (syncState === 'error') {
-            let errorText = 'Sync Error';
-
-            if (lastSyncedAt) {
-                const minutesAgo = Math.round((Date.now() - lastSyncedAt) / 60_000);
-
-                if (minutesAgo < 1) {
-                    errorText = 'Sync error — synced just now';
-                } else if (minutesAgo < 60) {
-                    errorText = `Sync error — ${minutesAgo}m ago`;
-                } else {
-                    const hoursAgo = Math.round(minutesAgo / 60);
-                    errorText = `Sync error — ${hoursAgo}h ago`;
-                }
-            }
-
-            return {
-                text: errorText,
-                icon: ExclamationTriangleIcon,
-                tone: 'status-danger-text-strong',
-                onClick: handleCloudOptions,
-                hoverIcon: CloudCogIcon,
-                hoverText: 'Cloud Options',
-            };
-        }
-
-        if (syncPhase === 'checking') {
-            return {
-                text: 'Checking for updates...',
-                icon: CloudSyncIcon,
-                tone: 'status-warning-text-strong',
-                onClick: handleCloudOptions,
-            };
-        }
-
-        if (syncPhase === 'downloading') {
-            return {
-                text: 'Fetching updates...',
-                icon: CloudSyncIcon,
-                tone: 'status-warning-text-strong',
-                onClick: handleCloudOptions,
-            };
-        }
-
-        if (syncPhase === 'uploading') {
-            return {
-                text: 'Syncing changes...',
-                icon: CloudSyncIcon,
-                tone: 'status-warning-text-strong',
-                onClick: handleCloudOptions,
-            };
-        }
-
-        const showSyncingText = manualSyncInProgress || (isSyncing && !hasSynced);
-
-        // Actively syncing (first sync or manual sync)
-        if (showSyncingText) {
-            return {
-                text: 'Syncing...',
-                icon: CloudSyncIcon,
-                tone: 'status-warning-text-strong',
-                onClick: handleCloudOptions,
-            };
-        }
-
-        // Manual sync mode with pending changes
-        if (isManualMode && hasPendingChanges) {
-            return {
-                text: 'Sync changes',
-                icon: CloudUploadIcon,
-                tone: 'status-warning-text-strong',
-                onClick: handleManualSync,
-            };
-        }
-
-        // Actively syncing (auto sync) - icon change only
-        if (isSyncing) {
-            return {
-                text: 'In sync',
-                icon: CloudSyncIcon,
-                tone: 'status-warning-text-strong',
-                onClick: handleCloudOptions,
-            };
-        }
-
-        // Connected and synced
-        return {
-            text: 'In sync',
-            icon: CloudCheckIcon,
-            tone: 'status-success-text-strong',
-            onClick: handleCloudOptions,
-            hoverIcon: CloudCogIcon,
-            hoverText: 'Cloud Options',
-        };
-    }, [isReady, authLoading, isDriveConnected, isConnecting, isSyncing, hasSynced, manualSyncInProgress, syncPhase, syncState, isManualMode, hasPendingChanges, hadPreviousSession, lastSyncedAt, isOffline, handleConnect, handleCloudOptions, handleManualSync]);
+        return getYjsSyncStatusDescriptor({
+            isReady,
+            authLoading,
+            isOffline,
+            isDriveConnected,
+            isConnecting,
+            hadPreviousSession,
+            syncState,
+            syncPhase,
+            lastSyncedAt,
+            manualSyncInProgress,
+            pendingSyncChanges,
+            autoSyncEnabled,
+            isSyncing,
+            hasSynced,
+            onConnect: handleConnect,
+            onCloudOptions: handleCloudOptions,
+            onManualSync: handleManualSync,
+        });
+    }, [
+        authLoading,
+        autoSyncEnabled,
+        hadPreviousSession,
+        handleCloudOptions,
+        handleConnect,
+        handleManualSync,
+        hasSynced,
+        isConnecting,
+        isDriveConnected,
+        isOffline,
+        isReady,
+        isSyncing,
+        lastSyncedAt,
+        manualSyncInProgress,
+        pendingSyncChanges,
+        syncPhase,
+        syncState,
+    ]);
 
     const IconComponent = (isHovered && status.hoverIcon) ? status.hoverIcon : status.icon;
     const displayText = (isHovered && status.hoverText) ? status.hoverText : status.text;

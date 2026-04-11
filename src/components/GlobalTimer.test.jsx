@@ -111,4 +111,28 @@ describe('GlobalTimer', () => {
             expect(screen.getByText('1m 5s')).toBeInTheDocument()
         })
     })
+
+    it('keeps the task title on the normal text color while the timer is active', () => {
+
+        mockTimers = [{
+            projectId: 'project-1',
+            taskId: 'task-1',
+            startTime: Date.now() - 10000,
+            elapsedTime: 10000,
+            isPaused: false,
+            note: ''
+        }]
+
+        renderWithToast(
+            <GlobalTimer
+                navigateToProject={vi.fn()}
+                onClose={vi.fn()}
+            />
+        )
+
+        const taskTitleButton = screen.getByRole('button', { name: 'Task One' })
+
+        expect(taskTitleButton.className).toContain('text-foreground')
+        expect(taskTitleButton.className).not.toContain('status-danger-text-strong')
+    })
 })

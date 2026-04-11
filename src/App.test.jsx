@@ -6,7 +6,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 
@@ -47,6 +47,14 @@ const timersHookState = vi.hoisted(() => ({
     timers: [],
 }))
 
+const tasksHookState = vi.hoisted(() => ({
+    tasks: [],
+    createTask: vi.fn((task) => ({
+        ...task,
+        id: task.id || 'created-task',
+    })),
+}))
+
 const urlHookState = vi.hoisted(() => ({
     urlParams: { view: 'dashboard', projectId: null, clientId: null },
     navigateToProjects: vi.fn(),
@@ -65,22 +73,38 @@ const todayStringState = vi.hoisted(() => ({
     value: '2026-02-25',
 }))
 
+const googleAuthHookState = vi.hoisted(() => ({
+    hadPreviousSession: false,
+    isLoading: false,
+    isSignedIn: false,
+}))
+
+const yjsHookState = vi.hoisted(() => ({
+    isReady: true,
+    isSyncing: false,
+    syncState: 'idle',
+    syncPhase: 'idle',
+    isDriveConnected: false,
+    isConnecting: false,
+    hasSynced: false,
+    manualSyncInProgress: false,
+    hasPendingSyncChanges: vi.fn(() => false),
+    pendingSyncChanges: false,
+    forceSyncDrive: vi.fn(),
+    autoSyncEnabled: true,
+    lastSyncedAt: null,
+    loadEntriesForYear: vi.fn(),
+    loadArchivedTasks: vi.fn(),
+    loadArchivedInvoices: vi.fn(),
+    getAvailableYears: vi.fn().mockResolvedValue([]),
+    clearAllData: vi.fn(),
+    driveSessionId: null,
+}))
+
 // Mock all Yjs-based hooks
 vi.mock('./contexts/YjsContext.tsx', () => ({
     YjsProvider: ({ children }) => children,
-    useYjs: () => ({
-        isReady: true,
-        isSyncing: false,
-        manualSyncInProgress: false,
-        hasPendingSyncChanges: () => false,
-        isDriveConnected: false,
-        forceSyncDrive: vi.fn(),
-        loadEntriesForYear: vi.fn(),
-        loadArchivedTasks: vi.fn(),
-        loadArchivedInvoices: vi.fn(),
-        getAvailableYears: vi.fn().mockResolvedValue([]),
-        clearAllData: vi.fn(),
-    }),
+    useYjs: () => yjsHookState,
 }))
 
 vi.mock('./hooks/useProjects.ts', () => ({
@@ -101,13 +125,13 @@ vi.mock('./hooks/useProjects.ts', () => ({
 
 vi.mock('./hooks/useTasks.ts', () => ({
     useTasks: () => ({
-        tasks: [],
-        activeTasks: [],
+        tasks: tasksHookState.tasks,
+        activeTasks: tasksHookState.tasks,
         archivedTasks: [],
         isLoading: false,
         archivedLoaded: false,
         getTask: vi.fn(),
-        createTask: vi.fn(),
+        createTask: tasksHookState.createTask,
         updateTask: vi.fn(),
         deleteTask: vi.fn(),
         archiveTask: vi.fn(),
@@ -266,9 +290,10 @@ vi.mock('./hooks/useUrlState.ts', () => ({
 
 vi.mock('./hooks/useGoogleAuth.ts', () => ({
     useGoogleAuth: () => ({
-        isSignedIn: false,
-        isLoading: false,
+        isSignedIn: googleAuthHookState.isSignedIn,
+        isLoading: googleAuthHookState.isLoading,
         accessToken: null,
+        hadPreviousSession: googleAuthHookState.hadPreviousSession,
         signIn: vi.fn(),
         signOut: vi.fn(),
     }),
@@ -325,11 +350,43 @@ vi.mock('./components/sync/YjsSyncStatus', () => ({ default: () => <div data-tes
 
 window.matchMedia = createMatchMedia()
 
+const setNavigatorOnline = (value) => {
+    Object.defineProperty(navigator, 'onLine', {
+        value,
+        configurable: true,
+    })
+}
+
 describe('App component', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
         window.history.pushState({}, '', '/')
+        googleAuthHookState.hadPreviousSession = false
+        googleAuthHookState.isLoading = false
+        googleAuthHookState.isSignedIn = false
+        setNavigatorOnline(true)
+        yjsHookState.isReady = true
+        yjsHookState.isSyncing = false
+        yjsHookState.syncState = 'idle'
+        yjsHookState.syncPhase = 'idle'
+        yjsHookState.isDriveConnected = false
+        yjsHookState.isConnecting = false
+        yjsHookState.hasSynced = false
+        yjsHookState.manualSyncInProgress = false
+        yjsHookState.hasPendingSyncChanges.mockReset()
+        yjsHookState.hasPendingSyncChanges.mockReturnValue(false)
+        yjsHookState.pendingSyncChanges = false
+        yjsHookState.forceSyncDrive.mockReset()
+        yjsHookState.autoSyncEnabled = true
+        yjsHookState.lastSyncedAt = null
+        yjsHookState.loadEntriesForYear.mockReset()
+        yjsHookState.loadArchivedTasks.mockReset()
+        yjsHookState.loadArchivedInvoices.mockReset()
+        yjsHookState.getAvailableYears.mockReset()
+        yjsHookState.getAvailableYears.mockResolvedValue([])
+        yjsHookState.clearAllData.mockReset()
+        yjsHookState.driveSessionId = null
         localStorage.getItem.mockImplementation((key) => {
             if (key === 'tasktime-onboarding-completed') {
                 return 'true'
@@ -348,6 +405,8 @@ describe('App component', () => {
         recurrenceHookState.generatePendingExpenses.mockReset()
         recurrenceHookState.updateRecurrence.mockReset()
         projectsHookState.projects.length = 0
+        tasksHookState.tasks.length = 0
+        tasksHookState.createTask.mockClear()
         clientsHookState.clients.length = 0
         timersHookState.timers.length = 0
         urlHookState.urlParams = { view: 'dashboard', projectId: null, clientId: null }
@@ -371,6 +430,25 @@ describe('App component', () => {
     it('renders the dashboard view by default', async () => {
         render(<App />)
         expect(await screen.findByTestId('dashboard')).toBeInTheDocument()
+    })
+
+    it('seeds the first onboarding task when onboarding is shown', () => {
+        localStorage.getItem.mockImplementation((key) => {
+            if (key === 'tasktime-onboarding-completed') {
+                return null
+            }
+
+            return null
+        })
+
+        render(<App />)
+
+        expect(tasksHookState.createTask).toHaveBeenCalledTimes(1)
+        expect(tasksHookState.createTask).toHaveBeenCalledWith(expect.objectContaining({
+            note: 'Start the timer, head to projects, and create your first one.',
+            title: 'Create my first project',
+            startDate: '2026-02-25',
+        }))
     })
 
     it('renders the desktop sidebar and not the mobile dock on larger screens', () => {
@@ -443,6 +521,102 @@ describe('App component', () => {
         await user.click(screen.getByRole('button', { name: 'Account' }))
 
         expect(urlHookState.navigateToAccount).toHaveBeenCalledTimes(1)
+    })
+
+    it('temporarily replaces More with sync status during an active mobile sync', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        yjsHookState.isDriveConnected = true
+        yjsHookState.syncPhase = 'uploading'
+
+        render(<App />)
+
+        expect(screen.getByRole('button', { name: 'Syncing changes...' })).toBeInTheDocument()
+        expect(screen.getByText('Syncing')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+    })
+
+    it('shows the sync button on mobile during the connecting phase', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        yjsHookState.isConnecting = true
+
+        render(<App />)
+
+        expect(screen.getByRole('button', { name: 'Syncing...' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+    })
+
+    it('returns the mobile sync slot to More after the success linger', () => {
+        vi.useFakeTimers()
+
+        try {
+            window.matchMedia = createMatchMedia({
+                '(max-width: 767px)': true,
+            })
+            yjsHookState.isDriveConnected = true
+            yjsHookState.syncPhase = 'uploading'
+
+            const { rerender } = render(<App />)
+
+            expect(screen.getByRole('button', { name: 'Syncing changes...' })).toBeInTheDocument()
+
+            yjsHookState.syncPhase = 'idle'
+            yjsHookState.hasSynced = true
+            act(() => {
+                rerender(<App />)
+            })
+
+            expect(screen.getByRole('button', { name: 'In sync' })).toBeInTheDocument()
+
+            act(() => {
+                vi.advanceTimersByTime(1200)
+            })
+
+            expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
+            expect(screen.queryByRole('button', { name: 'In sync' })).not.toBeInTheDocument()
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('shows a yellow More-button dot when mobile sync is offline', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        setNavigatorOnline(false)
+
+        render(<App />)
+
+        expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
+        expect(screen.getByTestId('mobile-more-status-dot').className.includes('status-warning-fill')).toBe(true)
+    })
+
+    it('shows a red More-button dot when drive sync is disconnected after a prior session', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        googleAuthHookState.hadPreviousSession = true
+
+        render(<App />)
+
+        expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
+        expect(screen.getByTestId('mobile-more-status-dot').className.includes('status-danger-fill')).toBe(true)
+    })
+
+    it('does not show a red More-button dot while a previous auth session is still restoring', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        googleAuthHookState.hadPreviousSession = true
+        googleAuthHookState.isSignedIn = true
+
+        render(<App />)
+
+        expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
+        expect(screen.queryByTestId('mobile-more-status-dot')).not.toBeInTheDocument()
     })
 
     it('opens the task modal from the mobile floating action button menu', async () => {

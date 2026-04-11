@@ -16,6 +16,15 @@ describe('main entrypoint', () => {
         vi.resetModules()
         vi.clearAllMocks()
         document.body.innerHTML = '<div id="root"></div>'
+        document.documentElement.style.removeProperty('--viewport-height')
+
+        Object.defineProperty(window, 'visualViewport', {
+            configurable: true,
+            value: {
+                height: 724,
+                addEventListener: vi.fn(),
+            },
+        })
 
         Object.defineProperty(navigator, 'serviceWorker', {
             configurable: true,
@@ -50,5 +59,16 @@ describe('main entrypoint', () => {
         expect(consoleErrorSpy).toHaveBeenNthCalledWith(2, '[TaskTime] Unhandled promise rejection:', 'nope')
 
         consoleErrorSpy.mockRestore()
+    })
+
+    it('syncs the viewport height CSS variable from the visual viewport', async () => {
+        await import('./main.jsx')
+
+        expect(document.documentElement.style.getPropertyValue('--viewport-height')).toBe('724px')
+
+        window.visualViewport.height = 680
+        window.dispatchEvent(new Event('resize'))
+
+        expect(document.documentElement.style.getPropertyValue('--viewport-height')).toBe('680px')
     })
 })

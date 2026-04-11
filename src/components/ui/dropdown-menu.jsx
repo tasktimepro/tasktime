@@ -6,9 +6,109 @@ import { Check, ChevronRight, Circle } from "lucide-react"
 
 import { cn } from "@/lib/utils.ts"
 
-const DropdownMenu = DropdownMenuPrimitive.Root
+const DropdownMenuContext = React.createContext(null)
 
-const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
+const DropdownMenu = ({
+  open: openProp,
+  defaultOpen = false,
+  onOpenChange,
+  children,
+  ...props
+}) => {
+  const isControlled = openProp !== undefined
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen)
+  const open = isControlled ? openProp : uncontrolledOpen
+
+  const setOpen = React.useCallback((nextOpen) => {
+    const resolvedOpen = typeof nextOpen === "function" ? nextOpen(open) : nextOpen
+
+    if (!isControlled) {
+      setUncontrolledOpen(resolvedOpen)
+    }
+
+    onOpenChange?.(resolvedOpen)
+  }, [isControlled, onOpenChange, open])
+
+  const contextValue = React.useMemo(() => ({ open, setOpen }), [open, setOpen])
+
+  return (
+    <DropdownMenuContext.Provider value={contextValue}>
+      <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen} {...props}>
+        {children}
+      </DropdownMenuPrimitive.Root>
+    </DropdownMenuContext.Provider>
+  )
+}
+
+const DropdownMenuTrigger = React.forwardRef(({ onClick, onPointerDown, onPointerMove, onPointerCancel, ...props }, ref) => {
+  const menuContext = React.useContext(DropdownMenuContext)
+  const touchStateRef = React.useRef({
+    pendingToggle: false,
+    startX: 0,
+    startY: 0,
+  })
+
+  const handlePointerDown = React.useCallback((event) => {
+    onPointerDown?.(event)
+
+    if (event.defaultPrevented || event.pointerType !== "touch" || !menuContext) {
+      return
+    }
+
+    touchStateRef.current = {
+      pendingToggle: true,
+      startX: event.clientX,
+      startY: event.clientY,
+    }
+
+    // Radix opens dropdowns on pointer-down by default. Prevent that on touch so
+    // a vertical scroll gesture does not immediately open the menu and block scrolling.
+    event.preventDefault()
+  }, [menuContext, onPointerDown])
+
+  const handlePointerMove = React.useCallback((event) => {
+    onPointerMove?.(event)
+
+    if (!touchStateRef.current.pendingToggle || event.pointerType !== "touch") {
+      return
+    }
+
+    const deltaX = Math.abs(event.clientX - touchStateRef.current.startX)
+    const deltaY = Math.abs(event.clientY - touchStateRef.current.startY)
+
+    if (deltaX > 8 || deltaY > 8) {
+      touchStateRef.current.pendingToggle = false
+    }
+  }, [onPointerMove])
+
+  const handlePointerCancel = React.useCallback((event) => {
+    onPointerCancel?.(event)
+    touchStateRef.current.pendingToggle = false
+  }, [onPointerCancel])
+
+  const handleClick = React.useCallback((event) => {
+    onClick?.(event)
+
+    if (event.defaultPrevented || !touchStateRef.current.pendingToggle || !menuContext) {
+      return
+    }
+
+    touchStateRef.current.pendingToggle = false
+    menuContext.setOpen((currentOpen) => !currentOpen)
+  }, [menuContext, onClick])
+
+  return (
+    <DropdownMenuPrimitive.Trigger
+      ref={ref}
+      onClick={handleClick}
+      onPointerCancel={handlePointerCancel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      {...props}
+    />
+  )
+})
+DropdownMenuTrigger.displayName = DropdownMenuPrimitive.Trigger.displayName
 
 const DropdownMenuGroup = DropdownMenuPrimitive.Group
 

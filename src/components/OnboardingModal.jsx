@@ -28,7 +28,6 @@ const STEPS = [
     { id: 'welcome', label: 'Welcome' },
     { id: 'sync', label: 'Sync' },
     { id: 'workflow', label: 'How it works' },
-    { id: 'finish', label: 'Start' },
 ];
 
 const BENEFIT_CARDS = [
@@ -191,7 +190,7 @@ const OnboardingModal = ({
         shouldResetScrollRef.current = false;
     }, [currentStep, isOpen]);
 
-    const primaryActionLabel = isLastStep ? 'Start Using TaskTime' : 'Next';
+    const primaryActionLabel = isLastStep ? 'Get Started' : 'Next';
 
     const currentStepContent = (() => {
         if (currentStepMeta?.id === 'welcome') {
@@ -217,11 +216,6 @@ const OnboardingModal = ({
                         ))}
                     </div>
 
-                    <Notice
-                        title="Built for solo freelancers"
-                        description="TaskTime was made for privacy-conscious solo freelancers who want something simple but complete enough for planning, tracking, expenses, and invoicing."
-                    />
-
                     <LegalInlineLinks className="text-center" />
                 </div>
             );
@@ -238,7 +232,7 @@ const OnboardingModal = ({
                             Sync with Google Drive
                         </h3>
                         <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-                            TaskTime saves changes locally first. If you connect Google Drive, files sync in the background to your app folder so your workspace stays available across sessions and devices, while remaining private.
+                            Connect your Google Drive to privately sync TaskTime across devices.
                         </p>
                     </div>
 
@@ -246,7 +240,7 @@ const OnboardingModal = ({
                         <DetailRow
                             icon={CloudCheckIcon}
                             title="Work keeps going offline"
-                            description="No connection is required to keep tracking. Local saves happen immediately and uploads resume when you are online again."
+                            description="Local saves happen immediately and uploads resume when you are online again."
                         />
                         <DetailRow
                             icon={ArrowUpTrayIcon}
@@ -293,42 +287,14 @@ const OnboardingModal = ({
                             <DetailRow key={card.title} {...card} />
                         ))}
                     </div>
-
-                    <Notice
-                        title="Start simple"
-                        description="You can begin with one project and a few tasks, then add clients, expenses, and recurring work as your setup grows."
-                    />
                 </div>
             );
         }
 
-        return (
-            <div className="flex min-h-[16rem] flex-col items-center justify-center px-2 py-2 text-center sm:px-4">
-                <div className="w-full max-w-lg space-y-2">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-                        <ClockIcon className="h-6 w-6 text-foreground" />
-                    </div>
-                    <h3 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                        It's TaskTime!
-                    </h3>
-                    <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-                        Get started by creating a task, start a timer, and shape your week in the planner.
-                    </p>
-                    <div className="flex justify-center pt-2">
-                        <Button
-                            onClick={handlePrimaryAction}
-                            leadingIcon={RocketIcon}
-                            className="w-full sm:w-auto"
-                        >
-                            {primaryActionLabel}
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        );
+        return null;
     })();
 
-    const footer = isLastStep ? null : (
+    const footer = (
         <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
                 <span>
@@ -358,7 +324,8 @@ const OnboardingModal = ({
 
                 <Button
                     onClick={handlePrimaryAction}
-                    trailingIcon={ChevronRightIcon}
+                    leadingIcon={isLastStep ? RocketIcon : undefined}
+                    trailingIcon={isLastStep ? undefined : ChevronRightIcon}
                     autoFocus={isFirstStep}
                     className="flex-1 sm:flex-none"
                 >
@@ -384,7 +351,7 @@ const OnboardingModal = ({
             contentRef={contentRef}
         >
             <div>
-                <div className={isLastStep ? 'min-h-[16rem]' : 'min-h-[22rem]'}>
+                <div className="min-h-[22rem]">
                     {currentStepContent}
                 </div>
             </div>

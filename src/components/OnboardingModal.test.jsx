@@ -28,7 +28,7 @@ describe('OnboardingModal', () => {
         expect(screen.queryByText('TaskTime setup')).not.toBeInTheDocument()
         expect(screen.queryByRole('list', { name: 'Setup progress' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Close dialog' })).not.toBeInTheDocument()
-        expect(screen.getByText('1 of 4')).toBeInTheDocument()
+        expect(screen.getByText('1 of 3')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Skip Onboarding' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Skip Step' })).not.toBeInTheDocument()
@@ -38,11 +38,12 @@ describe('OnboardingModal', () => {
         expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Next' }))
     })
 
-    it('walks through the sync, workflow, and finish steps', async () => {
+    it('walks through the sync step and finishes from the workflow step', async () => {
 
         const user = userEvent.setup()
+        const onComplete = vi.fn()
 
-        render(<OnboardingModal isOpen onComplete={vi.fn()} />)
+        render(<OnboardingModal isOpen onComplete={onComplete} />)
 
         await user.click(screen.getByRole('button', { name: 'Next' }))
 
@@ -59,15 +60,14 @@ describe('OnboardingModal', () => {
         expect(screen.getByText('Clients')).toBeInTheDocument()
         expect(screen.getByText('Expenses')).toBeInTheDocument()
         expect(screen.getByText('Invoices')).toBeInTheDocument()
-
-        await user.click(screen.getByRole('button', { name: 'Next' }))
-
-        expect(screen.getByText("It's TaskTime!")).toBeInTheDocument()
-        expect(screen.getByText(/Get started by creating a task, start a timer, and shape your week in the planner\./i)).toBeInTheDocument()
+        expect(screen.getByText('3 of 3')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Skip Onboarding' })).not.toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Start Using TaskTime' })).toBeInTheDocument()
-        expect(screen.queryByText('4 of 4')).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Get Started' })).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Get Started' }))
+
+        expect(onComplete).toHaveBeenCalledTimes(1)
     })
 
     it('lets the user skip onboarding at any time', async () => {

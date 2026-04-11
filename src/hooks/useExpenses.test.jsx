@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import * as Y from 'yjs'
 import { useExpenses } from './useExpenses'
@@ -285,6 +285,10 @@ describe('useExpenses', () => {
 
         const { result } = renderHook(() => useExpenses({ includeArchived: true }))
 
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
         expect(result.current.expenses.map((e) => e.id)).toEqual(['exp-1', 'exp-2'])
     })
 
@@ -322,7 +326,7 @@ describe('useExpenses', () => {
         vi.useRealTimers()
     })
 
-    it('returns archived expense when includeArchived is true', () => {
+    it('returns archived expense when includeArchived is true', async () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [buildExpense({ id: 'exp-1' })],
             archived: [buildExpense({ id: 'exp-2' })]
@@ -335,6 +339,10 @@ describe('useExpenses', () => {
         })
 
         const { result } = renderHook(() => useExpenses({ includeArchived: true }))
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
 
         expect(result.current.getExpense('exp-2')).toEqual(expect.objectContaining({ id: 'exp-2' }))
     })
@@ -364,7 +372,7 @@ describe('useExpenses', () => {
         }))
     })
 
-    it('updates and deletes archived expenses when includeArchived is enabled', () => {
+    it('updates and deletes archived expenses when includeArchived is enabled', async () => {
         const { store, loadArchivedExpenses } = buildStore({
             archived: [buildExpense({ id: 'arch-1', amount: 15 })],
         })
@@ -376,6 +384,10 @@ describe('useExpenses', () => {
         })
 
         const { result } = renderHook(() => useExpenses({ includeArchived: true }))
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
 
         act(() => {
             result.current.updateExpense('arch-1', { amount: 25 })

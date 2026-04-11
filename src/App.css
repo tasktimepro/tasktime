@@ -1,6 +1,12 @@
 /* Task. Time. Track. App Styles */
+html,
+body {
+  height: var(--viewport-height);
+}
+
 #root {
   width: 100%;
+  height: var(--viewport-height);
   min-height: var(--viewport-height);
   max-width: 100%;
   box-sizing: border-box;
@@ -10,8 +16,9 @@
 
 /* Apply consistent padding to prevent layout shifts from scrollbar */
 body {
+  min-height: var(--viewport-height);
   overflow: hidden;
-  background-color: var(--app-background);
+  background-color: hsl(var(--background));
 }
 
 /* Main content area should have max height and handle its own scrolling */

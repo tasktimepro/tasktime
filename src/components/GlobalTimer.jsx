@@ -157,7 +157,6 @@ const GlobalTimer = ({
     const borderColor = isPaused ? 'status-warning-border' : 'status-danger-border';
     const dotColor = isPaused ? 'status-warning-fill' : 'status-danger-fill';
     const dotAnimation = isPaused ? '' : 'animate-pulse';
-    const textColor = isPaused ? 'status-warning-text-strong' : 'status-danger-text-strong';
     const timeColor = isPaused ? 'status-warning-text status-warning-surface' : 'status-danger-text status-danger-surface';
 
     return (
@@ -169,7 +168,7 @@ const GlobalTimer = ({
                     <div className={`w-3 h-3 ${dotColor} rounded-full ${dotAnimation}`}></div>
                     <button
                         onClick={handleTaskTitleClick}
-                        className={`text-sm font-medium ${textColor} max-w-[150px] truncate hover:underline cursor-pointer transition-colors`}
+                        className="max-w-[150px] cursor-pointer truncate text-sm font-medium text-foreground transition-colors hover:underline"
                         title={currentProject ? `${currentTask.title} - Click to open ${currentProject.title}` : currentTask.title}
                     >
                         {currentTask.title}
@@ -203,7 +202,7 @@ const GlobalTimer = ({
                                 setIsExpandedInternal(nextValue);
                             }
                         }}
-                        className={`h-8 w-8 ${textColor} hover:bg-accent transition-colors`}
+                        className="h-8 w-8 transition-colors hover:bg-accent"
                         title={isExpanded ? "Hide options" : "Show timer options"}
                     >
                         {isExpanded ? (

@@ -13,6 +13,7 @@ import { useExpenses } from './hooks/useExpenses.ts';
 import { useExpenseRecurrences } from './hooks/useExpenseRecurrences.ts';
 import { usePreferences } from './hooks/usePreferences.ts';
 import { useTimers } from './hooks/useTimers.ts';
+import { useGoogleAuth } from './hooks/useGoogleAuth.ts';
 import { useUrlState } from './hooks/useUrlState.ts';
 import { usePlannerAttachments } from './hooks/usePlannerAttachments.ts';
 import { useDailyGoals } from './hooks/useDailyGoals.ts';
@@ -37,6 +38,7 @@ import FloatingActionButton from './components/FloatingActionButton';
 import ErrorBoundary from './components/ErrorBoundary';
 import InstallPrompt from './components/InstallPrompt';
 import CloudSyncStatusPanel from './components/sync/CloudSyncStatusPanel';
+import { getYjsSyncStatusDescriptor, SYNC_STATUS_KIND } from './components/sync/syncStatusDescriptor';
 import MobileBottomNav from './components/app/MobileBottomNav';
 import MobileMoreSheet from './components/app/MobileMoreSheet';
 import { ToastProvider } from './components/ToastContainer';
@@ -56,6 +58,18 @@ import { APP_VERSION, TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
 /** Original browser tab title */
 const ORIGINAL_TITLE = "TaskTime";
+const MOBILE_SYNC_SUCCESS_VISIBILITY_MS = 1000;
+const MOBILE_SYNC_FADE_DURATION_MS = 200;
+const MOBILE_SYNC_VISIBLE_KINDS = new Set([
+    SYNC_STATUS_KIND.CONNECTING,
+    SYNC_STATUS_KIND.CHECKING,
+    SYNC_STATUS_KIND.DOWNLOADING,
+    SYNC_STATUS_KIND.UPLOADING,
+    SYNC_STATUS_KIND.SYNCING,
+    SYNC_STATUS_KIND.SYNCED,
+]);
+const ONBOARDING_SEED_TASK_TITLE = 'Create my first project';
+
 const PAGE_TITLE_MAP = {
     dashboard: 'Dashboard',
     planner: 'Planner',
@@ -84,14 +98,71 @@ function App() {
  * Inner app content that consumes Yjs hooks
  */
 function AppContent() {
-    const { isReady, isSyncing, manualSyncInProgress, hasPendingSyncChanges, clearAllData, driveSessionId } = useYjs();
+    const {
+        isReady,
+        isSyncing,
+        syncState,
+        syncPhase,
+        isDriveConnected,
+        isConnecting,
+        hasSynced,
+        manualSyncInProgress,
+        hasPendingSyncChanges,
+        pendingSyncChanges,
+        forceSyncDrive,
+        autoSyncEnabled,
+        lastSyncedAt,
+        clearAllData,
+        driveSessionId,
+    } = useYjs();
+    const { hadPreviousSession, isLoading: authLoading, isSignedIn } = useGoogleAuth();
     const toast = useContext(ToastContext);
+    const [isSyncIndicatorOffline, setIsSyncIndicatorOffline] = useState(() => {
+        if (typeof navigator === 'undefined') {
+            return false;
+        }
+
+        return !navigator.onLine;
+    });
+    const [showMobileSyncButton, setShowMobileSyncButton] = useState(false);
+    const [isMobileSyncButtonFadingOut, setIsMobileSyncButtonFadingOut] = useState(false);
+    const mobileSyncHideTimeoutRef = useRef(null);
+    const mobileSyncFadeTimeoutRef = useRef(null);
 
     useEffect(() => {
         return startUsageMetrics({
             endpoint: SYNC_WORKER_CONFIG.isEnabled ? SYNC_WORKER_CONFIG.endpoints.metricsBatch : null,
             appVersion: APP_VERSION,
         });
+    }, []);
+
+    useEffect(() => {
+        const updateOfflineState = () => {
+            setIsSyncIndicatorOffline(!navigator.onLine);
+        };
+
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                updateOfflineState();
+            }
+        };
+
+        updateOfflineState();
+
+        window.addEventListener('online', updateOfflineState);
+        window.addEventListener('offline', updateOfflineState);
+        window.addEventListener('focus', updateOfflineState);
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        const interval = setInterval(updateOfflineState, 5000);
+
+        return () => {
+            window.removeEventListener('online', updateOfflineState);
+            window.removeEventListener('offline', updateOfflineState);
+            window.removeEventListener('focus', updateOfflineState);
+            document.removeEventListener('visibilitychange', handleVisibility);
+            clearInterval(interval);
+        };
     }, []);
 
     useEffect(() => {
@@ -176,6 +247,7 @@ function AppContent() {
     const focusedTimer = timers[0] || null;
     const timerIsActive = !!focusedTimer;
     const todayStr = useTodayString();
+    const onboardingSeedTaskCreatedRef = useRef(false);
     const lastExpenseGenerationDayRef = useRef(null);
 
     useEffect(() => {
@@ -670,6 +742,163 @@ function AppContent() {
 
     // === URL State ===
     const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToPlanner, updateUrl } = useUrlState();
+
+    const handleOpenMobileSyncSettings = useCallback(() => {
+        navigateToAccount({ section: 'sync' });
+    }, [navigateToAccount]);
+
+    const handleMobileManualSync = useCallback(async () => {
+        await forceSyncDrive({ allowPull: false });
+    }, [forceSyncDrive]);
+
+    const mobileSyncStatus = useMemo(() => {
+        return getYjsSyncStatusDescriptor({
+            isReady,
+            authLoading,
+            isOffline: isSyncIndicatorOffline,
+            isDriveConnected,
+            isConnecting,
+            hadPreviousSession,
+            syncState,
+            syncPhase,
+            lastSyncedAt,
+            manualSyncInProgress,
+            pendingSyncChanges,
+            autoSyncEnabled,
+            isSyncing,
+            hasSynced,
+            onConnect: undefined,
+            onCloudOptions: handleOpenMobileSyncSettings,
+            onManualSync: handleMobileManualSync,
+        });
+    }, [
+        autoSyncEnabled,
+        authLoading,
+        handleMobileManualSync,
+        handleOpenMobileSyncSettings,
+        hadPreviousSession,
+        hasSynced,
+        isConnecting,
+        isDriveConnected,
+        isReady,
+        isSyncIndicatorOffline,
+        isSyncing,
+        lastSyncedAt,
+        manualSyncInProgress,
+        pendingSyncChanges,
+        syncPhase,
+        syncState,
+    ]);
+
+    useEffect(() => {
+        if (mobileSyncHideTimeoutRef.current) {
+            clearTimeout(mobileSyncHideTimeoutRef.current);
+            mobileSyncHideTimeoutRef.current = null;
+        }
+
+        if (mobileSyncFadeTimeoutRef.current) {
+            clearTimeout(mobileSyncFadeTimeoutRef.current);
+            mobileSyncFadeTimeoutRef.current = null;
+        }
+
+        const shouldRenderMobileSyncButton = MOBILE_SYNC_VISIBLE_KINDS.has(mobileSyncStatus.kind);
+
+        if (!shouldRenderMobileSyncButton) {
+            setShowMobileSyncButton(false);
+            setIsMobileSyncButtonFadingOut(false);
+            return;
+        }
+
+        if (mobileSyncStatus.kind !== SYNC_STATUS_KIND.SYNCED) {
+            setShowMobileSyncButton(true);
+            setIsMobileSyncButtonFadingOut(false);
+            return;
+        }
+
+        if (!showMobileSyncButton) {
+            return;
+        }
+
+        mobileSyncHideTimeoutRef.current = setTimeout(() => {
+            setIsMobileSyncButtonFadingOut(true);
+
+            mobileSyncFadeTimeoutRef.current = setTimeout(() => {
+                setShowMobileSyncButton(false);
+                setIsMobileSyncButtonFadingOut(false);
+            }, MOBILE_SYNC_FADE_DURATION_MS);
+        }, MOBILE_SYNC_SUCCESS_VISIBILITY_MS);
+    }, [mobileSyncStatus.kind, showMobileSyncButton]);
+
+    useEffect(() => {
+        return () => {
+            if (mobileSyncHideTimeoutRef.current) {
+                clearTimeout(mobileSyncHideTimeoutRef.current);
+            }
+
+            if (mobileSyncFadeTimeoutRef.current) {
+                clearTimeout(mobileSyncFadeTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const handleMobileSyncButtonAction = useCallback(async (event) => {
+        if (!mobileSyncStatus.onClick) {
+            return;
+        }
+
+        event.currentTarget.blur();
+
+        try {
+            await mobileSyncStatus.onClick();
+        } catch (error) {
+            console.error('[App] Mobile sync action failed:', error);
+            toast?.showError(error instanceof Error ? error.message : 'Google Drive action failed.');
+        }
+    }, [mobileSyncStatus, toast]);
+
+    const mobileMoreButton = useMemo(() => {
+        if (!showMobileSyncButton) {
+            return null;
+        }
+
+        return {
+            ariaLabel: mobileSyncStatus.text,
+            Icon: mobileSyncStatus.icon,
+            isFadingOut: isMobileSyncButtonFadingOut,
+            label: mobileSyncStatus.kind === SYNC_STATUS_KIND.SYNCED ? 'Synced' : 'Syncing',
+            onClick: handleMobileSyncButtonAction,
+            toneClassName: `${mobileSyncStatus.tone} hover:bg-accent hover:text-accent-foreground`,
+        };
+    }, [handleMobileSyncButtonAction, isMobileSyncButtonFadingOut, mobileSyncStatus, showMobileSyncButton]);
+
+    const mobileMoreButtonBadge = useMemo(() => {
+        if (showMobileSyncButton) {
+            return null;
+        }
+
+        if (mobileSyncStatus.kind === SYNC_STATUS_KIND.OFFLINE) {
+            return {
+                description: 'Offline. Sync is unavailable until you reconnect.',
+                toneClassName: 'status-warning-fill',
+            };
+        }
+
+        if (mobileSyncStatus.kind === SYNC_STATUS_KIND.ERROR) {
+            return {
+                description: 'Sync needs attention. Open More to review sync settings.',
+                toneClassName: 'status-danger-fill',
+            };
+        }
+
+        if (mobileSyncStatus.kind === SYNC_STATUS_KIND.DISCONNECTED && hadPreviousSession && !authLoading && !isSignedIn) {
+            return {
+                description: 'Drive disconnected. Open More to reconnect sync.',
+                toneClassName: 'status-danger-fill',
+            };
+        }
+
+        return null;
+    }, [authLoading, hadPreviousSession, isSignedIn, mobileSyncStatus.kind, showMobileSyncButton]);
     
     const activeView = urlParams.view;
     const hasPersistedWorkspaceData = (
@@ -740,9 +969,18 @@ function AppContent() {
         }
 
         if (!isOnboardingCompleted) {
+            if (!onboardingSeedTaskCreatedRef.current && todayStr) {
+                createTask({
+                    title: ONBOARDING_SEED_TASK_TITLE,
+                    note: 'Start the timer, head to projects, and create your first one.',
+                    startDate: todayStr,
+                });
+                onboardingSeedTaskCreatedRef.current = true;
+            }
+
             setShowOnboarding(true);
         }
-    }, [activeView, hasPersistedWorkspaceData, isLoading, isOnboardingCompleted, showOnboarding]);
+    }, [activeView, createTask, hasPersistedWorkspaceData, isLoading, isOnboardingCompleted, showOnboarding, todayStr]);
 
     const handleCompleteOnboarding = useCallback(() => {
         setOnboardingCompleted(true);
@@ -1536,6 +1774,8 @@ function AppContent() {
                 <MobileBottomNav
                     items={mobilePrimaryNavItems}
                     isMoreActive={isMoreViewActive || isMoreMenuOpen}
+                    moreButton={mobileMoreButton}
+                    moreButtonBadge={mobileMoreButtonBadge}
                     onOpenMore={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
                 />
 
