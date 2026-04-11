@@ -88,9 +88,24 @@ test.describe('Backup smoke', () => {
         const deleteDialog = page.getByRole('dialog', { name: 'Delete All Account Data' });
         await expect(deleteDialog).toBeVisible();
         await deleteDialog.getByLabel(/Type .*delete all data.* to confirm:/i).fill('delete all data');
-        await deleteDialog.getByRole('button', { name: 'Delete All Data' }).click();
+        await Promise.all([
+            page.waitForEvent('framenavigated', {
+                predicate: (frame) => {
+                    if (frame !== page.mainFrame()) {
+                        return false;
+                    }
 
+                    const url = new URL(frame.url());
+
+                    return url.pathname === '/account' && url.searchParams.get('section') === 'data';
+                },
+            }),
+            deleteDialog.getByRole('button', { name: 'Delete All Data' }).click(),
+        ]);
+
+        await page.waitForLoadState('load');
         await page.waitForLoadState('networkidle');
+        await expect(page.getByRole('heading', { name: 'Your Data' })).toBeVisible();
 
         await page.goto('/projects');
         await expect(page.getByText('No projects')).toBeVisible();
@@ -102,6 +117,7 @@ test.describe('Backup smoke', () => {
         const importDialog = page.getByRole('dialog', { name: 'Import Data' });
         await expect(importDialog).toBeVisible();
         await importDialog.locator('#file-upload').setInputFiles(downloadPath);
+        await expect(importDialog.getByRole('button', { name: 'Import Data' })).toBeEnabled();
         await importDialog.getByRole('button', { name: 'Import Data' }).click();
 
         await expect(importDialog).not.toBeVisible();
