@@ -3,10 +3,41 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { readFileSync } from 'fs'
+import { PUBLIC_STATIC_ROUTE_DENYLIST } from './src/config/publicRoutes.js'
 
 const packageJson = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url))
 )
+
+const isPreviewCommand = process.argv.includes('preview')
+const publicRouteProxy = isPreviewCommand
+  ? undefined
+  : {
+      '/blog': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '/privacy': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '/contact': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '/terms': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '/src/styles/global.css': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '^/@fs/app/blog/': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+    }
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -18,6 +49,7 @@ export default defineConfig({
       manifest: false, // Use our custom manifest.json in public/
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallbackDenylist: PUBLIC_STATIC_ROUTE_DENYLIST,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\.exchangerate-api\.com/,
@@ -46,32 +78,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true, // Exit if port is already in use instead of automatically trying the next available port
     host: 'localhost',
-    proxy: {
-      '/blog': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/privacy': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/contact': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/terms': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/src/styles/global.css': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '^/@fs/app/blog/': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-    },
+    proxy: publicRouteProxy,
     // Handle SPA routing - redirect all requests to index.html
     historyApiFallback: true
   },
