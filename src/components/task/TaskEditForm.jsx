@@ -18,7 +18,7 @@ const TaskEditForm = ({
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="flex-1 text-sm"
+                className="flex-1"
                 autoFocus
                 disabled={isCompleted}
             />

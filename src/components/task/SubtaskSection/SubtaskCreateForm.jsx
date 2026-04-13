@@ -29,7 +29,7 @@ const SubtaskCreateForm = ({
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
                     placeholder="Enter subtask title"
-                    className="flex-1 text-sm"
+                    className="flex-1"
                     autoFocus
                 />
                 <Input
@@ -37,14 +37,14 @@ const SubtaskCreateForm = ({
                     value={newSubtaskNote}
                     onChange={(e) => setNewSubtaskNote(e.target.value)}
                     placeholder="Note"
-                    className="flex-1 text-sm"
+                    className="flex-1"
                 />
                 <NativeDateInput
                     value={newSubtaskStartDate}
                     onChange={(e) => {
                         setNewSubtaskStartDate(e.target.value);
                     }}
-                    className="w-40 text-sm dark:[color-scheme:dark]"
+                    className="w-40 dark:[color-scheme:dark]"
                 />
                 <Button type="submit" size="sm">
                     Add

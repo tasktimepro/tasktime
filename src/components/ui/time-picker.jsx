@@ -111,7 +111,7 @@ const TimeFieldInput = ({ label, value, min, max, onCommit }) => {
                 value={displayValue}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                className="h-8 text-sm"
+                className="h-8 text-base md:text-sm"
             />
         </div>
     );

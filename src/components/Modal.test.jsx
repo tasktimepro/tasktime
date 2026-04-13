@@ -57,9 +57,9 @@ describe('Modal', () => {
 
         expect(dialog.className.includes('w-[calc(100vw-1rem)]')).toBe(true)
         expect(dialog.className.includes('max-w-[calc(100vw-1rem)]')).toBe(true)
-        expect(dialog.className.includes('top-[calc(var(--viewport-height)*0.5)]')).toBe(true)
+        expect(dialog.className.includes('top-[50%]')).toBe(true)
         expect(dialog.className.includes('translate-y-[-50%]')).toBe(true)
-        expect(dialog.className.includes('max-h-[calc(var(--viewport-height)-var(--safe-area-top)-var(--safe-area-bottom)-1rem)]')).toBe(true)
+        expect(dialog.className.includes('max-h-[calc(100svh-var(--safe-area-top)-var(--safe-area-bottom)-1rem)]')).toBe(true)
         expect(dialog.className.includes('sm:max-w-md')).toBe(true)
         expect(dialog.className.includes('overflow-hidden')).toBe(true)
         expect(dialog.className.includes('rounded-lg')).toBe(true)

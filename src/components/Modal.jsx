@@ -79,7 +79,7 @@ const Modal = ({
             <DialogContent
                 className={cn(
                     sizeClasses[size],
-                    'flex w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden gap-0 p-0 max-h-[calc(var(--viewport-height)-var(--safe-area-top)-var(--safe-area-bottom)-1rem)] sm:w-full sm:max-h-[calc(var(--viewport-height)-2rem)]',
+                    'flex w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden gap-0 p-0 max-h-[calc(100svh-var(--safe-area-top)-var(--safe-area-bottom)-1rem)] sm:w-full sm:max-h-[calc(100svh-2rem)]',
                     className
                 )}
                 // Hide default close button if showCloseButton is false

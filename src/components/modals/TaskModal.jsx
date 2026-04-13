@@ -318,7 +318,6 @@ const TaskModal = ({
                         onChange={(event) => handleChange('note', event.target.value)}
                         placeholder="Add details for this task..."
                         rows={3}
-                        className="text-sm"
                     />
                 </div>
 

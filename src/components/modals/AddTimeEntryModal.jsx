@@ -331,7 +331,7 @@ const AddTimeEntryModal = ({
                         type="text"
                         value={formData.timeSpent}
                         onChange={(e) => updateFormForTimeSpent(e.target.value)}
-                        className="text-sm bg-background text-foreground"
+                        className="bg-background text-foreground"
                         ref={timeSpentInputRef}
                     />
                     <p className="text-xs text-muted-foreground">Format: {allowSeconds ? '2w 4d 6h 45m 30s' : '2w 4d 6h 45m'}</p>
@@ -343,7 +343,7 @@ const AddTimeEntryModal = ({
                             id="add-start-date"
                             value={formData.startDate}
                             onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                            className="text-sm bg-background text-foreground dark:[color-scheme:dark]"
+                            className="bg-background text-foreground dark:[color-scheme:dark]"
                         />
                     </div>
                     <div className="space-y-2">
@@ -352,7 +352,7 @@ const AddTimeEntryModal = ({
                             id="add-start-time"
                             value={formData.startTime}
                             onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
-                            className="text-sm bg-background"
+                            className="bg-background"
                             showSeconds={allowSeconds}
                         />
                     </div>
@@ -365,7 +365,6 @@ const AddTimeEntryModal = ({
                         onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
                         placeholder="What was done during this time..."
                         rows={2}
-                        className="text-sm"
                     />
                 </div>
             </div>
