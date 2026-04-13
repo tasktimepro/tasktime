@@ -345,7 +345,8 @@ const OnboardingModal = ({
             onClose={handleSkip}
             title="TaskTime setup"
             hideHeader
-            size="4xl"
+            size="3xl"
+            className="sm:max-w-[52rem]"
             showCloseButton={false}
             footer={footer}
             contentRef={contentRef}

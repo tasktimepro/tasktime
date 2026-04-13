@@ -10,7 +10,7 @@ import { parseStoredDate, toStorageDate } from '@/utils/dateUtils';
 import type { Expense } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
-import { objectToYMap } from '@/stores/yjs/entityUtils';
+import { objectToYMap, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 
 export interface UseExpensesOptions {
@@ -203,16 +203,18 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         const existing = readValidatedEntity<Expense>('expenses', map.get(id), `update expense ${id}`);
         if (!existing) return undefined;
 
-        const updated = validateCollectionEntity<Expense>('expenses', {
-            ...existing,
-            ...updates,
-            updatedAt: Date.now(),
-        }, `update expense ${id}`);
+        const updatesWithTimestamp = { ...updates, updatedAt: Date.now() } as Record<string, unknown>;
+        const merged = { ...existing, ...updatesWithTimestamp };
+        const validated = validateCollectionEntity<Expense>('expenses', merged, `update expense ${id}`);
 
-        const entityMap = objectToYMap(updated as unknown as Record<string, unknown>);
-        (map as any).set(id, entityMap);
+        const result = updateEntityFields(map as any, id, updatesWithTimestamp);
+        if (!result) {
+            // Fallback for old-format data (updateEntityFields handles conversion)
+            const entityMap = objectToYMap(validated as unknown as Record<string, unknown>);
+            (map as any).set(id, entityMap);
+        }
         markMeaningfulActivity();
-        return updated;
+        return validated;
     }, [isReady, findExpenseMap]);
 
     const deleteExpense = useCallback((id: string): boolean => {

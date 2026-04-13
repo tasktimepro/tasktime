@@ -574,7 +574,7 @@ const Expenses = ({
     }, [activeTab]);
 
     return (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4 overflow-x-hidden')}>
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
                 <TabsList className={cn(
                     'w-full bg-transparent rounded-none',

@@ -32,13 +32,13 @@ const TaskTimer = ({
     }, [isTimerActive, elapsedTime]);
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
             {showTimeDisplay && isTimerActive && (
-                <span className={`text-xs font-mono ${
+                <span className={`inline-block shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-center text-xs font-mono ${
                     isTimerPaused 
                         ? 'status-warning-text status-warning-surface' 
                         : 'status-danger-text status-danger-surface'
-                } px-2 py-1 rounded-md min-w-[32px] inline-block text-center`}>
+                }`}>
                     {currentTime}
                 </span>
             )}

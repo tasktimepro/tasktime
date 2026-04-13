@@ -195,6 +195,32 @@ describe('ExpenseModal', () => {
         expect(onClose).toHaveBeenCalled()
     })
 
+    it('shows only the amount field for a paid recurring expense instance submit flow', () => {
+        const editingExpense = {
+            id: 'e-rec-1',
+            title: 'Phone bill',
+            date: '2026-04-13',
+            amount: 89.99,
+            amountType: 'fixed',
+            currency: 'EUR',
+            paymentStatus: 'paid',
+            paymentMode: 'manual',
+            paidOn: '2026-04-13',
+            billingStatus: 'unbilled',
+            isPersonal: true,
+            billable: false,
+            isRecurring: true,
+            isTaxExempt: false,
+        }
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} editingExpense={editingExpense} />)
+
+        expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument()
+        expect(screen.getByLabelText(/Amount/i)).toHaveValue(89.99)
+        expect(screen.queryByLabelText(/Title/i)).not.toBeInTheDocument()
+        expect(screen.queryByLabelText(/^Date/i)).not.toBeInTheDocument()
+    })
+
     it('creates a recurring expense template and first instance', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date(2026, 1, 1, 12));

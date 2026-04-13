@@ -7,6 +7,7 @@ const hookState = vi.hoisted(() => ({
     tasks: [],
     entries: [],
     timers: [],
+    projects: [],
     deleteTask: vi.fn(),
     deleteEntry: vi.fn(),
     clearTimer: vi.fn(),
@@ -67,6 +68,12 @@ vi.mock('../../../hooks/useTimers', () => ({
     useTimers: () => ({
         timers: hookState.timers,
         clearTimer: hookState.clearTimer,
+    }),
+}));
+
+vi.mock('../../../hooks/useProjects', () => ({
+    useProjects: () => ({
+        projects: hookState.projects,
     }),
 }));
 
@@ -155,7 +162,7 @@ describe('SubtaskSection sorting', () => {
 
     it('shows billed and unbilled warnings for subtask deletion when applicable', () => {
         const subtasks = [
-            { id: 's1', title: 'Subtask 1', completed: false, lastActive: 200, billable: true, lastBilledAt: 1000 },
+            { id: 's1', title: 'Subtask 1', completed: false, lastActive: 200, billable: true, projectId: 'p1', lastBilledAt: 1000 },
         ];
 
         hookState.tasks = subtasks;
@@ -164,6 +171,7 @@ describe('SubtaskSection sorting', () => {
             { id: 'e2', taskId: 's1', start: 2000, end: 5600000 },
         ];
         hookState.timers = [];
+        hookState.projects = [{ id: 'p1', isPersonal: false }];
 
         renderSubtaskSection({ subtasks });
 

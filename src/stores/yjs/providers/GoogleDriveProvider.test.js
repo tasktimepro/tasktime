@@ -53,7 +53,7 @@ describe('YjsDriveProvider', () => {
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
     })
 
-    it('rejects remote updates that would break validated references', () => {
+    it('applies remote updates with broken references but logs a warning', () => {
         const liveDoc = new Y.Doc()
 
         const remoteDoc = new Y.Doc()
@@ -73,10 +73,30 @@ describe('YjsDriveProvider', () => {
             'test invalid state',
         )
 
-        expect(applied).toBe(false)
-        expect(liveDoc.getMap('projects').get('project-1')).toBeUndefined()
+        // CRDT convergence takes priority — update is applied despite reference issues
+        expect(applied).toBe(true)
+        expect(liveDoc.getMap('projects').get('project-1').get('title')).toBe('Broken Project')
         expect(warnSpy).toHaveBeenCalled()
 
+        warnSpy.mockRestore()
+    })
+
+    it('rejects corrupt CRDT binary data', () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        const corruptData = new Uint8Array([0xFF, 0xFE, 0x00, 0x01, 0x02])
+
+        const applied = provider.applyValidatedRemoteUpdate(
+            'core',
+            liveDoc,
+            corruptData,
+            'test corrupt data',
+        )
+
+        expect(applied).toBe(false)
+        expect(warnSpy).toHaveBeenCalled()
         warnSpy.mockRestore()
     })
 

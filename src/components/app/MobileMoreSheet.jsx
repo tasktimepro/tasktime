@@ -16,10 +16,15 @@ const MobileMoreSheet = ({
 }) => {
     const actionTileClassName = 'flex min-h-24 flex-col items-center justify-center rounded-2xl border border-border/60 bg-muted/50 px-3 py-4 text-center shadow-sm transition-colors hover:bg-accent cursor-pointer';
 
+    const handleOpenAutoFocus = (event) => {
+        event.preventDefault();
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent
                 hideCloseButton
+                onOpenAutoFocus={handleOpenAutoFocus}
                 overlayClassName="bottom-safe-nav"
                 className="bottom-safe-nav left-0 right-0 top-auto flex min-h-0 w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-[1.75rem] rounded-b-none border-x-0 border-b-0 bg-background p-0 shadow-none max-h-safe-nav"
             >

@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import Modal from '@/components/Modal';
 import { useTasks } from '@/hooks/useTasks';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
+import { useProjects } from '@/hooks/useProjects';
 import { getTaskDeletionBillingSummary, getTaskIdsToDelete } from '@/utils/taskUtils.ts';
 import DeleteTaskWarnings from './DeleteTaskWarnings';
 
@@ -25,6 +26,7 @@ const TaskActionsMenu = ({ task, onEdit, onDelete, onArchive = null }) => {
     const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
     const { tasks } = useTasks({ includeArchived: Boolean(task?.archived) });
     const { entries: timeEntries } = useTimeEntries();
+    const { projects } = useProjects();
     const canArchive = Boolean(onArchive) && !task.projectId && !task.archived;
 
     const taskIdsToDelete = useMemo(() => {
@@ -33,8 +35,8 @@ const TaskActionsMenu = ({ task, onEdit, onDelete, onArchive = null }) => {
     }, [task, tasks]);
 
     const deleteBillingSummary = useMemo(() => {
-        return getTaskDeletionBillingSummary(taskIdsToDelete, tasks, timeEntries);
-    }, [taskIdsToDelete, tasks, timeEntries]);
+        return getTaskDeletionBillingSummary(taskIdsToDelete, tasks, timeEntries, projects);
+    }, [taskIdsToDelete, tasks, timeEntries, projects]);
 
     const closeDeleteModal = () => {
         setShowDeleteConfirm(false);

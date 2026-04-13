@@ -354,13 +354,14 @@ function ExportImport({
                 </div>
 
                 {/* Data Summary */}
-                {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clients.length > 0 || invoiceTemplates.length > 0) && (
+                {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clients.length > 0 || invoiceTemplates.length > 0 || expenses.length > 0) && (
                     <div className={cn('rounded-lg bg-muted', isMobileLayout ? 'p-3' : 'p-4')}>
                         <h4 className="font-medium text-foreground mb-2">Current Data</h4>
                         <div className="text-sm text-muted-foreground space-y-1">
                             <p>Clients: <span className="font-medium">{clients.length}</span></p>
                             <p>Projects: <span className="font-medium">{projects.length}</span></p>
                             <p>Invoices: <span className="font-medium">{invoices.length}</span></p>
+                            <p>Expenses: <span className="font-medium">{expenses.length}</span></p>
                             <p>Tasks: <span className="font-medium">{tasks.length}</span></p>
                             <p>Time Entries: <span className="font-medium">{timeEntries.length}</span></p>
                             <p>Businesses: <span className="font-medium">{businessInfos.length}</span></p>

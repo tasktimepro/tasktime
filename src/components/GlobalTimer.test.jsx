@@ -6,6 +6,7 @@ import { ToastContext } from '../contexts/ToastContext'
 
 // Mock timer hook state
 let mockTimers = []
+let mockTasks = []
 
 // Hoisted mocks
 const timerHookMocks = vi.hoisted(() => ({
@@ -45,8 +46,8 @@ vi.mock('../hooks/useTimeEntries.ts', () => ({
 vi.mock('../hooks/useTasks.ts', () => ({
 
     useTasks: () => ({
-        tasks: [{ id: 'task-1', title: 'Task One', projectId: 'project-1' }],
-        activeTasks: [{ id: 'task-1', title: 'Task One', projectId: 'project-1' }],
+        tasks: mockTasks,
+        activeTasks: mockTasks,
         updateTask: vi.fn()
     })
 }))
@@ -81,6 +82,7 @@ describe('GlobalTimer', () => {
         vi.clearAllMocks()
         // Reset timer state
         mockTimers = []
+        mockTasks = [{ id: 'task-1', title: 'Task One', projectId: 'project-1' }]
     })
 
     afterEach(() => {
@@ -134,5 +136,42 @@ describe('GlobalTimer', () => {
 
         expect(taskTitleButton.className).toContain('text-foreground')
         expect(taskTitleButton.className).not.toContain('status-danger-text-strong')
+    })
+
+    it('truncates the title while keeping the pulse dot and timer controls from shrinking', () => {
+
+        mockTasks = [{
+            id: 'task-1',
+            title: 'A very long task title that should truncate before squeezing timer controls on mobile',
+            projectId: 'project-1'
+        }]
+
+        mockTimers = [{
+            projectId: 'project-1',
+            taskId: 'task-1',
+            startTime: Date.now() - 10000,
+            elapsedTime: 65000,
+            isPaused: false,
+            note: ''
+        }]
+
+        renderWithToast(
+            <GlobalTimer
+                navigateToProject={vi.fn()}
+                onClose={vi.fn()}
+            />
+        )
+
+        const taskTitleButton = screen.getByRole('button', {
+            name: 'A very long task title that should truncate before squeezing timer controls on mobile'
+        })
+        const timerDisplay = screen.getByText('1m 5s')
+        const pauseButton = screen.getByRole('button', { name: 'Pause Timer' })
+
+        expect(taskTitleButton.className).toContain('truncate')
+        expect(taskTitleButton.className).toContain('min-w-0')
+        expect(taskTitleButton.className).toContain('flex-1')
+        expect(timerDisplay.className).toContain('shrink-0')
+        expect(pauseButton.className).toContain('shrink-0')
     })
 })

@@ -17,6 +17,7 @@ import { useYjs } from '../contexts/YjsContext';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { resetOnboardingCompleted } from '../utils/onboardingUtils.ts';
+import { queuePostReloadToast } from '../utils/postReloadToast.ts';
 import YjsSyncSettings from './sync/YjsSyncSettings';
 import AccountFooter from './account/AccountFooter';
 
@@ -42,7 +43,7 @@ const Account = ({
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
     const { clearAllData, isDriveConnected, forceSyncDrive, disconnectDrive, wipeDriveData } = useYjs();
-    const { signOut } = useGoogleAuth();
+    const { signOut, revokeAccess } = useGoogleAuth();
     const { preferences, updatePreferences } = usePreferences();
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -105,17 +106,23 @@ const Account = ({
         try {
             if (isDriveConnected) {
                 await wipeDriveData();
+                await revokeAccess();
             }
 
-            // Clear all data via Yjs store (disconnects Drive locally)
+            // Clear all data via Yjs store after removing any active Drive session.
             await clearAllData();
             resetOnboardingCompleted();
             
             // Close modal and reset state
             setShowDeleteModal(false);
             setDeleteConfirmationText('');
-            
-            showSuccess('All local data has been deleted');
+
+            queuePostReloadToast({
+                level: 'success',
+                message: isDriveConnected
+                    ? 'All data was deleted and Google Drive was disconnected'
+                    : 'All data has been successfully deleted',
+            });
             
             // Reload the page to reinitialize the store
             window.location.reload();
@@ -140,7 +147,10 @@ const Account = ({
             await signOut();
             await clearAllData();
             resetOnboardingCompleted();
-            showSuccess('Signed out and local data cleared');
+            queuePostReloadToast({
+                level: 'success',
+                message: 'Signed out and local data cleared',
+            });
             window.location.reload();
         } catch (error) {
             console.error('Failed to sign out:', error);

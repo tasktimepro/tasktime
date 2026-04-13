@@ -179,24 +179,45 @@ export class YjsDriveProvider {
         }
     }
 
-    private applyValidatedRemoteUpdate(docName: DocName, doc: Y.Doc, update: Uint8Array, source: string): boolean {
+    /**
+     * Apply a remote CRDT update, always merging into the local doc.
+     *
+     * Validation runs on a projected copy first.  If the merged state has
+     * reference-integrity issues (e.g. a timer referencing an archived task
+     * whose doc isn't loaded), the update is still applied — CRDT
+     * convergence takes priority.  Invalid entities are filtered at
+     * read-time by `collectValidatedEntities`, so the UI stays safe.
+     */
+    applyValidatedRemoteUpdate(docName: DocName, doc: Y.Doc, update: Uint8Array, source: string): boolean {
         const projectedDoc = new Y.Doc();
 
-        applyUpdate(projectedDoc, encodeStateAsUpdate(doc));
-        applyUpdate(projectedDoc, update, 'remote');
+        try {
+            applyUpdate(projectedDoc, encodeStateAsUpdate(doc));
+            applyUpdate(projectedDoc, update, 'remote');
+        } catch (error) {
+            // Corrupt CRDT binary — this is the only case we truly reject
+            console.warn(`[YjsDriveProvider] Rejected corrupt remote ${source} for ${docName}:`, error);
+            projectedDoc.destroy();
+            return false;
+        }
+
         migrateInvoicesInDoc(projectedDoc);
 
         try {
             validateDocManagerState(this.docManager, docName, projectedDoc);
         } catch (error) {
-            console.warn(`[YjsDriveProvider] Rejected remote ${source} for ${docName}:`, error);
-            projectedDoc.destroy();
-            return false;
+            // Reference-integrity warning — log but still apply.
+            // Cross-document references (e.g. entries → tasks) can be
+            // temporarily broken during concurrent multi-device edits;
+            // blocking the update would prevent CRDT convergence.
+            console.warn(`[YjsDriveProvider] Validation warning after ${source} for ${docName} (update applied anyway):`, error);
         }
 
+        projectedDoc.destroy();
+
+        // Always apply the remote update to maintain CRDT convergence
         applyUpdate(doc, update, 'remote');
         migrateInvoicesInDoc(doc);
-        projectedDoc.destroy();
         return true;
     }
 

@@ -72,12 +72,13 @@ describe('taskUtils', () => {
 
             const summary = getTaskDeletionBillingSummary(
                 ['task-1'],
-                [{ id: 'task-1', billable: true, lastBilledAt: 1000 }],
+                [{ id: 'task-1', billable: true, projectId: 'project-1', lastBilledAt: 1000 }],
                 [
                     { taskId: 'task-1', start: 900, end: 1200, billedInvoiceId: 'inv-1' },
                     { taskId: 'task-1', start: 2000, end: 5600 },
                     { taskId: 'task-1', start: 2500, end: 3500, source: 'invoice-adjustment' }
-                ]
+                ],
+                [{ id: 'project-1', isPersonal: false }]
             )
 
             expect(summary).toEqual({
@@ -94,12 +95,13 @@ describe('taskUtils', () => {
             const summary = getTaskDeletionBillingSummary(
                 ['task-1', 'task-2'],
                 [
-                    { id: 'task-1', billable: false, lastBilledAt: null },
-                    { id: 'task-2', parentTaskId: 'task-1', billable: true, lastBilledAt: null }
+                    { id: 'task-1', projectId: 'project-1', billable: false, lastBilledAt: null },
+                    { id: 'task-2', projectId: 'project-1', parentTaskId: 'task-1', billable: true, lastBilledAt: null }
                 ],
                 [
                     { taskId: 'task-2', start: 1000, end: 4600 }
-                ]
+                ],
+                [{ id: 'project-1', isPersonal: false }]
             )
 
             expect(summary.hasUnbilledTime).toBe(true)
@@ -110,10 +112,42 @@ describe('taskUtils', () => {
 
             const summary = getTaskDeletionBillingSummary(
                 ['task-1'],
-                [{ id: 'task-1', billable: false, lastBilledAt: null }],
+                [{ id: 'task-1', billable: false, projectId: 'project-1', lastBilledAt: null }],
+                [
+                    { taskId: 'task-1', start: 1000, end: 4600 }
+                ],
+                [{ id: 'project-1', isPersonal: false }]
+            )
+
+            expect(summary.hasUnbilledTime).toBe(false)
+            expect(summary.unbilledTimeMs).toBe(0)
+            expect(summary.hasBilledTime).toBe(false)
+        })
+
+        it('does not treat billable time on tasks without a project as unbilled invoice time', () => {
+
+            const summary = getTaskDeletionBillingSummary(
+                ['task-1'],
+                [{ id: 'task-1', billable: true, projectId: null, lastBilledAt: null }],
                 [
                     { taskId: 'task-1', start: 1000, end: 4600 }
                 ]
+            )
+
+            expect(summary.hasUnbilledTime).toBe(false)
+            expect(summary.unbilledTimeMs).toBe(0)
+            expect(summary.hasBilledTime).toBe(false)
+        })
+
+        it('does not treat billable time on personal projects as unbilled invoice time', () => {
+
+            const summary = getTaskDeletionBillingSummary(
+                ['task-1'],
+                [{ id: 'task-1', billable: true, projectId: 'project-1', lastBilledAt: null }],
+                [
+                    { taskId: 'task-1', start: 1000, end: 4600 }
+                ],
+                [{ id: 'project-1', isPersonal: true }]
             )
 
             expect(summary.hasUnbilledTime).toBe(false)
@@ -125,11 +159,12 @@ describe('taskUtils', () => {
 
             const summary = getTaskDeletionBillingSummary(
                 ['task-1'],
-                [{ id: 'task-1', billable: true, lastBilledAt: 5000 }],
+                [{ id: 'task-1', billable: true, projectId: 'project-1', lastBilledAt: 5000 }],
                 [
                     { taskId: 'task-1', start: 1000, end: 2000 },
                     { taskId: 'task-1', start: 6000, end: 7000 }
-                ]
+                ],
+                [{ id: 'project-1', isPersonal: false }]
             )
 
             expect(summary.hasBilledTime).toBe(true)

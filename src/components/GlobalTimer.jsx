@@ -162,13 +162,13 @@ const GlobalTimer = ({
     return (
         <div className={`min-w-0 rounded-lg border px-4 py-2 ${borderColor} ${isExpanded ? 'space-y-3 max-w-full md:min-w-[26rem]' : ''}`}>
             {/* Main timer row */}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center justify-between gap-3">
                 {/* Left column: dot + task title */}
-                <div className="flex min-w-0 items-center gap-2">
-                    <div className={`w-3 h-3 ${dotColor} rounded-full ${dotAnimation}`}></div>
+                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                    <div className={`h-3 w-3 shrink-0 ${dotColor} rounded-full ${dotAnimation}`}></div>
                     <button
                         onClick={handleTaskTitleClick}
-                        className="max-w-[150px] cursor-pointer truncate text-sm font-medium text-foreground transition-colors hover:underline"
+                        className="min-w-0 flex-1 cursor-pointer truncate text-left text-sm font-medium text-foreground transition-colors hover:underline"
                         title={currentProject ? `${currentTask.title} - Click to open ${currentProject.title}` : currentTask.title}
                     >
                         {currentTask.title}
@@ -176,8 +176,8 @@ const GlobalTimer = ({
                 </div>
 
                 {/* Right column: time + controls + options toggle */}
-                <div className="flex items-center justify-end gap-2">
-                    <span className={`text-sm font-mono ${timeColor} px-2 py-1 rounded-md min-w-[32px] inline-block text-center`}>
+                <div className="flex shrink-0 items-center justify-end gap-2">
+                    <span className={`inline-block shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-center text-sm font-mono ${timeColor}`}>
                         {displayTime}
                     </span>
                     {/* Control buttons - using TaskTimer component */}
@@ -202,7 +202,7 @@ const GlobalTimer = ({
                                 setIsExpandedInternal(nextValue);
                             }
                         }}
-                        className="h-8 w-8 transition-colors hover:bg-accent"
+                        className="h-8 w-8 shrink-0 transition-colors hover:bg-accent"
                         title={isExpanded ? "Hide options" : "Show timer options"}
                     >
                         {isExpanded ? (

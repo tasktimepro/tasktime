@@ -1170,6 +1170,22 @@ const ExpenseModal = ({
                             </Select>
                         </div>
                     )}
+                    {isSubmittingRecurring && (
+                        <div className="space-y-2">
+                            <Label htmlFor="expense-amount">
+                                Amount <span className="text-destructive-strong">*</span>
+                            </Label>
+                            <Input
+                                id="expense-amount"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={formData.amount}
+                                onChange={(event) => handleChange('amount', event.target.value)}
+                                placeholder="0.00"
+                            />
+                        </div>
+                    )}
                     {showRecurringFields && (
                         <div className="space-y-2">
                             <Label htmlFor="expense-paid-by-recurring">Payment Method</Label>

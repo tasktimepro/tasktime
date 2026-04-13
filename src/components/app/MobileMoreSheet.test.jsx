@@ -76,6 +76,13 @@ describe('MobileMoreSheet', () => {
         expect(screen.queryByRole('button', { name: 'Close more navigation' })).not.toBeInTheDocument()
     })
 
+    it('does not auto-focus the first action when it opens', () => {
+        renderComponent()
+
+        expect(screen.getByRole('button', { name: 'Clients icon Clients View your clients' })).not.toBe(document.activeElement)
+        expect(document.body).toBe(document.activeElement)
+    })
+
     it('renders labeled top action tiles', () => {
         renderComponent({ darkMode: true, totalsHidden: true })
 

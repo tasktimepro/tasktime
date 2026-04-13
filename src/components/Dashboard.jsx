@@ -484,7 +484,8 @@ const Dashboard = ({
                 taskId: task.id,
                 start: activeTimer.startTime,
                 end: endTime,
-                note: activeTimer.note
+                note: activeTimer.note,
+                _stoppedTimerKey: task.projectId || task.id,
             });
 
             clearTimer(task.projectId || task.id);

@@ -168,7 +168,8 @@ const TaskItem = ({
                 taskId: task.id,
                 start: projectTimer.startTime,
                 end: now,
-                note: projectTimer.note
+                note: projectTimer.note,
+                _stoppedTimerKey: timerKey,
             });
             clearTimer(timerKey);
         }

@@ -1102,7 +1102,7 @@ function AppContent() {
 
     const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'account'].includes(activeView);
     const isMoreViewActive = ['clients', 'invoices', 'account'].includes(activeView);
-    const mobileTopPadding = showGlobalTimer && timerIsActive ? '5.75rem' : '1rem';
+    const mobileTopPadding = showGlobalTimer && timerIsActive ? '5.5rem' : '1rem';
     const mobileBottomPadding = '7rem';
     const desktopTopPadding = showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem';
     const desktopBottomPadding = '1.5rem';

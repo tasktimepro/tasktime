@@ -137,8 +137,8 @@ const TaskTree = ({
     }, [pendingDeleteTaskId, pendingDeleteTask, tasks]);
 
     const deleteBillingSummary = useMemo(() => {
-        return getTaskDeletionBillingSummary(pendingDeleteTaskIds, tasks, timeEntries);
-    }, [pendingDeleteTaskIds, tasks, timeEntries]);
+        return getTaskDeletionBillingSummary(pendingDeleteTaskIds, tasks, timeEntries, [project]);
+    }, [pendingDeleteTaskIds, tasks, timeEntries, project]);
 
     /**
      * Create a new task

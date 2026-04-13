@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event'
 import { ToastProvider } from './ToastContainer'
 import { useToast } from '../hooks/useToast'
 
+const consumePostReloadToastMock = vi.hoisted(() => vi.fn())
+
 const toasterRenderSpy = vi.hoisted(() => vi.fn())
 
 const toastMocks = vi.hoisted(() => ({
@@ -25,6 +27,10 @@ vi.mock('@/components/ui/sonner', () => ({
     }
 }))
 
+vi.mock('../utils/postReloadToast.ts', () => ({
+    consumePostReloadToast: consumePostReloadToastMock
+}))
+
 const TriggerToast = () => {
     const { showSuccess } = useToast()
 
@@ -40,6 +46,7 @@ describe('ToastProvider', () => {
     beforeEach(() => {
 
         vi.clearAllMocks()
+        consumePostReloadToastMock.mockReturnValue(null)
     })
 
     it('renders children and toaster', () => {
@@ -86,5 +93,21 @@ describe('ToastProvider', () => {
             left: '1rem',
             right: '1rem'
         })
+    })
+
+    it('dispatches a queued post-reload success toast on mount', () => {
+
+        consumePostReloadToastMock.mockReturnValue({
+            level: 'success',
+            message: 'Reloaded successfully'
+        })
+
+        render(
+            <ToastProvider>
+                <div>Child</div>
+            </ToastProvider>
+        )
+
+        expect(toastMocks.success).toHaveBeenCalledWith('Reloaded successfully', undefined)
     })
 })

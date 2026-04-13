@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
+import { useProjects } from '../../../hooks/useProjects';
 import DeleteTaskWarnings from '../DeleteTaskWarnings';
 import { getTaskDeletionBillingSummary } from '../../../utils/taskUtils.ts';
 import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
@@ -44,6 +45,7 @@ const SubtaskSection = ({
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
+    const { projects } = useProjects();
     const [pendingDeleteSubtaskId, setPendingDeleteSubtaskId] = useState(null);
 
     const sortedSubtasks = useMemo(() => {
@@ -73,11 +75,11 @@ const SubtaskSection = ({
 
     const deleteBillingSummary = useMemo(() => {
         if (!pendingDeleteSubtaskId) {
-            return getTaskDeletionBillingSummary([], tasks, timeEntries);
+            return getTaskDeletionBillingSummary([], tasks, timeEntries, projects);
         }
 
-        return getTaskDeletionBillingSummary([pendingDeleteSubtaskId], tasks, timeEntries);
-    }, [pendingDeleteSubtaskId, tasks, timeEntries]);
+        return getTaskDeletionBillingSummary([pendingDeleteSubtaskId], tasks, timeEntries, projects);
+    }, [pendingDeleteSubtaskId, tasks, timeEntries, projects]);
     
     /**
      * Handle subtask deletion with cleanup

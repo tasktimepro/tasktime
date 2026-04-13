@@ -69,11 +69,11 @@ function TimerControls({
     /**
      * Create a time entry with overlap validation
      */
-    const createValidatedEntry = useCallback((taskId, start, end, entryNote) => {
+    const createValidatedEntry = useCallback((taskId, start, end, entryNote, stoppedTimerKey) => {
         if (!validateTimeEntry(taskId, start, end)) {
             return false;
         }
-        createEntry({ taskId, start, end, note: entryNote });
+        createEntry({ taskId, start, end, note: entryNote, _stoppedTimerKey: stoppedTimerKey });
         return true;
     }, [validateTimeEntry, createEntry]);
 
@@ -97,7 +97,7 @@ function TimerControls({
                 ? (existingStart + projectTimer.elapsedTime)
                 : Date.now();
 
-            if (!createValidatedEntry(projectTimer.taskId, existingStart, existingEnd, projectTimer.note)) {
+            if (!createValidatedEntry(projectTimer.taskId, existingStart, existingEnd, projectTimer.note, timerKey)) {
                 return;
             }
             clearTimer(timerKey);
@@ -146,7 +146,7 @@ function TimerControls({
             : now;
         
         // Validate and create entry
-        if (!createValidatedEntry(task.id, entryStart, entryEnd, projectTimer.note)) {
+        if (!createValidatedEntry(task.id, entryStart, entryEnd, projectTimer.note, timerKey)) {
             return; // Don't clear timer if validation failed
         }
         
@@ -167,26 +167,26 @@ function TimerControls({
     const iconSize = size === 'sm' ? 'h-5 w-5' : 'h-5 w-5';
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
             {!isTimerActive ? (
                 // Start button - shown when no timer active for this task
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={handleStart}
-                    className="status-success-action h-8 w-8 status-success-text-strong"
+                    className="status-success-action h-8 w-8 shrink-0 status-success-text-strong"
                     title="Start Timer"
                 >
                     <PlayIcon className={iconSize} />
                 </Button>
             ) : isTimerPaused ? (
                 // For paused state, show resume and stop buttons (icons only)
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={handleResume}
-                        className="status-success-action h-8 w-8 status-success-text-strong"
+                        className="status-success-action h-8 w-8 shrink-0 status-success-text-strong"
                         title="Resume Timer"
                     >
                         <PlayIcon className={iconSize} />
@@ -195,7 +195,7 @@ function TimerControls({
                         variant="ghost"
                         size="icon"
                         onClick={handleStop}
-                        className="status-danger-action h-8 w-8 status-danger-text-strong"
+                        className="status-danger-action h-8 w-8 shrink-0 status-danger-text-strong"
                         title="Save & Stop Timer"
                     >
                         <StopIcon className={iconSize} />
@@ -203,12 +203,12 @@ function TimerControls({
                 </div>
             ) : (
                 // For active (running) state, show pause and stop buttons
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={handlePause}
-                        className="status-warning-action h-8 w-8 status-warning-text-strong"
+                        className="status-warning-action h-8 w-8 shrink-0 status-warning-text-strong"
                         title="Pause Timer"
                     >
                         <PauseIcon className={iconSize} />
@@ -217,7 +217,7 @@ function TimerControls({
                         variant="ghost"
                         size="icon"
                         onClick={handleStop}
-                        className="status-danger-action h-8 w-8 status-danger-text-strong"
+                        className="status-danger-action h-8 w-8 shrink-0 status-danger-text-strong"
                         title="Save & Stop Timer"
                     >
                         <StopIcon className={iconSize} />

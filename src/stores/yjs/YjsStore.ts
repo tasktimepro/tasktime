@@ -16,7 +16,7 @@ import { BackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
 import { migrateInvoicesInDoc } from './invoiceMigration';
 import { parseStoredDate } from '@/utils/dateUtils';
-import { readEntity, objectToYMap, collectEntities } from './entityUtils';
+import { readEntity, objectToYMap, collectEntities, forEachEntity } from './entityUtils';
 import type {
     DocName,
     SyncState,
@@ -679,8 +679,15 @@ export class YjsStore {
         // Set up backup manager with access to the provider's manifest
         this.backupManager = new BackupManager(this.driveProvider.getManifest(), this);
 
-        // After each successful sync, maybe create a backup
+        // After each successful sync, reconcile orphaned timers and maybe create a backup
         this.driveProvider.onSyncComplete(() => {
+            // Clean up timers whose stop-entry arrived from another device
+            try {
+                this.reconcileOrphanedTimers();
+            } catch (err) {
+                console.error('[YjsStore] Timer reconciliation error:', err);
+            }
+
             const enabled = this.preferences.get('backupEnabled') ?? true;
             if (!enabled || !this.backupManager) return;
 
@@ -883,6 +890,51 @@ export class YjsStore {
     async deleteAllBackups(): Promise<void> {
         if (!this.backupManager) return;
         return this.backupManager.deleteAllBackups();
+    }
+
+    // =========================================================================
+    // Reconciliation
+    // =========================================================================
+
+    /**
+     * Reconcile orphaned timers after sync.
+     *
+     * When a timer is stopped, two writes happen across different Yjs docs:
+     *   1. Time entry created in `entries-active`
+     *   2. Timer deleted from `core`
+     *
+     * If those deltas arrive on another device out of order (or one fails),
+     * a "ghost" timer can persist even though its entry already exists.
+     *
+     * This method detects and cleans up such orphans by matching entries
+     * that carry a `_stoppedTimerKey` against still-active timers.
+     */
+    reconcileOrphanedTimers(): void {
+        if (!this._coreDoc || !this._activeEntriesDoc) return;
+
+        const timersMap = this._coreDoc.getMap<MultiTimerState>('timers');
+        if (timersMap.size === 0) return;
+
+        // Build set of timer keys that have a matching completed entry
+        const stoppedKeys = new Set<string>();
+
+        forEachEntity<TimeEntry>(
+            this._activeEntriesDoc.getMap('timeEntries') as Y.Map<string, unknown>,
+            (entry) => {
+                if (entry._stoppedTimerKey && timersMap.has(entry._stoppedTimerKey)) {
+                    stoppedKeys.add(entry._stoppedTimerKey);
+                }
+            },
+        );
+
+        if (stoppedKeys.size === 0) return;
+
+        console.log('[YjsStore] Reconciling orphaned timers:', Array.from(stoppedKeys));
+        this._coreDoc.transact(() => {
+            for (const key of stoppedKeys) {
+                timersMap.delete(key);
+            }
+        });
     }
 
     // =========================================================================

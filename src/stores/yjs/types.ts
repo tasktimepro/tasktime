@@ -71,6 +71,8 @@ export interface TimeEntry {
     billedHourlyRate?: number | null;
     billedAt?: number | null;
     billedInvoiceId?: string | null;
+    /** Timer key (projectId) that produced this entry — used for cross-doc orphan reconciliation */
+    _stoppedTimerKey?: string;
 }
 
 export interface Client {

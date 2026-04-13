@@ -7,7 +7,8 @@ import TaskActionsMenu from './TaskActionsMenu'
 const hookState = vi.hoisted(() => ({
 
     tasks: [],
-    entries: []
+    entries: [],
+    projects: []
 }))
 
 vi.mock('@/hooks/useTasks', () => ({
@@ -21,6 +22,13 @@ vi.mock('@/hooks/useTimeEntries', () => ({
 
     useTimeEntries: () => ({
         entries: hookState.entries
+    })
+}))
+
+vi.mock('@/hooks/useProjects', () => ({
+
+    useProjects: () => ({
+        projects: hookState.projects
     })
 }))
 
@@ -40,6 +48,10 @@ describe('TaskActionsMenu', () => {
             { taskId: 't1', start: 500, end: 900, billedInvoiceId: 'inv-1' },
             { taskId: 't2', start: 2000, end: 5600000 }
         ]
+        hookState.projects = [{ id: 'p1', isPersonal: false }]
+
+        task.projectId = 'p1'
+        hookState.tasks[1].projectId = 'p1'
 
         render(<TaskActionsMenu task={task} onEdit={vi.fn()} onDelete={onDelete} />)
 
@@ -48,6 +60,26 @@ describe('TaskActionsMenu', () => {
 
         expect(screen.getByText('This task and its subtasks include 1.55 unbilled hours.')).toBeInTheDocument()
         expect(screen.getByText('This task and its subtasks include time that is already recorded on an invoice.')).toBeInTheDocument()
+    })
+
+    it('does not show unbilled warning for tasks on personal projects', async () => {
+
+        const onDelete = vi.fn()
+        const task = { id: 't1', title: 'Task', billable: true, projectId: 'p1' }
+        const user = userEvent.setup()
+
+        hookState.tasks = [task]
+        hookState.entries = [
+            { taskId: 't1', start: 2000, end: 5600000 }
+        ]
+        hookState.projects = [{ id: 'p1', isPersonal: true }]
+
+        render(<TaskActionsMenu task={task} onEdit={vi.fn()} onDelete={onDelete} />)
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByText('Delete'))
+
+        expect(screen.queryByText('This task includes 1.55 unbilled hours.')).not.toBeInTheDocument()
     })
 
     it('calls onEdit when edit is selected', async () => {
@@ -59,6 +91,7 @@ describe('TaskActionsMenu', () => {
 
         hookState.tasks = [task]
         hookState.entries = []
+        hookState.projects = []
 
         render(<TaskActionsMenu task={task} onEdit={onEdit} onDelete={onDelete} />)
 
@@ -77,6 +110,7 @@ describe('TaskActionsMenu', () => {
 
         hookState.tasks = [task]
         hookState.entries = []
+        hookState.projects = []
 
         render(<TaskActionsMenu task={task} onEdit={onEdit} onDelete={onDelete} />)
 
@@ -96,6 +130,7 @@ describe('TaskActionsMenu', () => {
 
         hookState.tasks = [task]
         hookState.entries = []
+        hookState.projects = []
 
         render(<TaskActionsMenu task={task} onEdit={vi.fn()} onDelete={vi.fn()} />)
 
@@ -117,6 +152,7 @@ describe('TaskActionsMenu', () => {
 
         hookState.tasks = [task]
         hookState.entries = []
+        hookState.projects = []
 
         render(<TaskActionsMenu task={task} onEdit={onEdit} onDelete={onDelete} />)
 

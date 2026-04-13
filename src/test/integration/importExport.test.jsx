@@ -203,4 +203,22 @@ describe('Import/Export integration', () => {
         // Reset for other tests
         mockTimers.length = 0
     })
+
+    it('shows expenses in the current data summary', () => {
+
+        render(
+            <ExportImport
+                {...baseProps}
+                projects={[]}
+                tasks={[]}
+                timeEntries={[]}
+                expenses={[{ id: 'expense-1', title: 'Lunch', amount: 12 }]}
+                onImport={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Current Data')).toBeInTheDocument()
+        expect(screen.getByText('Expenses:')).toBeInTheDocument()
+        expect(screen.getByText('1')).toBeInTheDocument()
+    })
 })

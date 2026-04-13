@@ -4,6 +4,7 @@
 
 type Task = {
     id: string;
+    projectId?: string | null;
     title?: string;
     parentTaskId?: string | null;
     billable?: boolean;
@@ -19,6 +20,11 @@ type TimeEntry = {
     billedAt?: number | null;
     billedInvoiceId?: string | null;
     billedHourlyRate?: number | null;
+};
+
+type Project = {
+    id: string;
+    isPersonal?: boolean;
 };
 
 type TaskDeletionBillingSummary = {
@@ -76,7 +82,8 @@ export const getSubtasks = (taskId: string, allTasks: Task[]): Task[] => {
 export const getTaskDeletionBillingSummary = (
     taskIds: string[],
     allTasks: Task[],
-    timeEntries: TimeEntry[]
+    timeEntries: TimeEntry[],
+    projects: Project[] = []
 ): TaskDeletionBillingSummary => {
     if (taskIds.length === 0) {
         return {
@@ -94,6 +101,7 @@ export const getTaskDeletionBillingSummary = (
             .filter((task) => taskIdSet.has(task.id))
             .map((task) => [task.id, task])
     );
+    const projectMap = new Map(projects.map((project) => [project.id, project]));
 
     let unbilledEntryCount = 0;
     let unbilledTimeMs = 0;
@@ -103,6 +111,8 @@ export const getTaskDeletionBillingSummary = (
         const task = taskMap.get(entry.taskId);
         if (!task) return;
         if (typeof entry.end !== 'number' || entry.end <= entry.start) return;
+
+        const project = task.projectId ? projectMap.get(task.projectId) : null;
 
         const billingCutoff = task.lastBilledAt || task.createdAt || 0;
         const isExplicitlyBilled = Boolean(
@@ -114,7 +124,13 @@ export const getTaskDeletionBillingSummary = (
             billedEntryCount += 1;
         }
 
-        if (task.billable === true && entry.source !== 'invoice-adjustment' && entry.start > billingCutoff) {
+        if (
+            task.billable === true
+            && Boolean(project)
+            && project?.isPersonal !== true
+            && entry.source !== 'invoice-adjustment'
+            && entry.start > billingCutoff
+        ) {
             unbilledEntryCount += 1;
             unbilledTimeMs += (entry.end - entry.start);
         }

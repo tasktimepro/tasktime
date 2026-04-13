@@ -10,7 +10,7 @@ import { useMasterClock } from '@/hooks/useMasterClock';
 import type { MultiTimerState, TimeEntry } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
-import { readEntity, objectToYMap } from '@/stores/yjs/entityUtils';
+import { readEntity, objectToYMap, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 
 export interface ActiveTimer extends MultiTimerState {
@@ -155,13 +155,11 @@ export function useTimers(): UseTimersResult {
         const elapsed = Date.now() - timer.startTime;
 
         store.coreDoc.transact(() => {
-            const entityMap = objectToYMap({
-                ...timer,
+            updateEntityFields(store.timers as any, projectId, {
                 paused: true,
                 pausedElapsedTime: elapsed,
                 lastActive: Date.now(),
-            } as unknown as Record<string, unknown>);
-            (store.timers as any).set(projectId, entityMap);
+            });
         });
 
         markMeaningfulActivity();
@@ -184,14 +182,12 @@ export function useTimers(): UseTimersResult {
         const alignedStartTime = alignedNow - (pausedSeconds * 1000);
 
         store.coreDoc.transact(() => {
-            const entityMap = objectToYMap({
-                ...timer,
+            updateEntityFields(store.timers as any, projectId, {
                 startTime: alignedStartTime,
                 paused: false,
                 pausedElapsedTime: 0,
                 lastActive: now,
-            } as unknown as Record<string, unknown>);
-            (store.timers as any).set(projectId, entityMap);
+            });
         });
 
         markMeaningfulActivity();
@@ -214,6 +210,7 @@ export function useTimers(): UseTimersResult {
             start: startTime,
             end: now,
             note: timer.note,
+            _stoppedTimerKey: projectId,
         }, `stop timer entry ${projectId}`);
 
         store.activeEntriesDoc.transact(() => {
@@ -246,18 +243,12 @@ export function useTimers(): UseTimersResult {
         const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `update timer ${projectId}`);
         if (!timer) return;
 
-        store.coreDoc.transact(() => {
-            const nextTimer = validateCollectionEntity<MultiTimerState>('timers', {
-                ...timer,
-                startTime: updates.startTime !== undefined ? updates.startTime : timer.startTime,
-                note: updates.note !== undefined ? updates.note : timer.note,
-                lastActive: Date.now(),
-            }, `update timer ${projectId}`);
+        const fieldUpdates: Record<string, unknown> = { lastActive: Date.now() };
+        if (updates.startTime !== undefined) fieldUpdates.startTime = updates.startTime;
+        if (updates.note !== undefined) fieldUpdates.note = updates.note;
 
-            const entityMap = objectToYMap({
-                ...nextTimer,
-            } as unknown as Record<string, unknown>);
-            (store.timers as any).set(projectId, entityMap);
+        store.coreDoc.transact(() => {
+            updateEntityFields(store.timers as any, projectId, fieldUpdates);
         });
 
         markMeaningfulActivity();
@@ -270,11 +261,9 @@ export function useTimers(): UseTimersResult {
         if (!timer) return;
 
         store.coreDoc.transact(() => {
-            const entityMap = objectToYMap({
-                ...timer,
+            updateEntityFields(store.timers as any, projectId, {
                 lastActive: Date.now(),
-            } as unknown as Record<string, unknown>);
-            (store.timers as any).set(projectId, entityMap);
+            });
         });
     }, [isReady, store]);
 

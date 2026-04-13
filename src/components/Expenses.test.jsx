@@ -185,4 +185,25 @@ describe('Expenses', () => {
         expect(outstandingTab.className).toContain('rounded-full');
         expect(outstandingTab.className.includes('rounded-none')).toBe(false);
     });
+
+    it('matches the invoices mobile spacing between the top tabs and page title', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        });
+
+        const { container } = render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        );
+
+        expect(container.firstChild).not.toBeNull();
+        expect(container.firstChild.className).toContain('space-y-4');
+        expect(container.firstChild.className).toContain('overflow-x-hidden');
+    });
 });

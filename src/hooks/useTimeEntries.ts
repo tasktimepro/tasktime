@@ -9,7 +9,7 @@ import { useYjs } from '@/contexts/YjsContext';
 import type { TimeEntry } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
-import { objectToYMap } from '@/stores/yjs/entityUtils';
+import { objectToYMap, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 
 export interface UseTimeEntriesOptions {
@@ -129,11 +129,16 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         // Check active entries first
         const activeEntry = readValidatedEntity<TimeEntry>('timeEntries', store.activeTimeEntries.get(id), `update time entry ${id}`);
         if (activeEntry) {
-            const updated = validateCollectionEntity<TimeEntry>('timeEntries', { ...activeEntry, ...updates }, `update time entry ${id}`);
-            const entityMap = objectToYMap(updated as unknown as Record<string, unknown>);
-            (store.activeTimeEntries as any).set(id, entityMap);
+            const merged = { ...activeEntry, ...updates };
+            const validated = validateCollectionEntity<TimeEntry>('timeEntries', merged, `update time entry ${id}`);
+
+            const result = updateEntityFields(store.activeTimeEntries as any, id, updates as Record<string, unknown>);
+            if (!result) {
+                const entityMap = objectToYMap(validated as unknown as Record<string, unknown>);
+                (store.activeTimeEntries as any).set(id, entityMap);
+            }
             markMeaningfulActivity();
-            return updated;
+            return validated;
         }
         
         // Note: Updating archived entries would require loading the year doc
