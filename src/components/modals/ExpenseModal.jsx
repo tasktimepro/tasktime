@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -148,6 +149,37 @@ const ExpenseModal = ({
     const emptyFormData = useMemo(() => buildEmptyFormData(todayString, defaultCurrency), [defaultCurrency, todayString]);
     const [confirmDialog, setConfirmDialog] = useState(null);
     const titleInputRef = useRef(null);
+    const oneTimePaymentModeOverrideRef = useRef(null);
+
+    const getDefaultOneTimePaymentState = useCallback((dateValue) => {
+        const resolvedDate = dateValue || todayString;
+        const shouldAutoPay = Boolean(resolvedDate) && resolvedDate === todayString;
+
+        return {
+            paymentMode: shouldAutoPay ? 'auto' : 'manual',
+            paidOn: shouldAutoPay ? resolvedDate : '',
+        };
+    }, [todayString]);
+
+    const resolveNewOneTimePaymentState = useCallback((dateValue) => {
+        const resolvedDate = dateValue || todayString;
+
+        if (oneTimePaymentModeOverrideRef.current === 'auto') {
+            return {
+                paymentMode: 'auto',
+                paidOn: resolvedDate,
+            };
+        }
+
+        if (oneTimePaymentModeOverrideRef.current === 'manual') {
+            return {
+                paymentMode: 'manual',
+                paidOn: '',
+            };
+        }
+
+        return getDefaultOneTimePaymentState(resolvedDate);
+    }, [getDefaultOneTimePaymentState, todayString]);
 
     const draftStateKey = useMemo(() => {
         if (!isOpen) {
@@ -340,24 +372,30 @@ const ExpenseModal = ({
             : (scopedProject?.preferredClientId || modalOptions?.clientId || NO_CLIENT_VALUE);
         const initialProjectId = scopedProject?.id || modalOptions?.projectId || NO_PROJECT_VALUE;
         const shouldStartRecurring = Boolean(modalOptions?.isRecurring);
+        const initialDate = modalOptions?.date || todayString;
         const defaultPaidBy = defaultPaymentMethod?.id || '';
         const defaultBusinessId = isPersonal ? '' : (defaultBusinessInfo?.id || '');
         const defaultBusiness = businessInfos.find((info) => info.id === defaultBusinessId);
         const defaultTaxNumber = isPersonal ? '' : (defaultBusiness?.taxNumber || '');
+        const initialOneTimePaymentState = shouldStartRecurring
+            ? { paymentMode: 'manual', paidOn: '' }
+            : resolveNewOneTimePaymentState(initialDate);
 
         return {
             key: draftStateKey,
             formData: applyScopedProjectContext({
                 ...emptyFormData,
-                date: modalOptions?.date || todayString,
+                date: initialDate,
                 currency: defaultCurrency,
+                paidOn: initialOneTimePaymentState.paidOn,
                 paidBy: defaultPaidBy,
+                paymentMode: initialOneTimePaymentState.paymentMode,
                 clientId: initialClientId,
                 projectId: initialProjectId,
                 businessId: defaultBusinessId,
                 isPersonal,
                 isRecurring: shouldStartRecurring,
-                startDate: modalOptions?.date || todayString,
+                startDate: initialDate,
                 taxNumber: defaultTaxNumber,
             }, scopedProject, businessInfos, defaultBusinessInfo),
             editingRecurrenceId: null,
@@ -375,6 +413,7 @@ const ExpenseModal = ({
         getSavedState,
         isOpen,
         modalOptions,
+        resolveNewOneTimePaymentState,
         scopedProject,
         todayString,
     ]);
@@ -402,6 +441,10 @@ const ExpenseModal = ({
 
         setDraftState(buildDraftStateRef.current());
     }, [draftStateKey, emptyFormData, isOpen]);
+
+    useEffect(() => {
+        oneTimePaymentModeOverrideRef.current = null;
+    }, [draftStateKey]);
 
     const activeDraftState = draftState;
     const { formData, editingRecurrenceId, missingRecurrenceId } = activeDraftState;
@@ -604,11 +647,26 @@ const ExpenseModal = ({
                 };
             }
 
+            const nextDate = prev.date || todayString;
+
+            if (!editingExpense && !editingRecurrenceId) {
+                const nextPaymentState = resolveNewOneTimePaymentState(nextDate);
+
+                return {
+                    ...prev,
+                    isRecurring: false,
+                    date: nextDate,
+                    paidOn: nextPaymentState.paidOn,
+                    paidBy: prev.paidBy || '',
+                    paymentMode: nextPaymentState.paymentMode,
+                };
+            }
+
             return {
                 ...prev,
                 isRecurring: false,
-                date: prev.date || todayString,
-                paidOn: prev.paidOn || '',
+                date: nextDate,
+                paidOn: prev.paymentMode === 'auto' ? nextDate : (prev.paidOn || ''),
                 paidBy: prev.paidBy || ''
             };
         });
@@ -648,13 +706,51 @@ const ExpenseModal = ({
             return;
         }
 
+        const nextPaymentState = resolveNewOneTimePaymentState(todayString);
+
         setFormData((prev) => ({
             ...prev,
             isRecurring: false,
+            paymentMode: nextPaymentState.paymentMode,
+            paidOn: nextPaymentState.paidOn,
             repeat: DEFAULT_REPEAT,
             startDate: todayString,
             monthlyType: 'first',
             monthlyDay: 1,
+        }));
+    };
+
+    const handleOneTimeDateChange = (value) => {
+        setFormData((prev) => {
+            const nextDate = value;
+            const nextFormData = {
+                ...prev,
+                date: nextDate,
+            };
+
+            if (!prev.isRecurring && !editingExpense && !editingRecurrenceId) {
+                const nextPaymentState = resolveNewOneTimePaymentState(nextDate);
+
+                nextFormData.paymentMode = nextPaymentState.paymentMode;
+                nextFormData.paidOn = nextPaymentState.paidOn;
+                return nextFormData;
+            }
+
+            if (!prev.isRecurring && prev.paymentMode === 'auto') {
+                nextFormData.paidOn = nextDate || '';
+            }
+
+            return nextFormData;
+        });
+    };
+
+    const handleOneTimePaymentModeChange = (checked) => {
+        oneTimePaymentModeOverrideRef.current = checked ? 'auto' : 'manual';
+
+        setFormData((prev) => ({
+            ...prev,
+            paymentMode: checked ? 'auto' : 'manual',
+            paidOn: checked ? (prev.date || todayString) : '',
         }));
     };
 
@@ -1010,31 +1106,52 @@ const ExpenseModal = ({
                                     />
                                 </div>
                                 {showOneTimeFields ? (
-                                <div className="space-y-2">
-                                    <Label htmlFor="expense-date">Date <span className="text-destructive-strong">*</span></Label>
-                                    <Input
-                                        id="expense-date"
-                                        type="date"
-                                        value={formData.date}
-                                        onChange={(event) => handleChange('date', event.target.value)}
-                                        className="dark:[color-scheme:dark]"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    <Label htmlFor="expense-end">End Date</Label>
-                                    <Input
-                                        id="expense-end"
-                                        type="date"
-                                        value={formData.endDate}
-                                        onChange={(event) => handleChange('endDate', event.target.value)}
-                                        disabled={recurringFieldsLocked}
-                                        className="dark:[color-scheme:dark]"
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
+                                    <div className="grid grid-cols-2 gap-4 md:contents">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="expense-date">Date <span className="text-destructive-strong">*</span></Label>
+                                            <NativeDateInput
+                                                id="expense-date"
+                                                value={formData.date}
+                                                onChange={(event) => handleOneTimeDateChange(event.target.value)}
+                                                className="dark:[color-scheme:dark]"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="expense-amount">
+                                                {isSubmittingRecurring
+                                                    ? 'Amount '
+                                                    : (formData.isRecurring && formData.amountType === 'variable'
+                                                        ? 'Amount (recurring estimate)'
+                                                        : 'Amount ')}
+                                                {!(formData.isRecurring && formData.amountType === 'variable') && (
+                                                    <span className="text-destructive-strong">*</span>
+                                                )}
+                                            </Label>
+                                            <Input
+                                                id="expense-amount"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={formData.amount}
+                                                onChange={(event) => handleChange('amount', event.target.value)}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="expense-end">End Date</Label>
+                                        <NativeDateInput
+                                            id="expense-end"
+                                            value={formData.endDate}
+                                            onChange={(event) => handleChange('endDate', event.target.value)}
+                                            disabled={recurringFieldsLocked}
+                                            className="dark:[color-scheme:dark]"
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
                     {showRecurringFields && (
                         <div className="space-y-2">
                             <Label>Amount Type</Label>
@@ -1101,42 +1218,54 @@ const ExpenseModal = ({
                             </div>
                         </div>
                     )}
-                    <div className="space-y-2">
-                        <Label htmlFor="expense-amount">
-                            {isSubmittingRecurring
-                                ? 'Amount '
-                                : (formData.isRecurring && formData.amountType === 'variable'
-                                    ? 'Amount (recurring estimate)'
-                                    : 'Amount ')}
-                            {!(formData.isRecurring && formData.amountType === 'variable') && (
-                                <span className="text-destructive-strong">*</span>
-                            )}
-                        </Label>
-                        <Input
-                            id="expense-amount"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={formData.amount}
-                            onChange={(event) => handleChange('amount', event.target.value)}
-                            placeholder="0.00"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Currency</Label>
-                        <CurrencySelect
-                            value={formData.currency}
-                            onValueChange={(value) => handleChange('currency', value)}
-                        />
-                    </div>
-                    {!isSubmittingRecurring && (
+                    {!showOneTimeFields && (
                         <div className="space-y-2">
-                            <Label htmlFor="expense-supplier">Supplier / Business</Label>
+                            <Label htmlFor="expense-amount">
+                                {isSubmittingRecurring
+                                    ? 'Amount '
+                                    : (formData.isRecurring && formData.amountType === 'variable'
+                                        ? 'Amount (recurring estimate)'
+                                        : 'Amount ')}
+                                {!(formData.isRecurring && formData.amountType === 'variable') && (
+                                    <span className="text-destructive-strong">*</span>
+                                )}
+                            </Label>
                             <Input
-                                id="expense-supplier"
-                                value={formData.supplierName}
-                                onChange={(event) => handleChange('supplierName', event.target.value)}
-                                placeholder="Supplier name"
+                                id="expense-amount"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={formData.amount}
+                                onChange={(event) => handleChange('amount', event.target.value)}
+                                placeholder="0.00"
+                            />
+                        </div>
+                    )}
+                    {!isSubmittingRecurring ? (
+                        <div className="grid grid-cols-2 gap-4 md:contents">
+                            <div className="space-y-2">
+                                <Label>Currency</Label>
+                                <CurrencySelect
+                                    value={formData.currency}
+                                    onValueChange={(value) => handleChange('currency', value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="expense-supplier">Supplier / Business</Label>
+                                <Input
+                                    id="expense-supplier"
+                                    value={formData.supplierName}
+                                    onChange={(event) => handleChange('supplierName', event.target.value)}
+                                    placeholder="Supplier name"
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <Label>Currency</Label>
+                            <CurrencySelect
+                                value={formData.currency}
+                                onValueChange={(value) => handleChange('currency', value)}
                             />
                         </div>
                     )}
@@ -1172,21 +1301,15 @@ const ExpenseModal = ({
                                 <div className="md:col-span-2">
                                     <CustomCheckbox
                                         checked={formData.paymentMode === 'auto'}
-                                        onChange={(checked) => {
-                                            handleChange('paymentMode', checked ? 'auto' : 'manual');
-                                            if (checked && formData.paidOn) {
-                                                handleChange('paidOn', '');
-                                            }
-                                        }}
-                                        label="Auto-payment"
+                                        onChange={handleOneTimePaymentModeChange}
+                                        label="Automatically paid on expense date"
                                     />
                                 </div>
                             )}
                             <div className="space-y-2">
                                 <Label htmlFor="expense-paid-on">Paid On</Label>
-                                <Input
+                                <NativeDateInput
                                     id="expense-paid-on"
-                                    type="date"
                                     value={formData.paidOn}
                                     onChange={(event) => handleChange('paidOn', event.target.value)}
                                     disabled={formData.paymentMode === 'auto'}

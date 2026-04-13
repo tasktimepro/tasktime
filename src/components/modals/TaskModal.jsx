@@ -7,6 +7,7 @@ import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { InlineFieldHeader } from '@/components/ui/inline-field-header';
 import { Input } from '@/components/ui/input';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -273,9 +274,8 @@ const TaskModal = ({
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-3">
                         <div className="space-y-2 md:flex-none">
                             <Label htmlFor="task-start-date">Start Date</Label>
-                            <Input
+                            <NativeDateInput
                                 id="task-start-date"
-                                type="date"
                                 value={formData.startDate}
                                 onChange={(event) => handleStartDateChange(event.target.value)}
                                 className="w-full md:w-48 dark:[color-scheme:dark]"

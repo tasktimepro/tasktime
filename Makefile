@@ -284,7 +284,7 @@ worker-metrics-weekly:
 	fi
 	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
-		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT device_hash) AS weekly_active_devices, COUNT(DISTINCT dedupe_hash) AS weekly_active_people_approx, COALESCE(SUM(session_count), 0) AS weekly_sessions, COUNT(DISTINCT CASE WHEN is_synced = 1 THEN device_hash END) AS weekly_synced_devices FROM daily_device_usage WHERE day >= date('now', '-6 day') AND meaningful_activity = 1"
+		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT device_hash) AS weekly_active_devices, COUNT(DISTINCT dedupe_hash) AS weekly_active_people_approx, COALESCE(SUM(session_count), 0) AS weekly_sessions, COUNT(DISTINCT CASE WHEN sync_person_hash IS NOT NULL THEN sync_person_hash END) AS weekly_synced_people FROM daily_device_usage WHERE day >= date('now', '-6 day') AND meaningful_action_count >= 2"
 
 # Monthly usage summary from the metrics D1 database
 worker-metrics-monthly:
@@ -294,4 +294,4 @@ worker-metrics-monthly:
 	fi
 	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
-		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT device_hash) AS monthly_active_devices, COUNT(DISTINCT dedupe_hash) AS monthly_active_people_approx, COALESCE(SUM(session_count), 0) AS monthly_sessions, COUNT(DISTINCT CASE WHEN is_synced = 1 THEN device_hash END) AS monthly_synced_devices FROM daily_device_usage WHERE day >= date('now', '-29 day') AND meaningful_activity = 1"
+		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT device_hash) AS monthly_active_devices, COUNT(DISTINCT dedupe_hash) AS monthly_active_people_approx, COALESCE(SUM(session_count), 0) AS monthly_sessions, COUNT(DISTINCT CASE WHEN sync_person_hash IS NOT NULL THEN sync_person_hash END) AS monthly_synced_people FROM daily_device_usage WHERE day >= date('now', '-29 day') AND meaningful_action_count >= 2"

@@ -128,6 +128,7 @@ function AppContent() {
     const [isMobileSyncButtonFadingOut, setIsMobileSyncButtonFadingOut] = useState(false);
     const mobileSyncHideTimeoutRef = useRef(null);
     const mobileSyncFadeTimeoutRef = useRef(null);
+    const mainContentRef = useRef(null);
 
     useEffect(() => {
         return startUsageMetrics({
@@ -742,6 +743,15 @@ function AppContent() {
 
     // === URL State ===
     const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToPlanner, updateUrl } = useUrlState();
+    const routeScrollKey = useMemo(() => {
+        return [
+            urlParams.view,
+            urlParams.projectId || '',
+            urlParams.clientId || '',
+            urlParams.year || '',
+            urlParams.week || '',
+        ].join(':');
+    }, [urlParams.clientId, urlParams.projectId, urlParams.view, urlParams.week, urlParams.year]);
 
     const handleOpenMobileSyncSettings = useCallback(() => {
         navigateToAccount({ section: 'sync' });
@@ -927,6 +937,23 @@ function AppContent() {
     const handleQuickCreateExpense = useCallback(() => {
         openExpenseModal(null);
     }, [openExpenseModal]);
+
+    useEffect(() => {
+        const mainContent = mainContentRef.current;
+
+        if (mainContent) {
+            if (typeof mainContent.scrollTo === 'function') {
+                mainContent.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+            } else {
+                mainContent.scrollTop = 0;
+                mainContent.scrollLeft = 0;
+            }
+        }
+
+        if (typeof window.scrollTo === 'function') {
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        }
+    }, [routeScrollKey]);
 
     useEffect(() => {
         if (timerIsActive && timerTaskId) return;
@@ -1528,7 +1555,7 @@ function AppContent() {
             )}
 
             {/* Main Content */}
-            <main className={`main-content relative ${isMobileLayout ? 'app-viewport-shell' : 'flex-1'}`}>
+            <main ref={mainContentRef} className={`main-content relative ${isMobileLayout ? 'app-viewport-shell' : 'flex-1'}`}>
                 <div
                     className={isMobileLayout ? 'app-shell-content px-4' : 'app-shell-content pr-4'}
                     style={{
@@ -1789,8 +1816,8 @@ function AppContent() {
                     onOpenAccount={handleMoreSheetAction(() => navigateToAccount())}
                     onClose={() => setIsMoreMenuOpen(false)}
                     onOpenChange={setIsMoreMenuOpen}
-                    onToggleDarkMode={() => setDarkMode(!darkMode)}
-                    onToggleTotals={() => setTotalsHidden(!totalsHidden)}
+                    onToggleDarkMode={() => setDarkMode((currentValue) => !currentValue)}
+                    onToggleTotals={() => setTotalsHidden((currentValue) => !currentValue)}
                     totalsHidden={totalsHidden}
                 />
             </>

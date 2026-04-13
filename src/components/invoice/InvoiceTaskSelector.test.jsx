@@ -2,6 +2,20 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import InvoiceTaskSelector from './InvoiceTaskSelector';
 
+const findAncestorWithClass = (element, className) => {
+    let current = element;
+
+    while (current) {
+        if (typeof current.className === 'string' && current.className.includes(className)) {
+            return current;
+        }
+
+        current = current.parentElement;
+    }
+
+    return null;
+};
+
 const createBaseProps = (overrides = {}) => ({
     activeSection: 'tasksTime',
     toggleSection: vi.fn(),
@@ -131,5 +145,44 @@ describe('InvoiceTaskSelector', () => {
         fireEvent.change(mergedHoursInput, { target: { value: '4.5' } });
 
         expect(handleHoursChange).toHaveBeenCalledWith('parent-1', '3');
+    });
+
+    it('keeps task actions inline and uses two-column mobile editors', () => {
+        render(
+            <InvoiceTaskSelector
+                {...createBaseProps({
+                    invoiceTasks: [
+                        {
+                            id: 'task-1',
+                            title: 'Responsive task',
+                            parentTaskId: null,
+                            hours: 4.25,
+                            originalHours: 4.25,
+                            originalTimeMs: 15300000
+                        }
+                    ],
+                    showAddTaskForm: true,
+                    selectedProject: { hourlyRate: null, flatRate: false },
+                })}
+            />
+        );
+
+        const taskRow = findAncestorWithClass(screen.getByText('Responsive task'), 'rounded border bg-card p-3');
+        const existingHoursInput = screen.getByDisplayValue('4.25');
+        const newTaskHoursInput = screen.getByPlaceholderText('Hours');
+        const existingHoursGrid = findAncestorWithClass(existingHoursInput, 'grid-cols-2');
+        const newTaskHoursGrid = findAncestorWithClass(newTaskHoursInput, 'grid-cols-2');
+        const headerActionRow = findAncestorWithClass(screen.getByRole('button', { name: '+ Add Task' }), 'justify-between');
+
+        expect(taskRow?.className.includes('flex-col')).toBe(true);
+        expect(taskRow?.className.includes('md:flex-row')).toBe(true);
+        expect(existingHoursGrid?.className.includes('grid-cols-2')).toBe(true);
+        expect(existingHoursInput.className.includes('w-full')).toBe(true);
+        expect(existingHoursInput.className.includes('md:w-20')).toBe(true);
+        expect(newTaskHoursGrid?.className.includes('grid-cols-2')).toBe(true);
+        expect(newTaskHoursInput.className.includes('w-full')).toBe(true);
+        expect(newTaskHoursInput.className.includes('sm:w-32')).toBe(true);
+        expect(headerActionRow?.className.includes('justify-between')).toBe(true);
+        expect(headerActionRow?.className.includes('flex-col')).toBe(false);
     });
 });

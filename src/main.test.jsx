@@ -71,4 +71,29 @@ describe('main entrypoint', () => {
 
         expect(document.documentElement.style.getPropertyValue('--viewport-height')).toBe('680px')
     })
+
+    it('uses innerHeight in standalone PWA mode unless keyboard is open', async () => {
+        Object.defineProperty(window.navigator, 'standalone', {
+            configurable: true,
+            value: true,
+        })
+
+        Object.defineProperty(window, 'innerHeight', {
+            configurable: true,
+            value: 844,
+        })
+
+        window.visualViewport.height = 810
+
+        await import('./main.jsx')
+
+        // Should use innerHeight (844) since keyboard is not open
+        expect(document.documentElement.style.getPropertyValue('--viewport-height')).toBe('844px')
+
+        // Simulate keyboard opening (visualViewport significantly smaller)
+        window.visualViewport.height = 400
+        window.dispatchEvent(new Event('resize'))
+
+        expect(document.documentElement.style.getPropertyValue('--viewport-height')).toBe('400px')
+    })
 })

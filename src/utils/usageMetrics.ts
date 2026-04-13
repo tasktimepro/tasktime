@@ -15,6 +15,7 @@ interface DayBucket {
     day: string;
     sessionCount: number;
     meaningfulActivity: boolean;
+    meaningfulActionCount: number;
     syncEnabled: boolean;
     sent: boolean;
 }
@@ -146,6 +147,7 @@ const getOrCreateBucket = (state: StoredUsageMetricsState, day: string): DayBuck
         day,
         sessionCount: 0,
         meaningfulActivity: false,
+        meaningfulActionCount: 0,
         syncEnabled: false,
         sent: false,
     };
@@ -232,17 +234,15 @@ export function markMeaningfulActivity(): void {
         ensureDeviceInstallId(state);
 
         const bucket = getOrCreateBucket(state, getLocalDayString());
-        const didChange = !bucket.meaningfulActivity || (runtime.sessionId && !bucket.syncEnabled);
 
         bucket.meaningfulActivity = true;
+        bucket.meaningfulActionCount = (bucket.meaningfulActionCount || 0) + 1;
         if (runtime.sessionId) {
             bucket.syncEnabled = true;
         }
 
-        if (didChange) {
-            touchBucketAfterChange(bucket);
-            await writeState(state);
-        }
+        touchBucketAfterChange(bucket);
+        await writeState(state);
     }).catch((error) => {
         console.error('[UsageMetrics] Failed to mark meaningful activity:', error);
     });
@@ -303,6 +303,7 @@ export async function maybeSendPendingUsageMetrics(reason = 'manual'): Promise<b
                 day: bucket.day,
                 sessionCount: bucket.sessionCount,
                 meaningfulActivity: bucket.meaningfulActivity,
+                meaningfulActionCount: bucket.meaningfulActionCount || 0,
                 syncEnabled: bucket.syncEnabled,
             })),
         };
@@ -403,6 +404,7 @@ export function startUsageMetrics(options: UsageMetricsStartOptions): () => void
 }
 
 export async function getStoredUsageMetricsState(): Promise<StoredUsageMetricsState> {
+    await operationQueue;
     return readState();
 }
 

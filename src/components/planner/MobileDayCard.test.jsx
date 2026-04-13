@@ -13,28 +13,21 @@ vi.mock('./DailyGoalProgress', () => ({
     default: () => <div>Daily goal progress</div>
 }));
 
-vi.mock('./hooks/useTimeProgress', () => ({
-    useTimeProgress: () => 0,
-    getProgressGradientStyle: () => ({}),
-}));
-
 describe('MobileDayCard', () => {
+    const baseProps = {
+        date: new Date(2026, 2, 24),
+        dateStr: '2026-03-24',
+        totalTimeMs: 0,
+        totalEarnings: 0,
+        currency: 'USD',
+        onPrev: () => {},
+        onNext: () => {},
+        onAddClick: () => {},
+        onCreateTask: () => {},
+    };
+
     it('uses the simplified mobile title/date stack and button icon API', () => {
-        render(
-            <MobileDayCard
-                date={new Date(2026, 2, 24)}
-                dateStr="2026-03-24"
-                isToday={true}
-                items={[]}
-                totalTimeMs={0}
-                totalEarnings={0}
-                currency="USD"
-                onPrev={() => {}}
-                onNext={() => {}}
-                onAddClick={() => {}}
-                onCreateTask={() => {}}
-            />
-        );
+        render(<MobileDayCard {...baseProps} isToday={true} items={[]} />);
 
         expect(screen.getByText('Today')).toBeInTheDocument();
         expect(screen.getByText('March 24')).toBeInTheDocument();
@@ -42,5 +35,21 @@ describe('MobileDayCard', () => {
         const attachButton = screen.getByRole('button', { name: /Attach item/i });
         expect(attachButton.querySelector('svg')).not.toBeNull();
         expect(attachButton.textContent).toContain('Attach item');
+    });
+
+    it('does not render the mobile item-count badge', () => {
+        render(<MobileDayCard {...baseProps} items={[{ key: 'task-1', title: 'Alpha', type: 'task' }]} />);
+
+        expect(screen.queryByText('1 item')).not.toBeInTheDocument();
+        expect(screen.queryByText('1 items')).not.toBeInTheDocument();
+    });
+
+    it('uses a full-card today background without a mobile top border accent', () => {
+        const { container } = render(<MobileDayCard {...baseProps} isToday={true} items={[]} />);
+
+        const card = container.firstChild;
+        expect(card.className).toContain('bg-muted/80');
+        expect(card.className).not.toContain('border-t-2');
+        expect(card.getAttribute('style')).toBeNull();
     });
 });

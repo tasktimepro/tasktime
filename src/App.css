@@ -1,5 +1,9 @@
 /* Task. Time. Track. App Styles */
-html,
+html {
+  height: var(--viewport-height);
+  background-color: hsl(var(--background));
+}
+
 body {
   height: var(--viewport-height);
 }

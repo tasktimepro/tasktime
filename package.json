@@ -16,7 +16,7 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
-    "test:e2e:smoke": "playwright test e2e/*.smoke.spec.js",
+    "test:e2e:smoke": "playwright test --workers=2 e2e/*.smoke.spec.js",
     "test:e2e:pwa:smoke": "npm run build && playwright test -c playwright.pwa.config.js",
     "release": "npm run lint && npm run test:coverage && npm run test:e2e:smoke && npm run test:e2e:pwa:smoke && npm run build"
   },

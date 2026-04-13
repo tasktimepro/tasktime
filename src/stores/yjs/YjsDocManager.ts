@@ -210,17 +210,29 @@ export class YjsDocManager {
                 resolve(); // Resolve anyway to not block the app
             }, 10_000);
 
-            persistence.once('synced', () => {
-                clearTimeout(timeout);
-                console.log(`[YjsDocManager] Loaded: ${name}`);
-                resolve();
-            });
-
             // Handle errors during initial load
-            persistence.on('error', (error: Error) => {
+            const handleInitialLoadError = (error: Error) => {
                 clearTimeout(timeout);
+                persistence.off('error', handleInitialLoadError);
                 console.error(`[YjsDocManager] Error loading ${name}:`, error);
                 reject(error);
+            };
+
+            persistence.on('error', handleInitialLoadError);
+
+            if (persistence.synced) {
+                clearTimeout(timeout);
+                persistence.off('error', handleInitialLoadError);
+                console.log(`[YjsDocManager] Loaded: ${name}`);
+                resolve();
+                return;
+            }
+
+            persistence.whenSynced.then(() => {
+                clearTimeout(timeout);
+                persistence.off('error', handleInitialLoadError);
+                console.log(`[YjsDocManager] Loaded: ${name}`);
+                resolve();
             });
         });
 

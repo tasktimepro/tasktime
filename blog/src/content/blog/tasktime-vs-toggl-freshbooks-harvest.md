@@ -45,13 +45,13 @@ Harvest also uploads everything to their servers and charges per seat, which get
 
 Let's be fair about where TaskTime isn't the right choice:
 
-- **Team collaboration.** If you need to share projects with a team, tools like Harvest or FreshBooks handle multi-user access better. TaskTime is built for solo freelancers.
+- **Team collaboration.** If you need to share projects with a team, tools like Harvest or FreshBooks handle multi-user access better. TaskTime is built for freelancers and solo professionals.
 - **Accounting features.** FreshBooks connects to banks, handles tax calculations, and generates financial reports. TaskTime focuses on the freelancer workflow (tasks → time → expenses → invoice), not full accounting.
 - **Integrations.** Toggl and Harvest plug into dozens of other tools. TaskTime is self-contained — which is a pro if you want simplicity, but a con if you rely on integrations.
 
 ## Who TaskTime is for
 
-TaskTime is the best fit if you're a solo freelancer who wants:
+TaskTime is the best fit if you're a freelancer or solo professional who wants:
 
 - One tool for tasks, time, expenses, and invoices
 - Your data on your device, not someone else's server

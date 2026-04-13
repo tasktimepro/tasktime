@@ -102,6 +102,23 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('padding: 0')
     })
 
+    it('forces a self-contained light document color model for mobile rendering', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('.invoice-document')
+        expect(html).toContain('background-color: #ffffff')
+        expect(html).toContain('color: #111827')
+        expect(html).toContain('color-scheme: light')
+        expect(html).toContain('-webkit-text-fill-color: #111827')
+        expect(html).toContain('forced-color-adjust: none')
+    })
+
     it('renders flat rate additional task totals with quantity', () => {
 
         const html = createInvoiceHTML({

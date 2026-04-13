@@ -14,4 +14,3 @@ export { default as MobileDayCard } from './MobileDayCard';
 export { default as DailyGoalModal } from './DailyGoalModal';
 export { default as WeeklyGoalModal } from './WeeklyGoalModal';
 export { default as DailyGoalProgress } from './DailyGoalProgress';
-export { useTimeProgress, getProgressGradientStyle } from './hooks/useTimeProgress';

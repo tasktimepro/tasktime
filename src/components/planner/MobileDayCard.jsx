@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { PlusIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/ui/icons';
 import PlannerItem from './PlannerItem';
 import AddItemPopover from './AddItemPopover';
-import { useTimeProgress, getProgressGradientStyle } from './hooks/useTimeProgress';
 import { cn } from '@/lib/utils';
 import DailyGoalProgress from './DailyGoalProgress';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
@@ -58,14 +57,8 @@ const MobileDayCard = ({
     onRemoveItem,
     onSetDailyGoal,
 }) => {
-
-    // Time progress for today
-    const progress = useTimeProgress();
-    const progressStyle = isToday ? getProgressGradientStyle(progress) : {};
-
     const dayName = format(date, 'EEEE');
     const dayDate = format(date, 'MMMM d');
-    const itemCount = items.length;
 
     const handleAddSelect = (type) => {
         onAddClick?.(dateStr, type);
@@ -105,9 +98,9 @@ const MobileDayCard = ({
     return (
         <div 
             className={cn(
-                'flex min-h-[50vh] flex-col overflow-hidden rounded-xl border bg-card shadow-sm'
+                'flex min-h-[50vh] flex-col overflow-hidden rounded-xl border bg-card shadow-sm',
+                isToday && 'bg-muted/80 dark:bg-muted/10'
             )}
-            style={progressStyle}
         >
             {/* Header with navigation */}
             <div className="border-b px-3 py-3 sm:px-4">
@@ -144,9 +137,6 @@ const MobileDayCard = ({
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground">
-                        {itemCount} {itemCount === 1 ? 'item' : 'items'}
-                    </span>
                     {formattedTime && (
                         <span className="rounded-full bg-muted px-2.5 py-1">
                             {formattedTime} worked

@@ -3,6 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import Expenses from './Expenses';
 
+const createMatchMedia = (matchesByQuery = {}) => vi.fn().mockImplementation((query) => ({
+    matches: Boolean(matchesByQuery[query]),
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+}));
+
 const toLocalStorageDate = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -91,6 +98,7 @@ describe('Expenses', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         expensesState.expenses = [];
+        window.matchMedia = createMatchMedia();
     });
 
     it('opens the mobile filter sheet', () => {
@@ -139,5 +147,42 @@ describe('Expenses', () => {
         );
 
         expect(screen.getByRole('tab', { name: 'Outstanding (1)' }).className.includes('status-warning-tab')).toBe(false);
+    });
+
+    it('uses the invoice-style pill tabs on mobile without the scroll-strip classes', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        });
+        expensesState.expenses = [
+            {
+                id: 'expense-1',
+                title: 'Hosting',
+                amount: 25,
+                date: toLocalStorageDate(new Date()),
+                paymentStatus: 'unpaid',
+                archived: false,
+            },
+        ];
+
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        );
+
+        const outstandingTab = screen.getByRole('tab', { name: 'Outstanding (1)' });
+        const tabList = outstandingTab.closest('[role="tablist"]');
+
+        expect(tabList).not.toBeNull();
+        expect(tabList.className).toContain('flex-wrap');
+        expect(tabList.className.includes('overflow-x-auto')).toBe(false);
+        expect(tabList.className.includes('border-b')).toBe(false);
+        expect(outstandingTab.className).toContain('rounded-full');
+        expect(outstandingTab.className.includes('rounded-none')).toBe(false);
     });
 });

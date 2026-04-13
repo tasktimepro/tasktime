@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { toDisplayDate } from '../../utils/dateUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../../utils/currencyUtils.ts';
 import { getInvoiceTotal } from '../../utils/invoiceUtils.ts';
+
+const A4_PREVIEW_WIDTH_PX = 794;
+const A4_PREVIEW_HEIGHT_PX = 1123;
 
 /**
  * InvoicePreviewModal component - Displays invoice preview HTML or fallback summary.
@@ -25,6 +28,50 @@ const InvoicePreviewModal = ({
 }) => {
     const previewHtml = htmlContent || invoice?.htmlContent || '';
     const previewTitle = title || (invoice ? `Invoice Preview - ${invoice.invoiceNumber}` : 'Invoice Preview');
+    const modalContentRef = useRef(null);
+    const previewPageRef = useRef(null);
+    const [previewScale, setPreviewScale] = useState(1);
+    const [previewHeight, setPreviewHeight] = useState(A4_PREVIEW_HEIGHT_PX);
+
+    useEffect(() => {
+        if (!isOpen || !previewHtml) {
+            setPreviewScale(1);
+            setPreviewHeight(A4_PREVIEW_HEIGHT_PX);
+            return undefined;
+        }
+
+        const syncPreviewLayout = () => {
+            const measuredWidth = modalContentRef.current?.clientWidth || window.innerWidth || A4_PREVIEW_WIDTH_PX;
+            const nextScale = Math.min(1, measuredWidth / A4_PREVIEW_WIDTH_PX);
+            const nextHeight = previewPageRef.current?.scrollHeight || A4_PREVIEW_HEIGHT_PX;
+
+            setPreviewScale(nextScale > 0 ? nextScale : 1);
+            setPreviewHeight(Math.max(nextHeight, A4_PREVIEW_HEIGHT_PX));
+        };
+
+        syncPreviewLayout();
+
+        window.addEventListener('resize', syncPreviewLayout);
+
+        let resizeObserver;
+
+        if (typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(syncPreviewLayout);
+
+            if (modalContentRef.current) {
+                resizeObserver.observe(modalContentRef.current);
+            }
+
+            if (previewPageRef.current) {
+                resizeObserver.observe(previewPageRef.current);
+            }
+        }
+
+        return () => {
+            window.removeEventListener('resize', syncPreviewLayout);
+            resizeObserver?.disconnect();
+        };
+    }, [isOpen, previewHtml]);
 
     const modalFooter = footer || (
         <div className="flex justify-end">
@@ -44,10 +91,32 @@ const InvoicePreviewModal = ({
             title={previewTitle}
             size="4xl"
             footer={modalFooter}
+            contentRef={modalContentRef}
         >
             {previewHtml ? (
-                <div className="bg-white text-black rounded-lg border border-border p-6 overflow-auto">
-                    <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                <div className="overflow-auto rounded-lg border border-border bg-muted/20 p-2 sm:p-3" data-testid="invoice-preview-shell">
+                    <div
+                        className="mx-auto"
+                        data-testid="invoice-preview-frame"
+                        style={{
+                            width: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
+                            minWidth: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
+                            height: `${previewHeight * previewScale}px`,
+                        }}
+                    >
+                        <div
+                            ref={previewPageRef}
+                            className="origin-top-left overflow-hidden bg-white text-black"
+                            data-testid="invoice-preview-page"
+                            style={{
+                                width: `${A4_PREVIEW_WIDTH_PX}px`,
+                                minHeight: `${A4_PREVIEW_HEIGHT_PX}px`,
+                                transform: `scale(${previewScale})`,
+                            }}
+                        >
+                            <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                        </div>
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-4">

@@ -361,6 +361,7 @@ describe('App component', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
         window.history.pushState({}, '', '/')
         googleAuthHookState.hadPreviousSession = false
         googleAuthHookState.isLoading = false
@@ -521,6 +522,33 @@ describe('App component', () => {
         await user.click(screen.getByRole('button', { name: 'Account' }))
 
         expect(urlHookState.navigateToAccount).toHaveBeenCalledTimes(1)
+    })
+
+    it('updates dark mode immediately while the more sheet stays open on mobile', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+            '(prefers-color-scheme: dark)': false,
+        })
+        document.head.innerHTML = `
+            <meta name="theme-color" content="#fcfcfc" />
+            <meta name="color-scheme" content="light" />
+        `
+
+        const user = userEvent.setup()
+
+        render(<App />)
+
+        await user.click(screen.getByRole('button', { name: 'More' }))
+
+        const dialog = screen.getByRole('dialog')
+
+        await user.click(within(dialog).getByRole('button', { name: 'Switch to dark mode' }))
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+        expect(within(screen.getByRole('dialog')).getByText('Light mode')).toBeInTheDocument()
+        expect(document.documentElement.classList.contains('dark')).toBe(true)
+        expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0a0a0a')
+        expect(document.querySelector('meta[name="color-scheme"]')?.getAttribute('content')).toBe('dark')
     })
 
     it('temporarily replaces More with sync status during an active mobile sync', () => {
@@ -731,6 +759,32 @@ describe('App component', () => {
         expect(main).not.toBeNull()
         expect(main?.className).toContain('app-viewport-shell')
         expect(main?.className).not.toContain('min-h-screen')
+    })
+
+    it('resets the main content scroll position when navigating to a different route', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+
+        const { container, rerender } = render(<App />)
+
+        const main = container.querySelector('main')
+
+        expect(main).not.toBeNull()
+
+        main.scrollTop = 180
+        main.scrollLeft = 24
+        main.scrollTo = ({ top = 0, left = 0 }) => {
+            main.scrollTop = top
+            main.scrollLeft = left
+        }
+
+        urlHookState.urlParams = { view: 'projects', projectId: null, clientId: null }
+        rerender(<App />)
+
+        expect(main.scrollTop).toBe(0)
+        expect(main.scrollLeft).toBe(0)
+        expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'auto' })
     })
 
     it('does not render the removed mobile top bar on project detail routes', () => {

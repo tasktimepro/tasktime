@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 
 /**
  * SubtaskCreateForm component - Form for creating subtasks.
@@ -38,8 +39,7 @@ const SubtaskCreateForm = ({
                     placeholder="Note"
                     className="flex-1 text-sm"
                 />
-                <Input
-                    type="date"
+                <NativeDateInput
                     value={newSubtaskStartDate}
                     onChange={(e) => {
                         setNewSubtaskStartDate(e.target.value);

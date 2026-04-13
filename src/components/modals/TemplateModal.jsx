@@ -6,6 +6,7 @@ import { useInvoiceTemplates } from '../../hooks/useInvoiceTemplates.ts';
 import { toDisplayDate } from '../../utils/dateUtils.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
@@ -455,8 +456,7 @@ const TemplateModal = ({
                                 <Label>
                                     Due Date
                                 </Label>
-                                <Input
-                                    type="date"
+                                <NativeDateInput
                                     value={formData.dueDatePrecise || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, dueDatePrecise: e.target.value }))}
                                     className="w-48"

@@ -14,6 +14,15 @@ const AccountFooter = ({ className }) => {
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
                 <a
+                    href="https://x.com/tasktimepro"
+                    className="inline-flex items-center justify-center text-foreground hover:text-primary"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    aria-label="TaskTime on X"
+                >
+                    <img src="/x.svg" alt="" aria-hidden="true" className="h-6 w-6" />
+                </a>
+                <a
                     href="/blog"
                     className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
                     target="_blank"

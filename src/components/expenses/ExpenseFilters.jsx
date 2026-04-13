@@ -3,6 +3,7 @@
  */
 
 import { Input } from '@/components/ui/input';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Button } from '@/components/ui/button';
 import { FilterIcon, MagnifyingGlassIcon } from '@/components/ui/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -185,8 +186,7 @@ const ExpenseFilters = ({
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">From</span>
-                        <input
-                            type="date"
+                        <NativeDateInput
                             value={customStart}
                             onChange={(event) => onCustomStartChange(event.target.value)}
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -194,8 +194,7 @@ const ExpenseFilters = ({
                     </div>
                     <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">To</span>
-                        <input
-                            type="date"
+                        <NativeDateInput
                             value={customEnd}
                             onChange={(event) => onCustomEndChange(event.target.value)}
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm"

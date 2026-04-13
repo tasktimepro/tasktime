@@ -15,6 +15,30 @@ import CustomCheckbox from '../CustomCheckbox';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { parseOptionalNumberInput, parseOptionalPositiveNumberInput } from '@/utils/numberInputUtils.ts';
 
+function getDefaultIsPersonal(modalOptions) {
+    if (modalOptions?.preselectedClientId) {
+        return false;
+    }
+
+    if (typeof modalOptions?.defaultPersonalProject === 'boolean') {
+        return modalOptions.defaultPersonalProject;
+    }
+
+    return true;
+}
+
+function createEmptyProjectFormData(modalOptions) {
+    return {
+        title: '',
+        hourlyRate: '',
+        flatRate: false,
+        preferredClientId: '',
+        overrideRate: false,
+        isPersonal: getDefaultIsPersonal(modalOptions),
+        color: ''
+    };
+}
+
 function buildProjectUpdatePayload(formData) {
     return {
         title: formData.title,
@@ -63,15 +87,7 @@ const ProjectModal = ({
     const activeClients = clients.filter(client => !client.archived);
     const isClientSelectDisabled = !!modalOptions?.preselectedClientId || activeClients.length === 0;
 
-    const [formData, setFormData] = useState({
-        title: '',
-        hourlyRate: '', // Keep as empty string for proper placeholder behavior
-        flatRate: false,
-        preferredClientId: '',
-        overrideRate: false,
-        isPersonal: false,
-        color: ''
-    });
+    const [formData, setFormData] = useState(() => createEmptyProjectFormData(modalOptions));
 
     // Initialize form data when opening or changing context
     useEffect(() => {
@@ -144,7 +160,7 @@ const ProjectModal = ({
                         flatRate: savedState.flatRate || false,
                         preferredClientId: savedState.preferredClientId || '',
                         overrideRate: savedState.overrideRate || false,
-                        isPersonal: savedState.isPersonal || false,
+                        isPersonal: savedState.isPersonal ?? getDefaultIsPersonal(modalOptions),
                         color: savedState.color || ''
                     });
                     
@@ -155,15 +171,7 @@ const ProjectModal = ({
                     }
                 } else {
                     // No saved state and no preselected client - reset form
-                    setFormData({
-                        title: '',
-                        hourlyRate: '',
-                        flatRate: false,
-                        preferredClientId: '',
-                        overrideRate: false,
-                        isPersonal: Boolean(modalOptions?.defaultPersonalProject),
-                        color: ''
-                    });
+                    setFormData(createEmptyProjectFormData(modalOptions));
                     setSelectedClientRate(null);
                 }
             }
@@ -264,7 +272,7 @@ const ProjectModal = ({
         });
 
         // Reset form
-        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false, color: '' });
+        setFormData(createEmptyProjectFormData(modalOptions));
         setSelectedClientRate(null);
 
         // Clear saved state since project was successfully created
@@ -395,7 +403,9 @@ const ProjectModal = ({
                                 Personal project (Not billable)
                             </label>
                             <p className="text-muted-foreground">
-                                Check this for personal projects without clients or invoices.
+                                {formData.isPersonal
+                                    ? 'Uncheck this for projects with clients or invoices.'
+                                    : 'Check this for projects without clients or invoices.'}
                             </p>
                         </div>
                     </div>
@@ -455,7 +465,7 @@ const ProjectModal = ({
                             <p className="text-xs text-muted-foreground mt-2">
                                 {activeClients.length === 0
                                     ? 'Create a client to associate with this project.'
-                                    : 'Every project must be associated with a client.'}
+                                    : 'Billable projects must be associated with a client.'}
                             </p>
                         )}
                     </div>

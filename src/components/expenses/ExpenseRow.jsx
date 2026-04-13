@@ -174,12 +174,12 @@ const ExpenseRow = ({
                         )}
                     </div>
 
-                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                    <div className="flex items-center justify-end gap-2">
                         {!isPaidDisplay && !isPreview && !(expense.paymentMode === 'auto' && expense.amountType !== 'variable') && (
                             <Button
                                 size="sm"
                                 leadingIcon={CheckIcon}
-                                className="w-full sm:w-auto"
+                                className="shrink-0"
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     onTogglePaid(expense);
@@ -196,7 +196,7 @@ const ExpenseRow = ({
                                 }}
                                 variant="ghost"
                                 size="icon"
-                                className="self-end"
+                                className="shrink-0"
                                 title="Edit Expense"
                             >
                                 <PencilIcon className="h-5 w-5" />

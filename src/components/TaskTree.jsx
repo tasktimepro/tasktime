@@ -3,6 +3,7 @@ import { DocumentCheckIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, SortIco
 import TaskItem from './TaskItem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Notice } from '@/components/ui/notice';
@@ -363,8 +364,7 @@ const TaskTree = ({
                             className={cn(!isMobileLayout && 'flex-1')}
                         />
 
-                        <Input
-                            type="date"
+                        <NativeDateInput
                             value={newTaskStartDate}
                             onChange={(e) => {
                                 setNewTaskStartDate(e.target.value);

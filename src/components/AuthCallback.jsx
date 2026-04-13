@@ -15,18 +15,41 @@ export const AuthCallback = () => {
         const state = params.get('state');
         const error = params.get('error');
 
-        // Send message to opener window
-        if (window.opener) {
-            window.opener.postMessage(
-                {
-                    type: 'google-auth-callback',
-                    code,
-                    state,
-                    error,
-                },
-                window.location.origin
-            );
+        const payload = {
+            type: 'google-auth-callback',
+            code,
+            state,
+            error,
+        };
 
+        let delivered = false;
+
+        // Primary: postMessage to opener window (works when popup reference is intact)
+        if (window.opener) {
+            try {
+                window.opener.postMessage(payload, window.location.origin);
+                delivered = true;
+            } catch {
+                // Cross-origin or COOP may block; fall through to BroadcastChannel
+            }
+        }
+
+        // Fallback: BroadcastChannel for mobile browsers where window.opener
+        // is lost after cross-origin Google OAuth redirects
+        if (!delivered && typeof BroadcastChannel !== 'undefined') {
+            try {
+                const channel = new BroadcastChannel('google-auth-callback');
+                channel.postMessage(payload);
+
+                // Keep channel open briefly so the message is delivered
+                setTimeout(() => channel.close(), 500);
+                delivered = true;
+            } catch {
+                // BroadcastChannel not available in this context
+            }
+        }
+
+        if (delivered) {
             // Close popup after short delay; ignore if COOP blocks
             setTimeout(() => {
                 try {
@@ -34,9 +57,9 @@ export const AuthCallback = () => {
                 } catch {
                     // Ignore if blocked by browser policies
                 }
-            }, 150);
+            }, 300);
         } else {
-            // Not in a popup - redirect to home
+            // Neither channel available - redirect to home
             window.location.href = '/';
         }
     }, []);

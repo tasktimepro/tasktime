@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { TimePicker } from '@/components/ui/time-picker';
@@ -338,9 +339,8 @@ const AddTimeEntryModal = ({
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="add-start-date">Date started</Label>
-                        <Input
+                        <NativeDateInput
                             id="add-start-date"
-                            type="date"
                             value={formData.startDate}
                             onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
                             className="text-sm bg-background text-foreground dark:[color-scheme:dark]"

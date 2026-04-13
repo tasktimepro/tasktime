@@ -196,7 +196,8 @@ export const useGoogleAuth = () => {
         const [session] = args as Parameters<ValidateWorkerSession>;
 
         if (!isOnline()) {
-            return false;
+            // Offline: assume stored session is still valid; don't clear it.
+            return true;
         }
 
         try {
@@ -204,12 +205,21 @@ export const useGoogleAuth = () => {
                 method: 'GET',
                 headers: { 'X-Session-Id': session.sessionId },
             });
-            if (!response.ok) return false;
-            const data = await response.json();
 
+            if (!response.ok) {
+                // 5xx or unexpected status: treat as transient server error.
+                // Only 2xx with authenticated:false means explicitly invalid.
+                if (response.status >= 500) return true;
+                return false;
+            }
+
+            const data = await response.json();
             return data.authenticated === true;
         } catch {
-            return false;
+            // Network error (offline, DNS failure, Worker unreachable).
+            // Optimistically keep the session; don't wipe credentials for
+            // transient connectivity issues.
+            return true;
         }
     }, [isOnline]);
 
@@ -607,6 +617,8 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
     return new Promise((resolve, reject) => {
 
         let settled = false;
+        let broadcastChannel: BroadcastChannel | null = null;
+
         const closedCheckId = window.setInterval(() => {
             if (popup.closed && !settled) {
                 cleanup();
@@ -619,6 +631,10 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
             window.removeEventListener('message', handleMessage);
             clearTimeout(timeoutId);
             window.clearInterval(closedCheckId);
+            if (broadcastChannel) {
+                try { broadcastChannel.close(); } catch { /* ignore */ }
+                broadcastChannel = null;
+            }
         };
 
         const timeoutId = setTimeout(() => {
@@ -629,17 +645,16 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
             }
         }, 120000);
 
-        const handleMessage = (event: MessageEvent) => {
-            if (event.origin !== window.location.origin) return;
+        const processPayload = (data: Record<string, unknown>) => {
 
-            const { type, code, state, error } = event.data || {};
+            const { type, code, state, error } = data;
             if (type !== 'google-auth-callback') return;
 
             cleanup();
 
             if (error) {
                 settled = true;
-                reject(new Error(error));
+                reject(new Error(error as string));
                 return;
             }
 
@@ -650,9 +665,30 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
             }
 
             settled = true;
-            resolve(code);
+            resolve(code as string);
+        };
+
+        const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            if (settled) return;
+            processPayload(event.data || {});
         };
 
         window.addEventListener('message', handleMessage);
+
+        // BroadcastChannel fallback: on mobile browsers, window.opener can be
+        // lost after cross-origin Google OAuth redirects, so postMessage never
+        // arrives. The AuthCallback page also posts to this channel.
+        if (typeof BroadcastChannel !== 'undefined') {
+            try {
+                broadcastChannel = new BroadcastChannel('google-auth-callback');
+                broadcastChannel.onmessage = (event: MessageEvent) => {
+                    if (settled) return;
+                    processPayload(event.data || {});
+                };
+            } catch {
+                // BroadcastChannel not available; rely on postMessage only
+            }
+        }
     });
 }

@@ -58,6 +58,23 @@ describe('useDarkModePreference', () => {
         expect(localStorage.setItem).toHaveBeenCalledWith('tasktime-dark-mode', 'true')
     })
 
+    it('uses the current device theme on first visit when no preference is saved', () => {
+        window.matchMedia = vi.fn().mockImplementation((query) => ({
+            matches: query === '(prefers-color-scheme: dark)',
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        }))
+
+        render(<TestComponent />)
+
+        expect(screen.getByRole('button', { name: 'dark' })).toBeInTheDocument()
+        expect(document.documentElement.classList.contains('dark')).toBe(true)
+        expect(document.documentElement.style.colorScheme).toBe('dark')
+        expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0a0a0a')
+        expect(document.querySelector('meta[name="color-scheme"]')?.getAttribute('content')).toBe('dark')
+        expect(localStorage.setItem).toHaveBeenCalledWith('tasktime-dark-mode', 'true')
+    })
+
     it('updates browser theme metadata when toggled', async () => {
         const user = userEvent.setup()
 

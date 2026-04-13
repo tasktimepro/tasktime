@@ -76,11 +76,24 @@ describe('usageMetrics', () => {
             expect.objectContaining({
                 day: '2026-04-09',
                 meaningfulActivity: true,
+                meaningfulActionCount: 1,
                 sessionCount: 0,
                 syncEnabled: false,
                 sent: false,
             }),
         ]);
+    });
+
+    it('increments meaningfulActionCount on each call to markMeaningfulActivity', async () => {
+        markMeaningfulActivity();
+        await flushAsyncWork();
+        markMeaningfulActivity();
+        await flushAsyncWork();
+        markMeaningfulActivity();
+        await flushAsyncWork();
+
+        const state = await getStoredUsageMetricsState();
+        expect(state.dayBuckets[0].meaningfulActionCount).toBe(3);
     });
 
     it('records an initial session and sends one delayed daily batch', async () => {
@@ -110,6 +123,7 @@ describe('usageMetrics', () => {
                     day: '2026-04-09',
                     sessionCount: 1,
                     meaningfulActivity: true,
+                    meaningfulActionCount: 1,
                     syncEnabled: false,
                 },
             ],

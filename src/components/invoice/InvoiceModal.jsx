@@ -5,6 +5,7 @@ import Modal from '../Modal';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { InlineFieldHeader } from '@/components/ui/inline-field-header';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -799,8 +800,7 @@ const InvoiceModal = ({
 
                                 {useInvoiceDateOverride && (
                                     <div>
-                                        <input
-                                            type="date"
+                                        <NativeDateInput
                                             value={invoiceDateOverride}
                                             onChange={(e) => setInvoiceDateOverride(e.target.value)}
                                             max={getTodayString()}

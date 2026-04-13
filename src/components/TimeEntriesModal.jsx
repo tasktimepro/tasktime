@@ -8,6 +8,7 @@ import AddTimeEntryModal from './modals/AddTimeEntryModal';
 import { formatDurationWithSeconds, toDisplayDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
+import useIsMobileLayout from '../hooks/useIsMobileLayout';
 
 /**
  * TimeEntriesModal component - Modal for viewing and managing time entries for a task
@@ -19,6 +20,7 @@ import { useTimeEntries } from '../hooks/useTimeEntries.ts';
  */
 const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     const { showSuccess, showError } = useToast();
+    const isMobileLayout = useIsMobileLayout();
 
     // Yjs hooks for state
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
@@ -155,54 +157,118 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
 
         return (
             <div key={entry.id} className={`border border-border rounded-lg p-3 hover:shadow-md transition-shadow ${isBilled ? 'bg-muted opacity-75' : ''}`}>
-                <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                        <div className="flex items-center space-x-4 text-sm">
-                            <div className="flex items-center space-x-2">
-                                <span className="text-muted-foreground">{startDate}</span>
-                                <span className="font-mono text-foreground">{startTime}</span>
-                                <span className="text-muted-foreground">→</span>
-                                {startDate !== endDate && <span className="text-muted-foreground">{endDate}</span>}
-                                <span className="font-mono text-foreground">{endTime}</span>
+                {isMobileLayout ? (
+                    <div className="space-y-2">
+                        <div
+                            className="flex items-center justify-between gap-3 text-sm"
+                            data-testid={`time-entry-summary-${entry.id}`}
+                        >
+                            <div className="min-w-0 text-muted-foreground">
+                                {startDate !== endDate ? `${startDate} → ${endDate}` : startDate}
                             </div>
-                            <div className="text-foreground font-medium">
+                            <div className="shrink-0 text-foreground font-medium">
                                 {formatDurationWithSeconds(duration)}
                             </div>
                         </div>
+                        <div
+                            className="flex items-center justify-between gap-3"
+                            data-testid={`time-entry-row-${entry.id}`}
+                        >
+                            <div
+                                className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+                                data-testid={`time-entry-range-${entry.id}`}
+                            >
+                                <span className="font-mono text-foreground">{startTime}</span>
+                                <span className="text-muted-foreground">→</span>
+                                <span className="font-mono text-foreground">{endTime}</span>
+                            </div>
+                            <div
+                                className="flex shrink-0 items-center gap-2"
+                                data-testid={`time-entry-actions-${entry.id}`}
+                            >
+                                {isBilled && (
+                                    <Badge variant="secondary">Billed</Badge>
+                                )}
+                                {!isBilled && (
+                                    <>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleEditEntry(entry)}
+                                            className="status-warning-action h-7 w-7 text-muted-foreground"
+                                            title="Edit entry"
+                                        >
+                                            <PencilIcon className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleDeleteEntry(entry.id)}
+                                            className="status-danger-action h-7 w-7 text-muted-foreground"
+                                            title="Delete entry"
+                                        >
+                                            <TrashIcon className="h-4 w-4" />
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
                         {entry.note && (
-                            <div className="mt-2 text-sm text-muted-foreground bg-muted p-2 rounded border-l-4 border-border">
+                            <div className="text-sm text-muted-foreground bg-muted p-2 rounded border-l-4 border-border">
                                 {entry.note}
                             </div>
                         )}
                     </div>
-                    <div className="flex items-center space-x-2 ml-4">
-                        {isBilled && (
-                            <Badge variant="secondary">Billed</Badge>
-                        )}
-                        {!isBilled && (
-                            <>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleEditEntry(entry)}
-                                    className="status-warning-action h-7 w-7 text-muted-foreground"
-                                    title="Edit entry"
-                                >
-                                    <PencilIcon className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDeleteEntry(entry.id)}
-                                    className="status-danger-action h-7 w-7 text-muted-foreground"
-                                    title="Delete entry"
-                                >
-                                    <TrashIcon className="h-4 w-4" />
-                                </Button>
-                            </>
-                        )}
+                ) : (
+                    <div className="flex items-center justify-between gap-3" data-testid={`time-entry-desktop-${entry.id}`}>
+                        <div className="flex-1">
+                            <div className="flex items-center space-x-4 text-sm">
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-muted-foreground">{startDate}</span>
+                                    <span className="font-mono text-foreground">{startTime}</span>
+                                    <span className="text-muted-foreground">→</span>
+                                    {startDate !== endDate && <span className="text-muted-foreground">{endDate}</span>}
+                                    <span className="font-mono text-foreground">{endTime}</span>
+                                </div>
+                                <div className="text-foreground font-medium">
+                                    {formatDurationWithSeconds(duration)}
+                                </div>
+                            </div>
+                            {entry.note && (
+                                <div className="mt-2 text-sm text-muted-foreground bg-muted p-2 rounded border-l-4 border-border">
+                                    {entry.note}
+                                </div>
+                            )}
+                        </div>
+                        <div className="ml-4 flex items-center space-x-2" data-testid={`time-entry-desktop-actions-${entry.id}`}>
+                            {isBilled && (
+                                <Badge variant="secondary">Billed</Badge>
+                            )}
+                            {!isBilled && (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleEditEntry(entry)}
+                                        className="status-warning-action h-7 w-7 text-muted-foreground"
+                                        title="Edit entry"
+                                    >
+                                        <PencilIcon className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleDeleteEntry(entry.id)}
+                                        className="status-danger-action h-7 w-7 text-muted-foreground"
+                                        title="Delete entry"
+                                    >
+                                        <TrashIcon className="h-4 w-4" />
+                                    </Button>
+                                </>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         );
     };

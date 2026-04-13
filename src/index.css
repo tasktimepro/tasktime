@@ -183,9 +183,14 @@ main,
         color-scheme: dark;
     }
 
+    input[type="date"].native-date-input-field::-webkit-calendar-picker-indicator {
+        opacity: 0;
+    }
+
     input[type="date"]::-webkit-calendar-picker-indicator {
         cursor: pointer;
         opacity: 0.72;
+        margin-right: 0.35rem;
     }
 
     .dark input[type="date"]::-webkit-calendar-picker-indicator {

@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { useUrlState } from '@/hooks/useUrlState.ts';
 import { useExpenses } from '@/hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
@@ -700,8 +701,7 @@ const Expenses = ({
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <label className="space-y-1">
                                         <span className="text-sm text-muted-foreground">From</span>
-                                        <input
-                                            type="date"
+                                        <NativeDateInput
                                             value={customStart}
                                             onChange={(event) => setCustomStart(event.target.value)}
                                             className="h-10 w-full rounded-md border border-input bg-background px-3 text-base"
@@ -709,8 +709,7 @@ const Expenses = ({
                                     </label>
                                     <label className="space-y-1">
                                         <span className="text-sm text-muted-foreground">To</span>
-                                        <input
-                                            type="date"
+                                        <NativeDateInput
                                             value={customEnd}
                                             onChange={(event) => setCustomEnd(event.target.value)}
                                             className="h-10 w-full rounded-md border border-input bg-background px-3 text-base"
@@ -722,22 +721,39 @@ const Expenses = ({
 
                         <div className="mt-6">
                             <Tabs value={activeStatusTab} onValueChange={setActiveStatusTab}>
-                                <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto whitespace-nowrap rounded-none border-b border-border bg-transparent p-0">
+                                <TabsList className={cn(
+                                    'w-full bg-transparent rounded-none',
+                                    isMobileLayout
+                                        ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
+                                        : 'h-auto justify-start gap-2 overflow-x-auto whitespace-nowrap border-b border-border p-0'
+                                )}>
                                     <TabsTrigger
                                         value="outstanding"
-                                        className="shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                        className={cn(
+                                            isMobileLayout
+                                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
+                                                : 'shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
+                                        )}
                                     >
                                         Outstanding ({outstandingExpenses.length})
                                     </TabsTrigger>
                                     <TabsTrigger
                                         value="upcoming"
-                                        className="shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                        className={cn(
+                                            isMobileLayout
+                                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
+                                                : 'shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
+                                        )}
                                     >
                                         Upcoming ({upcomingExpenses.length})
                                     </TabsTrigger>
                                     <TabsTrigger
                                         value="paid"
-                                        className="shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border"
+                                        className={cn(
+                                            isMobileLayout
+                                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
+                                                : 'shrink-0 px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
+                                        )}
                                     >
                                         Paid ({paidExpenses.length})
                                     </TabsTrigger>

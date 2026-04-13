@@ -4,7 +4,6 @@
  * Displays a 7-column week view with:
  * - Pinned clients/projects
  * - Recurring and due tasks
- * - Time progress indicator for today
  * 
  * Responsive: Shows day tabs + single day on mobile, full grid on desktop.
  */

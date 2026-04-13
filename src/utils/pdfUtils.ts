@@ -107,6 +107,25 @@ type StoredClient = {
     country?: string;
 };
 
+type PdfMargin = number | [number, number] | [number, number, number, number];
+
+type PdfOptions = {
+    margin?: PdfMargin;
+    filename?: string;
+    image?: {
+        type: 'jpeg' | 'png' | 'webp';
+        quality: number;
+    };
+    html2canvas?: {
+        scale: number;
+    };
+    jsPDF?: {
+        unit: string;
+        format: [number, number];
+        orientation: 'portrait' | 'landscape';
+    };
+};
+
 /**
  * Generate and download a PDF from HTML content
  * @param {string} htmlContent - The HTML content to convert to PDF
@@ -116,7 +135,7 @@ type StoredClient = {
 export const generatePDF = (
     htmlContent: string,
     filename = 'invoice.pdf',
-    options: Record<string, unknown> = {}
+    options: PdfOptions = {}
 ): Promise<void> => {
     return new Promise((resolve, reject) => {
         try {
@@ -125,7 +144,7 @@ export const generatePDF = (
                 return;
             }
 
-            const defaultOptions = {
+            const defaultOptions: PdfOptions = {
                 margin: [10, 20, 10, 20],  // top, right, bottom, left margins in mm
                 filename: filename,
                 image: { type: 'jpeg', quality: 0.98 },
@@ -221,7 +240,41 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     const parsedTotalHours = parseFloat(String(totalHours ?? 0)) || 0;
 
     return `
-        <div style="font-family: Arial, sans-serif; width: 100%; max-width: none; margin: 0; padding: 0; box-sizing: border-box;">
+        <style>
+            .invoice-document,
+            .invoice-document * {
+                box-sizing: border-box;
+            }
+
+            .invoice-document {
+                width: 100%;
+                max-width: none;
+                margin: 0;
+                padding: 0;
+                background-color: #ffffff;
+                color: #111827;
+                color-scheme: light;
+                -webkit-text-fill-color: #111827;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                forced-color-adjust: none;
+            }
+
+            .invoice-document p,
+            .invoice-document td,
+            .invoice-document th,
+            .invoice-document span,
+            .invoice-document div,
+            .invoice-document strong,
+            .invoice-document h1,
+            .invoice-document h2,
+            .invoice-document h3,
+            .invoice-document h4 {
+                color: inherit;
+                -webkit-text-fill-color: inherit;
+            }
+        </style>
+        <div class="invoice-document" style="font-family: Arial, sans-serif; width: 100%; max-width: none; margin: 0; padding: 0; box-sizing: border-box; background-color: #ffffff; color: #111827; color-scheme: light; -webkit-text-fill-color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; forced-color-adjust: none;">
             <div style="text-align: center; margin-bottom: 30px;">
                 <h1 style="color: #333; margin-bottom: 10px; font-size: 28px; font-weight: bold;">INVOICE</h1>
                 <p style="color: #666; margin: 0;">Invoice: #${invoiceNumber}</p>
@@ -306,7 +359,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         }
                         
                         // Calculate based on whether it's a flat rate task or hourly
-                        let taskAmount;
+                        let taskAmount: number;
                         if (usesFlatRate) {
                             const quantity = parseFloat(String(task.quantity)) || 1;
                             const flatRateValue = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
@@ -368,7 +421,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         const displayHours = parseFloat(String(task.hours)) || 0;
                         
                         // Calculate based on whether it's a flat rate task or hourly
-                        let taskAmount;
+                        let taskAmount: number;
                         if (usesFlatRate) {
                             taskAmount = (parseFloat(String(task.flatRate)) || 0) * (parseFloat(String(task.quantity)) || 1);
                         } else {
@@ -420,7 +473,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         const taskTitle = task.title;
                         
                         // Calculate task amount - consider hours for hourly tasks even in simplified table
-                        let taskAmount;
+                        let taskAmount: number;
                         
                         if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                             const subtaskHours = task.mergedSubtasks.reduce((total, subtask) => total + (parseFloat(String(subtask.hours)) || 0), 0);

@@ -14,8 +14,17 @@ test.describe('Expenses smoke', () => {
         const expenseDialog = page.getByRole('dialog', { name: 'New Expense' });
         await expect(expenseDialog).toBeVisible();
 
-        await expenseDialog.getByLabel(/Title/i).fill(expenseTitle);
+        const titleInput = expenseDialog.getByPlaceholder('Enter expense title');
+
+        await expect(titleInput).toBeVisible({ timeout: 20_000 });
+        await titleInput.fill(expenseTitle);
         await expenseDialog.getByLabel(/Amount/i).fill('12.34');
+
+        const autoPaidCheckbox = expenseDialog.getByRole('checkbox', { name: /Automatically paid on expense date/i });
+        if ((await autoPaidCheckbox.getAttribute('data-state')) === 'checked') {
+            await autoPaidCheckbox.click();
+        }
+
         await expenseDialog.getByRole('button', { name: 'Create Expense' }).click();
 
         await expect(expenseDialog).not.toBeVisible();

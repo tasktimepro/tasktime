@@ -56,7 +56,7 @@ const CustomCheckbox = ({
             <Label
                 htmlFor={checkboxId}
                 className={cn(
-                    "cursor-pointer select-none",
+                    "cursor-pointer select-none leading-5",
                     disabled && "cursor-not-allowed opacity-50",
                     labelClassName
                 )}

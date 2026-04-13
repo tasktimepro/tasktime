@@ -53,7 +53,8 @@ test.describe('Cloud sync smoke', () => {
 
         await page.reload();
 
-        await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible({ timeout: 20_000 });
+        await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible({ timeout: 20_000 });
 
         if (uploadedCoreState) {
             expect(driveFixture.readCurrentCoreProjectTitles()).toContain(projectTitle);

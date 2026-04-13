@@ -83,8 +83,8 @@ const InvoiceExpenseSelector = ({
                             description={exchangeRatesError}
                         />
                     )}
-                    <div className="flex justify-between items-center">
-                        <div className="flex space-x-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             {expenses.length > 0 && (
                                 <>
                                     <button
@@ -132,9 +132,9 @@ const InvoiceExpenseSelector = ({
                                 return (
                                     <div
                                         key={expense.id}
-                                        className={`flex items-center justify-between p-3 bg-card rounded border ${!isConvertible ? 'opacity-60' : ''}`}
+                                        className={`flex flex-col gap-3 rounded border bg-card p-3 sm:flex-row sm:items-center sm:justify-between ${!isConvertible ? 'opacity-60' : ''}`}
                                     >
-                                        <div className="flex items-center space-x-3 flex-1">
+                                        <div className="flex min-w-0 items-start gap-3 sm:flex-1">
                                             <CustomCheckbox
                                                 checked={selectedExpensesForBilling[expense.id] || false}
                                                 onChange={(checked) => setSelectedExpensesForBilling((prev) => ({
@@ -143,7 +143,7 @@ const InvoiceExpenseSelector = ({
                                                 }))}
                                                 disabled={!isConvertible}
                                             />
-                                            <div className="flex-1 pr-4">
+                                            <div className="min-w-0 flex-1 pr-0 sm:pr-4">
                                                 <p className="text-sm font-medium text-foreground">
                                                     {expense.title}
                                                 </p>
@@ -154,7 +154,7 @@ const InvoiceExpenseSelector = ({
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="text-right">
+                                        <div className="text-left sm:text-right">
                                             {isConvertible ? (
                                                 <>
                                                     <div className="text-sm font-medium text-foreground sensitive-data">
@@ -196,9 +196,9 @@ const InvoiceExpenseSelector = ({
                                     return (
                                         <div
                                             key={expense.id}
-                                            className="flex items-center justify-between p-3 bg-card rounded border"
+                                            className="flex flex-col gap-3 rounded border bg-card p-3 sm:flex-row sm:items-center sm:justify-between"
                                         >
-                                            <div className="flex items-center space-x-3 flex-1">
+                                            <div className="flex min-w-0 items-start gap-3 sm:flex-1">
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
@@ -210,7 +210,7 @@ const InvoiceExpenseSelector = ({
                                                 >
                                                     <TrashIcon className="w-5 h-5" />
                                                 </Button>
-                                                <div className="flex-1 pr-4">
+                                                <div className="min-w-0 flex-1 pr-0 sm:pr-4">
                                                     <p className="text-sm font-medium text-foreground">
                                                         {expense.title}
                                                     </p>
@@ -221,7 +221,7 @@ const InvoiceExpenseSelector = ({
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="text-right">
+                                            <div className="text-left sm:text-right">
                                                 <div className="text-sm font-medium text-foreground sensitive-data">
                                                     {formatCurrency(expense.amount || 0, invoiceCurrency)}
                                                 </div>
@@ -255,8 +255,8 @@ const InvoiceExpenseSelector = ({
                                     }}
                                 />
 
-                                <div className="flex flex-wrap items-end gap-3">
-                                    <div className="flex-1 min-w-[140px]">
+                                <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
+                                    <div className="w-full md:min-w-[140px] md:flex-1">
                                         <div className="text-xs text-muted-foreground mb-1">Amount</div>
                                         <Input
                                             type="number"
@@ -275,7 +275,7 @@ const InvoiceExpenseSelector = ({
                                             }}
                                         />
                                     </div>
-                                    <div className="w-36">
+                                    <div className="w-full md:w-36">
                                         <div className="text-xs text-muted-foreground mb-1">Currency</div>
                                         <Select
                                             value={newExpenseCurrency}
@@ -293,7 +293,7 @@ const InvoiceExpenseSelector = ({
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="flex-1 min-w-[160px]">
+                                    <div className="w-full md:min-w-[160px] md:flex-1">
                                         <div className="text-xs text-muted-foreground mb-1">Supplier (optional)</div>
                                         <Input
                                             type="text"
@@ -311,7 +311,7 @@ const InvoiceExpenseSelector = ({
                                     </div>
                                 </div>
 
-                                <div className="flex justify-end space-x-2">
+                                <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                                     <Button
                                         type="button"
                                         variant="secondary"

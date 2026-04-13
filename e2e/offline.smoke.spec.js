@@ -23,7 +23,6 @@ test.describe('Offline smoke', () => {
         const projectDialog = page.getByRole('dialog', { name: 'Create New Project' });
         await expect(projectDialog).toBeVisible();
         await projectDialog.getByLabel(/Project Title/i).fill(projectTitle);
-        await projectDialog.getByLabel(/Personal project \(Not billable\)/i).click();
         await projectDialog.getByRole('button', { name: 'Create Project' }).click();
 
         await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();

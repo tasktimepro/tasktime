@@ -631,15 +631,28 @@ export async function selectComboboxOption(page, trigger, optionName) {
     await page.getByRole('option', { name: optionName, exact: true }).click();
 }
 
+async function setPersonalProjectState(projectDialog, isPersonal) {
+    const personalProjectCheckbox = projectDialog.getByRole('checkbox', { name: /Personal project \(Not billable\)/i });
+    const currentState = await personalProjectCheckbox.getAttribute('data-state');
+    const isCurrentlyPersonal = currentState === 'checked';
+
+    if (isCurrentlyPersonal !== isPersonal) {
+        await personalProjectCheckbox.click();
+    }
+}
+
 export async function createPersonalProject(page, projectTitle) {
     await page.goto('/projects');
 
     await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
     await openCreateProjectDialog(page);
 
-    await page.getByLabel(/Project Title/i).fill(projectTitle);
-    await page.getByLabel(/Personal project \(Not billable\)/i).click();
-    await page.getByRole('button', { name: 'Create Project' }).click();
+    const projectDialog = page.getByRole('dialog', { name: 'Create New Project' });
+
+    await expect(projectDialog).toBeVisible();
+    await projectDialog.getByLabel(/Project Title/i).fill(projectTitle);
+    await setPersonalProjectState(projectDialog, true);
+    await projectDialog.getByRole('button', { name: 'Create Project' }).click();
 
     await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
 }
@@ -719,6 +732,8 @@ export async function createBillableProject(page, { projectTitle, clientTitle, c
 
     const projectDialog = page.getByRole('dialog', { name: 'Create New Project' });
     await expect(projectDialog).toBeVisible();
+
+    await setPersonalProjectState(projectDialog, false);
 
     await projectDialog.getByRole('button', { name: '+ New Client' }).click();
 

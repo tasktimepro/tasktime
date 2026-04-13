@@ -118,6 +118,18 @@ img {
     text-decoration: none;
 }
 
+.footer-icon-link {
+    align-items: center;
+    display: inline-flex;
+    justify-content: center;
+}
+
+.footer-icon-link img {
+    display: block;
+    height: 1.5rem;
+    width: 1.5rem;
+}
+
 .site-nav a:hover,
 .footer-links a:hover,
 .post-card h2 a:hover,

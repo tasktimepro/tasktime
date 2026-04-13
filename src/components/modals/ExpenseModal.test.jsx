@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExpenseModal from './ExpenseModal'
@@ -132,6 +132,10 @@ describe('ExpenseModal', () => {
         paymentMethodsMocks.defaultPaymentMethod = null
     })
 
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
     it('creates a one-time expense', async () => {
         const onClose = vi.fn()
         const user = userEvent.setup()
@@ -223,27 +227,79 @@ describe('ExpenseModal', () => {
         vi.useRealTimers();
     })
 
-    it('clears paid on when auto-payment is selected (one-time)', async () => {
-        const user = userEvent.setup()
+    it('defaults new one-time expenses dated today to automatically paid and mirrors paid on', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-04-13T12:00:00Z'))
 
         render(<ExpenseModal isOpen onClose={vi.fn()} />)
 
-        const paidOnInput = screen.getByLabelText(/Paid On/i)
-        await user.type(paidOnInput, '2026-02-01')
-        expect(paidOnInput).toHaveValue('2026-02-01')
+        const checkbox = screen.getByRole('checkbox', { name: /Automatically paid on expense date/i })
+        const paidOnInput = screen.getByLabelText(/^Paid On$/i)
 
-        await user.click(screen.getByLabelText(/Auto-payment/i))
-        expect(paidOnInput).toHaveValue('')
+        expect(checkbox.getAttribute('aria-checked')).toBe('true')
+        expect(paidOnInput).toHaveValue('2026-04-13')
+        expect(paidOnInput.disabled).toBe(true)
     })
 
-    it('clears paid on when auto-payment is selected (recurring)', async () => {
-        const user = userEvent.setup()
+    it('leaves auto-payment off for new future-dated one-time expenses', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-04-13T12:00:00Z'))
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} modalOptions={{ date: '2026-04-20' }} />)
+
+        const checkbox = screen.getByRole('checkbox', { name: /Automatically paid on expense date/i })
+        const paidOnInput = screen.getByLabelText(/^Paid On$/i)
+
+        expect(checkbox.getAttribute('aria-checked')).toBe('false')
+        expect(paidOnInput).toHaveValue('')
+        expect(paidOnInput.disabled).toBe(false)
+    })
+
+    it('switches auto-payment off when a defaulted one-time expense date moves away from today', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-04-13T12:00:00Z'))
 
         render(<ExpenseModal isOpen onClose={vi.fn()} />)
 
-        const paidOnInput = screen.getByLabelText(/Paid On/i)
-        await user.type(paidOnInput, '2026-02-01')
-        expect(paidOnInput).toHaveValue('2026-02-01')
+        const checkbox = screen.getByRole('checkbox', { name: /Automatically paid on expense date/i })
+        const expenseDateInput = screen.getByLabelText(/^Date/i)
+        const paidOnInput = screen.getByLabelText(/^Paid On$/i)
+
+        fireEvent.change(expenseDateInput, { target: { value: '2026-04-20' } })
+
+        expect(checkbox.getAttribute('aria-checked')).toBe('false')
+        expect(paidOnInput).toHaveValue('')
+        expect(paidOnInput.disabled).toBe(false)
+    })
+
+    it('keeps one-time auto-payment on and syncs paid on when the user explicitly enables it', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-04-13T12:00:00Z'))
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} modalOptions={{ date: '2026-04-20' }} />)
+
+        const checkbox = screen.getByRole('checkbox', { name: /Automatically paid on expense date/i })
+        const expenseDateInput = screen.getByLabelText(/^Date/i)
+        const paidOnInput = screen.getByLabelText(/^Paid On$/i)
+
+        fireEvent.click(checkbox)
+
+        expect(checkbox.getAttribute('aria-checked')).toBe('true')
+        expect(paidOnInput).toHaveValue('2026-04-20')
+        expect(paidOnInput.disabled).toBe(true)
+
+        fireEvent.change(expenseDateInput, { target: { value: '2026-04-21' } })
+
+        expect(checkbox.getAttribute('aria-checked')).toBe('true')
+        expect(paidOnInput).toHaveValue('2026-04-21')
+        expect(paidOnInput.disabled).toBe(true)
+    })
+
+    it('restores the one-time smart default instead of carrying recurring auto-payment back across type changes', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-04-13T12:00:00Z'))
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} modalOptions={{ date: '2026-04-20' }} />)
 
         const typeSelect = Array.from(document.querySelectorAll('select')).find((element) => (
             element.querySelector('option[value="recurring"]')
@@ -254,16 +310,35 @@ describe('ExpenseModal', () => {
         }
 
         fireEvent.change(typeSelect, { target: { value: 'recurring' } })
-        await user.click(screen.getByLabelText(/Auto-payment/i))
+        fireEvent.click(screen.getByRole('checkbox', { name: /Auto-payment/i }))
 
         fireEvent.change(typeSelect, { target: { value: 'one-time' } })
-        expect(screen.getByLabelText(/Paid On/i)).toHaveValue('')
+
+        expect(screen.getByRole('checkbox', { name: /Automatically paid on expense date/i }).getAttribute('aria-checked')).toBe('false')
+        expect(screen.getByLabelText(/^Paid On$/i)).toHaveValue('')
     })
 
     it('keeps footer actions inline on mobile', () => {
         render(<ExpenseModal isOpen onClose={vi.fn()} />)
 
         expect(screen.getByRole('button', { name: 'Cancel' }).className).not.toContain('w-full')
+    })
+
+    it('uses shared two-column mobile rows for date and amount, and for currency and supplier', () => {
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        const dateRow = screen.getByLabelText(/^Date/i).closest('div.grid')
+        const amountRow = screen.getByLabelText(/^Amount/i).closest('div.grid')
+        const currencyRow = screen.getByText('Currency').closest('div.grid')
+        const supplierRow = screen.getByLabelText('Supplier / Business').closest('div.grid')
+
+        expect(dateRow).not.toBeNull()
+        expect(dateRow).toBe(amountRow)
+        expect(dateRow.className).toContain('grid-cols-2')
+
+        expect(currencyRow).not.toBeNull()
+        expect(currencyRow).toBe(supplierRow)
+        expect(currencyRow.className).toContain('grid-cols-2')
     })
 
     it('locks a personal project context and keeps the expense personal', () => {

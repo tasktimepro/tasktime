@@ -4,6 +4,17 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TimeEntriesModal from './TimeEntriesModal'
 
+const createMatchMedia = (matchesByQuery = {}) => vi.fn().mockImplementation((query) => ({
+    matches: Boolean(matchesByQuery[query]),
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    onchange: null,
+    dispatchEvent: vi.fn()
+}))
+
 const toastMocks = vi.hoisted(() => ({
 
     showSuccess: vi.fn(),
@@ -82,6 +93,7 @@ describe('TimeEntriesModal', () => {
         timeEntriesHookMocks.updateEntry.mockClear()
         timeEntriesHookMocks.deleteEntry.mockClear()
         mockTimeEntries = []
+        window.matchMedia = createMatchMedia()
     })
 
     afterEach(() => {
@@ -284,5 +296,65 @@ describe('TimeEntriesModal', () => {
         expect(timeEntriesHookMocks.deleteEntry).toHaveBeenCalledTimes(1)
         expect(timeEntriesHookMocks.deleteEntry).toHaveBeenCalledWith('entry-1')
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry deleted successfully')
+    })
+
+    it('uses separate summary and time-action rows for mobile-friendly entry layout', () => {
+
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+
+        const entry = {
+            id: 'entry-layout',
+            taskId: 'task-1',
+            start: new Date('2026-01-19T10:00:00').getTime(),
+            end: new Date('2026-01-19T10:15:00').getTime()
+        }
+
+        mockTimeEntries = [entry]
+
+        render(
+            <TimeEntriesModal
+                {...baseProps}
+            />
+        )
+
+        const summary = screen.getByTestId('time-entry-summary-entry-layout')
+        const row = screen.getByTestId('time-entry-row-entry-layout')
+        const range = screen.getByTestId('time-entry-range-entry-layout')
+        const actions = screen.getByTestId('time-entry-actions-entry-layout')
+
+        expect(summary.textContent?.trim().length).toBeGreaterThan(0)
+        expect(summary.textContent).toContain('15m')
+        expect(row.className.includes('items-center')).toBe(true)
+        expect(range.textContent).toContain('10:00:00')
+        expect(range.textContent).toContain('10:15:00')
+        expect(actions.className.includes('flex-col')).toBe(false)
+        expect(actions.className.includes('items-center')).toBe(true)
+    })
+
+    it('preserves the original inline desktop row layout behind the responsive breakpoint', () => {
+
+        const entry = {
+            id: 'entry-desktop-layout',
+            taskId: 'task-1',
+            start: new Date('2026-01-19T10:00:00').getTime(),
+            end: new Date('2026-01-19T10:15:00').getTime()
+        }
+
+        mockTimeEntries = [entry]
+
+        render(
+            <TimeEntriesModal
+                {...baseProps}
+            />
+        )
+
+        const desktopRow = screen.getByTestId('time-entry-desktop-entry-desktop-layout')
+        const desktopActions = screen.getByTestId('time-entry-desktop-actions-entry-desktop-layout')
+
+        expect(desktopRow.className.includes('items-center')).toBe(true)
+        expect(desktopRow.className.includes('justify-between')).toBe(true)
+        expect(desktopActions.className.includes('space-x-2')).toBe(true)
     })
 })
