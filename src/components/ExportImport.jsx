@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
+import { useExpenses } from '../hooks/useExpenses.ts';
 import { markMeaningfulActivity } from '../utils/usageMetrics.ts';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,6 @@ function ExportImport({
     businessInfos = [],
     clients = [],
     invoiceTemplates = [],
-    expenses = [],
     expenseRecurrences = [],
     dailyGoals = [],
     plannerAttachments = [],
@@ -41,6 +41,7 @@ function ExportImport({
 }) {
     const isMobileLayout = useIsMobileLayout();
     const { timers } = useTimers();
+    const { expenses: allExpenses } = useExpenses({ includeArchived: true });
     const isTimerActive = timers.length > 0;
     const [showImportModal, setShowImportModal] = useState(false);
     const [importData, setImportData] = useState('');
@@ -83,7 +84,7 @@ function ExportImport({
             businessInfos: businessInfos,
             clients: clients,
             invoiceTemplates: invoiceTemplates,
-            expenses: expenses,
+            expenses: allExpenses,
             expenseRecurrences: expenseRecurrences,
             dailyGoals: dailyGoals,
             plannerAttachments: plannerAttachments,
@@ -354,14 +355,14 @@ function ExportImport({
                 </div>
 
                 {/* Data Summary */}
-                {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clients.length > 0 || invoiceTemplates.length > 0 || expenses.length > 0) && (
+                {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clients.length > 0 || invoiceTemplates.length > 0 || allExpenses.length > 0) && (
                     <div className={cn('rounded-lg bg-muted', isMobileLayout ? 'p-3' : 'p-4')}>
                         <h4 className="font-medium text-foreground mb-2">Current Data</h4>
                         <div className="text-sm text-muted-foreground space-y-1">
                             <p>Clients: <span className="font-medium">{clients.length}</span></p>
                             <p>Projects: <span className="font-medium">{projects.length}</span></p>
                             <p>Invoices: <span className="font-medium">{invoices.length}</span></p>
-                            <p>Expenses: <span className="font-medium">{expenses.length}</span></p>
+                            <p>Expenses: <span className="font-medium">{allExpenses.length}</span></p>
                             <p>Tasks: <span className="font-medium">{tasks.length}</span></p>
                             <p>Time Entries: <span className="font-medium">{timeEntries.length}</span></p>
                             <p>Businesses: <span className="font-medium">{businessInfos.length}</span></p>

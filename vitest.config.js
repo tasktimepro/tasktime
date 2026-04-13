@@ -13,15 +13,15 @@ export default defineConfig({
         globals: true,
         environment: 'jsdom',
         setupFiles: './src/test/setup.js',
-        include: ['src/**/*.{test,spec}.{js,jsx}'],
+        include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
             include: ['src/utils/**', 'src/hooks/**'],
             exclude: [
+                'src/**/*.{test,spec}.{js,jsx,ts,tsx}',
                 'src/hooks/useGoogleAuth.ts',
                 'src/hooks/yjs/**',
-                'src/hooks/**/*.{test,spec}.{js,jsx,ts,tsx}',
             ],
             thresholds: {
                 statements: 75,

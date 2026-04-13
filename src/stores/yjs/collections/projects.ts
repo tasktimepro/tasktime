@@ -102,10 +102,13 @@ export function createProjectHelpers(projects: Y.Map<string, Project>): ProjectH
         },
 
         create(data: Omit<Project, 'id'>): Project {
+            const now = Date.now();
             const project: Project = {
                 id: generateSlugId(data.title),
                 archived: false,
                 ...data,
+                createdAt: data.createdAt ?? now,
+                updatedAt: data.updatedAt ?? data.createdAt ?? now,
             };
             projects.set(project.id, project);
             return project;
@@ -115,7 +118,7 @@ export function createProjectHelpers(projects: Y.Map<string, Project>): ProjectH
             const existing = projects.get(id);
             if (!existing) return undefined;
 
-            const updated = { ...existing, ...updates };
+            const updated = { ...existing, ...updates, updatedAt: Date.now() };
             projects.set(id, updated);
             return updated;
         },

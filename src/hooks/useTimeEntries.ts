@@ -112,10 +112,15 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
     // CRUD operations
     const createEntry = useCallback((data: Omit<TimeEntry, 'id'>): TimeEntry => {
         if (!isReady) throw new Error('Store not ready');
+        const now = Date.now();
+        const createdAt = typeof data.createdAt === 'number' ? data.createdAt : now;
+        const updatedAt = typeof data.updatedAt === 'number' ? data.updatedAt : now;
         
         const entry = validateCollectionEntity<TimeEntry>('timeEntries', {
             id: generateId(),
             ...data,
+            createdAt,
+            updatedAt,
         }, 'create time entry');
         const entityMap = objectToYMap(entry as unknown as Record<string, unknown>);
         (store.activeTimeEntries as any).set(entry.id, entityMap);
@@ -129,10 +134,11 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         // Check active entries first
         const activeEntry = readValidatedEntity<TimeEntry>('timeEntries', store.activeTimeEntries.get(id), `update time entry ${id}`);
         if (activeEntry) {
-            const merged = { ...activeEntry, ...updates };
+            const updatesWithTimestamp = { ...updates, updatedAt: Date.now() };
+            const merged = { ...activeEntry, ...updatesWithTimestamp };
             const validated = validateCollectionEntity<TimeEntry>('timeEntries', merged, `update time entry ${id}`);
 
-            const result = updateEntityFields(store.activeTimeEntries as any, id, updates as Record<string, unknown>);
+            const result = updateEntityFields(store.activeTimeEntries as any, id, updatesWithTimestamp as Record<string, unknown>);
             if (!result) {
                 const entityMap = objectToYMap(validated as unknown as Record<string, unknown>);
                 (store.activeTimeEntries as any).set(id, entityMap);

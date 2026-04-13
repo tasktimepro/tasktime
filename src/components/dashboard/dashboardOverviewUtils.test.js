@@ -156,6 +156,9 @@ describe('dashboardOverviewUtils', () => {
             activeTasks,
             timeEntries,
             clients,
+            invoices: [],
+            expenses: [],
+            recurrences: [],
             projectFilter: DEFAULT_PROJECT_FILTER,
             projectSearchQuery: '',
         });
@@ -192,10 +195,50 @@ describe('dashboardOverviewUtils', () => {
                 },
             ],
             clients: [],
+            invoices: [],
+            expenses: [],
+            recurrences: [],
             projectFilter: 'unbilled',
             projectSearchQuery: 'alpha',
         });
 
         expect(result.map((project) => project.id)).toEqual(['project-1']);
+    });
+
+    it('sorts recent projects by related update timestamps instead of backdated entry times', () => {
+        const result = buildDashboardProjects({
+            projects: [
+                { id: 'project-1', title: 'Alpha Project', hourlyRate: 100 },
+                { id: 'project-2', title: 'Beta Project', hourlyRate: 100 },
+            ],
+            activeTasks: [
+                { id: 'task-1', title: 'Alpha Task', projectId: 'project-1', billable: true, lastBilledAt: 0 },
+                { id: 'task-2', title: 'Beta Task', projectId: 'project-2', billable: true, lastBilledAt: 0 },
+            ],
+            timeEntries: [
+                {
+                    id: 'entry-1',
+                    taskId: 'task-1',
+                    start: 1_000,
+                    end: 2_000,
+                    createdAt: 900_000,
+                    updatedAt: 900_000,
+                },
+                {
+                    id: 'entry-2',
+                    taskId: 'task-2',
+                    start: 400_000,
+                    end: 500_000,
+                },
+            ],
+            clients: [],
+            invoices: [],
+            expenses: [],
+            recurrences: [],
+            projectFilter: DEFAULT_PROJECT_FILTER,
+            projectSearchQuery: '',
+        });
+
+        expect(result.map((project) => project.id)).toEqual(['project-1', 'project-2']);
     });
 });

@@ -440,10 +440,13 @@ const Dashboard = ({
             activeTasks,
             timeEntries,
             clients,
+            invoices,
+            expenses,
+            recurrences,
             projectFilter,
             projectSearchQuery,
         });
-    }, [projects, activeTasks, timeEntries, clients, projectFilter, projectSearchQuery]);
+    }, [projects, activeTasks, timeEntries, clients, invoices, expenses, recurrences, projectFilter, projectSearchQuery]);
 
     const taskTimeTotals = useMemo(() => {
         const totals = {};

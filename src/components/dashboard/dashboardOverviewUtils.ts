@@ -1,6 +1,7 @@
 import { THIRTY_DAYS_MS } from '@/constants/app';
 import { millisecondsToHours } from '@/utils/dateUtils';
-import type { Client, Project, Task, TimeEntry } from '@/stores/yjs/types';
+import { buildProjectRecentUpdateMap } from '@/utils/activityUtils';
+import type { Client, Expense, ExpenseRecurrence, Invoice, Project, Task, TimeEntry } from '@/stores/yjs/types';
 
 type DashboardTimer = {
     taskId?: string | null;
@@ -59,6 +60,9 @@ interface BuildDashboardProjectsOptions {
     activeTasks: Task[];
     timeEntries: TimeEntry[];
     clients: Client[];
+    invoices: Invoice[];
+    expenses: Expense[];
+    recurrences: ExpenseRecurrence[];
     projectFilter: ProjectFilterValue;
     projectSearchQuery: string;
 }
@@ -177,6 +181,9 @@ export const buildDashboardProjects = ({
     activeTasks,
     timeEntries,
     clients,
+    invoices,
+    expenses,
+    recurrences,
     projectFilter,
     projectSearchQuery,
 }: BuildDashboardProjectsOptions): DashboardProject[] => {
@@ -185,6 +192,14 @@ export const buildDashboardProjects = ({
     const recentEntries = timeEntries.filter((entry) => entry.start > thirtyDaysAgo);
     const taskById = new Map(activeTasks.map((task) => [task.id, task]));
     const clientById = new Map(clients.map((client) => [client.id, client]));
+    const projectRecentUpdateMap = buildProjectRecentUpdateMap({
+        projects,
+        tasks: activeTasks,
+        timeEntries,
+        invoices,
+        expenses,
+        recurrences,
+    });
     const projectActivity = new Map<string, { totalTime: number; lastActivity: number; taskPendingTime: Record<string, number> }>();
 
     recentEntries.forEach((entry) => {
@@ -229,7 +244,7 @@ export const buildDashboardProjects = ({
             return {
                 ...project,
                 totalTime: activity.totalTime,
-                lastActivity: activity.lastActivity,
+                lastActivity: Math.max(activity.lastActivity, projectRecentUpdateMap.get(project.id) || 0),
                 pendingHours,
                 pendingAmount: project.hourlyRate ? pendingHours * project.hourlyRate : 0,
                 client: project.preferredClientId ? clientById.get(project.preferredClientId) || null : null,

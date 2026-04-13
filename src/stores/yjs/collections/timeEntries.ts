@@ -110,9 +110,12 @@ export function createTimeEntryHelpers(store: YjsStore): TimeEntryHelpers {
         },
 
         create(data: Omit<TimeEntry, 'id'>): TimeEntry {
+            const now = Date.now();
             const entry: TimeEntry = {
                 id: generateId(),
                 ...data,
+                createdAt: data.createdAt ?? now,
+                updatedAt: data.updatedAt ?? data.createdAt ?? now,
             };
 
             // New entries always go to active (will be archived later if old)
@@ -124,7 +127,7 @@ export function createTimeEntryHelpers(store: YjsStore): TimeEntryHelpers {
             // Find entry in active first
             const activeEntry = store.activeTimeEntries.get(id);
             if (activeEntry) {
-                const updated = { ...activeEntry, ...updates };
+                const updated = { ...activeEntry, ...updates, updatedAt: Date.now() };
                 store.activeTimeEntries.set(id, updated);
                 return updated;
             }
@@ -136,7 +139,7 @@ export function createTimeEntryHelpers(store: YjsStore): TimeEntryHelpers {
 
             // For archived entries, we update in activeTimeEntries
             // (the archival process will handle it later)
-            const updated = { ...existing, ...updates };
+            const updated = { ...existing, ...updates, updatedAt: Date.now() };
             store.activeTimeEntries.set(id, updated);
             return updated;
         },

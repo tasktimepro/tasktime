@@ -29,6 +29,7 @@ import ClientDeleteDialog from './modals/ClientDeleteDialog';
 import ClientArchiveDialog from './modals/ClientArchiveDialog';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
+import { buildClientRecentUpdateMap, buildProjectRecentUpdateMap } from '../utils/activityUtils.ts';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -77,70 +78,29 @@ const ClientList = ({
         return clients.filter(client => client.archived);
     }, [clients]);
 
-    const taskProjectMap = useMemo(() => {
-        const map = new Map();
-        tasks.forEach(task => {
-            if (task.projectId) {
-                map.set(task.id, task.projectId);
-            }
-        });
-        return map;
-    }, [tasks]);
-
-    const projectTaskActiveMap = useMemo(() => {
-        const map = new Map();
-        tasks.forEach(task => {
-            if (!task.projectId) return;
-
-            const lastActive = task.lastActive || 0;
-            const current = map.get(task.projectId) || 0;
-
-            if (lastActive > current) {
-                map.set(task.projectId, lastActive);
-            }
-        });
-        return map;
-    }, [tasks]);
-
     const projectLastActiveMap = useMemo(() => {
-        const map = new Map();
-        timeEntries.forEach(entry => {
-            const projectId = taskProjectMap.get(entry.taskId);
-            if (!projectId) return;
 
-            const activityTime = entry.end && entry.end > 0 ? entry.end : entry.start;
-            if (!activityTime) return;
-
-            const current = map.get(projectId) || 0;
-            if (activityTime > current) {
-                map.set(projectId, activityTime);
-            }
+        return buildProjectRecentUpdateMap({
+            projects,
+            tasks,
+            timeEntries,
+            invoices,
+            expenses,
+            recurrences,
         });
-
-        projectTaskActiveMap.forEach((lastActive, projectId) => {
-            const current = map.get(projectId) || 0;
-            if (lastActive > current) {
-                map.set(projectId, lastActive);
-            }
-        });
-
-        return map;
-    }, [timeEntries, taskProjectMap, projectTaskActiveMap]);
+    }, [projects, tasks, timeEntries, invoices, expenses, recurrences]);
 
     const clientLastActiveMap = useMemo(() => {
-        const map = new Map();
-        projects.forEach(project => {
-            const clientId = project.preferredClientId;
-            if (!clientId) return;
 
-            const projectLastActive = projectLastActiveMap.get(project.id) || 0;
-            const current = map.get(clientId) || 0;
-            if (projectLastActive > current) {
-                map.set(clientId, projectLastActive);
-            }
+        return buildClientRecentUpdateMap({
+            clients,
+            projects,
+            invoices,
+            expenses,
+            recurrences,
+            projectRecentUpdateMap: projectLastActiveMap,
         });
-        return map;
-    }, [projects, projectLastActiveMap]);
+    }, [clients, projects, invoices, expenses, recurrences, projectLastActiveMap]);
 
     const sortedActiveClients = useMemo(() => {
 

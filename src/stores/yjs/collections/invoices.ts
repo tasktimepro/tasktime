@@ -112,9 +112,12 @@ export function createInvoiceHelpers(invoices: Y.Map<string, Invoice>): InvoiceH
         },
 
         create(data: Omit<Invoice, 'id'>): Invoice {
+            const now = Date.now();
             const invoice: Invoice = {
                 id: generateId(),
                 ...data,
+                createdAt: data.createdAt ?? now,
+                updatedAt: data.updatedAt ?? data.createdAt ?? now,
             };
             invoices.set(invoice.id, invoice);
             return invoice;
@@ -124,7 +127,7 @@ export function createInvoiceHelpers(invoices: Y.Map<string, Invoice>): InvoiceH
             const existing = invoices.get(id);
             if (!existing) return undefined;
 
-            const updated = { ...existing, ...updates };
+            const updated = { ...existing, ...updates, updatedAt: Date.now() };
             invoices.set(id, updated);
             return updated;
         },

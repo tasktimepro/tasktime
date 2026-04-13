@@ -4,7 +4,7 @@
 
 export const SORT_OPTIONS = [
     { value: 'createdAt', label: 'Date created' },
-    { value: 'lastActive', label: 'Last active' },
+    { value: 'lastActive', label: 'Most recent' },
     { value: 'name', label: 'Name' },
 ] as const;
 

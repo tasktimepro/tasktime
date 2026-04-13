@@ -65,9 +65,12 @@ export function createClientHelpers(clients: Y.Map<string, Client>): ClientHelpe
         },
 
         create(data: Omit<Client, 'id'>): Client {
+            const now = Date.now();
             const client: Client = {
                 id: generateId(),
                 ...data,
+                createdAt: data.createdAt ?? now,
+                updatedAt: data.updatedAt ?? data.createdAt ?? now,
             };
             clients.set(client.id, client);
             return client;
@@ -77,7 +80,7 @@ export function createClientHelpers(clients: Y.Map<string, Client>): ClientHelpe
             const existing = clients.get(id);
             if (!existing) return undefined;
 
-            const updated = { ...existing, ...updates };
+            const updated = { ...existing, ...updates, updatedAt: Date.now() };
             clients.set(id, updated);
             return updated;
         },

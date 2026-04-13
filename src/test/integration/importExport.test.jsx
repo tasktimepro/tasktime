@@ -6,8 +6,14 @@ import ExportImport from '../../components/ExportImport'
 
 // Mock useTimers hook
 const mockTimers = [];
+const mockExpenses = [];
+
 vi.mock('../../hooks/useTimers.ts', () => ({
     useTimers: () => ({ timers: mockTimers })
+}));
+
+vi.mock('../../hooks/useExpenses.ts', () => ({
+    useExpenses: () => ({ expenses: mockExpenses })
 }));
 
 describe('Import/Export integration', () => {
@@ -15,6 +21,7 @@ describe('Import/Export integration', () => {
     beforeEach(() => {
 
         mockTimers.length = 0
+        mockExpenses.length = 0
     })
 
     const baseProps = {
@@ -206,13 +213,15 @@ describe('Import/Export integration', () => {
 
     it('shows expenses in the current data summary', () => {
 
+        mockExpenses.push({ id: 'expense-1', title: 'Lunch', amount: 12 })
+
         render(
             <ExportImport
                 {...baseProps}
                 projects={[]}
                 tasks={[]}
                 timeEntries={[]}
-                expenses={[{ id: 'expense-1', title: 'Lunch', amount: 12 }]}
+                expenses={[]}
                 onImport={vi.fn()}
             />
         )
@@ -220,5 +229,49 @@ describe('Import/Export integration', () => {
         expect(screen.getByText('Current Data')).toBeInTheDocument()
         expect(screen.getByText('Expenses:')).toBeInTheDocument()
         expect(screen.getByText('1')).toBeInTheDocument()
+    })
+
+    it('includes archived expenses in the current data summary and export payload', async () => {
+
+        const user = userEvent.setup()
+        const { createObjectURLSpy } = setupExportMocks()
+        const originalBlob = global.Blob
+        let capturedPayload = null
+
+        mockExpenses.push(
+            { id: 'expense-1', title: 'Lunch', amount: 12 },
+            { id: 'expense-2', title: 'Archive fee', amount: 25 }
+        )
+
+        const blobSpy = vi.spyOn(global, 'Blob').mockImplementation(function (parts, options) {
+            capturedPayload = parts?.[0] ?? null
+            return new originalBlob(parts, options)
+        })
+
+        render(
+            <ExportImport
+                {...baseProps}
+                projects={[]}
+                tasks={[]}
+                timeEntries={[]}
+                expenses={[]}
+                onImport={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Expenses:')).toBeInTheDocument()
+        expect(screen.getByText('2')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Export' }))
+
+        expect(createObjectURLSpy).toHaveBeenCalled()
+
+        const parsed = JSON.parse(capturedPayload)
+        expect(parsed.expenses).toEqual([
+            { id: 'expense-1', title: 'Lunch', amount: 12 },
+            { id: 'expense-2', title: 'Archive fee', amount: 25 }
+        ])
+
+        blobSpy.mockRestore()
     })
 })

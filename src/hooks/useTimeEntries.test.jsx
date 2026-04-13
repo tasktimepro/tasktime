@@ -41,6 +41,10 @@ describe('useTimeEntries', () => {
     })
 
     it('creates, updates, and deletes entries', async () => {
+        const createdAt = Date.parse('2026-04-14T12:00:00.000Z')
+        const updatedAt = Date.parse('2026-04-14T12:00:05.000Z')
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(createdAt)
+
         const activeTimeEntries = createTestYMap()
         const store = {
             activeTimeEntries,
@@ -65,23 +69,29 @@ describe('useTimeEntries', () => {
         })
 
         await waitFor(() => expect(result.current.entries).toHaveLength(1))
+        expect(createdEntry.createdAt).toBe(createdAt)
+        expect(createdEntry.updatedAt).toBe(createdAt)
 
         let updatedEntry
         await act(async () => {
+            nowSpy.mockReturnValue(updatedAt)
             updatedEntry = result.current.updateEntry(createdEntry.id, { note: 'Updated' })
         })
 
         expect(updatedEntry?.note).toBe('Updated')
+        expect(updatedEntry?.updatedAt).toBe(updatedAt)
 
         const created = store.activeTimeEntries.get(createdEntry.id)
         expect(created).toBeTruthy()
         expect(readStored(store.activeTimeEntries, createdEntry.id)?.note).toBe('Updated')
+        expect(readStored(store.activeTimeEntries, createdEntry.id)?.updatedAt).toBe(updatedAt)
 
         await act(async () => {
             expect(result.current.deleteEntry(createdEntry.id)).toBe(true)
         })
 
         await waitFor(() => expect(result.current.entries).toHaveLength(0))
+        nowSpy.mockRestore()
     })
 
     it('throws when creating entries and store is not ready', () => {

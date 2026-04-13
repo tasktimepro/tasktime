@@ -13,6 +13,8 @@
 export interface Project {
     id: string;
     title: string;
+    createdAt?: number;
+    updatedAt?: number;
     description?: string;
     invoiceIds?: string[];
     hourlyRate?: number | null;
@@ -66,6 +68,8 @@ export interface TimeEntry {
     taskId: string;
     start: number;
     end: number;
+    createdAt?: number;
+    updatedAt?: number;
     note?: string;
     source?: string;
     billedHourlyRate?: number | null;
@@ -77,6 +81,8 @@ export interface TimeEntry {
 
 export interface Client {
     id: string;
+    createdAt?: number;
+    updatedAt?: number;
     /** Display name / Company name shown in lists */
     title: string;
     /** Business legal name (for invoices) */
@@ -150,6 +156,8 @@ export interface Invoice {
     id: string;
     projectId: string;
     clientId: string;
+    createdAt?: number;
+    updatedAt?: number;
     businessInfoId?: string | null;
     invoiceNumber: string;
     date: string;

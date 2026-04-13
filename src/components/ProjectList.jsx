@@ -27,6 +27,7 @@ import { useTimers } from '../hooks/useTimers.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { getInvoicesForProject } from '../utils/invoiceUtils.ts';
+import { buildProjectRecentUpdateMap } from '../utils/activityUtils.ts';
 
 import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
 /**
@@ -98,59 +99,17 @@ const ProjectList = ({
         return projects.filter(project => project.archived);
     }, [projects]);
 
-    const taskProjectMap = useMemo(() => {
-
-        const map = new Map();
-        tasks.forEach(task => {
-            if (task.projectId) {
-                map.set(task.id, task.projectId);
-            }
-        });
-        return map;
-    }, [tasks]);
-
-    const projectTaskActiveMap = useMemo(() => {
-
-        const map = new Map();
-        tasks.forEach(task => {
-            if (!task.projectId) return;
-
-            const lastActive = task.lastActive || 0;
-            const current = map.get(task.projectId) || 0;
-
-            if (lastActive > current) {
-                map.set(task.projectId, lastActive);
-            }
-        });
-
-        return map;
-    }, [tasks]);
-
     const projectLastActiveMap = useMemo(() => {
 
-        const map = new Map();
-        timeEntries.forEach(entry => {
-            const projectId = taskProjectMap.get(entry.taskId);
-            if (!projectId) return;
-
-            const activityTime = entry.end && entry.end > 0 ? entry.end : entry.start;
-            if (!activityTime) return;
-
-            const current = map.get(projectId) || 0;
-            if (activityTime > current) {
-                map.set(projectId, activityTime);
-            }
+        return buildProjectRecentUpdateMap({
+            projects,
+            tasks,
+            timeEntries,
+            invoices,
+            expenses,
+            recurrences,
         });
-
-        projectTaskActiveMap.forEach((lastActive, projectId) => {
-            const current = map.get(projectId) || 0;
-            if (lastActive > current) {
-                map.set(projectId, lastActive);
-            }
-        });
-
-        return map;
-    }, [timeEntries, taskProjectMap, projectTaskActiveMap]);
+    }, [projects, tasks, timeEntries, invoices, expenses, recurrences]);
 
     const sortedActiveProjects = useMemo(() => {
 
@@ -431,7 +390,7 @@ const ProjectList = ({
                             <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground sm:text-sm">
                                 <span>Created {toDisplayDate(project.createdAt)}</span>
                                 {lastActive ? (
-                                    <span>Last active {toDisplayDate(lastActive)}</span>
+                                    <span>Most recent {toDisplayDate(lastActive)}</span>
                                 ) : null}
                             </div>
 

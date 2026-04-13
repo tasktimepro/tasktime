@@ -28,4 +28,5 @@
 
 [ ] Under new expenses modal it would be nice that Title & Supplier when focused should show a list of matching previous saved ones. Latest on top by default, but once you start typing most matching pattern is suggested at the top of the dropdown items below this input
 
+[ ] Stop timer to the nearest min, quarter, half an hour, hour > moving forward (option in projects modal).
 [ ] Timed sessions with sound alerts - I want to work on this for 1hour
