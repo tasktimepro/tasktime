@@ -3,29 +3,24 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { NativeDateInput } from './native-date-input';
 
 describe('NativeDateInput', () => {
-    it('opens the native picker through showPicker when available', () => {
-        const showPicker = vi.fn();
-
+    it('renders as a plain date input without a separate picker button', () => {
         render(<NativeDateInput aria-label="Expense date" value="2026-04-13" onChange={() => {}} />);
 
         const input = screen.getByLabelText('Expense date');
-        input.showPicker = showPicker;
 
-        fireEvent.click(screen.getByRole('button', { name: 'Open date picker' }));
-
-        expect(showPicker).toHaveBeenCalledTimes(1);
+        expect(input.type).toBe('date');
+        expect(screen.queryByRole('button', { name: 'Open date picker' })).toBeNull();
     });
 
-    it('falls back to focus and click when showPicker is unavailable', () => {
-        render(<NativeDateInput aria-label="Expense date" value="2026-04-13" onChange={() => {}} />);
+    it('forwards change events through the native input', () => {
+        const handleChange = vi.fn();
+
+        render(<NativeDateInput aria-label="Expense date" value="2026-04-13" onChange={handleChange} />);
 
         const input = screen.getByLabelText('Expense date');
-        const focusSpy = vi.spyOn(input, 'focus');
-        const clickSpy = vi.spyOn(input, 'click');
 
-        fireEvent.click(screen.getByRole('button', { name: 'Open date picker' }));
+        fireEvent.change(input, { target: { value: '2026-04-20' } });
 
-        expect(focusSpy).toHaveBeenCalledTimes(1);
-        expect(clickSpy).toHaveBeenCalledTimes(1);
+        expect(handleChange).toHaveBeenCalledTimes(1);
     });
 });

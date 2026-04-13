@@ -43,7 +43,7 @@ const findAncestorWithClass = (element, className) => {
 };
 
 describe('InvoiceExpenseSelector', () => {
-    it('uses stacked mobile layouts for expense rows and the add-expense form', () => {
+    it('keeps expense rows inline and stacks add-expense form actions on mobile', () => {
         render(
             <InvoiceExpenseSelector
                 {...createBaseProps({
@@ -65,8 +65,9 @@ describe('InvoiceExpenseSelector', () => {
         const amountInput = screen.getByPlaceholderText('0.00');
         const addExpenseButtonRow = findAncestorWithClass(screen.getByRole('button', { name: 'Add Expense' }), 'flex-col-reverse');
 
-        expect(expenseRow?.className.includes('flex-col')).toBe(true);
-        expect(expenseRow?.className.includes('sm:flex-row')).toBe(true);
+        expect(expenseRow?.className.includes('items-center')).toBe(true);
+        expect(expenseRow?.className.includes('justify-between')).toBe(true);
+        expect(expenseRow?.className.includes('flex-col')).toBe(false);
         expect(amountInput.className.includes('w-full')).toBe(true);
         expect(addExpenseButtonRow?.className.includes('flex-col-reverse')).toBe(true);
     });

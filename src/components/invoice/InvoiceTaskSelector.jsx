@@ -56,11 +56,11 @@ const InvoiceTaskSelector = ({
 }) => {
     const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length + additionalTasks.length;
     const orderedInvoiceTasks = orderTasksWithSubtasks(invoiceTasks);
-    const taskRowClassName = 'flex flex-col gap-3 rounded border bg-card p-3 md:flex-row md:items-start md:justify-between';
-    const taskMetaClassName = 'flex min-w-0 items-start gap-3';
-    const taskControlsClassName = 'flex w-full flex-col gap-3 md:w-auto md:items-end';
-    const taskOptionsClassName = 'flex flex-wrap items-center gap-3 md:justify-end';
-    const taskFieldsClassName = 'grid w-full grid-cols-2 gap-2 md:w-auto md:grid-cols-none md:grid-flow-col md:auto-cols-max md:items-end';
+    const taskRowClassName = 'flex flex-col gap-3 rounded border bg-card p-3 md:flex-row md:items-center md:justify-between';
+    const taskMetaClassName = 'flex min-w-0 items-start gap-3 md:flex-1 md:items-center';
+    const taskControlsClassName = 'flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:gap-4';
+    const taskOptionsClassName = 'flex flex-wrap items-center gap-3 md:flex-nowrap md:gap-4';
+    const taskFieldsClassName = 'grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:items-center md:gap-2';
     const quantityInputClassName = 'w-full min-w-0 rounded-md border border-border px-2.5 py-1.5 text-base text-foreground md:w-16 md:text-sm';
     const amountInputClassName = 'w-full min-w-0 rounded-md border border-border px-2.5 py-1.5 text-base text-foreground md:w-20 md:text-sm';
 
@@ -75,7 +75,7 @@ const InvoiceTaskSelector = ({
                     <div className="flex items-center space-x-2">
                         <h4 className="text-sm font-medium text-foreground">Tasks & Time</h4>
                         <span className="text-xs text-muted-foreground">({selectedTasksCount})</span>
-                        <div className="relative group flex">
+                        <div className="relative hidden sm:flex group">
                             <div
                                 className="text-muted-foreground hover:text-muted-foreground cursor-help focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
                                 tabIndex="0"
@@ -103,7 +103,7 @@ const InvoiceTaskSelector = ({
                 <div className="p-4 space-y-2">
                     {/* Select All/Deselect All and Add Task buttons */}
                     <div className="flex items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 md:flex-nowrap">
                             {invoiceTasks.length > 0 && (
                                 <>
                                     <button
@@ -246,7 +246,7 @@ const InvoiceTaskSelector = ({
                                             {isUsingFlatRate ? (
                                                 // Flat rate input with quantity
                                                 <div className={taskFieldsClassName}>
-                                                    <div className="min-w-0 text-left">
+                                                    <div className="min-w-0 text-left md:text-right">
                                                         <div className="text-xs text-muted-foreground mb-1 text-left">Quantity</div>
                                                         <input
                                                             type="number"
@@ -258,7 +258,7 @@ const InvoiceTaskSelector = ({
                                                             placeholder="1"
                                                         />
                                                     </div>
-                                                    <div className="min-w-0 text-left">
+                                                    <div className="min-w-0 text-left md:text-right">
                                                         <div className="text-xs text-muted-foreground mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
                                                         <input
                                                             type="number"
@@ -274,7 +274,7 @@ const InvoiceTaskSelector = ({
                                             ) : (
                                                 // Hours input with custom hourly rate
                                                 <div className={taskFieldsClassName}>
-                                                    <div className="min-w-0 text-left">
+                                                    <div className="min-w-0 text-left md:text-right">
                                                         <div className="text-xs text-muted-foreground mb-1 text-left">
                                                             Hours ({displayMinutes}min)
                                                         </div>
@@ -307,7 +307,7 @@ const InvoiceTaskSelector = ({
                                                             title={mergedSubtasks[task.id] ? "This shows the combined hours of parent and subtasks. Editing adjusts the parent task hours so the merged total matches your input." : ""}
                                                         />
                                                     </div>
-                                                    <div className="min-w-0 text-left">
+                                                    <div className="min-w-0 text-left md:text-right">
                                                         <div className="text-xs text-muted-foreground mb-1 text-left">Hourly rate</div>
                                                         <input
                                                             type="number"
@@ -377,7 +377,7 @@ const InvoiceTaskSelector = ({
                                                         {isUsingFlatRate ? (
                                                             // Flat rate input with quantity
                                                             <div className={taskFieldsClassName}>
-                                                                <div className="min-w-0 text-left">
+                                                                <div className="min-w-0 text-left md:text-right">
                                                                     <div className="text-xs text-muted-foreground mb-1 text-left">Quantity</div>
                                                                     <input
                                                                         type="number"
@@ -389,7 +389,7 @@ const InvoiceTaskSelector = ({
                                                                         placeholder="1"
                                                                     />
                                                                 </div>
-                                                                <div className="min-w-0 text-left">
+                                                                <div className="min-w-0 text-left md:text-right">
                                                                     <div className="text-xs text-muted-foreground mb-1 text-left">Rate ({getInvoiceCurrency()})</div>
                                                                     <input
                                                                         type="number"
@@ -405,7 +405,7 @@ const InvoiceTaskSelector = ({
                                                         ) : (
                                                             // Hours input with custom hourly rate
                                                             <div className={taskFieldsClassName}>
-                                                                <div className="min-w-0 text-left">
+                                                                <div className="min-w-0 text-left md:text-right">
                                                                     <div className="text-xs text-muted-foreground mb-1 text-left">Hours ({currentMinutes}min)</div>
                                                                     <input
                                                                         type="number"
@@ -416,7 +416,7 @@ const InvoiceTaskSelector = ({
                                                                         className={amountInputClassName}
                                                                     />
                                                                 </div>
-                                                                <div className="min-w-0 text-left">
+                                                                <div className="min-w-0 text-left md:text-right">
                                                                     <div className="text-xs text-muted-foreground mb-1 text-left">Hourly rate</div>
                                                                     <input
                                                                         type="number"
@@ -461,9 +461,9 @@ const InvoiceTaskSelector = ({
                                         />
                                     </div>
 
-                                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                                    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                                         {/* Checkbox + Inputs */}
-                                        <div className="flex w-full flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+                                        <div className="flex w-full flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
                                             <div className="flex items-center">
                                                 <CustomCheckbox
                                                     checked={newTaskUseFlatRate}
@@ -474,9 +474,9 @@ const InvoiceTaskSelector = ({
                                                 />
                                             </div>
 
-                                            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
+                                            <div className="grid w-full grid-cols-2 gap-2 md:flex md:flex-wrap md:items-end">
                                                 {newTaskUseFlatRate && (
-                                                    <div className="w-full text-left sm:w-24">
+                                                    <div className="w-full text-left md:w-24 md:text-right">
                                                         <div className="text-xs text-muted-foreground mb-1 text-left">Quantity</div>
                                                         <Input
                                                             type="number"
@@ -484,7 +484,7 @@ const InvoiceTaskSelector = ({
                                                             min="1"
                                                             value={newTaskQuantity}
                                                             onChange={(e) => setNewTaskQuantity(e.target.value)}
-                                                            className="h-9 w-full sm:w-24"
+                                                            className="h-9 w-full md:w-24"
                                                             placeholder="1"
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter') {
@@ -497,7 +497,7 @@ const InvoiceTaskSelector = ({
                                                     </div>
                                                 )}
 
-                                                <div className="w-full text-left sm:w-32">
+                                                <div className="w-full text-left md:w-32 md:text-right">
                                                     <div className="text-xs text-muted-foreground mb-1 text-left">
                                                         {newTaskUseFlatRate ? `Rate (${getInvoiceCurrency()})` : `Hours ${newTaskHours ? `(${hoursToMinutes(parseFloat(newTaskHours) || 0)}min)` : ''}`}
                                                     </div>
@@ -508,7 +508,7 @@ const InvoiceTaskSelector = ({
                                                         value={newTaskHours}
                                                         onChange={(e) => setNewTaskHours(e.target.value)}
                                                         placeholder={newTaskUseFlatRate ? "0.00" : "Hours"}
-                                                        className={`h-9 w-full sm:w-32 ${newTaskUseFlatRate ? 'sensitive-data' : ''}`}
+                                                        className={`h-9 w-full md:w-32 ${newTaskUseFlatRate ? 'sensitive-data' : ''}`}
                                                         onKeyDown={(e) => {
                                                             if (e.key === 'Enter') {
                                                                 e.preventDefault();
@@ -520,7 +520,7 @@ const InvoiceTaskSelector = ({
                                                 </div>
 
                                                 {!newTaskUseFlatRate && (
-                                                    <div className="w-full text-left sm:w-32">
+                                                    <div className="w-full text-left md:w-32 md:text-right">
                                                         <div className="text-xs text-muted-foreground mb-1 text-left">Hourly rate</div>
                                                         <Input
                                                             type="number"
@@ -529,7 +529,7 @@ const InvoiceTaskSelector = ({
                                                             value={newTaskHourlyRate !== '' ? newTaskHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
                                                             onChange={(e) => setNewTaskHourlyRate(e.target.value)}
                                                             placeholder="0.00"
-                                                            className="h-9 w-full sm:w-32 sensitive-data"
+                                                            className="h-9 w-full md:w-32 sensitive-data"
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter') {
                                                                     e.preventDefault();
@@ -544,7 +544,7 @@ const InvoiceTaskSelector = ({
                                         </div>
 
                                         {/* Buttons */}
-                                        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end lg:w-auto">
+                                        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end md:w-auto">
                                             <Button
                                                 type="button"
                                                 variant="secondary"

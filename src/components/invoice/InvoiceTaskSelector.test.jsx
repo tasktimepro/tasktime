@@ -147,7 +147,7 @@ describe('InvoiceTaskSelector', () => {
         expect(handleHoursChange).toHaveBeenCalledWith('parent-1', '3');
     });
 
-    it('keeps task actions inline and uses two-column mobile editors', () => {
+    it('keeps task actions inline and uses full-width mobile editors before md', () => {
         render(
             <InvoiceTaskSelector
                 {...createBaseProps({
@@ -181,7 +181,7 @@ describe('InvoiceTaskSelector', () => {
         expect(existingHoursInput.className.includes('md:w-20')).toBe(true);
         expect(newTaskHoursGrid?.className.includes('grid-cols-2')).toBe(true);
         expect(newTaskHoursInput.className.includes('w-full')).toBe(true);
-        expect(newTaskHoursInput.className.includes('sm:w-32')).toBe(true);
+        expect(newTaskHoursInput.className.includes('md:w-32')).toBe(true);
         expect(headerActionRow?.className.includes('justify-between')).toBe(true);
         expect(headerActionRow?.className.includes('flex-col')).toBe(false);
     });
