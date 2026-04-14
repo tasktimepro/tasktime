@@ -172,6 +172,8 @@ export interface Invoice {
     paymentMethodId?: string | null;
     currency?: string;
     paidAt?: number | null;
+    sentAt?: number | null;
+    sentToEmail?: string | null;
 }
 
 export interface InvoiceTemplate {
@@ -184,6 +186,21 @@ export interface InvoiceTemplate {
     defaultTaxRate?: number;
     defaultDueDays?: number;
     isDefault?: boolean;
+}
+
+export interface EmailTemplate {
+    id: string;
+    name: string;
+    type: 'invoice';
+    fromName?: string;
+    replyTo?: string;
+    subject: string;
+    sendBody: string;
+    reminderBody: string;
+    attachmentTitle: string;
+    isDefault?: boolean;
+    createdAt?: number;
+    updatedAt?: number;
 }
 
 export interface PaymentMethod {

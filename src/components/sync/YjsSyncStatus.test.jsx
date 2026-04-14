@@ -7,22 +7,25 @@ import YjsSyncStatus from './YjsSyncStatus'
 const signInMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
 const navigateToAccountMock = vi.hoisted(() => vi.fn())
+const forceSyncDriveMock = vi.hoisted(() => vi.fn())
+const yjsState = vi.hoisted(() => ({
+    isReady: true,
+    isSyncing: false,
+    syncState: 'idle',
+    syncPhase: 'idle',
+    isDriveConnected: false,
+    isConnecting: false,
+    hasSynced: false,
+    manualSyncInProgress: false,
+    pendingSyncChanges: false,
+    forceSyncDrive: forceSyncDriveMock,
+    autoSyncEnabled: true,
+    lastSyncedAt: null,
+}))
 let consoleErrorSpy
 
 vi.mock('@/contexts/YjsContext', () => ({
-    useYjs: () => ({
-        isReady: true,
-        isSyncing: false,
-        syncState: 'idle',
-        syncPhase: 'idle',
-        isDriveConnected: false,
-        isConnecting: false,
-        hasSynced: false,
-        manualSyncInProgress: false,
-        pendingSyncChanges: false,
-        forceSyncDrive: vi.fn(),
-        autoSyncEnabled: true,
-    }),
+    useYjs: () => yjsState,
 }))
 
 vi.mock('@/hooks/useGoogleAuth', () => ({
@@ -49,6 +52,17 @@ describe('YjsSyncStatus', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        yjsState.isReady = true
+        yjsState.isSyncing = false
+        yjsState.syncState = 'idle'
+        yjsState.syncPhase = 'idle'
+        yjsState.isDriveConnected = false
+        yjsState.isConnecting = false
+        yjsState.hasSynced = false
+        yjsState.manualSyncInProgress = false
+        yjsState.pendingSyncChanges = false
+        yjsState.autoSyncEnabled = true
+        yjsState.lastSyncedAt = null
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     })
 
@@ -65,5 +79,18 @@ describe('YjsSyncStatus', () => {
 
         expect(showErrorMock).toHaveBeenCalledWith('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
         expect(navigateToAccountMock).not.toHaveBeenCalled()
+    })
+
+    it('uses a full manual sync when pending changes are clicked', async () => {
+        yjsState.isDriveConnected = true
+        yjsState.pendingSyncChanges = true
+        yjsState.autoSyncEnabled = false
+
+        render(<YjsSyncStatus />)
+
+        await userEvent.click(screen.getByRole('button', { name: /sync changes/i }))
+
+        expect(forceSyncDriveMock).toHaveBeenCalledTimes(1)
+        expect(forceSyncDriveMock.mock.calls[0]).toEqual([])
     })
 })

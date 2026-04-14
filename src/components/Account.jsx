@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownTrayIcon, CogIcon, TrashIcon, CloudIcon, SignOutIcon } from '@/components/ui/icons';
+import { Mail } from 'lucide-react';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import ExportImport from './ExportImport';
 import Preferences from './Preferences';
+import EmailTemplates from './EmailTemplates';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +60,12 @@ const Account = ({
             name: 'Preferences',
             icon: CogIcon,
             description: 'Manage your personal preferences'
+        },
+        {
+            id: 'email-templates',
+            name: 'Email Templates',
+            icon: Mail,
+            description: 'Manage email templates'
         },
         {
             id: 'sync',
@@ -164,6 +172,8 @@ const Account = ({
         switch (activeTab) {
             case 'preferences':
                 return <Preferences preferences={preferences} updatePreferences={updatePreferences} />;
+            case 'email-templates':
+                return <EmailTemplates />;
             case 'sync':
                 return <YjsSyncSettings />;
             case 'backup':

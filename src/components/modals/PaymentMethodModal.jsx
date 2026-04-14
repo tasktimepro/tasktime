@@ -160,7 +160,7 @@ const PaymentMethodModal = ({
 
     // Modal footer with action buttons
     const modalFooter = (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             {/* Default Checkbox */}
             <div className="flex items-center space-x-2">
                 <CustomCheckbox

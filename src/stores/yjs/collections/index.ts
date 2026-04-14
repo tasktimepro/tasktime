@@ -34,5 +34,5 @@ export type { PreferencesHelpers } from './preferences';
 export { createTimerHelpers } from './timer';
 export type { TimerHelpers } from './timer';
 
-export { createPlannerAttachmentHelpers } from './plannerAttachments';
+export { createPlannerAttachmentHelpers, cleanupAttachmentsForEntity } from './plannerAttachments';
 export type { PlannerAttachmentHelpers } from './plannerAttachments';

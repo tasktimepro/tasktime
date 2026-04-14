@@ -118,12 +118,23 @@ type PdfOptions = {
     };
     html2canvas?: {
         scale: number;
+        onclone?: (doc: Document) => void;
     };
     jsPDF?: {
         unit: string;
         format: [number, number];
         orientation: 'portrait' | 'landscape';
     };
+};
+
+/** Force the cloned html2canvas document into light mode so PDFs are never
+ *  rendered with the app's dark-mode colours. */
+const forceLightModeOnClone = (doc: Document): void => {
+    doc.documentElement.style.colorScheme = 'light';
+    doc.documentElement.style.backgroundColor = '#ffffff';
+    doc.documentElement.style.color = '#111827';
+    doc.body.style.backgroundColor = '#ffffff';
+    doc.body.style.color = '#111827';
 };
 
 /**
@@ -148,11 +159,16 @@ export const generatePDF = (
                 margin: [10, 20, 10, 20],  // top, right, bottom, left margins in mm
                 filename: filename,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
+                html2canvas: { scale: 2, onclone: forceLightModeOnClone },
                 jsPDF: { unit: 'mm', format: [229, 297], orientation: 'portrait' }
             };
 
-            const finalOptions = { ...defaultOptions, ...options };
+            const finalOptions = {
+                ...defaultOptions,
+                ...options,
+                // Deep-merge html2canvas so onclone is never lost when caller overrides scale etc.
+                html2canvas: { ...defaultOptions.html2canvas, ...(options.html2canvas || {}) },
+            };
 
             // Sanitize HTML to prevent XSS via user-provided content in invoices
             const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
@@ -175,6 +191,55 @@ export const generatePDF = (
             console.error('PDF generation error:', error);
             reject(error);
         }
+    });
+};
+
+/**
+ * Generate a PDF as a base64 string (for email attachment)
+ */
+export const generatePDFBase64 = (htmlContent: string): Promise<string> => {
+
+    return new Promise((resolve, reject) => {
+
+        if (!htmlContent) {
+            reject(new Error('No HTML content provided'));
+            return;
+        }
+
+        const options: PdfOptions = {
+            margin: [10, 20, 10, 20],
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, onclone: forceLightModeOnClone },
+            jsPDF: { unit: 'mm', format: [229, 297], orientation: 'portrait' },
+        };
+
+        const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
+            USE_PROFILES: { html: true },
+            ADD_TAGS: ['style'],
+        });
+
+        html2pdf()
+            .set(options)
+            .from(sanitizedHtml)
+            .outputPdf('blob')
+            .then((blob: Blob) => {
+
+                const reader = new FileReader();
+
+                reader.onload = () => {
+
+                    const dataUrl = reader.result as string;
+                    // Strip data:application/pdf;base64, prefix
+                    const base64 = dataUrl.split(',')[1];
+                    resolve(base64);
+                };
+
+                reader.onerror = () => reject(new Error('Failed to convert PDF to base64'));
+                reader.readAsDataURL(blob);
+            })
+            .catch((error: unknown) => {
+                reject(error);
+            });
     });
 };
 

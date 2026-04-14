@@ -332,7 +332,7 @@ function ExportImport({
                     <Button
                         variant="outline"
                         onClick={handleExport}
-                        leadingIcon={ArrowDownTrayIcon}
+                        leadingIcon={ArrowUpTrayIcon}
                     >
                         Export
                     </Button>
@@ -348,7 +348,7 @@ function ExportImport({
                     <Button
                         variant="outline"
                         onClick={() => setShowImportModal(true)}
-                        leadingIcon={ArrowUpTrayIcon}
+                        leadingIcon={ArrowDownTrayIcon}
                     >
                         Import
                     </Button>

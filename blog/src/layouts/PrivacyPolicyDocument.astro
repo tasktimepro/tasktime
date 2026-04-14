@@ -2,7 +2,7 @@
 import PublicPageLayout from './PublicPageLayout.astro';
 
 const { canonicalPath = '/privacy' } = Astro.props;
-const LAST_UPDATED = '9 April 2026';
+const LAST_UPDATED = '14 April 2026';
 ---
 
 <PublicPageLayout
@@ -59,33 +59,46 @@ const LAST_UPDATED = '9 April 2026';
             Additionally, the anonymous usage counters described in section 3 are stored in aggregate form. They contain no user-identifiable information &mdash; only daily numeric totals.
         </p>
         <p>
+            When you send an invoice by email, a minimal audit record is saved: a hashed identifier derived from your sync session, a hashed form of the recipient&apos;s address, and a timestamp. This is used only to enforce monthly sending limits and prevent duplicate sends. No invoice content, PDF data, or message body is stored server-side.
+        </p>
+        <p>
             That is the complete list. There is no user database, no email list, and no third-party analytics.
         </p>
     </section>
 
     <section>
-        <h2>5. Data retention</h2>
+        <h2>5. Invoice email sending</h2>
+        <p>
+            TaskTime lets you send invoices directly to your clients by email. When you use this feature, your browser generates a PDF of the invoice and sends it, along with your message, to <strong>Resend</strong> (resend.com) &mdash; a third-party email delivery service &mdash; for delivery to the recipient. By using this feature you are sharing that invoice data with Resend, and their <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">privacy policy</a> applies to how they handle and deliver the message.
+        </p>
+        <p>
+            Resend is used solely to deliver the email on your behalf. We do not use it for marketing, advertising, or tracking.
+        </p>
+    </section>
+
+    <section>
+        <h2>6. Data retention</h2>
         <p>
             Your local data stays on your device until you delete it or clear your browser storage. Synced copies stay in your Google Drive until you delete them there. The encrypted session token is kept only while your sync connection is active.
         </p>
     </section>
 
     <section>
-        <h2>6. Security</h2>
+        <h2>7. Security</h2>
         <p>
             Because your data lives in your browser and your own Google Drive, its security depends on your device, your browser, and your Google account. We cannot guarantee the security of those systems, but we have deliberately chosen an architecture that keeps your data out of our hands entirely.
         </p>
     </section>
 
     <section>
-        <h2>7. You are in control</h2>
+        <h2>8. You are in control</h2>
         <p>
             You can export your data at any time for backup. You can connect or disconnect Google Drive sync whenever you want. You can delete all local data from the Account page. Because we never have your data in the first place, there is nothing for us to delete on our end.
         </p>
     </section>
 
     <section>
-        <h2>8. Changes to this policy</h2>
+        <h2>9. Changes to this policy</h2>
         <p>
             This policy may be updated as TaskTime evolves. The current version will always be posted here with the date it was last changed.
         </p>

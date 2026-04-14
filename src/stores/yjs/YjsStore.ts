@@ -30,6 +30,7 @@ import type {
     Client,
     BusinessInfo,
     InvoiceTemplate,
+    EmailTemplate,
     PaymentMethod,
     Expense,
     ExpenseRecurrence,
@@ -98,6 +99,9 @@ export class YjsStore {
         await this.archiveOldInvoices();
         await this.archiveOldExpenses();
 
+        // Clean up planner attachments referencing deleted projects/clients
+        this.cleanupOrphanedPlannerAttachments();
+
         this._isReady = true;
         console.log('[YjsStore] Initialized');
     }
@@ -136,6 +140,11 @@ export class YjsStore {
     get invoiceTemplates(): Y.Map<string, InvoiceTemplate> {
         this.assertReady();
         return this._coreDoc!.getMap('invoiceTemplates');
+    }
+
+    get emailTemplates(): Y.Map<string, EmailTemplate> {
+        this.assertReady();
+        return this._coreDoc!.getMap('emailTemplates');
     }
 
     get paymentMethods(): Y.Map<string, PaymentMethod> {
@@ -230,7 +239,10 @@ export class YjsStore {
                 }
 
                 await this.driveProvider.syncAndSubscribeDoc('tasks-archived');
-                this.clearDisconnectedDirtyDocs(['tasks-archived']);
+                // Only clear dirty flag if the doc was actually synced (not manual mode)
+                if (this.driveSyncMode !== 'manual') {
+                    this.clearDisconnectedDirtyDocs(['tasks-archived']);
+                }
             }
         }
         return this._archivedTasksDoc.getMap('tasks');
@@ -291,7 +303,9 @@ export class YjsStore {
                 }
 
                 await this.driveProvider.syncAndSubscribeDoc('expenses-archived');
-                this.clearDisconnectedDirtyDocs(['expenses-archived']);
+                if (this.driveSyncMode !== 'manual') {
+                    this.clearDisconnectedDirtyDocs(['expenses-archived']);
+                }
             }
         }
         return this._archivedExpensesDoc.getMap('expenses');
@@ -402,7 +416,9 @@ export class YjsStore {
             }
 
             await this.driveProvider.syncAndSubscribeDoc(docName);
-            this.clearDisconnectedDirtyDocs([docName]);
+            if (this.driveSyncMode !== 'manual') {
+                this.clearDisconnectedDirtyDocs([docName]);
+            }
         }
 
         return doc.getMap('timeEntries');
@@ -482,7 +498,9 @@ export class YjsStore {
                 }
 
                 await this.driveProvider.syncAndSubscribeDoc('invoices-archived');
-                this.clearDisconnectedDirtyDocs(['invoices-archived']);
+                if (this.driveSyncMode !== 'manual') {
+                    this.clearDisconnectedDirtyDocs(['invoices-archived']);
+                }
             }
         }
         return this._archivedInvoicesDoc.getMap('invoices');
@@ -517,6 +535,45 @@ export class YjsStore {
         allInvoices.push(...collectEntities<Invoice>(archivedMap as any));
 
         return allInvoices;
+    }
+
+    // =========================================================================
+    // Orphaned Planner Attachment Cleanup
+    // =========================================================================
+
+    /**
+     * Remove planner attachments whose referenced project or client no longer exists.
+     * Task-type attachments are skipped because archived tasks live in a separate
+     * on-demand doc that may not be loaded yet.
+     */
+    cleanupOrphanedPlannerAttachments(): void {
+
+        const projectIds = new Set<string>();
+        this._coreDoc!.getMap('projects').forEach((_v, key) => projectIds.add(key));
+
+        const clientIds = new Set<string>();
+        this._coreDoc!.getMap('clients').forEach((_v, key) => clientIds.add(key));
+
+        const attachments = this._coreDoc!.getMap('plannerAttachments');
+        const toDelete: string[] = [];
+
+        attachments.forEach((value, key) => {
+            const entity = readEntity<PlannerAttachment>(value);
+            if (!entity) return;
+
+            if (entity.type === 'project' && !projectIds.has(entity.referenceId)) {
+                toDelete.push(key);
+            } else if (entity.type === 'client' && !clientIds.has(entity.referenceId)) {
+                toDelete.push(key);
+            }
+        });
+
+        if (toDelete.length > 0) {
+            this._coreDoc!.transact(() => {
+                toDelete.forEach((key) => attachments.delete(key));
+            });
+            console.log(`[YjsStore] Cleaned up ${toDelete.length} orphaned planner attachment(s)`);
+        }
     }
 
     // =========================================================================
@@ -697,9 +754,13 @@ export class YjsStore {
 
         await this.driveProvider.connect(this.driveSyncMode);
 
-        this.clearDisconnectedDirtyDocs(
-            disconnectedDirtyDocs.filter((docName) => this.docManager.isLoaded(docName)),
-        );
+        // Clear disconnected dirty docs after a successful online reconnect.
+        // Offline reconnects stay queued until a real sync occurs.
+        if ((this.driveProvider.getState?.() ?? 'idle') !== 'offline') {
+            this.clearDisconnectedDirtyDocs(
+                disconnectedDirtyDocs.filter((docName) => this.docManager.isLoaded(docName)),
+            );
+        }
     }
 
     /**
@@ -725,6 +786,12 @@ export class YjsStore {
         await this.driveProvider?.sync(options?.force ?? false, {
             allowPull: options?.allowPull,
         });
+
+        // After a successful sync, clear any leftover disconnected dirty docs
+        // (matters for manual mode where they aren't cleared on connect)
+        if (this.disconnectedDirtyDocs.size > 0) {
+            this.clearDisconnectedDirtyDocs();
+        }
     }
 
     /**

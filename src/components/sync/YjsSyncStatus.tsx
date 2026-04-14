@@ -65,7 +65,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
     }, [navigateToAccount]);
 
     const handleManualSync = useCallback(async () => {
-        await forceSyncDrive({ allowPull: false });
+        await forceSyncDrive();
     }, [forceSyncDrive]);
 
     const status = useMemo(() => {

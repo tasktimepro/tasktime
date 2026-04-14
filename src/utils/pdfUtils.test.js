@@ -5,6 +5,7 @@ import {
     buildInvoiceHtmlContent,
     createInvoiceHTML,
     generatePDF,
+    generatePDFBase64,
     getCurrentInvoiceHtmlContent,
 } from './pdfUtils'
 
@@ -14,7 +15,8 @@ const html2pdfMocks = vi.hoisted(() => {
         html2pdf: vi.fn(),
         set: vi.fn(),
         from: vi.fn(),
-        save: vi.fn()
+        save: vi.fn(),
+        outputPdf: vi.fn(),
     }
 })
 
@@ -28,7 +30,8 @@ beforeEach(() => {
     vi.clearAllMocks()
 
     html2pdfMocks.save.mockResolvedValue(undefined)
-    html2pdfMocks.from.mockReturnValue({ save: html2pdfMocks.save })
+    html2pdfMocks.outputPdf.mockResolvedValue(new Blob(['%PDF-mock'], { type: 'application/pdf' }))
+    html2pdfMocks.from.mockReturnValue({ save: html2pdfMocks.save, outputPdf: html2pdfMocks.outputPdf })
     html2pdfMocks.set.mockReturnValue({ from: html2pdfMocks.from })
     html2pdfMocks.html2pdf.mockReturnValue({ set: html2pdfMocks.set })
 })
@@ -699,5 +702,42 @@ describe('generatePDF', () => {
         expect(errorSpy).toHaveBeenCalled()
 
         errorSpy.mockRestore()
+    })
+})
+
+describe('generatePDFBase64', () => {
+
+    it('returns a base64 string from HTML content', async () => {
+
+        const result = await generatePDFBase64('<p>Test Invoice</p>')
+
+        expect(typeof result).toBe('string')
+        // The result should be a valid base64 string (no data URL prefix)
+        expect(result).not.toContain('data:')
+        expect(result.length).toBeGreaterThan(0)
+
+        expect(html2pdfMocks.outputPdf).toHaveBeenCalledWith('blob')
+    })
+
+    it('rejects when no HTML content provided', async () => {
+
+        await expect(generatePDFBase64('')).rejects.toThrow('No HTML content provided')
+    })
+
+    it('rejects when html2pdf fails', async () => {
+
+        html2pdfMocks.outputPdf.mockRejectedValueOnce(new Error('PDF generation failed'))
+
+        await expect(generatePDFBase64('<p>Invoice</p>')).rejects.toThrow('PDF generation failed')
+    })
+
+    it('passes sanitized HTML to html2pdf', async () => {
+
+        await generatePDFBase64('<p>Hello</p><script>alert("xss")</script>')
+
+        expect(html2pdfMocks.from).toHaveBeenCalledOnce()
+        const passedHtml = html2pdfMocks.from.mock.calls[0][0]
+        expect(passedHtml).not.toContain('<script>')
+        expect(passedHtml).toContain('<p>Hello</p>')
     })
 })

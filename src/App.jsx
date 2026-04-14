@@ -66,6 +66,7 @@ const MOBILE_SYNC_VISIBLE_KINDS = new Set([
     SYNC_STATUS_KIND.DOWNLOADING,
     SYNC_STATUS_KIND.UPLOADING,
     SYNC_STATUS_KIND.SYNCING,
+    SYNC_STATUS_KIND.PENDING,
     SYNC_STATUS_KIND.SYNCED,
 ]);
 const ONBOARDING_SEED_TASK_TITLE = 'Create my first project';
@@ -758,7 +759,7 @@ function AppContent() {
     }, [navigateToAccount]);
 
     const handleMobileManualSync = useCallback(async () => {
-        await forceSyncDrive({ allowPull: false });
+        await forceSyncDrive();
     }, [forceSyncDrive]);
 
     const mobileSyncStatus = useMemo(() => {
@@ -875,7 +876,11 @@ function AppContent() {
             ariaLabel: mobileSyncStatus.text,
             Icon: mobileSyncStatus.icon,
             isFadingOut: isMobileSyncButtonFadingOut,
-            label: mobileSyncStatus.kind === SYNC_STATUS_KIND.SYNCED ? 'Synced' : 'Syncing',
+            label: mobileSyncStatus.kind === SYNC_STATUS_KIND.SYNCED
+                ? 'Synced'
+                : mobileSyncStatus.kind === SYNC_STATUS_KIND.PENDING
+                    ? 'Sync'
+                    : 'Syncing',
             onClick: handleMobileSyncButtonAction,
             toneClassName: `${mobileSyncStatus.tone} hover:bg-accent hover:text-accent-foreground`,
         };

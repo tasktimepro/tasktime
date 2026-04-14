@@ -247,6 +247,30 @@ describe('InvoicesList', () => {
         expect(matches.length).toBeGreaterThan(0)
     })
 
+    it('shows a sent badge for emailed invoices', () => {
+
+        const sentInvoice = {
+            ...baseInvoice,
+            id: 'inv-sent',
+            invoiceNumber: 'INV-SENT',
+            sentAt: Date.now()
+        }
+
+        render(
+            <InvoicesList
+                projectInvoices={[sentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        expect(screen.getByText('Sent')).toBeInTheDocument()
+        expect(screen.queryByText('Emailed')).not.toBeInTheDocument()
+    })
+
     it('toggles paid status without corrupting list', async () => {
 
         invoiceHookMocks.updateInvoice.mockClear()

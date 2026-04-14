@@ -93,6 +93,9 @@ describe('YjsStore reconnect sync tracking', () => {
         const store = new YjsStore()
         await store.initialize()
 
+        // Use sync mode so dirty docs are cleared on connect
+        store.setDriveSyncPreferences(true, 'sync')
+
         const project = new Y.Map()
         project.set('id', 'project-1')
         project.set('title', 'Offline project')
@@ -105,6 +108,31 @@ describe('YjsStore reconnect sync tracking', () => {
 
         const provider = providerInstances[0]
 
+        expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(['core'])
+        expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
+
+        store.destroy()
+    })
+
+    it('clears disconnected dirty docs after manual-mode reconnect sync', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        // Default mode is manual — don't change it
+
+        const project = new Y.Map()
+        project.set('id', 'project-1')
+        project.set('title', 'Offline project')
+
+        docs.get('core').getMap('projects').set('project-1', project)
+
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['core'])
+
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+
+        // Dirty docs are handed to provider and reconciled on reconnect
         expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(['core'])
         expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
 
@@ -260,6 +288,39 @@ describe('YjsStore timer reconciliation', () => {
         expect(coreDoc.getMap('timers').has('project-1')).toBe(false)
         expect(coreDoc.getMap('timers').has('project-2')).toBe(false)
         expect(coreDoc.getMap('timers').has('project-3')).toBe(true)
+
+        store.destroy()
+    })
+
+    it('cleans up orphaned planner attachments for missing projects and clients on init', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const coreDoc = docs.get('core')
+
+        // Set up a valid project and client
+        coreDoc.getMap('projects').set('p1', objectToYMap({ id: 'p1', title: 'Valid' }))
+        coreDoc.getMap('clients').set('c1', objectToYMap({ id: 'c1', title: 'Valid Client' }))
+
+        // Planner attachments — some valid, some orphaned
+        const atts = coreDoc.getMap('plannerAttachments')
+        atts.set('att-valid-project', objectToYMap({ id: 'att-valid-project', type: 'project', referenceId: 'p1' }))
+        atts.set('att-valid-client', objectToYMap({ id: 'att-valid-client', type: 'client', referenceId: 'c1' }))
+        atts.set('att-valid-task', objectToYMap({ id: 'att-valid-task', type: 'task', referenceId: 'task-whatever' }))
+        atts.set('att-orphan-project', objectToYMap({ id: 'att-orphan-project', type: 'project', referenceId: 'deleted-project' }))
+        atts.set('att-orphan-client', objectToYMap({ id: 'att-orphan-client', type: 'client', referenceId: 'deleted-client' }))
+
+        // Re-run the private cleanup method
+        store.cleanupOrphanedPlannerAttachments()
+
+        // Valid attachments survive
+        expect(atts.has('att-valid-project')).toBe(true)
+        expect(atts.has('att-valid-client')).toBe(true)
+        // Task attachments are NOT scrubbed (archived tasks may not be loaded)
+        expect(atts.has('att-valid-task')).toBe(true)
+        // Orphaned project and client attachments are removed
+        expect(atts.has('att-orphan-project')).toBe(false)
+        expect(atts.has('att-orphan-client')).toBe(false)
 
         store.destroy()
     })

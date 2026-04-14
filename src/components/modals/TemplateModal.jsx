@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TemplateVariablesPanel } from '@/components/ui/template-variables-panel';
 import CustomCheckbox from '../CustomCheckbox';
 import { parseIntegerInputWithFallback } from '@/utils/numberInputUtils.ts';
 
@@ -237,7 +238,7 @@ const TemplateModal = ({
 
     // Modal footer with action buttons
     const modalFooter = (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             {/* Default Checkbox */}
             <div className="flex items-center">
                 <CustomCheckbox
@@ -270,206 +271,183 @@ const TemplateModal = ({
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={editingTemplate ? 'Edit Invoice Template' : 'Create Invoice Template'}
+            title={editingTemplate ? 'Edit Invoice Template' : 'New Invoice Template'}
             size="3xl"
             footer={modalFooter}
         >
             <form id="template-form" onSubmit={handleSubmit} className="space-y-6">
-                {/* Basic Information */}
+                <div className="space-y-2">
+                    <Label>
+                        Template Name <span className="text-destructive-strong">*</span>
+                    </Label>
+                    <Input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="e.g., Standard Invoice, Project Invoice"
+                        required
+                    />
+                </div>
+
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <Label>
-                            Template Name <span className="text-destructive-strong">*</span>
+                            Invoice Number Format <span className="text-destructive-strong">*</span>
                         </Label>
                         <Input
                             type="text"
-                            value={formData.name}
-                            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="e.g., Standard Invoice, Project Invoice"
+                            value={formData.invoiceNumberFormat}
+                            onChange={(e) => setFormData(prev => ({ ...prev, invoiceNumberFormat: e.target.value }))}
+                            placeholder="e.g., INV-{projectId}-{timestamp}"
                             required
                         />
+                        <p className="text-sm text-muted-foreground">
+                            Preview: <strong>{formPreviewInvoiceNumber}</strong>
+                        </p>
                     </div>
-                </div>
 
-                {/* Invoice Number Configuration */}
-                <div className="border-t pt-6">
-                    <h3 className="text-sm font-medium text-foreground mb-4">Invoice Number Configuration</h3>
-                    
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label>
-                                Invoice Number Format <span className="text-destructive-strong">*</span>
-                            </Label>
-                            <Input
-                                type="text"
-                                value={formData.invoiceNumberFormat}
-                                onChange={(e) => setFormData(prev => ({ ...prev, invoiceNumberFormat: e.target.value }))}
-                                placeholder="e.g., INV-{projectId}-{timestamp}"
-                                required
-                            />
-                            <p className="text-sm text-muted-foreground">
-                                Preview: <strong>{formPreviewInvoiceNumber}</strong>
-                            </p>
-                        </div>
+                    <TemplateVariablesPanel
+                        title="Available Variables"
+                        description="Tap or click a variable to copy it. These placeholders are replaced when an invoice number is generated."
+                        variables={formatVariables}
+                    />
 
-                        <div className="bg-muted p-4 rounded-md">
-                            <h4 className="text-sm font-medium text-foreground mb-2">Available Variables:</h4>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                {formatVariables.map((variable) => (
-                                    <div key={variable.key} className="flex items-center">
-                                        <code className="bg-background px-1 rounded text-xs font-mono mr-2 border">
-                                            {variable.key}
-                                        </code>
-                                        <span className="text-muted-foreground">{variable.description}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="flex items-center">
-                            <CustomCheckbox
-                                checked={formData.useSequentialNumbers}
-                                onChange={(checked) => setFormData(prev => ({ ...prev, useSequentialNumbers: checked }))}
-                                label="Use sequential numbering"
-                                labelClassName="block text-sm text-foreground"
-                            />
-                            <span className="ml-2 text-xs text-muted-foreground">
-                                (Enables {'{sequential}'} variable)
-                            </span>
-                        </div>
-
-                        {formData.useSequentialNumbers && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>
-                                        Starting Number
-                                    </Label>
-                                    <Input
-                                        type="number"
-                                        min="1"
-                                        value={formData.sequentialNumberStart}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberStart: parseIntegerInputWithFallback(e.target.value, 1, { min: 1 }) }))}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>
-                                        Number of Digits
-                                    </Label>
-                                    <Input
-                                        type="number"
-                                        min="1"
-                                        max="10"
-                                        value={formData.sequentialNumberDigits}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberDigits: parseIntegerInputWithFallback(e.target.value, 4, { min: 1, max: 10 }) }))}
-                                    />
-                                    <p className="text-xs text-muted-foreground">
-                                        Preview: {(formData.sequentialNumberStart).toString().padStart(formData.sequentialNumberDigits || 4, '0')}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {formData.useSequentialNumbers && (
-                            <div className="flex items-center">
-                                <CustomCheckbox
-                                    checked={formData.sequentialResetYearly}
-                                    onChange={(checked) => setFormData(prev => ({ ...prev, sequentialResetYearly: checked }))}
-                                    label="Reset sequential number yearly"
-                                    labelClassName="block text-sm text-foreground"
-                                />
-                                <span className="ml-2 text-xs text-muted-foreground">
-                                    (Restarts at starting number each new year)
-                                </span>
-                            </div>
-                        )}
+                    <div className="flex items-center">
+                        <CustomCheckbox
+                            checked={formData.useSequentialNumbers}
+                            onChange={(checked) => setFormData(prev => ({ ...prev, useSequentialNumbers: checked }))}
+                            label="Use sequential numbering"
+                            labelClassName="block text-sm text-foreground"
+                        />
+                        <span className="ml-2 text-xs text-muted-foreground">
+                            (Enables {'{sequential}'} variable)
+                        </span>
                     </div>
-                </div>
 
-                {/* Due Date Configuration */}
-                <div className="border-t pt-6">
-                    <h3 className="text-sm font-medium text-foreground mb-4">Due Date Configuration</h3>
-                    
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label>
-                                Due Date Type
-                            </Label>
-                            <Select
-                                value={formData.dueDateType}
-                                onValueChange={(value) => setFormData(prev => ({ 
-                                    ...prev, 
-                                    dueDateType: value,
-                                    // Reset related fields when type changes
-                                    dueDateDays: value === 'fixed-days' ? prev.dueDateDays : 0,
-                                    dueDateWeeks: value === 'fixed-weeks' ? prev.dueDateWeeks || 1 : 0,
-                                    dueDatePrecise: value === 'precise-date' ? prev.dueDatePrecise || '' : ''
-                                }))}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select due date type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="fixed-days">Fixed days from invoice date</SelectItem>
-                                    <SelectItem value="fixed-weeks">Fixed weeks from invoice date</SelectItem>
-                                    <SelectItem value="precise-date">Precise date</SelectItem>
-                                    <SelectItem value="none">Don't show due date</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* Days input - only show for fixed-days type */}
-                        {formData.dueDateType === 'fixed-days' && (
+                    {formData.useSequentialNumbers && (
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>
-                                    Days Until Due
-                                </Label>
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    value={formData.dueDateDays}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, dueDateDays: parseIntegerInputWithFallback(e.target.value, 0, { min: 0 }) }))}
-                                    className="w-24"
-                                />
-                            </div>
-                        )}
-
-                        {/* Weeks input - only show for fixed-weeks type */}
-                        {formData.dueDateType === 'fixed-weeks' && (
-                            <div className="space-y-2">
-                                <Label>
-                                    Weeks Until Due
+                                    Starting Number
                                 </Label>
                                 <Input
                                     type="number"
                                     min="1"
-                                    value={formData.dueDateWeeks || 1}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, dueDateWeeks: parseIntegerInputWithFallback(e.target.value, 1, { min: 1 }) }))}
-                                    className="w-24"
+                                    value={formData.sequentialNumberStart}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberStart: parseIntegerInputWithFallback(e.target.value, 1, { min: 1 }) }))}
                                 />
                             </div>
-                        )}
 
-                        {/* Date picker - only show for precise-date type */}
-                        {formData.dueDateType === 'precise-date' && (
                             <div className="space-y-2">
                                 <Label>
-                                    Due Date
+                                    Number of Digits
                                 </Label>
-                                <NativeDateInput
-                                    value={formData.dueDatePrecise || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, dueDatePrecise: e.target.value }))}
-                                    className="w-48"
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    max="10"
+                                    value={formData.sequentialNumberDigits}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, sequentialNumberDigits: parseIntegerInputWithFallback(e.target.value, 4, { min: 1, max: 10 }) }))}
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                    Preview: {(formData.sequentialNumberStart).toString().padStart(formData.sequentialNumberDigits || 4, '0')}
+                                </p>
                             </div>
-                        )}
-
-                        {/* Preview - show for all types */}
-                        <div className="bg-muted border border-border rounded-md p-3">
-                            <p className="text-sm text-foreground">
-                                <strong>Preview:</strong> {formPreviewDueDate}
-                            </p>
                         </div>
+                    )}
+
+                    {formData.useSequentialNumbers && (
+                        <div className="flex items-center">
+                            <CustomCheckbox
+                                checked={formData.sequentialResetYearly}
+                                onChange={(checked) => setFormData(prev => ({ ...prev, sequentialResetYearly: checked }))}
+                                label="Reset sequential number yearly"
+                                labelClassName="block text-sm text-foreground"
+                            />
+                            <span className="ml-2 text-xs text-muted-foreground">
+                                (Restarts at starting number each new year)
+                            </span>
+                        </div>
+                    )}
+
+                    <div className="space-y-2 pt-2">
+                        <Label>
+                            Due Date Type
+                        </Label>
+                        <Select
+                            value={formData.dueDateType}
+                            onValueChange={(value) => setFormData(prev => ({ 
+                                ...prev, 
+                                dueDateType: value,
+                                // Reset related fields when type changes
+                                dueDateDays: value === 'fixed-days' ? prev.dueDateDays : 0,
+                                dueDateWeeks: value === 'fixed-weeks' ? prev.dueDateWeeks || 1 : 0,
+                                dueDatePrecise: value === 'precise-date' ? prev.dueDatePrecise || '' : ''
+                            }))}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select due date type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="fixed-days">Fixed days from invoice date</SelectItem>
+                                <SelectItem value="fixed-weeks">Fixed weeks from invoice date</SelectItem>
+                                <SelectItem value="precise-date">Precise date</SelectItem>
+                                <SelectItem value="none">Don't show due date</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Days input - only show for fixed-days type */}
+                    {formData.dueDateType === 'fixed-days' && (
+                        <div className="space-y-2">
+                            <Label>
+                                Days Until Due
+                            </Label>
+                            <Input
+                                type="number"
+                                min="0"
+                                value={formData.dueDateDays}
+                                onChange={(e) => setFormData(prev => ({ ...prev, dueDateDays: parseIntegerInputWithFallback(e.target.value, 0, { min: 0 }) }))}
+                                className="w-24"
+                            />
+                        </div>
+                    )}
+
+                    {/* Weeks input - only show for fixed-weeks type */}
+                    {formData.dueDateType === 'fixed-weeks' && (
+                        <div className="space-y-2">
+                            <Label>
+                                Weeks Until Due
+                            </Label>
+                            <Input
+                                type="number"
+                                min="1"
+                                value={formData.dueDateWeeks || 1}
+                                onChange={(e) => setFormData(prev => ({ ...prev, dueDateWeeks: parseIntegerInputWithFallback(e.target.value, 1, { min: 1 }) }))}
+                                className="w-24"
+                            />
+                        </div>
+                    )}
+
+                    {/* Date picker - only show for precise-date type */}
+                    {formData.dueDateType === 'precise-date' && (
+                        <div className="space-y-2">
+                            <Label>
+                                Due Date
+                            </Label>
+                            <NativeDateInput
+                                value={formData.dueDatePrecise || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, dueDatePrecise: e.target.value }))}
+                                className="w-48"
+                            />
+                        </div>
+                    )}
+
+                    {/* Preview - show for all types */}
+                    <div className="bg-muted border border-border rounded-md p-3">
+                        <p className="text-sm text-foreground">
+                            <strong>Preview:</strong> {formPreviewDueDate}
+                        </p>
                     </div>
                 </div>
             </form>

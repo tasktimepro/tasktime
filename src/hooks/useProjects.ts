@@ -6,10 +6,13 @@
 
 import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
+import { useYjs } from '@/contexts/YjsContext';
+import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import { toStorageDate } from '@/utils/dateUtils';
 import type { Project } from '@/stores/yjs/types';
 
 export function useProjects() {
+    const { store, isReady } = useYjs();
     const { items, isLoading, get, create, update, remove } = useYjsCollection<Project>(
         (store) => store.projects,
         { collectionName: 'projects' }
@@ -39,6 +42,16 @@ export function useProjects() {
         return items.filter(p => p.preferredClientId === clientId);
     }, [items]);
 
+    const deleteProject = useCallback((id: string) => {
+        const deleted = remove(id);
+
+        if (deleted && isReady) {
+            cleanupAttachmentsForEntity(store.plannerAttachments as any, id);
+        }
+
+        return deleted;
+    }, [remove, store, isReady]);
+
     return {
         // Data
         projects: items,
@@ -50,7 +63,7 @@ export function useProjects() {
         getProject: get,
         createProject: create,
         updateProject: update,
-        deleteProject: remove,
+        deleteProject,
         
         // Helpers
         archiveProject,

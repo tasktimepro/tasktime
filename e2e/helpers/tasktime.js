@@ -832,7 +832,7 @@ export async function createTrackedInvoice(page, {
     }
     await newTemplateButton.click();
 
-    const templateDialog = page.getByRole('dialog', { name: 'Create Invoice Template' });
+    const templateDialog = page.getByRole('dialog', { name: 'New Invoice Template' });
     await expect(templateDialog).toBeVisible();
     await templateDialog.locator('input').first().fill(templateName);
     await templateDialog.getByRole('button', { name: 'Create Template' }).click();

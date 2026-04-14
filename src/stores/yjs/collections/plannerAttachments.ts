@@ -6,7 +6,31 @@
 
 import * as Y from 'yjs';
 import type { PlannerAttachment } from '../types';
+import { readEntity } from '../entityUtils';
 import { generateId } from '@/utils/idUtils';
+
+/**
+ * Remove all planner attachments whose referenceId matches the given entity ID.
+ * Operates directly on the Y.Map, handling both Y.Map and plain-object storage formats.
+ */
+export function cleanupAttachmentsForEntity(
+    attachmentsMap: Y.Map<string, unknown>,
+    referenceId: string,
+): number {
+
+    const toDelete: string[] = [];
+
+    attachmentsMap.forEach((value, key) => {
+        const entity = readEntity<{ referenceId?: string }>(value);
+
+        if (entity?.referenceId === referenceId) {
+            toDelete.push(key);
+        }
+    });
+
+    toDelete.forEach((key) => attachmentsMap.delete(key));
+    return toDelete.length;
+}
 
 export interface PlannerAttachmentHelpers {
 

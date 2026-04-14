@@ -13,6 +13,7 @@ import type { Task } from '@/stores/yjs/types';
 import { getTodayString, toStorageDate } from '@/utils/dateUtils.ts';
 import { findNextRecurringDueDate, findPreviousRecurringDueDate, isRecurringTaskDueOnDate } from '@/utils/recurringUtils.ts';
 import { isRecurringCompletedOnDate, toggleRecurringCompletionDate } from '@/utils/recurringCompletionUtils.ts';
+import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import { collectEntities } from '@/stores/yjs/entityUtils';
 
 export interface UseTasksOptions {
@@ -128,6 +129,7 @@ export function useTasks(options: UseTasksOptions = {}) {
         const removedFromActive = remove(id);
 
         if (removedFromActive) {
+            cleanupAttachmentsForEntity(store.plannerAttachments as any, id);
             return true;
         }
 
@@ -142,10 +144,12 @@ export function useTasks(options: UseTasksOptions = {}) {
             return false;
         }
 
-        const removedFromArchive = archivedMap.delete(id);
+        const removedFromArchive = archivedMap.has(id);
+        archivedMap.delete(id);
 
         if (removedFromArchive) {
             markMeaningfulActivity();
+            cleanupAttachmentsForEntity(store.plannerAttachments as any, id);
             setArchivedLoaded(true);
             setArchivedTasks(collectEntities<Task>(archivedMap as any));
         }

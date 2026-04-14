@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon, PlusIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
+import { Send, Bell } from 'lucide-react';
 import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
@@ -16,6 +17,7 @@ import { getInvoiceStatus, getInvoiceStatusAfterMarkingUnpaid, getInvoiceTotal, 
 import Pagination from './Pagination';
 import Modal from './Modal';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
+import EmailPreviewModal from './invoice/EmailPreviewModal';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +40,8 @@ const InvoicesList = ({
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
     const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
+    const [emailInvoice, setEmailInvoice] = useState(null);
+    const [emailSendType, setEmailSendType] = useState('invoice');
     const { updateUrl } = useUrlState();
     
     // Yjs hook for invoice updates
@@ -174,6 +178,18 @@ const InvoicesList = ({
         setSelectedInvoice(invoice);
         setShowPreview(true);
     };
+
+    /**
+     * Open email preview modal for sending an invoice or reminder
+     */
+    const handleOpenEmailModal = useCallback((invoice, sendType = 'invoice') => {
+        setEmailInvoice(invoice);
+        setEmailSendType(sendType);
+    }, []);
+
+    const handleCloseEmailModal = useCallback(() => {
+        setEmailInvoice(null);
+    }, []);
 
     /**
      * Handle invoice edit
@@ -324,7 +340,7 @@ const InvoicesList = ({
                                                 {invoice.invoiceNumber}
                                             </h3>
                                         </div>
-                                        <div className={cn(isMobileLayout && 'w-full')}>
+                                        <div className={cn('flex flex-wrap gap-2', isMobileLayout && 'w-full')}>
                                             {invoiceIsPaid ? (
                                                 <Badge variant="success">
                                                     <CheckIcon className="h-3 w-3 mr-1" />
@@ -345,6 +361,13 @@ const InvoicesList = ({
                                                 <Badge variant="warning">
                                                     Outstanding <span className="mx-1">•</span>
                                                     <span className="sensitive-data">{invoiceTotal}</span>
+                                                </Badge>
+                                            )}
+
+                                            {invoice.sentAt && (
+                                                <Badge variant="outline" className="text-xs">
+                                                    <Send className="h-3 w-3 mr-1" />
+                                                    Sent
                                                 </Badge>
                                             )}
                                         </div>
@@ -462,6 +485,27 @@ const InvoicesList = ({
                                             </Button>
                                         )}
 
+                                        {/* Email actions: Send Invoice or Send Reminder */}
+                                        {!invoiceIsPaid && !invoice.sentAt && (
+                                            <Button
+                                                onClick={() => handleOpenEmailModal(invoice, 'invoice')}
+                                                variant="ghost"
+                                                size="icon"
+                                                title="Send Invoice by Email"
+                                            >
+                                                <Send className="h-5 w-5" />
+                                            </Button>
+                                        )}
+                                        {!invoiceIsPaid && invoice.sentAt && invoiceIsOverdue && (
+                                            <Button
+                                                onClick={() => handleOpenEmailModal(invoice, 'reminder')}
+                                                variant="ghost"
+                                                size="icon"
+                                                title="Send Payment Reminder"
+                                            >
+                                                <Bell className="h-5 w-5" />
+                                            </Button>
+                                        )}
                                         <Button
                                             onClick={() => handleEdit(invoice)}
                                             variant="ghost"
@@ -607,6 +651,22 @@ const InvoicesList = ({
 
             {/* Invoice Preview Modal */}
             {renderInvoicePreview()}
+
+            {/* Email Preview Modal */}
+            {emailInvoice && (
+                <EmailPreviewModal
+                    isOpen={!!emailInvoice}
+                    onClose={handleCloseEmailModal}
+                    invoice={emailInvoice}
+                    client={clients.find(c => c.id === emailInvoice.clientId)}
+                    businessInfo={emailInvoice.businessInfo?.id
+                        ? businessInfos.find(bi => bi.id === emailInvoice.businessInfo.id)
+                        : businessInfos.find(bi => bi.isDefault) || businessInfos[0]
+                    }
+                    clients={clients}
+                    sendType={emailSendType}
+                />
+            )}
 
             <Modal
                 isOpen={Boolean(pendingPaidEditInvoice)}

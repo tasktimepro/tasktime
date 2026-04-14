@@ -2,7 +2,7 @@
 
 ## Priority
 
-[x] Always scroll to top whenever navigating to a new page - noticed on phones especially
+[ ] 
 
 ---
 
@@ -19,8 +19,6 @@
 ---
 
 ## Ideas
-
-[ ] Ability to directly send invoice to client email address - Use https://resend.com/ free version (3000 free emails/mo)
 
 [ ] Add Logged Hours and Expenses sections in the dashboard at the bottom
     [ ] Logged Hours can have projects as filters but All is default

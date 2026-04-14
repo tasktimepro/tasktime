@@ -288,10 +288,10 @@ export class YjsDriveProvider {
                     await this.manifest.save();
                     this.log('connect: manifest saved');
                 }
-            } else {
-                // Backup & Manual: normally no network requests on connect.
-                // But on FIRST-EVER sync, check for existing remote data and pull it.
-                // This prevents a new device from pushing empty state and wiping remote data.
+            } else if (mode === 'backup') {
+                // Backup mode avoids background pulls after connect, but still
+                // performs a one-time remote check on connect so a fresh device
+                // doesn't overwrite existing Drive state with an empty local doc.
                 this.setState('syncing');
                 this.setPhase('checking');
 
@@ -331,6 +331,51 @@ export class YjsDriveProvider {
                     }
                 } else {
                     // No remote data — just subscribe to doc updates
+                    for (const docName of this.docManager.getLoadedDocs()) {
+                        this.subscribeToDoc(docName);
+                    }
+                }
+            } else {
+                // Manual mode still reconciles once on connect/reload so local
+                // state doesn't overwrite newer Drive data and offline edits can
+                // converge as soon as the session is restored.
+                this.setState('syncing');
+                this.setPhase('checking');
+
+                await this.manifest.load();
+                this.lastPullAt = Date.now();
+
+                const remoteManifest = this.manifest.getManifest();
+                const hasRemoteData = remoteManifest && Object.keys(remoteManifest.documents).length > 0;
+
+                this.promotePersistedLocalChangesToFullState(this.docManager.getLoadedDocs());
+
+                const shouldPushLocalChanges = this.hasLocalChangesToPush();
+
+                if (hasRemoteData) {
+                    this.log('connect: first-sync pull for manual mode');
+                    this.setPhase('downloading');
+
+                    for (const docName of this.docManager.getLoadedDocs()) {
+                        await this.syncDoc(docName, true);
+                        this.subscribeToDoc(docName);
+                    }
+
+                    if (this.manifest.isDirty()) {
+                        await this.manifest.save();
+                    }
+                } else if (shouldPushLocalChanges) {
+                    this.log('connect: first-sync push for local reconnect changes', { mode });
+
+                    for (const docName of this.docManager.getLoadedDocs()) {
+                        await this.syncDoc(docName, false);
+                        this.subscribeToDoc(docName);
+                    }
+
+                    if (this.manifest.isDirty()) {
+                        await this.manifest.save();
+                    }
+                } else {
                     for (const docName of this.docManager.getLoadedDocs()) {
                         this.subscribeToDoc(docName);
                     }

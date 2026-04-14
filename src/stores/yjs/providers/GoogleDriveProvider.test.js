@@ -26,7 +26,7 @@ function createProviderWithCoreDoc(coreDoc) {
 }
 
 describe('YjsDriveProvider', () => {
-    it('pushes queued reconnect changes during manual-mode connect when Drive is empty', async () => {
+    it('reconciles remote state on manual-mode connect', async () => {
         const liveDoc = new Y.Doc()
         liveDoc.getMap('projects').set('project-1', objectToYMap({
             id: 'project-1',
@@ -38,7 +38,7 @@ describe('YjsDriveProvider', () => {
         provider.isOnline = () => true
         provider.manifest = {
             load: vi.fn(async () => {}),
-            getManifest: vi.fn(() => ({ documents: {} })),
+            getManifest: vi.fn(() => ({ documents: { core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] } } })),
             isDirty: vi.fn(() => false),
             save: vi.fn(async () => {}),
         }
@@ -49,7 +49,8 @@ describe('YjsDriveProvider', () => {
 
         await provider.connect('manual')
 
-        expect(provider.syncDoc).toHaveBeenCalledWith('core', false)
+        expect(provider.manifest.load).toHaveBeenCalled()
+        expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
     })
 

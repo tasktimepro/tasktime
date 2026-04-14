@@ -577,6 +577,22 @@ describe('App component', () => {
         expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
     })
 
+    it('uses a full manual sync when tapping Sync changes on mobile', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        yjsHookState.isDriveConnected = true
+        yjsHookState.autoSyncEnabled = false
+        yjsHookState.pendingSyncChanges = true
+
+        render(<App />)
+
+        await userEvent.click(screen.getByRole('button', { name: 'Sync changes' }))
+
+        expect(yjsHookState.forceSyncDrive).toHaveBeenCalledTimes(1)
+        expect(yjsHookState.forceSyncDrive.mock.calls[0]).toEqual([])
+    })
+
     it('returns the mobile sync slot to More after the success linger', () => {
         vi.useFakeTimers()
 

@@ -6,9 +6,12 @@
 
 import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
+import { useYjs } from '@/contexts/YjsContext';
+import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import type { Client } from '@/stores/yjs/types';
 
 export function useClients() {
+    const { store, isReady } = useYjs();
     const { items, isLoading, get, create, update, remove } = useYjsCollection<Client>(
         (store) => store.clients,
         { collectionName: 'clients' }
@@ -26,6 +29,16 @@ export function useClients() {
         return items.find(c => (c.title || '').toLowerCase() === lower);
     }, [items]);
 
+    const deleteClient = useCallback((id: string) => {
+        const deleted = remove(id);
+
+        if (deleted && isReady) {
+            cleanupAttachmentsForEntity(store.plannerAttachments as any, id);
+        }
+
+        return deleted;
+    }, [remove, store, isReady]);
+
     return {
         // Data
         clients: items,
@@ -36,7 +49,7 @@ export function useClients() {
         getClient: get,
         createClient: create,
         updateClient: update,
-        deleteClient: remove,
+        deleteClient,
         
         // Helpers
         findByName,

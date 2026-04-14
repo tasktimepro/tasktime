@@ -6,6 +6,7 @@ import type {
     Client,
     DailyGoal,
     DocName,
+    EmailTemplate,
     Expense,
     ExpenseRecurrence,
     Invoice,
@@ -201,6 +202,8 @@ const invoiceSchema = z.object({
     paymentMethodId: optionalNullableIdSchema,
     currency: z.string().optional(),
     paidAt: finiteNumberSchema.nullable().optional(),
+    sentAt: finiteNumberSchema.nullable().optional(),
+    sentToEmail: z.string().nullable().optional(),
 }).passthrough() satisfies z.ZodType<Invoice>;
 
 const invoiceTemplateSchema = z.object({
@@ -214,6 +217,21 @@ const invoiceTemplateSchema = z.object({
     defaultDueDays: integerNumberSchema.optional(),
     isDefault: z.boolean().optional(),
 }).passthrough() satisfies z.ZodType<InvoiceTemplate>;
+
+const emailTemplateSchema = z.object({
+    id: nonEmptyStringSchema,
+    name: nonEmptyStringSchema,
+    type: z.literal('invoice'),
+    fromName: z.string().max(200).optional(),
+    replyTo: z.string().email().max(320).optional(),
+    subject: z.string().max(500),
+    sendBody: z.string().max(5000),
+    reminderBody: z.string().max(5000),
+    attachmentTitle: z.string().max(200),
+    isDefault: z.boolean().optional(),
+    createdAt: finiteNumberSchema.optional(),
+    updatedAt: finiteNumberSchema.optional(),
+}).passthrough() satisfies z.ZodType<EmailTemplate>;
 
 const paymentMethodSchema = z.object({
     id: nonEmptyStringSchema,
@@ -366,6 +384,7 @@ export const collectionSchemas = {
     businessInfos: businessInfoSchema,
     invoices: invoiceSchema,
     invoiceTemplates: invoiceTemplateSchema,
+    emailTemplates: emailTemplateSchema,
     paymentMethods: paymentMethodSchema,
     expenses: expenseSchema,
     expenseRecurrences: expenseRecurrenceSchema,
@@ -385,6 +404,7 @@ type ValidationSnapshot = {
     businessInfos: BusinessInfo[];
     invoices: Invoice[];
     invoiceTemplates: InvoiceTemplate[];
+    emailTemplates: EmailTemplate[];
     paymentMethods: PaymentMethod[];
     expenses: Expense[];
     expenseRecurrences: ExpenseRecurrence[];
@@ -460,6 +480,7 @@ function emptySnapshot(): ValidationSnapshot {
         businessInfos: [],
         invoices: [],
         invoiceTemplates: [],
+        emailTemplates: [],
         paymentMethods: [],
         expenses: [],
         expenseRecurrences: [],
@@ -500,6 +521,7 @@ function buildSnapshotFromDocs(docs: {
         snapshot.clients = collectValidatedEntities<Client>('clients', core.getMap('clients') as Y.Map<string, unknown>, 'core.clients');
         snapshot.businessInfos = collectValidatedEntities<BusinessInfo>('businessInfos', core.getMap('businessInfos') as Y.Map<string, unknown>, 'core.businessInfos');
         snapshot.invoiceTemplates = collectValidatedEntities<InvoiceTemplate>('invoiceTemplates', core.getMap('invoiceTemplates') as Y.Map<string, unknown>, 'core.invoiceTemplates');
+        snapshot.emailTemplates = collectValidatedEntities<EmailTemplate>('emailTemplates', core.getMap('emailTemplates') as Y.Map<string, unknown>, 'core.emailTemplates');
         snapshot.paymentMethods = collectValidatedEntities<PaymentMethod>('paymentMethods', core.getMap('paymentMethods') as Y.Map<string, unknown>, 'core.paymentMethods');
         snapshot.invoices = collectValidatedEntities<Invoice>('invoices', core.getMap('invoices') as Y.Map<string, unknown>, 'core.invoices');
         snapshot.expenses = collectValidatedEntities<Expense>('expenses', core.getMap('expenses') as Y.Map<string, unknown>, 'core.expenses');

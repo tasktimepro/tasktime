@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { renderHook, act } from '@testing-library/react'
 import { vi } from 'vitest'
+import * as Y from 'yjs'
 import { useBusinessInfos } from './useBusinessInfos'
 import { useClients } from './useClients'
 import { useInvoiceTemplates } from './useInvoiceTemplates'
@@ -9,6 +10,12 @@ import { useProjects } from './useProjects'
 import { useYjsCollection } from './useYjsCollection'
 
 vi.mock('./useYjsCollection', () => ({ useYjsCollection: vi.fn() }))
+vi.mock('@/contexts/YjsContext', () => ({
+    useYjs: () => ({
+        store: { plannerAttachments: new Y.Doc().getMap('plannerAttachments') },
+        isReady: true,
+    }),
+}))
 
 const mockUseYjsCollection = useYjsCollection
 
