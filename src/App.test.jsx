@@ -493,6 +493,44 @@ describe('App component', () => {
         expect(within(dialog).getByText(/Dark mode|Light mode/)).toBeInTheDocument()
     })
 
+    it('clears the previous mobile nav selection when More opens', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        urlHookState.urlParams = { view: 'projects', projectId: null, clientId: null }
+
+        render(<App />)
+
+        const projectsButton = screen.getByRole('button', { name: 'Projects' })
+        const moreButton = screen.getByRole('button', { name: 'More' })
+
+        expect(projectsButton.className.includes('text-muted-foreground')).toBe(false)
+        expect(moreButton.className.includes('text-muted-foreground')).toBe(true)
+
+        fireEvent.click(moreButton)
+
+        expect(projectsButton.className.includes('text-muted-foreground')).toBe(true)
+        expect(moreButton.className.includes('text-muted-foreground')).toBe(false)
+    })
+
+    it('navigates from the mobile dock while the More sheet is open', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        urlHookState.urlParams = { view: 'projects', projectId: null, clientId: null }
+
+        const user = userEvent.setup()
+        render(<App />)
+
+        await user.click(screen.getByRole('button', { name: 'More' }))
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Dashboard' }))
+
+        expect(urlHookState.navigateToDashboard).toHaveBeenCalledTimes(1)
+    })
+
     it('navigates through more-sheet destinations and closes the sheet on mobile', async () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,

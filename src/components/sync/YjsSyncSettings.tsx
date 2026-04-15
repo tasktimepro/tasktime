@@ -171,7 +171,7 @@ export default function YjsSyncSettings() {
         if (isManualMode) {
             return {
                 text: lastSyncedAt
-                    ? `Last manual sync ${formatDistance(lastSyncedAt, now, { addSuffix: true, includeSeconds: true })}`
+                    ? `Last sync ${formatDistance(lastSyncedAt, now, { addSuffix: true, includeSeconds: true })}`
                     : 'Connected (manual sync)',
                 tone: 'status-success-text-strong',
                 icon: CheckIcon

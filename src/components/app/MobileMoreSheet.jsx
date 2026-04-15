@@ -21,7 +21,7 @@ const MobileMoreSheet = ({
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
             <DialogContent
                 hideCloseButton
                 onOpenAutoFocus={handleOpenAutoFocus}

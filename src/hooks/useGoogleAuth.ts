@@ -75,6 +75,15 @@ if (!SYNC_WORKER_CONFIG.isEnabled) {
 const authSubscribers = new Set<() => void>();
 let forceReconnectState = false;
 
+// Module-level throttle for session validation. Repeated mounts within the
+// TTL window (e.g. More sheet open/close, tab switches) reuse the cached
+// result instead of hitting /auth/status every time. The Worker manages
+// token refresh server-side, so the client only needs a rare liveness check.
+const SESSION_VALIDATION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+let lastValidationTime = 0;
+let lastValidationResult = false;
+let lastValidationSessionId: string | null = null;
+
 const notifyAuthSubscribers = () => {
     authSubscribers.forEach(subscriber => {
         try {
@@ -200,6 +209,15 @@ export const useGoogleAuth = () => {
             return true;
         }
 
+        // Reuse the cached result when the same session was validated recently.
+        const now = Date.now();
+        if (
+            lastValidationSessionId === session.sessionId &&
+            now - lastValidationTime < SESSION_VALIDATION_TTL_MS
+        ) {
+            return lastValidationResult;
+        }
+
         try {
             const response = await fetch(SYNC_WORKER_CONFIG.endpoints.authStatus, {
                 method: 'GET',
@@ -210,11 +228,18 @@ export const useGoogleAuth = () => {
                 // 5xx or unexpected status: treat as transient server error.
                 // Only 2xx with authenticated:false means explicitly invalid.
                 if (response.status >= 500) return true;
+                lastValidationTime = now;
+                lastValidationResult = false;
+                lastValidationSessionId = session.sessionId;
                 return false;
             }
 
             const data = await response.json();
-            return data.authenticated === true;
+            const isValid = data.authenticated === true;
+            lastValidationTime = now;
+            lastValidationResult = isValid;
+            lastValidationSessionId = session.sessionId;
+            return isValid;
         } catch {
             // Network error (offline, DNS failure, Worker unreachable).
             // Optimistically keep the session; don't wipe credentials for
@@ -504,6 +529,14 @@ export const useGoogleAuth = () => {
         invalidateSession: invalidateStoredSession,
     };
 };
+
+/** Reset module-level caches. Test-only. */
+export function _resetValidationCache(): void {
+    lastValidationTime = 0;
+    lastValidationResult = false;
+    lastValidationSessionId = null;
+    forceReconnectState = false;
+}
 
 // ============================================
 // HELPER FUNCTIONS (for Worker OAuth popup flow)

@@ -1121,6 +1121,7 @@ function AppContent() {
 
     const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'account'].includes(activeView);
     const isMoreViewActive = ['clients', 'invoices', 'account'].includes(activeView);
+    const isMobilePrimarySelectionVisible = !isMoreMenuOpen;
     const mobileTopPadding = showGlobalTimer && timerIsActive ? '5.5rem' : '1rem';
     const mobileBottomPadding = '7rem';
     const desktopTopPadding = showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem';
@@ -1130,28 +1131,28 @@ function AppContent() {
             key: 'dashboard',
             label: 'Dashboard',
             Icon: LayoutDashboardIcon,
-            isActive: activeView === 'dashboard',
+            isActive: isMobilePrimarySelectionVisible && activeView === 'dashboard',
             onClick: () => navigateToDashboard(),
         },
         {
             key: 'planner',
             label: 'Planner',
             Icon: KanbanIcon,
-            isActive: activeView === 'planner',
+            isActive: isMobilePrimarySelectionVisible && activeView === 'planner',
             onClick: () => navigateToPlanner(),
         },
         {
             key: 'projects',
             label: 'Projects',
             Icon: ClipboardDocumentCheckIcon,
-            isActive: activeView === 'projects',
+            isActive: isMobilePrimarySelectionVisible && activeView === 'projects',
             onClick: () => navigateToProjects(),
         },
         {
             key: 'expenses',
             label: 'Expenses',
             Icon: HandCoinsIcon,
-            isActive: activeView === 'expenses',
+            isActive: isMobilePrimarySelectionVisible && activeView === 'expenses',
             onClick: () => navigateToExpenses(),
         },
     ];

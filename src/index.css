@@ -230,7 +230,7 @@ main,
     }
 
     .bottom-safe-nav {
-        bottom: calc(env(safe-area-inset-bottom) + 4.5rem);
+        bottom: calc(env(safe-area-inset-bottom) + 4.5rem) !important;
     }
 
     .max-h-safe-nav {

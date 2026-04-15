@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useGoogleAuth } from './useGoogleAuth'
+import { useGoogleAuth, _resetValidationCache } from './useGoogleAuth'
 import { getStoredSession, clearStoredSession } from '@/utils/googleAuthStorage'
 
 vi.mock('@/config/google', () => ({
@@ -39,6 +39,7 @@ describe('useGoogleAuth', () => {
     beforeEach(() => {
         vi.restoreAllMocks()
         vi.clearAllMocks()
+        _resetValidationCache()
         window.sessionStorage.clear()
         vi.stubGlobal('fetch', vi.fn())
         vi.spyOn(window, 'open').mockImplementation(() => createPopupStub())
@@ -410,6 +411,42 @@ describe('useGoogleAuth', () => {
         expect(result.current.sessionId).toBeNull()
         expect(result.current.hadPreviousSession).toBe(true)
         expect(clearStoredSession).toHaveBeenCalledTimes(1)
+        expect(fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not re-fetch auth status when remounting within the throttle window', async () => {
+        const storedSession = {
+            sessionId: 'session-throttle',
+            userId: 'user-throttle',
+            email: 'throttle@example.com',
+            createdAt: new Date().toISOString(),
+        }
+
+        getStoredSession.mockResolvedValue(storedSession)
+
+        fetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({ authenticated: true }),
+        })
+
+        const { result, unmount } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(fetch).toHaveBeenCalledTimes(1)
+
+        unmount()
+
+        const { result: result2 } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result2.current.isLoading).toBe(false)
+        })
+
+        expect(result2.current.isSignedIn).toBe(true)
         expect(fetch).toHaveBeenCalledTimes(1)
     })
 })
