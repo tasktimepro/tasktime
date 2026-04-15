@@ -66,7 +66,6 @@ const MOBILE_SYNC_VISIBLE_KINDS = new Set([
     SYNC_STATUS_KIND.DOWNLOADING,
     SYNC_STATUS_KIND.UPLOADING,
     SYNC_STATUS_KIND.SYNCING,
-    SYNC_STATUS_KIND.PENDING,
     SYNC_STATUS_KIND.SYNCED,
 ]);
 const ONBOARDING_SEED_TASK_TITLE = 'Create my first project';
@@ -812,7 +811,8 @@ function AppContent() {
             mobileSyncFadeTimeoutRef.current = null;
         }
 
-        const shouldRenderMobileSyncButton = MOBILE_SYNC_VISIBLE_KINDS.has(mobileSyncStatus.kind);
+        const isManualConnecting = !autoSyncEnabled && mobileSyncStatus.kind === SYNC_STATUS_KIND.CONNECTING;
+        const shouldRenderMobileSyncButton = MOBILE_SYNC_VISIBLE_KINDS.has(mobileSyncStatus.kind) && !isManualConnecting;
 
         if (!shouldRenderMobileSyncButton) {
             setShowMobileSyncButton(false);
@@ -838,7 +838,7 @@ function AppContent() {
                 setIsMobileSyncButtonFadingOut(false);
             }, MOBILE_SYNC_FADE_DURATION_MS);
         }, MOBILE_SYNC_SUCCESS_VISIBILITY_MS);
-    }, [mobileSyncStatus.kind, showMobileSyncButton]);
+    }, [autoSyncEnabled, mobileSyncStatus.kind, showMobileSyncButton]);
 
     useEffect(() => {
         return () => {
@@ -912,8 +912,22 @@ function AppContent() {
             };
         }
 
+        if (mobileSyncStatus.kind === SYNC_STATUS_KIND.PENDING) {
+            return {
+                description: 'Changes waiting to sync. Open More to review.',
+                toneClassName: 'status-warning-fill',
+            };
+        }
+
+        if (!autoSyncEnabled && mobileSyncStatus.kind === SYNC_STATUS_KIND.CONNECTING) {
+            return {
+                description: 'Connecting to Google Drive...',
+                toneClassName: 'status-warning-fill',
+            };
+        }
+
         return null;
-    }, [authLoading, hadPreviousSession, isSignedIn, mobileSyncStatus.kind, showMobileSyncButton]);
+    }, [authLoading, autoSyncEnabled, hadPreviousSession, isSignedIn, mobileSyncStatus.kind, showMobileSyncButton]);
     
     const activeView = urlParams.view;
     const hasPersistedWorkspaceData = (

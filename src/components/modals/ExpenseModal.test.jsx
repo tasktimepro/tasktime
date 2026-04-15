@@ -12,6 +12,7 @@ const toastMocks = vi.hoisted(() => ({
 
 const expensesMocks = vi.hoisted(() => ({
 
+    expenses: [],
     createExpense: vi.fn(),
     updateExpense: vi.fn(),
     deleteExpense: vi.fn()
@@ -64,6 +65,7 @@ vi.mock('../../hooks/useToast.ts', () => ({
 vi.mock('../../hooks/useExpenses.ts', () => ({
 
     useExpenses: () => ({
+        expenses: expensesMocks.expenses,
         createExpense: expensesMocks.createExpense,
         updateExpense: expensesMocks.updateExpense,
         deleteExpense: expensesMocks.deleteExpense
@@ -122,6 +124,7 @@ describe('ExpenseModal', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        expensesMocks.expenses = []
         recurrencesMocks.createRecurrence.mockImplementation((data) => ({ id: 'r1', ...data }))
         clientsMocks.clients = []
         projectsMocks.projects = []
@@ -365,6 +368,79 @@ describe('ExpenseModal', () => {
         expect(currencyRow).not.toBeNull()
         expect(currencyRow).toBe(supplierRow)
         expect(currencyRow.className).toContain('grid-cols-2')
+    })
+
+    it('shows recent title suggestions on focus and prefers the best typed match first', async () => {
+        const user = userEvent.setup()
+
+        expensesMocks.expenses = [
+            { id: 'expense-1', title: 'Printer ink', supplierName: 'Paper Depot', date: '2026-02-01', updatedAt: 1706745600000 },
+            { id: 'expense-2', title: 'Office supplies', supplierName: 'Stationery Hub', date: '2026-03-01', updatedAt: 1709251200000 },
+            { id: 'expense-3', title: 'Printer paper', supplierName: 'Paper Depot', date: '2026-04-01', updatedAt: 1711929600000 }
+        ]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        const titleInput = screen.getByLabelText(/Title/i)
+
+        await user.click(titleInput)
+
+        const titleSuggestionList = screen.getByRole('listbox', { name: 'Recent expense titles' }).parentElement
+
+        const titleOptions = screen.getAllByRole('option', { name: /Printer|Office/i })
+
+        expect(titleSuggestionList).not.toBeNull()
+        expect(titleSuggestionList.className).toContain('max-h-60')
+        expect(titleSuggestionList.className).toContain('overflow-y-auto')
+
+        expect(titleOptions.map((option) => option.textContent)).toEqual([
+            'Printer paper',
+            'Office supplies',
+            'Printer ink'
+        ])
+
+        await user.type(titleInput, 'print')
+
+        const filteredTitleOptions = screen.getAllByRole('option', { name: /Printer/i })
+
+        expect(filteredTitleOptions.map((option) => option.textContent)).toEqual([
+            'Printer paper',
+            'Printer ink'
+        ])
+    })
+
+    it('shows recent supplier suggestions on focus and applies a clicked suggestion', async () => {
+        const user = userEvent.setup()
+
+        expensesMocks.expenses = [
+            { id: 'expense-1', title: 'Printer ink', supplierName: 'Alpha Office', date: '2026-02-01', updatedAt: 1706745600000 },
+            { id: 'expense-2', title: 'Office supplies', supplierName: 'Acme Supplies', date: '2026-03-01', updatedAt: 1709251200000 },
+            { id: 'expense-3', title: 'Printer paper', supplierName: 'Acme Print', date: '2026-04-01', updatedAt: 1711929600000 }
+        ]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        const supplierInput = screen.getByLabelText('Supplier / Business')
+
+        await user.click(supplierInput)
+
+        const supplierOptions = screen.getAllByRole('option', { name: /Acme|Alpha/i })
+
+        expect(supplierOptions.map((option) => option.textContent)).toEqual([
+            'Acme Print',
+            'Acme Supplies',
+            'Alpha Office'
+        ])
+
+        await user.type(supplierInput, 'acme s')
+
+        const bestSupplierMatch = screen.getAllByRole('option', { name: /Acme/i })
+
+        expect(bestSupplierMatch[0].textContent).toBe('Acme Supplies')
+
+        await user.click(bestSupplierMatch[0])
+
+        expect(supplierInput).toHaveValue('Acme Supplies')
     })
 
     it('locks a personal project context and keeps the expense personal', () => {

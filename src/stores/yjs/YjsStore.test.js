@@ -114,7 +114,7 @@ describe('YjsStore reconnect sync tracking', () => {
         store.destroy()
     })
 
-    it('clears disconnected dirty docs after manual-mode reconnect sync', async () => {
+    it('keeps disconnected dirty docs queued after manual-mode reconnect', async () => {
         const store = new YjsStore()
         await store.initialize()
 
@@ -132,9 +132,9 @@ describe('YjsStore reconnect sync tracking', () => {
 
         const provider = providerInstances[0]
 
-        // Dirty docs are handed to provider and reconciled on reconnect
+        // Dirty docs are handed to provider but stay queued until a manual sync
         expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(['core'])
-        expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['core'])
 
         store.destroy()
     })

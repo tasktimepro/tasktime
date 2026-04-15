@@ -666,6 +666,8 @@ export async function syncNowFromAccount(page) {
     await expect(syncNowButton).toBeVisible();
     await expect(syncNowButton).toBeEnabled({ timeout: 20000 });
     await syncNowButton.click();
+    await expect(page.getByText('Synced successfully')).toBeVisible({ timeout: 20000 });
+    await expect(syncNowButton).toBeEnabled({ timeout: 20000 });
 }
 
 export async function disconnectDriveFromAccount(page) {

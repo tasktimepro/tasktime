@@ -577,7 +577,20 @@ describe('App component', () => {
         expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
     })
 
-    it('uses a full manual sync when tapping Sync changes on mobile', async () => {
+    it('shows a warning dot instead of sync button during connecting in manual mode on mobile', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        yjsHookState.isConnecting = true
+        yjsHookState.autoSyncEnabled = false
+
+        render(<App />)
+
+        expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
+        expect(screen.getByTestId('mobile-more-status-dot').className.includes('status-warning-fill')).toBe(true)
+    })
+
+    it('shows a warning dot on More when there are pending sync changes on mobile', () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
         })
@@ -587,10 +600,8 @@ describe('App component', () => {
 
         render(<App />)
 
-        await userEvent.click(screen.getByRole('button', { name: 'Sync changes' }))
-
-        expect(yjsHookState.forceSyncDrive).toHaveBeenCalledTimes(1)
-        expect(yjsHookState.forceSyncDrive.mock.calls[0]).toEqual([])
+        expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
+        expect(screen.getByTestId('mobile-more-status-dot').className.includes('status-warning-fill')).toBe(true)
     })
 
     it('returns the mobile sync slot to More after the success linger', () => {

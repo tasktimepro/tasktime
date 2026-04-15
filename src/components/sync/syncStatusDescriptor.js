@@ -159,6 +159,18 @@ export function getYjsSyncStatusDescriptor({
         };
     }
 
+    if (isManualMode) {
+        return {
+            kind: SYNC_STATUS_KIND.SYNCED,
+            text: 'Connected',
+            icon: CloudCheckIcon,
+            tone: 'status-success-text-strong',
+            onClick: onCloudOptions,
+            hoverIcon: CloudCogIcon,
+            hoverText: 'Cloud Options',
+        };
+    }
+
     if (isSyncing) {
         return {
             kind: SYNC_STATUS_KIND.SYNCING,

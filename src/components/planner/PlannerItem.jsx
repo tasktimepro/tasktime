@@ -220,7 +220,7 @@ const PlannerItem = ({
             }}
             title={progressTooltip}
             className={cn(
-                'group/item relative overflow-hidden rounded-md border p-2 transition-all',
+                'group/item relative overflow-hidden rounded-md border p-2 transition-shadow',
                 isClickable ? "cursor-pointer" : "cursor-default",
                 isMobileLayout ? 'flex items-start' : 'flex items-center',
                 "hover:shadow-sm",

@@ -17,6 +17,7 @@ declare module 'yjs' {
     }
 
     export class Map<K = string, V = unknown> {
+        readonly size: number;
         get(key: K): V | undefined;
         set(key: K, value: V): V;
         delete(key: K): boolean;

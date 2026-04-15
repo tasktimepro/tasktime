@@ -40,7 +40,7 @@ export default function YjsSyncSettings() {
     const [restoreConfirmBackup, setRestoreConfirmBackup] = useState<BackupInfo | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
 
-    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, forceSyncDrive, disconnectDrive, wipeDriveData, listBackups, createBackup, downloadBackup } = useYjs();
+    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, pendingSyncChanges, forceSyncDrive, disconnectDrive, wipeDriveData, listBackups, createBackup, downloadBackup } = useYjs();
     const { isSignedIn, isLoading: authLoading, user, signIn, signOut, hadPreviousSession } = useGoogleAuth();
     const { preferences, updatePreferences } = usePreferences();
     const { showSuccess, showError } = useToast();
@@ -51,6 +51,7 @@ export default function YjsSyncSettings() {
     const autoSyncMode = preferences.autoSyncMode ?? 'backup';
     const backupEnabled = preferences.backupEnabled ?? true;
     const backupFrequencyHours = preferences.backupFrequencyHours ?? 24;
+    const isManualMode = !autoSyncEnabled;
 
     // Update "time ago" display
     useEffect(() => {
@@ -159,6 +160,24 @@ export default function YjsSyncSettings() {
             };
         }
 
+        if (isManualMode && pendingSyncChanges) {
+            return {
+                text: 'Changes waiting for manual sync',
+                tone: 'status-warning-text-strong',
+                icon: CloudUploadIcon,
+            };
+        }
+
+        if (isManualMode) {
+            return {
+                text: lastSyncedAt
+                    ? `Last manual sync ${formatDistance(lastSyncedAt, now, { addSuffix: true, includeSeconds: true })}`
+                    : 'Connected (manual sync)',
+                tone: 'status-success-text-strong',
+                icon: CheckIcon
+            };
+        }
+
         return {
             text: lastSyncedAt
                 ? `Synced ${formatDistance(lastSyncedAt, now, { addSuffix: true, includeSeconds: true })}`
@@ -166,7 +185,7 @@ export default function YjsSyncSettings() {
             tone: 'status-success-text-strong',
             icon: CheckIcon
         };
-    }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now]);
+    }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now, isManualMode, pendingSyncChanges]);
 
     const handleConnect = async () => {
         try {

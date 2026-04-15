@@ -171,14 +171,14 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 | **Tab focus** | No auto-sync | Push pending local changes only | Full pull+push (60s cooldown) |
 | **Network online** | No auto-sync | Push pending local changes only | Full pull+push (60s cooldown) |
 | **Periodic interval** | None | None | Every 15 minutes (pull+push) |
-| **Page reload** | Full pull+push on connect | Full pull+push on connect | Full pull+push on connect |
+| **Page reload** | Connect only (no sync) | Full pull+push on connect | Full pull+push on connect |
 | **"Sync Now" button** | Full pull+push (force) | Full pull+push (force) | Full pull+push (force) |
-| **Reconnect after disconnect** | Push dirty docs on connect | Push dirty docs on connect | Push dirty docs on connect |
+| **Reconnect after disconnect** | Connect only (no sync) | Push dirty docs on connect | Push dirty docs on connect |
 
 **Key rules:**
 - **Backup = push-only by default.** No automatic pulling of remote changes. Users must click "Sync Now" or reload to get remote changes.
 - **Sync = full bidirectional.** Pulls + pushes on all triggers with cooldowns.
-- **Manual = user-controlled.** Only "Sync Now" and page reload trigger sync.
+- **Manual = user-controlled.** Only "Sync Now" triggers sync. Page reload and reconnect only establish the Drive connection without pulling or pushing.
 - **Pull efficiency:** Before downloading, a lightweight `modifiedTime` metadata check determines if the manifest changed. No download if unchanged.
 - **Pull throttle:** 30 seconds — skips manifest reload if no local changes and last pull was recent.
 - **Cross-tab lock:** Web Locks API prevents duplicate syncs across tabs.

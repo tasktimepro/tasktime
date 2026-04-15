@@ -26,7 +26,7 @@ function createProviderWithCoreDoc(coreDoc) {
 }
 
 describe('YjsDriveProvider', () => {
-    it('reconciles remote state on manual-mode connect', async () => {
+    it('only establishes the connection without syncing on manual-mode connect', async () => {
         const liveDoc = new Y.Doc()
         liveDoc.getMap('projects').set('project-1', objectToYMap({
             id: 'project-1',
@@ -50,7 +50,7 @@ describe('YjsDriveProvider', () => {
         await provider.connect('manual')
 
         expect(provider.manifest.load).toHaveBeenCalled()
-        expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
+        expect(provider.syncDoc).not.toHaveBeenCalled()
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
     })
 

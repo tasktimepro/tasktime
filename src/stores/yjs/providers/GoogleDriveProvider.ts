@@ -336,49 +336,19 @@ export class YjsDriveProvider {
                     }
                 }
             } else {
-                // Manual mode still reconciles once on connect/reload so local
-                // state doesn't overwrite newer Drive data and offline edits can
-                // converge as soon as the session is restored.
+                // Manual mode only establishes the connection and verifies
+                // Drive access. Pulling and pushing stay explicit so manual
+                // mode remains fully user-controlled even after reloads or
+                // reconnects.
                 this.setState('syncing');
                 this.setPhase('checking');
 
                 await this.manifest.load();
-                this.lastPullAt = Date.now();
-
-                const remoteManifest = this.manifest.getManifest();
-                const hasRemoteData = remoteManifest && Object.keys(remoteManifest.documents).length > 0;
 
                 this.promotePersistedLocalChangesToFullState(this.docManager.getLoadedDocs());
 
-                const shouldPushLocalChanges = this.hasLocalChangesToPush();
-
-                if (hasRemoteData) {
-                    this.log('connect: first-sync pull for manual mode');
-                    this.setPhase('downloading');
-
-                    for (const docName of this.docManager.getLoadedDocs()) {
-                        await this.syncDoc(docName, true);
-                        this.subscribeToDoc(docName);
-                    }
-
-                    if (this.manifest.isDirty()) {
-                        await this.manifest.save();
-                    }
-                } else if (shouldPushLocalChanges) {
-                    this.log('connect: first-sync push for local reconnect changes', { mode });
-
-                    for (const docName of this.docManager.getLoadedDocs()) {
-                        await this.syncDoc(docName, false);
-                        this.subscribeToDoc(docName);
-                    }
-
-                    if (this.manifest.isDirty()) {
-                        await this.manifest.save();
-                    }
-                } else {
-                    for (const docName of this.docManager.getLoadedDocs()) {
-                        this.subscribeToDoc(docName);
-                    }
+                for (const docName of this.docManager.getLoadedDocs()) {
+                    this.subscribeToDoc(docName);
                 }
             }
 

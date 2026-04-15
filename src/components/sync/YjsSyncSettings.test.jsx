@@ -12,6 +12,8 @@ const yjsSyncSettingsMocks = vi.hoisted(() => ({
     isSignedIn: false,
     isMobileLayout: false,
     user: null,
+    pendingSyncChanges: false,
+    lastSyncedAt: null,
     forceSyncDrive: vi.fn(),
     disconnectDrive: vi.fn(),
     signOut: vi.fn(),
@@ -29,7 +31,8 @@ vi.mock('@/contexts/YjsContext', () => ({
         isConnecting: false,
         hasSynced: false,
         manualSyncInProgress: false,
-        lastSyncedAt: null,
+        lastSyncedAt: yjsSyncSettingsMocks.lastSyncedAt,
+        pendingSyncChanges: yjsSyncSettingsMocks.pendingSyncChanges,
         forceSyncDrive: yjsSyncSettingsMocks.forceSyncDrive,
         disconnectDrive: yjsSyncSettingsMocks.disconnectDrive,
         wipeDriveData: vi.fn(),
@@ -75,6 +78,8 @@ describe('YjsSyncSettings', () => {
         yjsSyncSettingsMocks.isSignedIn = false
         yjsSyncSettingsMocks.isMobileLayout = false
         yjsSyncSettingsMocks.user = null
+        yjsSyncSettingsMocks.pendingSyncChanges = false
+        yjsSyncSettingsMocks.lastSyncedAt = null
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     })
 
@@ -103,5 +108,26 @@ describe('YjsSyncSettings', () => {
 
         expect(screen.getByRole('button', { name: 'Disconnect' }).className.includes('flex-1')).toBe(true)
         expect(screen.getByRole('button', { name: 'Sync Now' }).className.includes('flex-1')).toBe(true)
+    })
+
+    it('shows manual-mode connected wording before the first manual sync', () => {
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.getByText('Connected (manual sync)')).toBeInTheDocument()
+    })
+
+    it('shows waiting manual-sync wording when local changes are pending', () => {
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+        yjsSyncSettingsMocks.pendingSyncChanges = true
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.getByText('Changes waiting for manual sync')).toBeInTheDocument()
     })
 })

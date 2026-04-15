@@ -43,7 +43,7 @@ import type {
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const DISCONNECTED_DIRTY_DOCS_STORAGE_KEY = 'tasktime-disconnected-dirty-docs';
 
-type DocUpdateHandler = (update: Uint8Array, origin: unknown) => void;
+type DocUpdateHandler = (...args: unknown[]) => void;
 
 export class YjsStore {
 
@@ -754,9 +754,10 @@ export class YjsStore {
 
         await this.driveProvider.connect(this.driveSyncMode);
 
-        // Clear disconnected dirty docs after a successful online reconnect.
-        // Offline reconnects stay queued until a real sync occurs.
-        if ((this.driveProvider.getState?.() ?? 'idle') !== 'offline') {
+        // Clear disconnected dirty docs after a successful online reconnect
+        // only when connect() actually reconciled them. Manual mode keeps
+        // those docs queued until the user explicitly clicks Sync Now.
+        if (this.driveSyncMode !== 'manual' && (this.driveProvider.getState?.() ?? 'idle') !== 'offline') {
             this.clearDisconnectedDirtyDocs(
                 disconnectedDirtyDocs.filter((docName) => this.docManager.isLoaded(docName)),
             );

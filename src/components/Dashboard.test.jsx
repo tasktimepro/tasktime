@@ -9,10 +9,16 @@ const {
     mockShowSuccess,
     mockUseCurrencyConversion,
     mockUseTasks,
+    mockTimeEntries,
+    mockExpenses,
+    mockRecurrences,
 } = vi.hoisted(() => ({
     mockShowWarning: vi.fn(),
     mockShowSuccess: vi.fn(),
     mockUseCurrencyConversion: vi.fn(),
+    mockTimeEntries: [],
+    mockExpenses: [],
+    mockRecurrences: [],
     mockUseTasks: vi.fn(() => ({
         activeTasks: [],
         archivedTasks: [],
@@ -61,7 +67,7 @@ vi.mock('../hooks/useTasks', () => ({
 
 vi.mock('../hooks/useTimeEntries', () => ({
     useTimeEntries: () => ({
-        entries: [],
+        entries: mockTimeEntries,
         createEntry: vi.fn(),
         deleteEntry: vi.fn(),
     }),
@@ -76,13 +82,13 @@ vi.mock('../hooks/useTimers', () => ({
 
 vi.mock('../hooks/useExpenses', () => ({
     useExpenses: () => ({
-        expenses: [],
+        expenses: mockExpenses,
     }),
 }));
 
 vi.mock('../hooks/useExpenseRecurrences', () => ({
     useExpenseRecurrences: () => ({
-        recurrences: [],
+        recurrences: mockRecurrences,
     }),
 }));
 
@@ -158,6 +164,9 @@ describe('Dashboard', () => {
         mockShowWarning.mockReset();
         mockShowSuccess.mockReset();
         mockUseTasks.mockClear();
+        mockTimeEntries.length = 0;
+        mockExpenses.length = 0;
+        mockRecurrences.length = 0;
         mockUseCurrencyConversion.mockReturnValue({
             preferredCurrency: 'USD',
             exchangeRates: null,
@@ -183,11 +192,7 @@ describe('Dashboard', () => {
         />
     );
 
-    it('renders reports overview before recent sections on mobile', () => {
-        window.matchMedia = createMatchMedia({
-            '(max-width: 767px)': true,
-        });
-
+    it('renders reports overview before deferred sections', () => {
         renderDashboard();
 
         const todo = screen.getByTestId('todo-today');
@@ -198,20 +203,94 @@ describe('Dashboard', () => {
         expect(metrics.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('keeps reports overview after recent sections on desktop', () => {
-        renderDashboard();
-
-        const recent = screen.getByTestId('recent-tasks');
-        const metrics = screen.getByTestId('metrics-cards');
-
-        expect(recent.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    });
-
     it('passes the default dashboard filters to the overview cards', () => {
         renderDashboard();
 
         expect(screen.getByTestId('recent-tasks').textContent).toContain('recent');
         expect(screen.getByTestId('projects-overview').textContent).toContain('recent');
+        expect(screen.getByText('No paid expenses in the last 30 days')).toBeInTheDocument();
+        expect(screen.getByText('No time entries in the last 30 days')).toBeInTheDocument();
+    });
+
+    it('shows only items inside the 30-day dashboard window by default', () => {
+        mockUseTasks.mockReturnValue({
+            activeTasks: [
+                { id: 'task-1', title: 'Design sprint', projectId: 'project-1' },
+                { id: 'task-2', title: 'Invoice review', projectId: 'project-2' },
+                { id: 'task-3', title: 'Old discovery', projectId: 'project-1' },
+                { id: 'task-4', title: 'Sprint retro', projectId: 'project-1' },
+                { id: 'task-5', title: 'Client handoff', projectId: 'project-2' },
+                { id: 'task-6', title: 'Bug bash', projectId: 'project-1' },
+                { id: 'task-7', title: 'Status review', projectId: 'project-2' },
+                { id: 'task-8', title: 'Invoice follow-up', projectId: 'project-1' },
+            ],
+            archivedTasks: [],
+            updateTask: vi.fn(),
+            deleteTask: vi.fn(),
+            archiveTask: vi.fn(),
+            getOverdueTasks: vi.fn(() => []),
+            getTasksForToday: vi.fn(() => []),
+            getUpcomingTasks: vi.fn(() => []),
+            toggleRecurringCompletion: vi.fn(),
+            isCompletedOnDate: vi.fn(() => false),
+            resetExpiredSkips: vi.fn(),
+            isLoading: false,
+            archivedLoading: false,
+            archivedLoaded: true,
+            getRecurringStatus: vi.fn(() => ({
+                effectiveDateStr: null,
+                isDueToday: false,
+                isOverdue: false,
+                lastDueDateStr: null,
+            })),
+        });
+        mockTimeEntries.push(
+            { id: 'entry-1', taskId: 'task-1', start: Date.parse('2026-03-20T09:00:00.000Z'), end: Date.parse('2026-03-20T10:00:00.000Z') },
+            { id: 'entry-2', taskId: 'task-2', start: Date.parse('2026-03-21T09:00:00.000Z'), end: Date.parse('2026-03-21T09:30:00.000Z') },
+            { id: 'entry-3', taskId: 'task-3', start: Date.parse('2026-02-10T09:00:00.000Z'), end: Date.parse('2026-02-10T10:00:00.000Z') },
+            { id: 'entry-4', taskId: 'task-4', start: Date.parse('2026-03-22T09:00:00.000Z'), end: Date.parse('2026-03-22T10:00:00.000Z') },
+            { id: 'entry-5', taskId: 'task-5', start: Date.parse('2026-03-23T09:00:00.000Z'), end: Date.parse('2026-03-23T10:00:00.000Z') },
+            { id: 'entry-6', taskId: 'task-6', start: Date.parse('2026-03-24T09:00:00.000Z'), end: Date.parse('2026-03-24T10:00:00.000Z') },
+            { id: 'entry-7', taskId: 'task-7', start: Date.parse('2026-03-18T09:00:00.000Z'), end: Date.parse('2026-03-18T10:00:00.000Z') },
+            { id: 'entry-8', taskId: 'task-8', start: Date.parse('2026-03-19T09:00:00.000Z'), end: Date.parse('2026-03-19T10:00:00.000Z') },
+        );
+        mockExpenses.push(
+            { id: 'expense-paid', title: 'Hosting', amount: 24, currency: 'USD', date: '2026-03-10', paymentStatus: 'paid', amountType: 'fixed' },
+            { id: 'expense-old', title: 'Legacy software', amount: 49, currency: 'USD', date: '2026-02-15', paymentStatus: 'paid', amountType: 'fixed' },
+            { id: 'expense-2', title: 'Domain renewal', amount: 18, currency: 'USD', date: '2026-03-12', paymentStatus: 'paid', amountType: 'fixed' },
+            { id: 'expense-3', title: 'Design assets', amount: 35, currency: 'USD', date: '2026-03-13', paymentStatus: 'paid', amountType: 'fixed' },
+            { id: 'expense-4', title: 'Cloud backups', amount: 12, currency: 'USD', date: '2026-03-14', paymentStatus: 'paid', amountType: 'fixed' },
+            { id: 'expense-5', title: 'Monitoring', amount: 22, currency: 'USD', date: '2026-03-15', paymentStatus: 'paid', amountType: 'fixed' },
+            { id: 'expense-6', title: 'Support seat', amount: 16, currency: 'USD', date: '2026-03-16', paymentStatus: 'paid', amountType: 'fixed' },
+            { id: 'expense-7', title: 'Email delivery', amount: 11, currency: 'USD', date: '2026-03-17', paymentStatus: 'paid', amountType: 'fixed' },
+            { id: 'expense-upcoming', title: 'Office rent', amount: 900, currency: 'USD', date: '2026-04-28', paymentStatus: 'unpaid', amountType: 'fixed' },
+        );
+
+        render(
+            <Dashboard
+                projects={[
+                    { id: 'project-1', title: 'Alpha Project' },
+                    { id: 'project-2', title: 'Beta Project' },
+                ]}
+                invoices={[]}
+                clients={[]}
+                navigateToProject={vi.fn()}
+                navigateToClient={vi.fn()}
+                navigateToInvoices={vi.fn()}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('Design sprint')).toBeInTheDocument();
+        expect(screen.getByText('Invoice review')).toBeInTheDocument();
+        expect(screen.getByText('Invoice follow-up')).toBeInTheDocument();
+        expect(screen.getByText('Hosting')).toBeInTheDocument();
+        expect(screen.getByText('Email delivery')).toBeInTheDocument();
+        expect(screen.queryByText('Old discovery')).not.toBeInTheDocument();
+        expect(screen.queryByText('Legacy software')).not.toBeInTheDocument();
+        expect(screen.queryByText('Office rent')).not.toBeInTheDocument();
     });
 
     it('preloads archived tasks for the dashboard filters', () => {

@@ -143,6 +143,19 @@ describe('getYjsSyncStatusDescriptor', () => {
         expect(result.kind).toBe(SYNC_STATUS_KIND.PENDING)
     })
 
+    it('returns CONNECTED wording for manual mode without pending changes', () => {
+        const result = getYjsSyncStatusDescriptor({
+            ...baseArgs,
+            autoSyncEnabled: false,
+            pendingSyncChanges: false,
+            isSyncing: false,
+            hasSynced: false,
+        })
+
+        expect(result.kind).toBe(SYNC_STATUS_KIND.SYNCED)
+        expect(result.text).toBe('Connected')
+    })
+
     it('returns DISCONNECTED when not connected', () => {
         const result = getYjsSyncStatusDescriptor({
             ...baseArgs,

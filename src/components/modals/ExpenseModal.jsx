@@ -31,6 +31,118 @@ const NO_PROJECT_VALUE = 'no-project';
 const NO_BUSINESS_VALUE = 'no-business';
 const DEFAULT_REPEAT = 'monthly';
 const DEFAULT_AMOUNT_TYPE = 'fixed';
+const SUGGESTION_LIMIT = 6;
+
+const normalizeSuggestionValue = (value) => value.trim().replace(/\s+/g, ' ');
+
+const toSuggestionTimestamp = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (value instanceof Date) {
+        const timestamp = value.getTime();
+        return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+        const timestamp = Date.parse(value);
+        return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    return 0;
+};
+
+const compareSuggestionDates = (left, right) => {
+    if (left.sortTimestamp !== right.sortTimestamp) {
+        return right.sortTimestamp - left.sortTimestamp;
+    }
+
+    return right.latestIndex - left.latestIndex;
+};
+
+const buildExpenseHistorySuggestions = (expenses, field) => {
+    const suggestions = new Map();
+
+    expenses.forEach((expense, index) => {
+        const rawValue = typeof expense?.[field] === 'string' ? expense[field] : '';
+        const value = normalizeSuggestionValue(rawValue);
+
+        if (!value) {
+            return;
+        }
+
+        const key = value.toLowerCase();
+        const sortTimestamp = toSuggestionTimestamp(expense.updatedAt ?? expense.date ?? expense.createdAt);
+        const existing = suggestions.get(key);
+
+        if (!existing) {
+            suggestions.set(key, {
+                value,
+                sortTimestamp,
+                latestIndex: index,
+            });
+            return;
+        }
+
+        const nextEntry = {
+            value,
+            sortTimestamp,
+            latestIndex: index,
+        };
+
+        if (compareSuggestionDates(nextEntry, existing) < 0) {
+            return;
+        }
+
+        suggestions.set(key, nextEntry);
+    });
+
+    return Array.from(suggestions.values()).sort(compareSuggestionDates);
+};
+
+const getSuggestionMatchScore = (suggestionValue, query) => {
+    if (!query) {
+        return 0;
+    }
+
+    if (suggestionValue === query) {
+        return 4;
+    }
+
+    if (suggestionValue.startsWith(query)) {
+        return 3;
+    }
+
+    if (suggestionValue.split(/\s+/).some((part) => part.startsWith(query))) {
+        return 2;
+    }
+
+    if (suggestionValue.includes(query)) {
+        return 1;
+    }
+
+    return -1;
+};
+
+const rankSuggestions = (suggestions, query) => {
+    const normalizedQuery = normalizeSuggestionValue(query || '').toLowerCase();
+
+    return suggestions
+        .map((suggestion) => ({
+            ...suggestion,
+            matchScore: getSuggestionMatchScore(suggestion.value.toLowerCase(), normalizedQuery),
+        }))
+        .filter((suggestion) => suggestion.matchScore >= 0)
+        .sort((left, right) => {
+            if (left.matchScore !== right.matchScore) {
+                return right.matchScore - left.matchScore;
+            }
+
+            return compareSuggestionDates(left, right);
+        })
+        .slice(0, SUGGESTION_LIMIT);
+};
 
 const buildEmptyFormData = (todayString, currency) => ({
     title: '',
@@ -105,7 +217,7 @@ const ExpenseModal = ({
     clearSavedState,
 }) => {
     const { showSuccess, showError } = useToast();
-    const { createExpense, updateExpense, deleteExpense } = useExpenses({ includeArchived: true });
+    const { expenses, createExpense, updateExpense, deleteExpense } = useExpenses({ includeArchived: true });
     const { createRecurrence, getRecurrence, updateRecurrence, deleteRecurrence } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
@@ -148,6 +260,7 @@ const ExpenseModal = ({
     const defaultCurrency = preferences.currency || DEFAULT_CURRENCY;
     const emptyFormData = useMemo(() => buildEmptyFormData(todayString, defaultCurrency), [defaultCurrency, todayString]);
     const [confirmDialog, setConfirmDialog] = useState(null);
+    const [activeSuggestionField, setActiveSuggestionField] = useState(null);
     const titleInputRef = useRef(null);
     const oneTimePaymentModeOverrideRef = useRef(null);
 
@@ -512,11 +625,23 @@ const ExpenseModal = ({
         ? (defaultPaymentMethod?.id || '')
         : '');
 
+    const titleHistorySuggestions = useMemo(() => buildExpenseHistorySuggestions(expenses, 'title'), [expenses]);
+    const supplierHistorySuggestions = useMemo(() => buildExpenseHistorySuggestions(expenses, 'supplierName'), [expenses]);
+    const visibleTitleSuggestions = useMemo(() => rankSuggestions(titleHistorySuggestions, formData.title), [formData.title, titleHistorySuggestions]);
+    const visibleSupplierSuggestions = useMemo(() => rankSuggestions(supplierHistorySuggestions, formData.supplierName), [formData.supplierName, supplierHistorySuggestions]);
+    const showTitleSuggestions = activeSuggestionField === 'title' && visibleTitleSuggestions.length > 0;
+    const showSupplierSuggestions = activeSuggestionField === 'supplierName' && visibleSupplierSuggestions.length > 0;
+
     const handleChange = (field, value) => {
         setFormData((prev) => ({
             ...prev,
             [field]: value,
         }));
+    };
+
+    const handleSuggestionSelect = (field, value) => {
+        handleChange(field, value);
+        setActiveSuggestionField(null);
     };
 
     const handleBusinessChange = (value) => {
@@ -1097,13 +1222,38 @@ const ExpenseModal = ({
                             <>
                                 <div className="space-y-2">
                                     <Label htmlFor="expense-title">Title <span className="text-destructive-strong">*</span></Label>
-                                    <Input
-                                        id="expense-title"
-                                        ref={titleInputRef}
-                                        value={formData.title}
-                                        onChange={(event) => handleChange('title', event.target.value)}
-                                        placeholder="Enter expense title"
-                                    />
+                                    <div className="relative">
+                                        <Input
+                                            id="expense-title"
+                                            ref={titleInputRef}
+                                            value={formData.title}
+                                            onFocus={() => setActiveSuggestionField('title')}
+                                            onBlur={() => setActiveSuggestionField((current) => (current === 'title' ? null : current))}
+                                            onChange={(event) => handleChange('title', event.target.value)}
+                                            placeholder="Enter expense title"
+                                            aria-autocomplete="list"
+                                            aria-controls="expense-title-suggestions"
+                                            aria-expanded={showTitleSuggestions}
+                                        />
+                                        {showTitleSuggestions && (
+                                            <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-60 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
+                                                <div id="expense-title-suggestions" role="listbox" aria-label="Recent expense titles">
+                                                    {visibleTitleSuggestions.map((suggestion) => (
+                                                        <button
+                                                            key={suggestion.value}
+                                                            type="button"
+                                                            role="option"
+                                                            className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                                                            onMouseDown={(event) => event.preventDefault()}
+                                                            onClick={() => handleSuggestionSelect('title', suggestion.value)}
+                                                        >
+                                                            {suggestion.value}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 {showOneTimeFields ? (
                                     <div className="grid grid-cols-2 gap-4 md:contents">
@@ -1268,12 +1418,37 @@ const ExpenseModal = ({
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="expense-supplier">Supplier / Business</Label>
-                                <Input
-                                    id="expense-supplier"
-                                    value={formData.supplierName}
-                                    onChange={(event) => handleChange('supplierName', event.target.value)}
-                                    placeholder="Supplier name"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="expense-supplier"
+                                        value={formData.supplierName}
+                                        onFocus={() => setActiveSuggestionField('supplierName')}
+                                        onBlur={() => setActiveSuggestionField((current) => (current === 'supplierName' ? null : current))}
+                                        onChange={(event) => handleChange('supplierName', event.target.value)}
+                                        placeholder="Supplier name"
+                                        aria-autocomplete="list"
+                                        aria-controls="expense-supplier-suggestions"
+                                        aria-expanded={showSupplierSuggestions}
+                                    />
+                                    {showSupplierSuggestions && (
+                                        <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-60 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
+                                            <div id="expense-supplier-suggestions" role="listbox" aria-label="Recent suppliers">
+                                                {visibleSupplierSuggestions.map((suggestion) => (
+                                                    <button
+                                                        key={suggestion.value}
+                                                        type="button"
+                                                        role="option"
+                                                        className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                                                        onMouseDown={(event) => event.preventDefault()}
+                                                        onClick={() => handleSuggestionSelect('supplierName', suggestion.value)}
+                                                    >
+                                                        {suggestion.value}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     ) : (

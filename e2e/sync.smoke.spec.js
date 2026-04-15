@@ -13,7 +13,7 @@ import {
 } from './helpers/tasktime.js';
 
 test.describe('Cloud sync smoke', () => {
-    test('pulls remote data on first connected restore before empty local state can upload', async ({ page }) => {
+    test('keeps remote data untouched on first manual restore until Sync Now runs', async ({ page }) => {
         const projectTitle = `Playwright Remote Project ${Date.now()}`;
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({
             projects: [
@@ -41,27 +41,25 @@ test.describe('Cloud sync smoke', () => {
         await page.reload();
 
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-        await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
+        await expect(page.getByText('No projects')).toBeVisible();
+        await expect(page.getByRole('heading', { name: projectTitle })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Connected' })).toBeVisible();
+        expect(driveFixture.uploads).toHaveLength(0);
+
+        await syncNowFromAccount(page);
+        await page.goto('/projects');
+
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible({ timeout: 20_000 });
+        await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible({ timeout: 20_000 });
         await expect(page.getByText('No projects')).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
-
-        const uploadedCoreState = driveFixture.uploads.find((upload) => upload.metadata.name === 'tasktime-yjs-core.bin');
-
-        if (uploadedCoreState) {
-            expect(driveFixture.readCurrentCoreProjectTitles()).toContain(projectTitle);
-        }
 
         await page.reload();
 
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible({ timeout: 20_000 });
         await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible({ timeout: 20_000 });
-
-        if (uploadedCoreState) {
-            expect(driveFixture.readCurrentCoreProjectTitles()).toContain(projectTitle);
-        }
     });
 
-    test('pushes local changes on later Drive reconnect without requiring Sync Now', async ({ page }) => {
+    test('keeps local reconnect changes pending until Sync Now in manual mode', async ({ page }) => {
         const projectTitle = `Playwright Reconnect Project ${Date.now()}`;
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
 
@@ -84,14 +82,20 @@ test.describe('Cloud sync smoke', () => {
         await page.reload();
 
         await expect(page.getByRole('heading', { name: projectTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Sync changes' })).toBeVisible();
+        await expect.poll(() => {
+            return driveFixture.readCurrentSyncedCoreProjectTitles().includes(projectTitle);
+        }).toBe(false);
+
+        await page.getByRole('button', { name: 'Sync changes' }).click();
+
         await expect.poll(() => {
             return driveFixture.readCurrentSyncedCoreProjectTitles().includes(projectTitle);
         }).toBe(true);
-        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Sync changes' })).toHaveCount(0);
     });
 
-    test('merges remote data with disconnected local edits on reconnect without requiring Sync Now', async ({ page }) => {
+    test('merges remote data with disconnected local edits after Sync Now in manual mode', async ({ page }) => {
         const remoteProjectTitle = `Playwright Remote Reconnect Project ${Date.now()}`;
         const localProjectTitle = `Playwright Local Reconnect Project ${Date.now()}`;
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({
@@ -125,12 +129,22 @@ test.describe('Cloud sync smoke', () => {
         await page.reload();
 
         await expect(page.getByRole('heading', { name: localProjectTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: remoteProjectTitle, exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Sync changes' })).toBeVisible();
+        await expect.poll(() => {
+            const titles = driveFixture.readCurrentSyncedCoreProjectTitles();
+            return titles.includes(localProjectTitle) && titles.includes(remoteProjectTitle);
+        }).toBe(false);
+
+        await syncNowFromAccount(page);
+        await page.goto('/projects');
+
+        await expect(page.getByRole('heading', { name: localProjectTitle, exact: true })).toBeVisible();
         await expect(page.getByRole('heading', { name: remoteProjectTitle, exact: true })).toBeVisible();
         await expect.poll(() => {
             const titles = driveFixture.readCurrentSyncedCoreProjectTitles();
             return titles.includes(localProjectTitle) && titles.includes(remoteProjectTitle);
         }).toBe(true);
-        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Sync changes' })).toHaveCount(0);
 
         await page.reload();
@@ -139,7 +153,7 @@ test.describe('Cloud sync smoke', () => {
         await expect(page.getByRole('heading', { name: remoteProjectTitle, exact: true })).toBeVisible();
     });
 
-    test('converges same-project remote and disconnected local edits on reconnect without requiring Sync Now', async ({ page }) => {
+    test('converges same-project remote and disconnected local edits after Sync Now in manual mode', async ({ page }) => {
         const originalTitle = `Playwright Reconnect Shared Project ${Date.now()}`;
         const localTitle = `Playwright Reconnect Local Title ${Date.now()}`;
         const mergedColorValue = 'rgb(59, 130, 246)';
@@ -166,8 +180,14 @@ test.describe('Cloud sync smoke', () => {
 
         await page.reload();
 
+        await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Connected' })).toBeVisible();
+
+        await syncNowFromAccount(page);
+        await page.goto('/projects');
+
         await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connected' })).toBeVisible();
 
         await disconnectDriveFromAccount(page);
 
@@ -198,12 +218,23 @@ test.describe('Cloud sync smoke', () => {
 
         await expect(page.getByRole('heading', { name: localTitle, exact: true })).toBeVisible();
         await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toHaveCount(0);
+        await expect(getProjectCard(page, localTitle)).not.toHaveCSS('border-left-color', mergedColorValue);
+        await expect(page.getByRole('button', { name: 'Sync changes' })).toBeVisible();
+        await expect.poll(() => {
+            const project = driveFixture.readCurrentSyncedCoreProjects().find((item) => item.id === baseProject.id);
+            return project?.title === localTitle && project?.color === '#3b82f6';
+        }).toBe(false);
+
+        await syncNowFromAccount(page);
+        await page.goto('/projects');
+
+        await expect(page.getByRole('heading', { name: localTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toHaveCount(0);
         await expect(getProjectCard(page, localTitle)).toHaveCSS('border-left-color', mergedColorValue);
         await expect.poll(() => {
             const project = driveFixture.readCurrentSyncedCoreProjects().find((item) => item.id === baseProject.id);
             return project?.title === localTitle && project?.color === '#3b82f6';
         }).toBe(true);
-        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Sync changes' })).toHaveCount(0);
 
         await page.reload();
@@ -251,8 +282,8 @@ test.describe('Cloud sync smoke', () => {
             ]);
 
             await Promise.all([
-                expect(pageA.getByRole('button', { name: 'In sync' })).toBeVisible(),
-                expect(pageB.getByRole('button', { name: 'In sync' })).toBeVisible(),
+                expect(pageA.getByRole('button', { name: 'Connected' })).toBeVisible(),
+                expect(pageB.getByRole('button', { name: 'Connected' })).toBeVisible(),
             ]);
 
             const projectTitleA = `Playwright Context A Project ${Date.now()}`;
@@ -299,7 +330,7 @@ test.describe('Cloud sync smoke', () => {
         }
     });
 
-    test('converges same-project edits across devices after one device reloads before syncing', async ({ browser }) => {
+    test('converges same-project edits across devices after one device reloads before an explicit sync', async ({ browser }) => {
         test.slow();
 
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
@@ -360,7 +391,12 @@ test.describe('Cloud sync smoke', () => {
             // Simulate the page being refreshed before the local change is synced.
             await pageA.reload();
             await expect(pageA.getByRole('heading', { name: titleFromA, exact: true })).toBeVisible();
-            await expect(pageA.getByRole('button', { name: /In sync|Sync changes/ })).toBeVisible();
+            await expect(pageA.getByRole('button', { name: 'Sync changes' })).toBeVisible();
+            await expect.poll(() => {
+                return driveFixture.readCurrentSyncedCoreProjects().find((project) => project.title === titleFromA)?.title;
+            }).not.toBe(titleFromA);
+
+            await pageA.getByRole('button', { name: 'Sync changes' }).click();
             await expect.poll(() => {
                 return driveFixture.readCurrentSyncedCoreProjects().find((project) => project.title === titleFromA)?.title;
             }).toBe(titleFromA);
@@ -422,7 +458,7 @@ test.describe('Cloud sync smoke', () => {
             });
 
             await pageA.reload();
-            await expect(pageA.getByRole('button', { name: 'In sync' })).toBeVisible();
+            await expect(pageA.getByRole('button', { name: 'Connected' })).toBeVisible();
 
             const pageB = await context.newPage();
             await pageB.goto('/projects');
@@ -430,7 +466,7 @@ test.describe('Cloud sync smoke', () => {
             await Promise.all([
                 expect(pageA.getByRole('heading', { name: projectsHeadingName })).toBeVisible(),
                 expect(pageB.getByRole('heading', { name: projectsHeadingName })).toBeVisible(),
-                expect(pageB.getByRole('button', { name: 'In sync' })).toBeVisible(),
+                expect(pageB.getByRole('button', { name: 'Connected' })).toBeVisible(),
             ]);
 
             const originalTitle = `Playwright Same Device Project ${Date.now()}`;
@@ -488,12 +524,12 @@ test.describe('Cloud sync smoke', () => {
 
         await page.reload();
 
-        const inSyncButton = page.getByRole('button', { name: 'In sync' });
-        await expect(inSyncButton).toBeVisible();
+        const connectedButton = page.getByRole('button', { name: 'Connected' });
+        await expect(connectedButton).toBeVisible();
         await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Reconnect to Drive' })).toHaveCount(0);
 
-        await inSyncButton.click();
+        await connectedButton.click();
 
         await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
         await expect(page.getByText('playwright-sync@example.com')).toBeVisible();
@@ -534,7 +570,7 @@ test.describe('Cloud sync smoke', () => {
         });
 
         await page.reload();
-        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connected' })).toBeVisible();
 
         expireDriveRequests = true;
 

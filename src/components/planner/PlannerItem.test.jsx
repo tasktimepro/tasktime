@@ -167,6 +167,21 @@ describe('PlannerItem', () => {
         expect(item.style.minHeight).toBe('56px');
     });
 
+    it('does not animate planner item height changes', () => {
+        const { container } = render(
+            <PlannerItem
+                type="task"
+                title="Stable layout task"
+                heightPercent={0.9}
+                onClick={() => {}}
+            />
+        );
+
+        const item = container.firstChild;
+        expect(item).toHaveClass('transition-shadow');
+        expect(item).not.toHaveClass('transition-all');
+    });
+
     it('keeps desktop planner items compact without mobile metadata rows', () => {
         render(
             <PlannerItem

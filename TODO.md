@@ -2,7 +2,16 @@
 
 ## Priority
 
-[ ] 
+[ ]
+
+---
+
+## Blog Posts
+
+- Always keep in mind trending words and most likely searched for words for better SEO reachability
+[x] Create new blog post about the new feature with sending invoices directly from TaskTime - creating email templates, usign Resend etc.
+[ ] Create a blog about invoice templates, multiple businesses and payment methods and the advantages that come by having these
+[ ] Create another blog post about auto-converting multiple currences from different clients into your own prefered currency in reports overviews & totals/goals
 
 ---
 
@@ -20,11 +29,7 @@
 
 ## Ideas
 
-[ ] Add Logged Hours and Expenses sections in the dashboard at the bottom
-    [ ] Logged Hours can have projects as filters but All is default
-    [ ] Expenses can have Paid (default), Upcoming, Recurring filters
-
-[ ] Under new expenses modal it would be nice that Title & Supplier when focused should show a list of matching previous saved ones. Latest on top by default, but once you start typing most matching pattern is suggested at the top of the dropdown items below this input
-
 [ ] Stop timer to the nearest min, quarter, half an hour, hour > moving forward (option in projects modal).
+
 [ ] Timed sessions with sound alerts - I want to work on this for 1hour
+    - We must think were this should be placed, as a setting, or a global option in a project for example, and we choose which task we want to work on

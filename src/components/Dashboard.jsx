@@ -19,6 +19,9 @@ import useMetricsCalculation from './dashboard/hooks/useMetricsCalculation';
 import MetricsCards from './dashboard/MetricsCards';
 import RecentTasks from './dashboard/RecentTasks';
 import ProjectsOverview from './dashboard/ProjectsOverview';
+import TimeEntriesOverview from './dashboard/TimeEntriesOverview';
+import ExpensesOverview from './dashboard/ExpensesOverview';
+import { DEFAULT_EXPENSES_FILTER, DEFAULT_TIME_ENTRIES_PROJECT_FILTER } from './dashboard/dashboardWidgetConstants';
 import ToDoToday from './dashboard/ToDoToday';
 import {
     buildDashboardProjects,
@@ -85,6 +88,8 @@ const Dashboard = ({
     const [taskFilter, setTaskFilter] = useState(DEFAULT_TASK_FILTER);
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
     const [projectFilter, setProjectFilter] = useState(DEFAULT_PROJECT_FILTER);
+    const [timeEntriesProjectFilter, setTimeEntriesProjectFilter] = useState(DEFAULT_TIME_ENTRIES_PROJECT_FILTER);
+    const [expenseFilter, setExpenseFilter] = useState(DEFAULT_EXPENSES_FILTER);
     
     // Use Yjs hooks directly
     const {
@@ -116,38 +121,15 @@ const Dashboard = ({
     const [addEntryTask, setAddEntryTask] = useState(null);
     const [addEntryDateStr, setAddEntryDateStr] = useState(null);
 
+    // Defer below-fold widgets until after the initial paint so the
+    // priority sections (ToDoToday + MetricsCards) appear instantly.
+    const [deferredReady, setDeferredReady] = useState(false);
+    useEffect(() => { setDeferredReady(true); }, []);
+
     // Reset stale skip flags once on mount / when date changes
     useEffect(() => {
         resetExpiredSkips();
     }, [todayStr]); // eslint-disable-line react-hooks/exhaustive-deps
-    const [isMobileLayout, setIsMobileLayout] = useState(() => {
-        if (typeof window === 'undefined' || !window.matchMedia) {
-            return false;
-        }
-
-        return window.matchMedia('(max-width: 767px)').matches;
-    });
-
-    useEffect(() => {
-        if (typeof window === 'undefined' || !window.matchMedia) {
-            return undefined;
-        }
-
-        const mediaQuery = window.matchMedia('(max-width: 767px)');
-        const handleChange = (event) => {
-            setIsMobileLayout(event.matches);
-        };
-
-        setIsMobileLayout(mediaQuery.matches);
-
-        if (mediaQuery.addEventListener) {
-            mediaQuery.addEventListener('change', handleChange);
-            return () => mediaQuery.removeEventListener('change', handleChange);
-        }
-
-        mediaQuery.addListener(handleChange);
-        return () => mediaQuery.removeListener(handleChange);
-    }, []);
 
     const resolveRecurringActionDate = useCallback((task) => {
         if (!task?.recurring || !todayStr) return null;
@@ -447,6 +429,248 @@ const Dashboard = ({
             projectSearchQuery,
         });
     }, [projects, activeTasks, timeEntries, clients, invoices, expenses, recurrences, projectFilter, projectSearchQuery]);
+
+    const allTasks = useMemo(() => {
+        return [...activeTasks, ...archivedTasks];
+    }, [activeTasks, archivedTasks]);
+
+    const tasksById = useMemo(() => {
+        return new Map(allTasks.map((task) => [task.id, task]));
+    }, [allTasks]);
+
+    const projectsById = useMemo(() => {
+        return new Map(projects.map((project) => [project.id, project]));
+    }, [projects]);
+
+    const clientsById = useMemo(() => {
+        return new Map(clients.map((client) => [client.id, client]));
+    }, [clients]);
+
+    const sortedDashboardProjects = useMemo(() => {
+        return [...projects]
+            .filter((project) => !project.archived)
+            .sort((left, right) => left.title.localeCompare(right.title));
+    }, [projects]);
+
+    const recurringPreviewExpenses = useMemo(() => {
+        if (!todayStr) {
+            return [];
+        }
+
+        const datesByRecurrence = new Map();
+        expenses.forEach((expense) => {
+            if (!expense.recurrenceId) return;
+            if (!datesByRecurrence.has(expense.recurrenceId)) {
+                datesByRecurrence.set(expense.recurrenceId, new Set());
+            }
+            datesByRecurrence.get(expense.recurrenceId).add(expense.date);
+        });
+
+        return recurrences
+            .filter((recurrence) => recurrence.active)
+            .map((recurrence) => {
+                const baseStart = recurrence.lastGeneratedDate
+                    ? advanceByRepeat(
+                        recurrence.lastGeneratedDate,
+                        recurrence.repeat,
+                        recurrence.monthlyType,
+                        recurrence.monthlyDay
+                    )
+                    : recurrence.startDate;
+
+                const nextDate = getNextRecurringDate({
+                    startDate: baseStart,
+                    repeat: recurrence.repeat,
+                    monthlyType: recurrence.monthlyType,
+                    monthlyDay: recurrence.monthlyDay,
+                    endDate: recurrence.endDate,
+                    fromDate: todayStr,
+                });
+
+                if (!nextDate) {
+                    return null;
+                }
+
+                if (datesByRecurrence.get(recurrence.id)?.has(nextDate)) {
+                    return null;
+                }
+
+                return {
+                    ...buildExpenseFromRecurrence(recurrence, nextDate),
+                    id: `dashboard-preview-${recurrence.id}-${nextDate}`,
+                    isPreview: true,
+                };
+            })
+            .filter(Boolean);
+    }, [expenses, recurrences, todayStr]);
+
+    const dashboardTimeEntries = useMemo(() => {
+        const todayDate = parseStoredDate(todayStr);
+        const rangeStart = todayDate ? subDays(todayDate, 29) : null;
+
+        return timeEntries
+            .map((entry) => {
+                const task = tasksById.get(entry.taskId) || null;
+                const project = task?.projectId ? projectsById.get(task.projectId) || null : null;
+
+                return {
+                    ...entry,
+                    task,
+                    project,
+                };
+            })
+            .filter((entry) => {
+                if (timeEntriesProjectFilter === DEFAULT_TIME_ENTRIES_PROJECT_FILTER) {
+                    const entryDateValue = typeof entry.end === 'number' ? entry.end : entry.start;
+                    const entryDate = new Date(entryDateValue);
+
+                    if (todayDate && rangeStart) {
+                        return entryDate >= rangeStart && entryDate <= todayDate;
+                    }
+
+                    return true;
+                }
+
+                const entryDateValue = typeof entry.end === 'number' ? entry.end : entry.start;
+                const entryDate = new Date(entryDateValue);
+                const matchesProject = entry.project?.id === timeEntriesProjectFilter;
+
+                if (!matchesProject) {
+                    return false;
+                }
+
+                if (todayDate && rangeStart) {
+                    return entryDate >= rangeStart && entryDate <= todayDate;
+                }
+
+                return true;
+            })
+            .sort((left, right) => {
+                const leftDate = left.end || left.start || 0;
+                const rightDate = right.end || right.start || 0;
+                return rightDate - leftDate;
+            });
+    }, [timeEntries, tasksById, projectsById, timeEntriesProjectFilter, todayStr]);
+
+    const dashboardExpenses = useMemo(() => {
+        const todayDate = parseStoredDate(todayStr);
+        const rangeStart = todayDate ? subDays(todayDate, 29) : null;
+        const rangeEnd = todayDate ? addDays(todayDate, 29) : null;
+        const resolvedExpenses = expenses.map((expense) => ({
+            ...expense,
+            client: expense.clientId ? clientsById.get(expense.clientId) || null : null,
+            project: expense.projectId ? projectsById.get(expense.projectId) || null : null,
+        }));
+
+        const combinedRecurring = [
+            ...resolvedExpenses.filter((expense) => expense.recurrenceId),
+            ...recurringPreviewExpenses.map((expense) => ({
+                ...expense,
+                client: expense.clientId ? clientsById.get(expense.clientId) || null : null,
+                project: expense.projectId ? projectsById.get(expense.projectId) || null : null,
+            })),
+        ];
+
+        const isWithinPast30Days = (dateValue) => {
+            if (!todayDate || !rangeStart) {
+                return true;
+            }
+
+            const expenseDate = parseStoredDate(dateValue);
+            if (!expenseDate) {
+                return false;
+            }
+
+            return expenseDate >= rangeStart && expenseDate <= todayDate;
+        };
+
+        const isWithinNext30Days = (dateValue) => {
+            if (!todayDate || !rangeEnd) {
+                return true;
+            }
+
+            const expenseDate = parseStoredDate(dateValue);
+            if (!expenseDate) {
+                return false;
+            }
+
+            return expenseDate >= todayDate && expenseDate <= rangeEnd;
+        };
+
+        const isWithinDashboardWindow = (dateValue) => {
+            if (!todayDate || !rangeStart || !rangeEnd) {
+                return true;
+            }
+
+            const expenseDate = parseStoredDate(dateValue);
+            if (!expenseDate) {
+                return false;
+            }
+
+            return expenseDate >= rangeStart && expenseDate <= rangeEnd;
+        };
+
+        if (expenseFilter === 'paid') {
+            return resolvedExpenses
+                .filter((expense) => {
+                    if (expense.paymentStatus !== 'paid') {
+                        return false;
+                    }
+
+                    const expenseDate = parseStoredDate(expense.date);
+                    if (!expenseDate || !todayDate) {
+                        return true;
+                    }
+
+                    return isWithinPast30Days(expense.date)
+                        && (expense.paymentMode !== 'auto' || expense.amountType === 'variable' || expenseDate <= todayDate);
+                    })
+                    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+        }
+
+        if (expenseFilter === 'upcoming') {
+            return [
+                ...resolvedExpenses.filter((expense) => {
+                    const expenseDate = parseStoredDate(expense.date);
+                    if (!expenseDate || !todayDate) {
+                        return false;
+                    }
+
+                    if (!isWithinNext30Days(expense.date)) {
+                        return false;
+                    }
+
+                    return expense.paymentStatus !== 'paid'
+                        || (expense.paymentMode === 'auto' && expense.amountType !== 'variable');
+                }),
+                ...recurringPreviewExpenses.map((expense) => ({
+                    ...expense,
+                    client: expense.clientId ? clientsById.get(expense.clientId) || null : null,
+                    project: expense.projectId ? projectsById.get(expense.projectId) || null : null,
+                })),
+            ]
+                .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+        }
+
+        return combinedRecurring
+            .filter((expense) => {
+                if (!isWithinDashboardWindow(expense.date)) {
+                    return false;
+                }
+
+                if (expense.isPreview) {
+                    return true;
+                }
+
+                const expenseDate = parseStoredDate(expense.date);
+                if (!expenseDate || !todayDate) {
+                    return true;
+                }
+
+                return expenseDate >= todayDate || expense.paymentStatus !== 'paid';
+            })
+            .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+    }, [expenses, clientsById, projectsById, recurringPreviewExpenses, expenseFilter, todayStr]);
 
     const taskTimeTotals = useMemo(() => {
         const totals = {};
@@ -754,40 +978,62 @@ const Dashboard = ({
                 openExpenseView={openExpenseView}
             />
 
-            {isMobileLayout && reportsOverview}
+            {reportsOverview}
 
-            {/* Recent Tasks and Projects Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <RecentTasks
-                    recentTasks={recentTasks}
-                    taskFilter={taskFilter}
-                    setTaskFilter={setTaskFilter}
-                    taskSearchQuery={taskSearchQuery}
-                    setTaskSearchQuery={setTaskSearchQuery}
-                    isLoading={taskFilter === 'archived' && archivedLoading && !archivedLoaded}
-                    handleCompleteTask={handleCompleteTask}
-                    getTaskCompletedStatus={getTaskCompletedStatus}
-                    renderTaskTitle={renderTaskTitle}
-                    handleProjectTitleClick={handleProjectTitleClick}
-                    renderTaskControls={renderTaskControls}
-                    onEditTask={handleEditTask}
-                    onDeleteTask={handleDeleteTask}
-                    onArchiveTask={handleArchiveTask}
-                />
+            {/* Below-fold widgets deferred until after initial paint */}
+            {deferredReady && (
+                <>
+                    {/* Recent Tasks and Projects Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <RecentTasks
+                            recentTasks={recentTasks}
+                            taskFilter={taskFilter}
+                            setTaskFilter={setTaskFilter}
+                            taskSearchQuery={taskSearchQuery}
+                            setTaskSearchQuery={setTaskSearchQuery}
+                            isLoading={taskFilter === 'archived' && archivedLoading && !archivedLoaded}
+                            handleCompleteTask={handleCompleteTask}
+                            getTaskCompletedStatus={getTaskCompletedStatus}
+                            renderTaskTitle={renderTaskTitle}
+                            handleProjectTitleClick={handleProjectTitleClick}
+                            renderTaskControls={renderTaskControls}
+                            onEditTask={handleEditTask}
+                            onDeleteTask={handleDeleteTask}
+                            onArchiveTask={handleArchiveTask}
+                        />
 
-                <ProjectsOverview
-                    recentProjects={recentProjects}
-                    projectFilter={projectFilter}
-                    setProjectFilter={setProjectFilter}
-                    projectSearchQuery={projectSearchQuery}
-                    setProjectSearchQuery={setProjectSearchQuery}
-                    navigateToProject={navigateToProject}
-                    handleClientTitleClick={handleClientTitleClick}
-                    clients={clients}
-                />
-            </div>
+                        <ProjectsOverview
+                            recentProjects={recentProjects}
+                            projectFilter={projectFilter}
+                            setProjectFilter={setProjectFilter}
+                            projectSearchQuery={projectSearchQuery}
+                            setProjectSearchQuery={setProjectSearchQuery}
+                            navigateToProject={navigateToProject}
+                            handleClientTitleClick={handleClientTitleClick}
+                            clients={clients}
+                        />
+                    </div>
 
-            {!isMobileLayout && reportsOverview}
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                        <TimeEntriesOverview
+                            entries={dashboardTimeEntries}
+                            projects={sortedDashboardProjects}
+                            projectFilter={timeEntriesProjectFilter}
+                            setProjectFilter={setTimeEntriesProjectFilter}
+                            onTaskClick={handleTaskTitleClick}
+                            onProjectClick={navigateToProject}
+                        />
+
+                        <ExpensesOverview
+                            expenses={dashboardExpenses}
+                            expenseFilter={expenseFilter}
+                            setExpenseFilter={setExpenseFilter}
+                            preferredCurrency={preferences.currency}
+                            onExpenseClick={openExpenseView}
+                        />
+                    </div>
+                </>
+            )}
 
             <AddTimeEntryModal
                 isOpen={showAddEntryModal}

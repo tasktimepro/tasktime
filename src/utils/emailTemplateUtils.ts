@@ -22,7 +22,7 @@ export const DEFAULT_REMINDER_BODY = `Hi {clientName},
 
 This is a friendly reminder that invoice {invoiceNumber} for {currency}{amount} was due on {dueDate}.
 
-Please let us know if you have any questions.
+Please let me know if you have any questions.
 
 Thank you,
 {businessName}`;
