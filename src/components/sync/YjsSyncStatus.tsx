@@ -4,6 +4,7 @@
  * Shows connection status to Google Drive and sync state
  */
 
+import type { ComponentType, MouseEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
@@ -17,6 +18,12 @@ interface YjsSyncStatusProps {
     isCompact?: boolean;
     onActionComplete?: () => void;
 }
+
+const TooltipContentComponent = TooltipContent as unknown as ComponentType<{
+    children?: ReactNode;
+    side?: 'top' | 'right' | 'bottom' | 'left';
+    align?: 'start' | 'center' | 'end';
+}>;
 
 export default function YjsSyncStatus({ className = '', isCompact = false, onActionComplete }: YjsSyncStatusProps) {
 
@@ -108,15 +115,20 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
         syncState,
     ]);
 
+    useEffect(() => {
+        setIsHovered(false);
+    }, [status.kind]);
+
     const IconComponent = (isHovered && status.hoverIcon) ? status.hoverIcon : status.icon;
     const displayText = (isHovered && status.hoverText) ? status.hoverText : status.text;
 
-    const handleStatusClick = async (event) => {
+    const handleStatusClick = async (event: MouseEvent<HTMLButtonElement>) => {
         if (!status.onClick) {
             return;
         }
 
         event.currentTarget.blur();
+        setIsHovered(false);
 
         try {
             await status.onClick();
@@ -157,9 +169,9 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
             <TooltipTrigger asChild>
                 {content}
             </TooltipTrigger>
-            <TooltipContent side="right" align="center">
+            <TooltipContentComponent side="right" align="center">
                 {displayText}
-            </TooltipContent>
+            </TooltipContentComponent>
         </Tooltip>
     );
 }

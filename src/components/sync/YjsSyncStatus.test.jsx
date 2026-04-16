@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import YjsSyncStatus from './YjsSyncStatus'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { act } from 'react'
 
 const signInMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
@@ -92,5 +94,33 @@ describe('YjsSyncStatus', () => {
 
         expect(forceSyncDriveMock).toHaveBeenCalledTimes(1)
         expect(forceSyncDriveMock.mock.calls[0]).toEqual([])
+    })
+
+    it('clears stale hover state when status changes to synced in compact mode', async () => {
+        const user = userEvent.setup()
+
+        const { rerender } = render(
+            <TooltipProvider>
+                <YjsSyncStatus isCompact />
+            </TooltipProvider>
+        )
+
+        const statusButton = screen.getByRole('button', { name: /reconnect to drive/i })
+
+        await user.hover(statusButton)
+
+        yjsState.isDriveConnected = true
+        yjsState.hasSynced = true
+
+        await act(async () => {
+            rerender(
+                <TooltipProvider>
+                    <YjsSyncStatus isCompact />
+                </TooltipProvider>
+            )
+        })
+
+        expect(screen.getByRole('button', { name: /in sync/i })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /cloud options/i })).toBeNull()
     })
 })

@@ -414,6 +414,43 @@ describe('useGoogleAuth', () => {
         expect(fetch).toHaveBeenCalledTimes(1)
     })
 
+    it('does not restore a stale signed-in state after invalidateSession runs during session validation', async () => {
+        let resolveStatusRequest
+
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-race',
+            userId: 'user-race',
+            email: 'race@example.com',
+            createdAt: new Date().toISOString(),
+        })
+
+        fetch.mockImplementationOnce(() => new Promise((resolve) => {
+            resolveStatusRequest = resolve
+        }))
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await act(async () => {
+            await result.current.invalidateSession()
+        })
+
+        await act(async () => {
+            resolveStatusRequest({
+                ok: true,
+                json: async () => ({ authenticated: true }),
+            })
+        })
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        expect(result.current.isSignedIn).toBe(false)
+        expect(result.current.user).toBeNull()
+        expect(result.current.sessionId).toBeNull()
+        expect(result.current.hadPreviousSession).toBe(true)
+    })
+
     it('does not re-fetch auth status when remounting within the throttle window', async () => {
         const storedSession = {
             sessionId: 'session-throttle',

@@ -9,6 +9,7 @@ const showSuccessMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
 const yjsSyncSettingsMocks = vi.hoisted(() => ({
     isDriveConnected: false,
+    isConnecting: false,
     isSignedIn: false,
     isMobileLayout: false,
     user: null,
@@ -28,7 +29,7 @@ vi.mock('@/contexts/YjsContext', () => ({
         syncState: 'idle',
         syncPhase: 'idle',
         isDriveConnected: yjsSyncSettingsMocks.isDriveConnected,
-        isConnecting: false,
+        isConnecting: yjsSyncSettingsMocks.isConnecting,
         hasSynced: false,
         manualSyncInProgress: false,
         lastSyncedAt: yjsSyncSettingsMocks.lastSyncedAt,
@@ -75,6 +76,7 @@ describe('YjsSyncSettings', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         yjsSyncSettingsMocks.isDriveConnected = false
+        yjsSyncSettingsMocks.isConnecting = false
         yjsSyncSettingsMocks.isSignedIn = false
         yjsSyncSettingsMocks.isMobileLayout = false
         yjsSyncSettingsMocks.user = null
@@ -129,5 +131,28 @@ describe('YjsSyncSettings', () => {
         render(<YjsSyncSettings />)
 
         expect(screen.getByText('Changes waiting for manual sync')).toBeInTheDocument()
+    })
+
+    it('hides the connect button while a signed-in session is still reconnecting', () => {
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.isConnecting = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.queryByRole('button', { name: /connect google drive/i })).toBeNull()
+        expect(screen.getByText('Syncing...')).toBeInTheDocument()
+    })
+
+    it('hides the connect button when auth is restored but Drive is not yet marked connected', () => {
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.isDriveConnected = false
+        yjsSyncSettingsMocks.isConnecting = false
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.queryByRole('button', { name: /connect google drive/i })).toBeNull()
+        expect(screen.getByText('Not connected')).toBeInTheDocument()
     })
 })

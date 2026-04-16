@@ -4,6 +4,7 @@
  * Shows connection status and allows managing Google Drive sync
  */
 
+import type { ChangeEvent, ComponentType, MouseEvent } from 'react';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
@@ -11,20 +12,38 @@ import { usePreferences } from '@/hooks/usePreferences';
 import { useToast } from '@/hooks/useToast';
 import { ArrowPathIcon, CheckIcon, CloudIcon, CloudOffIcon, CloudSyncIcon, CloudDownloadIcon, CloudUploadIcon, ExclamationTriangleIcon, MoreHorizontalIcon, TrashIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Card as CardPrimitive, CardContent as CardContentPrimitive, CardHeader as CardHeaderPrimitive, CardTitle as CardTitlePrimitive } from '@/components/ui/card';
+import { Checkbox as CheckboxPrimitive } from '@/components/ui/checkbox';
+import { Input as InputPrimitive } from '@/components/ui/input';
+import { Label as LabelPrimitive } from '@/components/ui/label';
+import { Select as SelectPrimitive, SelectContent as SelectContentPrimitive, SelectItem as SelectItemPrimitive, SelectTrigger as SelectTriggerPrimitive, SelectValue as SelectValuePrimitive } from '@/components/ui/select';
+import { DropdownMenu as DropdownMenuPrimitive, DropdownMenuContent as DropdownMenuContentPrimitive, DropdownMenuItem as DropdownMenuItemPrimitive, DropdownMenuTrigger as DropdownMenuTriggerPrimitive } from '@/components/ui/dropdown-menu';
 import Modal from '@/components/Modal';
-import { format, formatDistance, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import type { BackupInfo } from '@/stores/yjs';
 import { parseIntegerInputWithFallback } from '@/utils/numberInputUtils';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 
 type ConfirmDialogType = 'disconnect' | 'wipe' | null;
+type UntypedUiComponent = ComponentType<any>;
+
+const Card = CardPrimitive as unknown as UntypedUiComponent;
+const CardContent = CardContentPrimitive as unknown as UntypedUiComponent;
+const CardHeader = CardHeaderPrimitive as unknown as UntypedUiComponent;
+const CardTitle = CardTitlePrimitive as unknown as UntypedUiComponent;
+const Checkbox = CheckboxPrimitive as unknown as UntypedUiComponent;
+const Input = InputPrimitive as unknown as UntypedUiComponent;
+const Label = LabelPrimitive as unknown as UntypedUiComponent;
+const Select = SelectPrimitive as unknown as UntypedUiComponent;
+const SelectContent = SelectContentPrimitive as unknown as UntypedUiComponent;
+const SelectItem = SelectItemPrimitive as unknown as UntypedUiComponent;
+const SelectTrigger = SelectTriggerPrimitive as unknown as UntypedUiComponent;
+const SelectValue = SelectValuePrimitive as unknown as UntypedUiComponent;
+const DropdownMenu = DropdownMenuPrimitive as unknown as UntypedUiComponent;
+const DropdownMenuContent = DropdownMenuContentPrimitive as unknown as UntypedUiComponent;
+const DropdownMenuItem = DropdownMenuItemPrimitive as unknown as UntypedUiComponent;
+const DropdownMenuTrigger = DropdownMenuTriggerPrimitive as unknown as UntypedUiComponent;
 
 export default function YjsSyncSettings() {
     const isMobileLayout = useIsMobileLayout();
@@ -46,6 +65,8 @@ export default function YjsSyncSettings() {
     const { showSuccess, showError } = useToast();
 
     const showAuthActions = isReady && !authLoading;
+    const showConnectButton = showAuthActions && !isOffline && !isSignedIn && !isDriveConnected && !isConnecting;
+    const showConnectedActions = showAuthActions && !isOffline && isSignedIn && isDriveConnected;
 
     const autoSyncEnabled = preferences.autoSyncEnabled ?? false;
     const autoSyncMode = preferences.autoSyncMode ?? 'backup';
@@ -171,7 +192,7 @@ export default function YjsSyncSettings() {
         if (isManualMode) {
             return {
                 text: lastSyncedAt
-                    ? `Last sync ${formatDistance(lastSyncedAt, now, { addSuffix: true, includeSeconds: true })}`
+                    ? `Last sync ${formatDistanceToNow(new Date(lastSyncedAt), { addSuffix: true, includeSeconds: true })}`
                     : 'Connected (manual sync)',
                 tone: 'status-success-text-strong',
                 icon: CheckIcon
@@ -180,11 +201,12 @@ export default function YjsSyncSettings() {
 
         return {
             text: lastSyncedAt
-                ? `Synced ${formatDistance(lastSyncedAt, now, { addSuffix: true, includeSeconds: true })}`
+                ? `Synced ${formatDistanceToNow(new Date(lastSyncedAt), { addSuffix: true, includeSeconds: true })}`
                 : 'Connected',
             tone: 'status-success-text-strong',
             icon: CheckIcon
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is a tick dependency that forces recomputation of relative-time strings
     }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now, isManualMode, pendingSyncChanges]);
 
     const handleConnect = async () => {
@@ -393,7 +415,7 @@ export default function YjsSyncSettings() {
                                     )}
                                 </div>
                             </div>
-                            {showAuthActions && !isOffline && isSignedIn && isDriveConnected && isMobileLayout && (
+                            {showConnectedActions && isMobileLayout && (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button
@@ -406,7 +428,7 @@ export default function YjsSyncSettings() {
                                             <MoreHorizontalIcon className="h-5 w-5" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                                    <DropdownMenuContent align="end" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
                                         <DropdownMenuItem
                                             onClick={handleWipeAndDisconnect}
                                             className="status-danger-action flex items-center space-x-2"
@@ -419,8 +441,7 @@ export default function YjsSyncSettings() {
                             )}
                         </div>
                         <div className={cn('flex items-center gap-2', isMobileLayout && 'w-full flex-wrap')}>
-                            {showAuthActions && !isOffline && (
-                                isSignedIn && isDriveConnected ? (
+                            {showConnectedActions ? (
                                     <>
                                         <Button
                                             variant="ghost"
@@ -451,7 +472,7 @@ export default function YjsSyncSettings() {
                                                         <MoreHorizontalIcon className="h-5 w-5" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                                                <DropdownMenuContent align="end" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
                                                     <DropdownMenuItem
                                                         onClick={handleWipeAndDisconnect}
                                                         className="status-danger-action flex items-center space-x-2"
@@ -463,20 +484,19 @@ export default function YjsSyncSettings() {
                                             </DropdownMenu>
                                         )}
                                     </>
-                                ) : (
-                                    <Button
-                                        onClick={handleConnect}
-                                        leadingIcon={CloudIcon}
-                                        title={hadPreviousSession ? 'Reconnect to Drive' : 'Connect Google Drive'}
-                                        className={cn(isMobileLayout && 'w-full')}
-                                    >
-                                        Connect Google Drive
-                                    </Button>
-                                )
-                            )}
+                            ) : showConnectButton ? (
+                                <Button
+                                    onClick={handleConnect}
+                                    leadingIcon={CloudIcon}
+                                    title={hadPreviousSession ? 'Reconnect to Drive' : 'Connect Google Drive'}
+                                    className={cn(isMobileLayout && 'w-full')}
+                                >
+                                    Connect Google Drive
+                                </Button>
+                            ) : null}
                         </div>
                     </div>
-                    {showAuthActions && isSignedIn && isDriveConnected && (
+                    {showConnectedActions && (
                         <div className={cn('space-y-3 rounded-md border border-border bg-muted/30', isMobileLayout ? 'p-3' : 'p-4')}>
                             <div className="flex items-center gap-3">
                                 <Checkbox
@@ -516,7 +536,7 @@ export default function YjsSyncSettings() {
             </Card>
 
             {/* Backup Settings Card */}
-            {showAuthActions && isSignedIn && isDriveConnected && (
+            {showConnectedActions && (
                 <Card className="mt-4">
                     <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
                         <CardTitle>Automatic Backups</CardTitle>
@@ -713,7 +733,7 @@ export default function YjsSyncSettings() {
                         <Input
                             id="wipe-drive-confirm"
                             value={wipeConfirmText}
-                            onChange={(event) => setWipeConfirmText(event.target.value)}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => setWipeConfirmText(event.target.value)}
                             placeholder="wipe drive"
                             className="mt-2"
                         />

@@ -456,6 +456,20 @@ export const useGoogleAuth = () => {
             }
 
             const isValid = await validateWorkerSession(session);
+
+            if (forceReconnectState) {
+                setState({
+                    isSignedIn: false,
+                    isLoading: false,
+                    user: null,
+                    accessToken: null,
+                    sessionId: null,
+                    error: null,
+                    hadPreviousSession: true,
+                });
+                return;
+            }
+
             if (isValid) {
                 forceReconnectState = false;
                 setState({
