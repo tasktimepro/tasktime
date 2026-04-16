@@ -615,7 +615,7 @@ describe('App component', () => {
         expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
     })
 
-    it('shows a warning dot instead of sync button during connecting in manual mode on mobile', () => {
+    it('keeps the More button neutral during connecting in manual mode on mobile', () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
         })
@@ -625,7 +625,7 @@ describe('App component', () => {
         render(<App />)
 
         expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
-        expect(screen.getByTestId('mobile-more-status-dot').className.includes('status-warning-fill')).toBe(true)
+        expect(screen.queryByTestId('mobile-more-status-dot')).not.toBeInTheDocument()
     })
 
     it('shows a warning dot on More when there are pending sync changes on mobile', () => {

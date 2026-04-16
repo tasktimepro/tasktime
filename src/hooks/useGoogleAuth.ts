@@ -652,12 +652,28 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
         let settled = false;
         let broadcastChannel: BroadcastChannel | null = null;
 
+        let popupClosedAt = 0;
+
         const closedCheckId = window.setInterval(() => {
-            if (popup.closed && !settled) {
-                cleanup();
-                settled = true;
-                reject(new Error('Authentication popup was closed before sign-in completed.'));
+
+            if (settled || !popup.closed) {
+                if (!popup.closed) popupClosedAt = 0;
+                return;
             }
+
+            // On mobile Safari, BroadcastChannel messages can arrive after
+            // the sending tab closes. Give a 1.5s grace period before
+            // treating popup closure as a user cancellation.
+            if (popupClosedAt === 0) {
+                popupClosedAt = Date.now();
+                return;
+            }
+
+            if (Date.now() - popupClosedAt < 1500) return;
+
+            cleanup();
+            settled = true;
+            reject(new Error('Authentication popup was closed before sign-in completed.'));
         }, 500);
 
         const cleanup = () => {

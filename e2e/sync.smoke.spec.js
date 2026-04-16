@@ -43,7 +43,7 @@ test.describe('Cloud sync smoke', () => {
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
         await expect(page.getByText('No projects')).toBeVisible();
         await expect(page.getByRole('heading', { name: projectTitle })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Connected' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
         expect(driveFixture.uploads).toHaveLength(0);
 
         await syncNowFromAccount(page);
@@ -181,13 +181,13 @@ test.describe('Cloud sync smoke', () => {
         await page.reload();
 
         await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Connected' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
 
         await syncNowFromAccount(page);
         await page.goto('/projects');
 
         await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connected' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
 
         await disconnectDriveFromAccount(page);
 
@@ -282,8 +282,8 @@ test.describe('Cloud sync smoke', () => {
             ]);
 
             await Promise.all([
-                expect(pageA.getByRole('button', { name: 'Connected' })).toBeVisible(),
-                expect(pageB.getByRole('button', { name: 'Connected' })).toBeVisible(),
+                expect(pageA.getByRole('button', { name: 'In sync' })).toBeVisible(),
+                expect(pageB.getByRole('button', { name: 'In sync' })).toBeVisible(),
             ]);
 
             const projectTitleA = `Playwright Context A Project ${Date.now()}`;
@@ -458,7 +458,7 @@ test.describe('Cloud sync smoke', () => {
             });
 
             await pageA.reload();
-            await expect(pageA.getByRole('button', { name: 'Connected' })).toBeVisible();
+            await expect(pageA.getByRole('button', { name: 'In sync' })).toBeVisible();
 
             const pageB = await context.newPage();
             await pageB.goto('/projects');
@@ -466,7 +466,7 @@ test.describe('Cloud sync smoke', () => {
             await Promise.all([
                 expect(pageA.getByRole('heading', { name: projectsHeadingName })).toBeVisible(),
                 expect(pageB.getByRole('heading', { name: projectsHeadingName })).toBeVisible(),
-                expect(pageB.getByRole('button', { name: 'Connected' })).toBeVisible(),
+                expect(pageB.getByRole('button', { name: 'In sync' })).toBeVisible(),
             ]);
 
             const originalTitle = `Playwright Same Device Project ${Date.now()}`;
@@ -524,7 +524,7 @@ test.describe('Cloud sync smoke', () => {
 
         await page.reload();
 
-        const connectedButton = page.getByRole('button', { name: 'Connected' });
+        const connectedButton = page.getByRole('button', { name: 'In sync' });
         await expect(connectedButton).toBeVisible();
         await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Reconnect to Drive' })).toHaveCount(0);
@@ -570,7 +570,7 @@ test.describe('Cloud sync smoke', () => {
         });
 
         await page.reload();
-        await expect(page.getByRole('button', { name: 'Connected' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
 
         expireDriveRequests = true;
 

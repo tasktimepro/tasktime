@@ -41,8 +41,10 @@ export const AuthCallback = () => {
                 const channel = new BroadcastChannel('google-auth-callback');
                 channel.postMessage(payload);
 
-                // Keep channel open briefly so the message is delivered
-                setTimeout(() => channel.close(), 500);
+                // Keep channel open long enough for the message to propagate
+                // to other tabs before this page closes. Mobile Safari can drop
+                // BroadcastChannel messages if the sending tab closes too soon.
+                setTimeout(() => channel.close(), 2000);
                 delivered = true;
             } catch {
                 // BroadcastChannel not available in this context
@@ -50,14 +52,16 @@ export const AuthCallback = () => {
         }
 
         if (delivered) {
-            // Close popup after short delay; ignore if COOP blocks
+            // Close popup after a delay that gives BroadcastChannel messages
+            // time to propagate to the opener tab. On mobile Safari, closing
+            // too early (e.g. 300ms) can race with message delivery.
             setTimeout(() => {
                 try {
                     window.close();
                 } catch {
                     // Ignore if blocked by browser policies
                 }
-            }, 300);
+            }, 1200);
         } else {
             // Neither channel available - redirect to home
             window.location.href = '/';
