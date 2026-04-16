@@ -143,7 +143,7 @@ describe('getYjsSyncStatusDescriptor', () => {
         expect(result.kind).toBe(SYNC_STATUS_KIND.PENDING)
     })
 
-    it('returns CONNECTED wording for manual mode without pending changes', () => {
+    it('returns In sync wording for manual mode without pending changes', () => {
         const result = getYjsSyncStatusDescriptor({
             ...baseArgs,
             autoSyncEnabled: false,
@@ -153,7 +153,18 @@ describe('getYjsSyncStatusDescriptor', () => {
         })
 
         expect(result.kind).toBe(SYNC_STATUS_KIND.SYNCED)
-        expect(result.text).toBe('Connected')
+        expect(result.text).toBe('In sync')
+    })
+
+    it('returns LOADING instead of CONNECTING for manual mode while connecting', () => {
+        const result = getYjsSyncStatusDescriptor({
+            ...baseArgs,
+            autoSyncEnabled: false,
+            isDriveConnected: false,
+            isConnecting: true,
+        })
+
+        expect(result.kind).toBe(SYNC_STATUS_KIND.LOADING)
     })
 
     it('returns DISCONNECTED when not connected', () => {

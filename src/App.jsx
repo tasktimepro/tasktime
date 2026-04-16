@@ -128,6 +128,7 @@ function AppContent() {
     const [isMobileSyncButtonFadingOut, setIsMobileSyncButtonFadingOut] = useState(false);
     const mobileSyncHideTimeoutRef = useRef(null);
     const mobileSyncFadeTimeoutRef = useRef(null);
+    const mobileSyncedFlashShownRef = useRef(false);
     const mainContentRef = useRef(null);
 
     useEffect(() => {
@@ -811,24 +812,34 @@ function AppContent() {
             mobileSyncFadeTimeoutRef.current = null;
         }
 
-        const isManualConnecting = !autoSyncEnabled && mobileSyncStatus.kind === SYNC_STATUS_KIND.CONNECTING;
-        const shouldRenderMobileSyncButton = MOBILE_SYNC_VISIBLE_KINDS.has(mobileSyncStatus.kind) && !isManualConnecting;
+        const shouldRenderMobileSyncButton = MOBILE_SYNC_VISIBLE_KINDS.has(mobileSyncStatus.kind);
 
         if (!shouldRenderMobileSyncButton) {
+            mobileSyncedFlashShownRef.current = false;
             setShowMobileSyncButton(false);
             setIsMobileSyncButtonFadingOut(false);
             return;
         }
 
         if (mobileSyncStatus.kind !== SYNC_STATUS_KIND.SYNCED) {
+            mobileSyncedFlashShownRef.current = false;
             setShowMobileSyncButton(true);
             setIsMobileSyncButtonFadingOut(false);
             return;
         }
 
+        // SYNCED state: show brief green flash then fade out
         if (!showMobileSyncButton) {
+            if (mobileSyncedFlashShownRef.current) {
+                return;
+            }
+
+            mobileSyncedFlashShownRef.current = true;
+            setShowMobileSyncButton(true);
             return;
         }
+
+        mobileSyncedFlashShownRef.current = true;
 
         mobileSyncHideTimeoutRef.current = setTimeout(() => {
             setIsMobileSyncButtonFadingOut(true);
@@ -838,7 +849,7 @@ function AppContent() {
                 setIsMobileSyncButtonFadingOut(false);
             }, MOBILE_SYNC_FADE_DURATION_MS);
         }, MOBILE_SYNC_SUCCESS_VISIBILITY_MS);
-    }, [autoSyncEnabled, mobileSyncStatus.kind, showMobileSyncButton]);
+    }, [mobileSyncStatus.kind, showMobileSyncButton]);
 
     useEffect(() => {
         return () => {
@@ -919,15 +930,10 @@ function AppContent() {
             };
         }
 
-        if (!autoSyncEnabled && mobileSyncStatus.kind === SYNC_STATUS_KIND.CONNECTING) {
-            return {
-                description: 'Connecting to Google Drive...',
-                toneClassName: 'status-warning-fill',
-            };
-        }
+
 
         return null;
-    }, [authLoading, autoSyncEnabled, hadPreviousSession, isSignedIn, mobileSyncStatus.kind, showMobileSyncButton]);
+    }, [authLoading, hadPreviousSession, isSignedIn, mobileSyncStatus.kind, showMobileSyncButton]);
     
     const activeView = urlParams.view;
     const hasPersistedWorkspaceData = (

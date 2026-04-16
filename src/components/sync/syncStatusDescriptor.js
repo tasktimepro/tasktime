@@ -72,6 +72,15 @@ export function getYjsSyncStatusDescriptor({
     }
 
     if (isConnecting || !isDriveConnected) {
+        if (isManualMode) {
+            return {
+                kind: SYNC_STATUS_KIND.LOADING,
+                text: 'Loading...',
+                icon: CloudSyncIcon,
+                tone: 'text-muted-foreground',
+            };
+        }
+
         return {
             kind: SYNC_STATUS_KIND.CONNECTING,
             text: 'Syncing...',
@@ -162,7 +171,7 @@ export function getYjsSyncStatusDescriptor({
     if (isManualMode) {
         return {
             kind: SYNC_STATUS_KIND.SYNCED,
-            text: 'Connected',
+            text: 'In sync',
             icon: CloudCheckIcon,
             tone: 'status-success-text-strong',
             onClick: onCloudOptions,
