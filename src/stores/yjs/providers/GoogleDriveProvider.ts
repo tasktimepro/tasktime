@@ -501,6 +501,12 @@ export class YjsDriveProvider {
      * @param force - If true, bypasses the isSyncing guard and throttle (for manual Sync Now / visibility change)
      */
     async sync(force: boolean = false, options: { allowPull?: boolean } = {}): Promise<void> {
+        // Force sync supersedes any pending debounced sync
+        if (force && this.syncDebounceTimer) {
+            clearTimeout(this.syncDebounceTimer);
+            this.syncDebounceTimer = null;
+        }
+
         if (!this.connected) {
             console.warn('[YjsDriveProvider] Cannot sync: not connected');
             return;
@@ -586,9 +592,13 @@ export class YjsDriveProvider {
 
         this.isSyncing = true;
         this.setState('syncing');
-        markSyncStarted(); // Persist that sync is in progress
+        // Capture persisted state BEFORE markSyncStarted() overwrites it.
+        // markSyncStarted sets syncInterrupted=true for crash detection, but
+        // promotePersistedLocalChangesToFullState must only act on stale flags
+        // left over from a genuinely interrupted previous sync, not the current one.
         const loadedDocs = this.docManager.getLoadedDocs();
         this.promotePersistedLocalChangesToFullState(loadedDocs);
+        markSyncStarted();
         this.log('sync: started', { docs: loadedDocs, force, hasPendingLocal, allowPull });
 
         try {
@@ -1081,27 +1091,18 @@ export class YjsDriveProvider {
             return;
         }
 
-        if (this.syncMode === 'backup') {
-            if (this.syncDebounceTimer) {
-                clearTimeout(this.syncDebounceTimer);
-                this.syncDebounceTimer = null;
-            }
-
-            this.log('scheduleSync: backup mode, syncing immediately');
-            this.sync(false, { allowPull: false }).catch(console.error);
-            return;
-        }
-
         if (this.syncDebounceTimer) {
             clearTimeout(this.syncDebounceTimer);
         }
 
+        const allowPull = this.syncMode === 'sync';
+
         this.syncDebounceTimer = setTimeout(() => {
-            const allowPull = this.syncMode === 'sync';
+            this.syncDebounceTimer = null;
             this.sync(false, { allowPull }).catch(console.error);
         }, SYNC_DEBOUNCE_MS);
 
-        this.log('scheduleSync: debounced');
+        this.log('scheduleSync: debounced', { allowPull });
     }
 
     // =========================================================================
