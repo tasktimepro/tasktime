@@ -109,7 +109,7 @@ export function useTasks(options: UseTasksOptions = {}) {
     // Archive/unarchive operations
     const archiveTask = useCallback(async (id: string) => {
         await store.archiveTask(id);
-        markMeaningfulActivity();
+        markMeaningfulActivity('task_archive');
         // Reload archived if they were loaded
         if (archivedLoaded) {
             const archivedMap = store.archivedTasks;
@@ -121,7 +121,7 @@ export function useTasks(options: UseTasksOptions = {}) {
 
     const unarchiveTask = useCallback(async (id: string) => {
         await store.unarchiveTask(id);
-        markMeaningfulActivity();
+        markMeaningfulActivity('task_unarchive');
         setArchivedTasks(prev => prev.filter(t => t.id !== id));
     }, [store]);
 
@@ -148,7 +148,7 @@ export function useTasks(options: UseTasksOptions = {}) {
         archivedMap.delete(id);
 
         if (removedFromArchive) {
-            markMeaningfulActivity();
+            markMeaningfulActivity('task_delete');
             cleanupAttachmentsForEntity(store.plannerAttachments as any, id);
             setArchivedLoaded(true);
             setArchivedTasks(collectEntities<Task>(archivedMap as any));

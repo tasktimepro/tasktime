@@ -124,7 +124,7 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         }, 'create time entry');
         const entityMap = objectToYMap(entry as unknown as Record<string, unknown>);
         (store.activeTimeEntries as any).set(entry.id, entityMap);
-        markMeaningfulActivity();
+        markMeaningfulActivity('time_entry_create');
         return entry;
     }, [isReady, store]);
 
@@ -143,7 +143,7 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
                 const entityMap = objectToYMap(validated as unknown as Record<string, unknown>);
                 (store.activeTimeEntries as any).set(id, entityMap);
             }
-            markMeaningfulActivity();
+            markMeaningfulActivity('time_entry_update');
             return validated;
         }
         
@@ -156,7 +156,7 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         if (!isReady) return false;
         if (!store.activeTimeEntries.has(id)) return false;
         store.activeTimeEntries.delete(id);
-        markMeaningfulActivity();
+        markMeaningfulActivity('time_entry_delete');
         return true;
     }, [isReady, store]);
 

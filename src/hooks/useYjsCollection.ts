@@ -11,9 +11,34 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as Y from 'yjs';
 import { useYjs } from '@/contexts/YjsContext';
 import { generateId } from '@/utils/idUtils';
-import { markMeaningfulActivity } from '@/utils/usageMetrics';
+import { markMeaningfulActivity, type UsageMetricsAction } from '@/utils/usageMetrics';
 import { readEntity, objectToYMap, yMapToObject, collectEntities } from '@/stores/yjs/entityUtils';
 import { validateCollectionEntity, safeValidateCollectionEntity, type YjsCollectionName } from '@/stores/yjs/validation';
+
+const COLLECTION_ACTION_BASE_NAMES: Partial<Record<YjsCollectionName, string>> = {
+    businessInfos: 'business_info',
+    clients: 'client',
+    expenses: 'expense',
+    invoices: 'invoice',
+    invoiceTemplates: 'invoice_template',
+    paymentMethods: 'payment_method',
+    projects: 'project',
+    tasks: 'task',
+    timeEntries: 'time_entry',
+};
+
+const getCollectionAction = (
+    collectionName: YjsCollectionName | undefined,
+    verb: 'create' | 'update' | 'delete'
+): UsageMetricsAction => {
+    const baseName = collectionName ? COLLECTION_ACTION_BASE_NAMES[collectionName] : null;
+
+    if (!baseName) {
+        return `generic_${verb}`;
+    }
+
+    return `${baseName}_${verb}`;
+};
 
 export interface UseYjsCollectionResult<T extends { id: string }> {
     /** All items in the collection */
@@ -151,7 +176,7 @@ export function useYjsCollection<T extends { id: string }>(
 
         const entityMap = objectToYMap(validatedItem as unknown as Record<string, unknown>);
         (yMap as unknown as Y.Map<string, unknown>).set(id, entityMap);
-        markMeaningfulActivity();
+        markMeaningfulActivity(getCollectionAction(options.collectionName, 'create'));
 
         return validatedItem;
     }, [options.collectionName, yMap]);
@@ -180,7 +205,7 @@ export function useYjsCollection<T extends { id: string }>(
                 existing.set(key, (validatedEntity as Record<string, unknown>)[key]);
             }
 
-            markMeaningfulActivity();
+            markMeaningfulActivity(getCollectionAction(options.collectionName, 'update'));
 
             return validatedEntity;
         }
@@ -188,7 +213,7 @@ export function useYjsCollection<T extends { id: string }>(
         // Old format: merge and convert to nested Y.Map
         const entityMap = objectToYMap(validatedEntity as unknown as Record<string, unknown>);
         rawMap.set(id, entityMap);
-        markMeaningfulActivity();
+        markMeaningfulActivity(getCollectionAction(options.collectionName, 'update'));
 
         return validatedEntity;
     }, [options.collectionName, yMap]);
@@ -198,11 +223,11 @@ export function useYjsCollection<T extends { id: string }>(
         const removed = yMap.delete(id);
 
         if (removed) {
-            markMeaningfulActivity();
+            markMeaningfulActivity(getCollectionAction(options.collectionName, 'delete'));
         }
 
         return removed;
-    }, [yMap]);
+    }, [options.collectionName, yMap]);
 
     return {
         items,

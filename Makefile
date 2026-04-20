@@ -10,7 +10,7 @@ include $(WORKER_ENV_FILE)
 export CLOUDFLARE_API_TOKEN
 endif
 
-.PHONY: help dev stop build preview preview-build install lint clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build worker-kv-create worker-kv-create-preview worker-secret worker-deploy worker-logs worker-d1-list worker-d1-create worker-d1-apply worker-metrics-weekly worker-metrics-monthly
+.PHONY: help dev stop build preview preview-build install lint clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build worker-kv-create worker-kv-create-preview worker-secret worker-deploy worker-logs worker-d1-list worker-d1-create worker-d1-apply worker-metrics-weekly worker-metrics-monthly worker-metrics-action-weekly worker-metrics-action-monthly
 
 PREVIEW_PORT ?= 3101
 
@@ -45,6 +45,8 @@ help:
 	@echo "  make worker-d1-apply DB=<db-name> SQL=<file.sql> - Apply SQL to a remote D1 database"
 	@echo "  make worker-metrics-weekly - Query weekly active usage totals from D1"
 	@echo "  make worker-metrics-monthly - Query monthly active usage totals from D1"
+	@echo "  make worker-metrics-action-weekly ACTION=project_create - Query weekly totals for a specific action"
+	@echo "  make worker-metrics-action-monthly ACTION=timer_start - Query monthly totals for a specific action"
 	@echo ""
 
 # Start development server
@@ -295,3 +297,31 @@ worker-metrics-monthly:
 	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT device_hash) AS monthly_active_devices, COUNT(DISTINCT dedupe_hash) AS monthly_active_people_approx, COALESCE(SUM(session_count), 0) AS monthly_sessions, COUNT(DISTINCT CASE WHEN sync_person_hash IS NOT NULL THEN sync_person_hash END) AS monthly_synced_people FROM daily_device_usage WHERE day >= date('now', '-29 day') AND meaningful_action_count >= 2"
+
+# Weekly totals for a specific action type (usage: make worker-metrics-action-weekly ACTION=project_create)
+worker-metrics-action-weekly:
+	@if [ -z "$(CLOUDFLARE_API_TOKEN)" ]; then \
+		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
+		exit 1; \
+	fi
+	@if [ -z "$(ACTION)" ]; then \
+		echo "Usage: make worker-metrics-action-weekly ACTION=<action-name>"; \
+		exit 1; \
+	fi
+	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+		-e CLOUDFLARE_API_TOKEN \
+		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER), 0) > 0 THEN device_hash END) AS weekly_devices, COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER), 0) > 0 THEN dedupe_hash END) AS weekly_people_approx, COALESCE(SUM(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER)), 0) AS weekly_occurrences FROM daily_device_usage WHERE day >= date('now', '-6 day')"
+
+# Monthly totals for a specific action type (usage: make worker-metrics-action-monthly ACTION=timer_start)
+worker-metrics-action-monthly:
+	@if [ -z "$(CLOUDFLARE_API_TOKEN)" ]; then \
+		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
+		exit 1; \
+	fi
+	@if [ -z "$(ACTION)" ]; then \
+		echo "Usage: make worker-metrics-action-monthly ACTION=<action-name>"; \
+		exit 1; \
+	fi
+	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+		-e CLOUDFLARE_API_TOKEN \
+		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER), 0) > 0 THEN device_hash END) AS monthly_devices, COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER), 0) > 0 THEN dedupe_hash END) AS monthly_people_approx, COALESCE(SUM(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER)), 0) AS monthly_occurrences FROM daily_device_usage WHERE day >= date('now', '-29 day')"

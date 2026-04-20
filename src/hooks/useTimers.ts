@@ -143,7 +143,7 @@ export function useTimers(): UseTimersResult {
             (store.timers as any).set(timerKey, entityMap);
         });
 
-        markMeaningfulActivity();
+        markMeaningfulActivity('timer_start');
     }, [isReady, store]);
 
     const pauseTimer = useCallback((projectId: string) => {
@@ -162,7 +162,7 @@ export function useTimers(): UseTimersResult {
             });
         });
 
-        markMeaningfulActivity();
+        markMeaningfulActivity('timer_pause');
     }, [isReady, store]);
 
     const resumeTimer = useCallback((projectId: string) => {
@@ -190,7 +190,7 @@ export function useTimers(): UseTimersResult {
             });
         });
 
-        markMeaningfulActivity();
+        markMeaningfulActivity('timer_resume');
     }, [isReady, store]);
 
     const stopTimer = useCallback((projectId: string): TimeEntry | null => {
@@ -222,7 +222,7 @@ export function useTimers(): UseTimersResult {
             store.timers.delete(projectId);
         });
 
-        markMeaningfulActivity();
+        markMeaningfulActivity('timer_stop');
 
         return entry;
     }, [isReady, store]);
@@ -234,7 +234,7 @@ export function useTimers(): UseTimersResult {
             store.timers.delete(projectId);
         });
 
-        markMeaningfulActivity();
+        markMeaningfulActivity('timer_clear');
     }, [isReady, store]);
 
     const updateTimer = useCallback((projectId: string, updates: { startTime?: number; note?: string }) => {
@@ -251,7 +251,7 @@ export function useTimers(): UseTimersResult {
             updateEntityFields(store.timers as any, projectId, fieldUpdates);
         });
 
-        markMeaningfulActivity();
+        markMeaningfulActivity('timer_update');
     }, [isReady, store]);
 
     const focusTimer = useCallback((projectId: string) => {

@@ -77,6 +77,9 @@ describe('usageMetrics', () => {
                 day: '2026-04-09',
                 meaningfulActivity: true,
                 meaningfulActionCount: 1,
+                actionCounts: {
+                    generic_action: 1,
+                },
                 sessionCount: 0,
                 syncEnabled: false,
                 sent: false,
@@ -94,6 +97,26 @@ describe('usageMetrics', () => {
 
         const state = await getStoredUsageMetricsState();
         expect(state.dayBuckets[0].meaningfulActionCount).toBe(3);
+        expect(state.dayBuckets[0].actionCounts).toEqual({
+            generic_action: 3,
+        });
+    });
+
+    it('tracks specific action types separately from the total count', async () => {
+        markMeaningfulActivity('project_create');
+        await flushAsyncWork();
+        markMeaningfulActivity('timer_start');
+        await flushAsyncWork();
+        markMeaningfulActivity('project_create');
+        await flushAsyncWork();
+
+        const state = await getStoredUsageMetricsState();
+
+        expect(state.dayBuckets[0].meaningfulActionCount).toBe(3);
+        expect(state.dayBuckets[0].actionCounts).toEqual({
+            project_create: 2,
+            timer_start: 1,
+        });
     });
 
     it('records an initial session and sends one delayed daily batch', async () => {
@@ -124,6 +147,9 @@ describe('usageMetrics', () => {
                     sessionCount: 1,
                     meaningfulActivity: true,
                     meaningfulActionCount: 1,
+                    actionCounts: {
+                        generic_action: 1,
+                    },
                     syncEnabled: false,
                 },
             ],

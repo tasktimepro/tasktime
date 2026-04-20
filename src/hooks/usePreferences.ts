@@ -68,7 +68,7 @@ export function usePreferences() {
             [key]: value,
         } as Record<string, unknown>, `set preference ${String(key)}`);
         store.preferences.set(key, nextPreferences[key]);
-        markMeaningfulActivity();
+        markMeaningfulActivity('preference_update');
     }, [isReady, preferences, store]);
 
     // Update multiple preferences
@@ -86,7 +86,7 @@ export function usePreferences() {
             }
         });
 
-        markMeaningfulActivity();
+        markMeaningfulActivity('preference_update');
     }, [isReady, preferences, store]);
 
     // Reset to defaults
@@ -99,7 +99,7 @@ export function usePreferences() {
             store.preferences.set(key, value);
         });
 
-        markMeaningfulActivity();
+        markMeaningfulActivity('preferences_reset');
     }, [isReady, store]);
 
     return {

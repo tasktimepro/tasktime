@@ -2,7 +2,7 @@
 
 ## Priority
 
-[ ] I noticed one minor UI issue in such that the cloud sync icon in the sidebar after I connected remained the one with the "cloud-cog/setting icon" and green. Does not always happen - but we can check if there's a situation where that could be set as that icon for some reason. Then I also noticed that the cloud refresh/sync state icon can sometimes be grey instead of the usual yellow/amber color. Why is that? 
+[ ] It would be nice that when a second refresh happens because a new update was detected that we show a toast notice afterwards that the app was updated.
 
 ---
 

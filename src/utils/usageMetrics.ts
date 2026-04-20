@@ -11,11 +11,29 @@ const SESSION_GAP_MS = 30 * 60 * 1000;
 const OPEN_SEND_DELAY_MS = 30 * 1000;
 const MAX_SESSION_COUNT_PER_DAY = 100;
 
+type CollectionActionVerb = 'create' | 'update' | 'delete' | 'archive' | 'unarchive';
+
+export type UsageMetricsAction =
+    | `${string}_${CollectionActionVerb}`
+    | 'timer_start'
+    | 'timer_pause'
+    | 'timer_resume'
+    | 'timer_stop'
+    | 'timer_clear'
+    | 'timer_update'
+    | 'preference_update'
+    | 'preferences_reset'
+    | 'export_import'
+    | 'generic_action';
+
+type UsageActionCounts = Partial<Record<UsageMetricsAction, number>>;
+
 interface DayBucket {
     day: string;
     sessionCount: number;
     meaningfulActivity: boolean;
     meaningfulActionCount: number;
+    actionCounts: UsageActionCounts;
     syncEnabled: boolean;
     sent: boolean;
 }
@@ -87,16 +105,41 @@ const getLocalDayString = (date = new Date()): string => {
     return `${year}-${month}-${day}`;
 };
 
+const normalizeActionCounts = (value: unknown): UsageActionCounts => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {};
+    }
+
+    const normalized: UsageActionCounts = {};
+
+    for (const [key, count] of Object.entries(value)) {
+        if (!Number.isInteger(count) || count <= 0) {
+            continue;
+        }
+
+        normalized[key as UsageMetricsAction] = count;
+    }
+
+    return normalized;
+};
+
 const cloneState = (state: StoredUsageMetricsState): StoredUsageMetricsState => ({
     deviceInstallId: state.deviceInstallId,
     lastSendDay: state.lastSendDay,
-    dayBuckets: state.dayBuckets.map(bucket => ({ ...bucket })),
+    dayBuckets: state.dayBuckets.map(bucket => ({
+        ...bucket,
+        actionCounts: normalizeActionCounts(bucket.actionCounts),
+    })),
 });
 
 const normalizeState = (state: StoredUsageMetricsState): StoredUsageMetricsState => {
     const normalizedBuckets = [...state.dayBuckets]
         .sort((left, right) => left.day.localeCompare(right.day))
-        .slice(-MAX_STORED_BUCKETS);
+        .slice(-MAX_STORED_BUCKETS)
+        .map(bucket => ({
+            ...bucket,
+            actionCounts: normalizeActionCounts(bucket.actionCounts),
+        }));
 
     return {
         deviceInstallId: state.deviceInstallId ?? null,
@@ -148,6 +191,7 @@ const getOrCreateBucket = (state: StoredUsageMetricsState, day: string): DayBuck
         sessionCount: 0,
         meaningfulActivity: false,
         meaningfulActionCount: 0,
+        actionCounts: {},
         syncEnabled: false,
         sent: false,
     };
@@ -224,7 +268,7 @@ const recordSession = async (): Promise<void> => {
     });
 };
 
-export function markMeaningfulActivity(): void {
+export function markMeaningfulActivity(action: UsageMetricsAction = 'generic_action'): void {
     if (!isBrowser()) {
         return;
     }
@@ -237,6 +281,10 @@ export function markMeaningfulActivity(): void {
 
         bucket.meaningfulActivity = true;
         bucket.meaningfulActionCount = (bucket.meaningfulActionCount || 0) + 1;
+        bucket.actionCounts = {
+            ...normalizeActionCounts(bucket.actionCounts),
+            [action]: (bucket.actionCounts?.[action] || 0) + 1,
+        };
         if (runtime.sessionId) {
             bucket.syncEnabled = true;
         }
@@ -304,6 +352,7 @@ export async function maybeSendPendingUsageMetrics(reason = 'manual'): Promise<b
                 sessionCount: bucket.sessionCount,
                 meaningfulActivity: bucket.meaningfulActivity,
                 meaningfulActionCount: bucket.meaningfulActionCount || 0,
+                actionCounts: normalizeActionCounts(bucket.actionCounts),
                 syncEnabled: bucket.syncEnabled,
             })),
         };
