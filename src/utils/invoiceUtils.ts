@@ -2,6 +2,8 @@
  * Invoice utility helpers.
  */
 
+import type { InvoicePaymentCurrencySnapshot } from '@/stores/yjs/types';
+import { convertCurrency, normalizeCurrencyCode } from './currencyUtils';
 import { parseStoredDate } from './dateUtils';
 
 const SIMPLE_SEQUENTIAL_TOKEN = '{sequential}';
@@ -10,6 +12,7 @@ const PAID_INVOICE_STATUS = 'paid';
 const DRAFT_INVOICE_STATUS = 'draft';
 const SENT_INVOICE_STATUS = 'sent';
 const OVERDUE_INVOICE_STATUS = 'overdue';
+const EXCHANGE_RATE_BASE_CURRENCY = 'USD';
 
 const INVOICE_STATUS_VALUES = new Set([
     DRAFT_INVOICE_STATUS,
@@ -38,6 +41,44 @@ const getFiniteNumber = (value: any, fallback = 0) => {
 
 const getTrimmedString = (value: any) => {
     return typeof value === 'string' ? value.trim() : '';
+};
+
+const getFiniteRecord = (value: any) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return undefined;
+    }
+
+    const entries = Object.entries(value).filter(([, rate]) => typeof rate === 'number' && Number.isFinite(rate));
+    if (entries.length === 0) {
+        return undefined;
+    }
+
+    return Object.fromEntries(entries);
+};
+
+const normalizePaymentCurrencySnapshot = (invoice: any): InvoicePaymentCurrencySnapshot | null => {
+    const snapshot = invoice?.paymentCurrencySnapshot;
+    if (!snapshot || typeof snapshot !== 'object') {
+        return null;
+    }
+
+    const capturedAt = getFiniteNumber(snapshot.capturedAt, 0);
+    const sourceAmount = getFiniteNumber(snapshot.sourceAmount, Number.NaN);
+    const preferredCurrencyAmount = getFiniteNumber(snapshot.preferredCurrencyAmount, Number.NaN);
+
+    if (!capturedAt || !Number.isFinite(sourceAmount) || !Number.isFinite(preferredCurrencyAmount)) {
+        return null;
+    }
+
+    return {
+        capturedAt,
+        sourceCurrency: normalizeCurrencyCode(snapshot.sourceCurrency || invoice?.currency),
+        sourceAmount,
+        preferredCurrencyAtPayment: normalizeCurrencyCode(snapshot.preferredCurrencyAtPayment),
+        preferredCurrencyAmount,
+        exchangeRatesBase: getTrimmedString(snapshot.exchangeRatesBase) || EXCHANGE_RATE_BASE_CURRENCY,
+        exchangeRates: getFiniteRecord(snapshot.exchangeRates),
+    };
 };
 
 const normalizeExistingInvoiceItem = (item: any, index: number) => {
@@ -183,6 +224,102 @@ export const isInvoicePaid = (invoice: any) => getInvoiceStatus(invoice) === PAI
 
 export const isInvoiceOverdue = (invoice: any, referenceDate?: Date) => getInvoiceStatus(invoice, referenceDate) === OVERDUE_INVOICE_STATUS;
 
+export const createInvoicePaymentCurrencySnapshot = ({
+    invoice,
+    preferredCurrency,
+    exchangeRates,
+    capturedAt,
+}: {
+    invoice: any;
+    preferredCurrency: string;
+    exchangeRates?: Record<string, number> | null;
+    capturedAt: number;
+}): InvoicePaymentCurrencySnapshot => {
+    const sourceCurrency = normalizeCurrencyCode(invoice?.currency);
+    const targetCurrency = normalizeCurrencyCode(preferredCurrency);
+    const sourceAmount = getInvoiceTotal(invoice);
+    const normalizedRates = getFiniteRecord(exchangeRates);
+
+    let preferredCurrencyAmount = sourceAmount;
+    if (sourceCurrency !== targetCurrency) {
+        const result = convertCurrency(sourceAmount, sourceCurrency, targetCurrency, normalizedRates);
+        preferredCurrencyAmount = result.amount;
+    }
+
+    return {
+        capturedAt,
+        sourceCurrency,
+        sourceAmount,
+        preferredCurrencyAtPayment: targetCurrency,
+        preferredCurrencyAmount,
+        exchangeRatesBase: EXCHANGE_RATE_BASE_CURRENCY,
+        exchangeRates: normalizedRates,
+    };
+};
+
+export const getInvoicePaymentCurrencySnapshot = (invoice: any): InvoicePaymentCurrencySnapshot | null => {
+    return normalizePaymentCurrencySnapshot(invoice);
+};
+
+export const getPaidInvoiceConvertedAmount = (
+    invoice: any,
+    targetCurrency: string
+): { amount: number; currency: string; success: boolean; usedSnapshot: boolean } => {
+    const normalizedTargetCurrency = normalizeCurrencyCode(targetCurrency);
+    const snapshot = getInvoicePaymentCurrencySnapshot(invoice);
+
+    if (!snapshot) {
+        const invoiceCurrency = normalizeCurrencyCode(invoice?.currency);
+        return {
+            amount: getInvoiceTotal(invoice),
+            currency: invoiceCurrency,
+            success: invoiceCurrency === normalizedTargetCurrency,
+            usedSnapshot: false,
+        };
+    }
+
+    if (normalizedTargetCurrency === snapshot.preferredCurrencyAtPayment) {
+        return {
+            amount: snapshot.preferredCurrencyAmount,
+            currency: normalizedTargetCurrency,
+            success: true,
+            usedSnapshot: true,
+        };
+    }
+
+    if (normalizedTargetCurrency === snapshot.sourceCurrency) {
+        return {
+            amount: snapshot.sourceAmount,
+            currency: normalizedTargetCurrency,
+            success: true,
+            usedSnapshot: true,
+        };
+    }
+
+    if (snapshot.exchangeRates) {
+        const conversion = convertCurrency(
+            snapshot.sourceAmount,
+            snapshot.sourceCurrency,
+            normalizedTargetCurrency,
+            snapshot.exchangeRates
+        );
+
+        return {
+            amount: conversion.amount,
+            currency: normalizedTargetCurrency,
+            success: conversion.success,
+            usedSnapshot: true,
+        };
+    }
+
+    return {
+        amount: snapshot.sourceAmount,
+        currency: snapshot.sourceCurrency,
+        success: false,
+        usedSnapshot: true,
+    };
+};
+
 export const normalizeInvoiceRecord = (invoice: any, referenceDate?: Date) => {
     if (!invoice || typeof invoice !== 'object') {
         return invoice;
@@ -207,6 +344,7 @@ export const normalizeInvoiceRecord = (invoice: any, referenceDate?: Date) => {
         total,
         status,
         paidAt: typeof invoice.paidAt === 'number' ? invoice.paidAt : null,
+        paymentCurrencySnapshot: normalizePaymentCurrencySnapshot(invoice),
         businessInfoId: invoice.businessInfoId ?? invoice.businessInfo?.id ?? null,
         paymentMethodId: invoice.paymentMethodId ?? invoice.paymentMethod?.id ?? null,
         dueDate: invoice.dueDate ?? null,

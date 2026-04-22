@@ -35,6 +35,7 @@ import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTodayString } from '@/hooks/useDayRollover';
 import { linkifyNodes } from '@/utils/linkifyUtils';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
+import { buildBillableDurationFields } from '@/utils/timeEntryDurationUtils.ts';
 import AddTimeEntryModal from '@/components/modals/AddTimeEntryModal';
 import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
 
@@ -713,6 +714,11 @@ const Dashboard = ({
                 end: endTime,
                 note: activeTimer.note,
                 _stoppedTimerKey: task.projectId || task.id,
+                ...buildBillableDurationFields({
+                    start: activeTimer.startTime,
+                    end: endTime,
+                    billingIncrementMinutes: projects.find(project => project.id === task.projectId)?.billableTimeIncrementMinutes,
+                }),
             });
 
             clearTimer(task.projectId || task.id);
@@ -734,7 +740,7 @@ const Dashboard = ({
                 lastActive: now
             });
         }
-    }, [timers, createEntry, clearTimer, updateTask, getTaskCompletedStatus, toggleRecurringCompletion, todayStr, resolveRecurringActionDate]);
+    }, [timers, createEntry, clearTimer, updateTask, getTaskCompletedStatus, toggleRecurringCompletion, todayStr, resolveRecurringActionDate, projects]);
 
     /**
      * Handle clicking on task title to navigate to project

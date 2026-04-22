@@ -9,10 +9,12 @@ import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
 import { useTimers } from '../hooks/useTimers';
+import { useProjects } from '../hooks/useProjects';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app';
 import { formatDurationWithSeconds, getTodayString } from '../utils/dateUtils.ts';
+import { buildBillableDurationFields, getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import { startOfDay, endOfDay } from 'date-fns';
 
 /**
@@ -48,6 +50,7 @@ const TaskItem = ({
     const { tasks, updateTask, toggleRecurringCompletion, isCompletedOnDate } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer } = useTimers();
+    const { projects } = useProjects();
 
     const subtasks = useMemo(() => {
         return tasks.filter((t) => t.parentTaskId === task.id);
@@ -76,6 +79,14 @@ const TaskItem = ({
         if (!task.recurring) return null;
         return recurringCompletionDate || getTodayString();
     }, [task.recurring, recurringCompletionDate]);
+
+    const currentProject = useMemo(() => {
+        if (!task.projectId) {
+            return null;
+        }
+
+        return projects.find((project) => project.id === task.projectId) || null;
+    }, [projects, task.projectId]);
 
     const getEntryOverlapMs = useCallback((entry, dayStart, dayEnd) => {
         if (!entry || typeof entry.end !== 'number') return 0;
@@ -143,7 +154,7 @@ const TaskItem = ({
         });
 
         const totalBillableMs = relevantEntries.reduce((total, entry) => {
-            return total + (entry.end - entry.start);
+            return total + getBillableDurationMs(entry);
         }, 0);
 
         return totalBillableMs >= BILLABLE_TIME_THRESHOLD_MS;
@@ -170,6 +181,11 @@ const TaskItem = ({
                 end: now,
                 note: projectTimer.note,
                 _stoppedTimerKey: timerKey,
+                ...buildBillableDurationFields({
+                    start: projectTimer.startTime,
+                    end: now,
+                    billingIncrementMinutes: currentProject?.billableTimeIncrementMinutes,
+                }),
             });
             clearTimer(timerKey);
         }
@@ -189,7 +205,7 @@ const TaskItem = ({
             completedOnDate: checked ? todayStr : null,
             lastActive: now
         });
-    }, [isTimerActive, projectTimer, task.id, task.recurring, task.promptTimeEntry, recurringCompletionDate, effectiveDateStr, createEntry, clearTimer, updateTask, toggleRecurringCompletion, timerKey]);
+    }, [isTimerActive, projectTimer, task.id, task.recurring, task.promptTimeEntry, recurringCompletionDate, effectiveDateStr, createEntry, clearTimer, updateTask, toggleRecurringCompletion, timerKey, currentProject]);
 
     /**
      * Update task title.

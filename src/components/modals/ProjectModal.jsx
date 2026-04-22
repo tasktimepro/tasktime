@@ -15,6 +15,24 @@ import CustomCheckbox from '../CustomCheckbox';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { parseOptionalNumberInput, parseOptionalPositiveNumberInput } from '@/utils/numberInputUtils.ts';
 
+const BILLABLE_TIME_INCREMENT_OPTIONS = [
+    { value: '0', label: 'Exact worked time' },
+    { value: '1', label: 'Round up to 1 minute' },
+    { value: '15', label: 'Round up to 15 minutes' },
+    { value: '30', label: 'Round up to 30 minutes' },
+    { value: '60', label: 'Round up to 60 minutes' },
+];
+
+function parseBillableTimeIncrementMinutes(value) {
+    const parsedValue = Number.parseInt(value, 10);
+
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+        return null;
+    }
+
+    return parsedValue;
+}
+
 function getDefaultIsPersonal(modalOptions) {
     if (modalOptions?.preselectedClientId) {
         return false;
@@ -35,7 +53,8 @@ function createEmptyProjectFormData(modalOptions) {
         preferredClientId: '',
         overrideRate: false,
         isPersonal: getDefaultIsPersonal(modalOptions),
-        color: ''
+        color: '',
+        billableTimeIncrementMinutes: '0'
     };
 }
 
@@ -47,6 +66,9 @@ function buildProjectUpdatePayload(formData) {
         preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
         isPersonal: formData.isPersonal || false,
         color: formData.color || null,
+        billableTimeIncrementMinutes: formData.isPersonal || formData.flatRate
+            ? null
+            : parseBillableTimeIncrementMinutes(formData.billableTimeIncrementMinutes),
     };
 }
 
@@ -124,7 +146,10 @@ const ProjectModal = ({
                 preferredClientId: editingProject.preferredClientId || '',
                 overrideRate: isOverriding,
                 isPersonal: editingProject.isPersonal || false,
-                color: editingProject.color || ''
+                color: editingProject.color || '',
+                billableTimeIncrementMinutes: editingProject.billableTimeIncrementMinutes
+                    ? editingProject.billableTimeIncrementMinutes.toString()
+                    : '0'
             });
         } else {
             // If modalOptions contains preselectedClientId, it takes priority
@@ -145,7 +170,8 @@ const ProjectModal = ({
                             preferredClientId: modalOptions.preselectedClientId,
                             overrideRate: false,
                             isPersonal: false,
-                            color: ''
+                            color: '',
+                            billableTimeIncrementMinutes: '0'
                         };
                     });
                     setSelectedClientRate(preselectedClient);
@@ -161,7 +187,8 @@ const ProjectModal = ({
                         preferredClientId: savedState.preferredClientId || '',
                         overrideRate: savedState.overrideRate || false,
                         isPersonal: savedState.isPersonal ?? getDefaultIsPersonal(modalOptions),
-                        color: savedState.color || ''
+                        color: savedState.color || '',
+                        billableTimeIncrementMinutes: savedState.billableTimeIncrementMinutes || '0'
                     });
                     
                     // Restore client rate if needed
@@ -324,7 +351,7 @@ const ProjectModal = ({
      */
     const handleClose = () => {
         // Reset form data
-        setFormData({ title: '', hourlyRate: '', flatRate: false, preferredClientId: '', overrideRate: false, isPersonal: false, color: '' });
+        setFormData(createEmptyProjectFormData(modalOptions));
         setSelectedClientRate(null);
         onClose();
     };
@@ -530,6 +557,38 @@ const ProjectModal = ({
                                 placeholder="0.00"
                                 required={!formData.flatRate && formData.overrideRate}
                             />
+                        </div>
+                    </div>
+                )}
+
+                {!formData.isPersonal && !formData.flatRate && (
+                    <div className="border border-border rounded-lg p-4 bg-card space-y-3">
+                        <h4 className="text-sm font-medium text-foreground">Billing & Timer Rules</h4>
+                        <div>
+                            <Label htmlFor="billableTimeIncrementMinutes">
+                                Minimum billed time increment
+                            </Label>
+                            <Select
+                                value={formData.billableTimeIncrementMinutes}
+                                onValueChange={(value) => setFormData(prev => ({
+                                    ...prev,
+                                    billableTimeIncrementMinutes: value,
+                                }))}
+                            >
+                                <SelectTrigger id="billableTimeIncrementMinutes" className="mt-1">
+                                    <SelectValue placeholder="Select minimum billed time increment" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {BILLABLE_TIME_INCREMENT_OPTIONS.map(option => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Applies when stopping timers for this project. Time entries keep the actual worked timestamps, while billing and invoices use the rounded project minimum.
+                            </p>
                         </div>
                     </div>
                 )}

@@ -2,6 +2,8 @@
  * Task utility functions for handling task operations
  */
 
+import { getBillableDurationMs } from './timeEntryDurationUtils';
+
 type Task = {
     id: string;
     projectId?: string | null;
@@ -16,6 +18,8 @@ type TimeEntry = {
     taskId: string;
     start: number;
     end?: number;
+    billedDurationMs?: number | null;
+    billingIncrementMinutes?: number | null;
     source?: string;
     billedAt?: number | null;
     billedInvoiceId?: string | null;
@@ -132,7 +136,7 @@ export const getTaskDeletionBillingSummary = (
             && entry.start > billingCutoff
         ) {
             unbilledEntryCount += 1;
-            unbilledTimeMs += (entry.end - entry.start);
+            unbilledTimeMs += getBillableDurationMs(entry);
         }
     });
 

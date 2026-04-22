@@ -60,6 +60,13 @@ vi.mock('../../hooks/useTasks.ts', () => ({
     })
 }))
 
+vi.mock('../../hooks/useProjects.ts', () => ({
+
+    useProjects: () => ({
+        projects: [{ id: 'project-1', title: 'Test Project', billableTimeIncrementMinutes: null }],
+    })
+}))
+
 describe('Timer workflow integration', () => {
 
     const task = { id: 'task-1', projectId: 'project-1', title: 'Test Task' }

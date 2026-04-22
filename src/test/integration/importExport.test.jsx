@@ -7,6 +7,7 @@ import ExportImport from '../../components/ExportImport'
 // Mock useTimers hook
 const mockTimers = [];
 const mockExpenses = [];
+const mockExportBackupData = vi.fn();
 
 vi.mock('../../hooks/useTimers.ts', () => ({
     useTimers: () => ({ timers: mockTimers })
@@ -16,13 +17,21 @@ vi.mock('../../hooks/useExpenses.ts', () => ({
     useExpenses: () => ({ expenses: mockExpenses })
 }));
 
+vi.mock('../../contexts/YjsContext.tsx', () => ({
+    useYjs: () => ({
+        store: {
+            exportBackupData: mockExportBackupData,
+        },
+    }),
+}));
+
+vi.mock('../../hooks/useToast.ts', () => ({
+    useToast: () => ({
+        showError: vi.fn(),
+    }),
+}));
+
 describe('Import/Export integration', () => {
-
-    beforeEach(() => {
-
-        mockTimers.length = 0
-        mockExpenses.length = 0
-    })
 
     const baseProps = {
         projects: [{ id: 'project-1', title: 'Project One' }],
@@ -33,8 +42,34 @@ describe('Import/Export integration', () => {
         businessInfos: [],
         clients: [],
         invoiceTemplates: [],
+        emailTemplates: [],
         preferences: { currency: 'EUR' }
     }
+
+    beforeEach(() => {
+
+        mockTimers.length = 0
+        mockExpenses.length = 0
+        mockExportBackupData.mockResolvedValue({
+            version: '1.1',
+            exportDate: '2026-04-22T12:14:07.792Z',
+            backupType: 'manual',
+            projects: baseProps.projects,
+            tasks: baseProps.tasks,
+            timeEntries: baseProps.timeEntries,
+            invoices: baseProps.invoices,
+            paymentMethods: baseProps.paymentMethods,
+            businessInfos: baseProps.businessInfos,
+            clients: baseProps.clients,
+            invoiceTemplates: baseProps.invoiceTemplates,
+            emailTemplates: baseProps.emailTemplates,
+            expenses: mockExpenses,
+            expenseRecurrences: [],
+            dailyGoals: [],
+            plannerAttachments: [],
+            preferences: baseProps.preferences,
+        })
+    })
 
     const setupExportMocks = () => {
         const originalCreateElement = document.createElement.bind(document)
@@ -75,6 +110,7 @@ describe('Import/Export integration', () => {
 
         await user.click(screen.getByRole('button', { name: 'Export' }))
 
+        expect(mockExportBackupData).toHaveBeenCalledWith({ backupType: 'manual' })
         expect(createObjectURLSpy).toHaveBeenCalled()
 
         const link = getLastLink()
@@ -116,6 +152,7 @@ describe('Import/Export integration', () => {
         expect(parsed.businessInfos).toEqual(baseProps.businessInfos)
         expect(parsed.clients).toEqual(baseProps.clients)
         expect(parsed.invoiceTemplates).toEqual(baseProps.invoiceTemplates)
+        expect(parsed.emailTemplates).toEqual(baseProps.emailTemplates)
         expect(parsed.preferences).toEqual(baseProps.preferences)
 
         blobSpy.mockRestore()
@@ -144,6 +181,7 @@ describe('Import/Export integration', () => {
             businessInfos: [],
             clients: [],
             invoiceTemplates: [],
+            emailTemplates: [],
             preferences: { currency: 'USD' }
         }
 
@@ -161,6 +199,7 @@ describe('Import/Export integration', () => {
             businessInfos: [],
             clients: [],
             invoiceTemplates: [],
+            emailTemplates: [],
             expenses: [],
             expenseRecurrences: [],
             dailyGoals: [],

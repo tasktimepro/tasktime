@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePreferences } from '@/hooks/usePreferences';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
+import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 
 /**
  * MetricsDisplay component - Shows time and earnings metrics for different periods
@@ -68,7 +69,7 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
                 };
             }
 
-            taskRateTimeMap[key].totalTime += (entry.end - entry.start);
+            taskRateTimeMap[key].totalTime += getBillableDurationMs(entry);
         });
 
         // Calculate total rounded hours (matching invoice calculation)

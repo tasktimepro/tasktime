@@ -34,6 +34,10 @@ vi.mock('./YjsDocManager', async () => {
                 return Array.from(docs.keys())
             }
 
+            async listPersistedDocs() {
+                return Array.from(docs.keys())
+            }
+
             destroy() {
                 docs.forEach((doc) => doc.destroy())
                 docs.clear()
@@ -67,6 +71,7 @@ vi.mock('./providers/BackupManager', () => ({
 }))
 
 import { YjsStore } from './YjsStore.ts'
+import { objectToYMap } from './entityUtils.ts'
 
 describe('YjsStore reconnect sync tracking', () => {
     beforeEach(() => {
@@ -321,6 +326,114 @@ describe('YjsStore timer reconciliation', () => {
         // Orphaned project and client attachments are removed
         expect(atts.has('att-orphan-project')).toBe(false)
         expect(atts.has('att-orphan-client')).toBe(false)
+
+        store.destroy()
+    })
+
+    it('exports email templates plus archived and historical backup data', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const coreDoc = docs.get('core')
+        const activeEntriesDoc = docs.get('entries-active')
+        const archivedTasksDoc = new Y.Doc()
+        const archivedInvoicesDoc = new Y.Doc()
+        const archivedExpensesDoc = new Y.Doc()
+        const historicalEntriesDoc = new Y.Doc()
+
+        docs.set('tasks-archived', archivedTasksDoc)
+        docs.set('invoices-archived', archivedInvoicesDoc)
+        docs.set('expenses-archived', archivedExpensesDoc)
+        docs.set('entries-2024', historicalEntriesDoc)
+
+        coreDoc.getMap('projects').set('project-1', objectToYMap({ id: 'project-1', title: 'Project One' }))
+        coreDoc.getMap('tasks').set('task-active', objectToYMap({ id: 'task-active', title: 'Active Task', projectId: 'project-1' }))
+        coreDoc.getMap('clients').set('client-1', objectToYMap({ id: 'client-1', title: 'Client One' }))
+        coreDoc.getMap('businessInfos').set('business-1', objectToYMap({ id: 'business-1', title: 'Business One' }))
+        coreDoc.getMap('invoiceTemplates').set('invoice-template-1', objectToYMap({ id: 'invoice-template-1', name: 'Invoice Template' }))
+        coreDoc.getMap('emailTemplates').set('email-template-1', objectToYMap({ id: 'email-template-1', name: 'Email Template', type: 'invoice', subject: 'Hello', body: 'World', isDefault: true }))
+        coreDoc.getMap('paymentMethods').set('payment-1', objectToYMap({ id: 'payment-1', title: 'Wise' }))
+        coreDoc.getMap('expenses').set('expense-active', objectToYMap({ id: 'expense-active', title: 'Active Expense', date: '2026-04-01', amount: 10, currency: 'EUR', paymentStatus: 'paid', billingStatus: 'unbilled', isPersonal: true, billable: false }))
+        coreDoc.getMap('expenseRecurrences').set('recurrence-1', objectToYMap({ id: 'recurrence-1', title: 'Recurring Expense', currency: 'EUR', amount: 10, amountType: 'fixed', paymentMode: 'manual', repeat: 'monthly', monthlyType: 'specific', monthlyDay: 1, startDate: '2026-01-01', isPersonal: true, billable: false, active: true }))
+        coreDoc.getMap('plannerAttachments').set('attachment-1', objectToYMap({ id: 'attachment-1', type: 'project', referenceId: 'project-1', mode: 'weekday', weekday: 1, sortOrder: 1 }))
+        coreDoc.getMap('dailyGoals').set('goal-1', objectToYMap({ id: 'goal-1', weekday: 1, targetHours: 4 }))
+        coreDoc.getMap('invoices').set('invoice-active', objectToYMap({ id: 'invoice-active', projectId: 'project-1', clientId: 'client-1', date: '2026-04-01', dueDate: '2026-04-15', status: 'draft', subtotal: 10, tax: 0, total: 10, currency: 'EUR', items: [] }))
+        coreDoc.getMap('preferences').set('currency', 'EUR')
+
+        activeEntriesDoc.getMap('timeEntries').set('entry-active', objectToYMap({ id: 'entry-active', taskId: 'task-active', start: Date.UTC(2026, 3, 1), end: Date.UTC(2026, 3, 1, 1) }))
+        archivedTasksDoc.getMap('tasks').set('task-archived', objectToYMap({ id: 'task-archived', title: 'Archived Task', projectId: 'project-1', archived: true }))
+        archivedInvoicesDoc.getMap('invoices').set('invoice-archived', objectToYMap({ id: 'invoice-archived', projectId: 'project-1', clientId: 'client-1', date: '2025-01-01', dueDate: '2025-01-15', status: 'paid', subtotal: 20, tax: 0, total: 20, currency: 'EUR', items: [] }))
+        archivedExpensesDoc.getMap('expenses').set('expense-archived', objectToYMap({ id: 'expense-archived', title: 'Archived Expense', date: '2025-01-01', amount: 20, currency: 'EUR', paymentStatus: 'paid', billingStatus: 'unbilled', isPersonal: true, billable: false }))
+        historicalEntriesDoc.getMap('timeEntries').set('entry-2024', objectToYMap({ id: 'entry-2024', taskId: 'task-active', start: Date.UTC(2024, 0, 1), end: Date.UTC(2024, 0, 1, 1) }))
+
+        const payload = await store.exportBackupData({ backupType: 'manual', exportDate: '2026-04-22T00:00:00.000Z' })
+
+        expect(payload.emailTemplates).toEqual([
+            expect.objectContaining({ id: 'email-template-1' }),
+        ])
+        expect(payload.tasks).toEqual(expect.arrayContaining([
+            expect.objectContaining({ id: 'task-active' }),
+            expect.objectContaining({ id: 'task-archived' }),
+        ]))
+        expect(payload.invoices).toEqual(expect.arrayContaining([
+            expect.objectContaining({ id: 'invoice-active' }),
+            expect.objectContaining({ id: 'invoice-archived' }),
+        ]))
+        expect(payload.expenses).toEqual(expect.arrayContaining([
+            expect.objectContaining({ id: 'expense-active' }),
+            expect.objectContaining({ id: 'expense-archived' }),
+        ]))
+        expect(payload.timeEntries).toEqual(expect.arrayContaining([
+            expect.objectContaining({ id: 'entry-active' }),
+            expect.objectContaining({ id: 'entry-2024' }),
+        ]))
+        expect(payload.backupType).toBe('manual')
+
+        store.destroy()
+    })
+
+    it('imports email templates plus archived and historical backup data into the correct docs', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        await store.importBackupData({
+            projects: [{ id: 'project-1', title: 'Project One' }],
+            tasks: [
+                { id: 'task-active', title: 'Active Task', projectId: 'project-1' },
+                { id: 'task-archived', title: 'Archived Task', projectId: 'project-1', archived: true, archivedOnDate: '2026-04-22' },
+            ],
+            timeEntries: [
+                { id: 'entry-active', taskId: 'task-active', start: Date.now(), end: Date.now() + 1_000 },
+                { id: 'entry-2024', taskId: 'task-active', start: Date.UTC(2024, 0, 1), end: Date.UTC(2024, 0, 1, 1) },
+            ],
+            invoices: [
+                { id: 'invoice-active', invoiceNumber: 'INV-1000', projectId: 'project-1', clientId: 'client-1', date: '2026-04-01', dueDate: '2026-04-15', status: 'draft', subtotal: 10, tax: 0, total: 10, currency: 'EUR', items: [] },
+                { id: 'invoice-archived', invoiceNumber: 'INV-1001', projectId: 'project-1', clientId: 'client-1', date: '2025-01-01', dueDate: '2025-01-15', status: 'paid', paidAt: Date.UTC(2025, 0, 15), subtotal: 20, tax: 0, total: 20, currency: 'EUR', items: [] },
+            ],
+            paymentMethods: [],
+            businessInfos: [],
+            clients: [],
+            invoiceTemplates: [],
+            emailTemplates: [{ id: 'email-template-1', name: 'Email Template', type: 'invoice', subject: 'Hello', sendBody: 'World', reminderBody: 'Reminder', attachmentTitle: 'invoice.pdf', isDefault: true }],
+            expenses: [
+                { id: 'expense-active', title: 'Active Expense', date: '2026-04-01', amount: 10, currency: 'EUR', paymentStatus: 'paid', billingStatus: 'unbilled', isPersonal: true, billable: false, isRecurring: false, isTaxExempt: false },
+                { id: 'expense-archived', title: 'Archived Expense', date: '2025-01-01', amount: 20, currency: 'EUR', paymentStatus: 'paid', billingStatus: 'unbilled', isPersonal: true, billable: false, isRecurring: false, isTaxExempt: false },
+            ],
+            expenseRecurrences: [],
+            dailyGoals: [],
+            plannerAttachments: [],
+            preferences: { currency: 'EUR' },
+        })
+
+        expect(store.emailTemplates.has('email-template-1')).toBe(true)
+        expect(store.tasks.has('task-active')).toBe(true)
+        expect((await store.loadArchivedTasks()).has('task-archived')).toBe(true)
+        expect(store.activeTimeEntries.has('entry-active')).toBe(true)
+        expect((await store.loadEntriesForYear(2024)).has('entry-2024')).toBe(true)
+        expect(store.invoices.has('invoice-active')).toBe(true)
+        expect((await store.loadArchivedInvoices()).has('invoice-archived')).toBe(true)
+        expect(store.expenses.has('expense-active')).toBe(true)
+        expect((await store.loadArchivedExpenses()).has('expense-archived')).toBe(true)
 
         store.destroy()
     })

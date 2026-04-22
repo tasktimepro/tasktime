@@ -175,4 +175,27 @@ describe('buildInvoiceTaskData', () => {
         expect(result[0].hours).toBe(3.5)
         expect(result[0].isEdited).toBe(true)
     })
+
+    it('uses billed duration overrides for invoice totals when present', () => {
+
+        const tasks = [
+            { id: 'task-1', projectId: 'project-1', title: 'Billable', billable: true }
+        ]
+
+        const timeEntries = [
+            { taskId: 'task-1', start: 1, end: (5 * 60 * 1000) + 1, billedDurationMs: 15 * 60 * 1000 }
+        ]
+
+        const result = buildInvoiceTaskData({
+            projectForData: project,
+            selectedProject: null,
+            tasks,
+            timeEntries,
+            editableHours: {}
+        })
+
+        expect(result).toHaveLength(1)
+        expect(result[0].originalTimeMs).toBe(15 * 60 * 1000)
+        expect(result[0].originalHours).toBe(0.25)
+    })
 })

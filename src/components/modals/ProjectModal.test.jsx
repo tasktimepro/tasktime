@@ -37,6 +37,18 @@ describe('ProjectModal', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         clientState.clients = [];
+        if (!Element.prototype.hasPointerCapture) {
+            Element.prototype.hasPointerCapture = vi.fn(() => false);
+        }
+        if (!Element.prototype.setPointerCapture) {
+            Element.prototype.setPointerCapture = vi.fn();
+        }
+        if (!Element.prototype.releasePointerCapture) {
+            Element.prototype.releasePointerCapture = vi.fn();
+        }
+        if (!HTMLElement.prototype.scrollIntoView) {
+            HTMLElement.prototype.scrollIntoView = vi.fn();
+        }
     });
 
     it('checks personal project by default for a blank new project', () => {
@@ -90,5 +102,36 @@ describe('ProjectModal', () => {
 
         expect(screen.queryByRole('checkbox', { name: 'Personal project (Not billable)' })).not.toBeInTheDocument();
         expect(screen.getByText('Client')).toBeInTheDocument();
+    });
+
+    it('persists the billing increment setting for billable projects', async () => {
+        const user = userEvent.setup();
+
+        clientState.clients = [
+            {
+                id: 'client-1',
+                title: 'Acme',
+                archived: false,
+                hourlyRate: 100,
+                flatRate: false,
+            },
+        ];
+
+        render(
+            <ProjectModal
+                isOpen={true}
+                onClose={vi.fn()}
+                modalOptions={{ preselectedClientId: 'client-1' }}
+            />
+        );
+
+        await user.type(screen.getByLabelText('Project Title *'), 'Rounded Project');
+        await user.click(screen.getByRole('combobox', { name: 'Minimum billed time increment' }));
+        await user.click(await screen.findByRole('option', { name: 'Round up to 15 minutes' }));
+        await user.click(screen.getByRole('button', { name: 'Create Project' }));
+
+        expect(projectHookMocks.createProject).toHaveBeenCalledWith(expect.objectContaining({
+            billableTimeIncrementMinutes: 15,
+        }));
     });
 });

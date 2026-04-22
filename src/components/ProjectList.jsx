@@ -28,6 +28,7 @@ import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { getInvoicesForProject } from '../utils/invoiceUtils.ts';
 import { buildProjectRecentUpdateMap } from '../utils/activityUtils.ts';
+import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 
 import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
 /**
@@ -257,7 +258,7 @@ const ProjectList = ({
             if (!taskTimeMap[entry.taskId]) {
                 taskTimeMap[entry.taskId] = 0;
             }
-            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+            taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
         });
 
         const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
@@ -294,7 +295,7 @@ const ProjectList = ({
             if (!taskTimeMap[entry.taskId]) {
                 taskTimeMap[entry.taskId] = 0;
             }
-            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+            taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
         });
 
         return Object.values(taskTimeMap).reduce((total, taskTime) => {

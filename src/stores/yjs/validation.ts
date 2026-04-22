@@ -53,6 +53,7 @@ const projectSchema = z.object({
     lastBilledAt: finiteNumberSchema.nullable().optional(),
     color: z.string().nullable().optional(),
     invoiceIds: z.array(nonEmptyStringSchema).optional(),
+    billableTimeIncrementMinutes: z.number().int().positive().nullable().optional(),
 }).passthrough() satisfies z.ZodType<Project>;
 
 const taskSchema = z.object({
@@ -90,6 +91,8 @@ const timeEntrySchema = z.object({
     billedHourlyRate: finiteNumberSchema.nullable().optional(),
     billedAt: finiteNumberSchema.nullable().optional(),
     billedInvoiceId: optionalNullableIdSchema,
+    billedDurationMs: nonNegativeNumberSchema.nullable().optional(),
+    billingIncrementMinutes: z.number().int().positive().nullable().optional(),
 }).superRefine((value: TimeEntry, ctx: z.RefinementCtx) => {
     if (value.end < value.start) {
         ctx.addIssue({
@@ -182,6 +185,16 @@ const invoiceItemSchema = z.object({
     exchangeRate: finiteNumberSchema.optional(),
 }).passthrough();
 
+const invoicePaymentCurrencySnapshotSchema = z.object({
+    capturedAt: finiteNumberSchema,
+    sourceCurrency: nonEmptyStringSchema,
+    sourceAmount: finiteNumberSchema,
+    preferredCurrencyAtPayment: nonEmptyStringSchema,
+    preferredCurrencyAmount: finiteNumberSchema,
+    exchangeRatesBase: nonEmptyStringSchema.optional(),
+    exchangeRates: z.record(z.string(), finiteNumberSchema).optional(),
+}).passthrough();
+
 const invoiceSchema = z.object({
     id: nonEmptyStringSchema,
     projectId: nonEmptyStringSchema,
@@ -202,6 +215,7 @@ const invoiceSchema = z.object({
     paymentMethodId: optionalNullableIdSchema,
     currency: z.string().optional(),
     paidAt: finiteNumberSchema.nullable().optional(),
+    paymentCurrencySnapshot: invoicePaymentCurrencySnapshotSchema.nullable().optional(),
     sentAt: finiteNumberSchema.nullable().optional(),
     sentToEmail: z.string().nullable().optional(),
 }).passthrough() satisfies z.ZodType<Invoice>;

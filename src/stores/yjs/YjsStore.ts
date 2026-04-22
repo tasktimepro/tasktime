@@ -15,8 +15,16 @@ import { YjsDriveProvider } from './providers/GoogleDriveProvider';
 import { BackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
 import { migrateInvoicesInDoc } from './invoiceMigration';
+import {
+    backfillPaidInvoiceCurrencySnapshotsInDoc,
+    hasPaidInvoicesMissingCurrencySnapshotsInMap,
+} from './invoicePaymentSnapshotMigration';
+import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
+import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
+import { createBackupPayload, type BackupImportPayload, type BackupPayload } from '@/utils/backupData';
 import { parseStoredDate } from '@/utils/dateUtils';
 import { readEntity, objectToYMap, collectEntities, forEachEntity } from './entityUtils';
+import { validateCollectionEntity } from './validation';
 import type {
     DocName,
     SyncState,
@@ -93,6 +101,8 @@ export class YjsStore {
         if (migratedCoreInvoices > 0) {
             console.log(`[YjsStore] Migrated ${migratedCoreInvoices} active invoices to canonical shape`);
         }
+
+        await this.backfillInvoicePaymentSnapshots(this._coreDoc, 'active');
 
         // Run automatic archival of old data
         await this.archiveOldEntries();
@@ -279,6 +289,28 @@ export class YjsStore {
         return allTasks;
     }
 
+    async getAllExpenses(): Promise<Expense[]> {
+        const allExpenses: Expense[] = [];
+        const seenIds = new Set<string>();
+
+        for (const expense of collectEntities<Expense>(this.expenses as any)) {
+            allExpenses.push(expense);
+            seenIds.add(expense.id);
+        }
+
+        const archivedMap = await this.loadArchivedExpenses();
+
+        for (const expense of collectEntities<Expense>(archivedMap as any)) {
+            if (seenIds.has(expense.id)) {
+                continue;
+            }
+
+            allExpenses.push(expense);
+        }
+
+        return allExpenses;
+    }
+
     // =========================================================================
     // Archived Expenses (On-Demand)
     // =========================================================================
@@ -440,8 +472,7 @@ export class YjsStore {
         // Active entries
         entries.push(...collectEntities<TimeEntry>(this.activeTimeEntries as any));
 
-        // Get all years from local docs
-        const years = this.getLocalYears();
+        const years = await this.getAvailableYears();
 
         // Load each year's entries
         for (const year of years) {
@@ -490,6 +521,8 @@ export class YjsStore {
             if (migratedArchivedInvoices > 0) {
                 console.log(`[YjsStore] Migrated ${migratedArchivedInvoices} archived invoices to canonical shape`);
             }
+
+            await this.backfillInvoicePaymentSnapshots(this._archivedInvoicesDoc, 'archived');
 
             // Sync with Drive if connected
             if (this.driveProvider?.isConnected()) {
@@ -711,6 +744,27 @@ export class YjsStore {
         console.log(`[YjsStore] Archived ${toArchive.length} expenses older than 90 days`);
     }
 
+    private async backfillInvoicePaymentSnapshots(doc: Y.Doc, label: 'active' | 'archived'): Promise<void> {
+        const invoicesMap = doc.getMap('invoices') as Y.Map<string, unknown>;
+        if (!hasPaidInvoicesMissingCurrencySnapshotsInMap(invoicesMap)) {
+            return;
+        }
+
+        const preferredCurrencyValue = this._coreDoc?.getMap('preferences').get('currency');
+        const preferredCurrency = normalizeCurrencyCode(
+            typeof preferredCurrencyValue === 'string' ? preferredCurrencyValue : undefined
+        );
+        const { rates } = await fetchExchangeRates();
+        const backfilledCount = backfillPaidInvoiceCurrencySnapshotsInDoc(doc, {
+            preferredCurrency,
+            exchangeRates: rates,
+        });
+
+        if (backfilledCount > 0) {
+            console.log(`[YjsStore] Backfilled ${backfilledCount} ${label} invoice payment currency snapshots`);
+        }
+    }
+
     // =========================================================================
     // Google Drive Sync
     // =========================================================================
@@ -913,11 +967,161 @@ export class YjsStore {
      * Get available years for time entries (from Drive manifest)
      */
     async getAvailableYears(): Promise<number[]> {
-        const localYears = this.getLocalYears();
+        const localYears = new Set(this.getLocalYears());
+        const persistedDocs = await this.docManager.listPersistedDocs();
+
+        for (const docName of persistedDocs) {
+            const match = docName.match(/^entries-(\d{4})$/);
+
+            if (match) {
+                localYears.add(parseInt(match[1], 10));
+            }
+        }
+
         const driveYears = this.driveProvider?.getEntryYears() ?? [];
-        
+
         const allYears = new Set([...localYears, ...driveYears]);
         return Array.from(allYears).sort((a, b) => b - a);
+    }
+
+    async exportBackupData(options: { backupType?: 'automatic' | 'manual'; exportDate?: string } = {}): Promise<BackupPayload> {
+        const [tasks, timeEntries, invoices, expenses] = await Promise.all([
+            this.getAllTasks(),
+            this.loadAllTimeEntries(),
+            this.getAllInvoices(),
+            this.getAllExpenses(),
+        ]);
+
+        return createBackupPayload({
+            exportDate: options.exportDate,
+            backupType: options.backupType,
+            projects: collectEntities(this.projects as any),
+            tasks,
+            timeEntries,
+            invoices,
+            paymentMethods: collectEntities(this.paymentMethods as any),
+            businessInfos: collectEntities(this.businessInfos as any),
+            clients: collectEntities(this.clients as any),
+            invoiceTemplates: collectEntities(this.invoiceTemplates as any),
+            emailTemplates: collectEntities(this.emailTemplates as any),
+            expenses,
+            expenseRecurrences: collectEntities(this.expenseRecurrences as any),
+            dailyGoals: collectEntities(this.dailyGoals as any),
+            plannerAttachments: collectEntities(this.plannerAttachments as any),
+            preferences: Object.fromEntries(this.preferences.entries()) as Preferences,
+        });
+    }
+
+    async importBackupData(data: BackupImportPayload): Promise<void> {
+        const archivedTaskMapPromise = (data.tasks || []).some((task) => task.archived || task.archivedOnDate)
+            ? this.loadArchivedTasks()
+            : null;
+        const archivedInvoiceMapPromise = (data.invoices || []).some((invoice) => this.shouldArchiveInvoiceOnImport(normalizeInvoiceRecord(invoice)))
+            ? this.loadArchivedInvoices()
+            : null;
+        const archivedExpenseMapPromise = (data.expenses || []).some((expense) => this.shouldArchiveExpenseOnImport(expense))
+            ? this.loadArchivedExpenses()
+            : null;
+
+        const historicalEntryYears = new Set(
+            (data.timeEntries || [])
+                .filter((entry) => this.shouldArchiveTimeEntryOnImport(entry))
+                .map((entry) => new Date(entry.start).getFullYear())
+        );
+
+        const historicalEntryMaps = new Map<number, Y.Map<string, TimeEntry>>();
+
+        for (const year of historicalEntryYears) {
+            historicalEntryMaps.set(year, await this.loadEntriesForYear(year));
+        }
+
+        const archivedTasksMap = archivedTaskMapPromise ? await archivedTaskMapPromise : null;
+        const archivedInvoicesMap = archivedInvoiceMapPromise ? await archivedInvoiceMapPromise : null;
+        const archivedExpensesMap = archivedExpenseMapPromise ? await archivedExpenseMapPromise : null;
+
+        for (const project of data.projects || []) {
+            const validated = validateCollectionEntity<Project>('projects', project, `import project ${project.id}`);
+            (this.projects as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const task of data.tasks || []) {
+            const validated = validateCollectionEntity<Task>('tasks', task, `import task ${task.id}`);
+            const targetMap = validated.archived || validated.archivedOnDate ? archivedTasksMap : this.tasks;
+            (targetMap as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const entry of data.timeEntries || []) {
+            const validated = validateCollectionEntity<TimeEntry>('timeEntries', entry, `import time entry ${entry.id}`);
+            if (this.shouldArchiveTimeEntryOnImport(validated)) {
+                const year = new Date(validated.start).getFullYear();
+                const yearMap = historicalEntryMaps.get(year) ?? await this.loadEntriesForYear(year);
+                historicalEntryMaps.set(year, yearMap);
+                (yearMap as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+            } else {
+                (this.activeTimeEntries as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+            }
+        }
+
+        for (const invoice of data.invoices || []) {
+            const normalizedInvoice = normalizeInvoiceRecord(invoice);
+            const validated = validateCollectionEntity<Invoice>('invoices', normalizedInvoice, `import invoice ${normalizedInvoice.id}`);
+            const targetMap = this.shouldArchiveInvoiceOnImport(validated) ? archivedInvoicesMap : this.invoices;
+            (targetMap as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const method of data.paymentMethods || []) {
+            const validated = validateCollectionEntity<PaymentMethod>('paymentMethods', method, `import payment method ${method.id}`);
+            (this.paymentMethods as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const info of data.businessInfos || []) {
+            const validated = validateCollectionEntity<BusinessInfo>('businessInfos', info, `import business info ${info.id}`);
+            (this.businessInfos as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const client of data.clients || []) {
+            const validated = validateCollectionEntity<Client>('clients', client, `import client ${client.id}`);
+            (this.clients as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const template of data.invoiceTemplates || []) {
+            const validated = validateCollectionEntity<InvoiceTemplate>('invoiceTemplates', template, `import invoice template ${template.id}`);
+            (this.invoiceTemplates as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const template of data.emailTemplates || []) {
+            const validated = validateCollectionEntity<EmailTemplate>('emailTemplates', template, `import email template ${template.id}`);
+            (this.emailTemplates as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const expense of data.expenses || []) {
+            const validated = validateCollectionEntity<Expense>('expenses', expense, `import expense ${expense.id}`);
+            const targetMap = this.shouldArchiveExpenseOnImport(validated) ? archivedExpensesMap : this.expenses;
+            (targetMap as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const recurrence of data.expenseRecurrences || []) {
+            const validated = validateCollectionEntity<ExpenseRecurrence>('expenseRecurrences', recurrence, `import expense recurrence ${recurrence.id}`);
+            (this.expenseRecurrences as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const goal of data.dailyGoals || []) {
+            const validated = validateCollectionEntity<DailyGoal>('dailyGoals', goal, `import daily goal ${goal.id}`);
+            (this.dailyGoals as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const attachment of data.plannerAttachments || []) {
+            const validated = validateCollectionEntity<PlannerAttachment>('plannerAttachments', attachment, `import planner attachment ${attachment.id}`);
+            (this.plannerAttachments as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        const validatedPreferences = validateCollectionEntity<Preferences>('preferences', data.preferences || {}, 'import preferences');
+        for (const key of Array.from(this.preferences.keys())) {
+            this.preferences.delete(key);
+        }
+        for (const [key, value] of Object.entries(validatedPreferences)) {
+            this.preferences.set(key, value as Preferences[keyof Preferences]);
+        }
     }
 
     // =========================================================================
@@ -1085,6 +1289,38 @@ export class YjsStore {
         if (!this._isReady) {
             throw new Error('[YjsStore] Store not initialized. Call initialize() first.');
         }
+    }
+
+    private shouldArchiveTimeEntryOnImport(entry: TimeEntry): boolean {
+        return entry.start < Date.now() - NINETY_DAYS_MS;
+    }
+
+    private shouldArchiveInvoiceOnImport(invoice: Invoice): boolean {
+        if (invoice.status !== 'paid' || typeof invoice.paidAt !== 'number') {
+            return false;
+        }
+
+        return new Date(invoice.paidAt).getFullYear() < new Date().getFullYear();
+    }
+
+    private shouldArchiveExpenseOnImport(expense: Expense): boolean {
+        if (!expense?.date) {
+            return false;
+        }
+
+        const parsedDate = parseStoredDate(expense.date);
+        if (!parsedDate) {
+            return false;
+        }
+
+        if (parsedDate.getTime() >= Date.now() - NINETY_DAYS_MS) {
+            return false;
+        }
+
+        const isPaid = expense.paymentStatus === 'paid';
+        const isBillableUnbilled = expense.billable && expense.billingStatus === 'unbilled';
+
+        return isPaid && !isBillableUnbilled;
     }
 
     private trackDocForDisconnectedChanges(docName: DocName, doc: Y.Doc): void {

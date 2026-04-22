@@ -18,6 +18,7 @@ import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 import { useTimers } from '../hooks/useTimers.ts';
+import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import {
     getInvoicesForProject,
     getLatestInvoiceForProject,
@@ -1817,7 +1818,7 @@ const InvoiceGenerator = ({
             if (!taskTimeMap[entry.taskId]) {
                 taskTimeMap[entry.taskId] = 0;
             }
-            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+            taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
         });
 
         // Calculate total rounded hours (matching invoice calculation)

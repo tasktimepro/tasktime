@@ -6,6 +6,8 @@ import { useToast } from '../hooks/useToast.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTasks } from '../hooks/useTasks.ts';
+import { useProjects } from '../hooks/useProjects.ts';
+import { buildBillableDurationFields } from '../utils/timeEntryDurationUtils.ts';
 
 /**
  * TimerControls component - Handles task timer functionality using Yjs hooks directly
@@ -35,6 +37,7 @@ function TimerControls({
     
     const { entries, createEntry } = useTimeEntries();
     const { activeTasks, updateTask } = useTasks();
+    const { projects } = useProjects();
     
     const projectId = task.projectId;
     const timerKey = projectId || task.id;
@@ -66,6 +69,26 @@ function TimerControls({
         return true;
     }, [activeTasks, entries, task, showError]);
 
+    const buildTimeEntryPayload = useCallback((taskId, start, end, entryNote, stoppedTimerKey) => {
+        const entryTask = activeTasks.find(activeTask => activeTask.id === taskId) || (task.id === taskId ? task : null);
+        const project = entryTask?.projectId
+            ? projects.find(currentProject => currentProject.id === entryTask.projectId)
+            : null;
+
+        return {
+            taskId,
+            start,
+            end,
+            note: entryNote,
+            _stoppedTimerKey: stoppedTimerKey,
+            ...buildBillableDurationFields({
+                start,
+                end,
+                billingIncrementMinutes: project?.billableTimeIncrementMinutes,
+            }),
+        };
+    }, [activeTasks, projects, task]);
+
     /**
      * Create a time entry with overlap validation
      */
@@ -73,9 +96,9 @@ function TimerControls({
         if (!validateTimeEntry(taskId, start, end)) {
             return false;
         }
-        createEntry({ taskId, start, end, note: entryNote, _stoppedTimerKey: stoppedTimerKey });
+        createEntry(buildTimeEntryPayload(taskId, start, end, entryNote, stoppedTimerKey));
         return true;
-    }, [validateTimeEntry, createEntry]);
+    }, [validateTimeEntry, createEntry, buildTimeEntryPayload]);
 
     /**
      * Start timer for current task

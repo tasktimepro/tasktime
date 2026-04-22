@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../../../constants/app';
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimers } from '../../../hooks/useTimers';
+import { getBillableDurationMs } from '../../../utils/timeEntryDurationUtils';
 
 type TaskItem = {
     id: string;
@@ -18,6 +19,8 @@ type TimeEntry = {
     taskId: string;
     start: number;
     end?: number;
+    billedDurationMs?: number | null;
+    billingIncrementMinutes?: number | null;
 };
 
 type UseTaskStateParams = {
@@ -97,7 +100,7 @@ const useTaskState = ({
         });
 
         const totalBillableTime = taskBillableEntries.reduce((total, entry) => {
-            return total + ((entry.end as number) - entry.start);
+            return total + getBillableDurationMs(entry);
         }, 0);
 
         return totalBillableTime >= BILLABLE_TIME_THRESHOLD_MS;

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { ChevronDownIcon, ChevronRightIcon } from '@/components/ui/icons';
 import SubtaskItem from './SubtaskItem';
 import SubtaskCreateForm from './SubtaskCreateForm';
 import Modal from '../../Modal';
@@ -12,6 +13,7 @@ import DeleteTaskWarnings from '../DeleteTaskWarnings';
 import { getTaskDeletionBillingSummary } from '../../../utils/taskUtils.ts';
 import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
+import { toStorageDate } from '../../../utils/dateUtils.ts';
 
 /**
  * SubtaskSection component - Renders subtasks list and create form.
@@ -42,11 +44,12 @@ const SubtaskSection = ({
 }) => {
     const isMobileLayout = useIsMobileLayout();
     // Yjs hooks for state
-    const { tasks, deleteTask } = useTasks();
+    const { tasks, updateTask, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { timers, clearTimer } = useTimers();
     const { projects } = useProjects();
     const [pendingDeleteSubtaskId, setPendingDeleteSubtaskId] = useState(null);
+    const [showArchivedSubtasks, setShowArchivedSubtasks] = useState(false);
 
     const sortedSubtasks = useMemo(() => {
         return [...subtasks].sort((a, b) => {
@@ -63,6 +66,14 @@ const SubtaskSection = ({
             return bLastActive - aLastActive;
         });
     }, [subtasks]);
+
+    const activeSubtasks = useMemo(() => {
+        return sortedSubtasks.filter((subtask) => !subtask.archived);
+    }, [sortedSubtasks]);
+
+    const archivedSubtasks = useMemo(() => {
+        return sortedSubtasks.filter((subtask) => subtask.archived);
+    }, [sortedSubtasks]);
 
     const pendingDeleteSubtask = useMemo(() => {
 
@@ -88,6 +99,24 @@ const SubtaskSection = ({
 
         setPendingDeleteSubtaskId(subtaskId);
     }, []);
+
+    const handleArchiveSubtask = useCallback((subtaskId) => {
+        updateTask(subtaskId, {
+            archived: true,
+            archivedOnDate: toStorageDate(new Date()),
+            lastActive: Date.now(),
+        });
+        showSuccess('Subtask archived');
+    }, [updateTask, showSuccess]);
+
+    const handleUnarchiveSubtask = useCallback((subtaskId) => {
+        updateTask(subtaskId, {
+            archived: false,
+            archivedOnDate: null,
+            lastActive: Date.now(),
+        });
+        showSuccess('Subtask unarchived');
+    }, [updateTask, showSuccess]);
 
     const closeDeleteSubtaskModal = useCallback(() => {
 
@@ -117,18 +146,19 @@ const SubtaskSection = ({
         setPendingDeleteSubtaskId(null);
     }, [pendingDeleteSubtaskId, pendingDeleteSubtask, subtasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);
 
-    if (isArchived || (subtasks.length === 0 && !onCreateSubtask)) {
+    if (isArchived || (activeSubtasks.length === 0 && archivedSubtasks.length === 0 && !onCreateSubtask)) {
         return null;
     }
 
     return (
         <div className="border-t border-border bg-muted/40 rounded-b-lg">
-            <div className={cn('space-y-2 py-2 pr-2', isMobileLayout ? 'px-2' : 'pl-8')}>
-                {sortedSubtasks.map((subtask) => (
+            <div className={cn('space-y-2 py-2 pb-4 pr-2', isMobileLayout ? 'px-2' : 'pl-8')}>
+                {activeSubtasks.map((subtask) => (
                     <SubtaskItem
                         key={subtask.id}
                         task={subtask}
                         onToggleBillable={onToggleBillable}
+                        onArchive={() => handleArchiveSubtask(subtask.id)}
                         onDelete={() => handleDeleteSubtask(subtask.id)}
                         onEditTask={onEditTask}
                         onViewTask={onViewTask}
@@ -161,6 +191,39 @@ const SubtaskSection = ({
                             </button>
                         </div>
                     )
+                )}
+
+                {archivedSubtasks.length > 0 && (
+                    <div className="pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowArchivedSubtasks((prev) => !prev)}
+                            className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                            {showArchivedSubtasks ? (
+                                <ChevronDownIcon className="mr-1 h-4 w-4" />
+                            ) : (
+                                <ChevronRightIcon className="mr-1 h-4 w-4" />
+                            )}
+                            Archived Subtasks ({archivedSubtasks.length})
+                        </button>
+
+                        {showArchivedSubtasks && (
+                            <div className="mt-2 space-y-2">
+                                {archivedSubtasks.map((subtask) => (
+                                    <SubtaskItem
+                                        key={subtask.id}
+                                        task={subtask}
+                                        onToggleBillable={onToggleBillable}
+                                        onDelete={() => handleDeleteSubtask(subtask.id)}
+                                        onUnarchive={() => handleUnarchiveSubtask(subtask.id)}
+                                        onEditTask={onEditTask}
+                                        onViewTask={onViewTask}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
 

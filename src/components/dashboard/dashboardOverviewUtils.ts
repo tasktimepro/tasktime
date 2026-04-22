@@ -1,6 +1,7 @@
 import { THIRTY_DAYS_MS } from '@/constants/app';
 import { millisecondsToHours } from '@/utils/dateUtils';
 import { buildProjectRecentUpdateMap } from '@/utils/activityUtils';
+import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
 import type { Client, Expense, ExpenseRecurrence, Invoice, Project, Task, TimeEntry } from '@/stores/yjs/types';
 
 type DashboardTimer = {
@@ -220,7 +221,7 @@ export const buildDashboardProjects = ({
 
         const taskLastBilledAt = task.lastBilledAt || 0;
         if (entry.start > taskLastBilledAt && task.billable === true && entry.source !== 'invoice-adjustment') {
-            currentActivity.taskPendingTime[task.id] = (currentActivity.taskPendingTime[task.id] || 0) + (entry.end - entry.start);
+            currentActivity.taskPendingTime[task.id] = (currentActivity.taskPendingTime[task.id] || 0) + getBillableDurationMs(entry);
         }
 
         projectActivity.set(task.projectId, currentActivity);

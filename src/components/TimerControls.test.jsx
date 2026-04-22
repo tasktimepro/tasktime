@@ -33,6 +33,11 @@ const tasksHookMocks = vi.hoisted(() => ({
     updateTask: vi.fn()
 }))
 
+const projectHookMocks = vi.hoisted(() => ({
+
+    projects: [{ id: 'project-1', billableTimeIncrementMinutes: 15 }]
+}))
+
 vi.mock('../hooks/useTimers.ts', () => ({
 
     useTimers: () => ({
@@ -63,6 +68,11 @@ vi.mock('../hooks/useTasks.ts', () => ({
         activeTasks: [],
         updateTask: tasksHookMocks.updateTask
     })
+}))
+
+vi.mock('../hooks/useProjects.ts', () => ({
+
+    useProjects: () => projectHookMocks
 }))
 
 describe('TimerControls', () => {
@@ -185,6 +195,33 @@ describe('TimerControls', () => {
             })
         )
         expect(timerHookMocks.clearTimer).toHaveBeenCalledWith('project-1')
+    })
+
+    it('stores billable duration metadata when the project has a billing increment', async () => {
+
+        mockProjectTimer = {
+            projectId: 'project-1',
+            taskId: 'task-1',
+            startTime: 1000,
+            elapsedTime: 5000,
+            isPaused: false,
+            note: ''
+        }
+
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(6000)
+
+        renderWithToast(
+            <TimerControls task={baseTask} />
+        )
+
+        await userEvent.click(screen.getByTitle('Save & Stop Timer'))
+
+        expect(entriesHookMocks.createEntry).toHaveBeenCalledWith(expect.objectContaining({
+            billedDurationMs: 15 * 60 * 1000,
+            billingIncrementMinutes: 15,
+        }))
+
+        nowSpy.mockRestore()
     })
 
     it('stops existing timer when starting a new one', async () => {

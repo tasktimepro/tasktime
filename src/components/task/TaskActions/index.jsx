@@ -25,6 +25,7 @@ const TaskActions = ({
 }) => {
     // Use Yjs timer hook directly
     const { getTimerForTask } = useTimers();
+    const itemLabel = task.parentTaskId ? 'Subtask' : 'Task';
     const projectTimer = getTimerForTask(task.id, task.projectId);
     const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
     const isPaused = projectTimer?.isPaused || false;
@@ -54,8 +55,8 @@ const TaskActions = ({
                             size="icon"
                             onClick={onUnarchive}
                             className="h-8 w-8"
-                            title="Unarchive Task"
-                            aria-label="Unarchive Task"
+                            title={`Unarchive ${itemLabel}`}
+                            aria-label={`Unarchive ${itemLabel}`}
                         >
                             <ArchiveRestoreIcon className="h-5 w-5" />
                         </Button>
@@ -66,8 +67,8 @@ const TaskActions = ({
                             size="icon"
                             onClick={onDelete}
                             className="status-danger-action h-8 w-8 status-danger-text-strong"
-                            title="Delete Task"
-                            aria-label="Delete Task"
+                            title={`Delete ${itemLabel}`}
+                            aria-label={`Delete ${itemLabel}`}
                         >
                             <TrashIcon className="h-5 w-5" />
                         </Button>
@@ -114,13 +115,14 @@ const TaskActions = ({
                         </Button>
                     )}
 
-                    {!task.recurring && isCompleted && !task.parentTaskId && onArchive && !hideNonTimerActions && (
+                    {!task.recurring && isCompleted && onArchive && !hideNonTimerActions && (
                         <Button
                             variant="ghost"
                             size="icon"
                             onClick={onArchive}
                             className="status-warning-action h-8 w-8 status-warning-text-strong"
-                            title="Archive Task"
+                            title={`Archive ${itemLabel}`}
+                            aria-label={`Archive ${itemLabel}`}
                         >
                             <ArchiveBoxIcon className="h-5 w-5" />
                         </Button>

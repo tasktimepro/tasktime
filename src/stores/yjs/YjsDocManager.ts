@@ -160,6 +160,49 @@ export class YjsDocManager {
             .map(([name]) => name);
     }
 
+    async listPersistedDocs(): Promise<DocName[]> {
+        const persistedDocs = new Set<DocName>(this.getLoadedDocs());
+
+        if (typeof indexedDB === 'undefined') {
+            return Array.from(persistedDocs);
+        }
+
+        const indexedDbWithDatabases = indexedDB as IDBFactory & {
+            databases?: () => Promise<Array<{ name?: string }>>;
+        };
+
+        if (!indexedDbWithDatabases.databases) {
+            return Array.from(persistedDocs);
+        }
+
+        try {
+            const databases = await indexedDbWithDatabases.databases();
+
+            for (const database of databases) {
+                const name = database.name;
+
+                if (!name?.startsWith('tasktime-yjs-')) {
+                    continue;
+                }
+
+                const docName = name.slice('tasktime-yjs-'.length);
+
+                if (docName === 'core'
+                    || docName === 'tasks-archived'
+                    || docName === 'entries-active'
+                    || docName === 'expenses-archived'
+                    || docName === 'invoices-archived'
+                    || /^entries-\d+$/.test(docName)) {
+                    persistedDocs.add(docName as DocName);
+                }
+            }
+        } catch (error) {
+            console.warn('[YjsDocManager] Unable to enumerate persisted docs:', error);
+        }
+
+        return Array.from(persistedDocs);
+    }
+
     /**
      * Destroy all documents and cleanup
      * Call this when the store is being destroyed

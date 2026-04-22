@@ -726,7 +726,14 @@ export async function renameProjectFromList(page, { currentTitle, nextTitle }) {
     await editProjectFromList(page, { currentTitle, nextTitle });
 }
 
-export async function createBillableProject(page, { projectTitle, clientTitle, clientName, clientHourlyRate }) {
+export async function createBillableProject(page, {
+    projectTitle,
+    clientTitle,
+    clientName,
+    clientHourlyRate,
+    clientCurrency = null,
+    billableTimeIncrementOption = null,
+}) {
     await page.goto('/projects');
 
     await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
@@ -746,6 +753,12 @@ export async function createBillableProject(page, { projectTitle, clientTitle, c
     await clientDialog.getByLabel(/Business\/Name/i).fill(clientName);
     await clientDialog.getByRole('button', { name: /Pricing & Taxes/i }).click();
     await clientDialog.getByLabel(/Hourly Rate/i).fill(String(clientHourlyRate));
+
+    if (clientCurrency) {
+        await clientDialog.getByRole('combobox', { name: 'Default Currency' }).click();
+        await page.getByRole('option', { name: new RegExp(`^${clientCurrency} - `) }).click();
+    }
+
     await clientDialog.getByRole('button', { name: 'Create Client' }).click();
 
     await expect(clientDialog).not.toBeVisible();
@@ -757,6 +770,15 @@ export async function createBillableProject(page, { projectTitle, clientTitle, c
         projectDialog.locator('button[role="combobox"]').first(),
         clientTitle,
     );
+
+    if (billableTimeIncrementOption) {
+        await selectComboboxOption(
+            page,
+            projectDialog.getByRole('combobox', { name: 'Minimum billed time increment' }),
+            billableTimeIncrementOption,
+        );
+    }
+
     await projectDialog.getByRole('button', { name: 'Create Project' }).click();
 
     await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
@@ -791,12 +813,14 @@ export async function createTrackedInvoice(page, {
     taskTitle,
     templateName,
     clientHourlyRate = 125,
+    clientCurrency = null,
 }) {
     await createBillableProject(page, {
         projectTitle,
         clientTitle,
         clientName,
         clientHourlyRate,
+        clientCurrency,
     });
     await openProjectDashboard(page, projectTitle);
 

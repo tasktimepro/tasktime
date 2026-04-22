@@ -270,6 +270,59 @@ describe('TimeEntriesModal', () => {
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry updated successfully')
     })
 
+    it('shows billable minimum alongside actual worked time when present', () => {
+
+        mockTimeEntries = [
+            {
+                id: 'entry-rounded',
+                taskId: 'task-1',
+                start: new Date('2026-01-19T10:00:00').getTime(),
+                end: new Date('2026-01-19T10:05:00').getTime(),
+                billedDurationMs: 15 * 60 * 1000,
+                billingIncrementMinutes: 15,
+            }
+        ]
+
+        render(
+            <TimeEntriesModal
+                {...baseProps}
+            />
+        )
+
+        expect(screen.getAllByText('5m').length).toBeGreaterThan(0)
+        expect(screen.getByText('Billed:')).toBeInTheDocument()
+        expect(screen.getByText('15m')).toHaveClass('font-bold')
+        expect(screen.queryByText(/via project minimum/i)).not.toBeInTheDocument()
+    })
+
+    it('uses a higher-contrast badge for billed entries', async () => {
+
+        const user = userEvent.setup()
+
+        mockTimeEntries = [
+            {
+                id: 'entry-billed',
+                taskId: 'task-1',
+                start: new Date('2026-01-19T10:00:00').getTime(),
+                end: new Date('2026-01-19T10:15:00').getTime(),
+            }
+        ]
+
+        render(
+            <TimeEntriesModal
+                {...baseProps}
+                task={{
+                    ...baseTask,
+                    lastBilledAt: new Date('2026-01-19T12:00:00').getTime(),
+                }}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Billed Time Entries (1)' }))
+
+        expect(screen.getByText('Billed')).toHaveClass('bg-background', 'text-foreground')
+    })
+
     it('does not allow seconds when adding a new manual time entry', async () => {
 
         const user = userEvent.setup()

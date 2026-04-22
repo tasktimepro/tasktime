@@ -9,7 +9,7 @@ import InvoicesList from './InvoicesList';
 import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { getInvoiceTotal, isInvoicePaid } from '../utils/invoiceUtils.ts';
+import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
@@ -20,6 +20,7 @@ import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
 import { getInvoicesForProject } from '../utils/invoiceUtils.ts';
+import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -73,6 +74,7 @@ const ProjectDashboard = ({
     const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { preferences } = usePreferences();
     const projectTimer = getTimerForProject(project.id);
+    const projectCurrency = useMemo(() => getProjectCurrency(project, clients), [clients, project]);
     
     // Get invoices for this project
     const projectInvoices = getInvoicesForProject(invoices, project.id);
@@ -223,7 +225,8 @@ const ProjectDashboard = ({
         // Total revenue from paid invoices only
         const totalRevenue = projectInvoices.reduce((total, invoice) => {
             if (isInvoicePaid(invoice)) {
-                return total + getInvoiceTotal(invoice);
+                const resolvedPaidAmount = getPaidInvoiceConvertedAmount(invoice, projectCurrency);
+                return total + (resolvedPaidAmount.success ? resolvedPaidAmount.amount : getInvoiceTotal(invoice));
             }
             return total;
         }, 0);
@@ -267,7 +270,7 @@ const ProjectDashboard = ({
                 if (!taskTimeMap[entry.taskId]) {
                     taskTimeMap[entry.taskId] = 0;
                 }
-                taskTimeMap[entry.taskId] += (entry.end - entry.start);
+                taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
             });
 
             // Calculate total rounded hours (matching invoice calculation)
@@ -285,7 +288,7 @@ const ProjectDashboard = ({
             pendingAmount,
             potentialRevenue
         };
-    }, [projectTimeEntries, projectInvoices, project, projectTasks]);
+    }, [projectCurrency, projectTimeEntries, projectInvoices, project, projectTasks]);
 
     const projectClient = useMemo(() => {
         if (!project.preferredClientId) return null;

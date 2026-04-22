@@ -6,6 +6,7 @@ import TaskItem from './TaskItem';
 
 const hookState = vi.hoisted(() => ({
     tasks: [],
+    projects: [],
     entries: [],
     getTimerForTask: vi.fn(() => null),
     clearTimer: vi.fn(),
@@ -103,6 +104,12 @@ vi.mock('../hooks/useTimeEntries', () => ({
     useTimeEntries: () => ({
         entries: hookState.entries,
         createEntry: hookState.createEntry,
+    }),
+}));
+
+vi.mock('../hooks/useProjects', () => ({
+    useProjects: () => ({
+        projects: hookState.projects,
     }),
 }));
 

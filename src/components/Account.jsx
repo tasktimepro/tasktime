@@ -35,6 +35,7 @@ const Account = ({
     businessInfos,
     clients,
     invoiceTemplates,
+    emailTemplates,
     expenses,
     expenseRecurrences,
     dailyGoals,
@@ -194,6 +195,7 @@ const Account = ({
                             businessInfos={businessInfos}
                             clients={clients}
                             invoiceTemplates={invoiceTemplates}
+                            emailTemplates={emailTemplates}
                             expenses={expenses}
                             expenseRecurrences={expenseRecurrences}
                             dailyGoals={dailyGoals}

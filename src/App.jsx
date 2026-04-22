@@ -8,6 +8,7 @@ import { useClients } from './hooks/useClients.ts';
 import { useInvoices } from './hooks/useInvoices.ts';
 import { useBusinessInfos } from './hooks/useBusinessInfos.ts';
 import { useInvoiceTemplates } from './hooks/useInvoiceTemplates.ts';
+import { useEmailTemplates } from './hooks/useEmailTemplates.ts';
 import { usePaymentMethods } from './hooks/usePaymentMethods.ts';
 import { useExpenses } from './hooks/useExpenses.ts';
 import { useExpenseRecurrences } from './hooks/useExpenseRecurrences.ts';
@@ -45,7 +46,6 @@ import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { buildExpenseFromRecurrence } from './utils/expenseUtils.ts';
-import { normalizeInvoiceRecord } from './utils/invoiceUtils.ts';
 import { hasCompletedOnboarding, setOnboardingCompleted } from './utils/onboardingUtils.ts';
 import { getTaskIdsToDelete } from './utils/taskUtils.ts';
 import { setUsageMetricsSessionId, startUsageMetrics } from './utils/usageMetrics.ts';
@@ -114,6 +114,7 @@ function AppContent() {
         lastSyncedAt,
         clearAllData,
         driveSessionId,
+        store,
     } = useYjs();
     const { hadPreviousSession, isLoading: authLoading, isSignedIn } = useGoogleAuth();
     const toast = useContext(ToastContext);
@@ -228,9 +229,12 @@ function AppContent() {
 
     const { 
         invoiceTemplates, 
-        createInvoiceTemplate,
         isLoading: templatesLoading 
     } = useInvoiceTemplates();
+
+    const {
+        emailTemplates,
+    } = useEmailTemplates();
 
     const { 
         paymentMethods, 
@@ -1053,42 +1057,19 @@ function AppContent() {
     useEffect(() => {
         if (!pendingImport || !isReady) return;
 
-        (pendingImport.projects || []).forEach((project) => createProject(project));
-        (pendingImport.tasks || []).forEach((task) => createTask(task));
-        (pendingImport.timeEntries || []).forEach((entry) => createTimeEntry(entry));
-        (pendingImport.invoices || []).forEach((invoice) => createInvoice(normalizeInvoiceRecord(invoice)));
-        (pendingImport.paymentMethods || []).forEach((method) => createPaymentMethod(method));
-        (pendingImport.businessInfos || []).forEach((info) => createBusinessInfo(info));
-        (pendingImport.clients || []).forEach((client) => createClient(client));
-        (pendingImport.invoiceTemplates || []).forEach((template) => createInvoiceTemplate(template));
-        (pendingImport.expenses || []).forEach((expense) => createExpense(expense));
-        (pendingImport.expenseRecurrences || []).forEach((rec) => createRecurrence(rec));
-        (pendingImport.dailyGoals || []).forEach((goal) => setDailyGoal(goal.weekday, goal));
-        (pendingImport.plannerAttachments || []).forEach((att) => createAttachment(att));
-
-        updatePreferences(pendingImport.preferences || {});
-        timers.forEach(timer => {
-            clearTimer(timer.projectId);
-        });
-        setPendingImport(null);
+        (async () => {
+            try {
+                await store.importBackupData(pendingImport);
+                setPendingImport(null);
+            } catch (error) {
+                toast?.showError(error instanceof Error ? error.message : 'Import failed.');
+            }
+        })();
     }, [
         pendingImport,
         isReady,
-        createProject,
-        createTask,
-        createTimeEntry,
-        createInvoice,
-        createPaymentMethod,
-        createBusinessInfo,
-        createClient,
-        createInvoiceTemplate,
-        createExpense,
-        createRecurrence,
-        setDailyGoal,
-        createAttachment,
-        updatePreferences,
-        clearTimer,
-        timers,
+        store,
+        toast,
     ]);
 
     const [isMobileLayout, setIsMobileLayout] = useState(() => {
@@ -1752,6 +1733,7 @@ function AppContent() {
                                 businessInfos={businessInfos}
                                 clients={clients}
                                 invoiceTemplates={invoiceTemplates}
+                                emailTemplates={emailTemplates}
                                 expenses={expenses}
                                 expenseRecurrences={recurrences}
                                 dailyGoals={dailyGoals}

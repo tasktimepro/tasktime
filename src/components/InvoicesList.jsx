@@ -13,7 +13,7 @@ import { toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { getInvoiceStatus, getInvoiceStatusAfterMarkingUnpaid, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '../utils/invoiceUtils.ts';
+import { getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
@@ -45,7 +45,7 @@ const InvoicesList = ({
     const { updateUrl } = useUrlState();
     
     // Yjs hook for invoice updates
-    const { updateInvoice } = useInvoices();
+    const { markAsPaid, markAsUnpaid } = useInvoices();
 
     // Filter out soft-deleted invoices (projectInvoices already filtered by parent)
     const activeInvoices = useMemo(() => projectInvoices, [projectInvoices]);
@@ -228,12 +228,19 @@ const InvoicesList = ({
     /**
      * Handle payment processed toggle
      */
-    const handleInvoiceStatusToggle = (invoice) => {
+    const handleInvoiceStatusToggle = async (invoice) => {
         const nextPaidState = !isInvoicePaid(invoice);
-        updateInvoice(invoice.id, {
-            status: nextPaidState ? 'paid' : getInvoiceStatusAfterMarkingUnpaid(invoice),
-            paidAt: nextPaidState ? Date.now() : null
-        });
+
+        try {
+            if (nextPaidState) {
+                await markAsPaid(invoice.id);
+            } else {
+                markAsUnpaid(invoice.id);
+            }
+        } catch (error) {
+            showToast(error.message || 'Unable to update invoice payment status.', 'error');
+            return;
+        }
 
         // If marking as paid and we're on outstanding or overdue tab, and it's the last item on the page,
         // go to previous page if available

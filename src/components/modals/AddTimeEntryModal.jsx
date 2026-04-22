@@ -16,6 +16,7 @@ import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
 import { BILLABLE_TIME_THRESHOLD_MS } from '@/constants/app';
 import { getCurrentTimeString, getTodayString, timestampToDateString, timestampToTimeString } from '@/utils/dateUtils.ts';
+import { buildBillableDurationFields, getBillableDurationMs } from '@/utils/timeEntryDurationUtils.ts';
 import { checkTimeOverlap } from '@/utils/timeValidationUtils.ts';
 
 /**
@@ -230,12 +231,14 @@ const AddTimeEntryModal = ({
         return project && typeof project.hourlyRate === 'number' && project.hourlyRate > 0;
     }, [task?.projectId, projects]);
 
+    const preservedBillingIncrementMinutes = entry?.billingIncrementMinutes || null;
+
     const taskBillableTimeMs = useMemo(() => {
         if (!task) return 0;
         const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
         return timeEntries
             .filter(entry => entry.taskId === task.id && entry.end && entry.start > taskLastBilledAt)
-            .reduce((sum, entry) => sum + (entry.end - entry.start), 0);
+            .reduce((sum, entry) => sum + getBillableDurationMs(entry), 0);
     }, [task, timeEntries]);
 
     const maybeMarkTaskBillable = useCallback((addedDurationMs) => {
@@ -291,7 +294,12 @@ const AddTimeEntryModal = ({
             updateEntry(entry.id, {
                 start: startTimestamp,
                 end: endTimestamp,
-                note: formData.note.trim() || undefined
+                note: formData.note.trim() || undefined,
+                ...buildBillableDurationFields({
+                    start: startTimestamp,
+                    end: endTimestamp,
+                    billingIncrementMinutes: preservedBillingIncrementMinutes,
+                })
             });
             showSuccess('Time entry updated successfully');
             onClose();

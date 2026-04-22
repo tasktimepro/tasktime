@@ -1,12 +1,15 @@
 import { useCallback, useMemo } from 'react';
 import { getLastMonthRange, getThisMonthRange, millisecondsToHours, parseStoredDate } from '../../../utils/dateUtils';
 import { formatCurrency, getProjectCurrency } from '../../../utils/currencyUtils';
-import { getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '../../../utils/invoiceUtils';
+import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoiceOverdue, isInvoicePaid } from '../../../utils/invoiceUtils';
+import { getBillableDurationMs } from '../../../utils/timeEntryDurationUtils';
 
 type TimeEntry = {
     taskId: string;
     start: number;
     end: number;
+    billedDurationMs?: number | null;
+    billingIncrementMinutes?: number | null;
     deletedAt?: number;
     source?: string;
 };
@@ -108,7 +111,7 @@ const useMetricsCalculation = ({
                     currency: getProjectCurrency(project, clients)
                 };
             }
-            taskTimeMap[taskKey].totalTime += (entry.end - entry.start);
+            taskTimeMap[taskKey].totalTime += getBillableDurationMs(entry);
         });
 
         // Calculate earnings with task-by-task rounding
@@ -132,29 +135,49 @@ const useMetricsCalculation = ({
             return invoiceDate >= startTime && invoiceDate <= endTime;
         });
 
+        const addAmount = (amounts: Record<string, number>, currency: string, amount: number) => {
+            if (!amounts[currency]) {
+                amounts[currency] = 0;
+            }
+            amounts[currency] += amount;
+        };
+
         // Group paid and outstanding invoices by currency
         const paidInvoicesByCurrency: Record<string, number> = {};
+        const paidInvoicesRequiringLiveConversion: Record<string, number> = {};
         const outstandingInvoicesByCurrency: Record<string, number> = {};
+        let hadPaidSnapshotConversionError = false;
+
         invoicesInRange.forEach(invoice => {
             const amount = getInvoiceTotal(invoice);
             const currency = invoice.currency || preferredCurrency;
 
             if (isInvoicePaid(invoice)) {
-                if (!paidInvoicesByCurrency[currency]) {
-                    paidInvoicesByCurrency[currency] = 0;
+                const resolvedPaidAmount = getPaidInvoiceConvertedAmount(invoice, preferredCurrency);
+
+                if (resolvedPaidAmount.success) {
+                    addAmount(paidInvoicesByCurrency, resolvedPaidAmount.currency, resolvedPaidAmount.amount);
+                } else if (!resolvedPaidAmount.usedSnapshot) {
+                    addAmount(paidInvoicesRequiringLiveConversion, currency, amount);
+                } else {
+                    addAmount(paidInvoicesByCurrency, resolvedPaidAmount.currency, resolvedPaidAmount.amount);
+                    hadPaidSnapshotConversionError = true;
                 }
-                paidInvoicesByCurrency[currency] += amount;
             } else {
-                if (!outstandingInvoicesByCurrency[currency]) {
-                    outstandingInvoicesByCurrency[currency] = 0;
-                }
-                outstandingInvoicesByCurrency[currency] += amount;
+                addAmount(outstandingInvoicesByCurrency, currency, amount);
             }
         });
 
         // Convert currencies using the preferred currency
         const billableResult = convertToCurrency(billableEarningsByCurrency);
-        const paidResult = convertToCurrency(paidInvoicesByCurrency);
+        const paidFallbackResult = convertToCurrency(paidInvoicesRequiringLiveConversion);
+        const paidResult = {
+            amounts: Object.entries(paidFallbackResult.amounts).reduce((mergedAmounts, [currency, amount]) => {
+                addAmount(mergedAmounts, currency, amount);
+                return mergedAmounts;
+            }, { ...paidInvoicesByCurrency }),
+            hadConversionError: hadPaidSnapshotConversionError || paidFallbackResult.hadConversionError,
+        };
         const outstandingResult = convertToCurrency(outstandingInvoicesByCurrency);
 
         return {
@@ -294,7 +317,7 @@ const useMetricsCalculation = ({
             if (!taskTimeMap[taskKey]) {
                 taskTimeMap[taskKey] = { totalTime: 0 };
             }
-            taskTimeMap[taskKey].totalTime += (entry.end - entry.start);
+            taskTimeMap[taskKey].totalTime += getBillableDurationMs(entry);
         });
 
         // Calculate total billable hours with task-by-task rounding

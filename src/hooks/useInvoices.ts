@@ -9,7 +9,14 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
 import type { Invoice } from '@/stores/yjs/types';
 import { collectEntities } from '@/stores/yjs/entityUtils';
-import { getInvoiceStatus, getInvoiceTotal, isInvoicePaid } from '@/utils/invoiceUtils';
+import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
+import {
+    createInvoicePaymentCurrencySnapshot,
+    getInvoiceStatus,
+    getInvoiceStatusAfterMarkingUnpaid,
+    getInvoiceTotal,
+    isInvoicePaid,
+} from '@/utils/invoiceUtils';
 
 export interface UseInvoicesOptions {
     /** Filter to a specific project */
@@ -120,17 +127,59 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         [filteredInvoices]
     );
 
+    const getPreferredCurrency = useCallback(() => {
+        const storedPreference = store.preferences?.get('currency');
+        return normalizeCurrencyCode(typeof storedPreference === 'string' ? storedPreference : undefined);
+    }, [store]);
+
     // Status update helpers
     const markAsSent = useCallback((id: string) => {
-        return update(id, { status: 'sent', paidAt: null });
-    }, [update]);
-
-    const markAsPaid = useCallback((id: string) => {
-        return update(id, { 
-            status: 'paid', 
-            paidAt: Date.now() 
+        return update(id, {
+            status: 'sent',
+            paidAt: null,
+            paymentCurrencySnapshot: null,
         });
     }, [update]);
+
+    const markAsPaid = useCallback(async (id: string) => {
+        const invoice = get(id);
+        if (!invoice) {
+            return undefined;
+        }
+
+        const paidAt = Date.now();
+        const preferredCurrency = getPreferredCurrency();
+        const invoiceCurrency = normalizeCurrencyCode(invoice.currency || preferredCurrency);
+        const { rates, error } = await fetchExchangeRates();
+
+        if (!rates && invoiceCurrency !== preferredCurrency) {
+            throw new Error(error || 'Unable to load exchange rates for payment snapshot.');
+        }
+
+        return update(id, {
+            status: 'paid',
+            paidAt,
+            paymentCurrencySnapshot: createInvoicePaymentCurrencySnapshot({
+                invoice,
+                preferredCurrency,
+                exchangeRates: rates,
+                capturedAt: paidAt,
+            }),
+        });
+    }, [get, getPreferredCurrency, update]);
+
+    const markAsUnpaid = useCallback((id: string) => {
+        const invoice = get(id);
+        if (!invoice) {
+            return undefined;
+        }
+
+        return update(id, {
+            status: getInvoiceStatusAfterMarkingUnpaid(invoice),
+            paidAt: null,
+            paymentCurrencySnapshot: null,
+        });
+    }, [get, update]);
 
     // Get total amounts
     const totals = useMemo(() => {
@@ -165,5 +214,6 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         // Status helpers
         markAsSent,
         markAsPaid,
+        markAsUnpaid,
     };
 }

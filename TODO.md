@@ -2,12 +2,7 @@
 
 ## Priority
 
-[ ] It would also be nice if I could archive subtasks that are completed - how can we best do this without breaking the UX/UI?
-
-[ ] Stop timer to the nearest min, quarter, half an hour, hour > moving forward (option in projects modal). This is so that tasks under that project whenever there timer is stopped, we always adjust the time as per this setting.
-    - This is not about stopping the timer to the nearest quarter past, half past etc. it means that for this project a timer no matter if it was 1min and I set to quarter, the stopped timer will be 15min - it's that kind, that I charge by the minimum of 15min or 30min, or hour, or even if I submitted 10s it should always add 1min if I choose that etc.
-
-[ ] Conversion rates of totals showed in the reports overview or earned money should be from a snapshot of the day that the invoice was marked as paid - this way the income does not fluctuate overtime - and we preserve the true closest likely conversion total of the money you actually earned
+[ ] Can we remove the migrations under stores/yjs now that I've run them through, and since I'm the only one using the app for now?
 
 ---
 

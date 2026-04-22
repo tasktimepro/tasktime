@@ -9,7 +9,7 @@
     "build": "node ./scripts/build-pages.mjs",
     "build:app": "vite build",
     "build:blog": "npm --prefix blog run build",
-    "lint": "eslint .",
+    "lint": "sh ./scripts/run-eslint.sh",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",

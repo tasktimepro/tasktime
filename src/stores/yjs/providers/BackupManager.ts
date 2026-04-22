@@ -14,11 +14,9 @@
  */
 
 import { ManifestManager } from './ManifestManager';
-import { collectEntities } from '../entityUtils';
 import type { YjsStore } from '../YjsStore';
 
 const BACKUP_PREFIX = 'tasktime-backup-';
-const BACKUP_VERSION = '1.1';
 
 /** Number of recent daily backups to retain */
 const DAILY_RETENTION = 7;
@@ -94,8 +92,8 @@ export class BackupManager {
      * Create a full backup snapshot
      */
     async createBackup(): Promise<string> {
-        const data = this.serializeStore();
-        const json = JSON.stringify(data);
+        const data = await this.store.exportBackupData({ backupType: 'automatic' });
+        const json = JSON.stringify(data, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
 
         const now = new Date();
@@ -209,30 +207,6 @@ export class BackupManager {
         if (toDelete.length > 0) {
             console.log(`[BackupManager] Pruned ${toDelete.length} old backups, kept ${keepIds.size}`);
         }
-    }
-
-    /**
-     * Serialize the entire YjsStore into the standard export format
-     */
-    private serializeStore(): Record<string, unknown> {
-        return {
-            version: BACKUP_VERSION,
-            exportDate: new Date().toISOString(),
-            backupType: 'automatic',
-            projects: collectEntities(this.store.projects),
-            tasks: collectEntities(this.store.tasks),
-            timeEntries: collectEntities(this.store.activeTimeEntries),
-            invoices: collectEntities(this.store.invoices),
-            paymentMethods: collectEntities(this.store.paymentMethods),
-            businessInfos: collectEntities(this.store.businessInfos),
-            clients: collectEntities(this.store.clients),
-            invoiceTemplates: collectEntities(this.store.invoiceTemplates),
-            expenses: collectEntities(this.store.expenses),
-            expenseRecurrences: collectEntities(this.store.expenseRecurrences),
-            dailyGoals: collectEntities(this.store.dailyGoals),
-            plannerAttachments: collectEntities(this.store.plannerAttachments),
-            preferences: Object.fromEntries(this.store.preferences.entries()),
-        };
     }
 
     /**

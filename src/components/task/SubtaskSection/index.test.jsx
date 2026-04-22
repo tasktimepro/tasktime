@@ -8,6 +8,7 @@ const hookState = vi.hoisted(() => ({
     entries: [],
     timers: [],
     projects: [],
+    updateTask: vi.fn(),
     deleteTask: vi.fn(),
     deleteEntry: vi.fn(),
     clearTimer: vi.fn(),
@@ -19,9 +20,11 @@ vi.mock('../../../hooks/useIsMobileLayout', () => ({
 }));
 
 vi.mock('./SubtaskItem', () => ({
-    default: ({ task, onDelete }) => (
+    default: ({ task, onArchive, onUnarchive, onDelete }) => (
         <div data-testid="subtask-item">
             <span>{task.title}</span>
+            {onArchive && <button type="button" onClick={onArchive}>Archive {task.title}</button>}
+            {onUnarchive && <button type="button" onClick={onUnarchive}>Unarchive {task.title}</button>}
             <button type="button" onClick={onDelete}>Delete {task.title}</button>
         </div>
     ),
@@ -53,6 +56,7 @@ vi.mock('@/components/ui/notice', () => ({
 vi.mock('../../../hooks/useTasks', () => ({
     useTasks: () => ({
         tasks: hookState.tasks,
+        updateTask: hookState.updateTask,
         deleteTask: hookState.deleteTask,
     }),
 }));
@@ -103,6 +107,58 @@ const renderSubtaskSection = ({ subtasks, showSuccess = vi.fn() }) => {
 };
 
 describe('SubtaskSection sorting', () => {
+    it('keeps archived subtasks hidden behind a collapsible section', () => {
+        hookState.tasks = [];
+        hookState.entries = [];
+        hookState.timers = [];
+
+        const subtasks = [
+            { id: 's1', title: 'Active subtask', completed: false, archived: false, lastActive: 300 },
+            { id: 's2', title: 'Archived subtask', completed: true, archived: true, lastActive: 200 },
+        ];
+
+        renderSubtaskSection({ subtasks });
+
+        expect(screen.getByText('Active subtask')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Archived Subtasks (1)' })).toBeInTheDocument();
+        expect(screen.queryByText('Archived subtask')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Archived Subtasks (1)' }));
+
+        expect(screen.getByText('Archived subtask')).toBeInTheDocument();
+    });
+
+    it('archives completed subtasks and unarchives archived subtasks', () => {
+        const showSuccess = vi.fn();
+        const subtasks = [
+            { id: 's1', title: 'Completed subtask', completed: true, archived: false, lastActive: 300 },
+            { id: 's2', title: 'Archived subtask', completed: true, archived: true, lastActive: 200 },
+        ];
+
+        hookState.tasks = subtasks;
+        hookState.entries = [];
+        hookState.timers = [];
+
+        renderSubtaskSection({ subtasks, showSuccess });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Archive Completed subtask' }));
+
+        expect(hookState.updateTask).toHaveBeenCalledWith('s1', expect.objectContaining({
+            archived: true,
+            archivedOnDate: expect.any(String),
+        }));
+        expect(showSuccess).toHaveBeenCalledWith('Subtask archived');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Archived Subtasks (1)' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Unarchive Archived subtask' }));
+
+        expect(hookState.updateTask).toHaveBeenCalledWith('s2', expect.objectContaining({
+            archived: false,
+            archivedOnDate: null,
+        }));
+        expect(showSuccess).toHaveBeenCalledWith('Subtask unarchived');
+    });
+
     it('removes extra left indentation for subtasks on mobile', () => {
         hookState.tasks = [];
         hookState.entries = [];
@@ -198,10 +254,10 @@ describe('SubtaskSection sorting', () => {
         const renderedTitles = screen.getAllByTestId('subtask-item').map((item) => item.textContent);
 
         expect(renderedTitles).toEqual([
-            'Active newestDelete Active newest',
-            'Active olderDelete Active older',
-            'Completed recentDelete Completed recent',
-            'Completed olderDelete Completed older',
+            'Active newestArchive Active newestDelete Active newest',
+            'Active olderArchive Active olderDelete Active older',
+            'Completed recentArchive Completed recentDelete Completed recent',
+            'Completed olderArchive Completed olderDelete Completed older',
         ]);
     });
 });

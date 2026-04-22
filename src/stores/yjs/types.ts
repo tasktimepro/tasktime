@@ -26,6 +26,8 @@ export interface Project {
     lastBilledAt?: number | null;
     /** Color tag for visual identification (hex, e.g., "#3B82F6") */
     color?: string | null;
+    /** Round timer-created billable time up in these minute increments */
+    billableTimeIncrementMinutes?: number | null;
 }
 
 export interface Task {
@@ -75,6 +77,8 @@ export interface TimeEntry {
     billedHourlyRate?: number | null;
     billedAt?: number | null;
     billedInvoiceId?: string | null;
+    billedDurationMs?: number | null;
+    billingIncrementMinutes?: number | null;
     /** Timer key (projectId) that produced this entry — used for cross-doc orphan reconciliation */
     _stoppedTimerKey?: string;
 }
@@ -152,6 +156,16 @@ export interface InvoiceItem {
     exchangeRate?: number;
 }
 
+export interface InvoicePaymentCurrencySnapshot {
+    capturedAt: number;
+    sourceCurrency: string;
+    sourceAmount: number;
+    preferredCurrencyAtPayment: string;
+    preferredCurrencyAmount: number;
+    exchangeRatesBase?: string;
+    exchangeRates?: Record<string, number>;
+}
+
 export interface Invoice {
     id: string;
     projectId: string;
@@ -172,6 +186,7 @@ export interface Invoice {
     paymentMethodId?: string | null;
     currency?: string;
     paidAt?: number | null;
+    paymentCurrencySnapshot?: InvoicePaymentCurrencySnapshot | null;
     sentAt?: number | null;
     sentToEmail?: string | null;
 }

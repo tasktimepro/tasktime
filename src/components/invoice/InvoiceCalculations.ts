@@ -1,4 +1,5 @@
 import { millisecondsToHours } from '../../utils/dateUtils';
+import { getBillableDurationMs } from '../../utils/timeEntryDurationUtils';
 
 type TaskItem = {
     id: string;
@@ -14,6 +15,7 @@ type TimeEntry = {
     taskId: string;
     start: number;
     end?: number;
+    billedDurationMs?: number | null;
     source?: string;
 };
 
@@ -95,7 +97,7 @@ export const buildInvoiceTaskData = ({
         if (!taskTimeMap[entry.taskId]) {
             taskTimeMap[entry.taskId] = 0;
         }
-        taskTimeMap[entry.taskId] += ((entry.end as number) - entry.start);
+        taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
     });
 
     // Add manually billable tasks to the map (even if they have no time)

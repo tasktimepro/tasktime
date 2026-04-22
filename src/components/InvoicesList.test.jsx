@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InvoicesList from './InvoicesList'
 
@@ -8,7 +8,8 @@ const updateUrlMock = vi.fn()
 
 const invoiceHookMocks = vi.hoisted(() => ({
 
-    updateInvoice: vi.fn()
+    markAsPaid: vi.fn(),
+    markAsUnpaid: vi.fn(),
 }))
 
 const pdfMocks = vi.hoisted(() => ({
@@ -37,7 +38,8 @@ vi.mock('../hooks/useUrlState.ts', () => ({
 vi.mock('../hooks/useInvoices.ts', () => ({
 
     useInvoices: () => ({
-        updateInvoice: invoiceHookMocks.updateInvoice
+        markAsPaid: invoiceHookMocks.markAsPaid,
+        markAsUnpaid: invoiceHookMocks.markAsUnpaid,
     })
 }))
 
@@ -68,6 +70,10 @@ describe('InvoicesList', () => {
     beforeEach(() => {
 
         updateUrlMock.mockClear()
+        invoiceHookMocks.markAsPaid.mockReset()
+        invoiceHookMocks.markAsPaid.mockResolvedValue(undefined)
+        invoiceHookMocks.markAsUnpaid.mockReset()
+        invoiceHookMocks.markAsUnpaid.mockReturnValue(undefined)
         pdfMocks.generatePDF.mockClear()
         pdfMocks.createInvoiceHTML.mockClear()
         pdfMocks.getCurrentInvoiceHtmlContent.mockClear()
@@ -273,8 +279,6 @@ describe('InvoicesList', () => {
 
     it('toggles paid status without corrupting list', async () => {
 
-        invoiceHookMocks.updateInvoice.mockClear()
-
         render(
             <InvoicesList
                 projectInvoices={[baseInvoice]}
@@ -288,11 +292,10 @@ describe('InvoicesList', () => {
 
         await user.click(screen.getByRole('button', { name: 'Mark as Paid' }))
 
-        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
-        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith(
-            'inv-1',
-            expect.objectContaining({ status: 'paid', paidAt: expect.any(Number) })
-        )
+        await waitFor(() => {
+            expect(invoiceHookMocks.markAsPaid).toHaveBeenCalledTimes(1)
+        })
+        expect(invoiceHookMocks.markAsPaid).toHaveBeenCalledWith('inv-1')
     })
 
     it('warns before editing paid invoices', async () => {

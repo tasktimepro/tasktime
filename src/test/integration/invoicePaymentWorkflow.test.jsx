@@ -6,7 +6,8 @@ import InvoicesList from '../../components/InvoicesList'
 
 const invoiceHookMocks = vi.hoisted(() => ({
 
-    updateInvoice: vi.fn()
+    markAsPaid: vi.fn(),
+    markAsUnpaid: vi.fn(),
 }))
 
 const urlStateMocks = vi.hoisted(() => ({
@@ -17,7 +18,8 @@ const urlStateMocks = vi.hoisted(() => ({
 vi.mock('../../hooks/useInvoices.ts', () => ({
 
     useInvoices: () => ({
-        updateInvoice: invoiceHookMocks.updateInvoice
+        markAsPaid: invoiceHookMocks.markAsPaid,
+        markAsUnpaid: invoiceHookMocks.markAsUnpaid,
     })
 }))
 
@@ -48,8 +50,6 @@ describe('Invoice payment workflow integration', () => {
     it('marks an invoice as paid from the list', async () => {
 
         const user = userEvent.setup()
-        const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
-
         const invoice = {
             id: 'inv-1',
             invoiceNumber: 'INV-001',
@@ -76,14 +76,6 @@ describe('Invoice payment workflow integration', () => {
 
         await user.click(screen.getByRole('button', { name: 'Mark as Paid' }))
 
-        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith(
-            'inv-1',
-            expect.objectContaining({
-                status: 'paid',
-                paidAt: 1700000000000
-            })
-        )
-
-        dateSpy.mockRestore()
+        expect(invoiceHookMocks.markAsPaid).toHaveBeenCalledWith('inv-1')
     })
 })

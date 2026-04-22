@@ -3,7 +3,9 @@ import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@/c
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
+import { useToast } from '../hooks/useToast.ts';
 import { markMeaningfulActivity } from '../utils/usageMetrics.ts';
+import { useYjs } from '../contexts/YjsContext.tsx';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -16,13 +18,12 @@ import { cn } from '@/lib/utils';
  * ExportImport component for backing up and restoring application data
  * Provides JSON export/import functionality for all application data including:
  * - Projects, tasks, time entries, and invoices
- * - Payment methods, business info, clients, and invoice templates  
+ * - Payment methods, business info, clients, invoice templates, and email templates
  * - User preferences (currency, etc.)
  * 
  * Note: Timer state is intentionally excluded from export/import
  */
 const SUPPORTED_VERSIONS = ['1.0', '1.1'];
-const CURRENT_VERSION = '1.1';
 
 function ExportImport({ 
     projects, 
@@ -33,6 +34,7 @@ function ExportImport({
     businessInfos = [],
     clients = [],
     invoiceTemplates = [],
+    emailTemplates = [],
     expenseRecurrences = [],
     dailyGoals = [],
     plannerAttachments = [],
@@ -40,12 +42,15 @@ function ExportImport({
     onImport 
 }) {
     const isMobileLayout = useIsMobileLayout();
+    const { store } = useYjs();
     const { timers } = useTimers();
     const { expenses: allExpenses } = useExpenses({ includeArchived: true });
+    const { showError } = useToast();
     const isTimerActive = timers.length > 0;
     const [showImportModal, setShowImportModal] = useState(false);
     const [importData, setImportData] = useState('');
     const [importError, setImportError] = useState('');
+    const [isExporting, setIsExporting] = useState(false);
     
     /**
      * Calculate total time across all projects
@@ -72,37 +77,28 @@ function ExportImport({
     /**
      * Export all project data as JSON file
      */
-    const handleExport = () => {
-        const exportData = {
-            version: CURRENT_VERSION,
-            exportDate: new Date().toISOString(),
-            projects: projects,
-            tasks: tasks,
-            timeEntries: timeEntries,
-            invoices: invoices,
-            paymentMethods: paymentMethods,
-            businessInfos: businessInfos,
-            clients: clients,
-            invoiceTemplates: invoiceTemplates,
-            expenses: allExpenses,
-            expenseRecurrences: expenseRecurrences,
-            dailyGoals: dailyGoals,
-            plannerAttachments: plannerAttachments,
-            preferences: preferences
-        };
+    const handleExport = async () => {
+        setIsExporting(true);
 
-        const dataStr = JSON.stringify(exportData, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
-        
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `tasktime-backup-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        markMeaningfulActivity();
+        try {
+            const exportData = await store.exportBackupData({ backupType: 'manual' });
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `tasktime-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            markMeaningfulActivity();
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Unable to export backup data.');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     /**
@@ -232,6 +228,11 @@ function ExportImport({
                 throw new Error('Invalid data format: invoiceTemplates must be an array');
             }
 
+            // Validate emailTemplates if present
+            if (parsedData.emailTemplates && !Array.isArray(parsedData.emailTemplates)) {
+                throw new Error('Invalid data format: emailTemplates must be an array');
+            }
+
             // Validate expenses if present
             if (parsedData.expenses && !Array.isArray(parsedData.expenses)) {
                 throw new Error('Invalid data format: expenses must be an array');
@@ -267,6 +268,7 @@ function ExportImport({
                 businessInfos: parsedData.businessInfos || [],
                 clients: parsedData.clients || [],
                 invoiceTemplates: parsedData.invoiceTemplates || [],
+                emailTemplates: parsedData.emailTemplates || [],
                 expenses: parsedData.expenses || [],
                 expenseRecurrences: parsedData.expenseRecurrences || [],
                 dailyGoals: parsedData.dailyGoals || [],
@@ -332,9 +334,10 @@ function ExportImport({
                     <Button
                         variant="outline"
                         onClick={handleExport}
+                        disabled={isExporting}
                         leadingIcon={ArrowUpTrayIcon}
                     >
-                        Export
+                        {isExporting ? 'Exporting...' : 'Export'}
                     </Button>
                 </div>
 
@@ -355,7 +358,7 @@ function ExportImport({
                 </div>
 
                 {/* Data Summary */}
-                {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clients.length > 0 || invoiceTemplates.length > 0 || allExpenses.length > 0) && (
+                {(projects.length > 0 || paymentMethods.length > 0 || businessInfos.length > 0 || clients.length > 0 || invoiceTemplates.length > 0 || emailTemplates.length > 0 || allExpenses.length > 0) && (
                     <div className={cn('rounded-lg bg-muted', isMobileLayout ? 'p-3' : 'p-4')}>
                         <h4 className="font-medium text-foreground mb-2">Current Data</h4>
                         <div className="text-sm text-muted-foreground space-y-1">
@@ -368,6 +371,7 @@ function ExportImport({
                             <p>Businesses: <span className="font-medium">{businessInfos.length}</span></p>
                             <p>Payment Methods: <span className="font-medium">{paymentMethods.length}</span></p>
                             <p>Invoice Templates: <span className="font-medium">{invoiceTemplates.length}</span></p>
+                            <p>Email Templates: <span className="font-medium">{emailTemplates.length}</span></p>
                             <p>Total Time: <span className="font-medium">{calculateTotalTimeAcrossAllProjects()}</span></p>
                         </div>
                     </div>

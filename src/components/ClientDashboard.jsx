@@ -10,7 +10,7 @@ import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurr
 import { millisecondsToHours, formatDuration, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { getInvoiceTotal, isInvoicePaid } from '../utils/invoiceUtils.ts';
+import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
@@ -18,6 +18,7 @@ import { useInvoices } from '../hooks/useInvoices.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
+import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import ExpensesSection from './expenses/ExpensesSection';
 import {
     DropdownMenu,
@@ -157,7 +158,8 @@ const ClientDashboard = ({
         // Total revenue from paid invoices only
         const totalRevenue = clientInvoices.reduce((total, invoice) => {
             if (isInvoicePaid(invoice)) {
-                return total + getInvoiceTotal(invoice);
+                const resolvedPaidAmount = getPaidInvoiceConvertedAmount(invoice, clientCurrency);
+                return total + (resolvedPaidAmount.success ? resolvedPaidAmount.amount : getInvoiceTotal(invoice));
             }
             return total;
         }, 0);
@@ -187,7 +189,7 @@ const ClientDashboard = ({
                     if (!taskTimeMap[entry.taskId]) {
                         taskTimeMap[entry.taskId] = 0;
                     }
-                    taskTimeMap[entry.taskId] += (entry.end - entry.start);
+                    taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
                 });
 
                 // Calculate total rounded hours and revenue (matching invoice calculation)
@@ -215,7 +217,7 @@ const ClientDashboard = ({
             pendingAmount,
             invoiceCount: clientInvoices.length
         };
-    }, [clientTimeEntries, clientInvoices, clientProjects, clientTasks]);
+    }, [clientCurrency, clientTimeEntries, clientInvoices, clientProjects, clientTasks]);
 
     /**
      * Calculate unbilled amount for a project (requires hourly rate)
@@ -255,7 +257,7 @@ const ClientDashboard = ({
             if (!taskTimeMap[entry.taskId]) {
                 taskTimeMap[entry.taskId] = 0;
             }
-            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+            taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
         });
 
         // Calculate total rounded hours (matching invoice calculation)
@@ -303,7 +305,7 @@ const ClientDashboard = ({
             if (!taskTimeMap[entry.taskId]) {
                 taskTimeMap[entry.taskId] = 0;
             }
-            taskTimeMap[entry.taskId] += (entry.end - entry.start);
+            taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
         });
 
         // Calculate total rounded hours (matching invoice calculation)

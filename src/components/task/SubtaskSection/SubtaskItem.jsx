@@ -8,7 +8,9 @@ import { formatDurationWithSeconds, getTodayString } from '../../../utils/dateUt
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
+import { useProjects } from '../../../hooks/useProjects';
 import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
+import { buildBillableDurationFields, getBillableDurationMs } from '../../../utils/timeEntryDurationUtils.ts';
 
 /**
  * SubtaskItem component - Displays individual subtask.
@@ -18,6 +20,8 @@ import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
 const SubtaskItem = ({
     task,
     onToggleBillable,
+    onArchive,
+    onUnarchive,
     onDelete,
     onEditTask,
     onViewTask
@@ -31,6 +35,7 @@ const SubtaskItem = ({
     const { updateTask } = useTasks();
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer } = useTimers();
+    const { projects } = useProjects();
 
     // Compute state
     const timerKey = task.projectId || task.id;
@@ -45,6 +50,14 @@ const SubtaskItem = ({
     
     // Should dim if another task has active timer
     const shouldDimTask = isAnyTimerActive && !projectTimer?.isPaused && !isRelatedToActiveTimer;
+
+    const currentProject = useMemo(() => {
+        if (!task.projectId) {
+            return null;
+        }
+
+        return projects.find((project) => project.id === task.projectId) || null;
+    }, [projects, task.projectId]);
 
     // Calculate time for this subtask
     const mainTaskTime = useMemo(() => {
@@ -69,7 +82,7 @@ const SubtaskItem = ({
         });
 
         const totalBillableMs = relevantEntries.reduce((total, entry) => {
-            return total + (entry.end - entry.start);
+            return total + getBillableDurationMs(entry);
         }, 0);
 
         return totalBillableMs >= BILLABLE_TIME_THRESHOLD_MS;
@@ -98,6 +111,11 @@ const SubtaskItem = ({
                 end: now,
                 note: projectTimer.note,
                 _stoppedTimerKey: timerKey,
+                ...buildBillableDurationFields({
+                    start: projectTimer.startTime,
+                    end: now,
+                    billingIncrementMinutes: currentProject?.billableTimeIncrementMinutes,
+                }),
             });
             clearTimer(timerKey);
         }
@@ -108,7 +126,7 @@ const SubtaskItem = ({
             completedOnDate: checked ? todayStr : null,
             lastActive: now
         });
-    }, [isTimerActive, projectTimer, task.id, task.recurring, createEntry, clearTimer, updateTask, timerKey]);
+    }, [isTimerActive, projectTimer, task.id, task.recurring, createEntry, clearTimer, updateTask, timerKey, currentProject]);
 
     /**
      * Update subtask title
@@ -188,6 +206,8 @@ const SubtaskItem = ({
                             isArchived={isArchived}
                             isCompleted={isCompleted}
                             isRelatedToActiveTimer={isRelatedToActiveTimer}
+                            onArchive={onArchive}
+                            onUnarchive={onUnarchive}
                             onDelete={onDelete}
                             onToggleBillable={onToggleBillable}
                             onShowTimeEntries={() => setShowTimeEntriesModal(true)}
@@ -237,6 +257,8 @@ const SubtaskItem = ({
                         isArchived={isArchived}
                         isCompleted={isCompleted}
                         isRelatedToActiveTimer={isRelatedToActiveTimer}
+                        onArchive={onArchive}
+                        onUnarchive={onUnarchive}
                         onDelete={onDelete}
                         onToggleBillable={onToggleBillable}
                         onShowTimeEntries={() => setShowTimeEntriesModal(true)}

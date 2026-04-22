@@ -9,6 +9,7 @@ import { formatDurationWithSeconds, toDisplayDate } from '../utils/dateUtils.ts'
 import { useToast } from '../hooks/useToast.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { getActualDurationMs, getBillableDurationMs, hasBillableDurationOverride } from '../utils/timeEntryDurationUtils.ts';
 
 /**
  * TimeEntriesModal component - Modal for viewing and managing time entries for a task
@@ -153,10 +154,12 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     const renderTimeEntry = (entry, isBilled = false) => {
         const { date: startDate, time: startTime } = formatDateTime(entry.start);
         const { date: endDate, time: endTime } = formatDateTime(entry.end);
-        const duration = entry.end - entry.start;
+        const duration = getActualDurationMs(entry);
+        const billableDuration = getBillableDurationMs(entry);
+        const showsBillableMinimum = hasBillableDurationOverride(entry);
 
         return (
-            <div key={entry.id} className={`border border-border rounded-lg p-3 hover:shadow-md transition-shadow ${isBilled ? 'bg-muted opacity-75' : ''}`}>
+            <div key={entry.id} className={`border border-border rounded-lg p-3 hover:shadow-md transition-shadow ${isBilled ? 'bg-muted/70' : ''}`}>
                 {isMobileLayout ? (
                     <div className="space-y-2">
                         <div
@@ -187,7 +190,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                                 data-testid={`time-entry-actions-${entry.id}`}
                             >
                                 {isBilled && (
-                                    <Badge variant="secondary">Billed</Badge>
+                                    <Badge className="border-border bg-background text-foreground">Billed</Badge>
                                 )}
                                 {!isBilled && (
                                     <>
@@ -218,6 +221,11 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                                 {entry.note}
                             </div>
                         )}
+                        {showsBillableMinimum && (
+                            <div className="text-xs text-muted-foreground">
+                                Billed: <span className="font-bold text-foreground">{formatDurationWithSeconds(billableDuration)}</span>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="flex items-center justify-between gap-3" data-testid={`time-entry-desktop-${entry.id}`}>
@@ -239,10 +247,15 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                                     {entry.note}
                                 </div>
                             )}
+                            {showsBillableMinimum && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                    Billed: <span className="font-bold text-foreground">{formatDurationWithSeconds(billableDuration)}</span>
+                                </div>
+                            )}
                         </div>
                         <div className="ml-4 flex items-center space-x-2" data-testid={`time-entry-desktop-actions-${entry.id}`}>
                             {isBilled && (
-                                <Badge variant="secondary">Billed</Badge>
+                                <Badge className="border-border bg-background text-foreground">Billed</Badge>
                             )}
                             {!isBilled && (
                                 <>
