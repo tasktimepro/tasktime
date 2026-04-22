@@ -133,7 +133,7 @@ function AppContent() {
 
     useEffect(() => {
         return startUsageMetrics({
-            endpoint: SYNC_WORKER_CONFIG.isEnabled ? SYNC_WORKER_CONFIG.endpoints.metricsBatch : null,
+            endpoint: SYNC_WORKER_CONFIG.isMetricsEnabled ? SYNC_WORKER_CONFIG.endpoints.metricsBatch : null,
             appVersion: APP_VERSION,
         });
     }, []);

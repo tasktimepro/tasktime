@@ -134,6 +134,29 @@ describe('TimeEntriesModal', () => {
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry added successfully')
     })
 
+    it('preserves a manually edited start date when time spent changes', async () => {
+
+        const user = userEvent.setup()
+
+        render(
+            <TimeEntriesModal
+                {...baseProps}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Add Entry' }))
+
+        const startDateInput = screen.getByLabelText('Date started')
+        const timeSpentInput = screen.getByLabelText('Time spent')
+
+        await user.clear(startDateInput)
+        await user.type(startDateInput, '2026-01-19')
+        await user.clear(timeSpentInput)
+        await user.type(timeSpentInput, '1h')
+
+        expect(startDateInput).toHaveValue('2026-01-19')
+    })
+
     it('rejects manual entries with invalid ranges', async () => {
 
         const user = userEvent.setup()

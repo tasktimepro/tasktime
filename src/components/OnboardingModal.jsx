@@ -59,7 +59,7 @@ const BENEFIT_CARDS = [
     {
         icon: DocumentTextIcon,
         title: 'Invoices',
-        description: 'Turn tracked work and costs into invoices when you are ready to bill.',
+        description: 'Turn tracked work and costs into invoices, then send them directly from TaskTime when you’re ready to bill',
     },
 ];
 

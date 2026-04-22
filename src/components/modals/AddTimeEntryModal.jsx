@@ -40,6 +40,7 @@ const AddTimeEntryModal = ({
     const { projects } = useProjects();
 
     const timeSpentInputRef = useRef(null);
+    const hasManualStartOverrideRef = useRef(false);
 
     const MINUTES_PER_HOUR = 60;
     const HOURS_PER_DAY = 24;
@@ -100,6 +101,8 @@ const AddTimeEntryModal = ({
     }, [MINUTES_PER_DAY, MINUTES_PER_HOUR, MINUTES_PER_WEEK]);
 
     const resetForm = useCallback(() => {
+        hasManualStartOverrideRef.current = false;
+
         if (entry) {
             setFormData({
                 startDate: timestampToDateString(entry.start) || '',
@@ -192,7 +195,7 @@ const AddTimeEntryModal = ({
 
     const updateFormForTimeSpent = (value) => {
         const durationResult = parseTimeSpentInput(value);
-        const shouldAutoSetStart = !initialDateStr && !entry;
+        const shouldAutoSetStart = !initialDateStr && !entry && !hasManualStartOverrideRef.current;
         const now = Date.now();
 
         setFormData(prev => {
@@ -209,6 +212,16 @@ const AddTimeEntryModal = ({
 
             return nextForm;
         });
+    };
+
+    const handleStartDateChange = (event) => {
+        hasManualStartOverrideRef.current = true;
+        setFormData(prev => ({ ...prev, startDate: event.target.value }));
+    };
+
+    const handleStartTimeChange = (event) => {
+        hasManualStartOverrideRef.current = true;
+        setFormData(prev => ({ ...prev, startTime: event.target.value }));
     };
 
     const projectHasHourlyRate = useMemo(() => {
@@ -342,7 +355,7 @@ const AddTimeEntryModal = ({
                         <NativeDateInput
                             id="add-start-date"
                             value={formData.startDate}
-                            onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                            onChange={handleStartDateChange}
                             className="bg-background text-foreground dark:[color-scheme:dark]"
                         />
                     </div>
@@ -351,7 +364,7 @@ const AddTimeEntryModal = ({
                         <TimePicker
                             id="add-start-time"
                             value={formData.startTime}
-                            onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                            onChange={handleStartTimeChange}
                             className="bg-background"
                             showSeconds={allowSeconds}
                         />

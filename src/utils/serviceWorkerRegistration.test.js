@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const postReloadToastMocks = vi.hoisted(() => ({
+    queuePostReloadToast: vi.fn(),
+}));
+
+vi.mock('./postReloadToast.ts', () => ({
+    queuePostReloadToast: postReloadToastMocks.queuePostReloadToast,
+}));
+
 import { registerAppServiceWorker } from './serviceWorkerRegistration';
 
 function createEventTarget() {
@@ -44,6 +52,8 @@ function flushPromises() {
 
 describe('registerAppServiceWorker', () => {
     it('returns early when service workers are unavailable', () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
         const windowObject = {
             ...createEventTarget(),
             location: { reload: vi.fn() },
@@ -61,6 +71,8 @@ describe('registerAppServiceWorker', () => {
     });
 
     it('does not reload on first production install when no controller existed yet', async () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
         const windowObject = {
             ...createEventTarget(),
             location: { reload: vi.fn() },
@@ -85,9 +97,12 @@ describe('registerAppServiceWorker', () => {
         expect(serviceWorker.register).toHaveBeenCalledWith('/sw.js');
         expect(registration.update).toHaveBeenCalled();
         expect(windowObject.location.reload).not.toHaveBeenCalled();
+        expect(postReloadToastMocks.queuePostReloadToast).not.toHaveBeenCalled();
     });
 
     it('asks an already waiting production worker to skip waiting immediately', async () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
         const waitingWorker = createWorker('installed');
         const windowObject = {
             ...createEventTarget(),
@@ -114,6 +129,8 @@ describe('registerAppServiceWorker', () => {
     });
 
     it('reloads once when an existing production service worker is replaced', async () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
         const windowObject = {
             ...createEventTarget(),
             location: { reload: vi.fn() },
@@ -137,9 +154,16 @@ describe('registerAppServiceWorker', () => {
         serviceWorker.dispatch('controllerchange');
 
         expect(windowObject.location.reload).toHaveBeenCalledTimes(1);
+        expect(postReloadToastMocks.queuePostReloadToast).toHaveBeenCalledTimes(1);
+        expect(postReloadToastMocks.queuePostReloadToast).toHaveBeenCalledWith({
+            level: 'success',
+            message: 'TaskTime was updated',
+        });
     });
 
     it('asks a newly installed worker to skip waiting when an active controller already exists', async () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
         const windowObject = {
             ...createEventTarget(),
             location: { reload: vi.fn() },
@@ -169,6 +193,8 @@ describe('registerAppServiceWorker', () => {
     });
 
     it('does not ask a newly found worker to skip waiting when no installing worker exists', async () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
         const windowObject = {
             ...createEventTarget(),
             location: { reload: vi.fn() },
@@ -193,6 +219,8 @@ describe('registerAppServiceWorker', () => {
     });
 
     it('unregisters stale service workers in development', async () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
         const unregister = vi.fn();
         const serviceWorker = {
             getRegistrations: vi.fn().mockResolvedValue([{ unregister }, { unregister }]),

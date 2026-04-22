@@ -1,3 +1,5 @@
+import { queuePostReloadToast } from './postReloadToast.ts';
+
 /**
  * Register the production service worker and force-refresh only for actual updates.
  */
@@ -40,6 +42,10 @@ export function registerAppServiceWorker({
                 if (!hadControllerOnLoad || refreshing) return;
 
                 refreshing = true;
+                queuePostReloadToast({
+                    level: 'success',
+                    message: 'TaskTime was updated',
+                });
                 windowObject.location.reload();
             });
         });
