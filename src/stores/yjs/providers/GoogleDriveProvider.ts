@@ -86,6 +86,7 @@ export class YjsDriveProvider {
     private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     private isSyncing: boolean = false;
     private forceFullStateDocs: Set<DocName> = new Set();
+    private lifecycleListenersAttached: boolean = false;
 
     // Track which state versions and deltas we've already applied locally
     private appliedStateVersions: Map<DocName, number> = new Map();
@@ -139,6 +140,65 @@ export class YjsDriveProvider {
             console.log(`[DriveSync] ${ts} ${message}`, extra);
         } else {
             console.log(`[DriveSync] ${ts} ${message}`);
+        }
+    }
+
+    private handleDocumentVisibilityChange = (): void => {
+        if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+            return;
+        }
+
+        this.flushPendingChangesForPageExit('visibilitychange');
+    };
+
+    private handlePageHide = (): void => {
+        this.flushPendingChangesForPageExit('pagehide');
+    };
+
+    private attachLifecycleListeners(): void {
+        if (this.lifecycleListenersAttached || typeof document === 'undefined' || typeof window === 'undefined') {
+            return;
+        }
+
+        document.addEventListener('visibilitychange', this.handleDocumentVisibilityChange);
+        window.addEventListener('pagehide', this.handlePageHide);
+        this.lifecycleListenersAttached = true;
+    }
+
+    private detachLifecycleListeners(): void {
+        if (!this.lifecycleListenersAttached || typeof document === 'undefined' || typeof window === 'undefined') {
+            return;
+        }
+
+        document.removeEventListener('visibilitychange', this.handleDocumentVisibilityChange);
+        window.removeEventListener('pagehide', this.handlePageHide);
+        this.lifecycleListenersAttached = false;
+    }
+
+    private flushPendingChangesForPageExit(trigger: 'pagehide' | 'visibilitychange'): void {
+        if (!this.connected || this.syncMode === 'manual') {
+            return;
+        }
+
+        if (!this.hasLocalChangesToPush()) {
+            return;
+        }
+
+        this.log('page exit: flushing pending local changes', { trigger, mode: this.syncMode });
+        this.sync(true, { allowPull: false }).catch((error) => {
+            console.error('[YjsDriveProvider] Page-exit sync failed:', error);
+        });
+    }
+
+    private clearUploadedPendingPrefix(docName: DocName, uploadedBatch: Uint8Array[]): void {
+        if (uploadedBatch.length === 0) {
+            return;
+        }
+
+        const latestPending = this.pendingDeltas.get(docName) ?? [];
+
+        if (uploadedBatch.every((update, index) => latestPending[index] === update)) {
+            this.pendingDeltas.set(docName, latestPending.slice(uploadedBatch.length));
         }
     }
 
@@ -255,6 +315,7 @@ export class YjsDriveProvider {
         if (this.connected) return;
 
         const mode = syncMode ?? this.syncMode;
+        this.syncMode = mode;
 
         try {
             if (!this.isOnline()) {
@@ -353,6 +414,7 @@ export class YjsDriveProvider {
             }
 
             this.connected = true;
+            this.attachLifecycleListeners();
             this.updateSyncInterval();
             this.setState('idle');
             this.setPhase('idle');
@@ -376,6 +438,8 @@ export class YjsDriveProvider {
      * Disconnect from Google Drive
      */
     disconnect(): void {
+        this.detachLifecycleListeners();
+
         // Stop listening to doc updates
         for (const [docName, handler] of this.docUpdateHandlers) {
             const doc = this.docManager.getDocSync(docName);
@@ -741,12 +805,13 @@ export class YjsDriveProvider {
         if (this.forceFullStateDocs.has(docName)) {
             // Push full state after reconnect to capture offline changes
             // Note: pushFullState handles its own error recovery and will re-add to forceFullStateDocs on failure
+            const uploadedBatch = [...(this.pendingDeltas.get(docName) ?? [])];
             this.forceFullStateDocs.delete(docName); // Remove before push
             await this.pushFullState(docName, doc, true);
             // If pushFullState failed, it re-added to forceFullStateDocs, so don't clear pending
             if (!this.forceFullStateDocs.has(docName)) {
-                // Success - clear any pending deltas (they're now in the full state)
-                this.pendingDeltas.set(docName, []);
+                // Success - clear only the updates already included in the uploaded full state.
+                this.clearUploadedPendingPrefix(docName, uploadedBatch);
             }
         } else {
             await this.pushDeltas(docName, doc);
@@ -886,8 +951,10 @@ export class YjsDriveProvider {
             return;
         }
 
+        const uploadedBatch = [...pending];
+
         // Merge all pending deltas into one
-        const mergedDelta = mergeUpdates(pending);
+        const mergedDelta = mergeUpdates(uploadedBatch);
 
         // Upload as delta file
         const deltaId = crypto.randomUUID().slice(0, 8);
@@ -906,8 +973,9 @@ export class YjsDriveProvider {
             // This ensures the delta is recorded even if subsequent operations fail
             await this.manifest.save();
 
-            // Only clear pending after manifest is persisted to Drive
-            this.pendingDeltas.set(docName, []);
+            // Only clear the exact batch we uploaded after the manifest is persisted.
+            // New updates can arrive while the upload is in flight and must stay queued.
+            this.clearUploadedPendingPrefix(docName, uploadedBatch);
 
             this.updatePendingState();
 
