@@ -111,6 +111,7 @@ const SubtaskItem = ({
                 end: now,
                 note: projectTimer.note,
                 _stoppedTimerKey: timerKey,
+                _stoppedTimerInstanceId: projectTimer.timerInstanceId,
                 ...buildBillableDurationFields({
                     start: projectTimer.startTime,
                     end: now,

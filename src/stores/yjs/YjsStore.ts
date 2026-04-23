@@ -1179,7 +1179,7 @@ export class YjsStore {
      * a "ghost" timer can persist even though its entry already exists.
      *
      * This method detects and cleans up such orphans by matching entries
-     * that carry a `_stoppedTimerKey` against still-active timers.
+     * against the specific timer instance that produced them.
      */
     reconcileOrphanedTimers(): void {
         if (!this._coreDoc || !this._activeEntriesDoc) return;
@@ -1187,13 +1187,27 @@ export class YjsStore {
         const timersMap = this._coreDoc.getMap<MultiTimerState>('timers');
         if (timersMap.size === 0) return;
 
-        // Build set of timer keys that have a matching completed entry
         const stoppedKeys = new Set<string>();
 
         forEachEntity<TimeEntry>(
             this._activeEntriesDoc.getMap('timeEntries') as Y.Map<string, unknown>,
             (entry) => {
-                if (entry._stoppedTimerKey && timersMap.has(entry._stoppedTimerKey)) {
+                if (!entry._stoppedTimerKey) {
+                    return;
+                }
+
+                const timer = readEntity<MultiTimerState>(timersMap.get(entry._stoppedTimerKey));
+                if (!timer) {
+                    return;
+                }
+
+                if (entry._stoppedTimerInstanceId && timer.timerInstanceId === entry._stoppedTimerInstanceId) {
+                    stoppedKeys.add(entry._stoppedTimerKey);
+                    return;
+                }
+
+                // Legacy fallback for timers created before instance IDs existed.
+                if (!entry._stoppedTimerInstanceId && !timer.timerInstanceId && entry.taskId === timer.taskId && entry.start === timer.startTime) {
                     stoppedKeys.add(entry._stoppedTimerKey);
                 }
             },
@@ -1201,7 +1215,6 @@ export class YjsStore {
 
         if (stoppedKeys.size === 0) return;
 
-        console.log('[YjsStore] Reconciling orphaned timers:', Array.from(stoppedKeys));
         this._coreDoc.transact(() => {
             for (const key of stoppedKeys) {
                 timersMap.delete(key);

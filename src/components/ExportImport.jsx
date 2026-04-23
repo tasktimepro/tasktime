@@ -35,10 +35,6 @@ function ExportImport({
     clients = [],
     invoiceTemplates = [],
     emailTemplates = [],
-    expenseRecurrences = [],
-    dailyGoals = [],
-    plannerAttachments = [],
-    preferences = {},
     onImport 
 }) {
     const isMobileLayout = useIsMobileLayout();

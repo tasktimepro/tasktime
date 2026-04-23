@@ -79,6 +79,14 @@ const googleAuthHookState = vi.hoisted(() => ({
     isSignedIn: false,
 }))
 
+const onboardingModalMock = vi.hoisted(() => vi.fn(({ isOpen, onComplete }) => (
+    isOpen ? (
+        <div data-testid="onboarding-modal">
+            <button type="button" onClick={onComplete}>Complete onboarding</button>
+        </div>
+    ) : null
+)))
+
 const yjsHookState = vi.hoisted(() => ({
     isReady: true,
     isSyncing: false,
@@ -341,7 +349,7 @@ vi.mock('./components/modals/ModalManager', () => ({
 vi.mock('./components/modals/ExpenseViewModal', () => ({
     default: ({ isOpen, expense }) => (isOpen ? <div data-testid="expense-view-modal">{expense?.id}:{expense?.title}:{expense?.isPreview ? 'preview' : 'actual'}</div> : null)
 }))
-vi.mock('./components/OnboardingModal.jsx', () => ({ default: () => null }))
+vi.mock('./components/OnboardingModal.jsx', () => ({ default: onboardingModalMock }))
 vi.mock('./components/ErrorBoundary', () => ({ default: ({ children }) => children }))
 vi.mock('./components/OfflineIndicator', () => ({ default: () => <div data-testid="offline-indicator" /> }))
 vi.mock('./components/InstallPrompt', () => ({ default: () => <div data-testid="install-prompt" /> }))
@@ -366,6 +374,7 @@ describe('App component', () => {
         googleAuthHookState.hadPreviousSession = false
         googleAuthHookState.isLoading = false
         googleAuthHookState.isSignedIn = false
+        onboardingModalMock.mockClear()
         setNavigatorOnline(true)
         yjsHookState.isReady = true
         yjsHookState.isSyncing = false
@@ -439,17 +448,47 @@ describe('App component', () => {
                 return null
             }
 
+            if (key === 'tasktime-onboarding-pending') {
+                return null
+            }
+
             return null
         })
 
         render(<App />)
 
+        expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument()
         expect(tasksHookState.createTask).toHaveBeenCalledTimes(1)
         expect(tasksHookState.createTask).toHaveBeenCalledWith(expect.objectContaining({
             note: 'Start the timer, head to projects, and create your first one.',
             title: 'Create my first project',
             startDate: '2026-02-25',
         }))
+        expect(localStorage.setItem).toHaveBeenCalledWith('tasktime-onboarding-pending', 'true')
+    })
+
+    it('reopens onboarding after refresh while it is still pending', () => {
+        tasksHookState.tasks.push({
+            id: 'seed-task',
+            title: 'Create my first project',
+        })
+
+        localStorage.getItem.mockImplementation((key) => {
+            if (key === 'tasktime-onboarding-completed') {
+                return null
+            }
+
+            if (key === 'tasktime-onboarding-pending') {
+                return 'true'
+            }
+
+            return null
+        })
+
+        render(<App />)
+
+        expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument()
+        expect(tasksHookState.createTask).not.toHaveBeenCalled()
     })
 
     it('renders the desktop sidebar and not the mobile dock on larger screens', () => {

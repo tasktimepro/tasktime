@@ -197,10 +197,6 @@ const Account = ({
                             invoiceTemplates={invoiceTemplates}
                             emailTemplates={emailTemplates}
                             expenses={expenses}
-                            expenseRecurrences={expenseRecurrences}
-                            dailyGoals={dailyGoals}
-                            plannerAttachments={plannerAttachments}
-                            preferences={preferences}
                             onImport={onImport}
                         />
                     </div>

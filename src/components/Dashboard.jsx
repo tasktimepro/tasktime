@@ -714,6 +714,7 @@ const Dashboard = ({
                 end: endTime,
                 note: activeTimer.note,
                 _stoppedTimerKey: task.projectId || task.id,
+                _stoppedTimerInstanceId: activeTimer.timerInstanceId,
                 ...buildBillableDurationFields({
                     start: activeTimer.startTime,
                     end: endTime,

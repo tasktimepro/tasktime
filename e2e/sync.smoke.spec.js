@@ -7,6 +7,7 @@ import {
     editProjectFromList,
     getProjectCard,
     installMockDriveRoutes,
+    openProjectDashboard,
     projectsHeadingName,
     seedStoredGoogleSession,
     syncNowFromAccount,
@@ -151,6 +152,178 @@ test.describe('Cloud sync smoke', () => {
 
         await expect(page.getByRole('heading', { name: localProjectTitle, exact: true })).toBeVisible();
         await expect(page.getByRole('heading', { name: remoteProjectTitle, exact: true })).toBeVisible();
+    });
+
+    test('keeps an active timer running after backup auto-sync when older entries exist for the same project', async ({ page }) => {
+        const now = Date.now();
+        const projectId = `playwright-timer-project-${now}`;
+        const taskId = `playwright-timer-task-${now}`;
+        const projectTitle = `Playwright Sync Timer Project ${now}`;
+        const taskTitle = `Playwright Sync Timer Task ${now}`;
+        const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({
+            projects: [
+                {
+                    id: projectId,
+                    title: projectTitle,
+                    isPersonal: true,
+                    archived: false,
+                },
+            ],
+            tasks: [
+                {
+                    id: taskId,
+                    projectId,
+                    title: taskTitle,
+                    completed: false,
+                    archived: false,
+                },
+            ],
+            timeEntries: [
+                {
+                    id: `playwright-old-entry-${now}`,
+                    taskId,
+                    start: 1_000,
+                    end: 2_000,
+                    _stoppedTimerKey: projectId,
+                },
+            ],
+        }));
+
+        await installMockDriveRoutes(page, driveFixture);
+
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+
+        await seedStoredGoogleSession(page, {
+            sessionId: `playwright-backup-timer-session-${now}`,
+            userId: 'playwright-backup-timer-user',
+            email: 'playwright-backup-timer@example.com',
+        });
+
+        await page.reload();
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
+
+        await page.goto('/account?section=sync');
+        await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
+
+        const autoSyncCheckbox = page.getByRole('checkbox', { name: 'Enable auto-sync' });
+        await expect(autoSyncCheckbox).toBeVisible();
+        if (!(await autoSyncCheckbox.isChecked())) {
+            await autoSyncCheckbox.click();
+        }
+
+        await syncNowFromAccount(page);
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+
+        await openProjectDashboard(page, projectTitle);
+        await expect(page.getByRole('button', { name: taskTitle, exact: true })).toBeVisible();
+
+        const taskRow = page
+            .getByRole('button', { name: taskTitle, exact: true })
+            .locator('xpath=ancestor::div[contains(@class, "bg-card")][1]')
+            .first();
+
+        const uploadCountBeforeStart = driveFixture.uploads.length;
+
+        await taskRow.getByTitle('Start Timer').first().click();
+        await expect(taskRow.getByTitle('Save & Stop Timer').first()).toBeVisible();
+
+        await expect.poll(() => driveFixture.uploads.length, { timeout: 20_000 }).toBeGreaterThan(uploadCountBeforeStart);
+        await page.waitForTimeout(1_000);
+
+        await expect(taskRow.getByTitle('Save & Stop Timer').first()).toBeVisible();
+        await expect(taskRow.getByTitle('Pause Timer').first()).toBeVisible();
+    });
+
+    test('keeps an active timer running after reload reconnect in backup mode when older entries exist for the same project', async ({ page }) => {
+        const now = Date.now();
+        const projectId = `playwright-reload-timer-project-${now}`;
+        const taskId = `playwright-reload-timer-task-${now}`;
+        const projectTitle = `Playwright Reload Sync Timer Project ${now}`;
+        const taskTitle = `Playwright Reload Sync Timer Task ${now}`;
+        const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({
+            projects: [
+                {
+                    id: projectId,
+                    title: projectTitle,
+                    isPersonal: true,
+                    archived: false,
+                },
+            ],
+            tasks: [
+                {
+                    id: taskId,
+                    projectId,
+                    title: taskTitle,
+                    completed: false,
+                    archived: false,
+                },
+            ],
+            timeEntries: [
+                {
+                    id: `playwright-reload-old-entry-${now}`,
+                    taskId,
+                    start: 1_000,
+                    end: 2_000,
+                    _stoppedTimerKey: projectId,
+                },
+            ],
+        }));
+
+        await installMockDriveRoutes(page, driveFixture);
+
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+
+        await seedStoredGoogleSession(page, {
+            sessionId: `playwright-reload-backup-timer-session-${now}`,
+            userId: 'playwright-reload-backup-timer-user',
+            email: 'playwright-reload-backup-timer@example.com',
+        });
+
+        await page.reload();
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
+
+        await page.goto('/account?section=sync');
+        await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
+
+        const autoSyncCheckbox = page.getByRole('checkbox', { name: 'Enable auto-sync' });
+        await expect(autoSyncCheckbox).toBeVisible();
+        if (!(await autoSyncCheckbox.isChecked())) {
+            await autoSyncCheckbox.click();
+        }
+
+        await syncNowFromAccount(page);
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+
+        await openProjectDashboard(page, projectTitle);
+        await expect(page.getByRole('button', { name: taskTitle, exact: true })).toBeVisible();
+
+        const taskRow = page
+            .getByRole('button', { name: taskTitle, exact: true })
+            .locator('xpath=ancestor::div[contains(@class, "bg-card")][1]')
+            .first();
+
+        const uploadCountBeforeStart = driveFixture.uploads.length;
+
+        await taskRow.getByTitle('Start Timer').first().click();
+        await expect(taskRow.getByTitle('Save & Stop Timer').first()).toBeVisible();
+
+        await expect.poll(() => driveFixture.uploads.length, { timeout: 20_000 }).toBeGreaterThan(uploadCountBeforeStart);
+
+        await page.reload();
+        await expect(page.getByRole('heading', { name: projectTitle, exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible({ timeout: 20_000 });
+
+        const reloadedTaskRow = page
+            .getByRole('button', { name: taskTitle, exact: true })
+            .locator('xpath=ancestor::div[contains(@class, "bg-card")][1]')
+            .first();
+
+        await expect(reloadedTaskRow.getByTitle('Save & Stop Timer').first()).toBeVisible();
+        await expect(reloadedTaskRow.getByTitle('Pause Timer').first()).toBeVisible();
     });
 
     test('converges same-project remote and disconnected local edits after Sync Now in manual mode', async ({ page }) => {

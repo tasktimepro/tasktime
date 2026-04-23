@@ -69,7 +69,7 @@ function TimerControls({
         return true;
     }, [activeTasks, entries, task, showError]);
 
-    const buildTimeEntryPayload = useCallback((taskId, start, end, entryNote, stoppedTimerKey) => {
+    const buildTimeEntryPayload = useCallback((taskId, start, end, entryNote, stoppedTimerKey, stoppedTimerInstanceId) => {
         const entryTask = activeTasks.find(activeTask => activeTask.id === taskId) || (task.id === taskId ? task : null);
         const project = entryTask?.projectId
             ? projects.find(currentProject => currentProject.id === entryTask.projectId)
@@ -81,6 +81,7 @@ function TimerControls({
             end,
             note: entryNote,
             _stoppedTimerKey: stoppedTimerKey,
+            _stoppedTimerInstanceId: stoppedTimerInstanceId,
             ...buildBillableDurationFields({
                 start,
                 end,
@@ -92,11 +93,11 @@ function TimerControls({
     /**
      * Create a time entry with overlap validation
      */
-    const createValidatedEntry = useCallback((taskId, start, end, entryNote, stoppedTimerKey) => {
+    const createValidatedEntry = useCallback((taskId, start, end, entryNote, stoppedTimerKey, stoppedTimerInstanceId) => {
         if (!validateTimeEntry(taskId, start, end)) {
             return false;
         }
-        createEntry(buildTimeEntryPayload(taskId, start, end, entryNote, stoppedTimerKey));
+        createEntry(buildTimeEntryPayload(taskId, start, end, entryNote, stoppedTimerKey, stoppedTimerInstanceId));
         return true;
     }, [validateTimeEntry, createEntry, buildTimeEntryPayload]);
 
@@ -120,7 +121,7 @@ function TimerControls({
                 ? (existingStart + projectTimer.elapsedTime)
                 : Date.now();
 
-            if (!createValidatedEntry(projectTimer.taskId, existingStart, existingEnd, projectTimer.note, timerKey)) {
+            if (!createValidatedEntry(projectTimer.taskId, existingStart, existingEnd, projectTimer.note, timerKey, projectTimer.timerInstanceId)) {
                 return;
             }
             clearTimer(timerKey);
@@ -169,7 +170,7 @@ function TimerControls({
             : now;
         
         // Validate and create entry
-        if (!createValidatedEntry(task.id, entryStart, entryEnd, projectTimer.note, timerKey)) {
+        if (!createValidatedEntry(task.id, entryStart, entryEnd, projectTimer.note, timerKey, projectTimer.timerInstanceId)) {
             return; // Don't clear timer if validation failed
         }
         

@@ -1,6 +1,23 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Onboarding smoke', () => {
+    test('reopens after refresh until the user dismisses it', async ({ page }) => {
+
+        await page.goto('/');
+
+        const onboardingDialog = page.getByRole('dialog', { name: 'TaskTime setup' });
+        await expect(onboardingDialog).toBeVisible();
+
+        await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
+        await expect(onboardingDialog.getByRole('heading', { name: 'Sync with Google Drive' })).toBeVisible();
+
+        await page.reload();
+
+        const reloadedOnboardingDialog = page.getByRole('dialog', { name: 'TaskTime setup' });
+        await expect(reloadedOnboardingDialog).toBeVisible();
+        await expect(reloadedOnboardingDialog.getByText('Welcome to TaskTime.')).toBeVisible();
+    });
+
     test('walks through the current onboarding steps and stays dismissed after completion', async ({ page }) => {
 
         await page.goto('/');

@@ -81,6 +81,8 @@ export interface TimeEntry {
     billingIncrementMinutes?: number | null;
     /** Timer key (projectId) that produced this entry — used for cross-doc orphan reconciliation */
     _stoppedTimerKey?: string;
+    /** Unique timer instance identity for cross-doc orphan reconciliation */
+    _stoppedTimerInstanceId?: string;
 }
 
 export interface Client {
@@ -400,6 +402,7 @@ export interface Preferences {
 export interface MultiTimerState {
     projectId: string;
     taskId: string;
+    timerInstanceId?: string;
     startTime: number;
     paused?: boolean;
     pausedElapsedTime?: number;

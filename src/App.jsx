@@ -46,7 +46,12 @@ import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { buildExpenseFromRecurrence } from './utils/expenseUtils.ts';
-import { hasCompletedOnboarding, setOnboardingCompleted } from './utils/onboardingUtils.ts';
+import {
+    hasCompletedOnboarding,
+    hasPendingOnboarding,
+    setOnboardingCompleted,
+    setOnboardingPending,
+} from './utils/onboardingUtils.ts';
 import { getTaskIdsToDelete } from './utils/taskUtils.ts';
 import { setUsageMetricsSessionId, startUsageMetrics } from './utils/usageMetrics.ts';
 import { useTodayString } from './hooks/useDayRollover';
@@ -175,7 +180,6 @@ function AppContent() {
     // === Yjs Data Hooks ===
     const { 
         projects, 
-        createProject, 
         isLoading: projectsLoading 
     } = useProjects();
 
@@ -187,24 +191,21 @@ function AppContent() {
         isLoading: tasksLoading 
     } = useTasks();
 
-    const { updateAttachment, attachments: plannerAttachments, createAttachment } = usePlannerAttachments();
+    const { updateAttachment, attachments: plannerAttachments } = usePlannerAttachments();
 
     const { 
         entries: timeEntries, 
-        createEntry: createTimeEntry,
         deleteEntry,
         isLoading: entriesLoading 
     } = useTimeEntries();
 
     const { 
         clients, 
-        createClient,
         isLoading: clientsLoading 
     } = useClients();
 
     const { 
         invoices, 
-        createInvoice,
         isLoading: invoicesLoading 
     } = useInvoices();
 
@@ -218,12 +219,10 @@ function AppContent() {
         isLoading: expenseRecurrencesLoading,
         generatePendingExpenses,
         updateRecurrence,
-        createRecurrence,
     } = useExpenseRecurrences();
 
     const { 
         businessInfos, 
-        createBusinessInfo,
         isLoading: businessLoading 
     } = useBusinessInfos();
 
@@ -238,18 +237,16 @@ function AppContent() {
 
     const { 
         paymentMethods, 
-        createPaymentMethod,
         isLoading: paymentsLoading 
     } = usePaymentMethods();
 
     const { 
         preferences, 
-        updatePreferences,
         isLoading: preferencesLoading 
     } = usePreferences();
 
     const { timers, clearTimer, isLoading: timerLoading } = useTimers();
-    const { goals: dailyGoals, setGoal: setDailyGoal } = useDailyGoals();
+    const { goals: dailyGoals } = useDailyGoals();
     const focusedTimer = timers[0] || null;
     const timerIsActive = !!focusedTimer;
     const todayStr = useTodayString();
@@ -348,6 +345,7 @@ function AppContent() {
         return false;
     });
     const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(() => hasCompletedOnboarding());
+    const [isOnboardingPending, setIsOnboardingPending] = useState(() => hasPendingOnboarding());
     const [showOnboarding, setShowOnboarding] = useState(false);
     
     useEffect(() => {
@@ -1016,31 +1014,34 @@ function AppContent() {
             return;
         }
 
-        if (hasPersistedWorkspaceData) {
-            if (!showOnboarding && !isOnboardingCompleted) {
-                setOnboardingCompleted(true);
-                setIsOnboardingCompleted(true);
-            }
+        const shouldShowOnboarding = !isOnboardingCompleted && (isOnboardingPending || !hasPersistedWorkspaceData);
+
+        if (!shouldShowOnboarding) {
             return;
         }
 
-        if (!isOnboardingCompleted) {
-            if (!onboardingSeedTaskCreatedRef.current && todayStr) {
-                createTask({
-                    title: ONBOARDING_SEED_TASK_TITLE,
-                    note: 'Start the timer, head to projects, and create your first one.',
-                    startDate: todayStr,
-                });
-                onboardingSeedTaskCreatedRef.current = true;
-            }
-
-            setShowOnboarding(true);
+        if (!isOnboardingPending) {
+            setOnboardingPending(true);
+            setIsOnboardingPending(true);
         }
-    }, [activeView, createTask, hasPersistedWorkspaceData, isLoading, isOnboardingCompleted, showOnboarding, todayStr]);
+
+        if (!onboardingSeedTaskCreatedRef.current && todayStr && !hasPersistedWorkspaceData) {
+            createTask({
+                title: ONBOARDING_SEED_TASK_TITLE,
+                note: 'Start the timer, head to projects, and create your first one.',
+                startDate: todayStr,
+            });
+            onboardingSeedTaskCreatedRef.current = true;
+        }
+
+        setShowOnboarding(true);
+    }, [activeView, createTask, hasPersistedWorkspaceData, isLoading, isOnboardingCompleted, isOnboardingPending, todayStr]);
 
     const handleCompleteOnboarding = useCallback(() => {
+        setOnboardingPending(false);
         setOnboardingCompleted(true);
         setIsOnboardingCompleted(true);
+        setIsOnboardingPending(false);
         setShowOnboarding(false);
     }, []);
 

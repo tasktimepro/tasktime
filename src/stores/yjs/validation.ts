@@ -93,6 +93,8 @@ const timeEntrySchema = z.object({
     billedInvoiceId: optionalNullableIdSchema,
     billedDurationMs: nonNegativeNumberSchema.nullable().optional(),
     billingIncrementMinutes: z.number().int().positive().nullable().optional(),
+    _stoppedTimerKey: nonEmptyStringSchema.optional(),
+    _stoppedTimerInstanceId: nonEmptyStringSchema.optional(),
 }).superRefine((value: TimeEntry, ctx: z.RefinementCtx) => {
     if (value.end < value.start) {
         ctx.addIssue({
@@ -383,6 +385,7 @@ const preferencesSchema = z.object({
 const timerSchema = z.object({
     projectId: nonEmptyStringSchema,
     taskId: nonEmptyStringSchema,
+    timerInstanceId: nonEmptyStringSchema.optional(),
     startTime: finiteNumberSchema,
     paused: z.boolean().optional(),
     pausedElapsedTime: nonNegativeNumberSchema.optional(),

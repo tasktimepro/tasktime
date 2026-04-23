@@ -2,8 +2,8 @@ import { toast } from 'sonner';
 import { useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { ToastContext } from '../contexts/ToastContext.ts';
-import { TOAST_DURATION_DEFAULT_MS, TOAST_DURATION_WARNING_MS } from '../constants/app.ts';
-import { consumePostReloadToast } from '../utils/postReloadToast.ts';
+import { APP_VERSION, TOAST_DURATION_DEFAULT_MS, TOAST_DURATION_WARNING_MS } from '../constants/app.ts';
+import { consumeAppVersionUpdateToast, consumePostReloadToast } from '../utils/postReloadToast.ts';
 
 /**
  * Toast provider component that manages toasts across the application
@@ -13,24 +13,27 @@ export const ToastProvider = ({ children }) => {
 
     useEffect(() => {
         const pendingToast = consumePostReloadToast();
-        if (!pendingToast) {
+        const versionUpdateToast = consumeAppVersionUpdateToast(APP_VERSION);
+        const startupToast = pendingToast ?? versionUpdateToast;
+
+        if (!startupToast) {
             return;
         }
 
-        const options = pendingToast.duration ? { duration: pendingToast.duration } : undefined;
+        const options = startupToast.duration ? { duration: startupToast.duration } : undefined;
 
-        switch (pendingToast.level) {
+        switch (startupToast.level) {
             case 'success':
-                toast.success(pendingToast.message, options);
+                toast.success(startupToast.message, options);
                 break;
             case 'error':
-                toast.error(pendingToast.message, options);
+                toast.error(startupToast.message, options);
                 break;
             case 'info':
-                toast.info(pendingToast.message, options);
+                toast.info(startupToast.message, options);
                 break;
             case 'warning':
-                toast.warning(pendingToast.message, options);
+                toast.warning(startupToast.message, options);
                 break;
             default:
                 break;

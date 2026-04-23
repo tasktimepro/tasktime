@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
     hasCompletedOnboarding,
+    hasPendingOnboarding,
     ONBOARDING_COMPLETED_KEY,
+    ONBOARDING_PENDING_KEY,
     resetOnboardingCompleted,
     setOnboardingCompleted,
+    setOnboardingPending,
 } from './onboardingUtils.ts'
 
 describe('onboardingUtils', () => {
@@ -12,11 +15,25 @@ describe('onboardingUtils', () => {
 
         expect(hasCompletedOnboarding()).toBe(true)
 
-        setOnboardingCompleted(false)
-        expect(localStorage.setItem).toHaveBeenCalledWith(ONBOARDING_COMPLETED_KEY, 'false')
+        setOnboardingCompleted(true)
+        expect(localStorage.setItem).toHaveBeenCalledWith(ONBOARDING_COMPLETED_KEY, 'true')
+        expect(localStorage.removeItem).toHaveBeenCalledWith(ONBOARDING_PENDING_KEY)
+    })
 
+    it('reads and writes the onboarding pending flag', () => {
+        localStorage.getItem.mockReturnValue('true')
+
+        expect(hasPendingOnboarding()).toBe(true)
+
+        setOnboardingPending(true)
+        expect(localStorage.setItem).toHaveBeenCalledWith(ONBOARDING_PENDING_KEY, 'true')
+    })
+
+    it('resets both onboarding flags', () => {
         resetOnboardingCompleted()
+
         expect(localStorage.removeItem).toHaveBeenCalledWith(ONBOARDING_COMPLETED_KEY)
+        expect(localStorage.removeItem).toHaveBeenCalledWith(ONBOARDING_PENDING_KEY)
     })
 
     it('returns false when storage reads fail', () => {
@@ -25,6 +42,7 @@ describe('onboardingUtils', () => {
         })
 
         expect(hasCompletedOnboarding()).toBe(false)
+        expect(hasPendingOnboarding()).toBe(false)
     })
 
     it('ignores storage write and reset failures', () => {
@@ -36,6 +54,7 @@ describe('onboardingUtils', () => {
         })
 
         expect(() => setOnboardingCompleted(true)).not.toThrow()
+        expect(() => setOnboardingPending(true)).not.toThrow()
         expect(() => resetOnboardingCompleted()).not.toThrow()
     })
 
@@ -47,7 +66,9 @@ describe('onboardingUtils', () => {
         vi.stubGlobal('localStorage', undefined)
 
         expect(hasCompletedOnboarding()).toBe(false)
+        expect(hasPendingOnboarding()).toBe(false)
         expect(() => setOnboardingCompleted(true)).not.toThrow()
+        expect(() => setOnboardingPending(true)).not.toThrow()
         expect(() => resetOnboardingCompleted()).not.toThrow()
 
         vi.stubGlobal('window', originalWindow)

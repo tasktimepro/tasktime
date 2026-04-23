@@ -1,4 +1,5 @@
 const POST_RELOAD_TOAST_KEY = 'tasktime-post-reload-toast';
+const LAST_SEEN_APP_VERSION_KEY = 'tasktime-last-seen-app-version';
 
 export type PostReloadToast = {
     level: 'success' | 'error' | 'info' | 'warning';
@@ -40,6 +41,29 @@ export function consumePostReloadToast(): PostReloadToast | null {
             level: parsed.level,
             message: parsed.message,
             duration: parsed.duration,
+        };
+    } catch {
+        return null;
+    }
+}
+
+export function consumeAppVersionUpdateToast(currentVersion: string): PostReloadToast | null {
+    if (typeof window === 'undefined' || !currentVersion) {
+        return null;
+    }
+
+    try {
+        const lastSeenVersion = localStorage.getItem(LAST_SEEN_APP_VERSION_KEY);
+
+        localStorage.setItem(LAST_SEEN_APP_VERSION_KEY, currentVersion);
+
+        if (!lastSeenVersion || lastSeenVersion === currentVersion) {
+            return null;
+        }
+
+        return {
+            level: 'success',
+            message: 'TaskTime was updated',
         };
     } catch {
         return null;

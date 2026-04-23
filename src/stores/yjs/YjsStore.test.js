@@ -71,7 +71,6 @@ vi.mock('./providers/BackupManager', () => ({
 }))
 
 import { YjsStore } from './YjsStore.ts'
-import { objectToYMap } from './entityUtils.ts'
 
 describe('YjsStore reconnect sync tracking', () => {
     beforeEach(() => {
@@ -190,7 +189,7 @@ describe('YjsStore timer reconciliation', () => {
         return map
     }
 
-    it('deletes orphaned timers that have a matching _stoppedTimerKey entry', async () => {
+    it('deletes orphaned timers that have a matching stopped timer instance', async () => {
         const store = new YjsStore()
         await store.initialize()
 
@@ -201,6 +200,7 @@ describe('YjsStore timer reconciliation', () => {
         coreDoc.getMap('timers').set('project-1', objectToYMap({
             projectId: 'project-1',
             taskId: 'task-1',
+            timerInstanceId: 'timer-1',
             startTime: 1000,
             paused: false,
         }))
@@ -212,6 +212,7 @@ describe('YjsStore timer reconciliation', () => {
             start: 1000,
             end: 2000,
             _stoppedTimerKey: 'project-1',
+            _stoppedTimerInstanceId: 'timer-1',
         }))
 
         expect(coreDoc.getMap('timers').has('project-1')).toBe(true)
@@ -221,6 +222,65 @@ describe('YjsStore timer reconciliation', () => {
         expect(coreDoc.getMap('timers').has('project-1')).toBe(false)
         // Entry is preserved
         expect(entriesDoc.getMap('timeEntries').has('entry-1')).toBe(true)
+
+        store.destroy()
+    })
+
+    it('still deletes legacy orphaned timers when task and start time match', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const coreDoc = docs.get('core')
+        const entriesDoc = docs.get('entries-active')
+
+        coreDoc.getMap('timers').set('project-1', objectToYMap({
+            projectId: 'project-1',
+            taskId: 'task-1',
+            startTime: 1000,
+            paused: false,
+        }))
+
+        entriesDoc.getMap('timeEntries').set('entry-1', objectToYMap({
+            id: 'entry-1',
+            taskId: 'task-1',
+            start: 1000,
+            end: 2000,
+            _stoppedTimerKey: 'project-1',
+        }))
+
+        store.reconcileOrphanedTimers()
+
+        expect(coreDoc.getMap('timers').has('project-1')).toBe(false)
+
+        store.destroy()
+    })
+
+    it('does not delete a fresh timer just because the project has older stopped entries', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const coreDoc = docs.get('core')
+        const entriesDoc = docs.get('entries-active')
+
+        coreDoc.getMap('timers').set('project-1', objectToYMap({
+            projectId: 'project-1',
+            taskId: 'task-1',
+            timerInstanceId: 'timer-new',
+            startTime: 3000,
+            paused: false,
+        }))
+
+        entriesDoc.getMap('timeEntries').set('entry-old', objectToYMap({
+            id: 'entry-old',
+            taskId: 'task-1',
+            start: 1000,
+            end: 2000,
+            _stoppedTimerKey: 'project-1',
+        }))
+
+        store.reconcileOrphanedTimers()
+
+        expect(coreDoc.getMap('timers').has('project-1')).toBe(true)
 
         store.destroy()
     })
@@ -236,6 +296,7 @@ describe('YjsStore timer reconciliation', () => {
         coreDoc.getMap('timers').set('project-1', objectToYMap({
             projectId: 'project-1',
             taskId: 'task-1',
+            timerInstanceId: 'timer-1',
             startTime: 1000,
             paused: false,
         }))
@@ -265,27 +326,32 @@ describe('YjsStore timer reconciliation', () => {
         coreDoc.getMap('timers').set('project-1', objectToYMap({
             projectId: 'project-1',
             taskId: 'task-1',
+            timerInstanceId: 'timer-1',
             startTime: 1000,
         }))
         coreDoc.getMap('timers').set('project-2', objectToYMap({
             projectId: 'project-2',
             taskId: 'task-2',
+            timerInstanceId: 'timer-2',
             startTime: 2000,
         }))
         // project-3 has no matching entry — should survive
         coreDoc.getMap('timers').set('project-3', objectToYMap({
             projectId: 'project-3',
             taskId: 'task-3',
+            timerInstanceId: 'timer-3',
             startTime: 3000,
         }))
 
         entriesDoc.getMap('timeEntries').set('e1', objectToYMap({
             id: 'e1', taskId: 'task-1', start: 1000, end: 2000,
             _stoppedTimerKey: 'project-1',
+            _stoppedTimerInstanceId: 'timer-1',
         }))
         entriesDoc.getMap('timeEntries').set('e2', objectToYMap({
             id: 'e2', taskId: 'task-2', start: 2000, end: 3000,
             _stoppedTimerKey: 'project-2',
+            _stoppedTimerInstanceId: 'timer-2',
         }))
 
         store.reconcileOrphanedTimers()

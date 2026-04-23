@@ -131,6 +131,7 @@ export function useTimers(): UseTimersResult {
         const timer = validateCollectionEntity<MultiTimerState>('timers', {
             projectId: timerKey,
             taskId,
+            timerInstanceId: generateId(),
             startTime: alignedStartTime,
             paused: false,
             pausedElapsedTime: 0,
@@ -211,6 +212,7 @@ export function useTimers(): UseTimersResult {
             end: now,
             note: timer.note,
             _stoppedTimerKey: projectId,
+            _stoppedTimerInstanceId: timer.timerInstanceId,
         }, `stop timer entry ${projectId}`);
 
         store.activeEntriesDoc.transact(() => {
