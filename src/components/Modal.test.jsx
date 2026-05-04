@@ -123,4 +123,5 @@ describe('Modal', () => {
         expect(actionGroup?.className.includes('items-start')).toBe(false)
         expect(closeButton.className.includes('rounded-full')).toBe(true)
     })
+
 })

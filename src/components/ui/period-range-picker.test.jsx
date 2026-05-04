@@ -78,4 +78,22 @@ describe('PeriodRangePicker', () => {
         expect(onCustomStartChange).toHaveBeenCalledWith('2026-04-05');
         expect(onCustomEndChange).toHaveBeenCalledWith('2026-04-25');
     });
+
+    it('can remove the trigger from tab order for modal header actions', () => {
+        render(
+            <PeriodRangePicker
+                value="month"
+                onValueChange={() => {}}
+                options={[{ value: 'month', label: 'This Month' }]}
+                customStart=""
+                customEnd=""
+                onCustomStartChange={() => {}}
+                onCustomEndChange={() => {}}
+                ariaLabel="Invoice billing period"
+                triggerTabIndex={-1}
+            />
+        );
+
+        expect(screen.getByRole('button', { name: 'Invoice billing period' })).toHaveAttribute('tabindex', '-1');
+    });
 });

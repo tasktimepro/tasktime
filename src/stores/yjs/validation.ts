@@ -24,6 +24,10 @@ import type { YjsDocManager } from './YjsDocManager';
 const STORAGE_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const storageDateSchema = z.string().regex(STORAGE_DATE_REGEX);
+const nullableStorageDateSchema = z.preprocess(
+    (value) => (value === '' ? null : value),
+    storageDateSchema.nullable().optional()
+);
 const finiteNumberSchema = z.number().finite();
 const integerNumberSchema = z.number().int();
 const nonNegativeNumberSchema = z.number().finite().min(0);
@@ -278,24 +282,24 @@ const expenseSchema = z.object({
     receiptNumber: z.string().nullable().optional(),
     currency: nonEmptyStringSchema,
     amount: finiteNumberSchema,
-    paidOn: storageDateSchema.nullable().optional(),
+    paidOn: nullableStorageDateSchema,
     paidBy: z.string().nullable().optional(),
     paymentStatus: z.enum(['unpaid', 'paid']),
-    paymentMode: z.enum(['manual', 'auto']).optional(),
+    paymentMode: z.enum(['manual', 'auto']).optional().default('manual'),
     clientId: optionalNullableIdSchema,
     projectId: optionalNullableIdSchema,
     businessId: optionalNullableIdSchema,
     isPersonal: z.boolean(),
     billable: z.boolean(),
-    billingStatus: z.enum(['unbilled', 'billed']),
+    billingStatus: z.enum(['unbilled', 'billed']).default('unbilled'),
     invoiceId: optionalNullableIdSchema,
     billedAt: finiteNumberSchema.nullable().optional(),
-    isRecurring: z.boolean(),
+    isRecurring: z.boolean().default(false),
     recurrenceId: optionalNullableIdSchema,
     amountType: z.enum(['fixed', 'variable']).nullable().optional(),
     taxNumber: z.string().nullable().optional(),
-    isTaxExempt: z.boolean(),
-    paymentCurrencySnapshot: paymentCurrencySnapshotSchema.nullable().optional(),
+    isTaxExempt: z.boolean().default(false),
+    paymentCurrencySnapshot: paymentCurrencySnapshotSchema.nullable().optional().catch(null),
     isPreview: z.boolean().optional(),
     createdAt: finiteNumberSchema.optional(),
     updatedAt: finiteNumberSchema.optional(),

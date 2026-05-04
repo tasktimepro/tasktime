@@ -100,6 +100,43 @@ describe('useExpenses', () => {
         expect(result.current.expenses.map((e) => e.id)).toEqual(['2'])
     })
 
+    it('keeps legacy paid one-time expenses visible after validation normalization', () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [{
+                id: 'legacy-paid-expense',
+                title: 'Car Insurance & License',
+                date: '2026-04-30',
+                currency: 'EUR',
+                amount: 505.55,
+                paidOn: '2026-04-30',
+                paymentStatus: 'paid',
+                isPersonal: true,
+                billable: false,
+                paymentCurrencySnapshot: {},
+            }]
+        })
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        expect(result.current.expenses).toEqual([
+            expect.objectContaining({
+                id: 'legacy-paid-expense',
+                title: 'Car Insurance & License',
+                paymentStatus: 'paid',
+                billingStatus: 'unbilled',
+                isRecurring: false,
+                isTaxExempt: false,
+                paymentCurrencySnapshot: null,
+            })
+        ])
+    })
+
     it('computes totals correctly', () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [

@@ -929,8 +929,8 @@ const InvoiceGenerator = ({
             || null;
 
         if (!projectForInvoice) {
-            setInvoiceTasks([]);
-            setSelectedTasksForBilling({});
+            setInvoiceTasks((prev) => (prev.length === 0 ? prev : []));
+            setSelectedTasksForBilling((prev) => (Object.keys(prev).length === 0 ? prev : {}));
             return;
         }
 

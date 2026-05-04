@@ -235,7 +235,7 @@ describe('Expense recurrence auto-pay integration', () => {
         expect(upcomingNearest.compareDocumentPosition(upcomingLater) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
-    it('sorts paid by most recent paid date first', () => {
+    it('sorts paid by expense date descending', () => {
         mockRecurrences = []
         mockExpenses = [
             {
@@ -273,7 +273,7 @@ describe('Expense recurrence auto-pay integration', () => {
 
         const paidMostRecent = screen.getByText('Paid Most Recent')
         const paidOlder = screen.getByText('Paid Older')
-        expect(paidMostRecent.compareDocumentPosition(paidOlder) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(paidOlder.compareDocumentPosition(paidMostRecent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
     it('keeps outstanding expenses visible outside the selected period while upcoming stays within the default window', () => {

@@ -41,4 +41,5 @@ describe('InvoiceActions', () => {
         expect(screen.getByRole('button', { name: 'Generate Invoice' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Generate New Invoice' })).not.toBeInTheDocument()
     })
+
 })

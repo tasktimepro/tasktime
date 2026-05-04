@@ -17,6 +17,7 @@ function PeriodRangePicker({
     className,
     ariaLabel = 'Period',
     contentAlign = 'start',
+    triggerTabIndex,
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const rootRef = useRef(null);
@@ -67,6 +68,7 @@ function PeriodRangePicker({
                 aria-label={ariaLabel}
                 aria-expanded={isOpen}
                 aria-haspopup="dialog"
+                tabIndex={triggerTabIndex}
                 onClick={handleTriggerClick}
             >
                 <CalendarDaysIcon className="h-4 w-4 shrink-0 text-muted-foreground" />

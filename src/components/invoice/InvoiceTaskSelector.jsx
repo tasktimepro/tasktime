@@ -226,7 +226,7 @@ const InvoiceTaskSelector = ({
                                                             onChange={(checked) => handleToggleMergeSubtasks(task.id, checked)}
                                                             title="Merge subtasks with this parent task"
                                                             label="Merge subtasks"
-                                                            labelClassName="text-xs status-info-text font-medium"
+                                                            labelClassName="text-xs text-foreground font-medium"
                                                         />
                                                     </div>
                                                 )}

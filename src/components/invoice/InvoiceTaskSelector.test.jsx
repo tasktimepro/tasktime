@@ -147,6 +147,38 @@ describe('InvoiceTaskSelector', () => {
         expect(handleHoursChange).toHaveBeenCalledWith('parent-1', '3');
     });
 
+    it('uses standard foreground text for merge subtasks', () => {
+        render(
+            <InvoiceTaskSelector
+                {...createBaseProps({
+                    invoiceTasks: [
+                        {
+                            id: 'parent-1',
+                            title: 'Parent task',
+                            parentTaskId: null,
+                            hours: 2,
+                            originalHours: 2,
+                            originalTimeMs: 7200000
+                        },
+                        {
+                            id: 'child-1',
+                            title: 'Child task',
+                            parentTaskId: 'parent-1',
+                            hours: 1,
+                            originalHours: 1,
+                            originalTimeMs: 3600000
+                        }
+                    ]
+                })}
+            />
+        );
+
+        const mergeSubtasksLabel = screen.getByText('Merge subtasks');
+
+        expect(mergeSubtasksLabel.className.includes('text-foreground')).toBe(true);
+        expect(mergeSubtasksLabel.className.includes('status-info-text')).toBe(false);
+    });
+
     it('keeps task actions inline and uses full-width mobile editors before md', () => {
         render(
             <InvoiceTaskSelector

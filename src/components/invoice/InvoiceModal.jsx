@@ -235,6 +235,7 @@ const InvoiceModal = ({
             triggerClassName="bg-background"
             ariaLabel="Invoice billing period"
             contentAlign="end"
+            triggerTabIndex={-1}
         />
     );
 

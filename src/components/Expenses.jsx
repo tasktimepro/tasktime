@@ -416,11 +416,11 @@ const Expenses = ({
     }, [getDateMs]);
 
     const comparePaidByMostRecent = useCallback((a, b) => {
-        const paidDiff = getDateMs(b.paidOn) - getDateMs(a.paidOn);
-        if (paidDiff !== 0) return paidDiff;
-
         const dateDiff = getDateMs(b.date) - getDateMs(a.date);
         if (dateDiff !== 0) return dateDiff;
+
+        const paidDiff = getDateMs(b.paidOn) - getDateMs(a.paidOn);
+        if (paidDiff !== 0) return paidDiff;
 
         return (a.title || '').localeCompare(b.title || '');
     }, [getDateMs]);

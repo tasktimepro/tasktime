@@ -86,6 +86,29 @@ describe('Yjs validation', () => {
         }, 'test invoice')).not.toThrow()
     })
 
+    it('normalizes legacy one-time paid expenses instead of dropping them', () => {
+        expect(validateCollectionEntity('expenses', {
+            id: 'expense-legacy-paid',
+            title: 'Legacy paid expense',
+            date: '2026-04-30',
+            currency: 'EUR',
+            amount: 505.55,
+            paidOn: '',
+            paymentStatus: 'paid',
+            isPersonal: true,
+            billable: false,
+            paymentCurrencySnapshot: {},
+        }, 'legacy expense')).toEqual(expect.objectContaining({
+            id: 'expense-legacy-paid',
+            paidOn: null,
+            paymentMode: 'manual',
+            billingStatus: 'unbilled',
+            isRecurring: false,
+            isTaxExempt: false,
+            paymentCurrencySnapshot: null,
+        }))
+    })
+
     it('accepts payment methods in the persisted app shape', () => {
         expect(validateCollectionEntity('paymentMethods', {
             id: 'payment-method-1',
