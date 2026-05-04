@@ -2,7 +2,7 @@
 
 ## Priority
 
-[ ] Can we remove the migrations under stores/yjs now that I've run them through, and since I'm the only one using the app for now?
+[ ] Check about whether we need to keep the migration for the expense snapshot
 
 ---
 

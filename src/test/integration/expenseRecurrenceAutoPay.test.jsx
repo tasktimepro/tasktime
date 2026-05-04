@@ -5,6 +5,7 @@ import Expenses from '../../components/Expenses'
 
 let mockExpenses = []
 let mockRecurrences = []
+const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
 
 const expenseHookMocks = vi.hoisted(() => ({
 
@@ -101,6 +102,7 @@ describe('Expense recurrence auto-pay integration', () => {
 
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-02-09T12:00:00Z'))
+        HTMLElement.prototype.scrollIntoView = vi.fn()
 
         mockExpenses = []
         mockRecurrences = [
@@ -133,6 +135,7 @@ describe('Expense recurrence auto-pay integration', () => {
     afterEach(() => {
 
         cleanup()
+        HTMLElement.prototype.scrollIntoView = originalScrollIntoView
         vi.useRealTimers()
         vi.restoreAllMocks()
     })
@@ -356,5 +359,50 @@ describe('Expense recurrence auto-pay integration', () => {
 
         expect(screen.getByText('Recent Paid Expense')).toBeInTheDocument()
         expect(screen.queryByText('Old Paid Expense')).not.toBeInTheDocument()
+    })
+
+    it('shows paid expenses from the previous calendar month when last month is selected', () => {
+        vi.setSystemTime(new Date('2026-05-04T12:00:00Z'))
+        mockRecurrences = []
+        mockExpenses = [
+            {
+                id: 'exp-paid-april',
+                title: 'April Paid Expense',
+                date: '2026-04-30',
+                paidOn: '2026-04-30',
+                paymentStatus: 'paid',
+                amount: 50,
+                amountType: 'fixed',
+                currency: 'USD'
+            },
+            {
+                id: 'exp-paid-may',
+                title: 'May Paid Expense',
+                date: '2026-05-02',
+                paidOn: '2026-05-02',
+                paymentStatus: 'paid',
+                amount: 75,
+                amountType: 'fixed',
+                currency: 'USD'
+            }
+        ]
+
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        )
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Paid (1)' }))
+    fireEvent.click(screen.getAllByRole('combobox')[0])
+        fireEvent.click(screen.getByRole('option', { name: 'Last Month' }))
+
+        expect(screen.getByText('April Paid Expense')).toBeInTheDocument()
+        expect(screen.queryByText('May Paid Expense')).not.toBeInTheDocument()
     })
 })

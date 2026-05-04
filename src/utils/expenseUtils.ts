@@ -1,7 +1,173 @@
 import { endOfMonth } from 'date-fns';
 import { parseStoredDate, toStorageDate } from './dateUtils';
 import { generateRecurringExpenseId } from './idUtils';
-import type { Expense, ExpenseRecurrence } from '@/stores/yjs/types';
+import { convertCurrency, normalizeCurrencyCode } from './currencyUtils';
+import type { Expense, ExpensePaymentCurrencySnapshot, ExpenseRecurrence } from '@/stores/yjs/types';
+
+const EXCHANGE_RATE_BASE_CURRENCY = 'USD';
+
+const getFiniteNumber = (value: unknown, fallback: number): number => {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
+
+const getFiniteRecord = (value: unknown): Record<string, number> | undefined => {
+    if (!value || typeof value !== 'object') {
+        return undefined;
+    }
+
+    const entries = Object.entries(value).filter(([, rate]) => typeof rate === 'number' && Number.isFinite(rate));
+
+    if (entries.length === 0) {
+        return undefined;
+    }
+
+    return Object.fromEntries(entries);
+};
+
+const resolveExpensePaymentSnapshotCapturedAt = (expense: any): number => {
+    const paidOnDate = parseStoredDate(typeof expense?.paidOn === 'string' ? expense.paidOn : null);
+    if (paidOnDate) {
+        return paidOnDate.getTime();
+    }
+
+    const expenseDate = parseStoredDate(typeof expense?.date === 'string' ? expense.date : null);
+    if (expenseDate) {
+        return expenseDate.getTime();
+    }
+
+    if (typeof expense?.updatedAt === 'number' && Number.isFinite(expense.updatedAt)) {
+        return expense.updatedAt;
+    }
+
+    if (typeof expense?.createdAt === 'number' && Number.isFinite(expense.createdAt)) {
+        return expense.createdAt;
+    }
+
+    return Date.now();
+};
+
+const normalizeExpensePaymentCurrencySnapshot = (expense: any): ExpensePaymentCurrencySnapshot | null => {
+    const snapshot = expense?.paymentCurrencySnapshot;
+    if (!snapshot || typeof snapshot !== 'object') {
+        return null;
+    }
+
+    const capturedAt = getFiniteNumber(snapshot.capturedAt, 0);
+    const sourceAmount = getFiniteNumber(snapshot.sourceAmount, Number.NaN);
+    const preferredCurrencyAmount = getFiniteNumber(snapshot.preferredCurrencyAmount, Number.NaN);
+
+    if (!capturedAt || !Number.isFinite(sourceAmount) || !Number.isFinite(preferredCurrencyAmount)) {
+        return null;
+    }
+
+    return {
+        capturedAt,
+        sourceCurrency: normalizeCurrencyCode(snapshot.sourceCurrency || expense?.currency),
+        sourceAmount,
+        preferredCurrencyAtPayment: normalizeCurrencyCode(snapshot.preferredCurrencyAtPayment),
+        preferredCurrencyAmount,
+        exchangeRatesBase: typeof snapshot.exchangeRatesBase === 'string' && snapshot.exchangeRatesBase.trim()
+            ? snapshot.exchangeRatesBase.trim()
+            : EXCHANGE_RATE_BASE_CURRENCY,
+        exchangeRates: getFiniteRecord(snapshot.exchangeRates),
+    };
+};
+
+export const createExpensePaymentCurrencySnapshot = ({
+    expense,
+    preferredCurrency,
+    exchangeRates,
+    capturedAt,
+}: {
+    expense: any;
+    preferredCurrency: string;
+    exchangeRates?: Record<string, number> | null;
+    capturedAt?: number;
+}): ExpensePaymentCurrencySnapshot => {
+    const sourceCurrency = normalizeCurrencyCode(expense?.currency);
+    const targetCurrency = normalizeCurrencyCode(preferredCurrency);
+    const sourceAmount = getFiniteNumber(expense?.amount, 0);
+    const normalizedRates = getFiniteRecord(exchangeRates);
+
+    let preferredCurrencyAmount = sourceAmount;
+    if (sourceCurrency !== targetCurrency) {
+        const result = convertCurrency(sourceAmount, sourceCurrency, targetCurrency, normalizedRates);
+        preferredCurrencyAmount = result.amount;
+    }
+
+    return {
+        capturedAt: capturedAt ?? resolveExpensePaymentSnapshotCapturedAt(expense),
+        sourceCurrency,
+        sourceAmount,
+        preferredCurrencyAtPayment: targetCurrency,
+        preferredCurrencyAmount,
+        exchangeRatesBase: EXCHANGE_RATE_BASE_CURRENCY,
+        exchangeRates: normalizedRates,
+    };
+};
+
+export const getExpensePaymentCurrencySnapshot = (expense: any): ExpensePaymentCurrencySnapshot | null => {
+    return normalizeExpensePaymentCurrencySnapshot(expense);
+};
+
+export const getPaidExpenseConvertedAmount = (
+    expense: any,
+    targetCurrency: string
+): { amount: number; currency: string; success: boolean; usedSnapshot: boolean } => {
+    const normalizedTargetCurrency = normalizeCurrencyCode(targetCurrency);
+    const snapshot = getExpensePaymentCurrencySnapshot(expense);
+
+    if (!snapshot) {
+        const expenseCurrency = normalizeCurrencyCode(expense?.currency);
+        return {
+            amount: getFiniteNumber(expense?.amount, 0),
+            currency: expenseCurrency,
+            success: expenseCurrency === normalizedTargetCurrency,
+            usedSnapshot: false,
+        };
+    }
+
+    if (normalizedTargetCurrency === snapshot.preferredCurrencyAtPayment) {
+        return {
+            amount: snapshot.preferredCurrencyAmount,
+            currency: normalizedTargetCurrency,
+            success: true,
+            usedSnapshot: true,
+        };
+    }
+
+    if (normalizedTargetCurrency === snapshot.sourceCurrency) {
+        return {
+            amount: snapshot.sourceAmount,
+            currency: normalizedTargetCurrency,
+            success: true,
+            usedSnapshot: true,
+        };
+    }
+
+    if (snapshot.exchangeRates) {
+        const conversion = convertCurrency(
+            snapshot.sourceAmount,
+            snapshot.sourceCurrency,
+            normalizedTargetCurrency,
+            snapshot.exchangeRates
+        );
+
+        return {
+            amount: conversion.amount,
+            currency: normalizedTargetCurrency,
+            success: conversion.success,
+            usedSnapshot: true,
+        };
+    }
+
+    return {
+        amount: snapshot.sourceAmount,
+        currency: snapshot.sourceCurrency,
+        success: false,
+        usedSnapshot: true,
+    };
+};
 
 type RepeatInterval = 'monthly' | 'yearly';
 
@@ -158,6 +324,7 @@ export const buildExpenseFromRecurrence = (recurrence: ExpenseRecurrence, dateVa
         amountType: recurrence.amountType,
         taxNumber: recurrence.taxNumber ?? null,
         isTaxExempt: recurrence.isTaxExempt,
+        paymentCurrencySnapshot: null,
     };
 };
 

@@ -362,9 +362,9 @@ const ToDoToday = ({
         );
     };
 
-    const handleMarkExpensePaid = (expense) => {
+    const handleMarkExpensePaid = async (expense) => {
         try {
-            markAsPaid(expense.id);
+            await markAsPaid(expense.id);
             showSuccess('Expense marked as paid');
         } catch (error) {
             showError(error?.message || 'Unable to mark expense as paid');

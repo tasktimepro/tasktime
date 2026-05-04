@@ -12,6 +12,8 @@ import { generateId } from '@/utils/idUtils';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { objectToYMap, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
+import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
+import { createExpensePaymentCurrencySnapshot, getExpensePaymentCurrencySnapshot } from '@/utils/expenseUtils';
 
 export interface UseExpensesOptions {
     clientId?: string;
@@ -26,6 +28,8 @@ type MarkAsPaidOptions = {
     paidOn?: string | null;
     paidBy?: string | null;
 };
+
+const SNAPSHOT_SENSITIVE_EXPENSE_FIELDS = ['amount', 'currency', 'date', 'paidOn', 'paymentStatus'] as const;
 
 export function useExpenses(options: UseExpensesOptions = {}) {
     const { store, isReady, loadArchivedExpenses } = useYjs();
@@ -167,6 +171,76 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         return null;
     }, [store, options.includeArchived]);
 
+    const getPreferredCurrency = useCallback(() => {
+        const storedPreference = store.preferences?.get?.('currency');
+        return normalizeCurrencyCode(typeof storedPreference === 'string' ? storedPreference : undefined);
+    }, [store]);
+
+    const applyValidatedExpenseUpdate = useCallback((
+        map: typeof store.expenses,
+        id: string,
+        updatesWithTimestamp: Record<string, unknown>,
+        validated: Expense
+    ) => {
+        const result = updateEntityFields(map as any, id, updatesWithTimestamp);
+        if (!result) {
+            const entityMap = objectToYMap(validated as unknown as Record<string, unknown>);
+            (map as any).set(id, entityMap);
+        }
+
+        markMeaningfulActivity();
+        return validated;
+    }, [store]);
+
+    const ensureExpensePaymentSnapshot = useCallback(async (id: string): Promise<Expense | undefined> => {
+        const map = findExpenseMap(id);
+        if (!map) return undefined;
+
+        const expense = readValidatedEntity<Expense>('expenses', map.get(id), `ensure expense payment snapshot ${id}`);
+        if (!expense || expense.paymentStatus !== 'paid') {
+            return expense;
+        }
+
+        if (getExpensePaymentCurrencySnapshot(expense)) {
+            return expense;
+        }
+
+        const preferredCurrency = getPreferredCurrency();
+        const expenseCurrency = normalizeCurrencyCode(expense.currency || preferredCurrency);
+        const { rates, error } = await fetchExchangeRates();
+
+        if (!rates && expenseCurrency !== preferredCurrency) {
+            throw new Error(error || 'Unable to load exchange rates for expense payment snapshot.');
+        }
+
+        const updatedAt = Date.now();
+        const snapshot = createExpensePaymentCurrencySnapshot({
+            expense: {
+                ...expense,
+                updatedAt,
+            },
+            preferredCurrency,
+            exchangeRates: rates,
+        });
+        const merged = {
+            ...expense,
+            paymentCurrencySnapshot: snapshot,
+            updatedAt,
+        };
+        const validated = validateCollectionEntity<Expense>('expenses', merged, `update expense ${id} payment snapshot`);
+
+        return applyValidatedExpenseUpdate(map, id, {
+            paymentCurrencySnapshot: snapshot,
+            updatedAt,
+        }, validated);
+    }, [applyValidatedExpenseUpdate, findExpenseMap, getPreferredCurrency]);
+
+    const queueExpensePaymentSnapshot = useCallback((id: string) => {
+        void ensureExpensePaymentSnapshot(id).catch((error) => {
+            console.warn(`[useExpenses] Unable to persist payment snapshot for expense ${id}:`, error);
+        });
+    }, [ensureExpensePaymentSnapshot]);
+
     const createExpense = useCallback((data: Omit<Expense, 'id'> & { id?: string }): Expense => {
         if (!isReady) throw new Error('Store not ready');
 
@@ -191,8 +265,13 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         const entityMap = objectToYMap(validatedExpense as unknown as Record<string, unknown>);
         (store.expenses as any).set(id, entityMap);
         markMeaningfulActivity();
+
+        if (validatedExpense.paymentStatus === 'paid' && !getExpensePaymentCurrencySnapshot(validatedExpense)) {
+            queueExpensePaymentSnapshot(id);
+        }
+
         return validatedExpense;
-    }, [isReady, store]);
+    }, [isReady, queueExpensePaymentSnapshot, store]);
 
     const updateExpense = useCallback((id: string, updates: Partial<Expense>): Expense | undefined => {
         if (!isReady) return undefined;
@@ -204,18 +283,31 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         if (!existing) return undefined;
 
         const updatesWithTimestamp = { ...updates, updatedAt: Date.now() } as Record<string, unknown>;
+        const hasProvidedPaymentSnapshot = Object.prototype.hasOwnProperty.call(updatesWithTimestamp, 'paymentCurrencySnapshot')
+            && Boolean(getExpensePaymentCurrencySnapshot({ ...existing, ...updatesWithTimestamp }));
+        const shouldRefreshPaymentSnapshot = !hasProvidedPaymentSnapshot
+            && (updatesWithTimestamp.paymentStatus ?? existing.paymentStatus) === 'paid'
+            && (
+                updatesWithTimestamp.paymentCurrencySnapshot === null
+                || !getExpensePaymentCurrencySnapshot({ ...existing, ...updatesWithTimestamp })
+                || SNAPSHOT_SENSITIVE_EXPENSE_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(updatesWithTimestamp, field))
+            );
+
+        if (shouldRefreshPaymentSnapshot) {
+            updatesWithTimestamp.paymentCurrencySnapshot = null;
+        }
+
         const merged = { ...existing, ...updatesWithTimestamp };
         const validated = validateCollectionEntity<Expense>('expenses', merged, `update expense ${id}`);
 
-        const result = updateEntityFields(map as any, id, updatesWithTimestamp);
-        if (!result) {
-            // Fallback for old-format data (updateEntityFields handles conversion)
-            const entityMap = objectToYMap(validated as unknown as Record<string, unknown>);
-            (map as any).set(id, entityMap);
+        applyValidatedExpenseUpdate(map, id, updatesWithTimestamp, validated);
+
+        if (shouldRefreshPaymentSnapshot) {
+            queueExpensePaymentSnapshot(id);
         }
-        markMeaningfulActivity();
+
         return validated;
-    }, [isReady, findExpenseMap]);
+    }, [applyValidatedExpenseUpdate, isReady, findExpenseMap, queueExpensePaymentSnapshot]);
 
     const deleteExpense = useCallback((id: string): boolean => {
         if (!isReady) return false;
@@ -230,7 +322,7 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         return removed;
     }, [isReady, findExpenseMap]);
 
-    const markAsPaid = useCallback((id: string, options: MarkAsPaidOptions = {}) => {
+    const markAsPaid = useCallback(async (id: string, options: MarkAsPaidOptions = {}) => {
         const expense = getExpense(id);
         if (!expense) return undefined;
 
@@ -239,16 +331,39 @@ export function useExpenses(options: UseExpensesOptions = {}) {
             throw new Error('Amount is required to mark variable expenses as paid');
         }
 
+        const preferredCurrency = getPreferredCurrency();
+        const expenseCurrency = normalizeCurrencyCode(expense.currency || preferredCurrency);
+        const { rates, error } = await fetchExchangeRates();
+
+        if (!rates && expenseCurrency !== preferredCurrency) {
+            throw new Error(error || 'Unable to load exchange rates for expense payment snapshot.');
+        }
+
+        const paidOn = options.paidOn ?? toStorageDate(new Date());
+        const paidBy = options.paidBy ?? expense.paidBy ?? null;
+        const paidExpense = {
+            ...expense,
+            amount,
+            paidOn,
+            paidBy,
+            paymentStatus: 'paid' as const,
+        };
+
         return updateExpense(id, {
             amount,
-            paidOn: options.paidOn ?? toStorageDate(new Date()),
-            paidBy: options.paidBy ?? expense.paidBy ?? null,
+            paidOn,
+            paidBy,
             paymentStatus: 'paid',
+            paymentCurrencySnapshot: createExpensePaymentCurrencySnapshot({
+                expense: paidExpense,
+                preferredCurrency,
+                exchangeRates: rates,
+            }),
         });
-    }, [getExpense, updateExpense]);
+    }, [getExpense, getPreferredCurrency, updateExpense]);
 
     const markAsUnpaid = useCallback((id: string) => {
-        return updateExpense(id, { paidOn: null, paidBy: null, paymentStatus: 'unpaid' });
+        return updateExpense(id, { paidOn: null, paidBy: null, paymentStatus: 'unpaid', paymentCurrencySnapshot: null });
     }, [updateExpense]);
 
     const markAsBilled = useCallback((id: string, invoiceId: string) => {
@@ -326,6 +441,7 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         totals,
 
         getExpense,
+        ensureExpensePaymentSnapshot,
         createExpense,
         updateExpense,
         deleteExpense,

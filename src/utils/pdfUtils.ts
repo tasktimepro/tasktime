@@ -1,6 +1,7 @@
 import html2pdf from 'html2pdf.js';
 import DOMPurify from 'dompurify';
 import { getCurrencySymbol, getPreferredCurrency } from './currencyUtils';
+import { formatBillingPeriodLabel } from './billingPeriodUtils';
 
 type InvoiceTask = {
     id: string;
@@ -86,6 +87,9 @@ type InvoiceData = {
     taxLabel?: string;
     taskFlatRates?: Record<string, number | string>;
     taskHourlyRates?: Record<string, number | string>;
+    billingPeriodPreset?: string | null;
+    billingPeriodStart?: string | null;
+    billingPeriodEnd?: string | null;
     currency?: string;
 };
 
@@ -272,9 +276,17 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         taxLabel,
         taskFlatRates = {},
         taskHourlyRates = {},
+        billingPeriodPreset,
+        billingPeriodStart,
+        billingPeriodEnd,
         currency = getPreferredCurrency()
     } = invoiceData;
     const resolvedTotal = typeof total === 'number' ? total : (typeof totalAmount === 'number' ? totalAmount : 0);
+    const billingPeriodLabel = formatBillingPeriodLabel({
+        preset: billingPeriodPreset,
+        startDate: billingPeriodStart || '',
+        endDate: billingPeriodEnd || '',
+    });
 
     // Filter out subtasks that are already merged into parent tasks
     const mergedTaskIds = new Set<string>();
@@ -344,6 +356,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                 <h1 style="color: #333; margin-bottom: 10px; font-size: 28px; font-weight: bold;">INVOICE</h1>
                 <p style="color: #666; margin: 0;">Invoice: #${invoiceNumber}</p>
                 <p style="color: #666; margin: 0;">Date: ${date}${dueDate ? ` &nbsp;•&nbsp; Due Date: ${dueDate}` : ''}</p>
+                ${billingPeriodLabel ? `<p style="color: #666; margin: 0;">Billing Period: ${billingPeriodLabel}</p>` : ''}
                 ${project ? `<p style="color: #666; margin: 0;">Project: ${project.title}</p>` : ''}
             </div>
             
@@ -717,6 +730,9 @@ export const buildInvoiceHtmlContent = (
         taxLabel: invoice.taxLabel,
         taskFlatRates: invoice.taskFlatRates,
         taskHourlyRates: invoice.taskHourlyRates,
+        billingPeriodPreset: invoice.billingPeriodPreset,
+        billingPeriodStart: invoice.billingPeriodStart,
+        billingPeriodEnd: invoice.billingPeriodEnd,
         currency: invoice.currency,
     });
 };

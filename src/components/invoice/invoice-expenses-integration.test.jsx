@@ -229,7 +229,7 @@ describe('invoice expenses integration', () => {
             {
                 id: 'exp-1',
                 title: 'Expense One',
-                date: '2026-02-01',
+                date: '2026-04-01',
                 amount: 125,
                 currency: 'EUR',
                 billable: true,
@@ -288,7 +288,7 @@ describe('invoice expenses integration', () => {
             {
                 id: 'exp-gbp',
                 title: 'UK Service',
-                date: '2026-02-01',
+                date: '2026-04-01',
                 amount: 100,
                 currency: 'GBP',
                 billable: true,
@@ -347,7 +347,7 @@ describe('invoice expenses integration', () => {
             {
                 id: 'exp-chf',
                 title: 'Swiss Expense',
-                date: '2026-02-01',
+                date: '2026-04-01',
                 amount: 200,
                 currency: 'CHF',
                 billable: true,

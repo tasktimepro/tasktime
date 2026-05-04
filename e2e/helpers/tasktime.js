@@ -631,6 +631,16 @@ export async function selectComboboxOption(page, trigger, optionName) {
     await page.getByRole('option', { name: optionName, exact: true }).click();
 }
 
+export async function selectPeriodRangeOption(page, trigger, optionName) {
+    const ariaLabel = await trigger.getAttribute('aria-label');
+
+    await trigger.click();
+    await page
+        .getByRole('dialog', { name: `${ariaLabel} options` })
+        .getByRole('button', { name: optionName, exact: true })
+        .click();
+}
+
 async function setPersonalProjectState(projectDialog, isPersonal) {
     const personalProjectCheckbox = projectDialog.getByRole('checkbox', { name: /Personal project \(Not billable\)/i });
     const currentState = await personalProjectCheckbox.getAttribute('data-state');
@@ -846,6 +856,12 @@ export async function createTrackedInvoice(page, {
     const invoiceDialog = page.getByRole('dialog', { name: 'New Invoice' });
     await expect(invoiceDialog).toBeVisible();
 
+    await selectPeriodRangeOption(
+        page,
+        invoiceDialog.getByRole('button', { name: 'Invoice billing period' }),
+        'All Time',
+    );
+
     const selectAllButton = invoiceDialog.getByRole('button', { name: 'Select All', exact: true });
     if (!(await selectAllButton.isVisible())) {
         await invoiceDialog.getByRole('button', { name: /Tasks & Time/i }).click();
@@ -885,7 +901,11 @@ export async function createTrackedInvoice(page, {
     await expect(templateSelect).toContainText(templateName);
 
     const pricingToggle = invoiceDialog.getByRole('button', { name: /Pricing & Totals/i });
-    const expectedTotal = (await pricingToggle.innerText()).replace('Pricing & Totals', '').trim();
+    let expectedTotal = '';
+    await expect.poll(async () => {
+        expectedTotal = (await pricingToggle.innerText()).replace('Pricing & Totals', '').trim();
+        return expectedTotal;
+    }).not.toMatch(/0\.00$/);
     await expect(pricingToggle).toContainText(expectedTotal);
 
     await pricingToggle.click();

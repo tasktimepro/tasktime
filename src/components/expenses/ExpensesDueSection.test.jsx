@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import ExpensesDueSection from './ExpensesDueSection'
 
 const expensesMock = vi.hoisted(() => [])
@@ -38,6 +38,7 @@ describe('ExpensesDueSection', () => {
         expensesMock.length = 0
         recurrencesMock.length = 0
         markAsPaidMock.mockReset()
+        markAsPaidMock.mockResolvedValue(undefined)
         showSuccessMock.mockReset()
         showErrorMock.mockReset()
         vi.useFakeTimers()
@@ -97,7 +98,9 @@ describe('ExpensesDueSection', () => {
 
         render(<ExpensesDueSection openExpenseView={vi.fn()} />)
 
-        fireEvent.click(screen.getByRole('button', { name: 'Mark as paid' }))
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Mark as paid' }))
+        })
 
         expect(markAsPaidMock).toHaveBeenCalledWith('exp-1')
         expect(showSuccessMock).toHaveBeenCalledWith('Expense marked as paid')

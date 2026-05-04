@@ -148,9 +148,9 @@ const ExpensesDueSection = ({ openExpenseView }) => {
         return null;
     }
 
-    const handleMarkPaid = (expense) => {
+    const handleMarkPaid = async (expense) => {
         try {
-            markAsPaid(expense.id);
+            await markAsPaid(expense.id);
             showSuccess('Expense marked as paid');
         } catch (error) {
             showError(error?.message || 'Unable to mark expense as paid');

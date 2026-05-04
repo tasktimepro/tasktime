@@ -7,6 +7,7 @@ import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
 const {
     mockShowWarning,
     mockShowSuccess,
+    mockMetricsCards,
     mockUseCurrencyConversion,
     mockUseTasks,
     mockTimeEntries,
@@ -15,6 +16,7 @@ const {
 } = vi.hoisted(() => ({
     mockShowWarning: vi.fn(),
     mockShowSuccess: vi.fn(),
+    mockMetricsCards: vi.fn(() => <div data-testid="metrics-cards">Metrics cards</div>),
     mockUseCurrencyConversion: vi.fn(),
     mockTimeEntries: [],
     mockExpenses: [],
@@ -136,7 +138,7 @@ vi.mock('./dashboard/ProjectsOverview', () => ({
 }));
 
 vi.mock('./dashboard/MetricsCards', () => ({
-    default: () => <div data-testid="metrics-cards">Metrics cards</div>,
+    default: (...args) => mockMetricsCards(...args),
 }));
 
 vi.mock('@/components/modals/AddTimeEntryModal', () => ({
@@ -163,6 +165,7 @@ describe('Dashboard', () => {
         window.matchMedia = createMatchMedia();
         mockShowWarning.mockReset();
         mockShowSuccess.mockReset();
+        mockMetricsCards.mockClear();
         mockUseTasks.mockClear();
         mockTimeEntries.length = 0;
         mockExpenses.length = 0;
@@ -291,6 +294,58 @@ describe('Dashboard', () => {
         expect(screen.queryByText('Old discovery')).not.toBeInTheDocument();
         expect(screen.queryByText('Legacy software')).not.toBeInTheDocument();
         expect(screen.queryByText('Office rent')).not.toBeInTheDocument();
+    });
+
+    it('uses frozen expense payment snapshots for paid expense totals', () => {
+        mockUseCurrencyConversion.mockReturnValue({
+            preferredCurrency: 'EUR',
+            exchangeRates: null,
+            exchangeRatesLoading: false,
+            exchangeRatesError: null,
+            needsExchangeRates: true,
+            missingExchangeRates: [],
+            convertToCurrency: (amounts) => {
+                const total = Object.entries(amounts).reduce((sum, [currency, amount]) => {
+                    if (currency === 'USD') {
+                        return sum + (amount * 0.5)
+                    }
+
+                    return sum + amount
+                }, 0)
+
+                return { amounts: { EUR: total }, hadConversionError: false }
+            },
+        });
+
+        mockExpenses.push(
+            {
+                id: 'expense-snapshot',
+                title: 'Hosting',
+                amount: 100,
+                currency: 'USD',
+                date: '2026-03-10',
+                paymentStatus: 'paid',
+                amountType: 'fixed',
+                paymentCurrencySnapshot: {
+                    capturedAt: Date.parse('2026-03-10T00:00:00.000Z'),
+                    sourceCurrency: 'USD',
+                    sourceAmount: 100,
+                    preferredCurrencyAtPayment: 'EUR',
+                    preferredCurrencyAmount: 80,
+                    exchangeRatesBase: 'USD',
+                    exchangeRates: { USD: 1, EUR: 0.8 },
+                },
+            },
+        )
+
+        renderDashboard();
+
+        expect(mockMetricsCards).toHaveBeenCalledWith(expect.objectContaining({
+            expenseThisMonthPaidTotal: 80,
+            expenseLastMonthPaidTotal: 0,
+            expenseLast90DaysPaidTotal: 80,
+            preferredCurrency: 'EUR',
+        }), undefined);
     });
 
     it('preloads archived tasks for the dashboard filters', () => {

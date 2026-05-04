@@ -3,12 +3,12 @@
  */
 
 import { Input } from '@/components/ui/input';
-import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Button } from '@/components/ui/button';
 import { FilterIcon, MagnifyingGlassIcon } from '@/components/ui/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CustomCheckbox from '@/components/CustomCheckbox';
+import PeriodRangePicker from '@/components/ui/period-range-picker';
 
 const ExpenseFilters = ({
     search,
@@ -148,7 +148,7 @@ const ExpenseFilters = ({
 
     return (
         <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <div className="relative">
                     <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                     <Input
@@ -158,18 +158,16 @@ const ExpenseFilters = ({
                         className="pl-9"
                     />
                 </div>
-                <Select value={period} onValueChange={onPeriodChange}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {periodOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <PeriodRangePicker
+                    value={period}
+                    onValueChange={onPeriodChange}
+                    options={periodOptions}
+                    customStart={customStart}
+                    customEnd={customEnd}
+                    onCustomStartChange={onCustomStartChange}
+                    onCustomEndChange={onCustomEndChange}
+                    ariaLabel="Expense period"
+                />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" leadingIcon={FilterIcon}>
@@ -181,27 +179,6 @@ const ExpenseFilters = ({
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
-
-            {period === 'custom' && (
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">From</span>
-                        <NativeDateInput
-                            value={customStart}
-                            onChange={(event) => onCustomStartChange(event.target.value)}
-                            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">To</span>
-                        <NativeDateInput
-                            value={customEnd}
-                            onChange={(event) => onCustomEndChange(event.target.value)}
-                            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                        />
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

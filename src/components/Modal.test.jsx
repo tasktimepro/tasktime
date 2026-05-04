@@ -98,4 +98,29 @@ describe('Modal', () => {
         expect(footer?.className.includes('gap-2')).toBe(true)
         expect(footer?.className.includes('pb-[max(0.75rem,var(--safe-area-bottom))]')).toBe(true)
     })
+
+    it('keeps header actions center-aligned with the title until wrapping is needed', () => {
+        render(
+            <Modal
+                isOpen
+                onClose={vi.fn()}
+                title="New Invoice"
+                headerActions={<button type="button">Custom Range</button>}
+            >
+                <div>Content</div>
+            </Modal>
+        )
+
+        const title = screen.getByText('New Invoice')
+        const closeButton = screen.getByRole('button', { name: 'Close dialog' })
+        const headerActions = screen.getByRole('button', { name: 'Custom Range' })
+        const header = title.parentElement?.parentElement
+        const actionGroup = headerActions.parentElement?.parentElement
+
+        expect(header?.className.includes('items-center')).toBe(true)
+        expect(title.parentElement?.className.includes('basis-full')).toBe(false)
+        expect(actionGroup?.className.includes('items-center')).toBe(true)
+        expect(actionGroup?.className.includes('items-start')).toBe(false)
+        expect(closeButton.className.includes('rounded-full')).toBe(true)
+    })
 })

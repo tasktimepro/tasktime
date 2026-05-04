@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
+    createInvoicePaymentCurrencySnapshot,
     extractSequentialNumber,
+    getInvoicePaymentCurrencySnapshot,
+    getInvoiceStatusAfterMarkingUnpaid,
     getInvoicesForProject,
     getLatestInvoiceForProject,
     getNextSequentialNumberForTemplate,
+    getPaidInvoiceConvertedAmount,
     normalizeInvoiceRecord,
     resolveCurrentInvoiceTemplate,
 } from './invoiceUtils'
@@ -174,5 +178,55 @@ describe('invoiceUtils', () => {
                 taskId: undefined,
             }
         ])
+    })
+
+    it('creates and reuses invoice payment currency snapshots', () => {
+
+        const snapshot = createInvoicePaymentCurrencySnapshot({
+            invoice: {
+                currency: 'USD',
+                total: 100,
+            },
+            preferredCurrency: 'EUR',
+            exchangeRates: { USD: 1, EUR: 0.8 },
+            capturedAt: 123,
+        })
+
+        expect(snapshot).toEqual({
+            capturedAt: 123,
+            sourceCurrency: 'USD',
+            sourceAmount: 100,
+            preferredCurrencyAtPayment: 'EUR',
+            preferredCurrencyAmount: 80,
+            exchangeRatesBase: 'USD',
+            exchangeRates: { USD: 1, EUR: 0.8 },
+        })
+
+        expect(getInvoicePaymentCurrencySnapshot({ paymentCurrencySnapshot: snapshot, currency: 'USD' })).toEqual(snapshot)
+        expect(getPaidInvoiceConvertedAmount({ paymentCurrencySnapshot: snapshot, currency: 'USD', total: 100 }, 'EUR')).toEqual({
+            amount: 80,
+            currency: 'EUR',
+            success: true,
+            usedSnapshot: true,
+        })
+        expect(getPaidInvoiceConvertedAmount({ paymentCurrencySnapshot: snapshot, currency: 'USD', total: 100 }, 'USD')).toEqual({
+            amount: 100,
+            currency: 'USD',
+            success: true,
+            usedSnapshot: true,
+        })
+        expect(getPaidInvoiceConvertedAmount({ paymentCurrencySnapshot: snapshot, currency: 'USD', total: 100 }, 'GBP')).toEqual({
+            amount: 100,
+            currency: 'GBP',
+            success: false,
+            usedSnapshot: true,
+        })
+    })
+
+    it('falls back correctly when marking invoices unpaid', () => {
+
+        expect(getInvoiceStatusAfterMarkingUnpaid({ status: 'draft' })).toBe('draft')
+        expect(getInvoiceStatusAfterMarkingUnpaid({ status: 'sent', dueDate: '2026-01-01' }, new Date('2026-02-01'))).toBe('overdue')
+        expect(getInvoiceStatusAfterMarkingUnpaid({ status: 'sent', dueDate: '2026-03-01' }, new Date('2026-02-01'))).toBe('sent')
     })
 })

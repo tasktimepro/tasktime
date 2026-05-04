@@ -42,6 +42,7 @@ import { cn } from '@/lib/utils.ts';
  * @param {string} props.size - Modal size (sm, md, lg, xl, 2xl, 3xl, 4xl, 5xl, 6xl, 7xl, full)
  * @param {boolean} props.showCloseButton - Whether to show the close button (default: true)
  * @param {boolean} props.hideHeader - Whether to visually hide the modal header while preserving accessible title/description
+ * @param {React.ReactNode} props.headerActions - Header content rendered beside the close button (optional)
  * @param {string} props.className - Additional class names for the modal content wrapper
  * @param {React.ReactNode} props.footer - Footer content (optional) - USE THIS FOR ACTION BUTTONS
  */
@@ -54,6 +55,7 @@ const Modal = ({
     size = 'md',
     showCloseButton = true,
     hideHeader = false,
+    headerActions,
     className = '',
     footer,
     contentRef,
@@ -95,8 +97,8 @@ const Modal = ({
                         </DialogHeader>
                     ) : null
                 ) : (
-                    (title || description || showCloseButton) && (
-                        <div className={cn('flex flex-shrink-0 items-center gap-3 px-4 pb-2 pt-[max(0.75rem,var(--safe-area-top))] md:px-6 md:py-4', !(title || description) && 'justify-end')}>
+                    (title || description || headerActions || showCloseButton) && (
+                        <div className={cn('flex flex-shrink-0 flex-wrap items-center gap-3 px-4 pb-2 pt-[max(0.75rem,var(--safe-area-top))] md:px-6 md:py-4', !(title || description || headerActions) && 'justify-end')}>
                             {(title || description) && (
                                 <DialogHeader className="min-w-0 flex-1 py-0">
                                     {title && <DialogTitle>{title}</DialogTitle>}
@@ -104,18 +106,24 @@ const Modal = ({
                                 </DialogHeader>
                             )}
 
-                            {showCloseButton && (
-                                <DialogClose asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="icon-sm"
-                                        className="rounded-full"
-                                        aria-label="Close dialog"
-                                    >
-                                        <XMarkIcon className="h-5 w-5" />
-                                        <span className="sr-only">Close</span>
-                                    </Button>
-                                </DialogClose>
+                            {(headerActions || showCloseButton) && (
+                                <div className={cn('ml-auto flex max-w-full items-center gap-2', !(title || description) && 'w-full justify-end')}>
+                                    {headerActions && <div className="max-w-full shrink-0">{headerActions}</div>}
+
+                                    {showCloseButton && (
+                                        <DialogClose asChild>
+                                            <Button
+                                                variant="outline"
+                                                size="icon-sm"
+                                                className="rounded-full"
+                                                aria-label="Close dialog"
+                                            >
+                                                <XMarkIcon className="h-5 w-5" />
+                                                <span className="sr-only">Close</span>
+                                            </Button>
+                                        </DialogClose>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )
@@ -146,6 +154,7 @@ Modal.propTypes = {
     size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', 'full']),
     showCloseButton: PropTypes.bool,
     hideHeader: PropTypes.bool,
+    headerActions: PropTypes.node,
     className: PropTypes.string,
     footer: PropTypes.node,
     contentRef: PropTypes.oneOfType([

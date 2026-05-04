@@ -4,11 +4,20 @@ import { vi } from 'vitest'
 import * as Y from 'yjs'
 import { useExpenses } from './useExpenses'
 import { useYjs } from '@/contexts/YjsContext'
+import { fetchExchangeRates } from '@/utils/currencyUtils'
 import { readStored } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
+vi.mock('@/utils/currencyUtils', async () => {
+    const actual = await vi.importActual('@/utils/currencyUtils')
+    return {
+        ...actual,
+        fetchExchangeRates: vi.fn(),
+    }
+})
 
 const mockUseYjs = useYjs
+const mockFetchExchangeRates = fetchExchangeRates
 
 const buildExpense = (overrides = {}) => ({
     id: 'expense-default',
@@ -69,6 +78,7 @@ const buildStore = ({ active = [], archived = [] } = {}) => {
 describe('useExpenses', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockFetchExchangeRates.mockResolvedValue({ rates: { USD: 1, EUR: 0.8 }, error: null })
     })
 
     it('filters and sorts expenses by date desc', () => {
@@ -109,7 +119,7 @@ describe('useExpenses', () => {
         expect(result.current.totals).toEqual({ total: 35, unpaid: 25, paid: 10, billableUnbilled: 30 })
     })
 
-    it('markAsPaid requires amount for variable expenses', () => {
+    it('markAsPaid requires amount for variable expenses', async () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [buildExpense({
                 id: 'v1',
@@ -126,10 +136,10 @@ describe('useExpenses', () => {
 
         const { result } = renderHook(() => useExpenses())
 
-        expect(() => result.current.markAsPaid('v1')).toThrow('Amount is required')
+        await expect(result.current.markAsPaid('v1')).rejects.toThrow('Amount is required')
     })
 
-    it('markAsPaid updates amount and status', () => {
+    it('markAsPaid updates amount and status', async () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [buildExpense({
                 id: 'v2',
@@ -146,8 +156,8 @@ describe('useExpenses', () => {
 
         const { result } = renderHook(() => useExpenses())
 
-        act(() => {
-            result.current.markAsPaid('v2', { amount: 147.23, paidBy: 'Card' })
+        await act(async () => {
+            await result.current.markAsPaid('v2', { amount: 147.23, paidBy: 'Card' })
         })
 
         const updated = readStored(store.expenses, 'v2')
@@ -158,7 +168,106 @@ describe('useExpenses', () => {
         }))
     })
 
-    it('returns undefined when marking a missing expense as paid', () => {
+    it('persists a payment currency snapshot for paid cross-currency expenses', async () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({
+                id: 'fx-1',
+                currency: 'USD',
+                amount: 100,
+            })]
+        })
+
+        store.preferences = new Map([['currency', 'EUR']])
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        await act(async () => {
+            await result.current.markAsPaid('fx-1', { paidOn: '2025-02-03' })
+        })
+
+        await waitFor(() => {
+            expect(readStored(store.expenses, 'fx-1')).toEqual(expect.objectContaining({
+                paymentCurrencySnapshot: expect.objectContaining({
+                    sourceCurrency: 'USD',
+                    sourceAmount: 100,
+                    preferredCurrencyAtPayment: 'EUR',
+                    preferredCurrencyAmount: 80,
+                    capturedAt: new Date(2025, 1, 3).getTime(),
+                }),
+            }))
+        })
+    })
+
+    it('queues a payment snapshot when creating a paid cross-currency expense', async () => {
+        const { store, loadArchivedExpenses } = buildStore()
+
+        store.preferences = new Map([['currency', 'EUR']])
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        act(() => {
+            result.current.createExpense(buildExpense({
+                id: 'created-paid',
+                currency: 'USD',
+                amount: 50,
+                paymentStatus: 'paid',
+                paidOn: '2025-02-05',
+            }))
+        })
+
+        await waitFor(() => {
+            expect(readStored(store.expenses, 'created-paid')).toEqual(expect.objectContaining({
+                paymentCurrencySnapshot: expect.objectContaining({
+                    sourceCurrency: 'USD',
+                    preferredCurrencyAtPayment: 'EUR',
+                }),
+            }))
+        })
+    })
+
+    it('does not mark cross-currency expenses paid when exchange rates are unavailable', async () => {
+        mockFetchExchangeRates.mockResolvedValue({ rates: null, error: 'offline' })
+
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({
+                id: 'fx-offline',
+                currency: 'USD',
+                amount: 100,
+            })]
+        })
+
+        store.preferences = new Map([['currency', 'EUR']])
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        await expect(result.current.markAsPaid('fx-offline')).rejects.toThrow('offline')
+
+        const storedExpense = readStored(store.expenses, 'fx-offline')
+        expect(storedExpense).toEqual(expect.objectContaining({
+            paymentStatus: 'unpaid',
+        }))
+        expect(storedExpense).not.toHaveProperty('paymentCurrencySnapshot')
+    })
+
+    it('returns undefined when marking a missing expense as paid', async () => {
         const { store, loadArchivedExpenses } = buildStore()
 
         mockUseYjs.mockReturnValue({
@@ -168,7 +277,112 @@ describe('useExpenses', () => {
         })
 
         const { result } = renderHook(() => useExpenses())
-        expect(result.current.markAsPaid('missing')).toBeUndefined()
+        await expect(result.current.markAsPaid('missing')).resolves.toBeUndefined()
+    })
+
+    it('reuses an existing payment snapshot without refetching exchange rates', async () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({
+                id: 'paid-with-snapshot',
+                paymentStatus: 'paid',
+                paymentCurrencySnapshot: {
+                    capturedAt: 1,
+                    sourceCurrency: 'USD',
+                    sourceAmount: 100,
+                    preferredCurrencyAtPayment: 'EUR',
+                    preferredCurrencyAmount: 80,
+                },
+            })]
+        })
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        await expect(result.current.ensureExpensePaymentSnapshot('paid-with-snapshot')).resolves.toEqual(expect.objectContaining({
+            id: 'paid-with-snapshot',
+        }))
+        expect(mockFetchExchangeRates).not.toHaveBeenCalled()
+    })
+
+    it('refreshes paid expense snapshots when sensitive fields change', async () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({
+                id: 'paid-refresh',
+                paymentStatus: 'paid',
+                currency: 'USD',
+                paidOn: '2025-02-01',
+                paymentCurrencySnapshot: {
+                    capturedAt: new Date(2025, 1, 1).getTime(),
+                    sourceCurrency: 'USD',
+                    sourceAmount: 10,
+                    preferredCurrencyAtPayment: 'EUR',
+                    preferredCurrencyAmount: 8,
+                },
+            })]
+        })
+
+        store.preferences = new Map([['currency', 'EUR']])
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        act(() => {
+            result.current.updateExpense('paid-refresh', { paidOn: '2025-02-03' })
+        })
+
+        await waitFor(() => {
+            expect(readStored(store.expenses, 'paid-refresh')).toEqual(expect.objectContaining({
+                paymentCurrencySnapshot: expect.objectContaining({
+                    capturedAt: new Date(2025, 1, 3).getTime(),
+                }),
+            }))
+        })
+    })
+
+    it('keeps a provided payment snapshot when updating a paid expense', () => {
+        const providedSnapshot = {
+            capturedAt: 99,
+            sourceCurrency: 'USD',
+            sourceAmount: 100,
+            preferredCurrencyAtPayment: 'EUR',
+            preferredCurrencyAmount: 80,
+        }
+
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({
+                id: 'paid-provided-snapshot',
+                paymentStatus: 'paid',
+                currency: 'USD',
+            })]
+        })
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        act(() => {
+            result.current.updateExpense('paid-provided-snapshot', {
+                paymentCurrencySnapshot: providedSnapshot,
+            })
+        })
+
+        expect(readStored(store.expenses, 'paid-provided-snapshot')).toEqual(expect.objectContaining({
+            paymentCurrencySnapshot: providedSnapshot,
+        }))
     })
 
     it('filters by project, personal, and billable options', () => {
@@ -198,7 +412,7 @@ describe('useExpenses', () => {
     it('updates payment and billing statuses', () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [
-                buildExpense({ id: 'exp-1', paymentStatus: 'paid' }),
+                buildExpense({ id: 'exp-1', paymentStatus: 'paid', paymentCurrencySnapshot: { capturedAt: 1, sourceCurrency: 'EUR', sourceAmount: 10, preferredCurrencyAtPayment: 'EUR', preferredCurrencyAmount: 10 } }),
                 buildExpense({ id: 'exp-2' }),
                 buildExpense({ id: 'exp-3', billingStatus: 'billed', invoiceId: 'inv-2', billedAt: 100 }),
             ]
@@ -219,6 +433,7 @@ describe('useExpenses', () => {
         })
 
         expect(readStored(store.expenses, 'exp-1')).toEqual(expect.objectContaining({ paymentStatus: 'unpaid' }))
+        expect(readStored(store.expenses, 'exp-1').paymentCurrencySnapshot).toBeNull()
         expect(readStored(store.expenses, 'exp-2')).toEqual(expect.objectContaining({ billingStatus: 'billed', invoiceId: 'inv-1' }))
         expect(readStored(store.expenses, 'exp-3')).toEqual(expect.objectContaining({ billingStatus: 'unbilled', invoiceId: null, billedAt: null }))
     })

@@ -1,4 +1,5 @@
 import { millisecondsToHours } from '../../utils/dateUtils';
+import { isStoredDateWithinBillingRange } from '../../utils/billingPeriodUtils';
 import { getBillableDurationMs } from '../../utils/timeEntryDurationUtils';
 
 type TaskItem = {
@@ -9,6 +10,7 @@ type TaskItem = {
     lastBilledAt?: number;
     createdAt?: number;
     billable?: boolean;
+    archived?: boolean;
 };
 
 type TimeEntry = {
@@ -25,6 +27,8 @@ type BuildInvoiceTaskParams = {
     tasks: TaskItem[];
     timeEntries: TimeEntry[];
     editableHours: Record<string, number>;
+    billingPeriodStart?: string;
+    billingPeriodEnd?: string;
 };
 
 type InvoiceTaskData = {
@@ -53,32 +57,37 @@ export const buildInvoiceTaskData = ({
     selectedProject,
     tasks,
     timeEntries,
-    editableHours
+    editableHours,
+    billingPeriodStart = '',
+    billingPeriodEnd = '',
 }: BuildInvoiceTaskParams): InvoiceTaskData[] | null => {
     // Use provided project or default to selected project
     const projectToUse = projectForData || selectedProject;
     if (!projectToUse) return null;
 
-    // Get all tasks that belong to this project
-    const projectTasks = tasks.filter(task => task.projectId === projectToUse.id);
-    const projectTaskIds = projectTasks.map(task => task.id);
+    // Get all active tasks that belong to this project.
+    const projectTasks = tasks.filter(task => task.projectId === projectToUse.id && task.archived !== true);
+    const projectTaskIds = new Set(projectTasks.map(task => task.id));
+    const projectTaskMap = new Map(projectTasks.map(task => [task.id, task]));
 
     // Filter billable entries based on individual task billing dates
     const billableEntries = timeEntries.filter(entry => {
         // Double check that this entry belongs to a task in the current project
-        if (!projectTaskIds.includes(entry.taskId)) return false;
+        if (!projectTaskIds.has(entry.taskId)) return false;
         if (!entry.end || entry.end <= entry.start) return false;
         if (entry.source === 'invoice-adjustment') return false;
 
         // Find the task for this entry
-        const task = projectTasks.find(t => t.id === entry.taskId);
+        const task = projectTaskMap.get(entry.taskId);
         if (!task || task.projectId !== projectToUse.id) return false;
 
         // Use task-specific lastBilledAt - if never billed, all entries are pending
         const taskLastBilledAt = task.lastBilledAt || 0;
 
         // Only include entries created after this task's last billing date
-        return entry.start > taskLastBilledAt;
+        if (entry.start <= taskLastBilledAt) return false;
+
+        return isStoredDateWithinBillingRange(entry.start, billingPeriodStart, billingPeriodEnd);
     });
 
     // Get manually marked billable tasks (tasks with billable: true)
@@ -109,7 +118,7 @@ export const buildInvoiceTaskData = ({
 
     // Prepare tasks data array
     const tasksData = Object.entries(taskTimeMap).map(([taskId, totalTime]) => {
-        const task = tasks.find(t => t.id === taskId);
+        const task = projectTaskMap.get(taskId);
         return {
             id: taskId,
             title: task ? task.title || 'Unknown Task' : 'Unknown Task',
@@ -122,7 +131,7 @@ export const buildInvoiceTaskData = ({
         };
     }).filter(task => {
         if (!task) return false;
-        const taskData = tasks.find(t => t && t.id === task.id && t.projectId === projectToUse.id);
+        const taskData = projectTaskMap.get(task.id);
         // Only include tasks that have billable explicitly set to true
         // This ensures tasks toggled to non-billable are excluded
         return taskData && taskData.billable === true;

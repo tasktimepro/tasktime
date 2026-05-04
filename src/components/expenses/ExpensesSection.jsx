@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronDownIcon, PlusIcon } from '@/components/ui/icons';
 import { useExpenses } from '@/hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
+import { useToast } from '@/hooks/useToast.ts';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
 import ExpenseList from './ExpenseList';
@@ -25,6 +26,7 @@ const ExpensesSection = ({
 
     const { expenses, markAsPaid, markAsUnpaid } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
+    const { showError } = useToast();
     const [isExpanded, setIsExpanded] = useState(false);
 
     const filteredExpenses = useMemo(() => {
@@ -127,7 +129,7 @@ const ExpensesSection = ({
         openExpenseModal(null, { clientId, projectId });
     };
 
-    const handleTogglePaid = (expense) => {
+    const handleTogglePaid = async (expense) => {
         if (expense.paymentStatus === 'paid') {
             markAsUnpaid(expense.id);
             return;
@@ -138,7 +140,11 @@ const ExpensesSection = ({
             return;
         }
 
-        markAsPaid(expense.id);
+        try {
+            await markAsPaid(expense.id);
+        } catch (error) {
+            showError(error?.message || 'Unable to mark expense as paid');
+        }
     };
 
     return (

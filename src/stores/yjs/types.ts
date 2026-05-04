@@ -168,6 +168,8 @@ export interface InvoicePaymentCurrencySnapshot {
     exchangeRates?: Record<string, number>;
 }
 
+export type ExpensePaymentCurrencySnapshot = InvoicePaymentCurrencySnapshot;
+
 export interface Invoice {
     id: string;
     projectId: string;
@@ -186,6 +188,9 @@ export interface Invoice {
     total: number;
     notes?: string;
     paymentMethodId?: string | null;
+    billingPeriodPreset?: 'last-month' | 'month' | 'all-time' | 'custom';
+    billingPeriodStart?: string | null;
+    billingPeriodEnd?: string | null;
     currency?: string;
     paidAt?: number | null;
     paymentCurrencySnapshot?: InvoicePaymentCurrencySnapshot | null;
@@ -263,6 +268,7 @@ export interface Expense {
     amountType?: 'fixed' | 'variable' | null;
     taxNumber?: string | null;
     isTaxExempt: boolean;
+    paymentCurrencySnapshot?: ExpensePaymentCurrencySnapshot | null;
     isPreview?: boolean;
     createdAt?: number;
     updatedAt?: number;

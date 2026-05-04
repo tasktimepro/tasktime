@@ -5,6 +5,7 @@ import {
     createTrackedInvoice,
     getInvoiceCardByProject,
     openProjectDashboard,
+    selectPeriodRangeOption,
 } from './helpers/tasktime.js';
 
 async function seedCurrencyState(page, { preferredCurrency, rates }) {
@@ -230,6 +231,12 @@ test.describe('Invoices smoke', () => {
         const invoiceDialog = page.getByRole('dialog', { name: 'New Invoice' });
         await expect(invoiceDialog).toBeVisible();
 
+        await selectPeriodRangeOption(
+            page,
+            invoiceDialog.getByRole('button', { name: 'Invoice billing period' }),
+            'All Time',
+        );
+
         const selectAllButton = invoiceDialog.getByRole('button', { name: 'Select All', exact: true });
         if (!(await selectAllButton.isVisible())) {
             await invoiceDialog.getByRole('button', { name: /Tasks & Time/i }).click();
@@ -266,7 +273,11 @@ test.describe('Invoices smoke', () => {
         await expect(templateSelect).toContainText(templateName);
 
         const pricingToggle = invoiceDialog.getByRole('button', { name: /Pricing & Totals/i });
-        const expectedTotal = (await pricingToggle.innerText()).replace('Pricing & Totals', '').trim();
+        let expectedTotal = '';
+        await expect.poll(async () => {
+            expectedTotal = (await pricingToggle.innerText()).replace('Pricing & Totals', '').trim();
+            return expectedTotal;
+        }).not.toMatch(/0\.00$/);
         await expect(expectedTotal).toContain('15.00');
 
         await pricingToggle.click();

@@ -37,9 +37,6 @@ const Account = ({
     invoiceTemplates,
     emailTemplates,
     expenses,
-    expenseRecurrences,
-    dailyGoals,
-    plannerAttachments,
     onImport,
 }) => {
     const isMobileLayout = useIsMobileLayout();

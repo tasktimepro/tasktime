@@ -187,7 +187,7 @@ const invoiceItemSchema = z.object({
     exchangeRate: finiteNumberSchema.optional(),
 }).passthrough();
 
-const invoicePaymentCurrencySnapshotSchema = z.object({
+const paymentCurrencySnapshotSchema = z.object({
     capturedAt: finiteNumberSchema,
     sourceCurrency: nonEmptyStringSchema,
     sourceAmount: finiteNumberSchema,
@@ -215,9 +215,12 @@ const invoiceSchema = z.object({
     total: finiteNumberSchema,
     notes: z.string().optional(),
     paymentMethodId: optionalNullableIdSchema,
+    billingPeriodPreset: z.enum(['last-month', 'month', 'all-time', 'custom']).optional(),
+    billingPeriodStart: storageDateSchema.nullable().optional(),
+    billingPeriodEnd: storageDateSchema.nullable().optional(),
     currency: z.string().optional(),
     paidAt: finiteNumberSchema.nullable().optional(),
-    paymentCurrencySnapshot: invoicePaymentCurrencySnapshotSchema.nullable().optional(),
+    paymentCurrencySnapshot: paymentCurrencySnapshotSchema.nullable().optional(),
     sentAt: finiteNumberSchema.nullable().optional(),
     sentToEmail: z.string().nullable().optional(),
 }).passthrough() satisfies z.ZodType<Invoice>;
@@ -292,6 +295,7 @@ const expenseSchema = z.object({
     amountType: z.enum(['fixed', 'variable']).nullable().optional(),
     taxNumber: z.string().nullable().optional(),
     isTaxExempt: z.boolean(),
+    paymentCurrencySnapshot: paymentCurrencySnapshotSchema.nullable().optional(),
     isPreview: z.boolean().optional(),
     createdAt: finiteNumberSchema.optional(),
     updatedAt: finiteNumberSchema.optional(),

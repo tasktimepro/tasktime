@@ -406,9 +406,9 @@ const Planner = ({
                 break;
         }
     }, [navigateToClient, navigateToProject, onViewTask, openExpenseView]);
-    const handleExpenseMarkPaid = useCallback((expense, amount) => {
+    const handleExpenseMarkPaid = useCallback(async (expense, amount) => {
         try {
-            markAsPaid(expense.id, typeof amount === 'number' ? { amount } : undefined);
+            await markAsPaid(expense.id, typeof amount === 'number' ? { amount } : undefined);
             showSuccess('Expense marked as paid');
         } catch (error) {
             showError(error?.message || 'Unable to mark expense as paid');

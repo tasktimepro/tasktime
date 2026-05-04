@@ -15,7 +15,6 @@ import { YjsDocManager } from '../YjsDocManager';
 import { ManifestManager, AuthorizationError } from './ManifestManager';
 import { BackupManager } from './BackupManager';
 import type { DocName, SyncState, DriveSyncMode, SyncPhase } from '../types';
-import { migrateInvoicesInDoc } from '../invoiceMigration';
 import { validateDocManagerState } from '../validation';
 import {
     markPendingChanges,
@@ -261,8 +260,6 @@ export class YjsDriveProvider {
             return false;
         }
 
-        migrateInvoicesInDoc(projectedDoc);
-
         try {
             validateDocManagerState(this.docManager, docName, projectedDoc);
         } catch (error) {
@@ -277,7 +274,6 @@ export class YjsDriveProvider {
 
         // Always apply the remote update to maintain CRDT convergence
         applyUpdate(doc, update, 'remote');
-        migrateInvoicesInDoc(doc);
         return true;
     }
 

@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import ExpenseViewModal from './ExpenseViewModal'
 
 const expensesMock = vi.hoisted(() => [])
@@ -74,11 +74,12 @@ describe('ExpenseViewModal', () => {
         businessInfosMock.length = 0
         paymentMethodsMock.length = 0
         markAsPaidMock.mockReset()
+        markAsPaidMock.mockResolvedValue(undefined)
         showSuccessMock.mockReset()
         showErrorMock.mockReset()
     })
 
-    it('shows expense details and marks as paid', () => {
+    it('shows expense details and marks as paid', async () => {
         const expense = {
             id: 'exp-1',
             title: 'Office Rent',
@@ -110,7 +111,7 @@ describe('ExpenseViewModal', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Mark as paid' }))
         expect(markAsPaidMock).toHaveBeenCalledWith('exp-1')
-        expect(showSuccessMock).toHaveBeenCalledWith('Expense marked as paid')
+        await waitFor(() => expect(showSuccessMock).toHaveBeenCalledWith('Expense marked as paid'))
     })
 
     it('uses Submit action when amount is required', () => {

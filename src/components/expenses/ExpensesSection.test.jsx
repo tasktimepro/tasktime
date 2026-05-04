@@ -7,13 +7,25 @@ import ExpensesSection from './ExpensesSection'
 const hookMocks = vi.hoisted(() => ({
 
     expenses: [],
-    recurrences: []
+    recurrences: [],
+    markAsPaid: vi.fn(),
+    markAsUnpaid: vi.fn(),
+    showError: vi.fn()
 }))
 
 vi.mock('@/hooks/useExpenses.ts', () => ({
 
     useExpenses: () => ({
-        expenses: hookMocks.expenses
+        expenses: hookMocks.expenses,
+        markAsPaid: hookMocks.markAsPaid,
+        markAsUnpaid: hookMocks.markAsUnpaid
+    })
+}))
+
+vi.mock('@/hooks/useToast.ts', () => ({
+
+    useToast: () => ({
+        showError: hookMocks.showError,
     })
 }))
 
@@ -65,6 +77,10 @@ describe('ExpensesSection', () => {
             }
         ]
         hookMocks.recurrences = []
+        hookMocks.markAsPaid.mockReset()
+        hookMocks.markAsPaid.mockResolvedValue(undefined)
+        hookMocks.markAsUnpaid.mockReset()
+        hookMocks.showError.mockReset()
         user = userEvent.setup()
     })
 

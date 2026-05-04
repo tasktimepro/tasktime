@@ -1,8 +1,13 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InvoiceGenerator from './InvoiceGenerator'
+
+const pdfMocks = vi.hoisted(() => ({
+
+    createInvoiceHTML: vi.fn(() => '<html />')
+}))
 
 const toastMocks = vi.hoisted(() => ({
 
@@ -42,10 +47,20 @@ const templateHookMocks = vi.hoisted(() => ({
     invoiceTemplates: []
 }))
 
+const expenseHookMocks = vi.hoisted(() => ({
+
+    expenses: [],
+    markAsBilled: vi.fn(),
+    markAsUnbilled: vi.fn()
+}))
+
 let modalConfig = {
     applyDateOverride: false,
     skipTemplateSelection: false,
-    adjustTaskHours: null
+    adjustTaskHours: null,
+    billingPeriodPreset: null,
+    billingPeriodStart: null,
+    billingPeriodEnd: null
 }
 
 vi.mock('../hooks/useToast.ts', () => ({
@@ -102,9 +117,9 @@ vi.mock('../hooks/useInvoiceTemplates.ts', () => ({
 vi.mock('../hooks/useExpenses.ts', () => ({
 
     useExpenses: () => ({
-        expenses: [],
-        markAsBilled: vi.fn(),
-        markAsUnbilled: vi.fn()
+        expenses: expenseHookMocks.expenses,
+        markAsBilled: expenseHookMocks.markAsBilled,
+        markAsUnbilled: expenseHookMocks.markAsUnbilled
     })
 }))
 
@@ -141,12 +156,17 @@ vi.mock('./invoice/InvoiceModal', () => {
         handleTemplateSelection,
         setInvoiceDateOverride,
         setUseInvoiceDateOverride,
+        setBillingPeriodPreset,
+        setBillingPeriodStart,
+        setBillingPeriodEnd,
     }) {
         const didApplyAdjustments = React.useRef(false)
+        const didApplyBillingPeriod = React.useRef(false)
 
         React.useEffect(() => {
             if (!showInvoiceForm) {
                 didApplyAdjustments.current = false
+                didApplyBillingPeriod.current = false
                 return
             }
 
@@ -160,6 +180,23 @@ vi.mock('./invoice/InvoiceModal', () => {
                 modalConfig.adjustTaskHours.hours
             )
         }, [showInvoiceForm, handleHoursChange])
+
+        React.useEffect(() => {
+            if (!showInvoiceForm || didApplyBillingPeriod.current || !modalConfig.billingPeriodPreset) {
+                return
+            }
+
+            didApplyBillingPeriod.current = true
+            setBillingPeriodPreset(modalConfig.billingPeriodPreset)
+
+            if (modalConfig.billingPeriodStart !== null) {
+                setBillingPeriodStart(modalConfig.billingPeriodStart)
+            }
+
+            if (modalConfig.billingPeriodEnd !== null) {
+                setBillingPeriodEnd(modalConfig.billingPeriodEnd)
+            }
+        }, [showInvoiceForm, setBillingPeriodEnd, setBillingPeriodPreset, setBillingPeriodStart])
 
         if (!showInvoiceForm) {
             return null
@@ -200,7 +237,7 @@ vi.mock('./invoice/InvoiceModal', () => {
 
 vi.mock('../utils/pdfUtils.ts', () => ({
 
-    createInvoiceHTML: vi.fn(() => '<html />')
+    createInvoiceHTML: pdfMocks.createInvoiceHTML
 }))
 
 vi.mock('../utils/currencyUtils.ts', async () => {
@@ -250,8 +287,19 @@ describe('InvoiceGenerator', () => {
         timeEntryHookMocks.createEntry.mockClear()
         timeEntryHookMocks.deleteEntry.mockClear()
         taskHookMocks.updateTask.mockClear()
+        expenseHookMocks.expenses = []
+        expenseHookMocks.markAsBilled.mockClear()
+        expenseHookMocks.markAsUnbilled.mockClear()
+        pdfMocks.createInvoiceHTML.mockClear()
         taskHookMocks.tasks = [{ id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 }]
-        modalConfig = { applyDateOverride: false, skipTemplateSelection: false, adjustTaskHours: null }
+        modalConfig = {
+            applyDateOverride: false,
+            skipTemplateSelection: false,
+            adjustTaskHours: null,
+            billingPeriodPreset: null,
+            billingPeriodStart: null,
+            billingPeriodEnd: null
+        }
         templateHookMocks.invoiceTemplates = [
             {
                 id: 'tpl-1',
@@ -294,6 +342,7 @@ describe('InvoiceGenerator', () => {
         const fixedNow = new Date('2026-01-19T12:00:00Z').getTime()
         const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow)
 
+        modalConfig.billingPeriodPreset = 'all-time'
         modalConfig.adjustTaskHours = { taskId: 'task-1', hours: 2 }
         timeEntryHookMocks.createEntry.mockClear()
         const user = userEvent.setup()
@@ -513,6 +562,7 @@ describe('InvoiceGenerator', () => {
         const fixedDate = new Date('2026-01-11T10:00:00Z')
         const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedDate.getTime())
         try {
+            modalConfig.billingPeriodPreset = 'all-time'
             const user = userEvent.setup()
             timeEntryHookMocks.updateEntry.mockClear()
 
@@ -542,6 +592,7 @@ describe('InvoiceGenerator', () => {
         const fixedNow = fixedDate.getTime()
         const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow)
         try {
+            modalConfig.billingPeriodPreset = 'all-time'
             const user = userEvent.setup()
 
             taskHookMocks.tasks = [
@@ -594,5 +645,82 @@ describe('InvoiceGenerator', () => {
         expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
         const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
         expect(invoiceData.tasks.map(task => task.id)).toEqual(['parent-1', 'child-1', 'root-1'])
+    })
+
+    it('defaults new invoices to last month billing period', () => {
+
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-05-04T12:00:00Z'))
+
+        try {
+            invoiceHookMocks.createInvoice.mockClear()
+
+            renderGenerator()
+
+            fireEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            fireEvent.click(screen.getByRole('button', { name: 'Save Invoice' }))
+
+            expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+            const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+            expect(invoiceData.billingPeriodPreset).toBe('last-month')
+            expect(invoiceData.billingPeriodStart).toBe('2026-04-01')
+            expect(invoiceData.billingPeriodEnd).toBe('2026-04-30')
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('refreshes invoice task hours when switching billing period presets', () => {
+
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-05-04T12:00:00Z'))
+
+        try {
+            modalConfig.billingPeriodPreset = 'all-time'
+            invoiceHookMocks.createInvoice.mockClear()
+
+            renderGenerator()
+
+            fireEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            fireEvent.click(screen.getByRole('button', { name: 'Save Invoice' }))
+
+            expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+            const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+            expect(invoiceData.tasks).toEqual([
+                expect.objectContaining({
+                    id: 'task-1',
+                    hours: 1,
+                })
+            ])
+            expect(invoiceData.subtotal).toBe(100)
+            expect(invoiceData.total).toBe(100)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('persists custom billing periods into saved invoice data and generated html', () => {
+
+        modalConfig.billingPeriodPreset = 'custom'
+        modalConfig.billingPeriodStart = '2026-03-10'
+        modalConfig.billingPeriodEnd = '2026-03-31'
+        invoiceHookMocks.createInvoice.mockClear()
+
+        renderGenerator()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.billingPeriodPreset).toBe('custom')
+        expect(invoiceData.billingPeriodStart).toBe('2026-03-10')
+        expect(invoiceData.billingPeriodEnd).toBe('2026-03-31')
+
+        expect(pdfMocks.createInvoiceHTML).toHaveBeenCalledWith(expect.objectContaining({
+            billingPeriodPreset: 'custom',
+            billingPeriodStart: '2026-03-10',
+            billingPeriodEnd: '2026-03-31',
+        }))
     })
 })

@@ -133,10 +133,10 @@ const ExpenseViewModal = ({
         onEdit?.(currentExpense);
     }, [currentExpense, onClose, onEdit]);
 
-    const handleMarkPaid = useCallback(() => {
+    const handleMarkPaid = useCallback(async () => {
         if (!currentExpense) return;
         try {
-            markAsPaid(currentExpense.id);
+            await markAsPaid(currentExpense.id);
             showSuccess('Expense marked as paid');
         } catch (error) {
             showError(error?.message || 'Unable to mark expense as paid');

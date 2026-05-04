@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
     advanceByRepeat,
     buildExpenseFromRecurrence,
+    createExpensePaymentCurrencySnapshot,
+    getPaidExpenseConvertedAmount,
     getPendingPeriods,
     getNextRecurringDate,
     isExpenseInDateRange,
@@ -113,6 +115,39 @@ describe('expenseUtils', () => {
         expect(expense.paymentMode).toBe('auto');
         expect(expense.paymentStatus).toBe('paid');
         expect(expense.paidOn).toBe('2025-02-01');
+    });
+
+    it('creates and resolves paid expense currency snapshots', () => {
+        const snapshot = createExpensePaymentCurrencySnapshot({
+            expense: {
+                currency: 'USD',
+                amount: 125,
+                paidOn: '2025-02-01',
+            },
+            preferredCurrency: 'EUR',
+            exchangeRates: { USD: 1, EUR: 0.8 },
+        });
+
+        expect(snapshot).toEqual({
+            capturedAt: new Date(2025, 1, 1).getTime(),
+            sourceCurrency: 'USD',
+            sourceAmount: 125,
+            preferredCurrencyAtPayment: 'EUR',
+            preferredCurrencyAmount: 100,
+            exchangeRatesBase: 'USD',
+            exchangeRates: { USD: 1, EUR: 0.8 },
+        });
+
+        expect(getPaidExpenseConvertedAmount({
+            amount: 125,
+            currency: 'USD',
+            paymentCurrencySnapshot: snapshot,
+        }, 'EUR')).toEqual({
+            amount: 100,
+            currency: 'EUR',
+            success: true,
+            usedSnapshot: true,
+        });
     });
 
     it('isExpenseInDateRange includes boundaries', () => {

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Notice } from '@/components/ui/notice';
+import PeriodRangePicker from '@/components/ui/period-range-picker';
 import InvoiceTaskSelector from './InvoiceTaskSelector';
 import InvoiceExpenseSelector from './InvoiceExpenseSelector';
 import InvoicePreview from './InvoicePreview';
@@ -110,6 +111,13 @@ const InvoiceModal = ({
     setInvoiceDateOverride,
     useInvoiceDateOverride,
     setUseInvoiceDateOverride,
+    billingPeriodPreset,
+    setBillingPeriodPreset,
+    billingPeriodStart,
+    setBillingPeriodStart,
+    billingPeriodEnd,
+    setBillingPeriodEnd,
+    billingPeriodOptions,
     // Modal stacking functions
     openClientModal,
     openProjectModal,
@@ -214,12 +222,29 @@ const InvoiceModal = ({
         />
     );
 
+    const headerActions = (
+        <PeriodRangePicker
+            value={billingPeriodPreset}
+            onValueChange={setBillingPeriodPreset}
+            options={billingPeriodOptions}
+            customStart={billingPeriodStart}
+            customEnd={billingPeriodEnd}
+            onCustomStartChange={setBillingPeriodStart}
+            onCustomEndChange={setBillingPeriodEnd}
+            className="max-w-[calc(100vw-7rem)]"
+            triggerClassName="bg-background"
+            ariaLabel="Invoice billing period"
+            contentAlign="end"
+        />
+    );
+
     return (
         <Modal 
             isOpen={showInvoiceForm}
             onClose={handleCancel}
             title={editingInvoice ? 'Edit Invoice' : 'New Invoice'}
             size="2xl"
+            headerActions={headerActions}
             footer={footer}
         >
             <form id="invoice-form" onSubmit={handleSave} className="space-y-5">

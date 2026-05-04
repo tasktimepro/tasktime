@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { endOfMonth, endOfYear, startOfMonth, startOfYear } from 'date-fns';
+import { endOfMonth, endOfYear, startOfMonth, startOfYear, subMonths } from 'date-fns';
 import {
     ArrowPathIcon,
     BuildingOfficeIcon,
@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 
 const PERIOD_OPTIONS = [
     { value: 'month', label: 'This Month' },
+    { value: 'last-month', label: 'Last Month' },
     { value: 'quarter', label: 'This Quarter' },
     { value: 'year', label: 'This Year' },
     { value: 'custom', label: 'Custom Range' },
@@ -63,7 +64,7 @@ const Expenses = ({
     const isMobileLayout = useIsMobileLayout();
 
     const { urlParams, updateUrl } = useUrlState();
-    const { showSuccess } = useToast();
+    const { showSuccess, showError } = useToast();
     const { expenses, markAsPaid, markAsUnpaid, createExpense } = useExpenses({ includeArchived: true });
     const {
         recurrences,
@@ -200,6 +201,17 @@ const Expenses = ({
                 historicalEndDate: toStorageDate(quarterEnd) || '',
                 upcomingStartDate: todayValue,
                 upcomingEndDate: toStorageDate(quarterEnd) || '',
+            };
+        }
+
+        if (period === 'last-month') {
+            const lastMonth = subMonths(today, 1);
+
+            return {
+                historicalStartDate: toStorageDate(startOfMonth(lastMonth)) || '',
+                historicalEndDate: toStorageDate(endOfMonth(lastMonth)) || '',
+                upcomingStartDate: toStorageDate(startOfMonth(lastMonth)) || '',
+                upcomingEndDate: toStorageDate(endOfMonth(lastMonth)) || '',
             };
         }
 
@@ -522,7 +534,7 @@ const Expenses = ({
         return map;
     }, [projects]);
 
-    const handleTogglePaid = (expense) => {
+    const handleTogglePaid = async (expense) => {
         if (expense.paymentStatus === 'paid') {
             markAsUnpaid(expense.id);
             return;
@@ -533,7 +545,11 @@ const Expenses = ({
             return;
         }
 
-        markAsPaid(expense.id);
+        try {
+            await markAsPaid(expense.id);
+        } catch (error) {
+            showError(error?.message || 'Unable to mark expense as paid');
+        }
     };
 
     const sortedRecurrences = useMemo(() => {

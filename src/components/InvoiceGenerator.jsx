@@ -25,6 +25,55 @@ import {
     getNextSequentialNumberForTemplate,
     resolveCurrentInvoiceTemplate,
 } from '../utils/invoiceUtils.ts';
+import {
+    getBillingPeriodRange,
+    getDefaultInvoiceBillingPeriodState,
+    getStoredInvoiceBillingPeriodState,
+    INVOICE_BILLING_PERIOD_OPTIONS,
+    isStoredDateWithinBillingRange,
+} from '../utils/billingPeriodUtils.ts';
+
+const areBooleanMapsEqual = (left, right) => {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+
+    if (leftKeys.length !== rightKeys.length) {
+        return false;
+    }
+
+    return leftKeys.every((key) => left[key] === right[key]);
+};
+
+const areNumberMapsEqual = (left, right) => {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+
+    if (leftKeys.length !== rightKeys.length) {
+        return false;
+    }
+
+    return leftKeys.every((key) => left[key] === right[key]);
+};
+
+const areInvoiceTaskListsEqual = (left, right) => {
+    if (left.length !== right.length) {
+        return false;
+    }
+
+    return left.every((task, index) => {
+        const otherTask = right[index];
+
+        return otherTask
+            && task.id === otherTask.id
+            && task.title === otherTask.title
+            && task.parentTaskId === otherTask.parentTaskId
+            && task.originalHours === otherTask.originalHours
+            && task.originalTimeMs === otherTask.originalTimeMs
+            && task.hours === otherTask.hours
+            && task.isEdited === otherTask.isEdited
+            && task.billable === otherTask.billable;
+    });
+};
 
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
@@ -76,6 +125,18 @@ const InvoiceGenerator = ({
     const [exchangeRates, setExchangeRates] = useState(null);
     const [exchangeRatesError, setExchangeRatesError] = useState(null);
     const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
+    const defaultBillingPeriodState = useMemo(() => getDefaultInvoiceBillingPeriodState(), []);
+    const [billingPeriodPreset, setBillingPeriodPreset] = useState(defaultBillingPeriodState.preset);
+    const [billingPeriodStart, setBillingPeriodStart] = useState(defaultBillingPeriodState.startDate);
+    const [billingPeriodEnd, setBillingPeriodEnd] = useState(defaultBillingPeriodState.endDate);
+
+    const { startDate: activeBillingPeriodStart, endDate: activeBillingPeriodEnd } = useMemo(() => {
+        return getBillingPeriodRange({
+            preset: billingPeriodPreset,
+            customStart: billingPeriodStart,
+            customEnd: billingPeriodEnd,
+        });
+    }, [billingPeriodEnd, billingPeriodPreset, billingPeriodStart]);
 
     useEffect(() => {
         if (!showInvoiceForm) {
@@ -137,10 +198,8 @@ const InvoiceGenerator = ({
         );
     }, [editingInvoice]);
 
-    const availableExpenses = useMemo(() => {
-        const invoiceId = editingInvoice?.id || null;
-
-        if (!selectedClient && !selectedProject) {
+    const getScopedAvailableExpenses = useCallback((projectForScope = null, clientForScope = null, invoiceId = null) => {
+        if (!projectForScope && !clientForScope) {
             return [];
         }
 
@@ -148,11 +207,15 @@ const InvoiceGenerator = ({
             .filter((expense) => {
                 if (!expense || !expense.billable) return false;
 
-                if (selectedProject?.id) {
-                    if (expense.projectId !== selectedProject.id) return false;
-                } else if (selectedClient?.id) {
-                    if (expense.clientId !== selectedClient.id) return false;
+                if (projectForScope?.id) {
+                    if (expense.projectId !== projectForScope.id) return false;
+                } else if (clientForScope?.id) {
+                    if (expense.clientId !== clientForScope.id) return false;
                 } else {
+                    return false;
+                }
+
+                if (!isStoredDateWithinBillingRange(expense.date, activeBillingPeriodStart, activeBillingPeriodEnd)) {
                     return false;
                 }
 
@@ -161,7 +224,11 @@ const InvoiceGenerator = ({
                 return false;
             })
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [expenses, selectedClient, selectedProject, editingInvoice]);
+    }, [activeBillingPeriodEnd, activeBillingPeriodStart, expenses]);
+
+    const availableExpenses = useMemo(() => {
+        return getScopedAvailableExpenses(selectedProject, selectedClient, editingInvoice?.id || null);
+    }, [editingInvoice, getScopedAvailableExpenses, selectedClient, selectedProject]);
 
     const availableExpensesWithConversion = useMemo(() => {
         return availableExpenses.map((expense) => {
@@ -749,6 +816,11 @@ const InvoiceGenerator = ({
                 setAdditionalTasks(editingInvoice.additionalTasks);
             }
 
+            const storedBillingPeriodState = getStoredInvoiceBillingPeriodState(editingInvoice);
+            setBillingPeriodPreset(storedBillingPeriodState.preset);
+            setBillingPeriodStart(storedBillingPeriodState.startDate);
+            setBillingPeriodEnd(storedBillingPeriodState.endDate);
+
             const invoiceOnlyItems = (editingInvoice.items || [])
                 .filter((item) => item && !item.expenseId)
                 .map((item, index) => ({
@@ -813,6 +885,9 @@ const InvoiceGenerator = ({
             setInvoiceNote('');
             setInvoiceDateOverride('');
             setUseInvoiceDateOverride(false);
+            setBillingPeriodPreset(defaultBillingPeriodState.preset);
+            setBillingPeriodStart(defaultBillingPeriodState.startDate);
+            setBillingPeriodEnd(defaultBillingPeriodState.endDate);
             setMergedSubtasks({});
             setShowAddExpenseForm(false);
             setNewExpenseTitle('');
@@ -820,7 +895,7 @@ const InvoiceGenerator = ({
             setNewExpenseSupplierName('');
             setNewExpenseCurrency(normalizedInvoiceCurrency);
         }
-    }, [editingInvoice, normalizedInvoiceCurrency]);
+    }, [defaultBillingPeriodState, editingInvoice, normalizedInvoiceCurrency]);
 
     useEffect(() => {
         if (!showAddExpenseForm) {
@@ -837,9 +912,148 @@ const InvoiceGenerator = ({
             selectedProject,
             tasks,
             timeEntries,
-            editableHours
+            editableHours: {},
+            billingPeriodStart: activeBillingPeriodStart,
+            billingPeriodEnd: activeBillingPeriodEnd,
         });
-    }, [selectedProject, timeEntries, tasks, editableHours]);
+    }, [activeBillingPeriodEnd, activeBillingPeriodStart, selectedProject, timeEntries, tasks]);
+
+    useEffect(() => {
+        if (!showInvoiceForm) {
+            return;
+        }
+
+        const projectForInvoice = selectedProject
+            || (editingInvoice?.projectId ? projects.find((item) => item.id === editingInvoice.projectId) : null)
+            || project
+            || null;
+
+        if (!projectForInvoice) {
+            setInvoiceTasks([]);
+            setSelectedTasksForBilling({});
+            return;
+        }
+
+        const nextTasks = prepareInvoiceData(projectForInvoice) || [];
+        const editingTaskMap = new Map((editingInvoice?.tasks || []).map((task) => [task.id, task]));
+        const previousInvoiceTaskMap = new Map(invoiceTasks.map((task) => [task.id, task]));
+
+        setInvoiceTasks((prev) => (areInvoiceTaskListsEqual(prev, nextTasks) ? prev : nextTasks));
+        setEditableHours((prev) => {
+            const next = {};
+
+            nextTasks.forEach((task) => {
+                if (prev[task.id] !== undefined) {
+                    if (editingInvoice && editingTaskMap.has(task.id)) {
+                        next[task.id] = prev[task.id];
+                        return;
+                    }
+
+                    const previousTask = previousInvoiceTaskMap.get(task.id);
+                    const previousOriginalHours = previousTask
+                        ? Math.round((Number(previousTask.originalHours) || 0) * 100) / 100
+                        : null;
+                    const previousEditableHours = Math.round((Number(prev[task.id]) || 0) * 100) / 100;
+
+                    next[task.id] = previousOriginalHours !== null && previousEditableHours === previousOriginalHours
+                        ? task.originalHours
+                        : prev[task.id];
+                    return;
+                }
+
+                const editingTask = editingTaskMap.get(task.id);
+                next[task.id] = editingTask
+                    ? Math.round((Number(editingTask.hours) || 0) * 100) / 100
+                    : task.originalHours;
+            });
+
+            return areNumberMapsEqual(prev, next) ? prev : next;
+        });
+
+        setSelectedTasksForBilling((prev) => {
+            const next = {};
+
+            nextTasks.forEach((task) => {
+                if (prev[task.id] !== undefined) {
+                    next[task.id] = prev[task.id];
+                    return;
+                }
+
+                next[task.id] = editingInvoice ? editingTaskMap.has(task.id) : true;
+            });
+
+            return areBooleanMapsEqual(prev, next) ? prev : next;
+        });
+    }, [editingInvoice, invoiceTasks, prepareInvoiceData, project, projects, selectedProject, showInvoiceForm]);
+
+    useEffect(() => {
+        if (!showInvoiceForm) {
+            return;
+        }
+
+        const editingExpenseIds = new Set(
+            (editingInvoice?.items || [])
+                .filter((item) => item?.expenseId)
+                .map((item) => item.expenseId)
+        );
+
+        setSelectedExpensesForBilling((prev) => {
+            const next = {};
+
+            availableExpensesWithConversion.forEach((expense) => {
+                if (!expense.isConvertible) {
+                    return;
+                }
+
+                if (prev[expense.id] !== undefined) {
+                    next[expense.id] = prev[expense.id];
+                    return;
+                }
+
+                next[expense.id] = editingInvoice
+                    ? editingExpenseIds.has(expense.id) || expense.invoiceId === editingInvoice.id
+                    : true;
+            });
+
+            return areBooleanMapsEqual(prev, next) ? prev : next;
+        });
+    }, [availableExpensesWithConversion, editingInvoice, showInvoiceForm]);
+
+    useEffect(() => {
+        if (!showInvoiceForm || !selectedProject?.flatRate) {
+            return;
+        }
+
+        setUseFlatRate((prev) => {
+            const next = { ...prev };
+            let hasChanges = false;
+
+            invoiceTasks.forEach((task) => {
+                if (next[task.id] === undefined) {
+                    next[task.id] = true;
+                    hasChanges = true;
+                }
+            });
+
+            return hasChanges ? next : prev;
+        });
+
+        setTaskQuantities((prev) => {
+            const next = { ...prev };
+            let hasChanges = false;
+
+            invoiceTasks.forEach((task) => {
+                if (next[task.id] === undefined) {
+                    next[task.id] = 1;
+                    hasChanges = true;
+                }
+            });
+
+            return hasChanges ? next : prev;
+        });
+
+        setNewTaskUseFlatRate(true);
+    }, [invoiceTasks, selectedProject, showInvoiceForm]);
 
     // Handler assignments (replace function definitions)
     const handleTaskSelectionForBilling = InvoiceHandler.handleTaskSelectionForBilling(setSelectedTasksForBilling);
@@ -1170,6 +1384,7 @@ const InvoiceGenerator = ({
                 id: expense.id,
                 title: expense.title,
                 amount: expense.convertedAmount || 0,
+                date: expense.date,
                 supplierName: expense.supplierName || null,
                 currency: normalizedInvoiceCurrency,
                 originalAmount: expense.originalAmount,
@@ -1269,6 +1484,9 @@ const InvoiceGenerator = ({
             paymentMethodId: resolvedPaymentMethod?.id || null,
             businessInfo: resolvedBusinessInfo ? { ...resolvedBusinessInfo } : null,
             businessInfoId: resolvedBusinessInfo?.id || null,
+            billingPeriodPreset,
+            billingPeriodStart: activeBillingPeriodStart || null,
+            billingPeriodEnd: activeBillingPeriodEnd || null,
             clientId: selectedClient?.id || null,
             currency: selectedClient?.defaultCurrency || getPreferredCurrency(),
             template: resolvedTemplate ? { ...resolvedTemplate } : null,
@@ -1345,6 +1563,9 @@ const InvoiceGenerator = ({
                     ? toDisplayDate(new Date(invoiceDateOverride))
                     : (editingInvoice ? toDisplayDate(editingInvoice.date) : toDisplayDate(new Date())),
                 dueDate: dueDate ? toDisplayDate(dueDate) : null,
+                billingPeriodPreset,
+                billingPeriodStart: activeBillingPeriodStart || null,
+                billingPeriodEnd: activeBillingPeriodEnd || null,
                 currency: selectedClient?.defaultCurrency || getPreferredCurrency()
             })
         };
@@ -1514,6 +1735,7 @@ const InvoiceGenerator = ({
                     if (entry.start <= cutoff) return;
                     if (!entry.end || entry.end <= entry.start) return;
                     if (entry.start > currentTime) return;
+                    if (!isStoredDateWithinBillingRange(entry.start, activeBillingPeriodStart, activeBillingPeriodEnd)) return;
 
                     updateEntry(entry.id, {
                         billedHourlyRate: billedRateByTaskId.get(entry.taskId),
@@ -1940,6 +2162,13 @@ const InvoiceGenerator = ({
                     setInvoiceDateOverride={setInvoiceDateOverride}
                     useInvoiceDateOverride={useInvoiceDateOverride}
                     setUseInvoiceDateOverride={setUseInvoiceDateOverride}
+                    billingPeriodPreset={billingPeriodPreset}
+                    setBillingPeriodPreset={setBillingPeriodPreset}
+                    billingPeriodStart={billingPeriodStart}
+                    setBillingPeriodStart={setBillingPeriodStart}
+                    billingPeriodEnd={billingPeriodEnd}
+                    setBillingPeriodEnd={setBillingPeriodEnd}
+                    billingPeriodOptions={INVOICE_BILLING_PERIOD_OPTIONS}
                     // Modal stacking functions
                     openClientModal={handleOpenClientModal}
                     openProjectModal={handleOpenProjectModal}

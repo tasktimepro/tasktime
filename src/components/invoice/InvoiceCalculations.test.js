@@ -86,6 +86,46 @@ describe('buildInvoiceTaskData', () => {
         expect(result[0].billable).toBe(true)
     })
 
+    it('excludes archived manually billable tasks and subtasks with zero time', () => {
+
+        const tasks = [
+            { id: 'task-1', projectId: 'project-1', title: 'Archived Task', billable: true, archived: true },
+            { id: 'parent', projectId: 'project-1', title: 'Parent', billable: false },
+            { id: 'child', projectId: 'project-1', title: 'Archived Subtask', parentTaskId: 'parent', billable: true, archived: true }
+        ]
+
+        const result = buildInvoiceTaskData({
+            projectForData: project,
+            selectedProject: null,
+            tasks,
+            timeEntries: [],
+            editableHours: {}
+        })
+
+        expect(result).toBeNull()
+    })
+
+    it('excludes archived billable tasks even when they have unbilled time', () => {
+
+        const tasks = [
+            { id: 'task-1', projectId: 'project-1', title: 'Archived Task', billable: true, archived: true }
+        ]
+
+        const timeEntries = [
+            { taskId: 'task-1', start: 0, end: 3600000 }
+        ]
+
+        const result = buildInvoiceTaskData({
+            projectForData: project,
+            selectedProject: null,
+            tasks,
+            timeEntries,
+            editableHours: {}
+        })
+
+        expect(result).toBeNull()
+    })
+
     it('excludes tasks toggled to non-billable', () => {
 
         const tasks = [
@@ -197,5 +237,39 @@ describe('buildInvoiceTaskData', () => {
         expect(result).toHaveLength(1)
         expect(result[0].originalTimeMs).toBe(15 * 60 * 1000)
         expect(result[0].originalHours).toBe(0.25)
+    })
+
+    it('filters billable time entries to the selected billing period', () => {
+
+        const tasks = [
+            { id: 'task-1', projectId: 'project-1', title: 'Billable', billable: true }
+        ]
+
+        const timeEntries = [
+            {
+                taskId: 'task-1',
+                start: new Date(2026, 3, 10, 9, 0, 0).getTime(),
+                end: new Date(2026, 3, 10, 11, 0, 0).getTime()
+            },
+            {
+                taskId: 'task-1',
+                start: new Date(2026, 4, 2, 9, 0, 0).getTime(),
+                end: new Date(2026, 4, 2, 10, 0, 0).getTime()
+            }
+        ]
+
+        const result = buildInvoiceTaskData({
+            projectForData: project,
+            selectedProject: null,
+            tasks,
+            timeEntries,
+            editableHours: {},
+            billingPeriodStart: '2026-04-01',
+            billingPeriodEnd: '2026-04-30'
+        })
+
+        expect(result).toHaveLength(1)
+        expect(result[0].originalTimeMs).toBe(2 * 60 * 60 * 1000)
+        expect(result[0].originalHours).toBe(2)
     })
 })

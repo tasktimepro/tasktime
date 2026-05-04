@@ -34,7 +34,7 @@ import { CornerDownRightIcon } from '@/components/ui/icons';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTodayString } from '@/hooks/useDayRollover';
 import { linkifyNodes } from '@/utils/linkifyUtils';
-import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
+import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate, getPaidExpenseConvertedAmount } from '@/utils/expenseUtils';
 import { buildBillableDurationFields } from '@/utils/timeEntryDurationUtils.ts';
 import AddTimeEntryModal from '@/components/modals/AddTimeEntryModal';
 import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
@@ -271,8 +271,11 @@ const Dashboard = ({
             upcomingThisMonth: {},
             upcomingThisMonthHasEstimate: false,
             paidThisMonth: {},
+            paidThisMonthLiveFallback: {},
             paidLastMonth: {},
+            paidLastMonthLiveFallback: {},
             paidLast90Days: {},
+            paidLast90DaysLiveFallback: {},
         };
 
         const withUpcoming = upcomingExpenses.reduce((acc, expense) => {
@@ -290,37 +293,64 @@ const Dashboard = ({
 
             const currency = expense.currency || preferences.currency || 'EUR';
             const amount = expense.amount || 0;
+            const resolvedPaidAmount = expense.paymentStatus === 'paid'
+                ? getPaidExpenseConvertedAmount(expense, preferredCurrency)
+                : null;
+
+            const addPaidAmount = (resolvedKey, fallbackKey) => {
+                if (!resolvedPaidAmount) {
+                    return;
+                }
+
+                if (resolvedPaidAmount.success) {
+                    addAmount(acc, resolvedKey, resolvedPaidAmount.currency, resolvedPaidAmount.amount);
+                    return;
+                }
+
+                addAmount(acc, fallbackKey, currency, amount);
+            };
 
             if (expenseDate >= monthStart && expenseDate <= monthEnd && expenseDate <= todayDate && expense.paymentStatus === 'paid') {
-                addAmount(acc, 'paidThisMonth', currency, amount);
+                addPaidAmount('paidThisMonth', 'paidThisMonthLiveFallback');
             }
 
             if (expense.paymentStatus === 'paid') {
                 if (expenseDate >= lastMonthStart && expenseDate <= lastMonthEnd) {
-                    addAmount(acc, 'paidLastMonth', currency, amount);
+                    addPaidAmount('paidLastMonth', 'paidLastMonthLiveFallback');
                 }
 
                 if (expenseDate >= last90Start && expenseDate <= todayDate) {
-                    addAmount(acc, 'paidLast90Days', currency, amount);
+                    addPaidAmount('paidLast90Days', 'paidLast90DaysLiveFallback');
                 }
             }
 
             return acc;
         }, withUpcoming);
-    }, [expenses, preferences.currency, recurrences, todayStr]);
+    }, [expenses, preferredCurrency, preferences.currency, recurrences, todayStr]);
 
     const expenseMetrics = useMemo(() => {
         const upcoming = convertToCurrency(expenseMetricsByCurrency.upcomingThisMonth);
-        const paidThisMonth = convertToCurrency(expenseMetricsByCurrency.paidThisMonth);
-        const paidLastMonth = convertToCurrency(expenseMetricsByCurrency.paidLastMonth);
-        const paidLast90Days = convertToCurrency(expenseMetricsByCurrency.paidLast90Days);
+        const mergeConvertedAmounts = (resolvedAmounts, fallbackAmounts) => {
+            return Object.entries(fallbackAmounts).reduce((merged, [currency, amount]) => {
+                merged[currency] = (merged[currency] || 0) + amount;
+                return merged;
+            }, { ...resolvedAmounts });
+        };
+
+        const paidThisMonthFallback = convertToCurrency(expenseMetricsByCurrency.paidThisMonthLiveFallback);
+        const paidLastMonthFallback = convertToCurrency(expenseMetricsByCurrency.paidLastMonthLiveFallback);
+        const paidLast90DaysFallback = convertToCurrency(expenseMetricsByCurrency.paidLast90DaysLiveFallback);
+
+        const paidThisMonth = mergeConvertedAmounts(expenseMetricsByCurrency.paidThisMonth, paidThisMonthFallback.amounts);
+        const paidLastMonth = mergeConvertedAmounts(expenseMetricsByCurrency.paidLastMonth, paidLastMonthFallback.amounts);
+        const paidLast90Days = mergeConvertedAmounts(expenseMetricsByCurrency.paidLast90Days, paidLast90DaysFallback.amounts);
 
         return {
             upcomingThisMonthTotal: upcoming.amounts[preferredCurrency] || 0,
             upcomingThisMonthHasEstimate: expenseMetricsByCurrency.upcomingThisMonthHasEstimate,
-            paidThisMonthTotal: paidThisMonth.amounts[preferredCurrency] || 0,
-            paidLastMonthTotal: paidLastMonth.amounts[preferredCurrency] || 0,
-            paidLast90DaysTotal: paidLast90Days.amounts[preferredCurrency] || 0,
+            paidThisMonthTotal: paidThisMonth[preferredCurrency] || 0,
+            paidLastMonthTotal: paidLastMonth[preferredCurrency] || 0,
+            paidLast90DaysTotal: paidLast90Days[preferredCurrency] || 0,
         };
     }, [convertToCurrency, expenseMetricsByCurrency, preferredCurrency]);
 

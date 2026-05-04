@@ -14,11 +14,10 @@ import { YjsDocManager } from './YjsDocManager';
 import { YjsDriveProvider } from './providers/GoogleDriveProvider';
 import { BackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
-import { migrateInvoicesInDoc } from './invoiceMigration';
 import {
-    backfillPaidInvoiceCurrencySnapshotsInDoc,
-    hasPaidInvoicesMissingCurrencySnapshotsInMap,
-} from './invoicePaymentSnapshotMigration';
+    backfillPaidExpenseCurrencySnapshotsInDoc,
+    hasPaidExpensesMissingCurrencySnapshotsInMap,
+} from './expensePaymentSnapshotMigration';
 import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
 import { createBackupPayload, type BackupImportPayload, type BackupPayload } from '@/utils/backupData';
@@ -97,12 +96,7 @@ export class YjsStore {
         this.trackDocForDisconnectedChanges('core', this._coreDoc);
         this.trackDocForDisconnectedChanges('entries-active', this._activeEntriesDoc);
 
-        const migratedCoreInvoices = migrateInvoicesInDoc(this._coreDoc);
-        if (migratedCoreInvoices > 0) {
-            console.log(`[YjsStore] Migrated ${migratedCoreInvoices} active invoices to canonical shape`);
-        }
-
-        await this.backfillInvoicePaymentSnapshots(this._coreDoc, 'active');
+        await this.backfillExpensePaymentSnapshots(this._coreDoc, 'active');
 
         // Run automatic archival of old data
         await this.archiveOldEntries();
@@ -339,6 +333,8 @@ export class YjsStore {
                     this.clearDisconnectedDirtyDocs(['expenses-archived']);
                 }
             }
+
+            await this.backfillExpensePaymentSnapshots(this._archivedExpensesDoc, 'archived');
         }
         return this._archivedExpensesDoc.getMap('expenses');
     }
@@ -516,13 +512,6 @@ export class YjsStore {
             this._archivedInvoicesLoading = null;
 
             this.trackDocForDisconnectedChanges('invoices-archived', this._archivedInvoicesDoc);
-
-            const migratedArchivedInvoices = migrateInvoicesInDoc(this._archivedInvoicesDoc);
-            if (migratedArchivedInvoices > 0) {
-                console.log(`[YjsStore] Migrated ${migratedArchivedInvoices} archived invoices to canonical shape`);
-            }
-
-            await this.backfillInvoicePaymentSnapshots(this._archivedInvoicesDoc, 'archived');
 
             // Sync with Drive if connected
             if (this.driveProvider?.isConnected()) {
@@ -744,27 +733,6 @@ export class YjsStore {
         console.log(`[YjsStore] Archived ${toArchive.length} expenses older than 90 days`);
     }
 
-    private async backfillInvoicePaymentSnapshots(doc: Y.Doc, label: 'active' | 'archived'): Promise<void> {
-        const invoicesMap = doc.getMap('invoices') as Y.Map<string, unknown>;
-        if (!hasPaidInvoicesMissingCurrencySnapshotsInMap(invoicesMap)) {
-            return;
-        }
-
-        const preferredCurrencyValue = this._coreDoc?.getMap('preferences').get('currency');
-        const preferredCurrency = normalizeCurrencyCode(
-            typeof preferredCurrencyValue === 'string' ? preferredCurrencyValue : undefined
-        );
-        const { rates } = await fetchExchangeRates();
-        const backfilledCount = backfillPaidInvoiceCurrencySnapshotsInDoc(doc, {
-            preferredCurrency,
-            exchangeRates: rates,
-        });
-
-        if (backfilledCount > 0) {
-            console.log(`[YjsStore] Backfilled ${backfilledCount} ${label} invoice payment currency snapshots`);
-        }
-    }
-
     // =========================================================================
     // Google Drive Sync
     // =========================================================================
@@ -799,6 +767,10 @@ export class YjsStore {
                 console.error('[YjsStore] Timer reconciliation error:', err);
             }
 
+            this.backfillExpensePaymentSnapshotsForLoadedDocs().catch((error) => {
+                console.error('[YjsStore] Expense payment snapshot backfill error:', error);
+            });
+
             const enabled = this.preferences.get('backupEnabled') ?? true;
             if (!enabled || !this.backupManager) return;
 
@@ -815,6 +787,38 @@ export class YjsStore {
             this.clearDisconnectedDirtyDocs(
                 disconnectedDirtyDocs.filter((docName) => this.docManager.isLoaded(docName)),
             );
+        }
+    }
+
+    private async backfillExpensePaymentSnapshots(doc: Y.Doc, label: 'active' | 'archived'): Promise<void> {
+        const expensesMap = doc.getMap('expenses') as Y.Map<string, unknown>;
+        if (!hasPaidExpensesMissingCurrencySnapshotsInMap(expensesMap)) {
+            return;
+        }
+
+        const preferredCurrencyValue = this._coreDoc?.getMap('preferences').get('currency');
+        const preferredCurrency = normalizeCurrencyCode(
+            typeof preferredCurrencyValue === 'string' ? preferredCurrencyValue : undefined
+        );
+
+        const { rates } = await fetchExchangeRates();
+        const backfilledCount = backfillPaidExpenseCurrencySnapshotsInDoc(doc, {
+            preferredCurrency,
+            exchangeRates: rates,
+        });
+
+        if (backfilledCount > 0) {
+            console.log(`[YjsStore] Backfilled ${backfilledCount} ${label} expense payment currency snapshots`);
+        }
+    }
+
+    private async backfillExpensePaymentSnapshotsForLoadedDocs(): Promise<void> {
+        if (this._coreDoc) {
+            await this.backfillExpensePaymentSnapshots(this._coreDoc, 'active');
+        }
+
+        if (this._archivedExpensesDoc) {
+            await this.backfillExpensePaymentSnapshots(this._archivedExpensesDoc, 'archived');
         }
     }
 
@@ -1121,6 +1125,11 @@ export class YjsStore {
         }
         for (const [key, value] of Object.entries(validatedPreferences)) {
             this.preferences.set(key, value as Preferences[keyof Preferences]);
+        }
+
+        await this.backfillExpensePaymentSnapshots(this._coreDoc!, 'active');
+        if (this._archivedExpensesDoc) {
+            await this.backfillExpensePaymentSnapshots(this._archivedExpensesDoc, 'archived');
         }
     }
 
