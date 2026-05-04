@@ -12,7 +12,6 @@ const PAID_INVOICE_STATUS = 'paid';
 const DRAFT_INVOICE_STATUS = 'draft';
 const SENT_INVOICE_STATUS = 'sent';
 const OVERDUE_INVOICE_STATUS = 'overdue';
-const EXCHANGE_RATE_BASE_CURRENCY = 'USD';
 
 const INVOICE_STATUS_VALUES = new Set([
     DRAFT_INVOICE_STATUS,
@@ -76,8 +75,6 @@ const normalizePaymentCurrencySnapshot = (invoice: any): InvoicePaymentCurrencyS
         sourceAmount,
         preferredCurrencyAtPayment: normalizeCurrencyCode(snapshot.preferredCurrencyAtPayment),
         preferredCurrencyAmount,
-        exchangeRatesBase: getTrimmedString(snapshot.exchangeRatesBase) || EXCHANGE_RATE_BASE_CURRENCY,
-        exchangeRates: getFiniteRecord(snapshot.exchangeRates),
     };
 };
 
@@ -234,17 +231,20 @@ export const createInvoicePaymentCurrencySnapshot = ({
     preferredCurrency: string;
     exchangeRates?: Record<string, number> | null;
     capturedAt: number;
-}): InvoicePaymentCurrencySnapshot => {
+}): InvoicePaymentCurrencySnapshot | null => {
     const sourceCurrency = normalizeCurrencyCode(invoice?.currency);
     const targetCurrency = normalizeCurrencyCode(preferredCurrency);
     const sourceAmount = getInvoiceTotal(invoice);
+
+    if (sourceCurrency === targetCurrency) {
+        return null;
+    }
+
     const normalizedRates = getFiniteRecord(exchangeRates);
 
     let preferredCurrencyAmount = sourceAmount;
-    if (sourceCurrency !== targetCurrency) {
-        const result = convertCurrency(sourceAmount, sourceCurrency, targetCurrency, normalizedRates);
-        preferredCurrencyAmount = result.amount;
-    }
+    const result = convertCurrency(sourceAmount, sourceCurrency, targetCurrency, normalizedRates);
+    preferredCurrencyAmount = result.amount;
 
     return {
         capturedAt,
@@ -252,8 +252,6 @@ export const createInvoicePaymentCurrencySnapshot = ({
         sourceAmount,
         preferredCurrencyAtPayment: targetCurrency,
         preferredCurrencyAmount,
-        exchangeRatesBase: EXCHANGE_RATE_BASE_CURRENCY,
-        exchangeRates: normalizedRates,
     };
 };
 
@@ -292,22 +290,6 @@ export const getPaidInvoiceConvertedAmount = (
             amount: snapshot.sourceAmount,
             currency: normalizedTargetCurrency,
             success: true,
-            usedSnapshot: true,
-        };
-    }
-
-    if (snapshot.exchangeRates) {
-        const conversion = convertCurrency(
-            snapshot.sourceAmount,
-            snapshot.sourceCurrency,
-            normalizedTargetCurrency,
-            snapshot.exchangeRates
-        );
-
-        return {
-            amount: conversion.amount,
-            currency: normalizedTargetCurrency,
-            success: conversion.success,
             usedSnapshot: true,
         };
     }

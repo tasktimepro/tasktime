@@ -96,7 +96,11 @@ export function updateEntityFields<T extends Record<string, unknown>>(
     if (existing instanceof Y.Map) {
         // New format: field-level update for proper CRDT merge
         for (const [key, value] of Object.entries(updates)) {
-            existing.set(key, value);
+            if (value === undefined) {
+                existing.delete(key);
+            } else {
+                existing.set(key, value);
+            }
         }
 
         return yMapToObject<T>(existing);

@@ -164,8 +164,6 @@ export interface InvoicePaymentCurrencySnapshot {
     sourceAmount: number;
     preferredCurrencyAtPayment: string;
     preferredCurrencyAmount: number;
-    exchangeRatesBase?: string;
-    exchangeRates?: Record<string, number>;
 }
 
 export type ExpensePaymentCurrencySnapshot = InvoicePaymentCurrencySnapshot;

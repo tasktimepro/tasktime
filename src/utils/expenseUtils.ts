@@ -4,8 +4,6 @@ import { generateRecurringExpenseId } from './idUtils';
 import { convertCurrency, normalizeCurrencyCode } from './currencyUtils';
 import type { Expense, ExpensePaymentCurrencySnapshot, ExpenseRecurrence } from '@/stores/yjs/types';
 
-const EXCHANGE_RATE_BASE_CURRENCY = 'USD';
-
 const getFiniteNumber = (value: unknown, fallback: number): number => {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 };
@@ -66,10 +64,6 @@ const normalizeExpensePaymentCurrencySnapshot = (expense: any): ExpensePaymentCu
         sourceAmount,
         preferredCurrencyAtPayment: normalizeCurrencyCode(snapshot.preferredCurrencyAtPayment),
         preferredCurrencyAmount,
-        exchangeRatesBase: typeof snapshot.exchangeRatesBase === 'string' && snapshot.exchangeRatesBase.trim()
-            ? snapshot.exchangeRatesBase.trim()
-            : EXCHANGE_RATE_BASE_CURRENCY,
-        exchangeRates: getFiniteRecord(snapshot.exchangeRates),
     };
 };
 
@@ -83,17 +77,20 @@ export const createExpensePaymentCurrencySnapshot = ({
     preferredCurrency: string;
     exchangeRates?: Record<string, number> | null;
     capturedAt?: number;
-}): ExpensePaymentCurrencySnapshot => {
+}): ExpensePaymentCurrencySnapshot | null => {
     const sourceCurrency = normalizeCurrencyCode(expense?.currency);
     const targetCurrency = normalizeCurrencyCode(preferredCurrency);
     const sourceAmount = getFiniteNumber(expense?.amount, 0);
+
+    if (sourceCurrency === targetCurrency) {
+        return null;
+    }
+
     const normalizedRates = getFiniteRecord(exchangeRates);
 
     let preferredCurrencyAmount = sourceAmount;
-    if (sourceCurrency !== targetCurrency) {
-        const result = convertCurrency(sourceAmount, sourceCurrency, targetCurrency, normalizedRates);
-        preferredCurrencyAmount = result.amount;
-    }
+    const result = convertCurrency(sourceAmount, sourceCurrency, targetCurrency, normalizedRates);
+    preferredCurrencyAmount = result.amount;
 
     return {
         capturedAt: capturedAt ?? resolveExpensePaymentSnapshotCapturedAt(expense),
@@ -101,8 +98,6 @@ export const createExpensePaymentCurrencySnapshot = ({
         sourceAmount,
         preferredCurrencyAtPayment: targetCurrency,
         preferredCurrencyAmount,
-        exchangeRatesBase: EXCHANGE_RATE_BASE_CURRENCY,
-        exchangeRates: normalizedRates,
     };
 };
 
@@ -141,22 +136,6 @@ export const getPaidExpenseConvertedAmount = (
             amount: snapshot.sourceAmount,
             currency: normalizedTargetCurrency,
             success: true,
-            usedSnapshot: true,
-        };
-    }
-
-    if (snapshot.exchangeRates) {
-        const conversion = convertCurrency(
-            snapshot.sourceAmount,
-            snapshot.sourceCurrency,
-            normalizedTargetCurrency,
-            snapshot.exchangeRates
-        );
-
-        return {
-            amount: conversion.amount,
-            currency: normalizedTargetCurrency,
-            success: conversion.success,
             usedSnapshot: true,
         };
     }

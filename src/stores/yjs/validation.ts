@@ -197,8 +197,6 @@ const paymentCurrencySnapshotSchema = z.object({
     sourceAmount: finiteNumberSchema,
     preferredCurrencyAtPayment: nonEmptyStringSchema,
     preferredCurrencyAmount: finiteNumberSchema,
-    exchangeRatesBase: nonEmptyStringSchema.optional(),
-    exchangeRates: z.record(z.string(), finiteNumberSchema).optional(),
 }).passthrough();
 
 const invoiceSchema = z.object({

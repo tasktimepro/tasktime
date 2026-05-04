@@ -78,7 +78,7 @@ describe('useInvoices', () => {
             await result.current.markAsPaid('c')
         })
 
-        expect(update).toHaveBeenCalledWith('a', { status: 'sent', paidAt: null, paymentCurrencySnapshot: null })
+        expect(update).toHaveBeenCalledWith('a', { status: 'sent', paidAt: null, paymentCurrencySnapshot: undefined })
         expect(update).toHaveBeenCalledWith('c', expect.objectContaining({
             status: 'paid',
             paymentCurrencySnapshot: expect.objectContaining({
@@ -280,7 +280,7 @@ describe('useInvoices', () => {
         expect(update).toHaveBeenCalledWith('paid-invoice', {
             status: 'sent',
             paidAt: null,
-            paymentCurrencySnapshot: null,
+            paymentCurrencySnapshot: undefined,
         })
     })
 
@@ -306,7 +306,7 @@ describe('useInvoices', () => {
         expect(result.current.markAsUnpaid('missing')).toBeUndefined()
     })
 
-    it('allows same-currency paid snapshots when exchange rates are unavailable', async () => {
+    it('marks same-currency invoices paid without storing a snapshot when exchange rates are unavailable', async () => {
         const update = vi.fn()
         mockFetchExchangeRates.mockResolvedValue({ rates: null, error: 'offline' })
         mockPreferences.get.mockReturnValue('USD')
@@ -336,11 +336,7 @@ describe('useInvoices', () => {
 
         expect(update).toHaveBeenCalledWith('usd-invoice', expect.objectContaining({
             status: 'paid',
-            paymentCurrencySnapshot: expect.objectContaining({
-                sourceCurrency: 'USD',
-                preferredCurrencyAtPayment: 'USD',
-                preferredCurrencyAmount: 100,
-            }),
+            paymentCurrencySnapshot: undefined,
         }))
     })
 

@@ -198,8 +198,6 @@ describe('invoiceUtils', () => {
             sourceAmount: 100,
             preferredCurrencyAtPayment: 'EUR',
             preferredCurrencyAmount: 80,
-            exchangeRatesBase: 'USD',
-            exchangeRates: { USD: 1, EUR: 0.8 },
         })
 
         expect(getInvoicePaymentCurrencySnapshot({ paymentCurrencySnapshot: snapshot, currency: 'USD' })).toEqual(snapshot)
@@ -217,10 +215,23 @@ describe('invoiceUtils', () => {
         })
         expect(getPaidInvoiceConvertedAmount({ paymentCurrencySnapshot: snapshot, currency: 'USD', total: 100 }, 'GBP')).toEqual({
             amount: 100,
-            currency: 'GBP',
+            currency: 'USD',
             success: false,
             usedSnapshot: true,
         })
+    })
+
+    it('does not create an invoice payment snapshot when source and preferred currencies match', () => {
+
+        expect(createInvoicePaymentCurrencySnapshot({
+            invoice: {
+                currency: 'EUR',
+                total: 100,
+            },
+            preferredCurrency: 'EUR',
+            exchangeRates: { USD: 1, EUR: 0.8 },
+            capturedAt: 123,
+        })).toBeNull()
     })
 
     it('falls back correctly when marking invoices unpaid', () => {

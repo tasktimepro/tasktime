@@ -202,7 +202,13 @@ export function useYjsCollection<T extends { id: string }>(
         if (existing instanceof Y.Map) {
             // New format: field-level CRDT update
             for (const key of Object.keys(updatesWithTimestamp)) {
-                existing.set(key, (validatedEntity as Record<string, unknown>)[key]);
+                const value = (validatedEntity as Record<string, unknown>)[key];
+
+                if (value === undefined) {
+                    existing.delete(key);
+                } else {
+                    existing.set(key, value);
+                }
             }
 
             markMeaningfulActivity(getCollectionAction(options.collectionName, 'update'));

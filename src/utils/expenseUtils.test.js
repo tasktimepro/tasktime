@@ -134,8 +134,6 @@ describe('expenseUtils', () => {
             sourceAmount: 125,
             preferredCurrencyAtPayment: 'EUR',
             preferredCurrencyAmount: 100,
-            exchangeRatesBase: 'USD',
-            exchangeRates: { USD: 1, EUR: 0.8 },
         });
 
         expect(getPaidExpenseConvertedAmount({
@@ -147,6 +145,117 @@ describe('expenseUtils', () => {
             currency: 'EUR',
             success: true,
             usedSnapshot: true,
+        });
+
+        expect(getPaidExpenseConvertedAmount({
+            amount: 125,
+            currency: 'USD',
+            paymentCurrencySnapshot: snapshot,
+        }, 'USD')).toEqual({
+            amount: 125,
+            currency: 'USD',
+            success: true,
+            usedSnapshot: true,
+        });
+
+        expect(getPaidExpenseConvertedAmount({
+            amount: 125,
+            currency: 'USD',
+            paymentCurrencySnapshot: snapshot,
+        }, 'GBP')).toEqual({
+            amount: 125,
+            currency: 'USD',
+            success: false,
+            usedSnapshot: true,
+        });
+    });
+
+    it('does not create a paid expense snapshot when source and preferred currencies match', () => {
+        expect(createExpensePaymentCurrencySnapshot({
+            expense: {
+                currency: 'EUR',
+                amount: 125,
+                paidOn: '2025-02-01',
+            },
+            preferredCurrency: 'EUR',
+            exchangeRates: { USD: 1, EUR: 0.8 },
+        })).toBeNull();
+    });
+
+    it('falls back to the raw expense amount when no snapshot exists', () => {
+        expect(getPaidExpenseConvertedAmount({
+            amount: 50,
+            currency: 'USD',
+        }, 'USD')).toEqual({
+            amount: 50,
+            currency: 'USD',
+            success: true,
+            usedSnapshot: false,
+        });
+
+        expect(getPaidExpenseConvertedAmount({
+            amount: 50,
+            currency: 'USD',
+        }, 'EUR')).toEqual({
+            amount: 50,
+            currency: 'USD',
+            success: false,
+            usedSnapshot: false,
+        });
+    });
+
+    it('falls back through date and timestamp sources when capturing snapshot time', () => {
+        const fromExpenseDate = createExpensePaymentCurrencySnapshot({
+            expense: {
+                currency: 'USD',
+                amount: 20,
+                date: '2025-03-15',
+            },
+            preferredCurrency: 'EUR',
+            exchangeRates: { USD: 1, EUR: 0.9 },
+        });
+
+        const fromUpdatedAt = createExpensePaymentCurrencySnapshot({
+            expense: {
+                currency: 'USD',
+                amount: 20,
+                updatedAt: 1234,
+            },
+            preferredCurrency: 'EUR',
+            exchangeRates: { USD: 1, EUR: 0.9 },
+        });
+
+        const fromCreatedAt = createExpensePaymentCurrencySnapshot({
+            expense: {
+                currency: 'USD',
+                amount: 20,
+                createdAt: 5678,
+            },
+            preferredCurrency: 'EUR',
+            exchangeRates: { USD: 1, EUR: 0.9 },
+        });
+
+        expect(fromExpenseDate?.capturedAt).toBe(new Date(2025, 2, 15).getTime());
+        expect(fromUpdatedAt?.capturedAt).toBe(1234);
+        expect(fromCreatedAt?.capturedAt).toBe(5678);
+    });
+
+    it('ignores invalid payment currency snapshots', () => {
+        expect(getPaidExpenseConvertedAmount({
+            amount: 75,
+            currency: 'USD',
+            paymentCurrencySnapshot: {
+                capturedAt: 0,
+                sourceCurrency: 'USD',
+                sourceAmount: 75,
+                preferredCurrencyAtPayment: 'EUR',
+                preferredCurrencyAmount: 60,
+            },
+        }, 'EUR')).toEqual({
+            amount: 75,
+            currency: 'USD',
+            success: false,
+            usedSnapshot: false,
         });
     });
 

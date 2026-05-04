@@ -31,6 +31,10 @@ type MarkAsPaidOptions = {
 
 const SNAPSHOT_SENSITIVE_EXPENSE_FIELDS = ['amount', 'currency', 'date', 'paidOn', 'paymentStatus'] as const;
 
+const shouldStoreExpensePaymentSnapshot = (expense: Partial<Expense>, preferredCurrency: string) => {
+    return normalizeCurrencyCode(expense.currency || preferredCurrency) !== preferredCurrency;
+};
+
 export function useExpenses(options: UseExpensesOptions = {}) {
     const { store, isReady, loadArchivedExpenses } = useYjs();
     const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
@@ -206,6 +210,10 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         }
 
         const preferredCurrency = getPreferredCurrency();
+        if (!shouldStoreExpensePaymentSnapshot(expense, preferredCurrency)) {
+            return expense;
+        }
+
         const expenseCurrency = normalizeCurrencyCode(expense.currency || preferredCurrency);
         const { rates, error } = await fetchExchangeRates();
 
@@ -267,7 +275,11 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         markMeaningfulActivity();
 
         if (validatedExpense.paymentStatus === 'paid' && !getExpensePaymentCurrencySnapshot(validatedExpense)) {
-            queueExpensePaymentSnapshot(id);
+            const preferredCurrency = getPreferredCurrency();
+
+            if (shouldStoreExpensePaymentSnapshot(validatedExpense, preferredCurrency)) {
+                queueExpensePaymentSnapshot(id);
+            }
         }
 
         return validatedExpense;
@@ -283,18 +295,24 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         if (!existing) return undefined;
 
         const updatesWithTimestamp = { ...updates, updatedAt: Date.now() } as Record<string, unknown>;
+        const nextExpense = { ...existing, ...updatesWithTimestamp };
+        const preferredCurrency = getPreferredCurrency();
+        const shouldStoreSnapshot = (updatesWithTimestamp.paymentStatus ?? existing.paymentStatus) === 'paid'
+            && shouldStoreExpensePaymentSnapshot(nextExpense, preferredCurrency);
         const hasProvidedPaymentSnapshot = Object.prototype.hasOwnProperty.call(updatesWithTimestamp, 'paymentCurrencySnapshot')
-            && Boolean(getExpensePaymentCurrencySnapshot({ ...existing, ...updatesWithTimestamp }));
-        const shouldRefreshPaymentSnapshot = !hasProvidedPaymentSnapshot
-            && (updatesWithTimestamp.paymentStatus ?? existing.paymentStatus) === 'paid'
+            && Boolean(getExpensePaymentCurrencySnapshot(nextExpense));
+        const shouldRefreshPaymentSnapshot = shouldStoreSnapshot
+            && !hasProvidedPaymentSnapshot
             && (
                 updatesWithTimestamp.paymentCurrencySnapshot === null
-                || !getExpensePaymentCurrencySnapshot({ ...existing, ...updatesWithTimestamp })
+                || !getExpensePaymentCurrencySnapshot(nextExpense)
                 || SNAPSHOT_SENSITIVE_EXPENSE_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(updatesWithTimestamp, field))
             );
 
-        if (shouldRefreshPaymentSnapshot) {
-            updatesWithTimestamp.paymentCurrencySnapshot = null;
+        if (!shouldStoreSnapshot && Object.prototype.hasOwnProperty.call(existing, 'paymentCurrencySnapshot')) {
+            updatesWithTimestamp.paymentCurrencySnapshot = undefined;
+        } else if (shouldRefreshPaymentSnapshot) {
+            updatesWithTimestamp.paymentCurrencySnapshot = undefined;
         }
 
         const merged = { ...existing, ...updatesWithTimestamp };
@@ -307,7 +325,7 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         }
 
         return validated;
-    }, [applyValidatedExpenseUpdate, isReady, findExpenseMap, queueExpensePaymentSnapshot]);
+    }, [applyValidatedExpenseUpdate, getPreferredCurrency, isReady, findExpenseMap, queueExpensePaymentSnapshot]);
 
     const deleteExpense = useCallback((id: string): boolean => {
         if (!isReady) return false;
@@ -332,11 +350,16 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         }
 
         const preferredCurrency = getPreferredCurrency();
-        const expenseCurrency = normalizeCurrencyCode(expense.currency || preferredCurrency);
-        const { rates, error } = await fetchExchangeRates();
+        const requiresSnapshot = shouldStoreExpensePaymentSnapshot(expense, preferredCurrency);
+        let rates: Record<string, number> | null = null;
+        let error: string | null = null;
 
-        if (!rates && expenseCurrency !== preferredCurrency) {
-            throw new Error(error || 'Unable to load exchange rates for expense payment snapshot.');
+        if (requiresSnapshot) {
+            ({ rates, error } = await fetchExchangeRates());
+
+            if (!rates) {
+                throw new Error(error || 'Unable to load exchange rates for expense payment snapshot.');
+            }
         }
 
         const paidOn = options.paidOn ?? toStorageDate(new Date());
@@ -358,12 +381,12 @@ export function useExpenses(options: UseExpensesOptions = {}) {
                 expense: paidExpense,
                 preferredCurrency,
                 exchangeRates: rates,
-            }),
+            }) ?? undefined,
         });
     }, [getExpense, getPreferredCurrency, updateExpense]);
 
     const markAsUnpaid = useCallback((id: string) => {
-        return updateExpense(id, { paidOn: null, paidBy: null, paymentStatus: 'unpaid', paymentCurrencySnapshot: null });
+        return updateExpense(id, { paidOn: null, paidBy: null, paymentStatus: 'unpaid', paymentCurrencySnapshot: undefined });
     }, [updateExpense]);
 
     const markAsBilled = useCallback((id: string, invoiceId: string) => {

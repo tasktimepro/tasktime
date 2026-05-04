@@ -18,6 +18,10 @@ import {
     isInvoicePaid,
 } from '@/utils/invoiceUtils';
 
+const shouldStoreInvoicePaymentSnapshot = (invoice: Partial<Invoice>, preferredCurrency: string) => {
+    return normalizeCurrencyCode(invoice.currency || preferredCurrency) !== preferredCurrency;
+};
+
 export interface UseInvoicesOptions {
     /** Filter to a specific project */
     projectId?: string;
@@ -137,7 +141,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         return update(id, {
             status: 'sent',
             paidAt: null,
-            paymentCurrencySnapshot: null,
+            paymentCurrencySnapshot: undefined,
         });
     }, [update]);
 
@@ -149,11 +153,16 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
 
         const paidAt = Date.now();
         const preferredCurrency = getPreferredCurrency();
-        const invoiceCurrency = normalizeCurrencyCode(invoice.currency || preferredCurrency);
-        const { rates, error } = await fetchExchangeRates();
+        const requiresSnapshot = shouldStoreInvoicePaymentSnapshot(invoice, preferredCurrency);
+        let rates: Record<string, number> | null = null;
+        let error: string | null = null;
 
-        if (!rates && invoiceCurrency !== preferredCurrency) {
-            throw new Error(error || 'Unable to load exchange rates for payment snapshot.');
+        if (requiresSnapshot) {
+            ({ rates, error } = await fetchExchangeRates());
+
+            if (!rates) {
+                throw new Error(error || 'Unable to load exchange rates for payment snapshot.');
+            }
         }
 
         return update(id, {
@@ -164,7 +173,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
                 preferredCurrency,
                 exchangeRates: rates,
                 capturedAt: paidAt,
-            }),
+            }) ?? undefined,
         });
     }, [get, getPreferredCurrency, update]);
 
@@ -177,7 +186,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         return update(id, {
             status: getInvoiceStatusAfterMarkingUnpaid(invoice),
             paidAt: null,
-            paymentCurrencySnapshot: null,
+            paymentCurrencySnapshot: undefined,
         });
     }, [get, update]);
 

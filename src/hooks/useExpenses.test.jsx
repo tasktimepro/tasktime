@@ -470,7 +470,7 @@ describe('useExpenses', () => {
         })
 
         expect(readStored(store.expenses, 'exp-1')).toEqual(expect.objectContaining({ paymentStatus: 'unpaid' }))
-        expect(readStored(store.expenses, 'exp-1').paymentCurrencySnapshot).toBeNull()
+        expect(readStored(store.expenses, 'exp-1').paymentCurrencySnapshot).toBeUndefined()
         expect(readStored(store.expenses, 'exp-2')).toEqual(expect.objectContaining({ billingStatus: 'billed', invoiceId: 'inv-1' }))
         expect(readStored(store.expenses, 'exp-3')).toEqual(expect.objectContaining({ billingStatus: 'unbilled', invoiceId: null, billedAt: null }))
     })
