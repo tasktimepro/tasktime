@@ -266,6 +266,9 @@ export interface Expense {
     amountType?: 'fixed' | 'variable' | null;
     taxNumber?: string | null;
     isTaxExempt: boolean;
+    amountExcludingTax?: number | null;
+    taxLabel?: string | null;
+    taxRate?: number | null;
     paymentCurrencySnapshot?: ExpensePaymentCurrencySnapshot | null;
     isPreview?: boolean;
     createdAt?: number;
@@ -294,6 +297,9 @@ export interface ExpenseRecurrence {
     billable: boolean;
     taxNumber?: string | null;
     isTaxExempt: boolean;
+    amountExcludingTax?: number | null;
+    taxLabel?: string | null;
+    taxRate?: number | null;
     lastGeneratedDate?: string | null;
     active: boolean;
     createdAt?: number;

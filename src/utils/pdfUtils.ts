@@ -365,8 +365,6 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                     <h3 style="color: #333; margin-bottom: 10px;"><strong>Invoice To:</strong></h3>
                     <p style="margin: 0; line-height: 1.5;">
                         ${client.name}<br>
-                        ${client.contactPerson ? client.contactPerson + '<br>' : ''}
-                        ${client.email ? client.email + '<br>' : ''}
                         ${client.address ? client.address + '<br>' : ''}
                         ${client.city ? client.city + ', ' : ''}${client.state ? client.state + ' ' : ''}${client.zip || ''}${(client.city || client.state || client.zip) && client.country ? '<br>' : ''}
                         ${client.country ? client.country : ''}

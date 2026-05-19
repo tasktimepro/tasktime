@@ -83,6 +83,19 @@ describe('expenseUtils', () => {
         expect(expense.recurrenceId).toBe('r1');
     });
 
+    it('buildExpenseFromRecurrence copies tax detail fields', () => {
+        const expense = buildExpenseFromRecurrence({
+            ...recurrenceBase,
+            amountExcludingTax: 1000,
+            taxLabel: 'VAT',
+            taxRate: 20,
+        }, '2025-02-01');
+
+        expect(expense.amountExcludingTax).toBe(1000);
+        expect(expense.taxLabel).toBe('VAT');
+        expect(expense.taxRate).toBe(20);
+    });
+
     it('buildExpenseFromRecurrence produces deterministic IDs', () => {
         const expense1 = buildExpenseFromRecurrence(recurrenceBase, '2025-02-01');
         const expense2 = buildExpenseFromRecurrence(recurrenceBase, '2025-02-01');

@@ -20,8 +20,9 @@ test.describe('Backup smoke', () => {
             templateName,
         });
 
-        await page.goto('/account?section=backup');
-        await expect(page.getByRole('heading', { name: 'Backup & Restore' })).toBeVisible();
+        await page.goto('/account?section=data');
+        await expect(page.getByRole('heading', { name: 'Your Data' })).toBeVisible();
+        await expect(page.getByText('Backup & Restore')).toBeVisible();
 
         const [download] = await Promise.all([
             page.waitForEvent('download'),
@@ -70,8 +71,9 @@ test.describe('Backup smoke', () => {
             templateName,
         });
 
-        await page.goto('/account?section=backup');
-        await expect(page.getByRole('heading', { name: 'Backup & Restore' })).toBeVisible();
+        await page.goto('/account?section=data');
+        await expect(page.getByRole('heading', { name: 'Your Data' })).toBeVisible();
+        await expect(page.getByText('Backup & Restore')).toBeVisible();
 
         const [download] = await Promise.all([
             page.waitForEvent('download'),
@@ -110,8 +112,9 @@ test.describe('Backup smoke', () => {
         await page.goto('/projects');
         await expect(page.getByText('No projects')).toBeVisible();
 
-        await page.goto('/account?section=backup');
-        await expect(page.getByRole('heading', { name: 'Backup & Restore' })).toBeVisible();
+        await page.goto('/account?section=data');
+        await expect(page.getByRole('heading', { name: 'Your Data' })).toBeVisible();
+        await expect(page.getByText('Backup & Restore')).toBeVisible();
         await page.getByRole('button', { name: 'Import', exact: true }).click();
 
         const importDialog = page.getByRole('dialog', { name: 'Import Data' });

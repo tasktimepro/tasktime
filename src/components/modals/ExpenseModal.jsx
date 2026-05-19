@@ -25,6 +25,7 @@ import { usePaymentMethods } from '../../hooks/usePaymentMethods.ts';
 import { buildExpenseFromRecurrence } from '@/utils/expenseUtils';
 import { DEFAULT_CURRENCY } from '@/utils/currencyUtils.ts';
 import { toStorageDate } from '@/utils/dateUtils.ts';
+import { parseOptionalNumberInput } from '@/utils/numberInputUtils.ts';
 
 const NO_CLIENT_VALUE = 'no-client';
 const NO_PROJECT_VALUE = 'no-project';
@@ -32,6 +33,70 @@ const NO_BUSINESS_VALUE = 'no-business';
 const DEFAULT_REPEAT = 'monthly';
 const DEFAULT_AMOUNT_TYPE = 'fixed';
 const SUGGESTION_LIMIT = 6;
+
+const hasSelectedClient = (clientId) => Boolean(clientId && clientId !== NO_CLIENT_VALUE);
+const hasSelectedProject = (projectId) => Boolean(projectId && projectId !== NO_PROJECT_VALUE);
+
+const getBusinessTaxLabel = (businessInfo) => businessInfo?.taxLabel || 'Tax';
+
+const calculateAmountExcludingTax = (amountValue, taxRateValue) => {
+    const amount = parseOptionalNumberInput(amountValue);
+    const taxRate = parseOptionalNumberInput(taxRateValue);
+
+    if (amount === null || amount <= 0 || taxRate === null || taxRate < 0) {
+        return '';
+    }
+
+    const divisor = 1 + (taxRate / 100);
+
+    if (divisor <= 0) {
+        return '';
+    }
+
+    return (amount / divisor).toFixed(2);
+};
+
+const roundMoney = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+const taxAmountsMatchTotal = (amountValue, amountExcludingTaxValue, taxRateValue) => {
+    const total = parseOptionalNumberInput(amountValue);
+    const amountExcludingTax = parseOptionalNumberInput(amountExcludingTaxValue);
+    const taxRate = parseOptionalNumberInput(taxRateValue);
+
+    if (total === null || amountExcludingTax === null || taxRate === null) {
+        return false;
+    }
+
+    const calculatedTotal = amountExcludingTax * (1 + (taxRate / 100));
+
+    return roundMoney(calculatedTotal) === roundMoney(total);
+};
+
+const buildTaxFormFields = (businessInfo, existingFields = {}) => {
+    if (!businessInfo?.taxEnabled) {
+        return {
+            amountExcludingTax: existingFields.amountExcludingTax ?? '',
+            taxLabel: '',
+            taxRate: '',
+        };
+    }
+
+    const existingTaxRate = existingFields.taxRate;
+    const hasExistingTaxRate = existingTaxRate !== undefined && existingTaxRate !== null && existingTaxRate !== '';
+    const resolvedTaxRate = hasExistingTaxRate ? existingTaxRate : businessInfo.taxRate ?? 0;
+    const existingAmountExcludingTax = existingFields.amountExcludingTax;
+    const hasExistingAmountExcludingTax = existingAmountExcludingTax !== undefined
+        && existingAmountExcludingTax !== null
+        && existingAmountExcludingTax !== '';
+
+    return {
+        amountExcludingTax: hasExistingAmountExcludingTax
+            ? existingAmountExcludingTax
+            : calculateAmountExcludingTax(existingFields.amount, resolvedTaxRate),
+        taxLabel: existingFields.taxLabel || getBusinessTaxLabel(businessInfo),
+        taxRate: String(resolvedTaxRate),
+    };
+};
 
 const normalizeSuggestionValue = (value) => value.trim().replace(/\s+/g, ' ');
 
@@ -169,6 +234,9 @@ const buildEmptyFormData = (todayString, currency) => ({
     monthlyDay: 1,
     taxNumber: '',
     isTaxExempt: false,
+    amountExcludingTax: '',
+    taxLabel: '',
+    taxRate: '',
 });
 
 const applyScopedProjectContext = (nextFormData, scopedProject, businessInfos, defaultBusinessInfo) => {
@@ -194,6 +262,11 @@ const applyScopedProjectContext = (nextFormData, scopedProject, businessInfos, d
         taxNumber: nextIsPersonal
             ? ''
             : (selectedBusinessInfo?.taxNumber || nextFormData.taxNumber || ''),
+        ...buildTaxFormFields(selectedBusinessInfo, {
+            amountExcludingTax: nextIsPersonal ? '' : nextFormData.amountExcludingTax,
+            taxLabel: nextIsPersonal ? '' : nextFormData.taxLabel,
+            taxRate: nextIsPersonal ? '' : nextFormData.taxRate,
+        }),
     };
 };
 
@@ -387,6 +460,15 @@ const ExpenseModal = ({
             const resolvedTaxNumber = isPersonal
                 ? ''
                 : (resolvedBusiness?.taxNumber || editingExpense.taxNumber || '');
+            const initialTaxFields = isPersonal
+                ? buildTaxFormFields(null)
+                : buildTaxFormFields(resolvedBusiness, {
+                    amountExcludingTax: editingExpense.amountExcludingTax != null
+                        ? String(editingExpense.amountExcludingTax)
+                        : '',
+                    taxLabel: editingExpense.taxLabel || '',
+                    taxRate: editingExpense.taxRate != null ? String(editingExpense.taxRate) : undefined,
+                });
 
             return {
                 key: draftStateKey,
@@ -415,6 +497,7 @@ const ExpenseModal = ({
                     monthlyDay: Number((editingExpense.date || todayString).split('-')[2]) || 1,
                     taxNumber: resolvedTaxNumber,
                     isTaxExempt: editingExpense.isTaxExempt === true,
+                    ...initialTaxFields,
                 },
                 editingRecurrenceId: null,
                 missingRecurrenceId: null,
@@ -441,6 +524,15 @@ const ExpenseModal = ({
             const resolvedTaxNumber = isPersonal
                 ? ''
                 : (resolvedBusiness?.taxNumber || recurrence.taxNumber || '');
+            const initialTaxFields = isPersonal
+                ? buildTaxFormFields(null)
+                : buildTaxFormFields(resolvedBusiness, {
+                    amountExcludingTax: recurrence.amountExcludingTax != null
+                        ? String(recurrence.amountExcludingTax)
+                        : '',
+                    taxLabel: recurrence.taxLabel || '',
+                    taxRate: recurrence.taxRate != null ? String(recurrence.taxRate) : undefined,
+                });
 
             return {
                 key: draftStateKey,
@@ -472,6 +564,7 @@ const ExpenseModal = ({
                         || 1,
                     taxNumber: resolvedTaxNumber,
                     isTaxExempt: recurrence.isTaxExempt === true,
+                    ...initialTaxFields,
                 },
                 editingRecurrenceId: recurrence.id,
                 missingRecurrenceId: null,
@@ -490,6 +583,7 @@ const ExpenseModal = ({
         const defaultBusinessId = isPersonal ? '' : (defaultBusinessInfo?.id || '');
         const defaultBusiness = businessInfos.find((info) => info.id === defaultBusinessId);
         const defaultTaxNumber = isPersonal ? '' : (defaultBusiness?.taxNumber || '');
+        const defaultTaxFields = isPersonal ? buildTaxFormFields(null) : buildTaxFormFields(defaultBusiness);
         const initialOneTimePaymentState = shouldStartRecurring
             ? { paymentMode: 'manual', paidOn: '' }
             : resolveNewOneTimePaymentState(initialDate);
@@ -510,6 +604,7 @@ const ExpenseModal = ({
                 isRecurring: shouldStartRecurring,
                 startDate: initialDate,
                 taxNumber: defaultTaxNumber,
+                ...defaultTaxFields,
             }, scopedProject, businessInfos, defaultBusinessInfo),
             editingRecurrenceId: null,
             missingRecurrenceId: null,
@@ -632,10 +727,36 @@ const ExpenseModal = ({
     const showTitleSuggestions = activeSuggestionField === 'title' && visibleTitleSuggestions.length > 0;
     const showSupplierSuggestions = activeSuggestionField === 'supplierName' && visibleSupplierSuggestions.length > 0;
 
+    const selectedBusiness = formData.isPersonal || !formData.businessId
+        ? null
+        : (businessInfos.find((info) => info.id === formData.businessId) || null);
+    const showExpenseTaxFields = Boolean(selectedBusiness?.taxEnabled) && !formData.isTaxExempt;
+    const expenseTaxLabel = getBusinessTaxLabel(selectedBusiness);
+
     const handleChange = (field, value) => {
         setFormData((prev) => ({
             ...prev,
             [field]: value,
+        }));
+    };
+
+    const handleAmountChange = (value) => {
+        setFormData((prev) => ({
+            ...prev,
+            amount: value,
+            amountExcludingTax: showExpenseTaxFields
+                ? calculateAmountExcludingTax(value, prev.taxRate)
+                : prev.amountExcludingTax,
+        }));
+    };
+
+    const handleTaxRateChange = (value) => {
+        setFormData((prev) => ({
+            ...prev,
+            taxRate: value,
+            amountExcludingTax: showExpenseTaxFields
+                ? calculateAmountExcludingTax(prev.amount, value)
+                : prev.amountExcludingTax,
         }));
     };
 
@@ -651,7 +772,10 @@ const ExpenseModal = ({
         setFormData((prev) => ({
             ...prev,
             businessId: nextId,
-            taxNumber: selected?.taxNumber || ''
+            taxNumber: selected?.taxNumber || '',
+            ...buildTaxFormFields(selected, {
+                amount: prev.amount,
+            }),
         }));
     };
 
@@ -688,6 +812,9 @@ const ExpenseModal = ({
                 projectId: NO_PROJECT_VALUE,
                 businessId: '',
                 taxNumber: '',
+                amountExcludingTax: '',
+                taxLabel: '',
+                taxRate: '',
                 billable: false,
             }));
             return;
@@ -700,7 +827,12 @@ const ExpenseModal = ({
             ...prev,
             isPersonal: false,
             businessId: prev.businessId || defaultId,
-            taxNumber: prev.businessId ? prev.taxNumber : (selected?.taxNumber || '')
+            taxNumber: prev.businessId ? prev.taxNumber : (selected?.taxNumber || ''),
+            ...buildTaxFormFields(prev.businessId ? businessInfos.find((info) => info.id === prev.businessId) : selected, {
+                amount: prev.amount,
+                taxLabel: prev.taxLabel,
+                taxRate: prev.taxRate,
+            }),
         }));
     };
 
@@ -931,9 +1063,34 @@ const ExpenseModal = ({
             return;
         }
 
+        if (!formData.isPersonal && !formData.businessId) {
+            showError('Business is required for business expenses');
+            return;
+        }
+
+        if (formData.billable && !hasSelectedClient(formData.clientId)) {
+            showError('Client is required for billable expenses');
+            return;
+        }
+
+        if (showExpenseTaxFields && !isVariable) {
+            if (!taxAmountsMatchTotal(formData.amount, formData.amountExcludingTax, formData.taxRate)) {
+                showError(`Total amount must match Amount (excl. ${expenseTaxLabel}) plus ${expenseTaxLabel}`);
+                return;
+            }
+        }
+
         const effectiveDate = showOneTimeFields ? formData.date : formData.startDate;
         const effectiveBusinessId = !formData.isPersonal ? (formData.businessId || null) : null;
         const effectiveTaxNumber = !formData.isPersonal ? (selectedBusiness?.taxNumber || null) : null;
+        const amountExcludingTaxValue = parseOptionalNumberInput(formData.amountExcludingTax);
+        const taxRateValue = parseOptionalNumberInput(formData.taxRate);
+        const effectiveTaxLabel = showExpenseTaxFields
+            ? (formData.taxLabel || getBusinessTaxLabel(selectedBusiness))
+            : null;
+        const effectiveTaxRate = showExpenseTaxFields
+            ? (taxRateValue ?? selectedBusiness?.taxRate ?? 0)
+            : null;
         const isAutoPayment = formData.paymentMode === 'auto' && !isVariable;
         const resolvedPaidOn = isAutoPayment
             ? effectiveDate
@@ -953,8 +1110,8 @@ const ExpenseModal = ({
                 ? 'paid'
                 : (showOneTimeFields && formData.paidOn ? 'paid' : 'unpaid'),
             paymentMode: formData.paymentMode || 'manual',
-            clientId: formData.clientId === NO_CLIENT_VALUE ? null : formData.clientId,
-            projectId: formData.projectId === NO_PROJECT_VALUE ? null : formData.projectId,
+            clientId: hasSelectedClient(formData.clientId) ? formData.clientId : null,
+            projectId: hasSelectedProject(formData.projectId) ? formData.projectId : null,
             businessId: effectiveBusinessId,
             isPersonal: formData.isPersonal,
             billable: formData.billable,
@@ -966,6 +1123,9 @@ const ExpenseModal = ({
             amountType: formData.isRecurring ? formData.amountType : null,
             taxNumber: effectiveTaxNumber,
             isTaxExempt: formData.isTaxExempt,
+            amountExcludingTax: showExpenseTaxFields ? amountExcludingTaxValue : null,
+            taxLabel: effectiveTaxLabel,
+            taxRate: effectiveTaxRate,
         };
 
         if (isEditingTemplate) {
@@ -996,6 +1156,9 @@ const ExpenseModal = ({
                 billable: payload.billable,
                 taxNumber: payload.taxNumber,
                 isTaxExempt: payload.isTaxExempt,
+                amountExcludingTax: payload.amountExcludingTax,
+                taxLabel: payload.taxLabel,
+                taxRate: payload.taxRate,
             });
             showSuccess('Recurring expense updated');
 
@@ -1033,6 +1196,9 @@ const ExpenseModal = ({
                 billable: payload.billable,
                 taxNumber: payload.taxNumber,
                 isTaxExempt: payload.isTaxExempt,
+                amountExcludingTax: payload.amountExcludingTax,
+                taxLabel: payload.taxLabel,
+                taxRate: payload.taxRate,
                 lastGeneratedDate: shouldGenerateInitial ? formData.startDate : null,
                 active: true,
             });
@@ -1067,21 +1233,13 @@ const ExpenseModal = ({
         onClose();
     };
 
-    const selectedBusiness = formData.isPersonal || !formData.businessId
-        ? null
-        : (businessInfos.find((info) => info.id === formData.businessId) || null);
-
     const availableProjects = useMemo(() => {
-        if (formData.isPersonal) {
-            return activeProjects.filter((project) => project.isPersonal && !project.archived);
-        }
-
-        if (formData.clientId !== NO_CLIENT_VALUE) {
+        if (hasSelectedClient(formData.clientId)) {
             return getProjectsByClient(formData.clientId).filter((project) => !project.archived);
         }
 
-        return activeProjects.filter((project) => !project.isPersonal && project.preferredClientId && !project.archived);
-    }, [formData.clientId, formData.isPersonal, getProjectsByClient, activeProjects]);
+        return activeProjects.filter((project) => project.isPersonal && !project.archived);
+    }, [formData.clientId, getProjectsByClient, activeProjects]);
 
     const handleDeleteTemplate = () => {
         if (!editingRecurrenceId) return;
@@ -1283,7 +1441,7 @@ const ExpenseModal = ({
                                                 min="0"
                                                 step="0.01"
                                                 value={formData.amount}
-                                                onChange={(event) => handleChange('amount', event.target.value)}
+                                                onChange={(event) => handleAmountChange(event.target.value)}
                                                 placeholder="0.00"
                                             />
                                         </div>
@@ -1331,7 +1489,7 @@ const ExpenseModal = ({
                                 min="0"
                                 step="0.01"
                                 value={formData.amount}
-                                onChange={(event) => handleChange('amount', event.target.value)}
+                                onChange={(event) => handleAmountChange(event.target.value)}
                                 placeholder="0.00"
                             />
                         </div>
@@ -1402,7 +1560,7 @@ const ExpenseModal = ({
                                 min="0"
                                 step="0.01"
                                 value={formData.amount}
-                                onChange={(event) => handleChange('amount', event.target.value)}
+                                onChange={(event) => handleAmountChange(event.target.value)}
                                 placeholder="0.00"
                             />
                         </div>
@@ -1588,7 +1746,36 @@ const ExpenseModal = ({
                                     </Select>
                                 </div>
                             )}
-                            <div className="space-y-2">
+                            {!formData.isPersonal && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="expense-business">Business</Label>
+                                    <Select
+                                        value={formData.businessId || ''}
+                                        onValueChange={handleBusinessChange}
+                                    >
+                                        <SelectTrigger id="expense-business">
+                                            <SelectValue placeholder="Select business" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {formData.businessId && (
+                                                <SelectItem value={NO_BUSINESS_VALUE}>No business</SelectItem>
+                                            )}
+                                            {businessInfos.length > 0 ? (
+                                                businessInfos.map((info) => (
+                                                    <SelectItem key={info.id} value={info.id}>
+                                                        {info.title || info.name || info.businessName || 'Untitled business'}
+                                                    </SelectItem>
+                                                ))
+                                            ) : (
+                                                <SelectItem value="no-business-found" disabled>
+                                                    No businesses found
+                                                </SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            <div className={`space-y-2 ${!formData.isPersonal ? 'md:col-span-2' : ''}`}>
                                 <Label htmlFor="expense-project">Project</Label>
                                 <Select
                                     value={formData.projectId === NO_PROJECT_VALUE ? '' : formData.projectId}
@@ -1610,37 +1797,40 @@ const ExpenseModal = ({
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {showExpenseTaxFields && (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="expense-tax-rate">{expenseTaxLabel} (%)</Label>
+                                        <Input
+                                            id="expense-tax-rate"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            step="0.01"
+                                            value={formData.taxRate}
+                                            onChange={(event) => handleTaxRateChange(event.target.value)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="expense-amount-excluding-tax">
+                                            Amount (excl. {expenseTaxLabel})
+                                        </Label>
+                                        <Input
+                                            id="expense-amount-excluding-tax"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={formData.amountExcludingTax}
+                                            onChange={(event) => handleChange('amountExcludingTax', event.target.value)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                         {!formData.isPersonal && (
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label>Business</Label>
-                                    <Select
-                                        value={formData.businessId || ''}
-                                        onValueChange={handleBusinessChange}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select business" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {formData.businessId && (
-                                                <SelectItem value={NO_BUSINESS_VALUE}>No business</SelectItem>
-                                            )}
-                                            {businessInfos.length > 0 ? (
-                                                businessInfos.map((info) => (
-                                                    <SelectItem key={info.id} value={info.id}>
-                                                        {info.title || info.name || info.businessName || 'Untitled business'}
-                                                    </SelectItem>
-                                                ))
-                                            ) : (
-                                                <SelectItem value="no-business-found" disabled>
-                                                    No businesses found
-                                                </SelectItem>
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="hidden md:block" aria-hidden="true" />
                                 <div className="space-y-2">
                                     <Label>
                                         Tax No <span className="text-xs text-muted-foreground">(from selected business)</span>
@@ -1656,7 +1846,27 @@ const ExpenseModal = ({
                                 <div className="flex min-h-9 items-center pt-1 md:mt-6 md:pt-0">
                                     <CustomCheckbox
                                         checked={formData.isTaxExempt}
-                                        onChange={(checked) => handleChange('isTaxExempt', checked)}
+                                        onChange={(checked) => {
+                                            setFormData((prev) => {
+                                                if (checked) {
+                                                    return {
+                                                        ...prev,
+                                                        isTaxExempt: true,
+                                                        amountExcludingTax: '',
+                                                        taxLabel: '',
+                                                        taxRate: '',
+                                                    };
+                                                }
+
+                                                return {
+                                                    ...prev,
+                                                    isTaxExempt: false,
+                                                    ...buildTaxFormFields(selectedBusiness, {
+                                                        amount: prev.amount,
+                                                    }),
+                                                };
+                                            });
+                                        }}
                                         disabled={!formData.businessId}
                                         label="Tax Exempt"
                                     />

@@ -304,7 +304,7 @@ describe('createInvoiceHTML', () => {
         }])
 
         expect(html).toContain('Fresh Client')
-        expect(html).toContain('fresh@example.com')
+        expect(html).not.toContain('fresh@example.com')
         expect(html).not.toContain('Stale Name')
     })
 
@@ -397,6 +397,8 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Invoice To:')
         expect(html).toContain('Invoice From:')
         expect(html).toContain('Payment Details:')
+        expect(html).not.toContain('Contact<br>')
+        expect(html).not.toContain('client@example.com')
         expect(html).toContain('vertical-align: middle;')
         expect(html).toContain('background-color: #f8f9fa; padding: 15px; border-radius: 5px;')
         expect(html).toContain('margin: 0; line-height: 1.4;')

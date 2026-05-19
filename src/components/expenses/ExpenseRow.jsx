@@ -145,14 +145,15 @@ const ExpenseRow = ({
                         </p>
                         {!compact && (
                             <div className="text-xs text-muted-foreground mt-1 space-y-1">
-                                {expense.isPersonal ? (
-                                    <p>
-                                        Type: <span className="font-medium text-muted-foreground">Personal expense</span>
-                                    </p>
-                                ) : (
+                                <p>
+                                    Type: <span className="font-medium text-muted-foreground">
+                                        {expense.isPersonal ? 'Personal expense' : 'Business expense'}
+                                    </span>
+                                </p>
+                                {!expense.isPersonal && clientName && (
                                     <p>
                                         Client: <span className="font-medium text-muted-foreground">
-                                            {clientName || 'Client'}
+                                            {clientName}
                                         </span>
                                     </p>
                                 )}

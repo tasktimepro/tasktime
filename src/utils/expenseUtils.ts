@@ -303,6 +303,9 @@ export const buildExpenseFromRecurrence = (recurrence: ExpenseRecurrence, dateVa
         amountType: recurrence.amountType,
         taxNumber: recurrence.taxNumber ?? null,
         isTaxExempt: recurrence.isTaxExempt,
+        amountExcludingTax: recurrence.amountExcludingTax ?? null,
+        taxLabel: recurrence.taxLabel ?? null,
+        taxRate: recurrence.taxRate ?? null,
         paymentCurrencySnapshot: null,
     };
 };

@@ -308,6 +308,24 @@ const InvoiceGenerator = ({
         return availableExpensesWithConversion.filter((expense) => !expense.isConvertible).length;
     }, [availableExpensesWithConversion]);
 
+    const resolveCurrentBusinessInfo = useCallback((businessInfoSource) => {
+        if (!businessInfoSource) {
+            return null;
+        }
+
+        const businessInfoId = businessInfoSource.businessInfoId
+            || businessInfoSource.businessInfo?.id
+            || businessInfoSource.id;
+
+        if (!businessInfoId) {
+            return businessInfoSource.businessInfo || businessInfoSource;
+        }
+
+        return businessInfos.find((businessInfo) => businessInfo.id === businessInfoId)
+            || businessInfoSource.businessInfo
+            || businessInfoSource;
+    }, [businessInfos]);
+
     // Auto-open the form when showButton is false (modal mode)
     useEffect(() => {
         if (!showButton) { // Modal mode (auto-open is possible)
@@ -414,17 +432,9 @@ const InvoiceGenerator = ({
 
         // If editing an invoice, prefer the latest business info data
         if (editingInvoice) {
-            const invoiceBusinessInfoId = editingInvoice.businessInfoId || editingInvoice.businessInfo?.id;
-            if (invoiceBusinessInfoId) {
-                const latestBusinessInfo = businessInfos.find(bi => bi.id === invoiceBusinessInfoId);
-                if (latestBusinessInfo) {
-                    setSelectedBusinessInfo(latestBusinessInfo);
-                    return;
-                }
-            }
-
-            if (editingInvoice.businessInfo) {
-                setSelectedBusinessInfo(editingInvoice.businessInfo);
+            const resolvedBusinessInfo = resolveCurrentBusinessInfo(editingInvoice);
+            if (resolvedBusinessInfo) {
+                setSelectedBusinessInfo(resolvedBusinessInfo);
                 return;
             }
         }
@@ -436,8 +446,9 @@ const InvoiceGenerator = ({
                 .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by creation date, newest first
             
             for (const invoice of clientInvoices) {
-                if (invoice.businessInfo) {
-                    setSelectedBusinessInfo(invoice.businessInfo);
+                const resolvedBusinessInfo = resolveCurrentBusinessInfo(invoice);
+                if (resolvedBusinessInfo) {
+                    setSelectedBusinessInfo(resolvedBusinessInfo);
                     return;
                 }
             }
@@ -447,22 +458,23 @@ const InvoiceGenerator = ({
         if (!projectManuallyChanged && projectInvoices.length > 0) {
             for (let i = projectInvoices.length - 1; i >= 0; i--) {
                 const invoice = projectInvoices[i];
-                if (invoice.businessInfo) {
-                    setSelectedBusinessInfo(invoice.businessInfo);
+                const resolvedBusinessInfo = resolveCurrentBusinessInfo(invoice);
+                if (resolvedBusinessInfo) {
+                    setSelectedBusinessInfo(resolvedBusinessInfo);
                     return;
                 }
             }
         }
         
         // PRIORITY 3: Use default business info if no history found
-        const defaultBusinessInfo = businessInfos.find(bi => bi.isDefault);
+        const defaultBusinessInfo = businessInfos.find(bi => bi.isDefault) || businessInfos[0];
         if (defaultBusinessInfo) {
             setSelectedBusinessInfo(defaultBusinessInfo);
             return;
         }
         
         // No need to reset to null as that's the initial state
-    }, [editingInvoice, projectInvoices, businessInfos, selectedBusinessInfo, projectManuallyChanged, selectedClient, invoices]);
+    }, [editingInvoice, projectInvoices, businessInfos, selectedBusinessInfo, projectManuallyChanged, selectedClient, invoices, resolveCurrentBusinessInfo]);
 
     /**
      * Initialize selected client info based on previous invoices or editing invoice
@@ -1314,6 +1326,12 @@ const InvoiceGenerator = ({
         }
 
         const pricing = calculatePricing;
+
+        if (pricing.total <= 0) {
+            showWarning('Invoice total must be greater than 0 to generate an invoice');
+            return null;
+        }
+
         const totalHours = pricing.totalHours;
 
         // Calculate due date using template - use override date if available (for both new and editing)
@@ -1371,11 +1389,9 @@ const InvoiceGenerator = ({
             return paymentMethods.find(pm => pm.id === paymentMethodId) || editingInvoice.paymentMethod || null;
         })();
 
-        const resolvedBusinessInfo = selectedBusinessInfo || (() => {
+        const resolvedBusinessInfo = resolveCurrentBusinessInfo(selectedBusinessInfo) || (() => {
             if (!editingInvoice) return null;
-            const businessInfoId = editingInvoice.businessInfoId || editingInvoice.businessInfo?.id;
-            if (!businessInfoId) return editingInvoice.businessInfo || null;
-            return businessInfos.find(bi => bi.id === businessInfoId) || editingInvoice.businessInfo || null;
+            return resolveCurrentBusinessInfo(editingInvoice);
         })();
 
         const selectedExpenseItems = availableExpensesWithConversion

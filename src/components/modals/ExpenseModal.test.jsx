@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExpenseModal from './ExpenseModal'
@@ -121,6 +121,26 @@ vi.mock('../../hooks/usePaymentMethods.ts', () => ({
 }))
 
 describe('ExpenseModal', () => {
+
+    const chooseSelectOption = async (user, label, optionName) => {
+        await user.click(screen.getByLabelText(label))
+        await user.click(await screen.findByRole('option', { name: optionName }))
+    }
+
+    beforeAll(() => {
+        if (!HTMLElement.prototype.hasPointerCapture) {
+            HTMLElement.prototype.hasPointerCapture = () => false
+        }
+        if (!HTMLElement.prototype.setPointerCapture) {
+            HTMLElement.prototype.setPointerCapture = () => {}
+        }
+        if (!HTMLElement.prototype.releasePointerCapture) {
+            HTMLElement.prototype.releasePointerCapture = () => {}
+        }
+        if (!HTMLElement.prototype.scrollIntoView) {
+            HTMLElement.prototype.scrollIntoView = () => {}
+        }
+    })
 
     beforeEach(() => {
         vi.clearAllMocks()
@@ -509,5 +529,243 @@ describe('ExpenseModal', () => {
         expect(projectSelect).toBeDisabled()
         expect(clientSelect.textContent).toContain('Acme Co')
         expect(projectSelect.textContent).toContain('Website refresh')
+    })
+
+    it('blocks saving a business expense without a business', async () => {
+        const user = userEvent.setup()
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Unassigned business cost')
+        await user.type(screen.getByLabelText(/Amount/i), '12')
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(toastMocks.showError).toHaveBeenCalledWith('Business is required for business expenses')
+        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+    })
+
+    it('blocks saving a project-only business expense without a business', async () => {
+        const user = userEvent.setup()
+        projectsMocks.projects = [
+            { id: 'personal-project', title: 'Studio admin', isPersonal: true, archived: false, preferredClientId: null }
+        ]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Project-only cost')
+        await user.type(screen.getByLabelText(/Amount/i), '18')
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+        await chooseSelectOption(user, 'Project', 'Studio admin')
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(toastMocks.showError).toHaveBeenCalledWith('Business is required for business expenses')
+        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+    })
+
+    it('blocks saving a client-only business expense without a business', async () => {
+        const user = userEvent.setup()
+        clientsMocks.clients = [
+            { id: 'client-1', title: 'Acme Co', archived: false }
+        ]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Client-only cost')
+        await user.type(screen.getByLabelText(/Amount/i), '22')
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+        await chooseSelectOption(user, 'Client', 'Acme Co')
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(toastMocks.showError).toHaveBeenCalledWith('Business is required for business expenses')
+        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+    })
+
+    it('saves a business-only expense without requiring a client', async () => {
+        const user = userEvent.setup()
+        businessInfosMocks.businessInfos = [
+            { id: 'business-1', title: 'TaskTime LLC', taxNumber: 'TAX-123' }
+        ]
+        businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Software license')
+        await user.type(screen.getByLabelText(/Amount/i), '25')
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(expensesMocks.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Software license',
+            isPersonal: false,
+            clientId: null,
+            projectId: null,
+            businessId: 'business-1',
+            taxNumber: 'TAX-123'
+        }))
+    })
+
+    it('requires a client when a business expense is billable', async () => {
+        const user = userEvent.setup()
+        businessInfosMocks.businessInfos = [
+            { id: 'business-1', title: 'TaskTime LLC', taxNumber: 'TAX-123' }
+        ]
+        businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Client pass-through cost')
+        await user.type(screen.getByLabelText(/Amount/i), '40')
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+        await user.click(screen.getByRole('checkbox', { name: 'Billable' }))
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(toastMocks.showError).toHaveBeenCalledWith('Client is required for billable expenses')
+        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+    })
+
+    it('pre-calculates and stores tax details for expenses assigned to a tax-enabled business', async () => {
+        const user = userEvent.setup()
+        businessInfosMocks.businessInfos = [
+            {
+                id: 'business-1',
+                title: 'TaskTime LLC',
+                taxNumber: 'TAX-123',
+                taxEnabled: true,
+                taxLabel: 'VAT',
+                taxRate: 20
+            }
+        ]
+        businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Taxed software')
+        await user.type(screen.getByLabelText(/Amount/i), '120')
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+
+        const amountExcludingTaxInput = screen.getByLabelText('Amount (excl. VAT)')
+        const taxRateInput = screen.getByLabelText('VAT (%)')
+        const totalAmountInput = document.querySelector('#expense-amount')
+
+        expect(totalAmountInput).not.toBeNull()
+        expect(taxRateInput.compareDocumentPosition(amountExcludingTaxInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(taxRateInput).toHaveValue(20)
+        expect(amountExcludingTaxInput).toHaveValue(100)
+
+        await user.clear(taxRateInput)
+        await user.type(taxRateInput, '10')
+
+        expect(amountExcludingTaxInput).toHaveValue(109.09)
+
+        await user.clear(totalAmountInput)
+        await user.type(totalAmountInput, '220')
+
+        expect(amountExcludingTaxInput).toHaveValue(200)
+
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(expensesMocks.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+            amount: 220,
+            amountExcludingTax: 200,
+            taxLabel: 'VAT',
+            taxRate: 10,
+            businessId: 'business-1'
+        }))
+    })
+
+    it('hides and clears tax details when tax exempt is checked', async () => {
+        const user = userEvent.setup()
+        businessInfosMocks.businessInfos = [
+            {
+                id: 'business-1',
+                title: 'TaskTime LLC',
+                taxNumber: 'TAX-123',
+                taxEnabled: true,
+                taxLabel: 'VAT',
+                taxRate: 18
+            }
+        ]
+        businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Tax exempt expense')
+        await user.type(screen.getByLabelText(/Amount/i), '118')
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+
+        expect(screen.getByLabelText('VAT (%)')).toBeInTheDocument()
+        expect(screen.getByLabelText('Amount (excl. VAT)')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('checkbox', { name: 'Tax Exempt' }))
+
+        expect(screen.queryByLabelText('VAT (%)')).not.toBeInTheDocument()
+        expect(screen.queryByLabelText('Amount (excl. VAT)')).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(expensesMocks.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+            isTaxExempt: true,
+            amountExcludingTax: null,
+            taxLabel: null,
+            taxRate: null,
+            businessId: 'business-1'
+        }))
+    })
+
+    it('blocks tax-enabled expenses when tax details do not match the total amount', async () => {
+        const user = userEvent.setup()
+        businessInfosMocks.businessInfos = [
+            {
+                id: 'business-1',
+                title: 'TaskTime LLC',
+                taxNumber: 'TAX-123',
+                taxEnabled: true,
+                taxLabel: 'VAT',
+                taxRate: 20
+            }
+        ]
+        businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Mismatched tax expense')
+        await user.type(screen.getByLabelText(/Amount/i), '120')
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+
+        const amountExcludingTaxInput = screen.getByLabelText('Amount (excl. VAT)')
+        await user.clear(amountExcludingTaxInput)
+        await user.type(amountExcludingTaxInput, '90')
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(toastMocks.showError).toHaveBeenCalledWith('Total amount must match Amount (excl. VAT) plus VAT')
+        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+    })
+
+    it('shows personal projects for business expenses until a client is selected', async () => {
+        const user = userEvent.setup()
+        clientsMocks.clients = [
+            { id: 'client-1', title: 'Acme Co', archived: false }
+        ]
+        projectsMocks.projects = [
+            { id: 'personal-project', title: 'Studio admin', isPersonal: true, archived: false, preferredClientId: null },
+            { id: 'client-project', title: 'Website refresh', isPersonal: false, archived: false, preferredClientId: 'client-1' }
+        ]
+        projectsMocks.getProjectsByClient.mockReturnValue([projectsMocks.projects[1]])
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+        await user.click(screen.getByLabelText('Project'))
+
+        expect(await screen.findByRole('option', { name: 'Studio admin' })).toBeInTheDocument()
+        expect(screen.queryByRole('option', { name: 'Website refresh' })).not.toBeInTheDocument()
+
+        await user.keyboard('{Escape}')
+        await chooseSelectOption(user, 'Client', 'Acme Co')
+        await user.click(screen.getByLabelText('Project'))
+
+        expect(await screen.findByRole('option', { name: 'Website refresh' })).toBeInTheDocument()
+        expect(screen.queryByRole('option', { name: 'Studio admin' })).not.toBeInTheDocument()
     })
 })

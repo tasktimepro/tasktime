@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownTrayIcon, CogIcon, TrashIcon, CloudIcon, SignOutIcon } from '@/components/ui/icons';
-import { Mail } from 'lucide-react';
+import { CogIcon, TrashIcon, CloudIcon, SignOutIcon } from '@/components/ui/icons';
+import { Database, Mail } from 'lucide-react';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import ExportImport from './ExportImport';
 import Preferences from './Preferences';
@@ -72,26 +72,25 @@ const Account = ({
             description: 'Connect Google Drive sync'
         },
         {
-            id: 'backup',
-            name: 'Backup & Restore',
-            icon: ArrowDownTrayIcon,
-            description: 'Export and import your data'
-        },
-        {
             id: 'data',
             name: 'Your Data',
-            icon: TrashIcon,
+            icon: Database,
             description: 'Manage your account data'
         }
     ], []);
     
     // Get current section from URL or default to first section
-    const activeTab = urlParams.section || sideNavItems[0].id;
+    const activeTab = urlParams.section === 'backup'
+        ? 'data'
+        : (urlParams.section || sideNavItems[0].id);
     
     // Set default section if it's not already set
     useEffect(() => {
         if (!urlParams.section) {
             updateUrl({ section: sideNavItems[0].id });
+        }
+        if (urlParams.section === 'backup') {
+            updateUrl({ section: 'data' });
         }
     }, [urlParams.section, updateUrl, sideNavItems]);
 
@@ -174,30 +173,6 @@ const Account = ({
                 return <EmailTemplates />;
             case 'sync':
                 return <YjsSyncSettings />;
-            case 'backup':
-                return (
-                    <div>
-                        <div className="mb-6">
-                            <h2 className="text-2xl font-bold text-foreground">Backup & Restore</h2>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Export your data for backup purposes or import data from a previous backup.
-                            </p>
-                        </div>
-                        <ExportImport 
-                            projects={projects} 
-                            tasks={tasks} 
-                            timeEntries={timeEntries} 
-                            invoices={invoices}
-                            paymentMethods={paymentMethods}
-                            businessInfos={businessInfos}
-                            clients={clients}
-                            invoiceTemplates={invoiceTemplates}
-                            emailTemplates={emailTemplates}
-                            expenses={expenses}
-                            onImport={onImport}
-                        />
-                    </div>
-                );
             case 'data':
                 return (
                     <div>
@@ -209,6 +184,30 @@ const Account = ({
                         </div>
                         
                         <div className="space-y-6">
+                            <Card>
+                                <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
+                                    <CardTitle>Backup & Restore</CardTitle>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Export your data for backup purposes or import data from a previous backup.
+                                    </p>
+                                </CardHeader>
+                                <CardContent className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
+                                    <ExportImport 
+                                        projects={projects} 
+                                        tasks={tasks} 
+                                        timeEntries={timeEntries} 
+                                        invoices={invoices}
+                                        paymentMethods={paymentMethods}
+                                        businessInfos={businessInfos}
+                                        clients={clients}
+                                        invoiceTemplates={invoiceTemplates}
+                                        emailTemplates={emailTemplates}
+                                        expenses={expenses}
+                                        onImport={onImport}
+                                    />
+                                </CardContent>
+                            </Card>
+
                             {/* Delete All Account Data */}
                             <Card>
                                 <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>

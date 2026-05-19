@@ -51,15 +51,15 @@ describe('billingPeriodUtils', () => {
     it('derives default and stored billing period state', () => {
 
         expect(getDefaultInvoiceBillingPeriodState(new Date(2026, 4, 4))).toEqual({
-            preset: 'last-month',
-            startDate: '2026-04-01',
-            endDate: '2026-04-30'
+            preset: 'all-time',
+            startDate: '',
+            endDate: ''
         })
 
         expect(getStoredInvoiceBillingPeriodState(null, new Date(2026, 4, 4))).toEqual({
-            preset: 'last-month',
-            startDate: '2026-04-01',
-            endDate: '2026-04-30'
+            preset: 'all-time',
+            startDate: '',
+            endDate: ''
         })
 
         expect(getStoredInvoiceBillingPeriodState({})).toEqual({
@@ -73,7 +73,7 @@ describe('billingPeriodUtils', () => {
             billingPeriodStart: '2026-02-01',
             billingPeriodEnd: '2026-02-28'
         })).toEqual({
-            preset: 'last-month',
+            preset: 'all-time',
             startDate: '2026-02-01',
             endDate: '2026-02-28'
         })

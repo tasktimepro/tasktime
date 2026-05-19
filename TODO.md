@@ -2,7 +2,7 @@
 
 ## Priority
 
-[ ] Check about whether we need to keep the migration for the expense snapshot
+
 
 ---
 
@@ -16,6 +16,8 @@
 ---
 
 ## Project updates
+
+[ ] Reports page
 
 [ ] Budgeting (could also be time, not just money), Tasks Templates
 

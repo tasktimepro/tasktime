@@ -32,4 +32,25 @@ describe('ExpenseRow', () => {
         expect(markPaidButton.className.includes('shrink-0')).toBe(true);
         expect(editButton.className.includes('self-end')).toBe(false);
     });
+
+    it('labels business expenses without a client as business expenses', () => {
+        render(
+            <ExpenseRow
+                expense={{
+                    id: 'expense-1',
+                    title: 'Software license',
+                    date: '2026-04-12',
+                    amount: 15.99,
+                    currency: 'EUR',
+                    paymentStatus: 'paid',
+                    isPersonal: false,
+                }}
+                onEdit={vi.fn()}
+                onTogglePaid={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('Business expense')).toBeInTheDocument();
+        expect(screen.queryByText('Client:')).not.toBeInTheDocument();
+    });
 });

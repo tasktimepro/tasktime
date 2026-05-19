@@ -1,7 +1,7 @@
 import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
 import { parseStoredDate, toDisplayDate, toStorageDate } from './dateUtils';
 
-export const DEFAULT_INVOICE_BILLING_PERIOD = 'last-month';
+export const DEFAULT_INVOICE_BILLING_PERIOD = 'all-time';
 
 export const INVOICE_BILLING_PERIOD_OPTIONS = [
     { value: 'last-month', label: 'Last Month' },

@@ -154,6 +154,7 @@ vi.mock('./invoice/InvoiceModal', () => {
         handleHoursChange,
         handleSaveInvoice,
         handleTemplateSelection,
+        selectedBusinessInfo,
         setInvoiceDateOverride,
         setUseInvoiceDateOverride,
         setBillingPeriodPreset,
@@ -204,6 +205,11 @@ vi.mock('./invoice/InvoiceModal', () => {
 
         return (
             <div>
+                <div data-testid="tax-status">
+                    {selectedBusinessInfo?.taxEnabled
+                        ? `${selectedBusinessInfo.taxLabel} ${selectedBusinessInfo.taxRate}%`
+                        : 'no tax configured'}
+                </div>
                 {modalConfig.applyDateOverride && (
                     <button
                         type="button"
@@ -514,6 +520,63 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.businessInfoId).toBe('bi-1')
     })
 
+    it('falls back to the first business info tax settings when no default business is marked', async () => {
+
+        const user = userEvent.setup()
+
+        renderGenerator({
+            businessInfos: [
+                {
+                    id: 'bi-1',
+                    title: 'Primary Business',
+                    taxEnabled: true,
+                    taxLabel: 'GST',
+                    taxRate: 10,
+                }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        expect(screen.getByTestId('tax-status')).toHaveTextContent('GST 10%')
+    })
+
+    it('uses the current business tax settings instead of a stale invoice snapshot', async () => {
+
+        const user = userEvent.setup()
+        invoiceHookMocks.invoices = [
+            {
+                id: 'inv-history-1',
+                clientId: 'client-1',
+                createdAt: 100,
+                businessInfoId: 'bi-1',
+                businessInfo: {
+                    id: 'bi-1',
+                    title: 'Old Business Snapshot',
+                    taxEnabled: false,
+                    taxLabel: 'VAT',
+                    taxRate: 0,
+                }
+            }
+        ]
+
+        renderGenerator({
+            businessInfos: [
+                {
+                    id: 'bi-1',
+                    title: 'Updated Business',
+                    taxEnabled: true,
+                    taxLabel: 'VAT',
+                    taxRate: 20,
+                }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        expect(screen.getByTestId('tax-status')).toHaveTextContent('VAT 20%')
+    })
+
     it('refreshes template data when updating an invoice', async () => {
 
         invoiceHookMocks.updateInvoice.mockClear()
@@ -602,7 +665,7 @@ describe('InvoiceGenerator', () => {
 
             renderGenerator({
                 timeEntries: [
-                    { id: 'entry-1', taskId: 'task-1', start: 1000, end: 2000 }
+                    { id: 'entry-1', taskId: 'task-1', start: 1000, end: 3601000 }
                 ]
             })
 
@@ -611,7 +674,7 @@ describe('InvoiceGenerator', () => {
 
             expect(taskHookMocks.updateTask).toHaveBeenCalledTimes(1)
             expect(taskHookMocks.updateTask).toHaveBeenCalledWith('task-1', {
-                lastBilledAt: 2000
+                lastBilledAt: 3601000
             })
             expect(taskHookMocks.updateTask).not.toHaveBeenCalledWith('task-1', {
                 lastBilledAt: fixedNow
@@ -647,7 +710,22 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.tasks.map(task => task.id)).toEqual(['parent-1', 'child-1', 'root-1'])
     })
 
-    it('defaults new invoices to last month billing period', () => {
+    it('shows a warning and skips invoice generation when total is zero', async () => {
+
+        modalConfig.adjustTaskHours = { taskId: 'task-1', hours: 0 }
+        const user = userEvent.setup()
+
+        renderGenerator()
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(toastMocks.showWarning).toHaveBeenCalledWith('Invoice total must be greater than 0 to generate an invoice')
+        expect(invoiceHookMocks.createInvoice).not.toHaveBeenCalled()
+        expect(templateHookMocks.updateInvoiceTemplate).not.toHaveBeenCalled()
+    })
+
+    it('defaults new invoices to all time billing period', () => {
 
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-05-04T12:00:00Z'))
@@ -662,9 +740,9 @@ describe('InvoiceGenerator', () => {
 
             expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
             const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
-            expect(invoiceData.billingPeriodPreset).toBe('last-month')
-            expect(invoiceData.billingPeriodStart).toBe('2026-04-01')
-            expect(invoiceData.billingPeriodEnd).toBe('2026-04-30')
+            expect(invoiceData.billingPeriodPreset).toBe('all-time')
+            expect(invoiceData.billingPeriodStart).toBeNull()
+            expect(invoiceData.billingPeriodEnd).toBeNull()
         } finally {
             vi.useRealTimers()
         }
@@ -706,7 +784,14 @@ describe('InvoiceGenerator', () => {
         modalConfig.billingPeriodEnd = '2026-03-31'
         invoiceHookMocks.createInvoice.mockClear()
 
-        renderGenerator()
+        const customRangeStart = Date.parse('2026-03-15T09:00:00Z')
+        const customRangeEnd = customRangeStart + 3600000
+
+        renderGenerator({
+            timeEntries: [
+                { id: 'entry-custom', taskId: 'task-1', start: customRangeStart, end: customRangeEnd }
+            ]
+        })
 
         fireEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
         fireEvent.click(screen.getByRole('button', { name: 'Save Invoice' }))

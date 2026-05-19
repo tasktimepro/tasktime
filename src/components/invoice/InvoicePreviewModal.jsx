@@ -94,7 +94,7 @@ const InvoicePreviewModal = ({
             contentRef={modalContentRef}
         >
             {previewHtml ? (
-                <div className="overflow-auto rounded-lg border border-border bg-muted/20 p-2 sm:p-3" data-testid="invoice-preview-shell">
+                <div className="overflow-auto rounded-lg border border-slate-200 bg-white p-2 text-black sm:p-3" data-testid="invoice-preview-shell">
                     <div
                         className="mx-auto"
                         data-testid="invoice-preview-frame"
@@ -131,9 +131,6 @@ const InvoicePreviewModal = ({
                             <h3 className="text-sm font-medium text-foreground mb-2">Invoice To:</h3>
                             <div className="text-sm text-muted-foreground">
                                 <p>{invoice?.client?.name}</p>
-                                {invoice?.client?.email && (
-                                    <p>{invoice.client.email}</p>
-                                )}
                                 {invoice?.client?.address && (
                                     <p>{invoice.client.address}</p>
                                 )}

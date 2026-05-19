@@ -153,6 +153,32 @@ describe('Account', () => {
         expect(screen.getByRole('button', { name: 'Sign out' }).className.includes('shrink-0')).toBe(true);
     });
 
+    it('merges backup and restore into the your data tab above deletion', () => {
+        accountLayoutMocks.activeSection = 'data';
+
+        renderAccount();
+
+        expect(screen.queryByRole('tab', { name: 'Backup & Restore' })).not.toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Your Data' })).toBeInTheDocument();
+        expect(screen.getByText('Backup & Restore')).toBeInTheDocument();
+        expect(screen.getByTestId('backup-content')).toBeInTheDocument();
+
+        const backupHeading = screen.getByText('Backup & Restore');
+        const deleteButton = screen.getByRole('button', { name: 'Delete All Account Data' });
+
+        expect(backupHeading.compareDocumentPosition(deleteButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('redirects the removed backup tab to your data', () => {
+        accountLayoutMocks.activeSection = 'backup';
+
+        renderAccount();
+
+        expect(accountLayoutMocks.updateUrl).toHaveBeenCalledWith({ section: 'data' });
+        expect(screen.getByRole('heading', { name: 'Your Data' })).toBeInTheDocument();
+        expect(screen.getByTestId('backup-content')).toBeInTheDocument();
+    });
+
     it('revokes the Drive session before clearing data when connected', async () => {
         accountLayoutMocks.isDriveConnected = true;
         accountLayoutMocks.activeSection = 'data';

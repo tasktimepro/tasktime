@@ -239,7 +239,7 @@ const OnboardingModal = ({
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <DetailRow
                             icon={CloudCheckIcon}
-                            title="Work keeps going offline"
+                            title="Keep working offline"
                             description="Local saves happen immediately and uploads resume when you are online again."
                         />
                         <DetailRow
