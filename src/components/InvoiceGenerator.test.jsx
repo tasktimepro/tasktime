@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InvoiceGenerator from './InvoiceGenerator'
 
@@ -725,7 +725,7 @@ describe('InvoiceGenerator', () => {
         expect(templateHookMocks.updateInvoiceTemplate).not.toHaveBeenCalled()
     })
 
-    it('defaults new invoices to all time billing period', () => {
+    it('defaults new invoices to all time billing period', async () => {
 
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-05-04T12:00:00Z'))
@@ -735,8 +735,13 @@ describe('InvoiceGenerator', () => {
 
             renderGenerator()
 
-            fireEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
-            fireEvent.click(screen.getByRole('button', { name: 'Save Invoice' }))
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            })
+
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: 'Save Invoice' }))
+            })
 
             expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
             const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
@@ -748,7 +753,7 @@ describe('InvoiceGenerator', () => {
         }
     })
 
-    it('refreshes invoice task hours when switching billing period presets', () => {
+    it('refreshes invoice task hours when switching billing period presets', async () => {
 
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-05-04T12:00:00Z'))
@@ -759,8 +764,13 @@ describe('InvoiceGenerator', () => {
 
             renderGenerator()
 
-            fireEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
-            fireEvent.click(screen.getByRole('button', { name: 'Save Invoice' }))
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            })
+
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: 'Save Invoice' }))
+            })
 
             expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
             const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
@@ -777,12 +787,13 @@ describe('InvoiceGenerator', () => {
         }
     })
 
-    it('persists custom billing periods into saved invoice data and generated html', () => {
+    it('persists custom billing periods into saved invoice data and generated html', async () => {
 
         modalConfig.billingPeriodPreset = 'custom'
         modalConfig.billingPeriodStart = '2026-03-10'
         modalConfig.billingPeriodEnd = '2026-03-31'
         invoiceHookMocks.createInvoice.mockClear()
+        const user = userEvent.setup()
 
         const customRangeStart = Date.parse('2026-03-15T09:00:00Z')
         const customRangeEnd = customRangeStart + 3600000
@@ -793,8 +804,8 @@ describe('InvoiceGenerator', () => {
             ]
         })
 
-        fireEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Save Invoice' }))
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(screen.getByRole('button', { name: 'Save Invoice' }))
 
         expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
         const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]

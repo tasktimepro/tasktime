@@ -43,7 +43,6 @@ import { formatCurrency } from '@/utils/currencyUtils.ts';
  * @param {'fixed' | 'variable'} props.amountType - Expense amount type
  * @param {string} props.currency - Expense currency
  * @param {string | null} props.supplierName - Expense supplier
- * @param {(amount?: number) => void} props.onMarkPaid - Expense quick action
  * @param {boolean} props.hasAttachment - Whether item has a planner attachment (can be removed)
  * @param {boolean} props.isPreview - Whether item is a non-interactive preview
  * @param {() => void} props.onClick - Click handler
@@ -65,7 +64,6 @@ const PlannerItem = ({
     amountType,
     currency,
     supplierName,
-    onMarkPaid,
     hasAttachment = false,
     isPreview = false,
     onClick,
@@ -272,19 +270,6 @@ const PlannerItem = ({
 
                 {type === 'task' && isTimerActive && (
                     <span className="status-success-text-strong animate-pulse flex-shrink-0 text-xs">●</span>
-                )}
-
-                {isExpense && typeof onMarkPaid === 'function' && (
-                    <button
-                        type="button"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onMarkPaid();
-                        }}
-                        className="ml-1 inline-flex h-8 flex-shrink-0 items-center rounded-md border border-border px-2.5 text-xs font-medium text-foreground hover:bg-muted cursor-pointer"
-                    >
-                        Mark paid
-                    </button>
                 )}
 
                 {/* Three-dot menu button - appears on hover */}

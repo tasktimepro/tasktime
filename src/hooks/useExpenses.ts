@@ -283,7 +283,7 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         }
 
         return validatedExpense;
-    }, [isReady, queueExpensePaymentSnapshot, store]);
+    }, [getPreferredCurrency, isReady, queueExpensePaymentSnapshot, store]);
 
     const updateExpense = useCallback((id: string, updates: Partial<Expense>): Expense | undefined => {
         if (!isReady) return undefined;

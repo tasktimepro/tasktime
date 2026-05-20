@@ -127,9 +127,7 @@ describe('PlannerItem', () => {
         expect(screen.queryByText('📌')).not.toBeInTheDocument();
     });
 
-    it('renders expense metadata and mark paid action in mobile layout', () => {
-        const handleMarkPaid = vi.fn();
-
+    it('renders expense metadata without a mark paid action in mobile layout', () => {
         render(
             <PlannerItem
                 type="expense"
@@ -139,16 +137,13 @@ describe('PlannerItem', () => {
                 amountType="variable"
                 currency="EUR"
                 supplierName="A1"
-                onMarkPaid={handleMarkPaid}
                 onClick={() => {}}
             />
         );
 
         expect(screen.getByText('~€15.99 EUR')).toBeInTheDocument();
         expect(screen.getByText('A1')).toBeInTheDocument();
-
-        fireEvent.click(screen.getByRole('button', { name: 'Mark paid' }));
-        expect(handleMarkPaid).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('button', { name: 'Mark paid' })).not.toBeInTheDocument();
     });
 
     it('ignores desktop height scaling in mobile layout', () => {

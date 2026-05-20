@@ -17,7 +17,9 @@
 
 ## Project updates
 
-[ ] Reports page
+[ ] Detailed reports page with CSV exports, and bulk invoice downloads
+
+[ ] System notifications for to do today tasks that were upcoming including recurring expenses
 
 [ ] Budgeting (could also be time, not just money), Tasks Templates
 

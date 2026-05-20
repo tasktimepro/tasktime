@@ -14,7 +14,6 @@ import { YjsDocManager } from './YjsDocManager';
 import { YjsDriveProvider } from './providers/GoogleDriveProvider';
 import { BackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
-import { normalizeCurrencyCode } from '@/utils/currencyUtils';
 import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
 import { createBackupPayload, type BackupImportPayload, type BackupPayload } from '@/utils/backupData';
 import { parseStoredDate } from '@/utils/dateUtils';

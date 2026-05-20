@@ -13,7 +13,6 @@ import { addDays, differenceInCalendarWeeks, getWeek, getWeekYear, setWeek, star
 import { useUrlState } from '@/hooks/useUrlState';
 import { usePlannerItems } from '@/hooks/usePlannerItems';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
-import { useExpenses } from '@/hooks/useExpenses';
 import { useTodayDate } from '@/hooks/useDayRollover';
 import { usePreferences } from '@/hooks/usePreferences';
 import { useWeeklyGoals } from '@/hooks/useWeeklyGoals';
@@ -55,10 +54,9 @@ const Planner = ({
 }) => {
 
     const { urlParams, updateUrl, navigateToProject, navigateToClient } = useUrlState();
-    const { showSuccess, showError } = useToast();
+    const { showSuccess } = useToast();
     const { preferences } = usePreferences();
     const { weeklyGoals, hasGoals: hasWeeklyGoals } = useWeeklyGoals();
-    const { markAsPaid } = useExpenses();
 
     const defaultCurrency = useMemo(
         () => normalizeCurrencyCode(preferences.currency || 'EUR'),
@@ -163,24 +161,27 @@ const Planner = ({
         };
     }, []);
 
-    // Mobile: selected day (default to today's index or first day)
-    const [selectedDayIndex, setSelectedDayIndex] = useState(() => {
-        const todayIndex = weekDays.findIndex(d => d.isToday);
-        return todayIndex >= 0 ? todayIndex : 0;
-    });
+    const defaultSelectedDateStr = useMemo(() => {
+        const todayDay = weekDays.find((day) => day.isToday);
+        return todayDay?.dateStr || weekDays[0]?.dateStr || null;
+    }, [weekDays]);
 
-    // Update selected day when week changes
+    // Mobile: selected day (default to today's date or first day)
+    const [selectedDateStr, setSelectedDateStr] = useState(() => defaultSelectedDateStr);
+
+    // Preserve the selected day across same-week re-renders, but recover when the date falls out of view.
     useEffect(() => {
-        const todayIndex = weekDays.findIndex(d => d.isToday);
-        if (todayIndex >= 0) {
-            setSelectedDayIndex(todayIndex);
-        } else {
-            setSelectedDayIndex(0);
+        if (!selectedDateStr || !weekDays.some((day) => day.dateStr === selectedDateStr)) {
+            setSelectedDateStr(defaultSelectedDateStr);
         }
-    }, [weekStart, weekDays]);
+    }, [selectedDateStr, weekDays, defaultSelectedDateStr]);
+
+    const selectedDayIndex = useMemo(() => {
+        return weekDays.findIndex((day) => day.dateStr === selectedDateStr);
+    }, [weekDays, selectedDateStr]);
 
     // Get selected day data for mobile view
-    const selectedDay = weekDays[selectedDayIndex] || weekDays[0];
+    const selectedDay = (selectedDayIndex >= 0 ? weekDays[selectedDayIndex] : null) || weekDays[0];
 
     // State for entity picker modal
     const [pickerState, setPickerState] = useState({
@@ -245,22 +246,26 @@ const Planner = ({
 
     // Mobile: select day by dateStr
     const handleSelectDay = useCallback((dateStr) => {
-        const index = weekDays.findIndex(d => d.dateStr === dateStr);
-        if (index >= 0) {
-            setSelectedDayIndex(index);
+        const nextSelectedDay = weekDays.find((day) => day.dateStr === dateStr);
+        if (nextSelectedDay) {
+            setSelectedDateStr(nextSelectedDay.dateStr);
         }
     }, [weekDays]);
 
     // Mobile: navigate to prev/next day
     const handlePrevDay = useCallback(() => {
+        if (!selectedDay) {
+            return;
+        }
+
         if (selectedDayIndex > 0) {
-            setSelectedDayIndex(selectedDayIndex - 1);
+            setSelectedDateStr(weekDays[selectedDayIndex - 1].dateStr);
         } else {
             // Go to previous week, last day
             navigateWeek(-1);
-            setSelectedDayIndex(weekDays.length - 1);
+            setSelectedDateStr(addDays(selectedDay.date, -1).toISOString().slice(0, 10));
         }
-    }, [selectedDayIndex, navigateWeek, weekDays.length]);
+    }, [selectedDay, selectedDayIndex, navigateWeek, weekDays]);
 
     const handleOpenDailyGoals = useCallback((dateStr) => {
         if (!dateStr) return;
@@ -374,14 +379,18 @@ const Planner = ({
     }, [weekDays, findWeeklyAttachmentForDay, updateAttachment, createAttachment, showSuccess]);
 
     const handleNextDay = useCallback(() => {
-        if (selectedDayIndex < 6) {
-            setSelectedDayIndex(selectedDayIndex + 1);
+        if (!selectedDay) {
+            return;
+        }
+
+        if (selectedDayIndex >= 0 && selectedDayIndex < (weekDays.length - 1)) {
+            setSelectedDateStr(weekDays[selectedDayIndex + 1].dateStr);
         } else {
             // Go to next week, first day
             navigateWeek(1);
-            setSelectedDayIndex(0);
+            setSelectedDateStr(addDays(selectedDay.date, 1).toISOString().slice(0, 10));
         }
-    }, [selectedDayIndex, navigateWeek]);
+    }, [selectedDay, selectedDayIndex, navigateWeek, weekDays]);
 
     // Item click handler
     const handleItemClick = useCallback((item) => {
@@ -406,14 +415,6 @@ const Planner = ({
                 break;
         }
     }, [navigateToClient, navigateToProject, onViewTask, openExpenseView]);
-    const handleExpenseMarkPaid = useCallback(async (expense, amount) => {
-        try {
-            await markAsPaid(expense.id, typeof amount === 'number' ? { amount } : undefined);
-            showSuccess('Expense marked as paid');
-        } catch (error) {
-            showError(error?.message || 'Unable to mark expense as paid');
-        }
-    }, [markAsPaid, showSuccess, showError]);
 
     // Remove item from planner (delete attachment)
     const handleRemoveItem = useCallback((item) => {
@@ -731,7 +732,6 @@ const Planner = ({
                         onAddClick={handleAddClick}
                         onCreateTask={handleCreateTask}
                         onItemClick={handleItemClick}
-                        onMarkExpensePaid={handleExpenseMarkPaid}
                         onRemoveItem={handleRemoveItem}
                         onEditItem={handleEditPlannerOptions}
                         onSetDailyGoal={handleOpenDailyGoals}
@@ -757,7 +757,6 @@ const Planner = ({
                         onAddClick={handleAddClick}
                         onCreateTask={handleCreateTask}
                         onItemClick={handleItemClick}
-                        onMarkExpensePaid={handleExpenseMarkPaid}
                         onRemoveItem={handleRemoveItem}
                         onEditItem={handleEditPlannerOptions}
                         onSetDailyGoal={handleOpenDailyGoals}

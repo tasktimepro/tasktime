@@ -28,6 +28,8 @@ declare module 'yjs' {
         keys(): IterableIterator<K>;
         observe(callback: (event: unknown, transaction: unknown) => void): void;
         unobserve(callback: (event: unknown, transaction: unknown) => void): void;
+        observeDeep(callback: (events: unknown[], transaction: unknown) => void): void;
+        unobserveDeep(callback: (events: unknown[], transaction: unknown) => void): void;
         toJSON(): Record<string, V>;
         [Symbol.iterator](): IterableIterator<[K, V]>;
     }
