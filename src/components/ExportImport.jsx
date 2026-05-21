@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
+import { BACKUP_VERSION } from '../utils/backupData.ts';
 
 /**
  * ExportImport component for backing up and restoring application data
@@ -23,7 +24,7 @@ import { cn } from '@/lib/utils';
  * 
  * Note: Timer state is intentionally excluded from export/import
  */
-const SUPPORTED_VERSIONS = ['1.0', '1.1'];
+const SUPPORTED_VERSIONS = ['1.0', '1.1', BACKUP_VERSION];
 
 function ExportImport({ 
     projects, 

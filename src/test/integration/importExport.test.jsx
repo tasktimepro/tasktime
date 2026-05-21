@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExportImport from '../../components/ExportImport'
+import { BACKUP_VERSION } from '../../utils/backupData'
 
 // Mock useTimers hook
 const mockTimers = [];
@@ -51,7 +52,7 @@ describe('Import/Export integration', () => {
         mockTimers.length = 0
         mockExpenses.length = 0
         mockExportBackupData.mockResolvedValue({
-            version: '1.1',
+            version: BACKUP_VERSION,
             exportDate: '2026-04-22T12:14:07.792Z',
             backupType: 'manual',
             projects: baseProps.projects,
@@ -173,6 +174,7 @@ describe('Import/Export integration', () => {
         await user.click(screen.getByRole('button', { name: 'Import' }))
 
         const payload = {
+            version: BACKUP_VERSION,
             projects: [{ id: 'project-1', title: 'Imported' }],
             tasks: [],
             timeEntries: [],
@@ -206,6 +208,7 @@ describe('Import/Export integration', () => {
             plannerAttachments: [],
             preferences: payload.preferences
         })
+        expect(screen.queryByRole('dialog', { name: 'Import Data' })).not.toBeInTheDocument()
     })
 
     it('shows error for invalid JSON', async () => {

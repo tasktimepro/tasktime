@@ -36,7 +36,7 @@ test.describe('Backup smoke', () => {
 
         const exportedJson = JSON.parse(await readFile(downloadPath, 'utf8'));
 
-        expect(exportedJson.version).toBe('1.1');
+        expect(exportedJson.version).toBe('1.3');
         expect(typeof exportedJson.exportDate).toBe('string');
         expect(exportedJson.projects).toEqual(expect.arrayContaining([
             expect.objectContaining({ title: projectTitle }),
