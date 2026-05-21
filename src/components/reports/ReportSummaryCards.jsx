@@ -35,7 +35,7 @@ function ReportSummaryCards({ cards }) {
                 {...buildCardProps('blue')}
             />
             <StatCard
-                title="Revenue Paid"
+                title="Payments Received"
                 value={cards.revenuePaid.value}
                 subtitle={cards.revenuePaid.subtitle}
                 icon={BanknotesIcon}

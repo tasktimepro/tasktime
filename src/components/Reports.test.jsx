@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import Reports from './Reports';
 
 const mockUpdateUrl = vi.fn();
@@ -12,6 +12,78 @@ const mockExportInvoicesReportPdf = vi.fn(() => Promise.resolve());
 const mockExportOutstandingReportPdf = vi.fn(() => Promise.resolve());
 const mockExportExpensesReportPdf = vi.fn(() => Promise.resolve());
 const mockGeneratePdfBlob = vi.fn(() => Promise.resolve(new Blob(['pdf'], { type: 'application/pdf' })));
+const createDefaultInvoices = () => [
+    {
+        id: 'invoice-1',
+        projectId: 'project-1',
+        clientId: 'client-1',
+        businessInfoId: 'business-1',
+        invoiceNumber: 'INV-001',
+        date: '2026-04-12',
+        dueDate: '2026-04-26',
+        status: 'paid',
+        subtotal: 1000,
+        tax: 220,
+        total: 1220,
+        currency: 'EUR',
+        paidAt: new Date('2026-04-20T10:00:00Z').getTime(),
+    },
+    {
+        id: 'invoice-2',
+        projectId: 'project-1',
+        clientId: 'client-1',
+        businessInfoId: 'business-1',
+        invoiceNumber: 'INV-002',
+        date: '2026-04-16',
+        dueDate: '2026-04-01',
+        status: 'sent',
+        subtotal: 200,
+        tax: 44,
+        total: 244,
+        currency: 'EUR',
+    },
+    {
+        id: 'invoice-3',
+        projectId: 'project-1',
+        clientId: 'client-1',
+        invoiceNumber: 'INV-003',
+        date: '2026-04-18',
+        dueDate: '2099-01-01',
+        status: 'sent',
+        subtotal: 300,
+        tax: 66,
+        total: 366,
+        currency: 'EUR',
+    },
+];
+const createDefaultExpenses = () => [
+    {
+        id: 'expense-1',
+        title: 'Hosting',
+        date: '2026-04-08',
+        supplierName: 'Cloud Host',
+        currency: 'EUR',
+        amount: 120,
+        paidOn: '2026-04-09',
+        paymentStatus: 'paid',
+        projectId: 'project-1',
+        clientId: 'client-1',
+        businessId: 'business-1',
+        isPersonal: false,
+        billable: false,
+        billingStatus: 'unbilled',
+        isRecurring: false,
+        isTaxExempt: false,
+        amountExcludingTax: 100,
+        taxRate: 20,
+    },
+];
+const mockInvoices = createDefaultInvoices();
+const mockExpenses = createDefaultExpenses();
+const mockConvertToCurrency = vi.fn((amountsByCurrency) => ({
+    amounts: amountsByCurrency,
+    hadConversionError: false,
+}));
 const mockTaxReturnPeriods = [
     {
         id: 'period-1',
@@ -35,77 +107,13 @@ vi.mock('@/hooks/useUrlState.ts', () => ({
 
 vi.mock('@/hooks/useInvoices.ts', () => ({
     useInvoices: () => ({
-        invoices: [
-            {
-                id: 'invoice-1',
-                projectId: 'project-1',
-                clientId: 'client-1',
-                businessInfoId: 'business-1',
-                invoiceNumber: 'INV-001',
-                date: '2026-04-12',
-                dueDate: '2026-04-26',
-                status: 'paid',
-                subtotal: 1000,
-                tax: 220,
-                total: 1220,
-                currency: 'EUR',
-                paidAt: new Date('2026-04-20T10:00:00Z').getTime(),
-            },
-            {
-                id: 'invoice-2',
-                projectId: 'project-1',
-                clientId: 'client-1',
-                businessInfoId: 'business-1',
-                invoiceNumber: 'INV-002',
-                date: '2026-04-16',
-                dueDate: '2026-04-01',
-                status: 'sent',
-                subtotal: 200,
-                tax: 44,
-                total: 244,
-                currency: 'EUR',
-            },
-            {
-                id: 'invoice-3',
-                projectId: 'project-1',
-                clientId: 'client-1',
-                invoiceNumber: 'INV-003',
-                date: '2026-04-18',
-                dueDate: '2099-01-01',
-                status: 'sent',
-                subtotal: 300,
-                tax: 66,
-                total: 366,
-                currency: 'EUR',
-            },
-        ],
+        invoices: mockInvoices,
     }),
 }));
 
 vi.mock('@/hooks/useExpenses.ts', () => ({
     useExpenses: () => ({
-        expenses: [
-            {
-                id: 'expense-1',
-                title: 'Hosting',
-                date: '2026-04-08',
-                supplierName: 'Cloud Host',
-                currency: 'EUR',
-                amount: 120,
-                paidOn: '2026-04-09',
-                paymentStatus: 'paid',
-                projectId: 'project-1',
-                clientId: 'client-1',
-                businessId: 'business-1',
-                isPersonal: false,
-                billable: false,
-                billingStatus: 'unbilled',
-                isRecurring: false,
-                isTaxExempt: false,
-                amountExcludingTax: 100,
-                taxRate: 20,
-            },
-        ],
+        expenses: mockExpenses,
         markManyAsClaimed: vi.fn(),
         markManyAsUnclaimed: vi.fn(),
     }),
@@ -227,10 +235,7 @@ vi.mock('@/hooks/useIsMobileLayout', () => ({
 vi.mock('@/components/dashboard/hooks/useCurrencyConversion', () => ({
     default: () => ({
         preferredCurrency: 'EUR',
-        convertToCurrency: (amountsByCurrency) => ({
-            amounts: amountsByCurrency,
-            hadConversionError: false,
-        }),
+        convertToCurrency: mockConvertToCurrency,
         exchangeRatesError: null,
         missingExchangeRates: [],
     }),
@@ -271,6 +276,13 @@ describe('Reports', () => {
         mockExportOutstandingReportPdf.mockClear();
         mockExportExpensesReportPdf.mockClear();
         mockGeneratePdfBlob.mockClear();
+        mockConvertToCurrency.mockReset();
+        mockConvertToCurrency.mockImplementation((amountsByCurrency) => ({
+            amounts: amountsByCurrency,
+            hadConversionError: false,
+        }));
+        mockInvoices.splice(0, mockInvoices.length, ...createDefaultInvoices());
+        mockExpenses.splice(0, mockExpenses.length, ...createDefaultExpenses());
         mockTaxReturnPeriods.splice(0, mockTaxReturnPeriods.length, {
             id: 'period-1',
             title: 'April 2026 VAT return',
@@ -287,11 +299,23 @@ describe('Reports', () => {
 
         expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
         expect(screen.getByText('Revenue Issued')).toBeInTheDocument();
+        expect(screen.getByText('Payments Received')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Report period' })).toHaveTextContent('Last Month');
 
         await waitFor(() => {
             expect(mockUpdateUrl).toHaveBeenCalledWith({ section: 'overview' });
         });
+    });
+
+    it('shows review issues as a header tag and opens details on click', () => {
+        render(<Reports />);
+
+        expect(screen.queryByText('Some records need review')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Needs review: 1 record' }));
+
+        expect(screen.getByRole('heading', { name: 'Records needing review' })).toBeInTheDocument();
+        expect(screen.getByText('Invoices without business profile')).toBeInTheDocument();
     });
 
     it('orders the report filters and resets them to defaults', () => {
@@ -415,7 +439,8 @@ describe('Reports', () => {
         render(<Reports />);
 
         expect(screen.getByRole('heading', { name: 'Monthly summary' })).toBeInTheDocument();
-        expect(screen.getByText('Needs review')).toBeInTheDocument();
+        expect(screen.getByText('Payments Received')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Needs review' })).toBeInTheDocument();
         expect(screen.getByText('Invoices without business profile')).toBeInTheDocument();
     });
 
@@ -434,6 +459,138 @@ describe('Reports', () => {
         expect(summaryGrid?.className).toContain('sm:grid-cols-2');
         expect(summaryGrid?.className).toContain('xl:grid-cols-3');
         expect(summarySection?.compareDocumentPosition(topClientsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('keeps monthly derived totals and breakdowns consistent when currencies are mixed', () => {
+        mockSection = 'monthly';
+        mockInvoices.splice(0, mockInvoices.length,
+            {
+                id: 'invoice-eur',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                businessInfoId: 'business-1',
+                invoiceNumber: 'INV-EUR',
+                date: '2026-04-10',
+                dueDate: '2026-04-20',
+                status: 'paid',
+                subtotal: 80,
+                tax: 20,
+                total: 100,
+                currency: 'EUR',
+                paidAt: new Date('2026-04-12T10:00:00Z').getTime(),
+            },
+            {
+                id: 'invoice-usd',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                businessInfoId: 'business-1',
+                invoiceNumber: 'INV-USD',
+                date: '2026-04-11',
+                dueDate: '2026-04-21',
+                status: 'paid',
+                subtotal: 80,
+                tax: 20,
+                total: 100,
+                currency: 'USD',
+                paidAt: new Date('2026-04-13T10:00:00Z').getTime(),
+            },
+        );
+        mockExpenses.splice(0, mockExpenses.length,
+            {
+                id: 'expense-eur',
+                title: 'Hosting EUR',
+                date: '2026-04-08',
+                currency: 'EUR',
+                amount: 50,
+                amountExcludingTax: 40,
+                paidOn: '2026-04-09',
+                paymentStatus: 'paid',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                businessId: 'business-1',
+                isTaxExempt: false,
+            },
+            {
+                id: 'expense-usd',
+                title: 'Hosting USD',
+                date: '2026-04-09',
+                currency: 'USD',
+                amount: 10,
+                amountExcludingTax: 6,
+                paidOn: '2026-04-10',
+                paymentStatus: 'paid',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                businessId: 'business-1',
+                isTaxExempt: false,
+            },
+        );
+        mockConvertToCurrency.mockImplementation((amountsByCurrency) => {
+            const total = (amountsByCurrency.EUR || 0) + ((amountsByCurrency.USD || 0) * 0.5);
+
+            return {
+                amounts: { EUR: total },
+                hadConversionError: false,
+            };
+        });
+
+        render(<Reports />);
+
+        expect(screen.getByText('Payments Received')).toBeInTheDocument();
+        expect(screen.getAllByText('€150.00').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('€55.00').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('€95.00').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('€18.00').length).toBeGreaterThan(0);
+        expect(within(screen.getByRole('heading', { name: 'Top clients' }).parentElement).getByText('€150.00')).toBeInTheDocument();
+        expect(screen.queryByText('€140.00')).not.toBeInTheDocument();
+    });
+
+    it('keeps uninvoiced work totals and exports consistent when billable expenses use another currency', () => {
+        mockSection = 'to-invoice';
+        mockExpenses.splice(0, mockExpenses.length,
+            {
+                id: 'billable-expense-usd',
+                title: 'Billable Hosting',
+                date: '2026-04-08',
+                currency: 'USD',
+                amount: 10,
+                amountExcludingTax: 10,
+                paidOn: '2026-04-09',
+                paymentStatus: 'paid',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                businessId: 'business-1',
+                billable: true,
+                billingStatus: 'unbilled',
+                isTaxExempt: true,
+            },
+        );
+        mockConvertToCurrency.mockImplementation((amountsByCurrency) => {
+            const total = (amountsByCurrency.EUR || 0) + ((amountsByCurrency.USD || 0) * 0.5);
+
+            return {
+                amounts: { EUR: total },
+                hadConversionError: false,
+            };
+        });
+
+        render(<Reports />);
+
+        expect(screen.getByRole('heading', { name: 'To invoice' })).toBeInTheDocument();
+        expect(screen.getByText('€205.00')).toBeInTheDocument();
+        expect(screen.getByText('Time €200.00')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+
+        expect(mockBuildCsvContent).toHaveBeenCalledWith(
+            expect.any(Array),
+            expect.arrayContaining([
+                expect.objectContaining({
+                    expenseAmount: '€5.00',
+                    estimatedAmount: '€200.00',
+                }),
+            ]),
+        );
     });
 
     it('renders the invoices tab with register summaries', () => {

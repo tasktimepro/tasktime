@@ -2,8 +2,9 @@
 
 ## Priority
 
-[ ] Reset Filters button in reports page
-[ ] Fix Sort/Order button with iconOnly issue
+[ ] Create a blog about accounting with tasktime using the reports
+[ ] The wording in the reports overview in the main dashboard for earned - should that be received instead or? to match what we did in reporting?
+[ ] Adjust filter and mobile views for Reporting page
 
 ---
 
@@ -13,8 +14,7 @@
 [x] Create new blog post about the new feature with sending invoices directly from TaskTime - creating email templates, usign Resend etc.
 [ ] Create a blog about invoice templates, multiple businesses and payment methods and the advantages that come by having these
 [ ] Create another blog post about auto-converting multiple currences from different clients into your own prefered currency in reports overviews & totals/goals
-[ ] Create a blog about accounting with tasktime using the reports
-    [ ] Create a few more ideas based on reporting here
+[ ] Create a few more blog ideas based on reporting as that has a lot of functionality
 
 ---
 

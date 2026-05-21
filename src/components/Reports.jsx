@@ -11,11 +11,11 @@ import { useBusinessInfos } from '@/hooks/useBusinessInfos.ts';
 import { useExpenseCategories } from '@/hooks/useExpenseCategories.ts';
 import { useTaxReturnPeriods } from '@/hooks/useTaxReturnPeriods.ts';
 import { useToast } from '@/hooks/useToast.ts';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import CustomCheckbox from '@/components/CustomCheckbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeDateInput } from '@/components/ui/native-date-input';
@@ -23,7 +23,7 @@ import { Notice } from '@/components/ui/notice';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowDownTrayIcon, ChartBarIcon, ClockIcon, DocumentCheckIcon, DocumentTextIcon, HandCoinsIcon } from '@/components/ui/icons';
+import { ArrowDownTrayIcon, ChartBarIcon, ClockIcon, DocumentCheckIcon, DocumentTextIcon, ExclamationTriangleIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import useCurrencyConversion from '@/components/dashboard/hooks/useCurrencyConversion';
@@ -34,7 +34,7 @@ import { buildCsvContent, downloadCsvFile } from '@/utils/reportCsvUtils';
 import { REPORT_PERIOD_OPTIONS, getDateRangeLabel, getDefaultCustomRange, getDefaultReportPeriod, resolveReportDateRange } from '@/utils/reportDateUtils';
 import { ACCOUNTANT_PACK_MANIFEST_COLUMNS, buildAccountantPackManifestRows } from '@/utils/reportPackUtils';
 import { downloadZipFile } from '@/utils/reportZipUtils';
-import { formatCurrency } from '@/utils/currencyUtils';
+import { formatCurrency, getProjectCurrency } from '@/utils/currencyUtils';
 import { formatDuration, millisecondsToHours, parseStoredDate, toDisplayDate, toStorageDate } from '@/utils/dateUtils';
 import { getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '@/utils/invoiceUtils';
 import { buildMonthlyReportHtml, exportClientStatementPdf, exportExpensesReportPdf, exportInvoicesReportPdf, exportMonthlyReportPdf, exportOutstandingReportPdf, exportProjectWorkSummaryPdf } from '@/utils/reportPdfUtils';
@@ -126,6 +126,40 @@ const sumAmountsByCurrency = (items, getCurrency, getAmount) => {
     }, {});
 };
 
+const addCurrencyAmount = (totals, currency, amount) => {
+    if (!currency || !Number.isFinite(amount) || amount === 0) {
+        return;
+    }
+
+    totals[currency] = (totals[currency] || 0) + amount;
+};
+
+const subtractCurrencyTotals = (leftTotals, rightTotals) => {
+    const result = {};
+
+    Object.entries(leftTotals).forEach(([currency, amount]) => {
+        addCurrencyAmount(result, currency, amount);
+    });
+
+    Object.entries(rightTotals).forEach(([currency, amount]) => {
+        addCurrencyAmount(result, currency, -amount);
+    });
+
+    return result;
+};
+
+const addCurrencyTotals = (...currencyTotals) => {
+    const result = {};
+
+    currencyTotals.forEach((totals) => {
+        Object.entries(totals).forEach(([currency, amount]) => {
+            addCurrencyAmount(result, currency, amount);
+        });
+    });
+
+    return result;
+};
+
 const matchesStoredDateRange = (dateValue, startDate, endDate) => {
     if (!dateValue) {
         return false;
@@ -169,6 +203,13 @@ const formatCurrencyBreakdown = ({ amountsByCurrency, convertToCurrency, currenc
 
     const total = Object.values(converted.amounts).reduce((sum, amount) => sum + amount, 0);
     return formatCurrency(total, preferredCurrency);
+};
+
+const getCurrencyBreakdownSortTotal = ({ amountsByCurrency, convertToCurrency }) => {
+    const converted = convertToCurrency(amountsByCurrency);
+    const amounts = converted.hadConversionError ? amountsByCurrency : converted.amounts;
+
+    return Object.values(amounts).reduce((sum, amount) => sum + (Number.isFinite(amount) ? amount : 0), 0);
 };
 
 const downloadReport = ({ filename, columns, rows }) => {
@@ -314,25 +355,46 @@ function ReportSection({
     );
 }
 
-const buildBreakdownRows = ({ items, getLabel, getAmount, preferredCurrency, limit = 5 }) => {
+const buildBreakdownRows = ({
+    items,
+    getLabel,
+    getAmount,
+    getCurrency,
+    convertToCurrency,
+    currencyDisplayMode,
+    preferredCurrency,
+    limit = 5,
+}) => {
     const grouped = items.reduce((map, item) => {
         const label = getLabel(item);
         const amount = getAmount(item);
+        const currency = getCurrency(item);
 
-        if (!label || !Number.isFinite(amount) || amount === 0) {
+        if (!label || !currency || !Number.isFinite(amount) || amount === 0) {
             return map;
         }
 
-        map.set(label, (map.get(label) || 0) + amount);
+        const totals = map.get(label) || {};
+        addCurrencyAmount(totals, currency, amount);
+        map.set(label, totals);
+
         return map;
     }, new Map());
 
     return Array.from(grouped.entries())
-        .sort(([, amountA], [, amountB]) => amountB - amountA)
+        .sort(([, totalsA], [, totalsB]) => {
+            return getCurrencyBreakdownSortTotal({ amountsByCurrency: totalsB, convertToCurrency })
+                - getCurrencyBreakdownSortTotal({ amountsByCurrency: totalsA, convertToCurrency });
+        })
         .slice(0, limit)
-        .map(([label, amount]) => ({
+        .map(([label, amountsByCurrency]) => ({
             label,
-            value: formatCurrency(amount, preferredCurrency),
+            value: formatCurrencyBreakdown({
+                amountsByCurrency,
+                convertToCurrency,
+                currencyDisplayMode,
+                preferredCurrency,
+            }),
         }));
 };
 
@@ -831,18 +893,21 @@ function Reports() {
             const project = activeProjects.find((item) => item.title === row.projectTitle)
                 || activeProjects.find((item) => item.id === row.key);
             const hourlyRate = typeof project?.hourlyRate === 'number' ? project.hourlyRate : 0;
+            const projectCurrency = project ? getProjectCurrency(project, clients) : preferredCurrency;
             const estimatedAmount = hourlyRate > 0
                 ? Math.round(millisecondsToHours(row.unbilledBillableMs) * hourlyRate * 100) / 100
                 : 0;
+            const estimatedAmountsByCurrency = {};
+            addCurrencyAmount(estimatedAmountsByCurrency, projectCurrency, estimatedAmount);
 
             grouped.set(row.key, {
                 key: row.key,
                 clientTitle: row.clientTitle,
                 projectTitle: row.projectTitle,
                 uninvoicedHoursMs: row.unbilledBillableMs,
-                expenseAmount: 0,
+                expenseAmountsByCurrency: {},
                 expenseCount: 0,
-                estimatedAmount,
+                estimatedAmountsByCurrency,
                 hourlyRate,
             });
         });
@@ -854,21 +919,28 @@ function Reports() {
                 clientTitle: expense.clientId ? (clientsById.get(expense.clientId)?.title || EMPTY_CLIENT) : EMPTY_CLIENT,
                 projectTitle: expense.projectId ? (projectsById.get(expense.projectId)?.title || EMPTY_PROJECT) : EMPTY_PROJECT,
                 uninvoicedHoursMs: 0,
-                expenseAmount: 0,
+                expenseAmountsByCurrency: {},
                 expenseCount: 0,
-                estimatedAmount: 0,
+                estimatedAmountsByCurrency: {},
                 hourlyRate: 0,
             };
 
-            current.expenseAmount += expense.amount || 0;
+            addCurrencyAmount(current.expenseAmountsByCurrency, expense.currency || preferredCurrency, expense.amount || 0);
             current.expenseCount += 1;
             grouped.set(key, current);
         });
 
         return Array.from(grouped.values())
-            .filter((row) => row.uninvoicedHoursMs > 0 || row.expenseAmount > 0)
-            .sort((rowA, rowB) => (rowB.estimatedAmount + rowB.expenseAmount) - (rowA.estimatedAmount + rowA.expenseAmount));
-    }, [activeProjects, clientsById, hoursRows, projectsById, unbilledExpenseRows]);
+            .map((row) => ({
+                ...row,
+                totalAmountsByCurrency: addCurrencyTotals(row.estimatedAmountsByCurrency, row.expenseAmountsByCurrency),
+            }))
+            .filter((row) => row.uninvoicedHoursMs > 0 || Object.keys(row.expenseAmountsByCurrency).length > 0)
+            .sort((rowA, rowB) => {
+                return getCurrencyBreakdownSortTotal({ amountsByCurrency: rowB.totalAmountsByCurrency, convertToCurrency })
+                    - getCurrencyBreakdownSortTotal({ amountsByCurrency: rowA.totalAmountsByCurrency, convertToCurrency });
+            });
+    }, [activeProjects, clients, clientsById, convertToCurrency, hoursRows, preferredCurrency, projectsById, unbilledExpenseRows]);
 
     const missingDataReviewCount = useMemo(() => {
         let count = 0;
@@ -881,6 +953,26 @@ function Reports() {
         count += filteredExpenses.filter((expense) => !expense.isTaxExempt && !expense.taxLabel && typeof expense.taxRate !== 'number').length;
 
         return count;
+    }, [clientsById, filteredExpenses, filteredInvoices]);
+
+    const metadataReviewRows = useMemo(() => {
+        return [
+            {
+                label: 'Invoices without business profile',
+                count: filteredInvoices.filter((invoice) => !invoice.businessInfoId).length,
+            },
+            {
+                label: 'Invoices without client country',
+                count: filteredInvoices.filter((invoice) => {
+                    const client = clientsById.get(invoice.clientId);
+                    return client && !client.country;
+                }).length,
+            },
+            {
+                label: 'Expenses missing tax metadata',
+                count: filteredExpenses.filter((expense) => !expense.isTaxExempt && !expense.taxLabel && typeof expense.taxRate !== 'number').length,
+            },
+        ].filter((row) => row.count > 0);
     }, [clientsById, filteredExpenses, filteredInvoices]);
 
     const revenueIssuedByCurrency = useMemo(() => {
@@ -922,52 +1014,68 @@ function Reports() {
     const totalHoursMs = useMemo(() => filteredTimeEntries.reduce((sum, entry) => sum + Math.max(0, (entry.end || 0) - entry.start), 0), [filteredTimeEntries]);
     const billableHoursMs = useMemo(() => filteredTimeEntries.reduce((sum, entry) => sum + (entry.task?.billable ? getBillableDurationMs(entry) : 0), 0), [filteredTimeEntries]);
     const totalUninvoicedHoursMs = useMemo(() => toInvoiceRows.reduce((sum, row) => sum + row.uninvoicedHoursMs, 0), [toInvoiceRows]);
-    const totalUninvoicedExpenseAmount = useMemo(() => toInvoiceRows.reduce((sum, row) => sum + row.expenseAmount, 0), [toInvoiceRows]);
-    const monthlyRevenuePaidTotal = useMemo(() => Object.values(revenuePaidByCurrency).reduce((sum, amount) => sum + amount, 0), [revenuePaidByCurrency]);
-    const monthlyExpensesTotal = useMemo(() => Object.values(expensesByCurrency).reduce((sum, amount) => sum + amount, 0), [expensesByCurrency]);
-    const monthlyOutputTaxTotal = useMemo(() => Object.values(outputTaxByCurrency).reduce((sum, amount) => sum + amount, 0), [outputTaxByCurrency]);
-    const monthlyInputTaxTotal = useMemo(() => Object.values(inputTaxByCurrency).reduce((sum, amount) => sum + amount, 0), [inputTaxByCurrency]);
-    const monthlyEstimatedProfit = monthlyRevenuePaidTotal - monthlyExpensesTotal;
-    const monthlyEstimatedVatPosition = monthlyOutputTaxTotal - monthlyInputTaxTotal;
-    const totalUninvoicedEstimatedAmount = useMemo(() => toInvoiceRows.reduce((sum, row) => sum + row.estimatedAmount, 0), [toInvoiceRows]);
+    const totalUninvoicedExpenseByCurrency = useMemo(() => {
+        return addCurrencyTotals(...toInvoiceRows.map((row) => row.expenseAmountsByCurrency));
+    }, [toInvoiceRows]);
+    const totalUninvoicedEstimatedByCurrency = useMemo(() => {
+        return addCurrencyTotals(...toInvoiceRows.map((row) => row.estimatedAmountsByCurrency));
+    }, [toInvoiceRows]);
+    const totalUninvoicedValueByCurrency = useMemo(() => {
+        return addCurrencyTotals(totalUninvoicedExpenseByCurrency, totalUninvoicedEstimatedByCurrency);
+    }, [totalUninvoicedEstimatedByCurrency, totalUninvoicedExpenseByCurrency]);
+    const monthlyEstimatedProfitByCurrency = useMemo(() => {
+        return subtractCurrencyTotals(revenuePaidByCurrency, expensesByCurrency);
+    }, [expensesByCurrency, revenuePaidByCurrency]);
+    const monthlyEstimatedVatPositionByCurrency = useMemo(() => {
+        return subtractCurrencyTotals(outputTaxByCurrency, inputTaxByCurrency);
+    }, [inputTaxByCurrency, outputTaxByCurrency]);
 
     const topClientBreakdown = useMemo(() => {
         return buildBreakdownRows({
             items: filteredInvoices,
             getLabel: (invoice) => clientsById.get(invoice.clientId)?.title || EMPTY_CLIENT,
             getAmount: (invoice) => getInvoiceTotal(invoice),
+            getCurrency: (invoice) => invoice.currency || preferredCurrency,
+            convertToCurrency,
+            currencyDisplayMode,
             preferredCurrency,
         });
-    }, [clientsById, filteredInvoices, preferredCurrency]);
+    }, [clientsById, convertToCurrency, currencyDisplayMode, filteredInvoices, preferredCurrency]);
 
     const topProjectBreakdown = useMemo(() => {
         return buildBreakdownRows({
             items: filteredInvoices,
             getLabel: (invoice) => projectsById.get(invoice.projectId)?.title || EMPTY_PROJECT,
             getAmount: (invoice) => getInvoiceTotal(invoice),
+            getCurrency: (invoice) => invoice.currency || preferredCurrency,
+            convertToCurrency,
+            currencyDisplayMode,
             preferredCurrency,
         });
-    }, [filteredInvoices, preferredCurrency, projectsById]);
+    }, [convertToCurrency, currencyDisplayMode, filteredInvoices, preferredCurrency, projectsById]);
 
     const topExpenseCategoryBreakdown = useMemo(() => {
         return buildBreakdownRows({
             items: filteredExpenses,
             getLabel: (expense) => expense.categoryId ? (expenseCategoriesById.get(expense.categoryId)?.name || EMPTY_CATEGORY) : EMPTY_CATEGORY,
             getAmount: (expense) => expense.amount || 0,
+            getCurrency: (expense) => expense.currency || preferredCurrency,
+            convertToCurrency,
+            currencyDisplayMode,
             preferredCurrency,
         });
-    }, [expenseCategoriesById, filteredExpenses, preferredCurrency]);
+    }, [convertToCurrency, currencyDisplayMode, expenseCategoriesById, filteredExpenses, preferredCurrency]);
 
     const monthlySummaryRows = useMemo(() => {
         return [
             { metric: 'Period', value: getDateRangeLabel(resolvedRange) },
             { metric: 'Revenue Issued', value: formatCurrencyBreakdown({ amountsByCurrency: revenueIssuedByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
-            { metric: 'Revenue Paid', value: formatCurrencyBreakdown({ amountsByCurrency: revenuePaidByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
+            { metric: 'Payments Received', value: formatCurrencyBreakdown({ amountsByCurrency: revenuePaidByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
             { metric: 'Expenses', value: formatCurrencyBreakdown({ amountsByCurrency: expensesByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
             { metric: 'Output Tax', value: formatCurrencyBreakdown({ amountsByCurrency: outputTaxByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
             { metric: 'Input Tax', value: formatCurrencyBreakdown({ amountsByCurrency: inputTaxByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
-            { metric: 'Estimated VAT Position', value: formatCurrency(monthlyEstimatedVatPosition, preferredCurrency) },
-            { metric: 'Estimated Profit', value: formatCurrency(monthlyEstimatedProfit, preferredCurrency) },
+            { metric: 'Estimated VAT Position', value: formatCurrencyBreakdown({ amountsByCurrency: monthlyEstimatedVatPositionByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
+            { metric: 'Estimated Profit', value: formatCurrencyBreakdown({ amountsByCurrency: monthlyEstimatedProfitByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
             { metric: 'Hours Worked', value: formatDuration(totalHoursMs) },
             { metric: 'Billable Utilization', value: formatPercent(totalHoursMs > 0 ? (billableHoursMs / totalHoursMs) * 100 : 0) },
             { metric: 'Outstanding Invoices', value: `${outstandingInvoices.length}` },
@@ -979,8 +1087,8 @@ function Reports() {
         currencyDisplayMode,
         expensesByCurrency,
         inputTaxByCurrency,
-        monthlyEstimatedProfit,
-        monthlyEstimatedVatPosition,
+        monthlyEstimatedProfitByCurrency,
+        monthlyEstimatedVatPositionByCurrency,
         overdueInvoices.length,
         outstandingInvoices.length,
         outputTaxByCurrency,
@@ -1040,7 +1148,7 @@ function Reports() {
             },
             revenuePaid: {
                 value: formatCurrencyBreakdown({ amountsByCurrency: revenuePaidByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
-                subtitle: `${paidInvoicesInRange.length} paid invoices`,
+                subtitle: `${paidInvoicesInRange.length} invoices paid in ${getDateRangeLabel(resolvedRange)}`,
             },
             outstanding: {
                 value: formatCurrencyBreakdown({ amountsByCurrency: outstandingByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
@@ -1060,7 +1168,12 @@ function Reports() {
             },
             uninvoicedWork: {
                 value: formatDuration(totalUninvoicedHoursMs),
-                subtitle: `${toInvoiceRows.length} groups • ${formatCurrency(totalUninvoicedExpenseAmount, preferredCurrency)}`,
+                subtitle: `${toInvoiceRows.length} groups • ${formatCurrencyBreakdown({
+                    amountsByCurrency: totalUninvoicedExpenseByCurrency,
+                    convertToCurrency,
+                    currencyDisplayMode,
+                    preferredCurrency,
+                })}`,
             },
             billableUtilization: {
                 value: formatPercent(utilization),
@@ -1085,7 +1198,7 @@ function Reports() {
         revenuePaidByCurrency,
         toInvoiceRows.length,
         totalHoursMs,
-        totalUninvoicedExpenseAmount,
+        totalUninvoicedExpenseByCurrency,
         totalUninvoicedHoursMs,
         issuedInvoicesInRange.length,
     ]);
@@ -1621,6 +1734,7 @@ function Reports() {
         }
 
         const hourlyRate = typeof workSummaryProject?.hourlyRate === 'number' ? workSummaryProject.hourlyRate : 0;
+        const projectCurrency = workSummaryProject ? getProjectCurrency(workSummaryProject, clients) : preferredCurrency;
         const estimatedAmount = hourlyRate > 0
             ? Math.round(millisecondsToHours(projectWorkSummary.totals.billableMs) * hourlyRate * 100) / 100
             : 0;
@@ -1631,9 +1745,9 @@ function Reports() {
             { label: 'Tasks covered', value: `${projectWorkSummary.totals.tasksCount}` },
             { label: 'Entries logged', value: `${projectWorkSummary.totals.entriesCount}` },
             { label: 'Noted entries', value: `${projectWorkSummary.totals.notesCount}` },
-            { label: 'Estimated billable amount', value: formatCurrency(estimatedAmount, preferredCurrency) },
+            { label: 'Estimated billable amount', value: formatCurrency(estimatedAmount, projectCurrency) },
         ];
-    }, [preferredCurrency, projectWorkSummary, workSummaryProject?.hourlyRate]);
+    }, [clients, preferredCurrency, projectWorkSummary, workSummaryProject]);
 
     const toInvoiceExportRows = useMemo(() => {
         return toInvoiceRows.map((row) => ({
@@ -1641,10 +1755,20 @@ function Reports() {
             project: row.projectTitle,
             uninvoicedHours: (row.uninvoicedHoursMs / (1000 * 60 * 60)).toFixed(2),
             expenseCount: row.expenseCount,
-            expenseAmount: row.expenseAmount.toFixed(2),
-            estimatedAmount: row.estimatedAmount.toFixed(2),
+            expenseAmount: formatCurrencyBreakdown({
+                amountsByCurrency: row.expenseAmountsByCurrency,
+                convertToCurrency,
+                currencyDisplayMode,
+                preferredCurrency,
+            }),
+            estimatedAmount: formatCurrencyBreakdown({
+                amountsByCurrency: row.estimatedAmountsByCurrency,
+                convertToCurrency,
+                currencyDisplayMode,
+                preferredCurrency,
+            }),
         }));
-    }, [toInvoiceRows]);
+    }, [convertToCurrency, currencyDisplayMode, preferredCurrency, toInvoiceRows]);
 
     const accountantPackCsvFiles = useMemo(() => {
         return [
@@ -1791,7 +1915,47 @@ function Reports() {
                             {headerContent.description}
                         </p>
                     </div>
-                    <Badge variant="outline">{getDateRangeLabel(resolvedRange)}</Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{getDateRangeLabel(resolvedRange)}</Badge>
+                        {missingDataReviewCount > 0 ? (
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className={cn(
+                                            badgeVariants({ variant: 'warning' }),
+                                            'cursor-pointer gap-1.5 border shadow-none'
+                                        )}
+                                        aria-label={`Needs review: ${missingDataReviewCount} record${missingDataReviewCount === 1 ? '' : 's'}`}
+                                    >
+                                        <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                                        <span>Needs review</span>
+                                        <span>{missingDataReviewCount}</span>
+                                    </button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle>Records needing review</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-muted-foreground">
+                                            {missingDataReviewCount} filtered record{missingDataReviewCount === 1 ? '' : 's'} {missingDataReviewCount === 1 ? 'is' : 'are'} missing business, country, or tax metadata that affects cleaner accounting exports.
+                                        </p>
+                                        <div className="space-y-2">
+                                            {metadataReviewRows.map((row) => (
+                                                <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                                                    <p className="text-sm text-foreground">{row.label}</p>
+                                                    <Badge variant="warning" className="shrink-0">
+                                                        {row.count}
+                                                    </Badge>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        ) : null}
+                    </div>
                 </div>
 
                 <ReportFilters
@@ -1833,14 +1997,6 @@ function Reports() {
                         description={missingExchangeRates.length > 0
                             ? `Missing rates for ${missingExchangeRates.join(', ')}. Showing source-currency totals where needed.`
                             : exchangeRatesError}
-                        variant="warning"
-                    />
-                ) : null}
-
-                {missingDataReviewCount > 0 ? (
-                    <Notice
-                        title="Some records need review"
-                        description={`${missingDataReviewCount} filtered records are missing business, country, or tax metadata required for cleaner accounting exports.`}
                         variant="warning"
                     />
                 ) : null}
@@ -1967,12 +2123,26 @@ function Reports() {
                             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                                 <div className="rounded-lg border border-border p-3">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estimated profit</p>
-                                    <p className="mt-2 text-lg font-semibold text-foreground">{formatCurrency(monthlyEstimatedProfit, preferredCurrency)}</p>
+                                    <p className="mt-2 text-lg font-semibold text-foreground">
+                                        {formatCurrencyBreakdown({
+                                            amountsByCurrency: monthlyEstimatedProfitByCurrency,
+                                            convertToCurrency,
+                                            currencyDisplayMode,
+                                            preferredCurrency,
+                                        })}
+                                    </p>
                                     <p className="mt-1 text-xs text-muted-foreground">Paid revenue minus filtered expenses</p>
                                 </div>
                                 <div className="rounded-lg border border-border p-3">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estimated VAT position</p>
-                                    <p className="mt-2 text-lg font-semibold text-foreground">{formatCurrency(monthlyEstimatedVatPosition, preferredCurrency)}</p>
+                                    <p className="mt-2 text-lg font-semibold text-foreground">
+                                        {formatCurrencyBreakdown({
+                                            amountsByCurrency: monthlyEstimatedVatPositionByCurrency,
+                                            convertToCurrency,
+                                            currencyDisplayMode,
+                                            preferredCurrency,
+                                        })}
+                                    </p>
                                     <p className="mt-1 text-xs text-muted-foreground">Output tax minus input tax</p>
                                 </div>
                                 <div className="rounded-lg border border-border p-3">
@@ -1982,7 +2152,14 @@ function Reports() {
                                 </div>
                                 <div className="rounded-lg border border-border p-3">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Uninvoiced value</p>
-                                    <p className="mt-2 text-lg font-semibold text-foreground">{formatCurrency(totalUninvoicedExpenseAmount + totalUninvoicedEstimatedAmount, preferredCurrency)}</p>
+                                    <p className="mt-2 text-lg font-semibold text-foreground">
+                                        {formatCurrencyBreakdown({
+                                            amountsByCurrency: totalUninvoicedValueByCurrency,
+                                            convertToCurrency,
+                                            currencyDisplayMode,
+                                            preferredCurrency,
+                                        })}
+                                    </p>
                                     <p className="mt-1 text-xs text-muted-foreground">{toInvoiceRows.length} open billing groups</p>
                                 </div>
                             </div>
@@ -3170,8 +3347,22 @@ function Reports() {
                                             </p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm font-semibold text-foreground">{formatCurrency(row.estimatedAmount + row.expenseAmount, preferredCurrency)}</p>
-                                            <p className="text-xs text-muted-foreground">Time {formatCurrency(row.estimatedAmount, preferredCurrency)}</p>
+                                            <p className="text-sm font-semibold text-foreground">
+                                                {formatCurrencyBreakdown({
+                                                    amountsByCurrency: row.totalAmountsByCurrency,
+                                                    convertToCurrency,
+                                                    currencyDisplayMode,
+                                                    preferredCurrency,
+                                                })}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Time {formatCurrencyBreakdown({
+                                                    amountsByCurrency: row.estimatedAmountsByCurrency,
+                                                    convertToCurrency,
+                                                    currencyDisplayMode,
+                                                    preferredCurrency,
+                                                })}
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
