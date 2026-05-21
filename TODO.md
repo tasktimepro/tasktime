@@ -2,7 +2,8 @@
 
 ## Priority
 
-
+[ ] Reset Filters button in reports page
+[ ] Fix Sort/Order button with iconOnly issue
 
 ---
 
@@ -12,6 +13,8 @@
 [x] Create new blog post about the new feature with sending invoices directly from TaskTime - creating email templates, usign Resend etc.
 [ ] Create a blog about invoice templates, multiple businesses and payment methods and the advantages that come by having these
 [ ] Create another blog post about auto-converting multiple currences from different clients into your own prefered currency in reports overviews & totals/goals
+[ ] Create a blog about accounting with tasktime using the reports
+    [ ] Create a few more ideas based on reporting here
 
 ---
 

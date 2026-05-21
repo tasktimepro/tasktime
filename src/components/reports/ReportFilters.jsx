@@ -1,10 +1,12 @@
 import PropTypes from 'prop-types';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     BanknotesIcon,
     BuildingOfficeIcon,
     ClipboardDocumentCheckIcon,
     DocumentTextIcon,
+    FunnelXIcon,
     HandCoinsIcon,
     ListFilterIcon,
     CurrencyDollarIcon,
@@ -41,6 +43,7 @@ function ReportFilters({
     onInvoiceStatusChange,
     onPeriodChange,
     onProjectIdChange,
+    onResetFilters,
     period,
     periodOptions,
     projectId,
@@ -65,7 +68,7 @@ function ReportFilters({
             />
 
             <Select value={businessId} onValueChange={onBusinessIdChange}>
-                <SelectTrigger className={triggerClassName} leadingIcon={BuildingOfficeIcon}>
+                <SelectTrigger className={triggerClassName} leadingIcon={BuildingOfficeIcon} aria-label="Business filter">
                     <SelectValue placeholder="Business profile" />
                 </SelectTrigger>
                 <SelectContent>
@@ -79,7 +82,7 @@ function ReportFilters({
             </Select>
 
             <Select value={clientId} onValueChange={onClientIdChange}>
-                <SelectTrigger className={triggerClassName} leadingIcon={UserGroupIcon}>
+                <SelectTrigger className={triggerClassName} leadingIcon={UserGroupIcon} aria-label="Client filter">
                     <SelectValue placeholder="Client" />
                 </SelectTrigger>
                 <SelectContent>
@@ -93,7 +96,7 @@ function ReportFilters({
             </Select>
 
             <Select value={projectId} onValueChange={onProjectIdChange}>
-                <SelectTrigger className={triggerClassName} leadingIcon={ClipboardDocumentCheckIcon}>
+                <SelectTrigger className={triggerClassName} leadingIcon={ClipboardDocumentCheckIcon} aria-label="Project filter">
                     <SelectValue placeholder="Project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -106,36 +109,8 @@ function ReportFilters({
                 </SelectContent>
             </Select>
 
-            <Select value={categoryId} onValueChange={onCategoryIdChange}>
-                <SelectTrigger className={triggerClassName} leadingIcon={ListFilterIcon}>
-                    <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-
-            <Select value={invoiceStatus} onValueChange={onInvoiceStatusChange}>
-                <SelectTrigger className={triggerClassName} leadingIcon={DocumentTextIcon}>
-                    <SelectValue placeholder="Invoice status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="non-draft">Non-draft invoices</SelectItem>
-                    <SelectItem value="all">All invoice statuses</SelectItem>
-                    <SelectItem value="paid">Paid only</SelectItem>
-                    <SelectItem value="unpaid">Unpaid only</SelectItem>
-                    <SelectItem value="overdue">Overdue only</SelectItem>
-                    <SelectItem value="draft">Draft only</SelectItem>
-                </SelectContent>
-            </Select>
-
             <Select value={expenseStatus} onValueChange={onExpenseStatusChange}>
-                <SelectTrigger className={triggerClassName} leadingIcon={HandCoinsIcon}>
+                <SelectTrigger className={triggerClassName} leadingIcon={HandCoinsIcon} aria-label="Expense status filter">
                     <SelectValue placeholder="Expense status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,18 +123,8 @@ function ReportFilters({
                 </SelectContent>
             </Select>
 
-            <Select value={incomeDateBasis} onValueChange={onIncomeDateBasisChange}>
-                <SelectTrigger className={triggerClassName} leadingIcon={BanknotesIcon}>
-                    <SelectValue placeholder="Income date" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="invoice-date">Income by invoice date</SelectItem>
-                    <SelectItem value="paid-date">Income by paid date</SelectItem>
-                </SelectContent>
-            </Select>
-
             <Select value={expenseDateBasis} onValueChange={onExpenseDateBasisChange}>
-                <SelectTrigger className={triggerClassName} leadingIcon={HandCoinsIcon}>
+                <SelectTrigger className={triggerClassName} leadingIcon={HandCoinsIcon} aria-label="Expense date filter">
                     <SelectValue placeholder="Expense date" />
                 </SelectTrigger>
                 <SelectContent>
@@ -168,8 +133,22 @@ function ReportFilters({
                 </SelectContent>
             </Select>
 
+            <Select value={categoryId} onValueChange={onCategoryIdChange}>
+                <SelectTrigger className={triggerClassName} leadingIcon={ListFilterIcon} aria-label="Category filter">
+                    <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
             <Select value={currencyDisplayMode} onValueChange={onCurrencyDisplayModeChange}>
-                <SelectTrigger className={triggerClassName} leadingIcon={CurrencyDollarIcon}>
+                <SelectTrigger className={triggerClassName} leadingIcon={CurrencyDollarIcon} aria-label="Currency display filter">
                     <SelectValue placeholder="Currency mode" />
                 </SelectTrigger>
                 <SelectContent>
@@ -177,6 +156,45 @@ function ReportFilters({
                     <SelectItem value="source">Source currencies</SelectItem>
                 </SelectContent>
             </Select>
+
+            <Select value={invoiceStatus} onValueChange={onInvoiceStatusChange}>
+                <SelectTrigger className={triggerClassName} leadingIcon={DocumentTextIcon} aria-label="Invoice status filter">
+                    <SelectValue placeholder="Invoice status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="non-draft">Non-draft invoices</SelectItem>
+                    <SelectItem value="all">All invoice statuses</SelectItem>
+                    <SelectItem value="paid">Paid only</SelectItem>
+                    <SelectItem value="unpaid">Unpaid only</SelectItem>
+                    <SelectItem value="overdue">Overdue only</SelectItem>
+                    <SelectItem value="draft">Draft only</SelectItem>
+                </SelectContent>
+            </Select>
+
+            <Select value={incomeDateBasis} onValueChange={onIncomeDateBasisChange}>
+                <SelectTrigger className={triggerClassName} leadingIcon={BanknotesIcon} aria-label="Income date filter">
+                    <SelectValue placeholder="Income date" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="invoice-date">Income by invoice date</SelectItem>
+                    <SelectItem value="paid-date">Income by paid date</SelectItem>
+                </SelectContent>
+            </Select>
+
+            <div className={cn(
+                'flex',
+                isMobileLayout ? 'justify-stretch' : 'col-span-2 justify-end xl:col-span-1 xl:col-start-4'
+            )}
+            >
+                <Button
+                    variant="ghost"
+                    className={cn(isMobileLayout ? triggerClassName : 'w-auto')}
+                    leadingIcon={FunnelXIcon}
+                    onClick={onResetFilters}
+                >
+                    Reset filters
+                </Button>
+            </div>
         </div>
     );
 }
@@ -218,6 +236,7 @@ ReportFilters.propTypes = {
     onInvoiceStatusChange: PropTypes.func.isRequired,
     onPeriodChange: PropTypes.func.isRequired,
     onProjectIdChange: PropTypes.func.isRequired,
+    onResetFilters: PropTypes.func.isRequired,
     period: PropTypes.string.isRequired,
     periodOptions: PropTypes.arrayOf(PropTypes.shape({
         label: PropTypes.string.isRequired,

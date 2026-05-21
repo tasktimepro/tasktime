@@ -72,6 +72,17 @@ describe('invoiceUtils', () => {
             template: { name: 'Embedded Template' }
         }, liveTemplates)).toEqual({ name: 'Embedded Template' })
 
+        expect(resolveCurrentInvoiceTemplate({
+            id: 'inv-legacy',
+            invoiceNumber: 'INV-1001',
+            projectId: 'project-1'
+        }, liveTemplates)).toBeNull()
+
+        expect(resolveCurrentInvoiceTemplate({
+            id: 'tpl-1',
+            name: 'Stale Template Snapshot'
+        }, liveTemplates)).toEqual({ id: 'tpl-1', name: 'Live Template' })
+
         expect(resolveCurrentInvoiceTemplate(null, liveTemplates)).toBeNull()
     })
 

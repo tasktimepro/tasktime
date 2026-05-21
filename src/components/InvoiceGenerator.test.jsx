@@ -710,6 +710,35 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.tasks.map(task => task.id)).toEqual(['parent-1', 'child-1', 'root-1'])
     })
 
+    it('omits selected tasks that compute to zero from saved invoices and preview html', async () => {
+
+        invoiceHookMocks.createInvoice.mockClear()
+        taskHookMocks.tasks = [
+            { id: 'task-1', projectId: 'project-1', title: 'Implementation', billable: true, hourlyRate: 100 },
+            { id: 'task-2', projectId: 'project-1', title: 'Discovery Workshop', billable: true, hourlyRate: 100 },
+            { id: 'task-3', projectId: 'project-1', title: 'QA and Polish', billable: true, hourlyRate: 100 }
+        ]
+
+        const user = userEvent.setup()
+
+        renderGenerator({
+            timeEntries: [
+                { id: 'entry-1', taskId: 'task-1', start: 1000, end: 3601000 }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.tasks.map(task => task.id)).toEqual(['task-1'])
+
+        expect(pdfMocks.createInvoiceHTML).toHaveBeenCalledWith(expect.objectContaining({
+            tasks: [expect.objectContaining({ id: 'task-1' })]
+        }))
+    })
+
     it('shows a warning and skips invoice generation when total is zero', async () => {
 
         modalConfig.adjustTaskHours = { taskId: 'task-1', hours: 0 }

@@ -294,6 +294,55 @@ describe('Reports', () => {
         });
     });
 
+    it('orders the report filters and resets them to defaults', () => {
+        render(<Reports />);
+
+        const orderedControls = [
+            screen.getByRole('button', { name: 'Report period' }),
+            screen.getByRole('combobox', { name: 'Business filter' }),
+            screen.getByRole('combobox', { name: 'Client filter' }),
+            screen.getByRole('combobox', { name: 'Project filter' }),
+            screen.getByRole('combobox', { name: 'Expense status filter' }),
+            screen.getByRole('combobox', { name: 'Expense date filter' }),
+            screen.getByRole('combobox', { name: 'Category filter' }),
+            screen.getByRole('combobox', { name: 'Currency display filter' }),
+            screen.getByRole('combobox', { name: 'Invoice status filter' }),
+            screen.getByRole('combobox', { name: 'Income date filter' }),
+            screen.getByRole('button', { name: 'Reset filters' }),
+        ];
+
+        orderedControls.forEach((control, index) => {
+            const nextControl = orderedControls[index + 1];
+
+            if (!nextControl) {
+                return;
+            }
+
+            expect(control.compareDocumentPosition(nextControl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Report period' }));
+        fireEvent.click(screen.getByRole('button', { name: 'This Month' }));
+
+        fireEvent.click(screen.getByRole('combobox', { name: 'Expense status filter' }));
+        fireEvent.click(screen.getByRole('option', { name: 'Paid only' }));
+
+        fireEvent.click(screen.getByRole('combobox', { name: 'Currency display filter' }));
+        fireEvent.click(screen.getByRole('option', { name: 'Source currencies' }));
+
+        expect(screen.getByRole('button', { name: 'Report period' })).toHaveTextContent('This Month');
+        expect(screen.getByRole('combobox', { name: 'Expense status filter' })).toHaveTextContent('Paid only');
+        expect(screen.getByRole('combobox', { name: 'Currency display filter' })).toHaveTextContent('Source currencies');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+        expect(screen.getByRole('button', { name: 'Report period' })).toHaveTextContent('Last Month');
+        expect(screen.getByRole('combobox', { name: 'Expense status filter' })).toHaveTextContent('All expenses');
+        expect(screen.getByRole('combobox', { name: 'Currency display filter' })).toHaveTextContent('Preferred currency');
+        expect(screen.getByRole('combobox', { name: 'Invoice status filter' })).toHaveTextContent('Non-draft invoices');
+        expect(screen.getByRole('combobox', { name: 'Income date filter' })).toHaveTextContent('Income by invoice date');
+    });
+
     it('renders the VAT summary tab with tax buckets and geography breakdown', () => {
         mockSection = 'tax';
 

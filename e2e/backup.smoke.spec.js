@@ -1,6 +1,52 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { createTrackedInvoice } from './helpers/tasktime.js';
+
+const FIXED_SMOKE_TIME = '2026-05-21T12:00:00Z';
+
+async function freezePageTime(page, isoString) {
+    const fixedNow = new Date(isoString).getTime();
+
+    await page.addInitScript(({ nextFixedNow }) => {
+        const NativeDate = Date;
+
+        class FixedDate extends NativeDate {
+            constructor(...args) {
+                if (args.length === 0) {
+                    super(nextFixedNow);
+                    return;
+                }
+
+                super(...args);
+            }
+
+            static now() {
+                return nextFixedNow;
+            }
+        }
+
+        FixedDate.parse = NativeDate.parse;
+        FixedDate.UTC = NativeDate.UTC;
+        FixedDate.prototype = NativeDate.prototype;
+
+        window.Date = FixedDate;
+    }, { nextFixedNow: fixedNow });
+}
+
+async function importBackupFixture(page, fixturePath) {
+    await page.goto('/account?section=data');
+    await expect(page.getByRole('heading', { name: 'Your Data' })).toBeVisible();
+    await expect(page.getByText('Backup & Restore')).toBeVisible();
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+
+    const importDialog = page.getByRole('dialog', { name: 'Import Data' });
+    await expect(importDialog).toBeVisible();
+    await importDialog.locator('#file-upload').setInputFiles(fixturePath);
+    await expect(importDialog.getByRole('button', { name: 'Import Data' })).toBeEnabled();
+    await importDialog.getByRole('button', { name: 'Import Data' }).click();
+    await expect(importDialog).not.toBeVisible();
+}
 
 test.describe('Backup smoke', () => {
 
@@ -140,5 +186,41 @@ test.describe('Backup smoke', () => {
         await expect(page.getByRole('heading', { name: /^Invoices \(1\)$/ })).toBeVisible();
         await expect(page.getByText(`Client: ${clientName}`)).toBeVisible();
         await expect(page.getByText(`Project: ${projectTitle}`)).toBeVisible();
+    });
+
+    test('imports the broad sample backup and previews an imported invoice in edit mode', async ({ page }) => {
+        const fixturePath = path.resolve(process.cwd(), 'docs/test-data/tasktime-sample-backup-v1.3.json');
+
+        await freezePageTime(page, FIXED_SMOKE_TIME);
+        await importBackupFixture(page, fixturePath);
+
+        await expect(page.getByText('Current Data')).toBeVisible();
+        await expect(page.getByText(/Projects:\s*5/)).toBeVisible();
+        await expect(page.getByText(/Invoices:\s*3/)).toBeVisible();
+
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: 'Acme Website Redesign' })).toBeVisible();
+
+        await page.goto('/invoices?section=invoices');
+        await expect(page.getByRole('heading', { name: /^Invoices \(3\)$/ })).toBeVisible();
+        await page.getByRole('tab', { name: /^Outstanding \(1\)$/ }).click();
+
+        const invoiceCard = page
+            .getByRole('heading', { name: 'RET-2026-004' })
+            .locator('xpath=ancestor::div[contains(@class, "p-4")][1]');
+
+        await expect(invoiceCard).toBeVisible();
+        await expect(invoiceCard).toContainText('RET-2026-004');
+        await invoiceCard.getByTitle('Edit Invoice').click();
+
+        const editDialog = page.getByRole('dialog', { name: 'Edit Invoice' });
+        await expect(editDialog).toBeVisible();
+
+        await editDialog.getByRole('button', { name: 'Preview invoice' }).click();
+
+        const previewDialog = page.getByRole('dialog', { name: 'Invoice Preview - RET-2026-004' });
+        await expect(previewDialog).toBeVisible();
+        await expect(page.getByTestId('invoice-preview-page')).toBeVisible();
+        await expect(page.getByTestId('invoice-preview-page')).toContainText('RET-2026-004');
     });
 });

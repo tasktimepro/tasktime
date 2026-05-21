@@ -284,6 +284,18 @@ const REVIEW_CHECKLIST_EXPORT_COLUMNS = [
     { key: 'count', header: 'Count' },
 ];
 
+const REPORT_FILTER_DEFAULTS = {
+    businessId: 'all',
+    clientId: 'all',
+    projectId: 'all',
+    categoryId: 'all',
+    invoiceStatus: 'non-draft',
+    expenseStatus: 'all',
+    incomeDateBasis: 'invoice-date',
+    expenseDateBasis: 'expense-date',
+    currencyDisplayMode: 'preferred',
+};
+
 const buildSectionClassName = (isMobileLayout) => cn(isMobileLayout ? 'space-y-4' : 'space-y-6');
 
 function ReportSection({
@@ -347,15 +359,15 @@ function Reports() {
     const [customRange] = useState(() => getDefaultCustomRange());
     const [customStart, setCustomStart] = useState(customRange.customStart);
     const [customEnd, setCustomEnd] = useState(customRange.customEnd);
-    const [businessId, setBusinessId] = useState('all');
-    const [clientId, setClientId] = useState('all');
-    const [projectId, setProjectId] = useState('all');
-    const [categoryId, setCategoryId] = useState('all');
-    const [invoiceStatus, setInvoiceStatus] = useState('non-draft');
-    const [expenseStatus, setExpenseStatus] = useState('all');
-    const [incomeDateBasis, setIncomeDateBasis] = useState('invoice-date');
-    const [expenseDateBasis, setExpenseDateBasis] = useState('expense-date');
-    const [currencyDisplayMode, setCurrencyDisplayMode] = useState('preferred');
+    const [businessId, setBusinessId] = useState(REPORT_FILTER_DEFAULTS.businessId);
+    const [clientId, setClientId] = useState(REPORT_FILTER_DEFAULTS.clientId);
+    const [projectId, setProjectId] = useState(REPORT_FILTER_DEFAULTS.projectId);
+    const [categoryId, setCategoryId] = useState(REPORT_FILTER_DEFAULTS.categoryId);
+    const [invoiceStatus, setInvoiceStatus] = useState(REPORT_FILTER_DEFAULTS.invoiceStatus);
+    const [expenseStatus, setExpenseStatus] = useState(REPORT_FILTER_DEFAULTS.expenseStatus);
+    const [incomeDateBasis, setIncomeDateBasis] = useState(REPORT_FILTER_DEFAULTS.incomeDateBasis);
+    const [expenseDateBasis, setExpenseDateBasis] = useState(REPORT_FILTER_DEFAULTS.expenseDateBasis);
+    const [currencyDisplayMode, setCurrencyDisplayMode] = useState(REPORT_FILTER_DEFAULTS.currencyDisplayMode);
     const [selectedExpenseIds, setSelectedExpenseIds] = useState([]);
     const [isClaimDialogOpen, setIsClaimDialogOpen] = useState(false);
 
@@ -405,6 +417,24 @@ function Reports() {
 
     const handleSectionChange = (section) => {
         updateUrl({ section, create: null, tab: null });
+    };
+
+    const handleResetFilters = () => {
+        const defaultCustomRange = getDefaultCustomRange();
+
+        setPeriod(getDefaultReportPeriod());
+        setCustomStart(defaultCustomRange.customStart);
+        setCustomEnd(defaultCustomRange.customEnd);
+        setBusinessId(REPORT_FILTER_DEFAULTS.businessId);
+        setClientId(REPORT_FILTER_DEFAULTS.clientId);
+        setProjectId(REPORT_FILTER_DEFAULTS.projectId);
+        setCategoryId(REPORT_FILTER_DEFAULTS.categoryId);
+        setInvoiceStatus(REPORT_FILTER_DEFAULTS.invoiceStatus);
+        setExpenseStatus(REPORT_FILTER_DEFAULTS.expenseStatus);
+        setIncomeDateBasis(REPORT_FILTER_DEFAULTS.incomeDateBasis);
+        setExpenseDateBasis(REPORT_FILTER_DEFAULTS.expenseDateBasis);
+        setCurrencyDisplayMode(REPORT_FILTER_DEFAULTS.currencyDisplayMode);
+        setSelectedExpenseIds([]);
     };
 
     const activeClients = useMemo(() => {
@@ -1790,6 +1820,7 @@ function Reports() {
                     onInvoiceStatusChange={setInvoiceStatus}
                     onPeriodChange={setPeriod}
                     onProjectIdChange={setProjectId}
+                    onResetFilters={handleResetFilters}
                     period={period}
                     periodOptions={REPORT_PERIOD_OPTIONS}
                     projectId={projectId}

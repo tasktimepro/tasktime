@@ -47,12 +47,15 @@ const getFiniteRecord = (value: any) => {
         return undefined;
     }
 
-    const entries = Object.entries(value).filter(([, rate]) => typeof rate === 'number' && Number.isFinite(rate));
+    const entries = Object.entries(value).filter(
+        (entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1])
+    );
+
     if (entries.length === 0) {
         return undefined;
     }
 
-    return Object.fromEntries(entries);
+    return Object.fromEntries(entries) as Record<string, number>;
 };
 
 const normalizePaymentCurrencySnapshot = (invoice: any): InvoicePaymentCurrencySnapshot | null => {
@@ -364,13 +367,41 @@ const getInvoiceSortValue = (invoice: any) => {
     return 0;
 };
 
-const getTemplateIdFromReference = (reference: any) => {
+const isTemplateLikeReference = (reference: any) => {
+
+    if (!reference || typeof reference !== 'object') {
+        return false;
+    }
+
+    return typeof reference.invoiceNumberFormat === 'string'
+        || typeof reference.prefix === 'string'
+        || typeof reference.useSequentialNumbers === 'boolean'
+        || typeof reference.currentSequentialNumber === 'number'
+        || typeof reference.sequentialNumberDigits === 'number'
+        || typeof reference.defaultDueDays === 'number';
+};
+
+const getTemplateIdFromReference = (reference: any, invoiceTemplates?: any[] | null) => {
 
     if (!reference) {
         return null;
     }
 
-    return reference.templateId || reference.template?.id || reference.id || null;
+    if (reference.templateId) {
+        return reference.templateId;
+    }
+
+    if (reference.template?.id) {
+        return reference.template.id;
+    }
+
+    if (!reference.id || !Array.isArray(invoiceTemplates)) {
+        return null;
+    }
+
+    return invoiceTemplates.some((template) => template?.id === reference.id)
+        ? reference.id
+        : null;
 };
 
 const isSimpleSequentialTemplate = (template: any) => {
@@ -403,14 +434,17 @@ const getTemplateInvoices = (
  * @param {Array} invoiceTemplates
  * @returns {Object|null}
  */
-export const resolveCurrentInvoiceTemplate = (reference, invoiceTemplates) => {
+export const resolveCurrentInvoiceTemplate = (
+    reference: any,
+    invoiceTemplates: any[] | null | undefined
+) => {
 
     if (!reference) {
         return null;
     }
 
-    const templateId = getTemplateIdFromReference(reference);
-    const fallbackTemplate = reference.template || reference;
+    const templateId = getTemplateIdFromReference(reference, invoiceTemplates);
+    const fallbackTemplate = reference.template || (isTemplateLikeReference(reference) ? reference : null);
 
     if (!templateId) {
         return fallbackTemplate || null;
@@ -429,7 +463,7 @@ export const resolveCurrentInvoiceTemplate = (reference, invoiceTemplates) => {
  * @param {Object|null|undefined} template
  * @returns {number|null}
  */
-export const extractSequentialNumber = (invoiceNumber, template) => {
+export const extractSequentialNumber = (invoiceNumber: any, template: any) => {
 
     if (typeof invoiceNumber !== 'string' || !isSimpleSequentialTemplate(template)) {
         return null;
@@ -469,7 +503,7 @@ export const getNextSequentialNumberForTemplate = (
 
     const usedSequentialNumbers = getTemplateInvoices(invoices, template.id, options.excludeInvoiceId)
         .map((invoice) => extractSequentialNumber(invoice?.invoiceNumber, template))
-        .filter((value) => Number.isInteger(value));
+        .filter((value): value is number => Number.isInteger(value));
 
     if (usedSequentialNumbers.length === 0) {
         return baseSequentialNumber;
@@ -484,7 +518,7 @@ export const getNextSequentialNumberForTemplate = (
  * @param {string|null|undefined} projectId
  * @returns {Array}
  */
-export const getInvoicesForProject = (invoices, projectId) => {
+export const getInvoicesForProject = (invoices: any[] | null | undefined, projectId: string | null | undefined) => {
 
     if (!projectId) {
         return [];
@@ -499,7 +533,7 @@ export const getInvoicesForProject = (invoices, projectId) => {
  * @param {string|null|undefined} projectId
  * @returns {Object|null}
  */
-export const getLatestInvoiceForProject = (invoices, projectId) => {
+export const getLatestInvoiceForProject = (invoices: any[] | null | undefined, projectId: string | null | undefined) => {
 
     const projectInvoices = getInvoicesForProject(invoices, projectId)
         .slice()

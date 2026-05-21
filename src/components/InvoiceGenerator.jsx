@@ -1287,6 +1287,31 @@ const InvoiceGenerator = ({
         updateInvoiceTemplate(template.id, { currentSequentialNumber: nextSequentialNumber });
     }, [updateInvoiceTemplate]);
 
+    const parseInvoiceNumber = useCallback((value, fallback = 0) => {
+        const parsedValue = Number.parseFloat(String(value ?? ''));
+        return Number.isFinite(parsedValue) ? parsedValue : fallback;
+    }, []);
+
+    const getInvoiceTaskAmount = useCallback((task, mergedTaskList = []) => {
+        const hasExplicitFlatRate = task?.flatRate !== undefined;
+        const usesTaskFlatRate = task?.useFlatRate === true || (task?.useFlatRate !== false && hasExplicitFlatRate);
+
+        if (usesTaskFlatRate) {
+            return parseInvoiceNumber(task?.flatRate) * parseInvoiceNumber(task?.quantity, 1);
+        }
+
+        const fallbackHourlyRate = parseInvoiceNumber(selectedProject?.hourlyRate) || parseInvoiceNumber(selectedClient?.hourlyRate);
+        const parentHourlyRate = parseInvoiceNumber(task?.hourlyRate) || fallbackHourlyRate;
+        let taskAmount = parseInvoiceNumber(task?.hours) * parentHourlyRate;
+
+        mergedTaskList.forEach((mergedTask) => {
+            const mergedTaskHourlyRate = parseInvoiceNumber(mergedTask?.hourlyRate) || fallbackHourlyRate;
+            taskAmount += parseInvoiceNumber(mergedTask?.hours) * mergedTaskHourlyRate;
+        });
+
+        return taskAmount;
+    }, [parseInvoiceNumber, selectedClient?.hourlyRate, selectedProject?.hourlyRate]);
+
     /**
      * Build invoice data for preview or save
      */
@@ -1447,6 +1472,38 @@ const InvoiceGenerator = ({
             invoiceTasks.filter(task => task && task.id && selectedTasksForBilling[task.id])
         );
 
+        const normalizedSelectedInvoiceTasks = orderedSelectedInvoiceTasks
+            .map(task => ({
+                ...task,
+                hours: editableHours[task?.id] || task?.originalHours || 0,
+                flatRate: taskFlatRates[task.id] || 0,
+                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                useFlatRate: useFlatRate[task.id] || false,
+                quantity: taskQuantities[task.id] || 1,
+                isMerged: (task && task.id && mergedSubtasks[task.id]) || false,
+                mergedSubtasks: (task && task.id && mergedSubtasks[task.id])
+                    ? invoiceTasks
+                        .filter(subtask => subtask && subtask.parentTaskId === task.id)
+                        .map(subtask => ({
+                            ...subtask,
+                            hours: editableHours[subtask.id] || subtask.originalHours || 0,
+                            flatRate: taskFlatRates[subtask.id] || 0,
+                            hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                            useFlatRate: useFlatRate[subtask.id] || false,
+                            quantity: taskQuantities[subtask.id] || 1
+                        }))
+                    : []
+            }))
+            .filter((task) => getInvoiceTaskAmount(task, task.isMerged ? task.mergedSubtasks : []) > 0);
+
+        const normalizedAdditionalTasks = additionalTasks
+            .filter(task => task)
+            .map(task => ({
+                ...task,
+                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
+            }))
+            .filter((task) => getInvoiceTaskAmount(task) > 0);
+
         return {
             id: invoiceId,
             project: selectedProject,
@@ -1461,22 +1518,8 @@ const InvoiceGenerator = ({
                 zip: selectedClient?.zip || '',
                 country: selectedClient?.country || ''
             },
-            tasks: orderedSelectedInvoiceTasks
-                .map(task => ({
-                    ...task,
-                    hours: editableHours[task?.id] || task?.originalHours || 0,
-                    flatRate: taskFlatRates[task.id] || 0,
-                    hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
-                    useFlatRate: useFlatRate[task.id] || false,
-                    quantity: taskQuantities[task.id] || 1, // Include quantity for flat rate tasks
-                    isMerged: (task && task.id && mergedSubtasks[task.id]) || false, // Track merged status
-                    mergedSubtasks: (task && task.id && mergedSubtasks[task.id]) ? 
-                        invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task.id) : []
-                })),
-            additionalTasks: additionalTasks.map(task => ({
-                ...task,
-                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
-            })),
+            tasks: normalizedSelectedInvoiceTasks,
+            additionalTasks: normalizedAdditionalTasks,
             expenseItems: allExpenseItems,
             items: [...expenseInvoiceItems, ...invoiceOnlyItems],
             taskFlatRates: taskFlatRates,
@@ -1531,28 +1574,8 @@ const InvoiceGenerator = ({
                     zip: selectedClient?.zip || '',
                     country: selectedClient?.country || ''
                 },
-                tasks: orderedSelectedInvoiceTasks
-                    .map(task => ({
-                        ...task,
-                        hours: editableHours[task.id] || task.originalHours,
-                        flatRate: taskFlatRates[task.id] || 0,
-                        hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
-                        useFlatRate: useFlatRate[task.id] || false,
-                        quantity: taskQuantities[task.id] || 1, // Include quantity for flat rate tasks
-                        isMerged: mergedSubtasks[task.id] || false, // Track merged status
-                        mergedSubtasks: mergedSubtasks[task?.id] ? 
-                            invoiceTasks.filter(subtask => subtask && subtask.parentTaskId === task?.id).map(subtask => ({
-                                ...subtask,
-                                hours: editableHours[subtask.id] || subtask.originalHours,
-                                flatRate: taskFlatRates[subtask.id] || 0,
-                                hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
-                                useFlatRate: useFlatRate[subtask.id] || false
-                            })) : []
-                    })),
-                additionalTasks: additionalTasks.filter(task => task).map(task => ({
-                    ...task,
-                    hourlyRate: task?.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
-                })),
+                tasks: normalizedSelectedInvoiceTasks,
+                additionalTasks: normalizedAdditionalTasks,
                 expenseItems: allExpenseItems,
                 taskFlatRates: taskFlatRates,
                 useFlatRate: useFlatRate,
