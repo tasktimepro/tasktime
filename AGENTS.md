@@ -1,27 +1,23 @@
 # Agent Instructions for TaskTime
 
 > **Purpose:** Guidelines and context for AI agents working on this codebase  
-> **Last Updated:** January 20, 2026
+> **Last Updated:** May 20, 2026
 
 ---
 
 ## 🚨 Critical Rules
 
-### Development Phase Status: PRE-PRODUCTION
+### Development Phase Status: PRODUCTION
 
-**This project is NOT in production. Therefore:**
+**This project has users in production. Therefore:**
 
-1. **NO backwards compatibility** — Break things freely when improving
-2. **NO legacy code** — Remove old implementations entirely, don't keep both
-3. **NO migration paths** — Users can clear browser data if needed
-4. **NO workarounds for old patterns** — Clean implementations only
-5. **NO deprecated code comments** — Delete, don't comment out
-6. **Per-file test coverage ≥ 70%** — For `src/hooks/**` and `src/utils/**`, each file must meet at least 75% coverage
-
-### When This Changes
-- These rules apply until first public release
-- Before going to production: revisit this document
-- After production: backwards compatibility becomes mandatory
+1. **Backwards compatibility is mandatory** — Existing local and synced Yjs data must keep working
+2. **No destructive schema changes without migration** — Add optional fields first, migrate safely, and preserve old data
+3. **No user-data reset assumptions** — Users must not be expected to clear browser data or Drive sync state
+4. **No clean breaks in persisted contracts** — Entity shapes, document names, sync metadata, and URL routes need compatibility handling
+5. **No automatic destructive sync actions** — Resets, claim states, archive moves, and billing mutations must be explicit and reversible where practical
+6. **Legacy code can be removed only after migration** — Delete old implementations after the replacement safely handles existing data
+7. **Per-file test coverage ≥ 70%** — For `src/hooks/**` and `src/utils/**`, each file must meet at least 75% coverage
 
 ---
 
@@ -41,7 +37,7 @@
 ## 🏗️ Architecture Decisions
 
 ### URL Routing
-- Path-based routing: `/`, `/projects`, `/projects/{id}`, `/clients`, `/clients/{id}`, `/invoices`, `/account`
+- Path-based routing: `/`, `/projects`, `/projects/{id}`, `/clients`, `/clients/{id}`, `/invoices`, `/reports`, `/expenses`, `/account`
 - Query params only for secondary state: `?section=`, `?tab=`, `?create=`
 - Custom `useUrlState` hook (not React Router)
 - Supports browser back/forward navigation
@@ -52,10 +48,12 @@
 - **Multi-doc architecture:** Data split by type/time period
 - **Sync provider:** Google Drive (delta uploads)
 
-### Schema Changes & Cloud Sync (Pre‑Production)
-- When changing document structure, ensure Drive data is cleared or isolated before testing.
-- Old cloud state can reintroduce incompatible records after a local wipe.
-- For production, plan explicit schema/versioning and server-side migration safeguards.
+### Schema Changes & Cloud Sync (Production)
+- Schema changes must be additive or include an explicit migration path.
+- Existing IndexedDB and Google Drive state must be considered live customer data.
+- Old cloud state can reintroduce incompatible records after local changes; compatibility must be handled in validation, migrations, and sync code.
+- Test schema changes against realistic existing local and Drive-backed data before release.
+- Never auto-sync destructive resets across devices.
 
 **Document structure:**
 | Document | Contents | Loading |
@@ -249,9 +247,9 @@ docker compose run --rm app npm run <script>
 
 1. **Don't use localStorage** — We use Yjs + IndexedDB
 2. **Don't add console.log** — Remove debug statements
-3. **Don't create migration code** — We're pre-production
+3. **Don't skip migration code** — Production data must remain readable
 4. **Don't keep old code "just in case"** — Delete it
-5. **Don't add backwards compatibility shims** — Clean breaks only
+5. **Don't break persisted data contracts** — Add compatibility handling or migrations
 6. **Don't use class components** — Functional only
 7. **Don't add new dependencies without justification** — Keep it lean
 8. **Don't run npm directly** — Use `docker compose run --rm app npm ...`

@@ -20,6 +20,7 @@ import { useExpenseRecurrences } from '../../hooks/useExpenseRecurrences.ts';
 import { useClients } from '../../hooks/useClients.ts';
 import { useProjects } from '../../hooks/useProjects.ts';
 import { useBusinessInfos } from '../../hooks/useBusinessInfos.ts';
+import { useExpenseCategories } from '../../hooks/useExpenseCategories.ts';
 import { usePreferences } from '../../hooks/usePreferences.ts';
 import { usePaymentMethods } from '../../hooks/usePaymentMethods.ts';
 import { buildExpenseFromRecurrence } from '@/utils/expenseUtils';
@@ -30,6 +31,7 @@ import { parseOptionalNumberInput } from '@/utils/numberInputUtils.ts';
 const NO_CLIENT_VALUE = 'no-client';
 const NO_PROJECT_VALUE = 'no-project';
 const NO_BUSINESS_VALUE = 'no-business';
+const NO_CATEGORY_VALUE = 'no-category';
 const DEFAULT_REPEAT = 'monthly';
 const DEFAULT_AMOUNT_TYPE = 'fixed';
 const SUGGESTION_LIMIT = 6;
@@ -223,6 +225,7 @@ const buildEmptyFormData = (todayString, currency) => ({
     clientId: NO_CLIENT_VALUE,
     projectId: NO_PROJECT_VALUE,
     businessId: '',
+    categoryId: '',
     isPersonal: true,
     billable: false,
     isRecurring: false,
@@ -295,6 +298,7 @@ const ExpenseModal = ({
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
     const { businessInfos, defaultBusinessInfo } = useBusinessInfos();
+    const { expenseCategories } = useExpenseCategories({ seedDefaults: true });
     const { preferences } = usePreferences();
     const { paymentMethods, defaultPaymentMethod } = usePaymentMethods();
 
@@ -486,6 +490,7 @@ const ExpenseModal = ({
                     clientId: editingExpense.clientId || NO_CLIENT_VALUE,
                     projectId: editingExpense.projectId || NO_PROJECT_VALUE,
                     businessId: resolvedBusinessId,
+                    categoryId: editingExpense.categoryId || '',
                     isPersonal,
                     billable: editingExpense.billable === true,
                     isRecurring: Boolean(editingExpense.isRecurring),
@@ -550,6 +555,7 @@ const ExpenseModal = ({
                     clientId: recurrence.clientId || NO_CLIENT_VALUE,
                     projectId: recurrence.projectId || NO_PROJECT_VALUE,
                     businessId: resolvedBusinessId,
+                    categoryId: recurrence.categoryId || '',
                     isPersonal,
                     billable: recurrence.billable === true,
                     isRecurring: true,
@@ -1113,6 +1119,7 @@ const ExpenseModal = ({
             clientId: hasSelectedClient(formData.clientId) ? formData.clientId : null,
             projectId: hasSelectedProject(formData.projectId) ? formData.projectId : null,
             businessId: effectiveBusinessId,
+            categoryId: formData.categoryId || null,
             isPersonal: formData.isPersonal,
             billable: formData.billable,
             billingStatus: editingExpense?.billingStatus || 'unbilled',
@@ -1151,6 +1158,7 @@ const ExpenseModal = ({
                 endDate: formData.endDate || null,
                 clientId: payload.clientId,
                 projectId: payload.projectId,
+                categoryId: payload.categoryId,
                 businessId: payload.businessId,
                 isPersonal: payload.isPersonal,
                 billable: payload.billable,
@@ -1191,6 +1199,7 @@ const ExpenseModal = ({
                 endDate: formData.endDate || null,
                 clientId: payload.clientId,
                 projectId: payload.projectId,
+                categoryId: payload.categoryId,
                 businessId: payload.businessId,
                 isPersonal: payload.isPersonal,
                 billable: payload.billable,
@@ -1792,6 +1801,27 @@ const ExpenseModal = ({
                                         {availableProjects.map((project) => (
                                             <SelectItem key={project.id} value={project.id}>
                                                 {project.title}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className={`space-y-2 ${!formData.isPersonal ? 'md:col-span-2' : ''}`}>
+                                <Label htmlFor="expense-category">Category</Label>
+                                <Select
+                                    value={formData.categoryId || ''}
+                                    onValueChange={(value) => handleChange('categoryId', value === NO_CATEGORY_VALUE ? '' : value)}
+                                >
+                                    <SelectTrigger id="expense-category">
+                                        <SelectValue placeholder="Select category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {formData.categoryId && (
+                                            <SelectItem value={NO_CATEGORY_VALUE}>No category</SelectItem>
+                                        )}
+                                        {expenseCategories.map((category) => (
+                                            <SelectItem key={category.id} value={category.id}>
+                                                {category.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

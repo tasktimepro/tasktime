@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Expenses from './Expenses';
 
 const createMatchMedia = (matchesByQuery = {}) => vi.fn().mockImplementation((query) => ({
@@ -32,6 +33,12 @@ const recurrenceState = vi.hoisted(() => ({
     pauseRecurrence: vi.fn(),
     resumeRecurrence: vi.fn(),
     deleteRecurrence: vi.fn(),
+}));
+
+const expenseCategoryState = vi.hoisted(() => ({
+    expenseCategories: [
+        { id: 'category-1', name: 'Software & subscriptions', archived: false },
+    ],
 }));
 
 vi.mock('@/hooks/useUrlState.ts', () => ({
@@ -76,6 +83,10 @@ vi.mock('@/hooks/usePreferences.ts', () => ({
     }),
 }));
 
+vi.mock('@/hooks/useExpenseCategories.ts', () => ({
+    useExpenseCategories: () => expenseCategoryState,
+}));
+
 vi.mock('@/hooks/useToast.ts', () => ({
     useToast: () => ({
         showSuccess: vi.fn(),
@@ -92,6 +103,10 @@ vi.mock('@/components/PaymentMethods', () => ({
 
 vi.mock('@/components/BusinessInfo', () => ({
     default: () => <div data-testid="business-info">Business info</div>,
+}));
+
+vi.mock('@/components/modals/ExpenseCategoryManagerModal', () => ({
+    default: ({ isOpen }) => isOpen ? <div data-testid="expense-category-manager">Expense category manager</div> : null,
 }));
 
 describe('Expenses', () => {
@@ -205,5 +220,25 @@ describe('Expenses', () => {
         expect(container.firstChild).not.toBeNull();
         expect(container.firstChild.className).toContain('space-y-4');
         expect(container.firstChild.className).toContain('overflow-x-hidden');
+    });
+
+    it('opens the category manager from the more actions menu', async () => {
+        const user = userEvent.setup();
+
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        );
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        await user.click(await screen.findByRole('menuitem', { name: 'Manage categories' }));
+
+        expect(screen.getByTestId('expense-category-manager')).toBeInTheDocument();
     });
 });

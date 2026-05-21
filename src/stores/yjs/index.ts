@@ -44,6 +44,7 @@ export type {
     BusinessInfo,
     InvoiceTemplate,
     PaymentMethod,
+    ExpenseCategory,
     Preferences,
     MultiTimerState,
 } from './types';

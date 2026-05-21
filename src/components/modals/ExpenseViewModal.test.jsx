@@ -9,6 +9,7 @@ const clientsMock = vi.hoisted(() => [])
 const projectsMock = vi.hoisted(() => [])
 const businessInfosMock = vi.hoisted(() => [])
 const paymentMethodsMock = vi.hoisted(() => [])
+const expenseCategoriesMock = vi.hoisted(() => [])
 const markAsPaidMock = vi.hoisted(() => vi.fn())
 const showSuccessMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
@@ -56,6 +57,13 @@ vi.mock('@/hooks/usePaymentMethods.ts', () => ({
     })
 }))
 
+vi.mock('@/hooks/useExpenseCategories.ts', () => ({
+
+    useExpenseCategories: () => ({
+        getExpenseCategory: (id) => expenseCategoriesMock.find((category) => category.id === id),
+    })
+}))
+
 vi.mock('@/hooks/useToast.ts', () => ({
 
     useToast: () => ({
@@ -73,6 +81,7 @@ describe('ExpenseViewModal', () => {
         projectsMock.length = 0
         businessInfosMock.length = 0
         paymentMethodsMock.length = 0
+        expenseCategoriesMock.length = 0
         markAsPaidMock.mockReset()
         markAsPaidMock.mockResolvedValue(undefined)
         showSuccessMock.mockReset()

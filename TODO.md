@@ -2,7 +2,8 @@
 
 ## Priority
 
-
+[ ] Expense category notice about deleting in the modal should only show up when they try to delete one that has what it says
+[ ] What is the default tag? They all have it and I cannot set it or not set it..
 
 ---
 

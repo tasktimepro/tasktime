@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getWeek, getWeekYear } from 'date-fns';
 import { usePreferences } from '@/hooks/usePreferences';
 
-type ViewName = 'dashboard' | 'planner' | 'projects' | 'clients' | 'invoices' | 'expenses' | 'account' | 'auth-callback';
+type ViewName = 'dashboard' | 'planner' | 'projects' | 'clients' | 'invoices' | 'reports' | 'expenses' | 'account' | 'auth-callback';
 
 type UrlParams = {
     view: ViewName;
@@ -34,7 +34,7 @@ type UrlUpdateParams = Partial<{
 
 /**
  * Parse URL path and search params into state object
- * Supports paths like: /, /projects, /projects/abc123, /clients, /clients/xyz789, /invoices, /expenses, /account
+ * Supports paths like: /, /projects, /projects/abc123, /clients, /clients/xyz789, /invoices, /reports, /expenses, /account
  */
 function getParamsFromUrl(): UrlParams {
     const pathname = window.location.pathname;
@@ -76,6 +76,9 @@ function getParamsFromUrl(): UrlParams {
                 break;
             case 'invoices':
                 view = 'invoices';
+                break;
+            case 'reports':
+                view = 'reports';
                 break;
             case 'expenses':
                 view = 'expenses';
@@ -224,6 +227,9 @@ export const useUrlState = () => {
             case 'invoices':
                 path = '/invoices';
                 break;
+            case 'reports':
+                path = '/reports';
+                break;
             case 'expenses':
                 path = '/expenses';
                 break;
@@ -293,6 +299,34 @@ export const useUrlState = () => {
     }, [updateUrl]);
 
     /**
+     * Navigate to reports view with optional parameters
+     */
+    const navigateToReports = useCallback((params: UrlUpdateParams = {}) => {
+        const finalParams: UrlUpdateParams = {
+            view: 'reports',
+            client: null,
+            project: null,
+            year: null,
+            week: null,
+            create: null,
+            tab: null,
+            expenseClientId: null,
+            expenseProjectId: null,
+            ...params
+        };
+
+        if (!('section' in params)) {
+            finalParams.section = 'overview';
+        }
+
+        if (!('tab' in params)) {
+            finalParams.tab = null;
+        }
+
+        updateUrl(finalParams);
+    }, [updateUrl]);
+
+    /**
      * Navigate to account view with optional parameters
      */
     const navigateToAccount = useCallback((params: UrlUpdateParams = {}) => {
@@ -349,6 +383,7 @@ export const useUrlState = () => {
         navigateToClients,
         navigateToClient,
         navigateToInvoices,
+        navigateToReports,
         navigateToExpenses,
         navigateToAccount,
         navigateToDashboard,

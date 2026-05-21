@@ -78,6 +78,19 @@ vi.mock('../../hooks/usePreferences.ts', () => ({
     })
 }))
 
+vi.mock('../../hooks/useExpenseCategories.ts', () => ({
+
+    useExpenseCategories: () => ({
+        expenseCategories: [],
+        allExpenseCategories: [],
+        createExpenseCategory: vi.fn(),
+        updateExpenseCategory: vi.fn(),
+        archiveExpenseCategory: vi.fn(),
+        restoreExpenseCategory: vi.fn(),
+        deleteExpenseCategory: vi.fn(),
+    })
+}))
+
 vi.mock('../../hooks/useToast.ts', () => ({
 
     useToast: () => ({

@@ -54,6 +54,11 @@ const paymentMethodsMocks = vi.hoisted(() => ({
     defaultPaymentMethod: null
 }))
 
+const expenseCategoriesMocks = vi.hoisted(() => ({
+
+    expenseCategories: []
+}))
+
 vi.mock('../../hooks/useToast.ts', () => ({
 
     useToast: () => ({
@@ -120,6 +125,13 @@ vi.mock('../../hooks/usePaymentMethods.ts', () => ({
     })
 }))
 
+vi.mock('../../hooks/useExpenseCategories.ts', () => ({
+
+    useExpenseCategories: () => ({
+        expenseCategories: expenseCategoriesMocks.expenseCategories
+    })
+}))
+
 describe('ExpenseModal', () => {
 
     const chooseSelectOption = async (user, label, optionName) => {
@@ -153,6 +165,7 @@ describe('ExpenseModal', () => {
         businessInfosMocks.defaultBusinessInfo = null
         paymentMethodsMocks.paymentMethods = []
         paymentMethodsMocks.defaultPaymentMethod = null
+        expenseCategoriesMocks.expenseCategories = []
     })
 
     afterEach(() => {

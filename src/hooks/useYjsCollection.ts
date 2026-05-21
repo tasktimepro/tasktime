@@ -18,6 +18,7 @@ import { validateCollectionEntity, safeValidateCollectionEntity, type YjsCollect
 const COLLECTION_ACTION_BASE_NAMES: Partial<Record<YjsCollectionName, string>> = {
     businessInfos: 'business_info',
     clients: 'client',
+    expenseCategories: 'expense_category',
     expenses: 'expense',
     invoices: 'invoice',
     invoiceTemplates: 'invoice_template',

@@ -4,6 +4,7 @@ import type {
     DailyGoal,
     EmailTemplate,
     Expense,
+    ExpenseCategory,
     ExpenseRecurrence,
     Invoice,
     InvoiceTemplate,
@@ -15,7 +16,7 @@ import type {
     TimeEntry,
 } from '@/stores/yjs/types';
 
-export const BACKUP_VERSION = '1.1';
+export const BACKUP_VERSION = '1.2';
 
 export interface BackupPayload {
     version: string;
@@ -26,6 +27,7 @@ export interface BackupPayload {
     timeEntries: TimeEntry[];
     invoices: Invoice[];
     paymentMethods: PaymentMethod[];
+    expenseCategories?: ExpenseCategory[];
     businessInfos: BusinessInfo[];
     clients: Client[];
     invoiceTemplates: InvoiceTemplate[];
@@ -51,6 +53,7 @@ export function createBackupPayload({
     timeEntries,
     invoices,
     paymentMethods,
+    expenseCategories,
     businessInfos,
     clients,
     invoiceTemplates,
@@ -70,6 +73,7 @@ export function createBackupPayload({
         timeEntries,
         invoices,
         paymentMethods,
+        expenseCategories,
         businessInfos,
         clients,
         invoiceTemplates,

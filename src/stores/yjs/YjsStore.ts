@@ -35,6 +35,7 @@ import type {
     EmailTemplate,
     PaymentMethod,
     Expense,
+    ExpenseCategory,
     ExpenseRecurrence,
     Preferences,
     MultiTimerState,
@@ -147,6 +148,11 @@ export class YjsStore {
     get paymentMethods(): Y.Map<string, PaymentMethod> {
         this.assertReady();
         return this._coreDoc!.getMap('paymentMethods');
+    }
+
+    get expenseCategories(): Y.Map<string, ExpenseCategory> {
+        this.assertReady();
+        return this._coreDoc!.getMap('expenseCategories');
     }
 
     get expenses(): Y.Map<string, Expense> {
@@ -960,6 +966,7 @@ export class YjsStore {
             timeEntries,
             invoices,
             paymentMethods: collectEntities(this.paymentMethods as any),
+            expenseCategories: collectEntities(this.expenseCategories as any),
             businessInfos: collectEntities(this.businessInfos as any),
             clients: collectEntities(this.clients as any),
             invoiceTemplates: collectEntities(this.invoiceTemplates as any),
@@ -1032,6 +1039,11 @@ export class YjsStore {
         for (const method of data.paymentMethods || []) {
             const validated = validateCollectionEntity<PaymentMethod>('paymentMethods', method, `import payment method ${method.id}`);
             (this.paymentMethods as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const category of data.expenseCategories || []) {
+            const validated = validateCollectionEntity<ExpenseCategory>('expenseCategories', category, `import expense category ${category.id}`);
+            (this.expenseCategories as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
         }
 
         for (const info of data.businessInfos || []) {

@@ -11,6 +11,7 @@ import { parseStoredDate, toDisplayDate, toStorageDate } from '@/utils/dateUtils
 
 const ExpenseRow = ({
     expense,
+    category,
     client,
     project,
     compact = false,
@@ -161,6 +162,13 @@ const ExpenseRow = ({
                                     <p>
                                         Project: <span className="font-medium text-muted-foreground">
                                             {projectName}
+                                        </span>
+                                    </p>
+                                )}
+                                {category?.name && (
+                                    <p>
+                                        Category: <span className="font-medium text-muted-foreground">
+                                            {category.name}
                                         </span>
                                     </p>
                                 )}

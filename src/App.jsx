@@ -25,6 +25,7 @@ import ClientDashboard from './components/ClientDashboard';
 import Dashboard from './components/Dashboard';
 import Planner from './components/Planner';
 import Expenses from './components/Expenses';
+import Reports from './components/Reports';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
 import AuthCallback from './components/AuthCallback';
@@ -57,7 +58,7 @@ import { setUsageMetricsSessionId, startUsageMetrics } from './utils/usageMetric
 import { useTodayString } from './hooks/useDayRollover';
 import { useDarkModePreference } from './hooks/useDarkModePreference.ts';
 import { SYNC_WORKER_CONFIG } from './config/google.ts';
-import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon } from '@/components/ui/icons';
+import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon, ChartBarIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { APP_VERSION, TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
@@ -81,6 +82,7 @@ const PAGE_TITLE_MAP = {
     clients: 'Clients',
     projects: 'Projects',
     invoices: 'Invoices',
+    reports: 'Reports',
     expenses: 'Expenses',
     account: 'Account'
 };
@@ -745,7 +747,7 @@ function AppContent() {
     }, [timerTaskId, timerStartTime, timerIsActive, isPaused, timerElapsedTime, currentTaskName]);
 
     // === URL State ===
-    const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToPlanner, updateUrl } = useUrlState();
+    const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToReports, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToPlanner, updateUrl } = useUrlState();
     const routeScrollKey = useMemo(() => {
         return [
             urlParams.view,
@@ -1107,8 +1109,8 @@ function AppContent() {
         setIsMoreMenuOpen(false);
     }, [activeView, selectedProject, selectedClient]);
 
-    const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'expenses', 'account'].includes(activeView);
-    const isMoreViewActive = ['clients', 'invoices', 'account'].includes(activeView);
+    const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'reports', 'expenses', 'account'].includes(activeView);
+    const isMoreViewActive = ['clients', 'invoices', 'reports', 'account'].includes(activeView);
     const isMobilePrimarySelectionVisible = !isMoreMenuOpen;
     const mobileTopPadding = showGlobalTimer && timerIsActive ? '5.5rem' : '1rem';
     const mobileBottomPadding = '7rem';
@@ -1158,6 +1160,13 @@ function AppContent() {
             description: 'Open invoice management and templates',
             Icon: DocumentTextIcon,
             onClick: () => navigateToInvoices(),
+        },
+        {
+            key: 'reports',
+            label: 'Reports',
+            description: 'Review filtered totals and export reporting views',
+            Icon: ChartBarIcon,
+            onClick: () => navigateToReports(),
         },
     ];
     const handleMoreSheetAction = (action) => () => {
@@ -1453,6 +1462,40 @@ function AppContent() {
                                 </button>
                             )}
                         </li>
+                        <li>
+                            {isSidebarCollapsed ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            onClick={handleSidebarCollapsedAction(() => navigateToReports())}
+                                            className={`w-10 mx-auto justify-center px-2 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                                activeView === 'reports'
+                                                    ? 'bg-accent text-accent-foreground font-semibold'
+                                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                            }`}
+                                            aria-label="Reports"
+                                        >
+                                            <ChartBarIcon className="h-5 w-5 flex-shrink-0" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" align="center">
+                                        Reports
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <button
+                                    onClick={() => navigateToReports()}
+                                    className={`w-full px-3 py-2 flex items-center text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                        activeView === 'reports'
+                                            ? 'bg-accent text-accent-foreground font-semibold'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    }`}
+                                >
+                                    <ChartBarIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    Reports
+                                </button>
+                            )}
+                        </li>
                     </ul>
                 </nav>
                 
@@ -1720,6 +1763,12 @@ function AppContent() {
                                 openBusinessModal={openBusinessModal}
                                 editBusinessModal={editBusinessModal}
                             />
+                            </ErrorBoundary>
+                        )}
+
+                    {activeView === 'reports' && (
+                            <ErrorBoundary>
+                            <Reports />
                             </ErrorBoundary>
                         )}
 

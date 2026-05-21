@@ -177,6 +177,22 @@ describe('useUrlState', () => {
         expect(window.location.search).toContain('section=preferences')
     })
 
+    it('navigates to reports with the overview section by default', () => {
+
+        const { result } = renderHook(() => useUrlState())
+
+        window.history.pushState({}, '', '/expenses?clientId=client-1&projectId=project-1')
+
+        act(() => {
+            result.current.navigateToReports()
+        })
+
+        expect(window.location.pathname).toBe('/reports')
+        expect(window.location.search).toContain('section=overview')
+        expect(window.location.search).not.toContain('clientId=')
+        expect(window.location.search).not.toContain('projectId=')
+    })
+
     it('parses client ID from URL', () => {
 
         window.history.pushState({}, '', '/clients/client-123')
@@ -190,6 +206,10 @@ describe('useUrlState', () => {
         window.history.pushState({}, '', '/expenses')
         const { result: expensesResult } = renderHook(() => useUrlState())
         expect(expensesResult.current.urlParams.view).toBe('expenses')
+
+        window.history.pushState({}, '', '/reports')
+        const { result: reportsResult } = renderHook(() => useUrlState())
+        expect(reportsResult.current.urlParams.view).toBe('reports')
 
         window.history.pushState({}, '', '/account')
         const { result: accountResult } = renderHook(() => useUrlState())

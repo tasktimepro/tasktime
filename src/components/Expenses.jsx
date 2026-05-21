@@ -28,6 +28,7 @@ import { useExpenses } from '@/hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
 import { useClients } from '@/hooks/useClients.ts';
 import { useProjects } from '@/hooks/useProjects.ts';
+import { useExpenseCategories } from '@/hooks/useExpenseCategories.ts';
 import { usePreferences } from '@/hooks/usePreferences.ts';
 import { useToast } from '@/hooks/useToast.ts';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
@@ -38,6 +39,7 @@ import ExpenseList from '@/components/expenses/ExpenseList';
 import ExpenseFilters from '@/components/expenses/ExpenseFilters';
 import PaymentMethods from '@/components/PaymentMethods';
 import BusinessInfo from '@/components/BusinessInfo';
+import ExpenseCategoryManagerModal from '@/components/modals/ExpenseCategoryManagerModal';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { FilterIcon, MagnifyingGlassIcon, XMarkIcon } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
@@ -76,11 +78,13 @@ const Expenses = ({
     } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
+    const { expenseCategories } = useExpenseCategories();
     const { preferences } = usePreferences();
 
     const [search, setSearch] = useState('');
     const [clientId, setClientId] = useState('all');
     const [projectId, setProjectId] = useState('all');
+    const [categoryId, setCategoryId] = useState('all');
     const [personalOnly, setPersonalOnly] = useState(false);
     const [billableOnly, setBillableOnly] = useState(false);
     const [recurringOnly, setRecurringOnly] = useState(false);
@@ -93,6 +97,7 @@ const Expenses = ({
     const recurrenceGeneratedRef = useRef(false);
     const [pendingDeleteRecurrence, setPendingDeleteRecurrence] = useState(null);
     const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+    const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
     const todayStr = useMemo(() => toStorageDate(new Date()) || '', []);
 
     const sideNavItems = useMemo(() => [
@@ -329,6 +334,10 @@ const Expenses = ({
             result = result.filter((expense) => expense.projectId === projectId);
         }
 
+        if (categoryId !== 'all') {
+            result = result.filter((expense) => (expense.categoryId || '') === categoryId);
+        }
+
         if (personalOnly) {
             result = result.filter((expense) => expense.isPersonal);
         }
@@ -376,6 +385,7 @@ const Expenses = ({
         search,
         clientId,
         projectId,
+        categoryId,
         personalOnly,
         billableOnly,
         recurringOnly,
@@ -485,6 +495,7 @@ const Expenses = ({
         if (search.trim()) return true;
         if (clientId !== 'all') return true;
         if (projectId !== 'all') return true;
+        if (categoryId !== 'all') return true;
         if (personalOnly || billableOnly || recurringOnly) return true;
         if (paidStatus !== 'all' || billedStatus !== 'all') return true;
         if (activeStatusTab !== 'outstanding' && period !== 'month') return true;
@@ -494,6 +505,7 @@ const Expenses = ({
         search,
         clientId,
         projectId,
+        categoryId,
         personalOnly,
         billableOnly,
         recurringOnly,
@@ -509,6 +521,7 @@ const Expenses = ({
         if (period !== 'month') count += 1;
         if (clientId !== 'all') count += 1;
         if (projectId !== 'all') count += 1;
+        if (categoryId !== 'all') count += 1;
         if (personalOnly) count += 1;
         if (billableOnly) count += 1;
         if (recurringOnly) count += 1;
@@ -516,7 +529,7 @@ const Expenses = ({
         if (billedStatus !== 'all') count += 1;
 
         return count;
-    }, [search, period, clientId, projectId, personalOnly, billableOnly, recurringOnly, paidStatus, billedStatus]);
+    }, [search, period, clientId, projectId, categoryId, personalOnly, billableOnly, recurringOnly, paidStatus, billedStatus]);
 
     const clientsById = useMemo(() => {
         const map = new Map();
@@ -533,6 +546,13 @@ const Expenses = ({
         });
         return map;
     }, [projects]);
+    const expenseCategoriesById = useMemo(() => {
+        const map = new Map();
+        expenseCategories.forEach((category) => {
+            map.set(category.id, category);
+        });
+        return map;
+    }, [expenseCategories]);
 
     const handleTogglePaid = async (expense) => {
         if (expense.paymentStatus === 'paid') {
@@ -575,6 +595,7 @@ const Expenses = ({
         setSearch('');
         setClientId('all');
         setProjectId('all');
+        setCategoryId('all');
         setPersonalOnly(false);
         setBillableOnly(false);
         setRecurringOnly(false);
@@ -635,9 +656,30 @@ const Expenses = ({
                                     View and manage all expenses across your workspace.
                                 </p>
                             </div>
-                            <Button className="w-full sm:w-auto" leadingIcon={PlusIcon} onClick={() => openExpenseModal(null)}>
-                                New Expense
-                            </Button>
+                            <div className="flex w-full gap-2 sm:w-auto sm:justify-end">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="shrink-0 rounded-full"
+                                            title="More actions"
+                                            aria-label="More actions"
+                                        >
+                                            <MoreHorizontalIcon className="h-5 w-5" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => setIsCategoryManagerOpen(true)}>
+                                            Manage categories
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                <Button className="min-w-0 flex-1 sm:w-auto sm:flex-none" leadingIcon={PlusIcon} onClick={() => openExpenseModal(null)}>
+                                    New Expense
+                                </Button>
+                            </div>
                         </div>
 
                         <div className="mt-6 hidden md:block">
@@ -652,13 +694,16 @@ const Expenses = ({
                                 onCustomStartChange={setCustomStart}
                                 onCustomEndChange={setCustomEnd}
                                 clients={activeClients}
+                                categories={expenseCategories}
                                 projects={availableProjects}
                                 clientId={clientId}
+                                categoryId={categoryId}
                                 projectId={projectId}
                                 onClientChange={(value) => {
                                     setClientId(value);
                                     setProjectId('all');
                                 }}
+                                onCategoryChange={setCategoryId}
                                 onProjectChange={setProjectId}
                                 personalOnly={personalOnly}
                                 billableOnly={billableOnly}
@@ -782,6 +827,7 @@ const Expenses = ({
                                 expenses={displayedExpenses}
                                 hasAnyExpenses={totalVisibleExpenseCount > 0}
                                 hasActiveFilters={hasActiveFilters || hasStatusFilters}
+                                expenseCategoriesById={expenseCategoriesById}
                                 clientsById={clientsById}
                                 projectsById={projectsById}
                                 onView={(expense) => openExpenseView?.(expense)}
@@ -1003,13 +1049,16 @@ const Expenses = ({
                             onCustomStartChange={setCustomStart}
                             onCustomEndChange={setCustomEnd}
                             clients={activeClients}
+                            categories={expenseCategories}
                             projects={availableProjects}
                             clientId={clientId}
+                            categoryId={categoryId}
                             projectId={projectId}
                             onClientChange={(value) => {
                                 setClientId(value);
                                 setProjectId('all');
                             }}
+                            onCategoryChange={setCategoryId}
                             onProjectChange={setProjectId}
                             personalOnly={personalOnly}
                             billableOnly={billableOnly}
@@ -1034,6 +1083,13 @@ const Expenses = ({
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {isCategoryManagerOpen ? (
+                <ExpenseCategoryManagerModal
+                    isOpen={isCategoryManagerOpen}
+                    onClose={() => setIsCategoryManagerOpen(false)}
+                />
+            ) : null}
         </div>
     );
 };

@@ -292,6 +292,7 @@ export const buildExpenseFromRecurrence = (recurrence: ExpenseRecurrence, dateVa
         paymentMode,
         clientId: recurrence.clientId ?? null,
         projectId: recurrence.projectId ?? null,
+        categoryId: recurrence.categoryId ?? null,
         businessId: recurrence.businessId ?? null,
         isPersonal: recurrence.isPersonal,
         billable: recurrence.billable,

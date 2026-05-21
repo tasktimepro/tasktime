@@ -8,6 +8,7 @@ import type {
     DocName,
     EmailTemplate,
     Expense,
+    ExpenseCategory,
     ExpenseRecurrence,
     Invoice,
     InvoiceTemplate,
@@ -287,6 +288,7 @@ const expenseSchema = z.object({
     clientId: optionalNullableIdSchema,
     projectId: optionalNullableIdSchema,
     businessId: optionalNullableIdSchema,
+    categoryId: optionalNullableIdSchema,
     isPersonal: z.boolean(),
     billable: z.boolean(),
     billingStatus: z.enum(['unbilled', 'billed']).default('unbilled'),
@@ -324,6 +326,7 @@ const expenseRecurrenceSchema = z.object({
     clientId: optionalNullableIdSchema,
     projectId: optionalNullableIdSchema,
     businessId: optionalNullableIdSchema,
+    categoryId: optionalNullableIdSchema,
     isPersonal: z.boolean(),
     billable: z.boolean(),
     taxNumber: z.string().nullable().optional(),
@@ -336,6 +339,16 @@ const expenseRecurrenceSchema = z.object({
     createdAt: finiteNumberSchema.optional(),
     updatedAt: finiteNumberSchema.optional(),
 }).passthrough() satisfies z.ZodType<ExpenseRecurrence>;
+
+const expenseCategorySchema = z.object({
+    id: nonEmptyStringSchema,
+    name: nonEmptyStringSchema,
+    group: z.string().nullable().optional(),
+    isDefault: z.boolean().default(false),
+    archived: z.boolean().default(false),
+    createdAt: finiteNumberSchema.optional(),
+    updatedAt: finiteNumberSchema.optional(),
+}).passthrough() satisfies z.ZodType<ExpenseCategory>;
 
 const plannerAttachmentSchema = z.object({
     id: nonEmptyStringSchema,
@@ -415,6 +428,7 @@ export const collectionSchemas = {
     invoiceTemplates: invoiceTemplateSchema,
     emailTemplates: emailTemplateSchema,
     paymentMethods: paymentMethodSchema,
+    expenseCategories: expenseCategorySchema,
     expenses: expenseSchema,
     expenseRecurrences: expenseRecurrenceSchema,
     plannerAttachments: plannerAttachmentSchema,
@@ -435,6 +449,7 @@ type ValidationSnapshot = {
     invoiceTemplates: InvoiceTemplate[];
     emailTemplates: EmailTemplate[];
     paymentMethods: PaymentMethod[];
+    expenseCategories: ExpenseCategory[];
     expenses: Expense[];
     expenseRecurrences: ExpenseRecurrence[];
     plannerAttachments: PlannerAttachment[];
@@ -511,6 +526,7 @@ function emptySnapshot(): ValidationSnapshot {
         invoiceTemplates: [],
         emailTemplates: [],
         paymentMethods: [],
+        expenseCategories: [],
         expenses: [],
         expenseRecurrences: [],
         plannerAttachments: [],
@@ -552,6 +568,7 @@ function buildSnapshotFromDocs(docs: {
         snapshot.invoiceTemplates = collectValidatedEntities<InvoiceTemplate>('invoiceTemplates', core.getMap('invoiceTemplates') as Y.Map<string, unknown>, 'core.invoiceTemplates');
         snapshot.emailTemplates = collectValidatedEntities<EmailTemplate>('emailTemplates', core.getMap('emailTemplates') as Y.Map<string, unknown>, 'core.emailTemplates');
         snapshot.paymentMethods = collectValidatedEntities<PaymentMethod>('paymentMethods', core.getMap('paymentMethods') as Y.Map<string, unknown>, 'core.paymentMethods');
+        snapshot.expenseCategories = collectValidatedEntities<ExpenseCategory>('expenseCategories', core.getMap('expenseCategories') as Y.Map<string, unknown>, 'core.expenseCategories');
         snapshot.invoices = collectValidatedEntities<Invoice>('invoices', core.getMap('invoices') as Y.Map<string, unknown>, 'core.invoices');
         snapshot.expenses = collectValidatedEntities<Expense>('expenses', core.getMap('expenses') as Y.Map<string, unknown>, 'core.expenses');
         snapshot.expenseRecurrences = collectValidatedEntities<ExpenseRecurrence>('expenseRecurrences', core.getMap('expenseRecurrences') as Y.Map<string, unknown>, 'core.expenseRecurrences');
@@ -605,6 +622,7 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
     const clientIds = new Set(snapshot.clients.map((item) => item.id));
     const businessInfoIds = new Set(snapshot.businessInfos.map((item) => item.id));
     const paymentMethodIds = new Set(snapshot.paymentMethods.map((item) => item.id));
+    const expenseCategoryIds = new Set(snapshot.expenseCategories.map((item) => item.id));
     const invoiceIds = new Set(snapshot.invoices.map((item) => item.id));
     const recurrenceIds = new Set(snapshot.expenseRecurrences.map((item) => item.id));
     const taskIds = new Set(snapshot.tasks.map((item) => item.id));
@@ -664,6 +682,10 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
         if (expense.recurrenceId) {
             assertReference(recurrenceIds.has(expense.recurrenceId), `${context}: expense ${expense.id} references missing recurrence ${expense.recurrenceId}`);
         }
+
+        if (expense.categoryId) {
+            assertReference(expenseCategoryIds.has(expense.categoryId), `${context}: expense ${expense.id} references missing expense category ${expense.categoryId}`);
+        }
     }
 
     for (const recurrence of snapshot.expenseRecurrences) {
@@ -677,6 +699,10 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
 
         if (recurrence.businessId) {
             assertReference(businessInfoIds.has(recurrence.businessId), `${context}: expense recurrence ${recurrence.id} references missing business info ${recurrence.businessId}`);
+        }
+
+        if (recurrence.categoryId) {
+            assertReference(expenseCategoryIds.has(recurrence.categoryId), `${context}: expense recurrence ${recurrence.id} references missing expense category ${recurrence.categoryId}`);
         }
     }
 

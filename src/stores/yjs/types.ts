@@ -256,6 +256,7 @@ export interface Expense {
     clientId?: string | null;
     projectId?: string | null;
     businessId?: string | null;
+    categoryId?: string | null;
     isPersonal: boolean;
     billable: boolean;
     billingStatus: 'unbilled' | 'billed';
@@ -293,6 +294,7 @@ export interface ExpenseRecurrence {
     clientId?: string | null;
     projectId?: string | null;
     businessId?: string | null;
+    categoryId?: string | null;
     isPersonal: boolean;
     billable: boolean;
     taxNumber?: string | null;
@@ -302,6 +304,16 @@ export interface ExpenseRecurrence {
     taxRate?: number | null;
     lastGeneratedDate?: string | null;
     active: boolean;
+    createdAt?: number;
+    updatedAt?: number;
+}
+
+export interface ExpenseCategory {
+    id: string;
+    name: string;
+    group?: string | null;
+    isDefault: boolean;
+    archived: boolean;
     createdAt?: number;
     updatedAt?: number;
 }

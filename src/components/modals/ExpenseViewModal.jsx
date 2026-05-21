@@ -15,6 +15,7 @@ import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
 import { useClients } from '@/hooks/useClients.ts';
 import { useProjects } from '@/hooks/useProjects.ts';
 import { useBusinessInfos } from '@/hooks/useBusinessInfos.ts';
+import { useExpenseCategories } from '@/hooks/useExpenseCategories.ts';
 import { useToast } from '@/hooks/useToast.ts';
 import { usePaymentMethods } from '@/hooks/usePaymentMethods.ts';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
@@ -40,6 +41,7 @@ const ExpenseViewModal = ({
     const { clients } = useClients();
     const { projects } = useProjects();
     const { businessInfos } = useBusinessInfos();
+    const { getExpenseCategory } = useExpenseCategories();
     const { paymentMethods } = usePaymentMethods();
 
     const currentExpense = useMemo(() => {
@@ -66,6 +68,10 @@ const ExpenseViewModal = ({
         if (!currentExpense?.businessId) return null;
         return businessInfos.find((item) => item.id === currentExpense.businessId) || null;
     }, [businessInfos, currentExpense]);
+    const category = useMemo(() => {
+        if (!currentExpense?.categoryId) return null;
+        return getExpenseCategory(currentExpense.categoryId) || null;
+    }, [currentExpense, getExpenseCategory]);
 
     const isPreview = Boolean(currentExpense?.isPreview);
     const isPaid = currentExpense?.paymentStatus === 'paid';
@@ -250,7 +256,7 @@ const ExpenseViewModal = ({
                     </div>
                 </div>
 
-                {(client || project || business) && (
+                {(client || project || business || category) && (
                     <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-4">
                         {client && (
                             <div className="space-y-1">
@@ -262,6 +268,12 @@ const ExpenseViewModal = ({
                             <div className="space-y-1">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Project</p>
                                 <p className="text-sm text-foreground">{project.title}</p>
+                            </div>
+                        )}
+                        {category && (
+                            <div className="space-y-1">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Category</p>
+                                <p className="text-sm text-foreground">{category.name}</p>
                             </div>
                         )}
                         {business && (

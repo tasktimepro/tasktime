@@ -8,6 +8,7 @@ import ExpenseRow from './ExpenseRow';
 
 const ExpenseList = ({
     expenses,
+    expenseCategoriesById = new Map(),
     clientsById,
     projectsById,
     onView,
@@ -47,11 +48,13 @@ const ExpenseList = ({
             {expenses.map((expense) => {
                 const client = clientsById.get(expense.clientId || '') || null;
                 const project = projectsById.get(expense.projectId || '') || null;
+                const category = expense.categoryId ? (expenseCategoriesById.get(expense.categoryId) || null) : null;
 
                 return (
                     <ExpenseRow
                         key={expense.id}
                         expense={expense}
+                        category={category}
                         client={client}
                         project={project}
                         compact={compact}

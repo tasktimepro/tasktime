@@ -21,10 +21,13 @@ const ExpenseFilters = ({
     onCustomStartChange,
     onCustomEndChange,
     clients,
+    categories,
     projects,
     clientId,
+    categoryId,
     projectId,
     onClientChange,
+    onCategoryChange,
     onProjectChange,
     personalOnly,
     billableOnly,
@@ -99,6 +102,22 @@ const ExpenseFilters = ({
                             {projects.map((project) => (
                                 <SelectItem key={project.id} value={project.id}>
                                     {project.title}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground">Category</div>
+                    <Select value={categoryId} onValueChange={onCategoryChange}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="All categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All categories</SelectItem>
+                            {categories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                    {category.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>
