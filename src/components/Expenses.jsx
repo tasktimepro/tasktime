@@ -11,6 +11,7 @@ import {
     PencilIcon,
     PlayIcon,
     PlusIcon,
+    TagsIcon,
     TrashIcon,
 } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
@@ -671,6 +672,7 @@ const Expenses = ({
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={() => setIsCategoryManagerOpen(true)}>
+                                            <TagsIcon className="h-4 w-4" />
                                             Manage categories
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>

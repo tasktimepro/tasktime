@@ -419,6 +419,23 @@ describe('Reports', () => {
         expect(screen.getByText('Invoices without business profile')).toBeInTheDocument();
     });
 
+    it('renders summary lines as a separate section above the monthly breakdown columns', () => {
+        mockSection = 'monthly';
+
+        render(<Reports />);
+
+        const summaryHeading = screen.getByRole('heading', { name: 'Summary lines' });
+        const topClientsHeading = screen.getByRole('heading', { name: 'Top clients' });
+        const summarySection = summaryHeading.closest('section');
+        const summaryGrid = summaryHeading.nextElementSibling;
+
+        expect(summarySection).not.toBeNull();
+        expect(summaryGrid?.className).toContain('grid');
+        expect(summaryGrid?.className).toContain('sm:grid-cols-2');
+        expect(summaryGrid?.className).toContain('xl:grid-cols-3');
+        expect(summarySection?.compareDocumentPosition(topClientsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('renders the invoices tab with register summaries', () => {
         mockSection = 'invoices';
 

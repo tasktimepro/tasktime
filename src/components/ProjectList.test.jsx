@@ -204,4 +204,30 @@ describe('ProjectList', () => {
         expect(actions?.className).toContain('ml-auto')
         expect(actions?.className).toContain('flex-wrap')
     })
+
+    it('renders archived project menu triggers with the same styling as active project cards', async () => {
+        const user = userEvent.setup()
+
+        projectsHookMocks.projects = [
+            { id: 'project-1', title: 'Active Project', createdAt: Date.now(), archived: false },
+            { id: 'project-2', title: 'Archived Project', createdAt: Date.now(), archived: true },
+        ]
+
+        render(
+            <ProjectList
+                onSelectProject={vi.fn()}
+                clients={[]}
+                openProjectModal={vi.fn()}
+                editProjectModal={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: /Archived Projects/i }))
+
+        const menuButtons = screen.getAllByRole('button', { name: 'More actions' })
+
+        expect(menuButtons).toHaveLength(2)
+        expect(menuButtons[0].className).toBe(menuButtons[1].className)
+    })
+
 })

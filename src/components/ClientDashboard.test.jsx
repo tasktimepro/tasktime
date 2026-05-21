@@ -151,5 +151,7 @@ describe('ClientDashboard', () => {
         expect(headerRow?.className.includes('flex-wrap')).toBe(true);
         expect(headerRow?.className.includes('flex-col')).toBe(false);
         expect(topHeaderRow?.className.includes('flex-col')).toBe(false);
+        expect(menuButton.className.includes('border')).toBe(true);
+        expect(menuButton.className.includes('rounded-full')).toBe(true);
     });
 });

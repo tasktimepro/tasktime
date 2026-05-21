@@ -237,7 +237,11 @@ describe('Expenses', () => {
         );
 
         await user.click(screen.getByRole('button', { name: 'More actions' }));
-        await user.click(await screen.findByRole('menuitem', { name: 'Manage categories' }));
+        const manageCategoriesItem = await screen.findByRole('menuitem', { name: 'Manage categories' });
+
+        expect(manageCategoriesItem.querySelector('svg')).not.toBeNull();
+
+        await user.click(manageCategoriesItem);
 
         expect(screen.getByTestId('expense-category-manager')).toBeInTheDocument();
     });

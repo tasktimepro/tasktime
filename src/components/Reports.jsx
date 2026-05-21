@@ -1993,10 +1993,10 @@ function Reports() {
                                 compact
                             />
 
-                            <div className="grid gap-4 xl:grid-cols-5">
-                                <div className="space-y-2">
-                                    <h3 className="text-sm font-semibold text-foreground">Summary lines</h3>
-                                    <div className="space-y-2">
+                            <div className="space-y-4">
+                                <section aria-labelledby="monthly-summary-lines-heading" className="space-y-2">
+                                    <h3 id="monthly-summary-lines-heading" className="text-sm font-semibold text-foreground">Summary lines</h3>
+                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                                         {monthlySummaryRows.map((row) => (
                                             <div key={row.metric} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
                                                 <p className="text-sm text-muted-foreground">{row.metric}</p>
@@ -2004,9 +2004,10 @@ function Reports() {
                                             </div>
                                         ))}
                                     </div>
-                                </div>
+                                </section>
 
-                                <div className="space-y-2">
+                                <div className="grid gap-4 xl:grid-cols-4">
+                                    <div className="space-y-2">
                                     <h3 className="text-sm font-semibold text-foreground">Top clients</h3>
                                     <div className="space-y-2">
                                         {topClientBreakdown.length === 0 ? (
@@ -2020,56 +2021,57 @@ function Reports() {
                                             ))
                                         )}
                                     </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <h3 className="text-sm font-semibold text-foreground">Top projects</h3>
-                                    <div className="space-y-2">
-                                        {topProjectBreakdown.length === 0 ? (
-                                            <Notice title="No project totals in this slice" compact />
-                                        ) : (
-                                            topProjectBreakdown.map((row) => (
-                                                <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
-                                                    <p className="text-sm text-muted-foreground">{row.label}</p>
-                                                    <p className="text-sm font-semibold text-foreground">{row.value}</p>
-                                                </div>
-                                            ))
-                                        )}
                                     </div>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <h3 className="text-sm font-semibold text-foreground">Expense categories</h3>
                                     <div className="space-y-2">
-                                        {topExpenseCategoryBreakdown.length === 0 ? (
-                                            <Notice title="No expense category totals in this slice" compact />
-                                        ) : (
-                                            topExpenseCategoryBreakdown.map((row) => (
-                                                <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
-                                                    <p className="text-sm text-muted-foreground">{row.label}</p>
-                                                    <p className="text-sm font-semibold text-foreground">{row.value}</p>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <h3 className="text-sm font-semibold text-foreground">Needs review</h3>
-                                    <div className="space-y-2">
-                                        {reviewChecklistRows.length === 0 ? (
-                                            <Notice title="No review issues in this slice" compact />
-                                        ) : (
-                                            reviewChecklistRows.map((row) => (
-                                                <div key={`${row.issue}-${row.scope}`} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="text-sm font-semibold text-foreground">{row.issue}</p>
-                                                        <p className="mt-1 text-xs text-muted-foreground">{row.scope}</p>
+                                        <h3 className="text-sm font-semibold text-foreground">Top projects</h3>
+                                        <div className="space-y-2">
+                                            {topProjectBreakdown.length === 0 ? (
+                                                <Notice title="No project totals in this slice" compact />
+                                            ) : (
+                                                topProjectBreakdown.map((row) => (
+                                                    <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                                                        <p className="text-sm text-muted-foreground">{row.label}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{row.value}</p>
                                                     </div>
-                                                    <p className="text-sm font-semibold text-foreground">{row.count}</p>
-                                                </div>
-                                            ))
-                                        )}
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <h3 className="text-sm font-semibold text-foreground">Expense categories</h3>
+                                        <div className="space-y-2">
+                                            {topExpenseCategoryBreakdown.length === 0 ? (
+                                                <Notice title="No expense category totals in this slice" compact />
+                                            ) : (
+                                                topExpenseCategoryBreakdown.map((row) => (
+                                                    <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                                                        <p className="text-sm text-muted-foreground">{row.label}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{row.value}</p>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <h3 className="text-sm font-semibold text-foreground">Needs review</h3>
+                                        <div className="space-y-2">
+                                            {reviewChecklistRows.length === 0 ? (
+                                                <Notice title="No review issues in this slice" compact />
+                                            ) : (
+                                                reviewChecklistRows.map((row) => (
+                                                    <div key={`${row.issue}-${row.scope}`} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-sm font-semibold text-foreground">{row.issue}</p>
+                                                            <p className="mt-1 text-xs text-muted-foreground">{row.scope}</p>
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-foreground">{row.count}</p>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -355,9 +355,9 @@ const ProjectDashboard = ({
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="icon"
-                                className="text-muted-foreground hover:bg-muted rounded-full"
+                                className="shrink-0 rounded-full text-muted-foreground"
                                 title="More actions"
                                 aria-label="More actions"
                             >

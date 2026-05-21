@@ -412,27 +412,16 @@ const ProjectList = ({
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                {archived ? (
-                                    <button
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted group"
-                                        title="More actions"
-                                        aria-label="More actions"
-                                    >
-                                        <MoreHorizontal className="h-5 w-5 group-hover:text-muted-foreground" />
-                                    </button>
-                                ) : (
-                                    <Button
-                                        onClick={(e) => e.stopPropagation()}
-                                        variant="ghost"
-                                        size="icon"
-                                        className="rounded-full text-muted-foreground hover:bg-muted"
-                                        title="More actions"
-                                        aria-label="More actions"
-                                    >
-                                        <MoreHorizontal className="h-5 w-5" />
-                                    </Button>
-                                )}
+                                <Button
+                                    onClick={(e) => e.stopPropagation()}
+                                    variant="ghost"
+                                    size="icon"
+                                    className="rounded-full text-muted-foreground hover:bg-muted"
+                                    title="More actions"
+                                    aria-label="More actions"
+                                >
+                                    <MoreHorizontal className="h-5 w-5" />
+                                </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                 {!archived && (

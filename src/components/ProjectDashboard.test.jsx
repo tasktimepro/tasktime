@@ -126,5 +126,7 @@ describe('ProjectDashboard', () => {
         const topHeaderRow = menuButton.parentElement?.parentElement;
 
         expect(topHeaderRow?.className.includes('flex-col')).toBe(false);
+        expect(menuButton.className.includes('border')).toBe(true);
+        expect(menuButton.className.includes('rounded-full')).toBe(true);
     });
 });

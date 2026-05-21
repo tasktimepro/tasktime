@@ -66,6 +66,7 @@ export {
     Sun as SunIcon,
     Timer as TimerIcon,
     Trash2 as TrashIcon,
+    Tags as TagsIcon,
     Upload as ArrowUpTrayIcon,
     User as UserIcon,
     Users as UserGroupIcon,

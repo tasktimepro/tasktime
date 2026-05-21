@@ -170,4 +170,29 @@ describe('ClientList', () => {
         expect(actions?.className).toContain('ml-auto')
         expect(actions?.className).toContain('flex-wrap')
     })
+
+    it('renders archived client menu triggers with the same styling as active client cards', async () => {
+        const user = userEvent.setup()
+
+        clientsHookMocks.clients = [
+            { id: 'client-1', title: 'Active Client', createdAt: Date.now(), archived: false },
+            { id: 'client-2', title: 'Archived Client', createdAt: Date.now(), archived: true },
+        ]
+
+        render(
+            <ClientList
+                onSelectClient={vi.fn()}
+                openClientModal={vi.fn()}
+                editClientModal={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: /Archived Clients/i }))
+
+        const menuButtons = screen.getAllByRole('button', { name: 'More actions' })
+
+        expect(menuButtons).toHaveLength(2)
+        expect(menuButtons[0].className).toBe(menuButtons[1].className)
+    })
+
 })
