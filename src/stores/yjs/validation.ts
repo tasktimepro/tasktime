@@ -18,6 +18,7 @@ import type {
     Preferences,
     Project,
     Task,
+    TaxReturnPeriod,
     TimeEntry,
 } from './types';
 import type { YjsDocManager } from './YjsDocManager';
@@ -302,6 +303,9 @@ const expenseSchema = z.object({
     amountExcludingTax: finiteNumberSchema.nullable().optional(),
     taxLabel: z.string().nullable().optional(),
     taxRate: finiteNumberSchema.nullable().optional(),
+    taxClaimStatus: z.enum(['unclaimed', 'claimed', 'excluded']).nullable().optional(),
+    taxClaimPeriodId: optionalNullableIdSchema,
+    taxClaimedAt: finiteNumberSchema.nullable().optional(),
     paymentCurrencySnapshot: paymentCurrencySnapshotSchema.nullable().optional().catch(null),
     isPreview: z.boolean().optional(),
     createdAt: finiteNumberSchema.optional(),
@@ -349,6 +353,29 @@ const expenseCategorySchema = z.object({
     createdAt: finiteNumberSchema.optional(),
     updatedAt: finiteNumberSchema.optional(),
 }).passthrough() satisfies z.ZodType<ExpenseCategory>;
+
+const taxReturnPeriodSchema = z.object({
+    id: nonEmptyStringSchema,
+    title: nonEmptyStringSchema,
+    type: z.enum(['vat', 'income-tax', 'sales-tax', 'other']),
+    startDate: storageDateSchema,
+    endDate: storageDateSchema,
+    businessInfoId: optionalNullableIdSchema,
+    status: z.enum(['draft', 'filed', 'paid']).default('draft'),
+    filedAt: finiteNumberSchema.nullable().optional(),
+    paidAt: finiteNumberSchema.nullable().optional(),
+    notes: z.string().nullable().optional(),
+    createdAt: finiteNumberSchema.optional(),
+    updatedAt: finiteNumberSchema.optional(),
+}).superRefine((value: TaxReturnPeriod, ctx: z.RefinementCtx) => {
+    if (value.endDate < value.startDate) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['endDate'],
+            message: 'endDate must be greater than or equal to startDate',
+        });
+    }
+}).passthrough() satisfies z.ZodType<TaxReturnPeriod>;
 
 const plannerAttachmentSchema = z.object({
     id: nonEmptyStringSchema,
@@ -429,6 +456,7 @@ export const collectionSchemas = {
     emailTemplates: emailTemplateSchema,
     paymentMethods: paymentMethodSchema,
     expenseCategories: expenseCategorySchema,
+    taxReturnPeriods: taxReturnPeriodSchema,
     expenses: expenseSchema,
     expenseRecurrences: expenseRecurrenceSchema,
     plannerAttachments: plannerAttachmentSchema,
@@ -450,6 +478,7 @@ type ValidationSnapshot = {
     emailTemplates: EmailTemplate[];
     paymentMethods: PaymentMethod[];
     expenseCategories: ExpenseCategory[];
+    taxReturnPeriods: TaxReturnPeriod[];
     expenses: Expense[];
     expenseRecurrences: ExpenseRecurrence[];
     plannerAttachments: PlannerAttachment[];
@@ -527,6 +556,7 @@ function emptySnapshot(): ValidationSnapshot {
         emailTemplates: [],
         paymentMethods: [],
         expenseCategories: [],
+        taxReturnPeriods: [],
         expenses: [],
         expenseRecurrences: [],
         plannerAttachments: [],
@@ -569,6 +599,7 @@ function buildSnapshotFromDocs(docs: {
         snapshot.emailTemplates = collectValidatedEntities<EmailTemplate>('emailTemplates', core.getMap('emailTemplates') as Y.Map<string, unknown>, 'core.emailTemplates');
         snapshot.paymentMethods = collectValidatedEntities<PaymentMethod>('paymentMethods', core.getMap('paymentMethods') as Y.Map<string, unknown>, 'core.paymentMethods');
         snapshot.expenseCategories = collectValidatedEntities<ExpenseCategory>('expenseCategories', core.getMap('expenseCategories') as Y.Map<string, unknown>, 'core.expenseCategories');
+        snapshot.taxReturnPeriods = collectValidatedEntities<TaxReturnPeriod>('taxReturnPeriods', core.getMap('taxReturnPeriods') as Y.Map<string, unknown>, 'core.taxReturnPeriods');
         snapshot.invoices = collectValidatedEntities<Invoice>('invoices', core.getMap('invoices') as Y.Map<string, unknown>, 'core.invoices');
         snapshot.expenses = collectValidatedEntities<Expense>('expenses', core.getMap('expenses') as Y.Map<string, unknown>, 'core.expenses');
         snapshot.expenseRecurrences = collectValidatedEntities<ExpenseRecurrence>('expenseRecurrences', core.getMap('expenseRecurrences') as Y.Map<string, unknown>, 'core.expenseRecurrences');
@@ -623,6 +654,7 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
     const businessInfoIds = new Set(snapshot.businessInfos.map((item) => item.id));
     const paymentMethodIds = new Set(snapshot.paymentMethods.map((item) => item.id));
     const expenseCategoryIds = new Set(snapshot.expenseCategories.map((item) => item.id));
+    const taxReturnPeriodIds = new Set(snapshot.taxReturnPeriods.map((item) => item.id));
     const invoiceIds = new Set(snapshot.invoices.map((item) => item.id));
     const recurrenceIds = new Set(snapshot.expenseRecurrences.map((item) => item.id));
     const taskIds = new Set(snapshot.tasks.map((item) => item.id));
@@ -686,6 +718,10 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
         if (expense.categoryId) {
             assertReference(expenseCategoryIds.has(expense.categoryId), `${context}: expense ${expense.id} references missing expense category ${expense.categoryId}`);
         }
+
+        if (expense.taxClaimPeriodId) {
+            assertReference(taxReturnPeriodIds.has(expense.taxClaimPeriodId), `${context}: expense ${expense.id} references missing tax return period ${expense.taxClaimPeriodId}`);
+        }
     }
 
     for (const recurrence of snapshot.expenseRecurrences) {
@@ -703,6 +739,12 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
 
         if (recurrence.categoryId) {
             assertReference(expenseCategoryIds.has(recurrence.categoryId), `${context}: expense recurrence ${recurrence.id} references missing expense category ${recurrence.categoryId}`);
+        }
+    }
+
+    for (const taxReturnPeriod of snapshot.taxReturnPeriods) {
+        if (taxReturnPeriod.businessInfoId) {
+            assertReference(businessInfoIds.has(taxReturnPeriod.businessInfoId), `${context}: tax return period ${taxReturnPeriod.id} references missing business info ${taxReturnPeriod.businessInfoId}`);
         }
     }
 

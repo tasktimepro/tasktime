@@ -29,6 +29,18 @@ type MarkAsPaidOptions = {
     paidBy?: string | null;
 };
 
+const getExpenseTaxClaimStatus = (expense: Partial<Expense>) => {
+    if (expense.taxClaimStatus === 'excluded') {
+        return 'excluded';
+    }
+
+    if (expense.taxClaimStatus === 'claimed' || Boolean(expense.taxClaimPeriodId)) {
+        return 'claimed';
+    }
+
+    return 'unclaimed';
+};
+
 const SNAPSHOT_SENSITIVE_EXPENSE_FIELDS = ['amount', 'currency', 'date', 'paidOn', 'paymentStatus'] as const;
 
 const shouldStoreExpensePaymentSnapshot = (expense: Partial<Expense>, preferredCurrency: string) => {
@@ -401,6 +413,34 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         return updateExpense(id, { billingStatus: 'unbilled', invoiceId: null, billedAt: null });
     }, [updateExpense]);
 
+    const markAsClaimed = useCallback((id: string, taxClaimPeriodId: string) => {
+        return updateExpense(id, {
+            taxClaimStatus: 'claimed',
+            taxClaimPeriodId,
+            taxClaimedAt: Date.now(),
+        });
+    }, [updateExpense]);
+
+    const markAsUnclaimed = useCallback((id: string) => {
+        return updateExpense(id, {
+            taxClaimStatus: 'unclaimed',
+            taxClaimPeriodId: null,
+            taxClaimedAt: null,
+        });
+    }, [updateExpense]);
+
+    const markManyAsClaimed = useCallback((ids: string[], taxClaimPeriodId: string) => {
+        return ids
+            .map((id) => markAsClaimed(id, taxClaimPeriodId))
+            .filter(Boolean);
+    }, [markAsClaimed]);
+
+    const markManyAsUnclaimed = useCallback((ids: string[]) => {
+        return ids
+            .map((id) => markAsUnclaimed(id))
+            .filter(Boolean);
+    }, [markAsUnclaimed]);
+
     const unbillExpensesForInvoice = useCallback((invoiceId: string) => {
         allExpenses
             .filter((expense) => expense.invoiceId === invoiceId)
@@ -473,6 +513,10 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         markAsUnpaid,
         markAsBilled,
         markAsUnbilled,
+        markAsClaimed,
+        markAsUnclaimed,
+        markManyAsClaimed,
+        markManyAsUnclaimed,
         unbillExpensesForInvoice,
 
         getExpensesForClient,
@@ -481,5 +525,6 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         getBillableUnbilledForProject,
         getOverdueExpenses,
         getUpcomingDueExpenses,
+        getExpenseTaxClaimStatus,
     };
 }

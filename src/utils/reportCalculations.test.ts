@@ -8,6 +8,7 @@ import {
     buildVatReportSummary,
     getClientGeographyLabel,
     getExpenseNetAmount,
+    getExpenseTaxClaimStatus,
     getExpenseTaxAmount,
     getInvoiceNetAmount,
     getInvoiceDaysOverdue,
@@ -26,6 +27,8 @@ describe('reportCalculations', () => {
 
         expect(getExpenseTaxAmount(expense)).toBe(20);
         expect(getExpenseNetAmount(expense)).toBe(100);
+        expect(getExpenseTaxAmount({ amount: 120, isTaxExempt: false, taxRate: 20 })).toBeCloseTo(20);
+        expect(getExpenseTaxAmount({ isTaxExempt: false, taxRate: 20 })).toBe(0);
     });
 
     it('derives invoice net amount from subtotal and tax fallback', () => {
@@ -38,6 +41,12 @@ describe('reportCalculations', () => {
         expect(getTaxBucketLabel({ taxRate: 20 })).toBe('20%');
         expect(getTaxBucketLabel({ isTaxExempt: true })).toBe('Exempt');
         expect(getTaxBucketLabel({})).toBe('Needs review');
+    });
+
+    it('normalizes expense tax-claim status from optional fields', () => {
+        expect(getExpenseTaxClaimStatus({})).toBe('unclaimed');
+        expect(getExpenseTaxClaimStatus({ taxClaimStatus: 'excluded' })).toBe('excluded');
+        expect(getExpenseTaxClaimStatus({ taxClaimPeriodId: 'period-1' })).toBe('claimed');
     });
 
     it('classifies client geography relative to the business country', () => {
@@ -86,6 +95,12 @@ describe('reportCalculations', () => {
                 isTaxExempt: false,
                 currency: 'EUR',
             },
+            {
+                id: 'expense-exempt',
+                amount: 15,
+                isTaxExempt: true,
+                currency: 'EUR',
+            },
         ];
 
         const clientsById = new Map([
@@ -110,10 +125,46 @@ describe('reportCalculations', () => {
         expect(summary.totalsByCurrency.inputTax).toEqual({ EUR: 10 });
         expect(summary.totalsByCurrency.netVat).toEqual({ EUR: 10 });
         expect(summary.salesBuckets).toHaveLength(2);
-        expect(summary.expenseBuckets).toHaveLength(2);
+        expect(summary.expenseBuckets).toHaveLength(3);
         expect(summary.geographyBuckets.map((bucket) => bucket.geography)).toEqual(['Domestic', 'EU cross-border']);
         expect(summary.needsReview.missingExpenseTaxMetadata).toBe(1);
         expect(summary.needsReview.needsReviewExpenseBuckets).toBe(1);
+    });
+
+    it('sorts matching tax buckets by currency', () => {
+        const summary = buildVatReportSummary({
+            invoices: [
+                {
+                    id: 'invoice-usd',
+                    clientId: 'client-1',
+                    businessInfoId: 'business-1',
+                    subtotal: 100,
+                    tax: 20,
+                    total: 120,
+                    taxRate: 20,
+                    currency: 'USD',
+                },
+                {
+                    id: 'invoice-eur',
+                    clientId: 'client-1',
+                    businessInfoId: 'business-1',
+                    subtotal: 100,
+                    tax: 20,
+                    total: 120,
+                    taxRate: 20,
+                    currency: 'EUR',
+                },
+            ],
+            expenses: [],
+            clientsById: new Map([
+                ['client-1', { id: 'client-1', country: 'SI' }],
+            ]),
+            businessInfosById: new Map([
+                ['business-1', { id: 'business-1', country: 'SI' }],
+            ]),
+        });
+
+        expect(summary.salesBuckets.map((bucket) => bucket.currency)).toEqual(['EUR', 'USD']);
     });
 
     it('keeps VAT totals separated by source currency', () => {
@@ -171,11 +222,65 @@ describe('reportCalculations', () => {
         });
     });
 
+    it('tracks claimed, unclaimed, and excluded expense tax separately', () => {
+        const summary = buildVatReportSummary({
+            invoices: [],
+            expenses: [
+                {
+                    id: 'expense-claimed',
+                    amount: 120,
+                    amountExcludingTax: 100,
+                    isTaxExempt: false,
+                    taxRate: 20,
+                    currency: 'EUR',
+                    taxClaimStatus: 'claimed',
+                    taxClaimPeriodId: 'period-1',
+                },
+                {
+                    id: 'expense-unclaimed',
+                    amount: 55,
+                    amountExcludingTax: 50,
+                    isTaxExempt: false,
+                    taxRate: 10,
+                    currency: 'EUR',
+                },
+                {
+                    id: 'expense-excluded',
+                    amount: 24,
+                    amountExcludingTax: 20,
+                    isTaxExempt: false,
+                    taxRate: 20,
+                    currency: 'EUR',
+                    taxClaimStatus: 'excluded',
+                },
+            ],
+            clientsById: new Map(),
+            businessInfosById: new Map(),
+        });
+
+        expect(summary.totals.inputTax).toBe(25);
+        expect(summary.totals.claimedInputTax).toBe(20);
+        expect(summary.totals.unclaimedInputTax).toBe(5);
+        expect(summary.totals.excludedInputTax).toBe(4);
+        expect(summary.totalsByCurrency.inputTax).toEqual({ EUR: 25 });
+        expect(summary.totalsByCurrency.claimedInputTax).toEqual({ EUR: 20 });
+        expect(summary.totalsByCurrency.unclaimedInputTax).toEqual({ EUR: 5 });
+        expect(summary.totalsByCurrency.excludedInputTax).toEqual({ EUR: 4 });
+        expect(summary.claimStatusBuckets.map((row) => row.bucketLabel)).toEqual([
+            'Claimed',
+            'Excluded',
+            'Unclaimed',
+        ]);
+    });
+
     it('derives overdue days and aging buckets for unpaid invoices', () => {
         const referenceDate = new Date('2026-05-20T12:00:00Z');
 
         expect(getInvoiceDaysOverdue({ dueDate: '2026-05-19', status: 'sent' }, referenceDate)).toBe(1);
         expect(getInvoiceDaysOverdue({ dueDate: '2026-05-20', status: 'sent' }, referenceDate)).toBe(0);
+        expect(getInvoiceDaysOverdue({ status: 'sent' }, referenceDate)).toBe(0);
+        expect(getInvoiceDaysOverdue({ dueDate: 'not-a-date', status: 'sent' }, referenceDate)).toBe(0);
+        expect(getInvoiceDaysOverdue({ dueDate: '2026-05-01', status: 'paid' }, referenceDate)).toBe(0);
 
         expect(getOutstandingAgingBucket({ dueDate: '2026-05-25', status: 'sent' }, referenceDate)).toBe('Not due');
         expect(getOutstandingAgingBucket({ dueDate: '2026-05-10', status: 'sent' }, referenceDate)).toBe('1-30 days');
@@ -229,6 +334,27 @@ describe('reportCalculations', () => {
             { bucketLabel: '1-30 days', currency: 'EUR', total: 50, count: 1 },
             { bucketLabel: '90+ days', currency: 'USD', total: 75, count: 1 },
         ]);
+    });
+
+    it('sorts outstanding buckets with matching bucket order by currency', () => {
+        const summary = buildOutstandingInvoiceSummary([
+            {
+                id: 'invoice-usd',
+                dueDate: '2026-05-01',
+                status: 'sent',
+                total: 50,
+                currency: 'USD',
+            },
+            {
+                id: 'invoice-eur',
+                dueDate: '2026-05-01',
+                status: 'sent',
+                total: 50,
+                currency: 'EUR',
+            },
+        ], new Date('2026-05-20T12:00:00Z'));
+
+        expect(summary.map((row) => row.currency)).toEqual(['EUR', 'USD']);
     });
 
     it('builds expense totals for gross, net, and VAT amounts', () => {
@@ -414,6 +540,16 @@ describe('reportCalculations', () => {
                     total: 50,
                     currency: 'USD',
                 },
+                {
+                    id: 'invoice-4',
+                    clientId: null,
+                    businessInfoId: null,
+                    status: 'sent',
+                    dueDate: '2099-01-01',
+                    subtotal: 10,
+                    tax: 0,
+                    total: 10,
+                },
             ],
             clientsById: new Map([
                 ['client-1', { id: 'client-1', title: 'Acme' }],
@@ -437,7 +573,7 @@ describe('reportCalculations', () => {
             totalByCurrency: { EUR: 360 },
         });
         expect(summary.totalsByCurrency).toEqual([
-            { currency: 'EUR', count: 2, subtotal: 300, tax: 60, total: 360 },
+            { currency: 'EUR', count: 3, subtotal: 310, tax: 60, total: 370 },
             { currency: 'USD', count: 1, subtotal: 50, tax: 0, total: 50 },
         ]);
     });

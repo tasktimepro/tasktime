@@ -2,7 +2,29 @@ import PropTypes from 'prop-types';
 import { BanknotesIcon, ChartBarIcon, CheckSquareIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { StatCard } from '@/components/ui/stat-card';
 
+const mutedCardClassName = 'border-border bg-muted/40';
+const titleClassByAccent = {
+    blue: 'status-info-text',
+    green: 'status-success-text',
+    amber: 'status-warning-text',
+    red: 'status-danger-text',
+    default: 'text-foreground',
+};
+const iconClassByAccent = {
+    blue: 'status-info-text-strong',
+    green: 'status-success-text-strong',
+    amber: 'status-warning-text-strong',
+    red: 'status-danger-text-strong',
+    default: 'text-muted-foreground',
+};
+
 function ReportSummaryCards({ cards }) {
+    const buildCardProps = (accent = 'default') => ({
+        className: mutedCardClassName,
+        titleClassName: titleClassByAccent[accent],
+        iconClassName: iconClassByAccent[accent],
+    });
+
     return (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
@@ -10,56 +32,56 @@ function ReportSummaryCards({ cards }) {
                 value={cards.revenueIssued.value}
                 subtitle={cards.revenueIssued.subtitle}
                 icon={DocumentTextIcon}
-                variant="blue"
+                {...buildCardProps('blue')}
             />
             <StatCard
                 title="Revenue Paid"
                 value={cards.revenuePaid.value}
                 subtitle={cards.revenuePaid.subtitle}
                 icon={BanknotesIcon}
-                variant="green"
+                {...buildCardProps('green')}
             />
             <StatCard
                 title="Outstanding"
                 value={cards.outstanding.value}
                 subtitle={cards.outstanding.subtitle}
                 icon={CurrencyDollarIcon}
-                variant="amber"
+                {...buildCardProps('amber')}
             />
             <StatCard
                 title="Overdue"
                 value={cards.overdue.value}
                 subtitle={cards.overdue.subtitle}
                 icon={HandCoinsIcon}
-                variant="red"
+                {...buildCardProps('red')}
             />
             <StatCard
                 title="Output Tax"
                 value={cards.outputTax.value}
                 subtitle={cards.outputTax.subtitle}
                 icon={ChartBarIcon}
-                variant="default"
+                {...buildCardProps()}
             />
             <StatCard
                 title="Expenses"
                 value={cards.expenses.value}
                 subtitle={cards.expenses.subtitle}
                 icon={HandCoinsIcon}
-                variant="default"
+                {...buildCardProps()}
             />
             <StatCard
                 title="Uninvoiced Work"
                 value={cards.uninvoicedWork.value}
                 subtitle={cards.uninvoicedWork.subtitle}
                 icon={CheckSquareIcon}
-                variant="default"
+                {...buildCardProps()}
             />
             <StatCard
                 title="Billable Utilization"
                 value={cards.billableUtilization.value}
                 subtitle={cards.billableUtilization.subtitle}
                 icon={ClockIcon}
-                variant="default"
+                {...buildCardProps()}
             />
         </div>
     );

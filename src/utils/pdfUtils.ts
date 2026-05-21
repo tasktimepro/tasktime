@@ -142,6 +142,43 @@ const forceLightModeOnClone = (doc: Document): void => {
 };
 
 /**
+ * Build sanitized PDF generator options once so all PDF flows stay aligned.
+ */
+const buildPdfContext = (
+    htmlContent: string,
+    filename?: string,
+    options: PdfOptions = {}
+) => {
+    if (!htmlContent) {
+        throw new Error('No HTML content provided');
+    }
+
+    const defaultOptions: PdfOptions = {
+        margin: [10, 20, 10, 20],  // top, right, bottom, left margins in mm
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, onclone: forceLightModeOnClone },
+        jsPDF: { unit: 'mm', format: [229, 297], orientation: 'portrait' }
+    };
+
+    const finalOptions = {
+        ...defaultOptions,
+        ...options,
+        html2canvas: { ...defaultOptions.html2canvas, ...(options.html2canvas || {}) },
+    };
+
+    const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
+        USE_PROFILES: { html: true },
+        ADD_TAGS: ['style'],
+    });
+
+    return {
+        finalOptions,
+        sanitizedHtml,
+    };
+};
+
+/**
  * Generate and download a PDF from HTML content
  * @param {string} htmlContent - The HTML content to convert to PDF
  * @param {string} filename - The filename for the PDF download
@@ -154,31 +191,7 @@ export const generatePDF = (
 ): Promise<void> => {
     return new Promise((resolve, reject) => {
         try {
-            if (!htmlContent) {
-                reject(new Error('No HTML content provided'));
-                return;
-            }
-
-            const defaultOptions: PdfOptions = {
-                margin: [10, 20, 10, 20],  // top, right, bottom, left margins in mm
-                filename: filename,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, onclone: forceLightModeOnClone },
-                jsPDF: { unit: 'mm', format: [229, 297], orientation: 'portrait' }
-            };
-
-            const finalOptions = {
-                ...defaultOptions,
-                ...options,
-                // Deep-merge html2canvas so onclone is never lost when caller overrides scale etc.
-                html2canvas: { ...defaultOptions.html2canvas, ...(options.html2canvas || {}) },
-            };
-
-            // Sanitize HTML to prevent XSS via user-provided content in invoices
-            const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
-                USE_PROFILES: { html: true },
-                ADD_TAGS: ['style'],
-            });
+            const { finalOptions, sanitizedHtml } = buildPdfContext(htmlContent, filename, options);
 
             html2pdf()
                 .set(finalOptions)
@@ -199,39 +212,42 @@ export const generatePDF = (
 };
 
 /**
+ * Generate a PDF blob from HTML content without downloading it.
+ */
+export const generatePDFBlob = (
+    htmlContent: string,
+    options: PdfOptions = {}
+): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        try {
+            const { finalOptions, sanitizedHtml } = buildPdfContext(htmlContent, undefined, options);
+
+            html2pdf()
+                .set(finalOptions)
+                .from(sanitizedHtml)
+                .outputPdf('blob')
+                .then((blob: Blob) => {
+                    resolve(blob);
+                })
+                .catch((error: unknown) => {
+                    reject(error);
+                });
+        } catch (error) {
+            reject(error);
+        }
+    });
+};
+
+/**
  * Generate a PDF as a base64 string (for email attachment)
  */
 export const generatePDFBase64 = (htmlContent: string): Promise<string> => {
-
     return new Promise((resolve, reject) => {
-
-        if (!htmlContent) {
-            reject(new Error('No HTML content provided'));
-            return;
-        }
-
-        const options: PdfOptions = {
-            margin: [10, 20, 10, 20],
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, onclone: forceLightModeOnClone },
-            jsPDF: { unit: 'mm', format: [229, 297], orientation: 'portrait' },
-        };
-
-        const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
-            USE_PROFILES: { html: true },
-            ADD_TAGS: ['style'],
-        });
-
-        html2pdf()
-            .set(options)
-            .from(sanitizedHtml)
-            .outputPdf('blob')
+        generatePDFBlob(htmlContent)
             .then((blob: Blob) => {
-
                 const reader = new FileReader();
 
                 reader.onload = () => {
-
                     const dataUrl = reader.result as string;
                     // Strip data:application/pdf;base64, prefix
                     const base64 = dataUrl.split(',')[1];

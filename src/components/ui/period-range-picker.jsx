@@ -71,8 +71,10 @@ function PeriodRangePicker({
                 tabIndex={triggerTabIndex}
                 onClick={handleTriggerClick}
             >
-                <CalendarDaysIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">{selectedOption?.label || placeholder}</span>
+                <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                    <CalendarDaysIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{selectedOption?.label || placeholder}</span>
+                </span>
                 <ChevronDownIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
             </button>
 

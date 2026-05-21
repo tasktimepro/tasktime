@@ -13,10 +13,11 @@ import type {
     Preferences,
     Project,
     Task,
+    TaxReturnPeriod,
     TimeEntry,
 } from '@/stores/yjs/types';
 
-export const BACKUP_VERSION = '1.2';
+export const BACKUP_VERSION = '1.3';
 
 export interface BackupPayload {
     version: string;
@@ -28,6 +29,7 @@ export interface BackupPayload {
     invoices: Invoice[];
     paymentMethods: PaymentMethod[];
     expenseCategories?: ExpenseCategory[];
+    taxReturnPeriods?: TaxReturnPeriod[];
     businessInfos: BusinessInfo[];
     clients: Client[];
     invoiceTemplates: InvoiceTemplate[];
@@ -54,6 +56,7 @@ export function createBackupPayload({
     invoices,
     paymentMethods,
     expenseCategories,
+    taxReturnPeriods,
     businessInfos,
     clients,
     invoiceTemplates,
@@ -74,6 +77,7 @@ export function createBackupPayload({
         invoices,
         paymentMethods,
         expenseCategories,
+        taxReturnPeriods,
         businessInfos,
         clients,
         invoiceTemplates,

@@ -5,6 +5,7 @@ import {
     buildInvoiceHtmlContent,
     createInvoiceHTML,
     generatePDF,
+    generatePDFBlob,
     generatePDFBase64,
     getCurrentInvoiceHtmlContent,
 } from './pdfUtils'
@@ -741,5 +742,21 @@ describe('generatePDFBase64', () => {
         const passedHtml = html2pdfMocks.from.mock.calls[0][0]
         expect(passedHtml).not.toContain('<script>')
         expect(passedHtml).toContain('<p>Hello</p>')
+    })
+})
+
+describe('generatePDFBlob', () => {
+
+    it('returns a pdf blob from HTML content', async () => {
+
+        const blob = await generatePDFBlob('<p>Blob Invoice</p>')
+
+        expect(blob).toBeInstanceOf(Blob)
+        expect(html2pdfMocks.outputPdf).toHaveBeenCalledWith('blob')
+    })
+
+    it('rejects when no HTML content is provided', async () => {
+
+        await expect(generatePDFBlob('')).rejects.toThrow('No HTML content provided')
     })
 })

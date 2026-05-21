@@ -475,6 +475,52 @@ describe('useExpenses', () => {
         expect(readStored(store.expenses, 'exp-3')).toEqual(expect.objectContaining({ billingStatus: 'unbilled', invoiceId: null, billedAt: null }))
     })
 
+    it('marks selected expenses as claimed and can reset them to unclaimed', () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [
+                buildExpense({ id: 'exp-1' }),
+                buildExpense({ id: 'exp-2', taxClaimStatus: 'claimed', taxClaimPeriodId: 'period-old', taxClaimedAt: 100 }),
+            ]
+        })
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedExpenses,
+        })
+
+        const { result } = renderHook(() => useExpenses())
+
+        act(() => {
+            result.current.markManyAsClaimed(['exp-1', 'exp-2'], 'period-1')
+        })
+
+        expect(readStored(store.expenses, 'exp-1')).toEqual(expect.objectContaining({
+            taxClaimStatus: 'claimed',
+            taxClaimPeriodId: 'period-1',
+        }))
+        expect(readStored(store.expenses, 'exp-2')).toEqual(expect.objectContaining({
+            taxClaimStatus: 'claimed',
+            taxClaimPeriodId: 'period-1',
+        }))
+        expect(typeof readStored(store.expenses, 'exp-1').taxClaimedAt).toBe('number')
+
+        act(() => {
+            result.current.markManyAsUnclaimed(['exp-1', 'exp-2'])
+        })
+
+        expect(readStored(store.expenses, 'exp-1')).toEqual(expect.objectContaining({
+            taxClaimStatus: 'unclaimed',
+            taxClaimPeriodId: null,
+            taxClaimedAt: null,
+        }))
+        expect(readStored(store.expenses, 'exp-2')).toEqual(expect.objectContaining({
+            taxClaimStatus: 'unclaimed',
+            taxClaimPeriodId: null,
+            taxClaimedAt: null,
+        }))
+    })
+
     it('unbills all expenses for an invoice', () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [

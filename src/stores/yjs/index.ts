@@ -47,6 +47,7 @@ export type {
     ExpenseCategory,
     Preferences,
     MultiTimerState,
+    TaxReturnPeriod,
 } from './types';
 
 // Collection helpers

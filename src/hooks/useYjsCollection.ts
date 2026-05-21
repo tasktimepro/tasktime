@@ -25,6 +25,7 @@ const COLLECTION_ACTION_BASE_NAMES: Partial<Record<YjsCollectionName, string>> =
     paymentMethods: 'payment_method',
     projects: 'project',
     tasks: 'task',
+    taxReturnPeriods: 'tax_return_period',
     timeEntries: 'time_entry',
 };
 

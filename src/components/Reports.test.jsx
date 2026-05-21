@@ -6,10 +6,22 @@ import Reports from './Reports';
 const mockUpdateUrl = vi.fn();
 const mockBuildCsvContent = vi.fn(() => 'csv-content');
 const mockDownloadCsvFile = vi.fn();
+const mockDownloadZipFile = vi.fn(() => Promise.resolve());
 const mockExportMonthlyReportPdf = vi.fn(() => Promise.resolve());
 const mockExportInvoicesReportPdf = vi.fn(() => Promise.resolve());
 const mockExportOutstandingReportPdf = vi.fn(() => Promise.resolve());
 const mockExportExpensesReportPdf = vi.fn(() => Promise.resolve());
+const mockGeneratePdfBlob = vi.fn(() => Promise.resolve(new Blob(['pdf'], { type: 'application/pdf' })));
+const mockTaxReturnPeriods = [
+    {
+        id: 'period-1',
+        title: 'April 2026 VAT return',
+        type: 'vat',
+        startDate: '2026-04-01',
+        endDate: '2026-04-30',
+        status: 'draft',
+    },
+];
 let mockSection = null;
 
 vi.mock('@/hooks/useUrlState.ts', () => ({
@@ -94,6 +106,8 @@ vi.mock('@/hooks/useExpenses.ts', () => ({
                 taxRate: 20,
             },
         ],
+        markManyAsClaimed: vi.fn(),
+        markManyAsUnclaimed: vi.fn(),
     }),
 }));
 
@@ -176,6 +190,33 @@ vi.mock('@/hooks/useExpenseCategories.ts', () => ({
                 name: 'Software & subscriptions',
             },
         ],
+        allExpenseCategories: [
+            {
+                id: 'category-1',
+                name: 'Software & subscriptions',
+            },
+        ],
+    }),
+}));
+
+vi.mock('@/hooks/useTaxReturnPeriods.ts', () => ({
+    useTaxReturnPeriods: () => ({
+        taxReturnPeriods: mockTaxReturnPeriods,
+        createTaxReturnPeriod: vi.fn(() => ({
+            id: 'period-created',
+            title: 'Created period',
+            type: 'vat',
+            startDate: '2026-04-01',
+            endDate: '2026-04-30',
+            status: 'draft',
+        })),
+    }),
+}));
+
+vi.mock('@/hooks/useToast.ts', () => ({
+    useToast: () => ({
+        showError: vi.fn(),
+        showSuccess: vi.fn(),
     }),
 }));
 
@@ -200,7 +241,12 @@ vi.mock('@/utils/reportCsvUtils', () => ({
     downloadCsvFile: (...args) => mockDownloadCsvFile(...args),
 }));
 
+vi.mock('@/utils/reportZipUtils', () => ({
+    downloadZipFile: (...args) => mockDownloadZipFile(...args),
+}));
+
 vi.mock('@/utils/reportPdfUtils', () => ({
+    buildMonthlyReportHtml: vi.fn(() => '<html>monthly report</html>'),
     exportClientStatementPdf: vi.fn(() => Promise.resolve()),
     exportExpensesReportPdf: (...args) => mockExportExpensesReportPdf(...args),
     exportInvoicesReportPdf: (...args) => mockExportInvoicesReportPdf(...args),
@@ -209,15 +255,30 @@ vi.mock('@/utils/reportPdfUtils', () => ({
     exportProjectWorkSummaryPdf: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('@/utils/pdfUtils.ts', () => ({
+    generatePDFBlob: (...args) => mockGeneratePdfBlob(...args),
+    getCurrentInvoiceHtmlContent: (invoice) => `<html>${invoice.invoiceNumber}</html>`,
+}));
+
 describe('Reports', () => {
     beforeEach(() => {
         mockUpdateUrl.mockReset();
         mockBuildCsvContent.mockClear();
         mockDownloadCsvFile.mockClear();
+        mockDownloadZipFile.mockClear();
         mockExportMonthlyReportPdf.mockClear();
         mockExportInvoicesReportPdf.mockClear();
         mockExportOutstandingReportPdf.mockClear();
         mockExportExpensesReportPdf.mockClear();
+        mockGeneratePdfBlob.mockClear();
+        mockTaxReturnPeriods.splice(0, mockTaxReturnPeriods.length, {
+            id: 'period-1',
+            title: 'April 2026 VAT return',
+            type: 'vat',
+            startDate: '2026-04-01',
+            endDate: '2026-04-30',
+            status: 'draft',
+        });
         mockSection = null;
     });
 
@@ -241,6 +302,7 @@ describe('Reports', () => {
         expect(screen.getByRole('heading', { name: 'VAT / tax summary' })).toBeInTheDocument();
         expect(screen.getByText('Sales buckets')).toBeInTheDocument();
         expect(screen.getByText('Expense buckets')).toBeInTheDocument();
+        expect(screen.getByText('Claim status')).toBeInTheDocument();
         expect(screen.getByText('Client geography')).toBeInTheDocument();
         expect(screen.getByText('20%')).toBeInTheDocument();
         expect(screen.getByText('Domestic')).toBeInTheDocument();
@@ -253,15 +315,20 @@ describe('Reports', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Export CSV pack' }));
 
-        expect(mockDownloadCsvFile).toHaveBeenCalledTimes(6);
-        expect(mockDownloadCsvFile.mock.calls.map(([filename]) => filename)).toEqual([
-            'monthly-summary-2026-04-01-to-2026-04-30.csv',
-            'monthly-invoices-2026-04-01-to-2026-04-30.csv',
-            'monthly-expenses-2026-04-01-to-2026-04-30.csv',
-            'monthly-hours-2026-04-01-to-2026-04-30.csv',
-            'monthly-tax-summary-2026-04-01-to-2026-04-30.csv',
-            'monthly-review-checklist-2026-04-01-to-2026-04-30.csv',
-        ]);
+        expect(mockDownloadZipFile).toHaveBeenCalledTimes(1);
+        expect(mockDownloadZipFile).toHaveBeenCalledWith(
+            'monthly-csv-pack-2026-04-01-to-2026-04-30.zip',
+            expect.arrayContaining([
+                expect.objectContaining({
+                    filename: 'monthly-summary-2026-04-01-to-2026-04-30.csv',
+                    content: 'csv-content',
+                }),
+                expect.objectContaining({
+                    filename: 'monthly-invoices-2026-04-01-to-2026-04-30.csv',
+                    content: 'csv-content',
+                }),
+            ]),
+        );
     });
 
     it('exports an accountant pack from the current filtered slice', async () => {
@@ -272,12 +339,25 @@ describe('Reports', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Export accountant pack' }));
 
         await waitFor(() => {
-            expect(mockDownloadCsvFile).toHaveBeenCalledTimes(6);
-            expect(mockExportMonthlyReportPdf).toHaveBeenCalledTimes(1);
-            expect(mockExportInvoicesReportPdf).toHaveBeenCalledTimes(1);
-            expect(mockExportOutstandingReportPdf).toHaveBeenCalledTimes(1);
-            expect(mockExportExpensesReportPdf).toHaveBeenCalledTimes(1);
+            expect(mockDownloadZipFile).toHaveBeenCalledTimes(1);
+            expect(mockGeneratePdfBlob).toHaveBeenCalledTimes(4);
         });
+
+        expect(mockDownloadZipFile).toHaveBeenCalledWith(
+            'accountant-pack.zip',
+            expect.arrayContaining([
+                expect.objectContaining({ filename: 'accountant-pack-manifest.csv' }),
+                expect.objectContaining({ filename: 'invoices.csv' }),
+                expect.objectContaining({ filename: 'expenses.csv' }),
+                expect.objectContaining({ filename: 'time-entries.csv' }),
+                expect.objectContaining({ filename: 'tax-summary.csv' }),
+                expect.objectContaining({ filename: 'review-checklist.csv' }),
+                expect.objectContaining({ filename: 'monthly-summary.pdf' }),
+                expect.objectContaining({ filename: 'invoice-INV-001.pdf' }),
+                expect.objectContaining({ filename: 'invoice-INV-002.pdf' }),
+                expect.objectContaining({ filename: 'invoice-INV-003.pdf' }),
+            ]),
+        );
     });
 
     it('renders the monthly tab with a needs review checklist', () => {
@@ -345,11 +425,28 @@ describe('Reports', () => {
 
         render(<Reports />);
 
-        expect(screen.getByRole('heading', { name: 'Expenses' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Expenses', level: 1 })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Export PDF' })).toBeInTheDocument();
         expect(screen.getByText('Ex VAT')).toBeInTheDocument();
         expect(screen.getByText('VAT amount')).toBeInTheDocument();
         expect(screen.getByText('Inc VAT')).toBeInTheDocument();
         expect(screen.getByText('Hosting')).toBeInTheDocument();
+    });
+
+    it('uses the shared native date inputs in the claim period modal', async () => {
+        mockSection = 'expenses';
+        mockTaxReturnPeriods.splice(0, mockTaxReturnPeriods.length);
+
+        render(<Reports />);
+
+        fireEvent.click(screen.getByLabelText('Select Hosting'));
+        fireEvent.click(screen.getByRole('button', { name: 'Mark selected as claimed' }));
+
+        const startDateInput = await screen.findByLabelText('Start date');
+        const endDateInput = screen.getByLabelText('End date');
+
+        expect(startDateInput).toHaveClass('native-date-input-field');
+        expect(endDateInput).toHaveClass('native-date-input-field');
+        expect(screen.getAllByRole('button', { name: 'Open date picker' })).toHaveLength(2);
     });
 });

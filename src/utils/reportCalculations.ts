@@ -74,6 +74,30 @@ export const getTaxBucketLabel = ({
     return 'Needs review';
 };
 
+export const getExpenseTaxClaimStatus = (expense: any) => {
+    if (expense?.taxClaimStatus === 'excluded') {
+        return 'excluded';
+    }
+
+    if (expense?.taxClaimStatus === 'claimed' || expense?.taxClaimPeriodId) {
+        return 'claimed';
+    }
+
+    return 'unclaimed';
+};
+
+export const getExpenseTaxClaimStatusLabel = (status: 'unclaimed' | 'claimed' | 'excluded') => {
+    if (status === 'claimed') {
+        return 'Claimed';
+    }
+
+    if (status === 'excluded') {
+        return 'Excluded';
+    }
+
+    return 'Unclaimed';
+};
+
 export const getClientGeographyLabel = ({
     businessCountry,
     clientCountry,
@@ -349,6 +373,7 @@ export const buildVatReportSummary = ({
     expenses,
     invoices,
 }: TaxSummaryParams) => {
+    const includedExpenses = expenses.filter((expense) => getExpenseTaxClaimStatus(expense) !== 'excluded');
     const salesBuckets = summarizeBuckets(invoices, (invoice) => ({
         bucketLabel: getTaxBucketLabel({
             taxLabel: invoice?.taxLabel,
@@ -367,6 +392,14 @@ export const buildVatReportSummary = ({
             taxRate: expense?.taxRate,
             isTaxExempt: expense?.isTaxExempt,
         }),
+        currency: expense?.currency || 'EUR',
+        grossAmount: expense?.amount || 0,
+        netAmount: getExpenseNetAmount(expense),
+        taxAmount: getExpenseTaxAmount(expense),
+    }));
+
+    const claimStatusBuckets = summarizeBuckets(expenses, (expense) => ({
+        bucketLabel: getExpenseTaxClaimStatusLabel(getExpenseTaxClaimStatus(expense)),
         currency: expense?.currency || 'EUR',
         grossAmount: expense?.amount || 0,
         netAmount: getExpenseNetAmount(expense),
@@ -403,15 +436,37 @@ export const buildVatReportSummary = ({
     });
 
     const totalOutputTax = salesBuckets.reduce((sum, row) => sum + row.taxAmount, 0);
-    const totalInputTax = expenseBuckets.reduce((sum, row) => sum + row.taxAmount, 0);
+    const totalInputTax = includedExpenses.reduce((sum, expense) => sum + getExpenseTaxAmount(expense), 0);
     const totalSalesNet = salesBuckets.reduce((sum, row) => sum + row.netAmount, 0);
     const totalExpensesNet = expenseBuckets.reduce((sum, row) => sum + row.netAmount, 0);
     const outputTaxByCurrency = sumBucketAmountsByCurrency(salesBuckets, 'taxAmount');
-    const inputTaxByCurrency = sumBucketAmountsByCurrency(expenseBuckets, 'taxAmount');
+    const inputTaxByCurrency = sumRecordsByCurrency(
+        includedExpenses,
+        (expense) => expense?.currency || 'EUR',
+        (expense) => getExpenseTaxAmount(expense)
+    );
     const salesNetByCurrency = sumBucketAmountsByCurrency(salesBuckets, 'netAmount');
     const expensesNetByCurrency = sumBucketAmountsByCurrency(expenseBuckets, 'netAmount');
     const salesGrossByCurrency = sumBucketAmountsByCurrency(salesBuckets, 'grossAmount');
     const expensesGrossByCurrency = sumBucketAmountsByCurrency(expenseBuckets, 'grossAmount');
+    const claimedExpenses = expenses.filter((expense) => getExpenseTaxClaimStatus(expense) === 'claimed');
+    const unclaimedExpenses = expenses.filter((expense) => getExpenseTaxClaimStatus(expense) === 'unclaimed');
+    const excludedExpenses = expenses.filter((expense) => getExpenseTaxClaimStatus(expense) === 'excluded');
+    const claimedInputTaxByCurrency = sumRecordsByCurrency(
+        claimedExpenses,
+        (expense) => expense?.currency || 'EUR',
+        (expense) => getExpenseTaxAmount(expense)
+    );
+    const unclaimedInputTaxByCurrency = sumRecordsByCurrency(
+        unclaimedExpenses,
+        (expense) => expense?.currency || 'EUR',
+        (expense) => getExpenseTaxAmount(expense)
+    );
+    const excludedInputTaxByCurrency = sumRecordsByCurrency(
+        excludedExpenses,
+        (expense) => expense?.currency || 'EUR',
+        (expense) => getExpenseTaxAmount(expense)
+    );
     const netVatByCurrency = subtractCurrencyTotals(outputTaxByCurrency, inputTaxByCurrency);
 
     const needsReview = {
@@ -432,18 +487,24 @@ export const buildVatReportSummary = ({
     };
 
     return {
+        claimStatusBuckets,
         expenseBuckets,
         geographyBuckets,
         needsReview,
         salesBuckets,
         totals: {
+            claimedInputTax: claimedExpenses.reduce((sum, expense) => sum + getExpenseTaxAmount(expense), 0),
+            excludedInputTax: excludedExpenses.reduce((sum, expense) => sum + getExpenseTaxAmount(expense), 0),
             inputTax: totalInputTax,
             netVat: totalOutputTax - totalInputTax,
             outputTax: totalOutputTax,
             expensesNet: totalExpensesNet,
             salesNet: totalSalesNet,
+            unclaimedInputTax: unclaimedExpenses.reduce((sum, expense) => sum + getExpenseTaxAmount(expense), 0),
         },
         totalsByCurrency: {
+            claimedInputTax: claimedInputTaxByCurrency,
+            excludedInputTax: excludedInputTaxByCurrency,
             expensesGross: expensesGrossByCurrency,
             expensesNet: expensesNetByCurrency,
             inputTax: inputTaxByCurrency,
@@ -451,6 +512,7 @@ export const buildVatReportSummary = ({
             outputTax: outputTaxByCurrency,
             salesGross: salesGrossByCurrency,
             salesNet: salesNetByCurrency,
+            unclaimedInputTax: unclaimedInputTaxByCurrency,
         },
     };
 };

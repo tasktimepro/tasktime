@@ -39,6 +39,7 @@ import type {
     ExpenseRecurrence,
     Preferences,
     MultiTimerState,
+    TaxReturnPeriod,
     PlannerAttachment,
     DailyGoal,
 } from './types';
@@ -153,6 +154,11 @@ export class YjsStore {
     get expenseCategories(): Y.Map<string, ExpenseCategory> {
         this.assertReady();
         return this._coreDoc!.getMap('expenseCategories');
+    }
+
+    get taxReturnPeriods(): Y.Map<string, TaxReturnPeriod> {
+        this.assertReady();
+        return this._coreDoc!.getMap('taxReturnPeriods');
     }
 
     get expenses(): Y.Map<string, Expense> {
@@ -967,6 +973,7 @@ export class YjsStore {
             invoices,
             paymentMethods: collectEntities(this.paymentMethods as any),
             expenseCategories: collectEntities(this.expenseCategories as any),
+            taxReturnPeriods: collectEntities(this.taxReturnPeriods as any),
             businessInfos: collectEntities(this.businessInfos as any),
             clients: collectEntities(this.clients as any),
             invoiceTemplates: collectEntities(this.invoiceTemplates as any),
@@ -1044,6 +1051,11 @@ export class YjsStore {
         for (const category of data.expenseCategories || []) {
             const validated = validateCollectionEntity<ExpenseCategory>('expenseCategories', category, `import expense category ${category.id}`);
             (this.expenseCategories as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const taxReturnPeriod of data.taxReturnPeriods || []) {
+            const validated = validateCollectionEntity<TaxReturnPeriod>('taxReturnPeriods', taxReturnPeriod, `import tax return period ${taxReturnPeriod.id}`);
+            (this.taxReturnPeriods as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
         }
 
         for (const info of data.businessInfos || []) {

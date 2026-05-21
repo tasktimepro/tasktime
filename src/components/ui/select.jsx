@@ -16,16 +16,18 @@ const SelectTrigger = React.forwardRef(({ className, children, leadingIcon: Lead
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-9 w-full cursor-pointer items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-0 focus:border-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      "flex h-9 w-full cursor-pointer items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-0 focus:border-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span:not([data-select-leading])]:line-clamp-1",
       LeadingIcon && !iconOnly && "gap-2",
       iconOnly && "w-9 justify-center px-0",
       className
     )}
     {...props}>
-    {LeadingIcon && (
-      <LeadingIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-    )}
-    {children}
+    {LeadingIcon ? (
+      <span data-select-leading className={cn("flex min-w-0 flex-1 items-center gap-2 overflow-hidden", !iconOnly && "text-left")}>
+        <LeadingIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+        {children}
+      </span>
+    ) : children}
     {!hideCaret && (
       <SelectPrimitive.Icon asChild>
         <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">

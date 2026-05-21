@@ -9,23 +9,36 @@ import { useProjects } from '@/hooks/useProjects.ts';
 import { useClients } from '@/hooks/useClients.ts';
 import { useBusinessInfos } from '@/hooks/useBusinessInfos.ts';
 import { useExpenseCategories } from '@/hooks/useExpenseCategories.ts';
+import { useTaxReturnPeriods } from '@/hooks/useTaxReturnPeriods.ts';
+import { useToast } from '@/hooks/useToast.ts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import CustomCheckbox from '@/components/CustomCheckbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Notice } from '@/components/ui/notice';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowDownTrayIcon, ChartBarIcon, ClockIcon, DocumentTextIcon, HandCoinsIcon, ListTodoIcon } from '@/components/ui/icons';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowDownTrayIcon, ChartBarIcon, ClockIcon, DocumentCheckIcon, DocumentTextIcon, HandCoinsIcon } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import useCurrencyConversion from '@/components/dashboard/hooks/useCurrencyConversion';
 import ReportFilters from '@/components/reports/ReportFilters';
 import ReportSummaryCards from '@/components/reports/ReportSummaryCards';
-import { buildClientStatementSummary, buildExpenseTotalsSummary, buildInvoiceRegisterSummary, buildOutstandingInvoiceSummary, buildProjectWorkSummary, buildVatReportSummary, getExpenseNetAmount, getExpenseTaxAmount, getInvoiceDaysOverdue } from '@/utils/reportCalculations';
+import { buildClientStatementSummary, buildExpenseTotalsSummary, buildInvoiceRegisterSummary, buildOutstandingInvoiceSummary, buildProjectWorkSummary, buildVatReportSummary, getExpenseNetAmount, getExpenseTaxAmount, getExpenseTaxClaimStatus, getExpenseTaxClaimStatusLabel, getInvoiceDaysOverdue } from '@/utils/reportCalculations';
 import { buildCsvContent, downloadCsvFile } from '@/utils/reportCsvUtils';
 import { REPORT_PERIOD_OPTIONS, getDateRangeLabel, getDefaultCustomRange, getDefaultReportPeriod, resolveReportDateRange } from '@/utils/reportDateUtils';
+import { ACCOUNTANT_PACK_MANIFEST_COLUMNS, buildAccountantPackManifestRows } from '@/utils/reportPackUtils';
+import { downloadZipFile } from '@/utils/reportZipUtils';
 import { formatCurrency } from '@/utils/currencyUtils';
 import { formatDuration, millisecondsToHours, parseStoredDate, toDisplayDate, toStorageDate } from '@/utils/dateUtils';
 import { getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '@/utils/invoiceUtils';
-import { exportClientStatementPdf, exportExpensesReportPdf, exportInvoicesReportPdf, exportMonthlyReportPdf, exportOutstandingReportPdf, exportProjectWorkSummaryPdf } from '@/utils/reportPdfUtils';
+import { buildMonthlyReportHtml, exportClientStatementPdf, exportExpensesReportPdf, exportInvoicesReportPdf, exportMonthlyReportPdf, exportOutstandingReportPdf, exportProjectWorkSummaryPdf } from '@/utils/reportPdfUtils';
+import { generatePDFBlob, getCurrentInvoiceHtmlContent } from '@/utils/pdfUtils.ts';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
 
 const REPORT_TABS = [
@@ -33,21 +46,71 @@ const REPORT_TABS = [
     { value: 'monthly', label: 'Monthly', icon: DocumentTextIcon },
     { value: 'statement', label: 'Statement', icon: DocumentTextIcon },
     { value: 'work-summary', label: 'Work Summary', icon: DocumentTextIcon },
-    { value: 'tax', label: 'Tax', icon: ChartBarIcon },
+    { value: 'tax', label: 'Tax', icon: DocumentCheckIcon },
     { value: 'invoices', label: 'Invoices', icon: DocumentTextIcon },
-    { value: 'outstanding', label: 'Outstanding', icon: HandCoinsIcon },
+    { value: 'outstanding', label: 'Outstanding', icon: DocumentTextIcon },
     { value: 'expenses', label: 'Expenses', icon: HandCoinsIcon },
     { value: 'hours', label: 'Hours', icon: ClockIcon },
-    { value: 'to-invoice', label: 'To Invoice', icon: ListTodoIcon },
 ];
+
+const REPORT_HEADER_CONTENT = {
+    overview: {
+        title: 'Reports',
+        description: 'Filter once, review key totals at a glance, and export the current slice.',
+    },
+    monthly: {
+        title: 'Monthly Summary',
+        description: 'Review the period summary, spot missing data, and export the monthly accounting pack.',
+    },
+    statement: {
+        title: 'Client Statement',
+        description: 'See opening balance, activity, payments, and closing balance for the selected client.',
+    },
+    'work-summary': {
+        title: 'Project Work Summary',
+        description: 'Summarize worked time by task so you can share a clear project activity report with a client.',
+    },
+    tax: {
+        title: 'VAT / Tax Summary',
+        description: 'Review sales tax, expense tax, claim status, and geography breakdowns for the current slice.',
+    },
+    invoices: {
+        title: 'Issued Invoices',
+        description: 'Inspect invoice totals, statuses, and register summaries, then export the filtered invoice list.',
+    },
+    outstanding: {
+        title: 'Outstanding / Aging',
+        description: 'Track open invoices, overdue balances, and aging buckets as of the selected report date.',
+    },
+    expenses: {
+        title: 'Expenses',
+        description: 'Review categorized expenses, tax treatment, and claim state, then mark selected items as claimed.',
+    },
+    hours: {
+        title: 'Hours Worked',
+        description: 'Analyze logged time by project and client, including billable and still-unbilled hours.',
+    },
+    'to-invoice': {
+        title: 'To Invoice',
+        description: 'Review uninvoiced time and billable expenses without mutating billing state or creating invoices.',
+    },
+};
 
 const EMPTY_BUSINESS = 'Unassigned';
 const EMPTY_CLIENT = 'No client';
 const EMPTY_PROJECT = 'No project';
 const EMPTY_CATEGORY = 'No category';
+const NEW_TAX_RETURN_PERIOD_VALUE = '__new_tax_return_period__';
 
 const formatPercent = (value) => `${value.toFixed(0)}%`;
 const slugifyFilePart = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'statement';
+const createTaxReturnPeriodDraft = (resolvedRange) => ({
+    title: `${getDateRangeLabel(resolvedRange)} VAT return`,
+    type: 'vat',
+    startDate: resolvedRange.startDate,
+    endDate: resolvedRange.endDate,
+    notes: '',
+});
 
 const sumAmountsByCurrency = (items, getCurrency, getAmount) => {
     return items.reduce((totals, item) => {
@@ -113,16 +176,11 @@ const downloadReport = ({ filename, columns, rows }) => {
     downloadCsvFile(filename, content);
 };
 
-const downloadReportPack = (reports) => {
-    reports.forEach(({ filename, columns, rows }) => {
-        downloadReport({ filename, columns, rows });
-    });
-};
-
-const downloadPdfPack = async (reports) => {
-    for (const report of reports) {
-        await report.exporter(report.payload);
-    }
+const buildCsvZipEntries = (reports) => {
+    return reports.map(({ filename, columns, rows }) => ({
+        filename,
+        content: buildCsvContent(columns, rows),
+    }));
 };
 
 const buildExportFileName = (prefix, startDate, endDate) => `${prefix}-${startDate}-to-${endDate}.csv`;
@@ -184,6 +242,8 @@ const EXPENSES_EXPORT_COLUMNS = [
     { key: 'taxAmount', header: 'Tax Amount' },
     { key: 'paymentStatus', header: 'Payment Status' },
     { key: 'billingStatus', header: 'Billing Status' },
+    { key: 'claimStatus', header: 'Claim Status' },
+    { key: 'claimPeriod', header: 'Claim Period' },
 ];
 
 const HOURS_EXPORT_COLUMNS = [
@@ -193,6 +253,20 @@ const HOURS_EXPORT_COLUMNS = [
     { key: 'totalHours', header: 'Total Hours' },
     { key: 'billableHours', header: 'Billable Hours' },
     { key: 'unbilledBillableHours', header: 'Unbilled Billable Hours' },
+];
+
+const TIME_ENTRIES_EXPORT_COLUMNS = [
+    { key: 'date', header: 'Date' },
+    { key: 'startTime', header: 'Start Time' },
+    { key: 'endTime', header: 'End Time' },
+    { key: 'task', header: 'Task' },
+    { key: 'project', header: 'Project' },
+    { key: 'client', header: 'Client' },
+    { key: 'billable', header: 'Billable' },
+    { key: 'durationHours', header: 'Duration Hours' },
+    { key: 'billableHours', header: 'Billable Hours' },
+    { key: 'billedInvoiceNumber', header: 'Billed Invoice Number' },
+    { key: 'note', header: 'Note' },
 ];
 
 const TO_INVOICE_EXPORT_COLUMNS = [
@@ -253,12 +327,21 @@ const buildBreakdownRows = ({ items, getLabel, getAmount, preferredCurrency, lim
 function Reports() {
     const isMobileLayout = useIsMobileLayout();
     const { urlParams, updateUrl } = useUrlState();
+    const { showError, showSuccess } = useToast();
     const { invoices } = useInvoices({ includeArchived: true });
-    const { expenses } = useExpenses({ includeArchived: true });
+    const {
+        expenses,
+        markManyAsClaimed,
+        markManyAsUnclaimed,
+    } = useExpenses({ includeArchived: true });
     const { projects } = useProjects();
     const { clients } = useClients();
     const { businessInfos } = useBusinessInfos();
-    const { expenseCategories } = useExpenseCategories();
+    const { allExpenseCategories } = useExpenseCategories();
+    const {
+        taxReturnPeriods,
+        createTaxReturnPeriod,
+    } = useTaxReturnPeriods();
     const { activeTasks, archivedTasks } = useTasks({ includeArchived: true });
     const [period, setPeriod] = useState(getDefaultReportPeriod);
     const [customRange] = useState(() => getDefaultCustomRange());
@@ -273,6 +356,8 @@ function Reports() {
     const [incomeDateBasis, setIncomeDateBasis] = useState('invoice-date');
     const [expenseDateBasis, setExpenseDateBasis] = useState('expense-date');
     const [currencyDisplayMode, setCurrencyDisplayMode] = useState('preferred');
+    const [selectedExpenseIds, setSelectedExpenseIds] = useState([]);
+    const [isClaimDialogOpen, setIsClaimDialogOpen] = useState(false);
 
     const resolvedRange = useMemo(() => {
         return resolveReportDateRange({
@@ -281,6 +366,8 @@ function Reports() {
             customEnd,
         });
     }, [period, customStart, customEnd]);
+    const [claimPeriodDraft, setClaimPeriodDraft] = useState(() => createTaxReturnPeriodDraft(resolvedRange));
+    const [selectedTaxReturnPeriodId, setSelectedTaxReturnPeriodId] = useState(NEW_TAX_RETURN_PERIOD_VALUE);
 
     const reportReferenceDate = useMemo(() => {
         return endOfDay(parseStoredDate(resolvedRange.endDate) || new Date());
@@ -299,13 +386,16 @@ function Reports() {
     });
 
     const allTasks = useMemo(() => [...activeTasks, ...archivedTasks], [activeTasks, archivedTasks]);
+    const invoicesById = useMemo(() => new Map(invoices.map((invoice) => [invoice.id, invoice])), [invoices]);
     const tasksById = useMemo(() => new Map(allTasks.map((task) => [task.id, task])), [allTasks]);
     const projectsById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
     const clientsById = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
     const businessInfosById = useMemo(() => new Map(businessInfos.map((businessInfo) => [businessInfo.id, businessInfo])), [businessInfos]);
-    const expenseCategoriesById = useMemo(() => new Map(expenseCategories.map((category) => [category.id, category])), [expenseCategories]);
+    const expenseCategoriesById = useMemo(() => new Map(allExpenseCategories.map((category) => [category.id, category])), [allExpenseCategories]);
+    const taxReturnPeriodsById = useMemo(() => new Map(taxReturnPeriods.map((period) => [period.id, period])), [taxReturnPeriods]);
 
     const activeTab = urlParams.section || 'overview';
+    const headerContent = REPORT_HEADER_CONTENT[activeTab] || REPORT_HEADER_CONTENT.overview;
 
     useEffect(() => {
         if (!urlParams.section) {
@@ -338,6 +428,26 @@ function Reports() {
             setProjectId('all');
         }
     }, [availableProjects, projectId]);
+
+    useEffect(() => {
+        setClaimPeriodDraft((current) => {
+            if (isClaimDialogOpen) {
+                return current;
+            }
+
+            return createTaxReturnPeriodDraft(resolvedRange);
+        });
+    }, [isClaimDialogOpen, resolvedRange]);
+
+    const availableTaxReturnPeriods = useMemo(() => {
+        return taxReturnPeriods.filter((taxReturnPeriod) => {
+            if (businessId === 'all') {
+                return true;
+            }
+
+            return (taxReturnPeriod.businessInfoId || '') === businessId;
+        });
+    }, [businessId, taxReturnPeriods]);
 
     const entityFilteredInvoices = useMemo(() => {
         return invoices.filter((invoice) => {
@@ -460,6 +570,19 @@ function Reports() {
                 return false;
             }
 
+            const taxClaimStatus = getExpenseTaxClaimStatus(expense);
+            if (expenseStatus === 'claimed' && taxClaimStatus !== 'claimed') {
+                return false;
+            }
+
+            if (expenseStatus === 'unclaimed' && taxClaimStatus !== 'unclaimed') {
+                return false;
+            }
+
+            if (expenseStatus === 'excluded' && taxClaimStatus !== 'excluded') {
+                return false;
+            }
+
             const dateValue = expenseDateBasis === 'paid-date'
                 ? expense.paidOn
                 : expense.date;
@@ -467,6 +590,121 @@ function Reports() {
             return matchesStoredDateRange(dateValue, resolvedRange.startDate, resolvedRange.endDate);
         });
     }, [businessId, categoryId, clientId, expenseDateBasis, expenseStatus, expenses, projectId, resolvedRange.endDate, resolvedRange.startDate]);
+
+    const selectedExpenses = useMemo(() => {
+        const selectedIds = new Set(selectedExpenseIds);
+        return filteredExpenses.filter((expense) => selectedIds.has(expense.id));
+    }, [filteredExpenses, selectedExpenseIds]);
+
+    useEffect(() => {
+        const visibleExpenseIds = new Set(filteredExpenses.map((expense) => expense.id));
+
+        setSelectedExpenseIds((current) => {
+            const next = current.filter((id) => visibleExpenseIds.has(id));
+
+            if (next.length === current.length) {
+                return current;
+            }
+
+            return next;
+        });
+    }, [filteredExpenses]);
+
+    const toggleExpenseSelection = (expenseId, checked) => {
+        setSelectedExpenseIds((current) => {
+            if (checked) {
+                return current.includes(expenseId) ? current : [...current, expenseId];
+            }
+
+            return current.filter((id) => id !== expenseId);
+        });
+    };
+
+    const toggleAllExpensesSelection = (checked) => {
+        setSelectedExpenseIds(checked ? filteredExpenses.map((expense) => expense.id) : []);
+    };
+
+    const selectedExpenseCount = selectedExpenses.length;
+    const allFilteredExpensesSelected = filteredExpenses.length > 0 && selectedExpenseCount === filteredExpenses.length;
+
+    const openClaimDialog = () => {
+        if (selectedExpenseCount === 0) {
+            showError('Select at least one expense to claim');
+            return;
+        }
+
+        const matchingPeriod = availableTaxReturnPeriods.find((taxReturnPeriod) => {
+            return taxReturnPeriod.startDate === resolvedRange.startDate
+                && taxReturnPeriod.endDate === resolvedRange.endDate
+                && (businessId === 'all' || (taxReturnPeriod.businessInfoId || '') === businessId);
+        });
+
+        setSelectedTaxReturnPeriodId(matchingPeriod?.id || NEW_TAX_RETURN_PERIOD_VALUE);
+        setClaimPeriodDraft(createTaxReturnPeriodDraft(resolvedRange));
+        setIsClaimDialogOpen(true);
+    };
+
+    const closeClaimDialog = () => {
+        setIsClaimDialogOpen(false);
+        setSelectedTaxReturnPeriodId(NEW_TAX_RETURN_PERIOD_VALUE);
+        setClaimPeriodDraft(createTaxReturnPeriodDraft(resolvedRange));
+    };
+
+    const markSelectedExpensesAsClaimed = () => {
+        if (selectedExpenseCount === 0) {
+            showError('Select at least one expense to claim');
+            return;
+        }
+
+        let taxReturnPeriodId = selectedTaxReturnPeriodId;
+
+        if (taxReturnPeriodId === NEW_TAX_RETURN_PERIOD_VALUE) {
+            const trimmedTitle = claimPeriodDraft.title.trim();
+
+            if (!trimmedTitle) {
+                showError('Tax return period title is required');
+                return;
+            }
+
+            if (!claimPeriodDraft.startDate || !claimPeriodDraft.endDate) {
+                showError('Tax return period dates are required');
+                return;
+            }
+
+            if (claimPeriodDraft.endDate < claimPeriodDraft.startDate) {
+                showError('Tax return period end date must be after the start date');
+                return;
+            }
+
+            const createdTaxReturnPeriod = createTaxReturnPeriod({
+                title: trimmedTitle,
+                type: claimPeriodDraft.type,
+                startDate: claimPeriodDraft.startDate,
+                endDate: claimPeriodDraft.endDate,
+                businessInfoId: businessId === 'all' ? null : businessId,
+                status: 'draft',
+                notes: claimPeriodDraft.notes.trim() || null,
+            });
+
+            taxReturnPeriodId = createdTaxReturnPeriod.id;
+        }
+
+        markManyAsClaimed(selectedExpenses.map((expense) => expense.id), taxReturnPeriodId);
+        showSuccess(`${selectedExpenseCount} expense${selectedExpenseCount === 1 ? '' : 's'} marked as claimed`);
+        setSelectedExpenseIds([]);
+        closeClaimDialog();
+    };
+
+    const markSelectedExpensesAsUnclaimed = () => {
+        if (selectedExpenseCount === 0) {
+            showError('Select at least one expense to unclaim');
+            return;
+        }
+
+        markManyAsUnclaimed(selectedExpenses.map((expense) => expense.id));
+        showSuccess(`${selectedExpenseCount} expense${selectedExpenseCount === 1 ? '' : 's'} marked as unclaimed`);
+        setSelectedExpenseIds([]);
+    };
 
     const filteredTimeEntries = useMemo(() => {
         return timeEntries
@@ -644,7 +882,11 @@ function Reports() {
     }, [filteredExpenses, preferredCurrency]);
 
     const inputTaxByCurrency = useMemo(() => {
-        return sumAmountsByCurrency(filteredExpenses, (expense) => expense.currency || preferredCurrency, (expense) => getExpenseTaxAmount(expense));
+        return sumAmountsByCurrency(
+            filteredExpenses.filter((expense) => getExpenseTaxClaimStatus(expense) !== 'excluded'),
+            (expense) => expense.currency || preferredCurrency,
+            (expense) => getExpenseTaxAmount(expense)
+        );
     }, [filteredExpenses, preferredCurrency]);
 
     const totalHoursMs = useMemo(() => filteredTimeEntries.reduce((sum, entry) => sum + Math.max(0, (entry.end || 0) - entry.start), 0), [filteredTimeEntries]);
@@ -910,8 +1152,10 @@ function Reports() {
             taxAmount: getExpenseTaxAmount(expense),
             paymentStatus: expense.paymentStatus,
             billingStatus: expense.billingStatus,
+            claimStatus: getExpenseTaxClaimStatusLabel(getExpenseTaxClaimStatus(expense)),
+            claimPeriod: expense.taxClaimPeriodId ? (taxReturnPeriodsById.get(expense.taxClaimPeriodId)?.title || 'Unknown period') : '',
         }));
-    }, [businessInfosById, clientsById, expenseCategoriesById, filteredExpenses, preferredCurrency, projectsById]);
+    }, [businessInfosById, clientsById, expenseCategoriesById, filteredExpenses, preferredCurrency, projectsById, taxReturnPeriodsById]);
 
     const hoursExportRows = useMemo(() => {
         return hoursRows.map((row) => ({
@@ -923,6 +1167,40 @@ function Reports() {
             unbilledBillableHours: (row.unbilledBillableMs / (1000 * 60 * 60)).toFixed(2),
         }));
     }, [hoursRows]);
+
+    const timeEntriesExportRows = useMemo(() => {
+        return filteredTimeEntries.map((entry) => {
+            const billedInvoice = entry.billedInvoiceId ? invoicesById.get(entry.billedInvoiceId) : null;
+            const actualMs = Math.max(0, (entry.end || 0) - entry.start);
+            const billableMs = entry.task?.billable ? getBillableDurationMs(entry) : 0;
+
+            return {
+                date: toStorageDate(entry.start) || '',
+                startTime: toDisplayDate(entry.start, {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                }),
+                endTime: toDisplayDate(entry.end, {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                }),
+                task: entry.task?.title || '',
+                project: entry.project?.title || EMPTY_PROJECT,
+                client: entry.client?.title || EMPTY_CLIENT,
+                billable: entry.task?.billable ? 'yes' : 'no',
+                durationHours: (actualMs / (1000 * 60 * 60)).toFixed(2),
+                billableHours: (billableMs / (1000 * 60 * 60)).toFixed(2),
+                billedInvoiceNumber: billedInvoice?.invoiceNumber || '',
+                note: entry.note || '',
+            };
+        });
+    }, [filteredTimeEntries, invoicesById]);
 
     const taxExportRows = useMemo(() => {
         const salesRows = vatSummary.salesBuckets.map((row) => ({
@@ -937,6 +1215,16 @@ function Reports() {
 
         const expenseRows = vatSummary.expenseBuckets.map((row) => ({
             section: 'Expenses',
+            label: row.bucketLabel,
+            currency: row.currency,
+            grossAmount: row.grossAmount.toFixed(2),
+            netAmount: row.netAmount.toFixed(2),
+            taxAmount: row.taxAmount.toFixed(2),
+            count: row.count,
+        }));
+
+        const claimRows = vatSummary.claimStatusBuckets.map((row) => ({
+            section: 'Claim status',
             label: row.bucketLabel,
             currency: row.currency,
             grossAmount: row.grossAmount.toFixed(2),
@@ -968,10 +1256,11 @@ function Reports() {
         return [
             ...salesRows,
             ...expenseRows,
+            ...claimRows,
             ...geographyRows,
             ...reviewRows,
         ];
-    }, [vatReviewItems, vatSummary.expenseBuckets, vatSummary.geographyBuckets, vatSummary.salesBuckets]);
+    }, [vatReviewItems, vatSummary.claimStatusBuckets, vatSummary.expenseBuckets, vatSummary.geographyBuckets, vatSummary.salesBuckets]);
 
     const outstandingSummary = useMemo(() => {
         return buildOutstandingInvoiceSummary(outstandingInvoices, reportReferenceDate);
@@ -1327,6 +1616,112 @@ function Reports() {
         }));
     }, [toInvoiceRows]);
 
+    const accountantPackCsvFiles = useMemo(() => {
+        return [
+            {
+                filename: 'invoices.csv',
+                columns: INVOICES_EXPORT_COLUMNS,
+                rows: invoicesExportRows,
+            },
+            {
+                filename: 'expenses.csv',
+                columns: EXPENSES_EXPORT_COLUMNS,
+                rows: expensesExportRows,
+            },
+            {
+                filename: 'time-entries.csv',
+                columns: TIME_ENTRIES_EXPORT_COLUMNS,
+                rows: timeEntriesExportRows,
+            },
+            {
+                filename: 'tax-summary.csv',
+                columns: TAX_EXPORT_COLUMNS,
+                rows: taxExportRows,
+            },
+            {
+                filename: 'review-checklist.csv',
+                columns: REVIEW_CHECKLIST_EXPORT_COLUMNS,
+                rows: reviewChecklistRows,
+            },
+        ];
+    }, [
+        expensesExportRows,
+        invoicesExportRows,
+        reviewChecklistRows,
+        taxExportRows,
+        timeEntriesExportRows,
+    ]);
+
+    const accountantPackPdfFiles = useMemo(() => {
+        return [
+            {
+                filename: 'monthly-summary.pdf',
+                htmlContent: buildMonthlyReportHtml({
+                    businessLabel: selectedBusinessLabel,
+                    generatedAtLabel,
+                    periodLabel,
+                    summaryRows: monthlySummaryRows.map((row) => ({ label: row.metric, value: row.value })),
+                    topClientBreakdown,
+                    categoryBreakdown: topExpenseCategoryBreakdown,
+                    projectBreakdown: topProjectBreakdown,
+                    reviewRows: reviewChecklistRows.map((row) => ({
+                        label: row.issue,
+                        value: `${row.count} ${row.scope.toLowerCase()}`,
+                    })),
+                }),
+            },
+        ];
+    }, [
+        generatedAtLabel,
+        monthlySummaryRows,
+        periodLabel,
+        reviewChecklistRows,
+        selectedBusinessLabel,
+        topClientBreakdown,
+        topExpenseCategoryBreakdown,
+        topProjectBreakdown,
+    ]);
+
+    const accountantPackInvoicePdfFiles = useMemo(() => {
+        return filteredInvoices
+            .filter((invoice) => invoice.invoiceNumber)
+            .map((invoice) => ({
+                invoiceId: invoice.id,
+                invoiceNumber: invoice.invoiceNumber,
+                filename: `invoice-${invoice.invoiceNumber}.pdf`,
+                htmlContent: getCurrentInvoiceHtmlContent(invoice, clients),
+            }));
+    }, [clients, filteredInvoices]);
+
+    const accountantPackManifestRows = useMemo(() => {
+        return buildAccountantPackManifestRows({
+            csvFiles: accountantPackCsvFiles,
+            pdfFiles: accountantPackPdfFiles,
+            invoicePdfFiles: accountantPackInvoicePdfFiles,
+        });
+    }, [accountantPackCsvFiles, accountantPackInvoicePdfFiles, accountantPackPdfFiles]);
+
+    const runAccountantPackExport = async () => {
+        const reportPdfEntries = await Promise.all(accountantPackPdfFiles.map(async (file) => ({
+            filename: file.filename,
+            content: await generatePDFBlob(file.htmlContent),
+        })));
+        const invoicePdfEntries = await Promise.all(accountantPackInvoicePdfFiles.map(async (file) => ({
+            filename: file.filename,
+            content: await generatePDFBlob(file.htmlContent),
+        })));
+
+        await downloadZipFile('accountant-pack.zip', [
+            {
+                filename: 'accountant-pack-manifest.csv',
+                content: buildCsvContent(ACCOUNTANT_PACK_MANIFEST_COLUMNS, accountantPackManifestRows),
+            },
+            ...buildCsvZipEntries(accountantPackCsvFiles),
+            ...reportPdfEntries,
+            ...invoicePdfEntries,
+        ]);
+    };
+
     return (
         <div className={buildSectionClassName(isMobileLayout)}>
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
@@ -1361,9 +1756,9 @@ function Reports() {
             <div className={buildSectionClassName(isMobileLayout)}>
                 <div className={cn('flex flex-wrap justify-between gap-4', isMobileLayout ? 'items-start' : 'items-center')}>
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">Reports</h1>
+                        <h1 className="text-2xl font-bold text-foreground">{headerContent.title}</h1>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Filter once, review key totals at a glance, and export the current slice.
+                            {headerContent.description}
                         </p>
                     </div>
                     <Badge variant="outline">{getDateRangeLabel(resolvedRange)}</Badge>
@@ -1374,7 +1769,7 @@ function Reports() {
                     businessInfos={businessInfos}
                     clientId={clientId}
                     categoryId={categoryId}
-                    categories={expenseCategories}
+                    categories={allExpenseCategories}
                     clients={activeClients}
                     currencyDisplayMode={currencyDisplayMode}
                     customEnd={customEnd}
@@ -1465,48 +1860,8 @@ function Reports() {
                                         variant="outline"
                                         size="sm"
                                         leadingIcon={ArrowDownTrayIcon}
-                                        onClick={() => downloadReportPack([
-                                            {
-                                                filename: buildExportFileName('monthly-summary', resolvedRange.startDate, resolvedRange.endDate),
-                                                columns: MONTHLY_SUMMARY_EXPORT_COLUMNS,
-                                                rows: monthlySummaryRows,
-                                            },
-                                            {
-                                                filename: buildExportFileName('monthly-invoices', resolvedRange.startDate, resolvedRange.endDate),
-                                                columns: INVOICES_EXPORT_COLUMNS,
-                                                rows: invoicesExportRows,
-                                            },
-                                            {
-                                                filename: buildExportFileName('monthly-expenses', resolvedRange.startDate, resolvedRange.endDate),
-                                                columns: EXPENSES_EXPORT_COLUMNS,
-                                                rows: expensesExportRows,
-                                            },
-                                            {
-                                                filename: buildExportFileName('monthly-hours', resolvedRange.startDate, resolvedRange.endDate),
-                                                columns: HOURS_EXPORT_COLUMNS,
-                                                rows: hoursExportRows,
-                                            },
-                                            {
-                                                filename: buildExportFileName('monthly-tax-summary', resolvedRange.startDate, resolvedRange.endDate),
-                                                columns: TAX_EXPORT_COLUMNS,
-                                                rows: taxExportRows,
-                                            },
-                                            {
-                                                filename: buildExportFileName('monthly-review-checklist', resolvedRange.startDate, resolvedRange.endDate),
-                                                columns: REVIEW_CHECKLIST_EXPORT_COLUMNS,
-                                                rows: reviewChecklistRows,
-                                            },
-                                        ])}
-                                    >
-                                        Export CSV pack
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        leadingIcon={ArrowDownTrayIcon}
                                         onClick={() => {
-                                            downloadReportPack([
+                                            void downloadZipFile(`monthly-csv-pack-${resolvedRange.startDate}-to-${resolvedRange.endDate}.zip`, buildCsvZipEntries([
                                                 {
                                                     filename: buildExportFileName('monthly-summary', resolvedRange.startDate, resolvedRange.endDate),
                                                     columns: MONTHLY_SUMMARY_EXPORT_COLUMNS,
@@ -1537,97 +1892,18 @@ function Reports() {
                                                     columns: REVIEW_CHECKLIST_EXPORT_COLUMNS,
                                                     rows: reviewChecklistRows,
                                                 },
-                                            ]);
-
-                                            void downloadPdfPack([
-                                                {
-                                                    exporter: exportMonthlyReportPdf,
-                                                    payload: {
-                                                        filename: `monthly-report-${resolvedRange.startDate}-to-${resolvedRange.endDate}.pdf`,
-                                                        businessLabel: selectedBusinessLabel,
-                                                        generatedAtLabel,
-                                                        periodLabel,
-                                                        summaryRows: monthlySummaryRows.map((row) => ({ label: row.metric, value: row.value })),
-                                                        topClientBreakdown,
-                                                        categoryBreakdown: topExpenseCategoryBreakdown,
-                                                        projectBreakdown: topProjectBreakdown,
-                                                        reviewRows: reviewChecklistRows.map((row) => ({
-                                                            label: row.issue,
-                                                            value: `${row.count} ${row.scope.toLowerCase()}`,
-                                                        })),
-                                                    },
-                                                },
-                                                {
-                                                    exporter: exportInvoicesReportPdf,
-                                                    payload: {
-                                                        filename: `issued-invoices-${resolvedRange.startDate}-to-${resolvedRange.endDate}.pdf`,
-                                                        businessLabel: selectedBusinessLabel,
-                                                        generatedAtLabel,
-                                                        periodLabel,
-                                                        summarySections: invoiceRegisterSummarySections,
-                                                        rows: invoicesExportRows.map((row) => ({
-                                                            invoiceNumber: row.invoiceNumber,
-                                                            client: row.client,
-                                                            business: row.business,
-                                                            project: row.project,
-                                                            invoiceDate: row.invoiceDate ? toDisplayDate(row.invoiceDate) : '',
-                                                            dueDate: row.dueDate ? toDisplayDate(row.dueDate) : '',
-                                                            paidDate: row.paidDate ? toDisplayDate(row.paidDate) : '',
-                                                            status: row.status,
-                                                            currency: row.currency,
-                                                            subtotal: formatCurrency(row.subtotal, row.currency),
-                                                            tax: formatCurrency(row.tax, row.currency),
-                                                            total: formatCurrency(row.total, row.currency),
-                                                        })),
-                                                    },
-                                                },
-                                                {
-                                                    exporter: exportOutstandingReportPdf,
-                                                    payload: {
-                                                        filename: `outstanding-invoices-${resolvedRange.startDate}-to-${resolvedRange.endDate}.pdf`,
-                                                        businessLabel: selectedBusinessLabel,
-                                                        generatedAtLabel,
-                                                        periodLabel,
-                                                        referenceDateLabel: toDisplayDate(reportReferenceDate),
-                                                        summaryRows: outstandingSummaryRows,
-                                                        agingRows: outstandingAgingSummaryRows,
-                                                        invoiceRows: outstandingExportRows.map((row) => ({
-                                                            invoiceNumber: row.invoiceNumber,
-                                                            client: row.client,
-                                                            invoiceDate: toDisplayDate(row.invoiceDate),
-                                                            dueDate: row.dueDate ? toDisplayDate(row.dueDate) : 'No due date',
-                                                            status: row.status,
-                                                            daysOverdue: `${row.daysOverdue}`,
-                                                            amount: formatCurrency(row.total, row.currency),
-                                                        })),
-                                                    },
-                                                },
-                                                {
-                                                    exporter: exportExpensesReportPdf,
-                                                    payload: {
-                                                        filename: `expenses-${resolvedRange.startDate}-to-${resolvedRange.endDate}.pdf`,
-                                                        businessLabel: selectedBusinessLabel,
-                                                        generatedAtLabel,
-                                                        periodLabel,
-                                                        summaryRows: expenseSummaryRows,
-                                                        rows: filteredExpenses.map((expense) => ({
-                                                            date: toDisplayDate(expense.date),
-                                                            paidDate: expense.paidOn ? toDisplayDate(expense.paidOn) : '',
-                                                            title: expense.title || '',
-                                                            supplier: expense.supplierName || '',
-                                                            category: expense.categoryId ? (expenseCategoriesById.get(expense.categoryId)?.name || EMPTY_CATEGORY) : EMPTY_CATEGORY,
-                                                            business: expense.businessId ? (businessInfosById.get(expense.businessId)?.businessName || businessInfosById.get(expense.businessId)?.name || businessInfosById.get(expense.businessId)?.title || EMPTY_BUSINESS) : EMPTY_BUSINESS,
-                                                            client: expense.clientId ? (clientsById.get(expense.clientId)?.title || EMPTY_CLIENT) : EMPTY_CLIENT,
-                                                            project: expense.projectId ? (projectsById.get(expense.projectId)?.title || EMPTY_PROJECT) : EMPTY_PROJECT,
-                                                            paymentStatus: expense.paymentStatus || '',
-                                                            billingStatus: expense.billingStatus || '',
-                                                            netAmount: formatCurrency(getExpenseNetAmount(expense), expense.currency || preferredCurrency),
-                                                            taxAmount: formatCurrency(getExpenseTaxAmount(expense), expense.currency || preferredCurrency),
-                                                            grossAmount: formatCurrency(expense.amount || 0, expense.currency || preferredCurrency),
-                                                        })),
-                                                    },
-                                                },
-                                            ]);
+                                            ]));
+                                        }}
+                                    >
+                                        Export CSV pack
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        leadingIcon={ArrowDownTrayIcon}
+                                        onClick={() => {
+                                            void runAccountantPackExport();
                                         }}
                                     >
                                         Export accountant pack
@@ -1679,6 +1955,12 @@ function Reports() {
                                     <p className="mt-1 text-xs text-muted-foreground">{toInvoiceRows.length} open billing groups</p>
                                 </div>
                             </div>
+
+                            <Notice
+                                title="Accountant pack contents"
+                                description={`${accountantPackCsvFiles.length + 1} CSV files, ${accountantPackPdfFiles.length} report PDF, and ${accountantPackInvoicePdfFiles.length} invoice PDFs will be downloaded for this slice.`}
+                                compact
+                            />
 
                             <div className="grid gap-4 xl:grid-cols-5">
                                 <div className="space-y-2">
@@ -2137,7 +2419,7 @@ function Reports() {
                                         </div>
                                     </div>
 
-                                    <div className="grid gap-4 xl:grid-cols-3">
+                                    <div className="grid gap-4 xl:grid-cols-4">
                                         <div className="space-y-2">
                                             <h3 className="text-sm font-semibold text-foreground">Sales buckets</h3>
                                             <div className="space-y-2">
@@ -2179,6 +2461,31 @@ function Reports() {
                                                                 Net {formatCurrency(row.netAmount, row.currency)}
                                                                 {' • '}
                                                                 Tax {formatCurrency(row.taxAmount, row.currency)}
+                                                                {' • '}
+                                                                {row.count} expenses
+                                                            </p>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <h3 className="text-sm font-semibold text-foreground">Claim status</h3>
+                                            <div className="space-y-2">
+                                                {vatSummary.claimStatusBuckets.length === 0 ? (
+                                                    <Notice title="No claim-state rows in this slice" compact />
+                                                ) : (
+                                                    vatSummary.claimStatusBuckets.map((row) => (
+                                                        <div key={`${row.bucketLabel}-${row.currency}`} className="rounded-lg border border-border p-3">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <p className="text-sm font-semibold text-foreground">{row.bucketLabel}</p>
+                                                                <p className="text-sm font-semibold text-foreground">{formatCurrency(row.taxAmount, row.currency)}</p>
+                                                            </div>
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                Net {formatCurrency(row.netAmount, row.currency)}
+                                                                {' • '}
+                                                                Gross {formatCurrency(row.grossAmount, row.currency)}
                                                                 {' • '}
                                                                 {row.count} expenses
                                                             </p>
@@ -2659,15 +2966,61 @@ function Reports() {
                                     />
                                 ) : null}
 
+                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+                                    <div className="flex items-center gap-3">
+                                        <CustomCheckbox
+                                            checked={allFilteredExpensesSelected}
+                                            onChange={toggleAllExpensesSelection}
+                                            label={`Select all ${filteredExpenses.length} expenses`}
+                                        />
+                                        <p className="text-sm text-muted-foreground">
+                                            {selectedExpenseCount > 0
+                                                ? `${selectedExpenseCount} selected`
+                                                : 'Select expenses to mark them as claimed or unclaimed'}
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={markSelectedExpensesAsUnclaimed}
+                                            disabled={selectedExpenseCount === 0}
+                                        >
+                                            Mark selected as unclaimed
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={openClaimDialog}
+                                            disabled={selectedExpenseCount === 0}
+                                        >
+                                            Mark selected as claimed
+                                        </Button>
+                                    </div>
+                                </div>
+
                                 <div className="space-y-3">
                                     {filteredExpenses.map((expense) => {
                                         const business = expense.businessId ? businessInfosById.get(expense.businessId) : null;
                                         const client = expense.clientId ? clientsById.get(expense.clientId) : null;
                                         const project = expense.projectId ? projectsById.get(expense.projectId) : null;
                                         const category = expense.categoryId ? expenseCategoriesById.get(expense.categoryId) : null;
+                                        const taxClaimStatus = getExpenseTaxClaimStatus(expense);
+                                        const taxReturnPeriod = expense.taxClaimPeriodId ? taxReturnPeriodsById.get(expense.taxClaimPeriodId) : null;
+                                        const claimBadgeVariant = taxClaimStatus === 'claimed'
+                                            ? 'success'
+                                            : (taxClaimStatus === 'excluded' ? 'secondary' : 'outline');
 
                                         return (
                                             <div key={expense.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-3">
+                                                <div className="pt-0.5">
+                                                    <Checkbox
+                                                        checked={selectedExpenseIds.includes(expense.id)}
+                                                        onCheckedChange={(checked) => toggleExpenseSelection(expense.id, checked === true)}
+                                                        aria-label={`Select ${expense.title}`}
+                                                    />
+                                                </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex flex-wrap items-center gap-2">
                                                         <p className="text-sm font-semibold text-foreground">{expense.title}</p>
@@ -2675,6 +3028,9 @@ function Reports() {
                                                             {expense.paymentStatus}
                                                         </Badge>
                                                         {expense.billable ? <Badge variant="outline">Billable</Badge> : null}
+                                                        <Badge variant={claimBadgeVariant}>
+                                                            {getExpenseTaxClaimStatusLabel(taxClaimStatus)}
+                                                        </Badge>
                                                     </div>
                                                     <p className="mt-1 text-sm text-muted-foreground">
                                                         {expense.supplierName || 'No supplier'}
@@ -2683,6 +3039,7 @@ function Reports() {
                                                     </p>
                                                     <p className="mt-1 text-xs text-muted-foreground">
                                                         {category?.name || EMPTY_CATEGORY}
+                                                        {taxReturnPeriod ? ` • ${taxReturnPeriod.title}` : ''}
                                                     </p>
                                                     <p className="mt-1 text-xs text-muted-foreground">
                                                         {toDisplayDate(expense.date)}{expense.paidOn ? ` • Paid ${toDisplayDate(expense.paidOn)}` : ''}
@@ -2789,6 +3146,129 @@ function Reports() {
                         )}
                     </ReportSection>
                 )}
+
+                <Dialog open={isClaimDialogOpen} onOpenChange={(open) => {
+                    if (!open) {
+                        closeClaimDialog();
+                    }
+                }}>
+                    <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>Mark selected expenses as claimed</DialogTitle>
+                        </DialogHeader>
+
+                        <div className="space-y-4">
+                            <Notice
+                                title={`${selectedExpenseCount} expense${selectedExpenseCount === 1 ? '' : 's'} selected`}
+                                description="Pick an existing tax return period or create a new one for this claim batch."
+                                compact
+                            />
+
+                            <div className="space-y-2">
+                                <Label htmlFor="tax-return-period-select">Tax return period</Label>
+                                <Select value={selectedTaxReturnPeriodId} onValueChange={setSelectedTaxReturnPeriodId}>
+                                    <SelectTrigger id="tax-return-period-select">
+                                        <SelectValue placeholder="Choose a tax return period" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={NEW_TAX_RETURN_PERIOD_VALUE}>Create new period</SelectItem>
+                                        {availableTaxReturnPeriods.map((taxReturnPeriod) => (
+                                            <SelectItem key={taxReturnPeriod.id} value={taxReturnPeriod.id}>
+                                                {taxReturnPeriod.title}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {selectedTaxReturnPeriodId === NEW_TAX_RETURN_PERIOD_VALUE ? (
+                                <div className="space-y-4 rounded-lg border border-border p-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="tax-return-period-title">Period title</Label>
+                                        <Input
+                                            id="tax-return-period-title"
+                                            value={claimPeriodDraft.title}
+                                            onChange={(event) => setClaimPeriodDraft((current) => ({
+                                                ...current,
+                                                title: event.target.value,
+                                            }))}
+                                            placeholder="May 2026 VAT return"
+                                        />
+                                    </div>
+
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="tax-return-period-start">Start date</Label>
+                                            <NativeDateInput
+                                                id="tax-return-period-start"
+                                                value={claimPeriodDraft.startDate}
+                                                onChange={(event) => setClaimPeriodDraft((current) => ({
+                                                    ...current,
+                                                    startDate: event.target.value,
+                                                }))}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="tax-return-period-end">End date</Label>
+                                            <NativeDateInput
+                                                id="tax-return-period-end"
+                                                value={claimPeriodDraft.endDate}
+                                                onChange={(event) => setClaimPeriodDraft((current) => ({
+                                                    ...current,
+                                                    endDate: event.target.value,
+                                                }))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="tax-return-period-type">Period type</Label>
+                                        <Select
+                                            value={claimPeriodDraft.type}
+                                            onValueChange={(value) => setClaimPeriodDraft((current) => ({
+                                                ...current,
+                                                type: value,
+                                            }))}
+                                        >
+                                            <SelectTrigger id="tax-return-period-type">
+                                                <SelectValue placeholder="Period type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="vat">VAT</SelectItem>
+                                                <SelectItem value="income-tax">Income tax</SelectItem>
+                                                <SelectItem value="sales-tax">Sales tax</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="tax-return-period-notes">Notes</Label>
+                                        <Textarea
+                                            id="tax-return-period-notes"
+                                            value={claimPeriodDraft.notes}
+                                            onChange={(event) => setClaimPeriodDraft((current) => ({
+                                                ...current,
+                                                notes: event.target.value,
+                                            }))}
+                                            placeholder="Optional filing notes"
+                                        />
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            <div className="flex justify-end gap-2">
+                                <Button type="button" variant="outline" onClick={closeClaimDialog}>
+                                    Cancel
+                                </Button>
+                                <Button type="button" onClick={markSelectedExpensesAsClaimed}>
+                                    Mark as claimed
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );

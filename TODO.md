@@ -2,8 +2,7 @@
 
 ## Priority
 
-[ ] Expense category notice about deleting in the modal should only show up when they try to delete one that has what it says
-[ ] What is the default tag? They all have it and I cannot set it or not set it..
+
 
 ---
 
@@ -18,8 +17,6 @@
 
 ## Project updates
 
-[ ] Detailed reports page with CSV exports, and bulk invoice downloads
-
 [ ] System notifications for to do today tasks that were upcoming including recurring expenses
 
 [ ] Budgeting (could also be time, not just money), Tasks Templates
@@ -30,6 +27,8 @@
     [ ] All tasks are still placed and visible under the Tasks section
 
 [ ] I also think we should have a notes section for each project so that we’re able to jot down quick notes or details/thoughts about the project
+
+[ ] Kanban style view for tasks in projects
 
 ---
 

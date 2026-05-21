@@ -66,6 +66,15 @@ describe('useExpenseCategories', () => {
         expect(result.current.expenseCategories).toHaveLength(1);
     });
 
+    it('does not seed defaults while the collection is loading', () => {
+        mockIsLoading = true;
+
+        const { result } = renderHook(() => useExpenseCategories({ seedDefaults: true }));
+
+        expect(mockCreate).not.toHaveBeenCalled();
+        expect(result.current.isLoading).toBe(true);
+    });
+
     it('returns active categories sorted ahead of archived entries', () => {
         mockItems = [
             {
@@ -102,5 +111,33 @@ describe('useExpenseCategories', () => {
             'category-custom',
             'category-archived',
         ]);
+    });
+
+    it('wraps category mutations with safe defaults', () => {
+        mockCreate.mockReturnValue({ id: 'created-category' });
+        mockUpdate.mockReturnValue({ id: 'updated-category' });
+        mockRemove.mockReturnValue(true);
+        mockGet.mockReturnValue({ id: 'category-1' });
+
+        const { result } = renderHook(() => useExpenseCategories());
+
+        expect(result.current.getExpenseCategory('category-1')).toEqual({ id: 'category-1' });
+        expect(result.current.createExpenseCategory({ name: 'Custom', group: 'other' })).toEqual({ id: 'created-category' });
+        expect(mockCreate).toHaveBeenCalledWith({
+            name: 'Custom',
+            group: 'other',
+            isDefault: false,
+            archived: false,
+        });
+
+        expect(result.current.archiveExpenseCategory('category-1')).toEqual({ id: 'updated-category' });
+        expect(mockUpdate).toHaveBeenCalledWith('category-1', { archived: true });
+
+        expect(result.current.restoreExpenseCategory('category-1')).toEqual({ id: 'updated-category' });
+        expect(mockUpdate).toHaveBeenCalledWith('category-1', { archived: false });
+
+        expect(result.current.deleteExpenseCategory('category-1')).toBe(true);
+        expect(mockRemove).toHaveBeenCalledWith('category-1');
+        expect(result.current.updateExpenseCategory).toBe(mockUpdate);
     });
 });

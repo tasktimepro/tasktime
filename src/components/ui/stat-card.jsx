@@ -22,6 +22,10 @@ const StatCard = ({
     variant = 'default',
     onClick,
     className,
+    titleClassName,
+    valueClassName,
+    subtitleClassName,
+    iconClassName,
     children,
 }) => {
 
@@ -89,19 +93,19 @@ const StatCard = ({
             <div className="flex items-center justify-between">
                 <div className="flex-1">
                     {title && (
-                        <h3 className={cn('text-sm font-medium', colors.title)}>
+                        <h3 className={cn('text-sm font-medium', colors.title, titleClassName)}>
                             {title}
                         </h3>
                     )}
                     
                     {value && (
-                        <div className={cn('mt-2 text-lg font-semibold', colors.value)}>
+                        <div className={cn('mt-2 text-lg font-semibold', colors.value, valueClassName)}>
                             {value}
                         </div>
                     )}
                     
                     {subtitle && (
-                        <div className={cn('mt-1 text-sm', colors.subtitle)}>
+                        <div className={cn('mt-1 text-sm', colors.subtitle, subtitleClassName)}>
                             {subtitle}
                         </div>
                     )}
@@ -110,7 +114,7 @@ const StatCard = ({
                 </div>
                 
                 {Icon && (
-                    <Icon className={cn('h-8 w-8 flex-shrink-0', colors.icon)} />
+                    <Icon className={cn('h-8 w-8 flex-shrink-0', colors.icon, iconClassName)} />
                 )}
             </div>
         </Component>
@@ -125,6 +129,10 @@ StatCard.propTypes = {
     variant: PropTypes.oneOf(['default', 'blue', 'green', 'amber', 'red', 'gray']),
     onClick: PropTypes.func,
     className: PropTypes.string,
+    titleClassName: PropTypes.string,
+    valueClassName: PropTypes.string,
+    subtitleClassName: PropTypes.string,
+    iconClassName: PropTypes.string,
     children: PropTypes.node,
 };
 

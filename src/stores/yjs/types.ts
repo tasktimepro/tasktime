@@ -270,6 +270,9 @@ export interface Expense {
     amountExcludingTax?: number | null;
     taxLabel?: string | null;
     taxRate?: number | null;
+    taxClaimStatus?: 'unclaimed' | 'claimed' | 'excluded' | null;
+    taxClaimPeriodId?: string | null;
+    taxClaimedAt?: number | null;
     paymentCurrencySnapshot?: ExpensePaymentCurrencySnapshot | null;
     isPreview?: boolean;
     createdAt?: number;
@@ -314,6 +317,21 @@ export interface ExpenseCategory {
     group?: string | null;
     isDefault: boolean;
     archived: boolean;
+    createdAt?: number;
+    updatedAt?: number;
+}
+
+export interface TaxReturnPeriod {
+    id: string;
+    title: string;
+    type: 'vat' | 'income-tax' | 'sales-tax' | 'other';
+    startDate: string;
+    endDate: string;
+    businessInfoId?: string | null;
+    status: 'draft' | 'filed' | 'paid';
+    filedAt?: number | null;
+    paidAt?: number | null;
+    notes?: string | null;
     createdAt?: number;
     updatedAt?: number;
 }

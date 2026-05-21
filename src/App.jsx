@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useContext, useCallback } from 'react';
+import { lazy, Suspense, useEffect, useState, useMemo, useRef, useContext, useCallback } from 'react';
 import './App.css';
 import { YjsProvider, useYjs } from './contexts/YjsContext.tsx';
 import { useProjects } from './hooks/useProjects.ts';
@@ -25,7 +25,6 @@ import ClientDashboard from './components/ClientDashboard';
 import Dashboard from './components/Dashboard';
 import Planner from './components/Planner';
 import Expenses from './components/Expenses';
-import Reports from './components/Reports';
 import Account from './components/Account';
 import Invoices from './components/Invoices';
 import AuthCallback from './components/AuthCallback';
@@ -61,6 +60,8 @@ import { SYNC_WORKER_CONFIG } from './config/google.ts';
 import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon, ChartBarIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { APP_VERSION, TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
+
+const Reports = lazy(() => import('./components/Reports'));
 
 /** Original browser tab title */
 const ORIGINAL_TITLE = "TaskTime";
@@ -1768,7 +1769,9 @@ function AppContent() {
 
                     {activeView === 'reports' && (
                             <ErrorBoundary>
-                            <Reports />
+                            <Suspense fallback={<div className="px-6 py-8 text-sm text-muted-foreground">Loading reports...</div>}>
+                                <Reports />
+                            </Suspense>
                             </ErrorBoundary>
                         )}
 

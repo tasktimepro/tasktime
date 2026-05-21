@@ -1,5 +1,15 @@
 import PropTypes from 'prop-types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    BanknotesIcon,
+    BuildingOfficeIcon,
+    ClipboardDocumentCheckIcon,
+    DocumentTextIcon,
+    HandCoinsIcon,
+    ListFilterIcon,
+    CurrencyDollarIcon,
+    UserGroupIcon,
+} from '@/components/ui/icons';
 import PeriodRangePicker from '@/components/ui/period-range-picker';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
@@ -55,7 +65,7 @@ function ReportFilters({
             />
 
             <Select value={businessId} onValueChange={onBusinessIdChange}>
-                <SelectTrigger className={triggerClassName}>
+                <SelectTrigger className={triggerClassName} leadingIcon={BuildingOfficeIcon}>
                     <SelectValue placeholder="Business profile" />
                 </SelectTrigger>
                 <SelectContent>
@@ -69,7 +79,7 @@ function ReportFilters({
             </Select>
 
             <Select value={clientId} onValueChange={onClientIdChange}>
-                <SelectTrigger className={triggerClassName}>
+                <SelectTrigger className={triggerClassName} leadingIcon={UserGroupIcon}>
                     <SelectValue placeholder="Client" />
                 </SelectTrigger>
                 <SelectContent>
@@ -83,7 +93,7 @@ function ReportFilters({
             </Select>
 
             <Select value={projectId} onValueChange={onProjectIdChange}>
-                <SelectTrigger className={triggerClassName}>
+                <SelectTrigger className={triggerClassName} leadingIcon={ClipboardDocumentCheckIcon}>
                     <SelectValue placeholder="Project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -97,7 +107,7 @@ function ReportFilters({
             </Select>
 
             <Select value={categoryId} onValueChange={onCategoryIdChange}>
-                <SelectTrigger className={triggerClassName}>
+                <SelectTrigger className={triggerClassName} leadingIcon={ListFilterIcon}>
                     <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -111,7 +121,7 @@ function ReportFilters({
             </Select>
 
             <Select value={invoiceStatus} onValueChange={onInvoiceStatusChange}>
-                <SelectTrigger className={triggerClassName}>
+                <SelectTrigger className={triggerClassName} leadingIcon={DocumentTextIcon}>
                     <SelectValue placeholder="Invoice status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -125,18 +135,21 @@ function ReportFilters({
             </Select>
 
             <Select value={expenseStatus} onValueChange={onExpenseStatusChange}>
-                <SelectTrigger className={triggerClassName}>
+                <SelectTrigger className={triggerClassName} leadingIcon={HandCoinsIcon}>
                     <SelectValue placeholder="Expense status" />
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="all">All expenses</SelectItem>
                     <SelectItem value="paid">Paid only</SelectItem>
                     <SelectItem value="unpaid">Unpaid only</SelectItem>
+                    <SelectItem value="claimed">Claimed only</SelectItem>
+                    <SelectItem value="unclaimed">Unclaimed only</SelectItem>
+                    <SelectItem value="excluded">Excluded only</SelectItem>
                 </SelectContent>
             </Select>
 
             <Select value={incomeDateBasis} onValueChange={onIncomeDateBasisChange}>
-                <SelectTrigger className={triggerClassName}>
+                <SelectTrigger className={triggerClassName} leadingIcon={BanknotesIcon}>
                     <SelectValue placeholder="Income date" />
                 </SelectTrigger>
                 <SelectContent>
@@ -146,7 +159,7 @@ function ReportFilters({
             </Select>
 
             <Select value={expenseDateBasis} onValueChange={onExpenseDateBasisChange}>
-                <SelectTrigger className={triggerClassName}>
+                <SelectTrigger className={triggerClassName} leadingIcon={HandCoinsIcon}>
                     <SelectValue placeholder="Expense date" />
                 </SelectTrigger>
                 <SelectContent>
@@ -156,7 +169,7 @@ function ReportFilters({
             </Select>
 
             <Select value={currencyDisplayMode} onValueChange={onCurrencyDisplayModeChange}>
-                <SelectTrigger className={triggerClassName}>
+                <SelectTrigger className={triggerClassName} leadingIcon={CurrencyDollarIcon}>
                     <SelectValue placeholder="Currency mode" />
                 </SelectTrigger>
                 <SelectContent>
