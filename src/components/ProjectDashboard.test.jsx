@@ -66,6 +66,7 @@ vi.mock('./InvoicesList', () => ({ default: () => <div>Invoices list</div> }));
 vi.mock('./MetricsDisplay', () => ({ default: () => <div>Metrics display</div> }));
 vi.mock('./expenses/ExpensesSection', () => ({ default: () => <div>Expenses section</div> }));
 vi.mock('./modals/ProjectDeleteDialog', () => ({ default: () => null }));
+vi.mock('./ProjectNotesEditor', () => ({ default: () => <div>Project notes editor</div> }));
 
 describe('ProjectDashboard', () => {
     const setMatchMedia = (matches) => {
@@ -128,5 +129,8 @@ describe('ProjectDashboard', () => {
         expect(topHeaderRow?.className.includes('flex-col')).toBe(false);
         expect(menuButton.className.includes('border')).toBe(true);
         expect(menuButton.className.includes('rounded-full')).toBe(true);
+        expect(screen.getByRole('tab', { name: 'Tasks' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Notes' })).toBeInTheDocument();
+        expect(screen.getByText('Task tree')).toBeInTheDocument();
     });
 });

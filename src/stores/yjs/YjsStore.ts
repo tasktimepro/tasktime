@@ -231,7 +231,7 @@ export class YjsStore {
      * Load archived tasks document (on-demand)
      * Call this when user views a project that has archived tasks
      */
-    async loadArchivedTasks(): Promise<Y.Map<string, Task>> {
+    async loadArchivedTasks(options: { allowPullFromDrive?: boolean } = {}): Promise<Y.Map<string, Task>> {
         if (!this._archivedTasksDoc) {
             if (!this._archivedTasksLoading) {
                 this._archivedTasksLoading = this.docManager.getDoc('tasks-archived');
@@ -247,7 +247,10 @@ export class YjsStore {
                     this.driveProvider.markDocsForFullStateUpload(['tasks-archived']);
                 }
 
-                await this.driveProvider.syncAndSubscribeDoc('tasks-archived');
+                await this.driveProvider.syncAndSubscribeDoc(
+                    'tasks-archived',
+                    options.allowPullFromDrive ? { allowPull: true } : undefined,
+                );
                 // Only clear dirty flag if the doc was actually synced (not manual mode)
                 if (this.driveSyncMode !== 'manual') {
                     this.clearDisconnectedDirtyDocs(['tasks-archived']);
@@ -275,20 +278,20 @@ export class YjsStore {
      * Get all tasks (active + archived) for lifetime stats
      * Loads archived doc if not already loaded
      */
-    async getAllTasks(): Promise<Task[]> {
+    async getAllTasks(options: { allowPullFromDrive?: boolean } = {}): Promise<Task[]> {
         const allTasks: Task[] = [];
 
         // Active tasks (always available)
         allTasks.push(...collectEntities<Task>(this.tasks as any));
 
         // Archived tasks (load if needed)
-        const archivedMap = await this.loadArchivedTasks();
+        const archivedMap = await this.loadArchivedTasks(options);
         allTasks.push(...collectEntities<Task>(archivedMap as any));
 
         return allTasks;
     }
 
-    async getAllExpenses(): Promise<Expense[]> {
+    async getAllExpenses(options: { allowPullFromDrive?: boolean } = {}): Promise<Expense[]> {
         const allExpenses: Expense[] = [];
         const seenIds = new Set<string>();
 
@@ -297,7 +300,7 @@ export class YjsStore {
             seenIds.add(expense.id);
         }
 
-        const archivedMap = await this.loadArchivedExpenses();
+        const archivedMap = await this.loadArchivedExpenses(options);
 
         for (const expense of collectEntities<Expense>(archivedMap as any)) {
             if (seenIds.has(expense.id)) {
@@ -317,7 +320,7 @@ export class YjsStore {
     /**
      * Load archived expenses document (on-demand)
      */
-    async loadArchivedExpenses(): Promise<Y.Map<string, Expense>> {
+    async loadArchivedExpenses(options: { allowPullFromDrive?: boolean } = {}): Promise<Y.Map<string, Expense>> {
         if (!this._archivedExpensesDoc) {
             if (!this._archivedExpensesLoading) {
                 this._archivedExpensesLoading = this.docManager.getDoc('expenses-archived');
@@ -333,7 +336,10 @@ export class YjsStore {
                     this.driveProvider.markDocsForFullStateUpload(['expenses-archived']);
                 }
 
-                await this.driveProvider.syncAndSubscribeDoc('expenses-archived');
+                await this.driveProvider.syncAndSubscribeDoc(
+                    'expenses-archived',
+                    options.allowPullFromDrive ? { allowPull: true } : undefined,
+                );
                 if (this.driveSyncMode !== 'manual') {
                     this.clearDisconnectedDirtyDocs(['expenses-archived']);
                 }
@@ -434,7 +440,7 @@ export class YjsStore {
     /**
      * Load entries for a specific year (on-demand)
      */
-    async loadEntriesForYear(year: number): Promise<Y.Map<string, TimeEntry>> {
+    async loadEntriesForYear(year: number, options: { allowPullFromDrive?: boolean } = {}): Promise<Y.Map<string, TimeEntry>> {
         const docName = `entries-${year}` as DocName;
         const wasLoaded = this.docManager.isLoaded(docName);
         const doc = await this.docManager.getDoc(docName);
@@ -447,7 +453,10 @@ export class YjsStore {
                 this.driveProvider.markDocsForFullStateUpload([docName]);
             }
 
-            await this.driveProvider.syncAndSubscribeDoc(docName);
+            await this.driveProvider.syncAndSubscribeDoc(
+                docName,
+                options.allowPullFromDrive ? { allowPull: true } : undefined,
+            );
             if (this.driveSyncMode !== 'manual') {
                 this.clearDisconnectedDirtyDocs([docName]);
             }
@@ -466,7 +475,7 @@ export class YjsStore {
     /**
      * Load ALL time entries across all years (for lifetime stats)
      */
-    async loadAllTimeEntries(): Promise<TimeEntry[]> {
+    async loadAllTimeEntries(options: { allowPullFromDrive?: boolean } = {}): Promise<TimeEntry[]> {
         const entries: TimeEntry[] = [];
 
         // Active entries
@@ -476,7 +485,7 @@ export class YjsStore {
 
         // Load each year's entries
         for (const year of years) {
-            const yearEntries = await this.loadEntriesForYear(year);
+            const yearEntries = await this.loadEntriesForYear(year, options);
             entries.push(...collectEntities<TimeEntry>(yearEntries as any));
         }
 
@@ -507,7 +516,7 @@ export class YjsStore {
     /**
      * Load archived invoices (paid from previous years) - on-demand
      */
-    async loadArchivedInvoices(): Promise<Y.Map<string, Invoice>> {
+    async loadArchivedInvoices(options: { allowPullFromDrive?: boolean } = {}): Promise<Y.Map<string, Invoice>> {
         if (!this._archivedInvoicesDoc) {
             if (!this._archivedInvoicesLoading) {
                 this._archivedInvoicesLoading = this.docManager.getDoc('invoices-archived');
@@ -523,7 +532,10 @@ export class YjsStore {
                     this.driveProvider.markDocsForFullStateUpload(['invoices-archived']);
                 }
 
-                await this.driveProvider.syncAndSubscribeDoc('invoices-archived');
+                await this.driveProvider.syncAndSubscribeDoc(
+                    'invoices-archived',
+                    options.allowPullFromDrive ? { allowPull: true } : undefined,
+                );
                 if (this.driveSyncMode !== 'manual') {
                     this.clearDisconnectedDirtyDocs(['invoices-archived']);
                 }
@@ -550,14 +562,14 @@ export class YjsStore {
      * Get all invoices (active + archived)
      * Loads archived doc if not already loaded
      */
-    async getAllInvoices(): Promise<Invoice[]> {
+    async getAllInvoices(options: { allowPullFromDrive?: boolean } = {}): Promise<Invoice[]> {
         const allInvoices: Invoice[] = [];
 
         // Active invoices (always available)
         allInvoices.push(...collectEntities<Invoice>(this.invoices as any));
 
         // Archived invoices (load if needed)
-        const archivedMap = await this.loadArchivedInvoices();
+        const archivedMap = await this.loadArchivedInvoices(options);
         allInvoices.push(...collectEntities<Invoice>(archivedMap as any));
 
         return allInvoices;
@@ -956,12 +968,24 @@ export class YjsStore {
         return Array.from(allYears).sort((a, b) => b - a);
     }
 
-    async exportBackupData(options: { backupType?: 'automatic' | 'manual'; exportDate?: string } = {}): Promise<BackupPayload> {
+    async exportBackupData(options: { backupType?: 'automatic' | 'manual'; exportDate?: string; refreshFromCloud?: boolean } = {}): Promise<BackupPayload> {
+        const shouldRefreshFromCloud = options.refreshFromCloud === true && this.driveProvider?.isConnected();
+        const loadOptions = shouldRefreshFromCloud ? { allowPullFromDrive: true } : undefined;
+
+        if (shouldRefreshFromCloud) {
+            await this.forceDriveSync({ allowPull: true });
+
+            const syncState = this.getSyncState();
+            if (syncState === 'offline' || syncState === 'error') {
+                throw new Error('Unable to refresh cloud data before export. Please check your connection and try again.');
+            }
+        }
+
         const [tasks, timeEntries, invoices, expenses] = await Promise.all([
-            this.getAllTasks(),
-            this.loadAllTimeEntries(),
-            this.getAllInvoices(),
-            this.getAllExpenses(),
+            this.getAllTasks(loadOptions),
+            this.loadAllTimeEntries(loadOptions),
+            this.getAllInvoices(loadOptions),
+            this.getAllExpenses(loadOptions),
         ]);
 
         return createBackupPayload({

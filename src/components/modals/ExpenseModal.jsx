@@ -71,7 +71,17 @@ const taxAmountsMatchTotal = (amountValue, amountExcludingTaxValue, taxRateValue
 
     const calculatedTotal = amountExcludingTax * (1 + (taxRate / 100));
 
-    return roundMoney(calculatedTotal) === roundMoney(total);
+    if (roundMoney(calculatedTotal) === roundMoney(total)) {
+        return true;
+    }
+
+    const canonicalAmountExcludingTax = parseOptionalNumberInput(calculateAmountExcludingTax(total, taxRate));
+
+    if (canonicalAmountExcludingTax === null) {
+        return false;
+    }
+
+    return roundMoney(canonicalAmountExcludingTax) === roundMoney(amountExcludingTax);
 };
 
 const buildTaxFormFields = (businessInfo, existingFields = {}) => {

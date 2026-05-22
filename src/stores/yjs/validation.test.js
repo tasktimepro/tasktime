@@ -30,6 +30,58 @@ describe('Yjs validation', () => {
             title: 'Valid Project',
         })
 
+        expect(validateCollectionEntity('projects', {
+            id: 'project-with-notes',
+            title: 'Project with notes',
+            notes: {
+                version: 1,
+                type: 'tiptap-json',
+                content: {
+                    type: 'doc',
+                    content: [
+                        {
+                            type: 'paragraph',
+                            content: [
+                                { type: 'text', text: 'Remember the kickoff link' },
+                            ],
+                        },
+                        {
+                            type: 'taskList',
+                            content: [
+                                {
+                                    type: 'taskItem',
+                                    attrs: { checked: false },
+                                    content: [{ type: 'paragraph' }],
+                                },
+                            ],
+                        },
+                    ],
+                },
+                plainTextPreview: 'Remember the kickoff link',
+                updatedAt: 123,
+            },
+        }, 'test project notes')).toMatchObject({
+            id: 'project-with-notes',
+            notes: {
+                type: 'tiptap-json',
+                version: 1,
+            },
+        })
+
+        expect(validateCollectionEntity('projects', {
+            id: 'project-bad-notes',
+            title: 'Bad notes',
+            notes: {
+                version: 1,
+                type: 'tiptap-json',
+                content: { content: [] },
+                updatedAt: 123,
+            },
+        }, 'test malformed project notes')).toEqual({
+            id: 'project-bad-notes',
+            title: 'Bad notes',
+        })
+
         expect(() => validateCollectionEntity('timeEntries', {
             id: 'entry-1',
             taskId: 'task-1',

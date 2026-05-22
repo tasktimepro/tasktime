@@ -1165,7 +1165,7 @@ function AppContent() {
         {
             key: 'reports',
             label: 'Reports',
-            description: 'Review filtered totals and export reporting views',
+            description: 'Review totals and export options',
             Icon: ChartBarIcon,
             onClick: () => navigateToReports(),
         },

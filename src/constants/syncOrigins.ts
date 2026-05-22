@@ -1,0 +1,1 @@
+export const PROJECT_NOTES_LOCAL_SAVE_ORIGIN = 'project-notes-local-save';

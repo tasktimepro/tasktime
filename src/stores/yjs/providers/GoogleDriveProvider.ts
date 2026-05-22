@@ -26,6 +26,7 @@ import {
     clearSyncPersistence,
     getSyncPersistenceState,
 } from '@/utils/syncPersistence';
+import { PROJECT_NOTES_LOCAL_SAVE_ORIGIN } from '@/constants/syncOrigins';
 
 export { AuthorizationError };
 
@@ -1123,6 +1124,11 @@ export class YjsDriveProvider {
 
             this.updatePendingState();
 
+            if (origin === PROJECT_NOTES_LOCAL_SAVE_ORIGIN) {
+                this.log('scheduleSync: deferred for local-only project notes update', { docName });
+                return;
+            }
+
             // Debounce sync
             this.scheduleSync();
         };
@@ -1260,10 +1266,10 @@ export class YjsDriveProvider {
      * Subscribe a newly loaded document to sync
      * Call this when loading an on-demand document (archived tasks, year entries)
      */
-    async syncAndSubscribeDoc(docName: DocName): Promise<void> {
+    async syncAndSubscribeDoc(docName: DocName, options: { allowPull?: boolean } = {}): Promise<void> {
         if (!this.connected) return;
 
-        if (this.syncMode === 'manual') {
+        if (this.syncMode === 'manual' && options.allowPull !== true) {
             this.subscribeToDoc(docName);
             return;
         }
@@ -1279,7 +1285,7 @@ export class YjsDriveProvider {
         }
 
         // Sync the document silently (don't show global "Fetching updates" for on-demand loads)
-        const shouldPull = this.syncMode === 'sync';
+        const shouldPull = options.allowPull ?? (this.syncMode === 'sync');
         await this.syncDoc(docName, shouldPull, true);
 
         // Subscribe to future updates

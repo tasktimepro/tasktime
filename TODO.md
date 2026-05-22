@@ -4,7 +4,14 @@
 
 [ ] Create a blog about accounting with tasktime using the reports
 [ ] The wording in the reports overview in the main dashboard for earned - should that be received instead or? to match what we did in reporting?
-[ ] Adjust filter and mobile views for Reporting page
+
+[ ] Kanban style view for tasks in projects?
+    [ ] Display options next to sort option icon (List, Kanban)
+    [ ] Use dnd-kit library for sorting and drag
+    [ ] Main task becomes the "Column", subtasks become the tasks within
+    [ ] Keep everything clean an minimal - follow the design patterns
+        [ ] Hide the action buttons and make them only available when we open the task in the modal - as it is now - BUT, we must include the billable/unbillable toggle button in the modal when we open them from a project with billable options enabled (non-personal ones)
+[ ] It would be nice then to also add drag to sort order to the other tasks view we have now the default list view - using the same library and making sure we don't break existing tasks and functionality since we're already live
 
 ---
 
@@ -20,18 +27,14 @@
 
 ## Project updates
 
+[ ] Business info - upload logo and choose colour - optional - we can start with one colour which will be used as a “highlight” colour inside the Invoice template.
+
+[ ] Task Templates -Create “global” tasks which are assigned a category/tag and these can be assigned to all projects for that category by default (or at a click of a button → import default tasks for this project category)
+    [ ] This would be a button under projects page “Create task templates”, then when creating a new project, we can choose a task template to be added
+
 [ ] System notifications for to do today tasks that were upcoming including recurring expenses
 
 [ ] Budgeting (could also be time, not just money), Tasks Templates
-
-[ ] Think about a timeline/journey task view that is user-friendly and guides us through the tasks within a project. I want to be able to see what’s the current task, and what is upcoming. For example when I open the projects page, within each project card I want to see the next up - or current task (if time is already submitted).
-    [ ] This must be a simple journey/timeline task view that reuses the same tasks functionality, but applies a nicer workflow
-    [ ] We should also think about prompt organisation - like a space to specifically create/set prompts for this task - this allows you to pre-define prompts for tasks so that you can easily follow through a plan, and this makes even more sense for the timline view + multi-timer workflow
-    [ ] All tasks are still placed and visible under the Tasks section
-
-[ ] I also think we should have a notes section for each project so that we’re able to jot down quick notes or details/thoughts about the project
-
-[ ] Kanban style view for tasks in projects
 
 ---
 

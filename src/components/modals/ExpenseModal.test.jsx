@@ -755,6 +755,41 @@ describe('ExpenseModal', () => {
         expect(expensesMocks.createExpense).not.toHaveBeenCalled()
     })
 
+    it('accepts auto-calculated tax details when rounding the tax-exclusive amount to two decimals', async () => {
+        const user = userEvent.setup()
+        businessInfosMocks.businessInfos = [
+            {
+                id: 'business-1',
+                title: 'TaskTime LLC',
+                taxNumber: 'TAX-123',
+                taxEnabled: true,
+                taxLabel: 'VAT',
+                taxRate: 18
+            }
+        ]
+        businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Rounded VAT expense')
+        await user.type(screen.getByLabelText(/Amount/i), '100')
+        await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
+
+        expect(screen.getByLabelText('VAT (%)')).toHaveValue(18)
+        expect(screen.getByLabelText('Amount (excl. VAT)')).toHaveValue(84.75)
+
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(toastMocks.showError).not.toHaveBeenCalledWith('Total amount must match Amount (excl. VAT) plus VAT')
+        expect(expensesMocks.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+            amount: 100,
+            amountExcludingTax: 84.75,
+            taxLabel: 'VAT',
+            taxRate: 18,
+            businessId: 'business-1'
+        }))
+    })
+
     it('shows personal projects for business expenses until a client is selected', async () => {
         const user = userEvent.setup()
         clientsMocks.clients = [

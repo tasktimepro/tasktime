@@ -77,12 +77,13 @@ describe('MobileMoreSheet', () => {
     })
 
     it('keeps the overlay above the bottom nav so nav buttons stay tappable', () => {
-        const { baseElement } = renderComponent()
+        renderComponent()
 
-        const overlay = baseElement.querySelector('[data-state="open"].fixed')
+        const overlay = screen.getByTestId('mobile-more-underlay')
 
         expect(overlay).not.toBeNull()
         expect(overlay.className).toContain('bottom-safe-nav')
+        expect(overlay.className).toContain('z-40')
     })
 
     it('does not auto-focus the first action when it opens', () => {

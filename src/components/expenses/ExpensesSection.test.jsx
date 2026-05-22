@@ -157,4 +157,50 @@ describe('ExpensesSection', () => {
 
         vi.useRealTimers();
     })
+
+    it('shows unpaid expenses before paid expenses while keeping date order within each group', async () => {
+        hookMocks.expenses = [
+            {
+                ...baseExpense,
+                id: 'paid-latest',
+                title: 'Paid latest',
+                date: '2026-05-22',
+                paymentStatus: 'paid'
+            },
+            {
+                ...baseExpense,
+                id: 'unpaid-middle',
+                title: 'Unpaid middle',
+                date: '2026-05-21',
+                paymentStatus: 'unpaid'
+            },
+            {
+                ...baseExpense,
+                id: 'unpaid-latest',
+                title: 'Unpaid latest',
+                date: '2026-05-23',
+                paymentStatus: 'unpaid'
+            },
+            {
+                ...baseExpense,
+                id: 'paid-older',
+                title: 'Paid older',
+                date: '2026-05-20',
+                paymentStatus: 'paid'
+            }
+        ]
+
+        render(
+            <ExpensesSection
+                clientId="client-1"
+                openExpenseModal={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Expenses (4)' }))
+
+        const titles = screen.getByTestId('expense-list').textContent
+
+        expect(titles).toBe('Unpaid latestUnpaid middlePaid latestPaid older')
+    })
 })

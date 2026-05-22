@@ -23,7 +23,7 @@ import { Notice } from '@/components/ui/notice';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowDownTrayIcon, ChartBarIcon, ClockIcon, DocumentCheckIcon, DocumentTextIcon, ExclamationTriangleIcon, HandCoinsIcon } from '@/components/ui/icons';
+import { ArrowDownTrayIcon, ChartBarIcon, ClockIcon, DocumentTextIcon, ExclamationTriangleIcon, HandCoinsIcon, ReceiptTextIcon, SheetIcon } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import useCurrencyConversion from '@/components/dashboard/hooks/useCurrencyConversion';
@@ -43,10 +43,10 @@ import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
 
 const REPORT_TABS = [
     { value: 'overview', label: 'Overview', icon: ChartBarIcon },
-    { value: 'monthly', label: 'Monthly', icon: DocumentTextIcon },
-    { value: 'statement', label: 'Statement', icon: DocumentTextIcon },
-    { value: 'work-summary', label: 'Work Summary', icon: DocumentTextIcon },
-    { value: 'tax', label: 'Tax', icon: DocumentCheckIcon },
+    { value: 'monthly', label: 'Monthly', icon: ReceiptTextIcon },
+    { value: 'statement', label: 'Statement', icon: ReceiptTextIcon },
+    { value: 'work-summary', label: 'Work Summary', icon: ReceiptTextIcon },
+    { value: 'tax', label: 'Tax', icon: SheetIcon },
     { value: 'invoices', label: 'Invoices', icon: DocumentTextIcon },
     { value: 'outstanding', label: 'Outstanding', icon: DocumentTextIcon },
     { value: 'expenses', label: 'Expenses', icon: HandCoinsIcon },
@@ -1144,11 +1144,11 @@ function Reports() {
         return {
             revenueIssued: {
                 value: formatCurrencyBreakdown({ amountsByCurrency: revenueIssuedByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
-                subtitle: `${issuedInvoicesInRange.length} invoices in ${getDateRangeLabel(resolvedRange)}`,
+                subtitle: `${issuedInvoicesInRange.length} invoice${issuedInvoicesInRange.length === 1 ? '' : 's'} issued`,
             },
             revenuePaid: {
                 value: formatCurrencyBreakdown({ amountsByCurrency: revenuePaidByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
-                subtitle: `${paidInvoicesInRange.length} invoices paid in ${getDateRangeLabel(resolvedRange)}`,
+                subtitle: `${paidInvoicesInRange.length} invoice${paidInvoicesInRange.length === 1 ? '' : 's'} paid`,
             },
             outstanding: {
                 value: formatCurrencyBreakdown({ amountsByCurrency: outstandingByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
@@ -1165,6 +1165,14 @@ function Reports() {
             expenses: {
                 value: formatCurrencyBreakdown({ amountsByCurrency: expensesByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
                 subtitle: `${filteredExpenses.length} expenses in range`,
+            },
+            estimatedProfit: {
+                value: formatCurrencyBreakdown({ amountsByCurrency: monthlyEstimatedProfitByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
+                subtitle: 'Paid revenue minus filtered expenses',
+            },
+            hoursWorked: {
+                value: formatDuration(totalHoursMs),
+                subtitle: `${formatDuration(billableHoursMs)} billable`,
             },
             uninvoicedWork: {
                 value: formatDuration(totalUninvoicedHoursMs),
@@ -1186,6 +1194,7 @@ function Reports() {
         currencyDisplayMode,
         expensesByCurrency,
         filteredExpenses.length,
+        monthlyEstimatedProfitByCurrency,
         overdueByCurrency,
         overdueInvoices.length,
         outstandingByCurrency,
@@ -1879,32 +1888,37 @@ function Reports() {
     return (
         <div className={buildSectionClassName(isMobileLayout)}>
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
-                <TabsList className={cn(
-                    'w-full bg-transparent rounded-none',
-                    isMobileLayout
-                        ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
-                        : 'justify-start border-b border-border p-0'
+                <div className={cn(
+                    'overflow-x-auto pb-1 scrollbar-hide',
+                    isMobileLayout ? '-mx-4 px-4' : ''
                 )}>
-                    {REPORT_TABS.map((tab) => {
-                        const Icon = tab.icon;
+                    <TabsList className={cn(
+                        'bg-transparent rounded-none w-max min-w-full flex-nowrap',
+                        isMobileLayout
+                            ? 'h-auto justify-start gap-2 border-0 p-0'
+                            : 'h-auto justify-start border-b border-border p-0'
+                    )}>
+                        {REPORT_TABS.map((tab) => {
+                            const Icon = tab.icon;
 
-                        return (
-                            <TabsTrigger
-                                key={tab.value}
-                                value={tab.value}
-                                className={cn(
-                                    'flex items-center font-medium text-sm whitespace-nowrap transition-colors',
-                                    isMobileLayout
-                                        ? 'rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
-                                        : 'mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border'
-                                )}
-                            >
-                                <Icon className="mr-2 h-4 w-4" />
-                                {tab.label}
-                            </TabsTrigger>
-                        );
-                    })}
-                </TabsList>
+                            return (
+                                <TabsTrigger
+                                    key={tab.value}
+                                    value={tab.value}
+                                    className={cn(
+                                        'flex items-center font-medium text-sm whitespace-nowrap transition-colors',
+                                        isMobileLayout
+                                            ? 'shrink-0 rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
+                                            : 'shrink-0 mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border'
+                                    )}
+                                >
+                                    <Icon className="mr-2 h-4 w-4" />
+                                    {tab.label}
+                                </TabsTrigger>
+                            );
+                        })}
+                    </TabsList>
+                </div>
             </Tabs>
 
             <div className={buildSectionClassName(isMobileLayout)}>

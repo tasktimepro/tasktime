@@ -12,6 +12,7 @@ const mockExportInvoicesReportPdf = vi.fn(() => Promise.resolve());
 const mockExportOutstandingReportPdf = vi.fn(() => Promise.resolve());
 const mockExportExpensesReportPdf = vi.fn(() => Promise.resolve());
 const mockGeneratePdfBlob = vi.fn(() => Promise.resolve(new Blob(['pdf'], { type: 'application/pdf' })));
+let mockIsMobileLayout = false;
 const createDefaultInvoices = () => [
     {
         id: 'invoice-1',
@@ -229,7 +230,7 @@ vi.mock('@/hooks/useToast.ts', () => ({
 }));
 
 vi.mock('@/hooks/useIsMobileLayout', () => ({
-    default: () => false,
+    default: () => mockIsMobileLayout,
 }));
 
 vi.mock('@/components/dashboard/hooks/useCurrencyConversion', () => ({
@@ -267,6 +268,7 @@ vi.mock('@/utils/pdfUtils.ts', () => ({
 
 describe('Reports', () => {
     beforeEach(() => {
+        mockIsMobileLayout = false;
         mockUpdateUrl.mockReset();
         mockBuildCsvContent.mockClear();
         mockDownloadCsvFile.mockClear();
@@ -298,8 +300,10 @@ describe('Reports', () => {
         render(<Reports />);
 
         expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
-        expect(screen.getByText('Revenue Issued')).toBeInTheDocument();
-        expect(screen.getByText('Payments Received')).toBeInTheDocument();
+        expect(screen.getByText('Issued')).toBeInTheDocument();
+        expect(screen.getByText('Received')).toBeInTheDocument();
+        expect(screen.getByText('Estimated Profit')).toBeInTheDocument();
+        expect(screen.getByText('Hours Worked')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Report period' })).toHaveTextContent('Last Month');
 
         await waitFor(() => {
@@ -318,35 +322,34 @@ describe('Reports', () => {
         expect(screen.getByText('Invoices without business profile')).toBeInTheDocument();
     });
 
-    it('orders the report filters and resets them to defaults', () => {
+    it('keeps the period picker inline, exposes the remaining report filters from More filters, and resets them to defaults', () => {
         render(<Reports />);
 
-        const orderedControls = [
-            screen.getByRole('button', { name: 'Report period' }),
-            screen.getByRole('combobox', { name: 'Business filter' }),
-            screen.getByRole('combobox', { name: 'Client filter' }),
-            screen.getByRole('combobox', { name: 'Project filter' }),
-            screen.getByRole('combobox', { name: 'Expense status filter' }),
-            screen.getByRole('combobox', { name: 'Expense date filter' }),
-            screen.getByRole('combobox', { name: 'Category filter' }),
-            screen.getByRole('combobox', { name: 'Currency display filter' }),
-            screen.getByRole('combobox', { name: 'Invoice status filter' }),
-            screen.getByRole('combobox', { name: 'Income date filter' }),
-            screen.getByRole('button', { name: 'Reset filters' }),
-        ];
-
-        orderedControls.forEach((control, index) => {
-            const nextControl = orderedControls[index + 1];
-
-            if (!nextControl) {
-                return;
-            }
-
-            expect(control.compareDocumentPosition(nextControl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        });
+        expect(screen.getByRole('button', { name: 'Report period' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'More filters' })).toBeInTheDocument();
+        expect(screen.queryByRole('combobox', { name: 'Business filter' })).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Report period' }));
         fireEvent.click(screen.getByRole('button', { name: 'This Month' }));
+
+        fireEvent.pointerDown(screen.getByRole('button', { name: 'More filters' }), {
+            button: 0,
+            clientX: 24,
+            clientY: 24,
+            ctrlKey: false,
+            pointerType: 'mouse',
+        });
+
+        expect(screen.getByRole('combobox', { name: 'Business filter' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Client filter' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Project filter' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Expense status filter' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Expense date filter' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Category filter' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Currency display filter' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Invoice status filter' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Income date filter' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Reset filters' })).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('combobox', { name: 'Expense status filter' }));
         fireEvent.click(screen.getByRole('option', { name: 'Paid only' }));
@@ -354,17 +357,39 @@ describe('Reports', () => {
         fireEvent.click(screen.getByRole('combobox', { name: 'Currency display filter' }));
         fireEvent.click(screen.getByRole('option', { name: 'Source currencies' }));
 
-        expect(screen.getByRole('button', { name: 'Report period' })).toHaveTextContent('This Month');
+        expect(document.querySelector('button[aria-label="Report period"]')).toHaveTextContent('This Month');
         expect(screen.getByRole('combobox', { name: 'Expense status filter' })).toHaveTextContent('Paid only');
         expect(screen.getByRole('combobox', { name: 'Currency display filter' })).toHaveTextContent('Source currencies');
 
         fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
 
-        expect(screen.getByRole('button', { name: 'Report period' })).toHaveTextContent('Last Month');
+        expect(document.querySelector('button[aria-label="Report period"]')).toHaveTextContent('Last Month');
         expect(screen.getByRole('combobox', { name: 'Expense status filter' })).toHaveTextContent('All expenses');
         expect(screen.getByRole('combobox', { name: 'Currency display filter' })).toHaveTextContent('Preferred currency');
         expect(screen.getByRole('combobox', { name: 'Invoice status filter' })).toHaveTextContent('Non-draft invoices');
         expect(screen.getByRole('combobox', { name: 'Income date filter' })).toHaveTextContent('Income by invoice date');
+    });
+
+    it('uses a horizontally scrollable tab strip on mobile', () => {
+        mockIsMobileLayout = true;
+
+        render(<Reports />);
+
+        const tabList = screen.getByRole('tablist');
+
+        expect(tabList.parentElement.className.includes('overflow-x-auto')).toBe(true);
+        expect(tabList.className.includes('flex-nowrap')).toBe(true);
+        expect(screen.getByRole('tab', { name: 'Overview' }).className.includes('shrink-0')).toBe(true);
+    });
+
+    it('keeps desktop tab overflow inside the tab strip instead of the page', () => {
+        render(<Reports />);
+
+        const tabList = screen.getByRole('tablist');
+
+        expect(tabList.parentElement.className.includes('overflow-x-auto')).toBe(true);
+        expect(tabList.className.includes('flex-nowrap')).toBe(true);
+        expect(screen.getByRole('tab', { name: 'Overview' }).className.includes('shrink-0')).toBe(true);
     });
 
     it('renders the VAT summary tab with tax buckets and geography breakdown', () => {

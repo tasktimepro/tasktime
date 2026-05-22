@@ -52,7 +52,7 @@ export interface UseYjsCollectionResult<T extends { id: string }> {
     /** Create a new item (ID is optional - auto-generated if not provided) */
     create: (data: Omit<T, 'id'> & { id?: string }) => T;
     /** Update an existing item (automatically updates updatedAt timestamp) */
-    update: (id: string, updates: Partial<T>) => T | undefined;
+    update: (id: string, updates: Partial<T>, options?: { origin?: unknown }) => T | undefined;
     /** Delete an item */
     remove: (id: string) => boolean;
 }
@@ -183,7 +183,7 @@ export function useYjsCollection<T extends { id: string }>(
         return validatedItem;
     }, [options.collectionName, yMap]);
 
-    const update = useCallback((id: string, updates: Partial<T>): T | undefined => {
+    const update = useCallback((id: string, updates: Partial<T>, updateOptions?: { origin?: unknown }): T | undefined => {
         if (!yMap) return undefined;
         
         const rawMap = yMap as unknown as Y.Map<string, unknown>;
@@ -201,26 +201,35 @@ export function useYjsCollection<T extends { id: string }>(
             ? validateCollectionEntity<T>(options.collectionName, mergedEntity, `update ${options.collectionName}.${id}`)
             : mergedEntity as unknown as T;
 
-        if (existing instanceof Y.Map) {
-            // New format: field-level CRDT update
-            for (const key of Object.keys(updatesWithTimestamp)) {
-                const value = (validatedEntity as Record<string, unknown>)[key];
+        const applyUpdate = () => {
+            if (existing instanceof Y.Map) {
+                // New format: field-level CRDT update
+                for (const key of Object.keys(updatesWithTimestamp)) {
+                    const value = (validatedEntity as Record<string, unknown>)[key];
 
-                if (value === undefined) {
-                    existing.delete(key);
-                } else {
-                    existing.set(key, value);
+                    if (value === undefined) {
+                        existing.delete(key);
+                    } else {
+                        existing.set(key, value);
+                    }
                 }
+
+                return;
             }
 
-            markMeaningfulActivity(getCollectionAction(options.collectionName, 'update'));
+            // Old format: merge and convert to nested Y.Map
+            const entityMap = objectToYMap(validatedEntity as unknown as Record<string, unknown>);
+            rawMap.set(id, entityMap);
+        };
 
-            return validatedEntity;
+        const parentDoc = (yMap as unknown as { doc?: Y.Doc }).doc;
+
+        if (parentDoc) {
+            parentDoc.transact(applyUpdate, updateOptions?.origin);
+        } else {
+            applyUpdate();
         }
 
-        // Old format: merge and convert to nested Y.Map
-        const entityMap = objectToYMap(validatedEntity as unknown as Record<string, unknown>);
-        rawMap.set(id, entityMap);
         markMeaningfulActivity(getCollectionAction(options.collectionName, 'update'));
 
         return validatedEntity;

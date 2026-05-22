@@ -43,6 +43,14 @@ const ExpensesSection = ({
             .slice(0, 15);
     }, [filteredExpenses]);
 
+    const getEffectivePaymentStatus = (expense) => {
+        if (expense.isPreview) {
+            return 'unpaid';
+        }
+
+        return expense.paymentStatus;
+    };
+
     const upcomingRecurringPreviews = useMemo(() => {
         if (!recurrences.length) return [];
 
@@ -118,7 +126,21 @@ const ExpensesSection = ({
 
     const displayedExpenses = useMemo(() => {
         const combined = [...recentExpenses, ...upcomingRecurringPreviews];
-        return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return combined.sort((a, b) => {
+            const paymentStatusDiff = Number(getEffectivePaymentStatus(a) === 'paid') - Number(getEffectivePaymentStatus(b) === 'paid');
+
+            if (paymentStatusDiff !== 0) {
+                return paymentStatusDiff;
+            }
+
+            const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+
+            if (dateDiff !== 0) {
+                return dateDiff;
+            }
+
+            return (a.title || '').localeCompare(b.title || '');
+        });
     }, [recentExpenses, upcomingRecurringPreviews]);
 
     const handleToggle = () => {

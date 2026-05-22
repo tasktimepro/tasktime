@@ -78,7 +78,10 @@ function ExportImport({
         setIsExporting(true);
 
         try {
-            const exportData = await store.exportBackupData({ backupType: 'manual' });
+            const exportData = await store.exportBackupData({
+                backupType: 'manual',
+                refreshFromCloud: true,
+            });
             const dataStr = JSON.stringify(exportData, null, 2);
             const dataBlob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(dataBlob);

@@ -16,6 +16,7 @@ export interface Project {
     createdAt?: number;
     updatedAt?: number;
     description?: string;
+    notes?: ProjectNotes | null;
     invoiceIds?: string[];
     hourlyRate?: number | null;
     flatRate?: boolean;
@@ -28,6 +29,27 @@ export interface Project {
     color?: string | null;
     /** Round timer-created billable time up in these minute increments */
     billableTimeIncrementMinutes?: number | null;
+}
+
+export interface TipTapJsonNode {
+    type: string;
+    attrs?: Record<string, JsonValue> | null;
+    content?: TipTapJsonNode[];
+    marks?: Array<{
+        type: string;
+        attrs?: Record<string, JsonValue> | null;
+    }>;
+    text?: string;
+}
+
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+export interface ProjectNotes {
+    version: 1;
+    type: 'tiptap-json';
+    content: TipTapJsonNode;
+    plainTextPreview?: string;
+    updatedAt: number;
 }
 
 export interface Task {

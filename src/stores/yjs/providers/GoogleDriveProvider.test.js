@@ -3,6 +3,7 @@
 import * as Y from 'yjs'
 import { describe, expect, it, vi } from 'vitest'
 import { YjsDriveProvider } from './GoogleDriveProvider.ts'
+import { PROJECT_NOTES_LOCAL_SAVE_ORIGIN } from '@/constants/syncOrigins'
 
 function objectToYMap(data) {
     const map = new Y.Map()
@@ -116,6 +117,44 @@ describe('YjsDriveProvider', () => {
         expect(syncSpy).toHaveBeenCalledWith(true, { allowPull: false })
 
         provider.disconnect()
+    })
+
+    it('queues local-only project note updates without scheduling an immediate sync', async () => {
+        vi.useFakeTimers()
+
+        try {
+            const liveDoc = new Y.Doc()
+            const provider = createProviderWithCoreDoc(liveDoc)
+
+            provider.isOnline = () => true
+            provider.setSyncMode('backup')
+            provider.manifest = {
+                load: vi.fn(async () => {}),
+                getManifest: vi.fn(() => ({ documents: {} })),
+                isDirty: vi.fn(() => false),
+                save: vi.fn(async () => {}),
+            }
+
+            const syncSpy = vi.spyOn(provider, 'sync').mockResolvedValue(undefined)
+
+            await provider.connect('backup')
+
+            liveDoc.transact(() => {
+                liveDoc.getMap('projects').set('project-1', objectToYMap({
+                    id: 'project-1',
+                    title: 'Deferred notes sync',
+                }))
+            }, PROJECT_NOTES_LOCAL_SAVE_ORIGIN)
+
+            vi.advanceTimersByTime(500)
+
+            expect(provider.pendingDeltas.get('core')).toHaveLength(1)
+            expect(syncSpy).not.toHaveBeenCalled()
+
+            provider.disconnect()
+        } finally {
+            vi.useRealTimers()
+        }
     })
 
     it('preserves updates queued while a delta upload is in flight', async () => {

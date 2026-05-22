@@ -58,7 +58,10 @@ vi.mock('./providers/GoogleDriveProvider', () => ({
             this.connect = vi.fn(async () => {})
             this.disconnect = vi.fn()
             this.isConnected = vi.fn(() => true)
+            this.getState = vi.fn(() => 'idle')
+            this.sync = vi.fn(async () => {})
             this.syncAndSubscribeDoc = vi.fn(async () => {})
+            this.getEntryYears = vi.fn(() => [])
             providerInstances.push(this)
         }
     }
@@ -153,6 +156,25 @@ describe('YjsStore reconnect sync tracking', () => {
 
         expect(provider.markDocsForFullStateUpload).not.toHaveBeenCalled()
         expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
+
+        store.destroy()
+    })
+
+    it('does not create a manual export when connected cloud refresh fails', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+        provider.getState.mockReturnValue('error')
+
+        await expect(store.exportBackupData({
+            backupType: 'manual',
+            refreshFromCloud: true,
+        })).rejects.toThrow('Unable to refresh cloud data before export')
+
+        expect(provider.sync).toHaveBeenCalledWith(true, { allowPull: true })
+        expect(provider.syncAndSubscribeDoc).not.toHaveBeenCalled()
 
         store.destroy()
     })
@@ -412,7 +434,20 @@ describe('YjsStore timer reconciliation', () => {
         docs.set('expenses-archived', archivedExpensesDoc)
         docs.set('entries-2024', historicalEntriesDoc)
 
-        coreDoc.getMap('projects').set('project-1', objectToYMap({ id: 'project-1', title: 'Project One' }))
+        coreDoc.getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Project One',
+            notes: {
+                version: 1,
+                type: 'tiptap-json',
+                content: {
+                    type: 'doc',
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Project note' }] }],
+                },
+                plainTextPreview: 'Project note',
+                updatedAt: Date.UTC(2026, 3, 22),
+            },
+        }))
         coreDoc.getMap('tasks').set('task-active', objectToYMap({ id: 'task-active', title: 'Active Task', projectId: 'project-1' }))
         coreDoc.getMap('clients').set('client-1', objectToYMap({ id: 'client-1', title: 'Client One' }))
         coreDoc.getMap('businessInfos').set('business-1', objectToYMap({ id: 'business-1', title: 'Business One' }))
@@ -437,6 +472,15 @@ describe('YjsStore timer reconciliation', () => {
         expect(payload.emailTemplates).toEqual([
             expect.objectContaining({ id: 'email-template-1' }),
         ])
+        expect(payload.projects).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                id: 'project-1',
+                notes: expect.objectContaining({
+                    type: 'tiptap-json',
+                    plainTextPreview: 'Project note',
+                }),
+            }),
+        ]))
         expect(payload.tasks).toEqual(expect.arrayContaining([
             expect.objectContaining({ id: 'task-active' }),
             expect.objectContaining({ id: 'task-archived' }),
@@ -463,7 +507,20 @@ describe('YjsStore timer reconciliation', () => {
         await store.initialize()
 
         await store.importBackupData({
-            projects: [{ id: 'project-1', title: 'Project One' }],
+            projects: [{
+                id: 'project-1',
+                title: 'Project One',
+                notes: {
+                    version: 1,
+                    type: 'tiptap-json',
+                    content: {
+                        type: 'doc',
+                        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Imported note' }] }],
+                    },
+                    plainTextPreview: 'Imported note',
+                    updatedAt: Date.UTC(2026, 3, 22),
+                },
+            }],
             tasks: [
                 { id: 'task-active', title: 'Active Task', projectId: 'project-1' },
                 { id: 'task-archived', title: 'Archived Task', projectId: 'project-1', archived: true, archivedOnDate: '2026-04-22' },
@@ -492,6 +549,10 @@ describe('YjsStore timer reconciliation', () => {
         })
 
         expect(store.emailTemplates.has('email-template-1')).toBe(true)
+        expect(store.projects.get('project-1').get('notes')).toEqual(expect.objectContaining({
+            type: 'tiptap-json',
+            plainTextPreview: 'Imported note',
+        }))
         expect(store.tasks.has('task-active')).toBe(true)
         expect((await store.loadArchivedTasks()).has('task-archived')).toBe(true)
         expect(store.activeTimeEntries.has('entry-active')).toBe(true)
@@ -500,6 +561,28 @@ describe('YjsStore timer reconciliation', () => {
         expect((await store.loadArchivedInvoices()).has('invoice-archived')).toBe(true)
         expect(store.expenses.has('expense-active')).toBe(true)
         expect((await store.loadArchivedExpenses()).has('expense-archived')).toBe(true)
+
+        store.destroy()
+    })
+
+    it('refreshes connected cloud docs before manual export when requested', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+        provider.getEntryYears.mockReturnValue([2024])
+
+        await store.exportBackupData({
+            backupType: 'manual',
+            refreshFromCloud: true,
+        })
+
+        expect(provider.sync).toHaveBeenCalledWith(true, { allowPull: true })
+        expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('tasks-archived', { allowPull: true })
+        expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('invoices-archived', { allowPull: true })
+        expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('expenses-archived', { allowPull: true })
+        expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('entries-2024', { allowPull: true })
 
         store.destroy()
     })

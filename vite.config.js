@@ -96,7 +96,6 @@ export default defineConfig({
           if (id.includes('@radix-ui')) return 'radix';
           if (id.includes('lucide-react')) return 'icons';
           if (id.includes('date-fns')) return 'date-fns';
-          if (id.includes('yjs') || id.includes('y-indexeddb')) return 'yjs';
           if (id.includes('sonner')) return 'sonner';
 
           return 'vendor';

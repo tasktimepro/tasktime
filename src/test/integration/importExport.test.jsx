@@ -111,7 +111,10 @@ describe('Import/Export integration', () => {
 
         await user.click(screen.getByRole('button', { name: 'Export' }))
 
-        expect(mockExportBackupData).toHaveBeenCalledWith({ backupType: 'manual' })
+        expect(mockExportBackupData).toHaveBeenCalledWith({
+            backupType: 'manual',
+            refreshFromCloud: true,
+        })
         expect(createObjectURLSpy).toHaveBeenCalled()
 
         const link = getLastLink()

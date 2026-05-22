@@ -32,6 +32,8 @@ import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
 import ExpensesSection from './expenses/ExpensesSection';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ProjectNotesEditor from './ProjectNotesEditor';
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -64,6 +66,7 @@ const ProjectDashboard = ({
     const [editingInvoice, setEditingInvoice] = useState(null);
     const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [activeTab, setActiveTab] = useState('tasks');
     const { showError, showSuccess } = useToast();
     const { getTimerForProject, clearTimer } = useTimers();
     const { deleteProject, archiveProject, unarchiveProject } = useProjects();
@@ -534,16 +537,53 @@ const ProjectDashboard = ({
                 </div>
             )}
 
-            {/* Task Tree */}
-            <Card>
-                <CardContent className={cn(isMobileLayout ? 'px-3 py-3' : 'pt-6')}>
-                    <TaskTree
-                        project={project}
-                        onEditTask={openTaskModal}
-                        onViewTask={onViewTask}
-                    />
-                </CardContent>
-            </Card>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className={cn(
+                    'w-full bg-transparent rounded-none',
+                    isMobileLayout
+                        ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
+                        : 'justify-start border-b border-border p-0'
+                )}>
+                    <TabsTrigger
+                        value="tasks"
+                        className={cn(
+                            'font-medium text-sm whitespace-nowrap transition-colors',
+                            isMobileLayout
+                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
+                                : 'mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border'
+                        )}
+                    >
+                        Tasks
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="notes"
+                        className={cn(
+                            'font-medium text-sm whitespace-nowrap transition-colors',
+                            isMobileLayout
+                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
+                                : 'mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border'
+                        )}
+                    >
+                        Notes
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="tasks" className="mt-4">
+                    <Card>
+                        <CardContent className={cn(isMobileLayout ? 'px-3 py-3' : 'pt-6')}>
+                            <TaskTree
+                                project={project}
+                                onEditTask={openTaskModal}
+                                onViewTask={onViewTask}
+                            />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="notes" className="mt-4">
+                    <ProjectNotesEditor key={project.id} project={project} />
+                </TabsContent>
+            </Tabs>
 
             <ExpensesSection
                 clientId={projectClient?.id}

@@ -36,6 +36,61 @@ const nonNegativeNumberSchema = z.number().finite().min(0);
 const nonEmptyStringSchema = z.string().trim().min(1);
 const optionalNullableIdSchema = z.string().trim().min(1).nullable().optional();
 
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
+    z.string(),
+    finiteNumberSchema,
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
+]));
+
+type TipTapJsonNodeValue = {
+    type: string;
+    attrs?: Record<string, JsonValue> | null;
+    content?: TipTapJsonNodeValue[];
+    marks?: Array<{
+        type: string;
+        attrs?: Record<string, JsonValue> | null;
+    }>;
+    text?: string;
+};
+
+const tipTapJsonNodeSchema: z.ZodType<TipTapJsonNodeValue> = z.lazy(() => z.object({
+    type: nonEmptyStringSchema,
+    attrs: z.record(z.string(), jsonValueSchema).nullable().optional(),
+    content: z.array(tipTapJsonNodeSchema).optional(),
+    marks: z.array(z.object({
+        type: nonEmptyStringSchema,
+        attrs: z.record(z.string(), jsonValueSchema).nullable().optional(),
+    }).passthrough()).optional(),
+    text: z.string().optional(),
+}).passthrough());
+
+const projectNotesSchema = z.object({
+    version: z.literal(1),
+    type: z.literal('tiptap-json'),
+    content: tipTapJsonNodeSchema,
+    plainTextPreview: z.string().optional(),
+    updatedAt: finiteNumberSchema,
+}).passthrough();
+
+const safeProjectNotesSchema = z.preprocess((value) => {
+    if (value == null) {
+        return value;
+    }
+
+    const parsed = projectNotesSchema.safeParse(value);
+
+    if (parsed.success) {
+        return parsed.data;
+    }
+
+    return undefined;
+}, projectNotesSchema.nullable().optional());
+
 const recurringConfigSchema = z.object({
     type: z.enum(['weekly', 'monthly', 'yearly']),
     weeklyDays: z.array(z.number().int().min(0).max(6)).optional(),
@@ -50,6 +105,7 @@ const projectSchema = z.object({
     createdAt: finiteNumberSchema.optional(),
     updatedAt: finiteNumberSchema.optional(),
     description: z.string().optional(),
+    notes: safeProjectNotesSchema,
     hourlyRate: finiteNumberSchema.nullable().optional(),
     flatRate: z.boolean().optional(),
     preferredClientId: optionalNullableIdSchema,
