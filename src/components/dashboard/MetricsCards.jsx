@@ -137,9 +137,9 @@ const MetricsCards = ({
             ];
         };
 
-        // Add earned invoice totals (highest priority)
+        // Add received invoice totals (highest priority)
         if (paidTotal > 0) {
-            const paidLines = renderAmountLine(metrics.paidInvoices, 'earned', BanknotesIcon, colors.icon, 'paid');
+            const paidLines = renderAmountLine(metrics.paidInvoices, 'received', BanknotesIcon, colors.icon, 'paid');
             components.push(...paidLines);
         }
 

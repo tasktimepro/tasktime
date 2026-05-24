@@ -41,6 +41,7 @@ describe('SubtaskCreateForm', () => {
         expect(formBody?.className.includes('flex')).toBe(false);
         expect(dateInput?.className.includes('w-full')).toBe(true);
         expect(actions?.className.includes('justify-end')).toBe(true);
+        expect(Array.from(actions?.children || []).map((item) => item.textContent)).toEqual(['Cancel', 'Add']);
 
         hookState.isMobileLayout = false;
     });
@@ -63,6 +64,32 @@ describe('SubtaskCreateForm', () => {
         expect(titleInput.className.includes('flex-1')).toBe(true);
         expect(noteInput.className.includes('flex-1')).toBe(true);
         expect(dateInput?.className.includes('w-40')).toBe(true);
+        expect(actions?.className.includes('ml-auto')).toBe(true);
         expect(actions?.className.includes('justify-end')).toBe(false);
+        expect(Array.from(actions?.children || []).map((item) => item.textContent)).toEqual(['Cancel', 'Add']);
+    });
+
+    it('can force the stacked layout off mobile', () => {
+        hookState.isMobileLayout = false;
+
+        const { container } = render(
+            <SubtaskCreateForm
+                {...defaultProps}
+                forceStackedLayout={true}
+            />
+        );
+
+        const form = screen.getByTestId('subtask-create-form');
+        const formBody = form.firstElementChild;
+        const dateInput = container.querySelector('input[type="date"]');
+        const actions = screen.getByRole('button', { name: 'Add' }).parentElement;
+
+        expect(form.className.includes('rounded-lg')).toBe(true);
+        expect(form.className.includes('bg-card')).toBe(true);
+        expect(formBody?.className.includes('space-y-3')).toBe(true);
+        expect(formBody?.className.includes('flex')).toBe(false);
+        expect(dateInput?.className.includes('w-full')).toBe(true);
+        expect(actions?.className.includes('justify-end')).toBe(true);
+        expect(Array.from(actions?.children || []).map((item) => item.textContent)).toEqual(['Cancel', 'Add']);
     });
 });

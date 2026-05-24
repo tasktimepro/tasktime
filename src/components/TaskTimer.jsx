@@ -3,6 +3,10 @@ import { formatDurationWithSeconds } from '../utils/dateUtils';
 import TimerControls from './TimerControls';
 import { useTimers } from '../hooks/useTimers';
 
+const stopDragPropagation = (event) => {
+    event.stopPropagation();
+};
+
 /**
  * TaskTimer component - Shows task timer and timer controls
  * 
@@ -32,7 +36,7 @@ const TaskTimer = ({
     }, [isTimerActive, elapsedTime]);
 
     return (
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2" onPointerDownCapture={stopDragPropagation}>
             {showTimeDisplay && isTimerActive && (
                 <span className={`inline-block shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-center text-xs font-mono ${
                     isTimerPaused 

@@ -30,6 +30,17 @@ vi.mock('./SubtaskItem', () => ({
     ),
 }));
 
+vi.mock('../drag/SortableSubtaskItem', () => ({
+    default: ({ task, onArchive, onUnarchive, onDelete }) => (
+        <div data-testid="subtask-item">
+            <span>{task.title}</span>
+            {onArchive && <button type="button" onClick={onArchive}>Archive {task.title}</button>}
+            {onUnarchive && <button type="button" onClick={onUnarchive}>Unarchive {task.title}</button>}
+            <button type="button" onClick={onDelete}>Delete {task.title}</button>
+        </div>
+    ),
+}));
+
 vi.mock('./SubtaskCreateForm', () => ({
     default: () => null,
 }));
@@ -81,7 +92,7 @@ vi.mock('../../../hooks/useProjects', () => ({
     }),
 }));
 
-const renderSubtaskSection = ({ subtasks, showSuccess = vi.fn() }) => {
+const renderSubtaskSection = ({ subtasks, showSuccess = vi.fn(), manualSortEnabled = false }) => {
     return render(
         <SubtaskSection
             subtasks={subtasks}
@@ -102,6 +113,7 @@ const renderSubtaskSection = ({ subtasks, showSuccess = vi.fn() }) => {
             showSuccess={showSuccess}
             onEditTask={vi.fn()}
             onViewTask={vi.fn()}
+            manualSortEnabled={manualSortEnabled}
         />
     );
 };
@@ -258,6 +270,26 @@ describe('SubtaskSection sorting', () => {
             'Active olderArchive Active olderDelete Active older',
             'Completed recentArchive Completed recentDelete Completed recent',
             'Completed olderArchive Completed olderDelete Completed older',
+        ]);
+    });
+
+    it('uses manual order for active subtasks when manual sort is enabled', () => {
+        hookState.tasks = [];
+        hookState.entries = [];
+        hookState.timers = [];
+
+        const subtasks = [
+            { id: 's1', title: 'Second subtask', completed: false, archived: false, sortOrder: 2000 },
+            { id: 's2', title: 'First subtask', completed: false, archived: false, sortOrder: 1000 },
+        ];
+
+        renderSubtaskSection({ subtasks, manualSortEnabled: true });
+
+        const renderedTitles = screen.getAllByTestId('subtask-item').map((item) => item.textContent);
+
+        expect(renderedTitles).toEqual([
+            'First subtaskArchive First subtaskDelete First subtask',
+            'Second subtaskArchive Second subtaskDelete Second subtask',
         ]);
     });
 });

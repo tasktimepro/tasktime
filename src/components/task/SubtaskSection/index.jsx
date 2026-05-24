@@ -1,6 +1,21 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ChevronDownIcon, ChevronRightIcon } from '@/components/ui/icons';
+import {
+    closestCenter,
+    DndContext,
+    KeyboardSensor,
+    PointerSensor,
+    useDroppable,
+    useSensor,
+    useSensors,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { ChevronDownIcon, ChevronRightIcon, GripVerticalIcon } from '@/components/ui/icons';
 import SubtaskItem from './SubtaskItem';
+import SortableSubtaskItem from '../drag/SortableSubtaskItem';
 import SubtaskCreateForm from './SubtaskCreateForm';
 import Modal from '../../Modal';
 import { Notice } from '@/components/ui/notice';
@@ -14,6 +29,19 @@ import { getTaskDeletionBillingSummary } from '../../../utils/taskUtils.ts';
 import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { toStorageDate } from '../../../utils/dateUtils.ts';
+import {
+    buildTaskContainerMoveOrderUpdates,
+    hasManualTaskOrder,
+    sortTasksByManualOrder,
+} from '../../../utils/taskOrderingUtils.ts';
+
+const renderListDropPlaceholder = (key = 'list-drop-placeholder') => (
+    <div
+        key={key}
+        className="h-[3.125rem] w-[min(40rem,100%)] rounded-md border border-dashed border-primary/50 bg-transparent"
+        aria-hidden="true"
+    />
+);
 
 /**
  * SubtaskSection component - Renders subtasks list and create form.
@@ -40,9 +68,34 @@ const SubtaskSection = ({
     isRelatedToActiveTimer,
     showSuccess,
     onEditTask,
-    onViewTask
+    onViewTask,
+    manualSortEnabled = false,
+    useExternalDragContext = false,
+    dragPreview = null,
+    showDecorativeDragHandles = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
+    const subtaskSensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 6,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+    const {
+        setNodeRef: setSubtaskContainerNodeRef,
+        isOver: isSubtaskContainerOver,
+    } = useDroppable({
+        id: `subtask-container:${task.id}`,
+        data: {
+            type: 'subtask-container',
+            parentTaskId: task.id,
+        },
+        disabled: !manualSortEnabled,
+    });
     // Yjs hooks for state
     const { tasks, updateTask, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
@@ -52,6 +105,10 @@ const SubtaskSection = ({
     const [showArchivedSubtasks, setShowArchivedSubtasks] = useState(false);
 
     const sortedSubtasks = useMemo(() => {
+        if ((manualSortEnabled || showDecorativeDragHandles) && hasManualTaskOrder(subtasks)) {
+            return sortTasksByManualOrder(subtasks, 'lastActive');
+        }
+
         return [...subtasks].sort((a, b) => {
             const aCompleted = a.completed === true;
             const bCompleted = b.completed === true;
@@ -65,7 +122,7 @@ const SubtaskSection = ({
 
             return bLastActive - aLastActive;
         });
-    }, [subtasks]);
+    }, [manualSortEnabled, showDecorativeDragHandles, subtasks]);
 
     const activeSubtasks = useMemo(() => {
         return sortedSubtasks.filter((subtask) => !subtask.archived);
@@ -74,6 +131,16 @@ const SubtaskSection = ({
     const archivedSubtasks = useMemo(() => {
         return sortedSubtasks.filter((subtask) => subtask.archived);
     }, [sortedSubtasks]);
+
+    const isCrossParentPreview = Boolean(
+        dragPreview?.taskId
+        && dragPreview.destinationParentTaskId
+        && dragPreview.destinationParentTaskId !== dragPreview.sourceParentTaskId
+    );
+    const showDropPreview = isCrossParentPreview && dragPreview.destinationParentTaskId === task.id;
+    const dragGhostTaskId = isCrossParentPreview && dragPreview.sourceParentTaskId === task.id
+        ? dragPreview.taskId
+        : null;
 
     const pendingDeleteSubtask = useMemo(() => {
 
@@ -146,14 +213,111 @@ const SubtaskSection = ({
         setPendingDeleteSubtaskId(null);
     }, [pendingDeleteSubtaskId, pendingDeleteSubtask, subtasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);
 
+    const handleSubtaskDragEnd = useCallback((event) => {
+        if (!manualSortEnabled) return;
+
+        const { active, over } = event;
+
+        if (!over) return;
+
+        const activeData = active.data.current || null;
+        const overData = over.data.current || null;
+        const activeId = activeData?.taskId || (typeof active.id === 'string' ? active.id.replace('subtask:', '') : null);
+        const overId = overData?.type === 'subtask'
+            ? (overData.taskId || (typeof over.id === 'string' ? over.id.replace('subtask:', '') : null))
+            : null;
+
+        if (!activeId) return;
+
+        const updates = buildTaskContainerMoveOrderUpdates(
+            activeSubtasks,
+            activeSubtasks,
+            activeId,
+            overId
+        );
+
+        updates.forEach((update) => {
+            updateTask(update.id, {
+                sortOrder: update.sortOrder,
+                sortOrderUpdatedAt: update.sortOrderUpdatedAt,
+            });
+        });
+    }, [activeSubtasks, manualSortEnabled, updateTask]);
+
     if (isArchived || (activeSubtasks.length === 0 && archivedSubtasks.length === 0 && !onCreateSubtask)) {
         return null;
     }
 
+    const renderedSortableSubtasks = [];
+    let previewInserted = false;
+
+    activeSubtasks.forEach((subtask) => {
+        if (showDropPreview && dragPreview.overTaskId === subtask.id) {
+            renderedSortableSubtasks.push(renderListDropPlaceholder(`list-drop-placeholder-${subtask.id}`));
+            previewInserted = true;
+        }
+
+        renderedSortableSubtasks.push(
+            <SortableSubtaskItem
+                key={subtask.id}
+                task={subtask}
+                onToggleBillable={onToggleBillable}
+                onArchive={() => handleArchiveSubtask(subtask.id)}
+                onDelete={() => handleDeleteSubtask(subtask.id)}
+                onEditTask={onEditTask}
+                onViewTask={onViewTask}
+                isDragGhost={dragGhostTaskId === subtask.id}
+                disableTransform={showDropPreview}
+            />
+        );
+    });
+
+    if (showDropPreview && !previewInserted) {
+        renderedSortableSubtasks.push(renderListDropPlaceholder('list-drop-placeholder-end'));
+    }
+
+    const renderDecorativeDragHandle = () => (
+        <span aria-hidden="true" className="inline-flex h-8 shrink-0 items-center justify-center text-muted-foreground">
+            <GripVerticalIcon className="h-4 w-4" />
+        </span>
+    );
+
     return (
         <div className="border-t border-border bg-muted/40 rounded-b-lg">
             <div className={cn('space-y-2 py-2 pb-4 pr-2', isMobileLayout ? 'px-2' : 'pl-8')}>
-                {activeSubtasks.map((subtask) => (
+                {manualSortEnabled ? (
+                    useExternalDragContext ? (
+                        <SortableContext items={activeSubtasks.map((subtask) => `subtask:${subtask.id}`)} strategy={verticalListSortingStrategy}>
+                            <div
+                                ref={setSubtaskContainerNodeRef}
+                                className={cn(
+                                    'space-y-2 rounded-md transition-colors',
+                                    showDropPreview && 'min-h-12'
+                                )}
+                            >
+                                {renderedSortableSubtasks}
+                            </div>
+                        </SortableContext>
+                    ) : (
+                    <DndContext
+                        sensors={subtaskSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleSubtaskDragEnd}
+                    >
+                        <SortableContext items={activeSubtasks.map((subtask) => `subtask:${subtask.id}`)} strategy={verticalListSortingStrategy}>
+                            <div
+                                ref={setSubtaskContainerNodeRef}
+                                className={cn(
+                                    'space-y-2 rounded-md transition-colors',
+                                    showDropPreview && 'min-h-12'
+                                )}
+                            >
+                                {renderedSortableSubtasks}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
+                    )
+                ) : activeSubtasks.map((subtask) => (
                     <SubtaskItem
                         key={subtask.id}
                         task={subtask}
@@ -162,6 +326,7 @@ const SubtaskSection = ({
                         onDelete={() => handleDeleteSubtask(subtask.id)}
                         onEditTask={onEditTask}
                         onViewTask={onViewTask}
+                        dragHandle={showDecorativeDragHandles ? renderDecorativeDragHandle() : null}
                     />
                 ))}
 

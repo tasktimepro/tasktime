@@ -1,5 +1,9 @@
 import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
 
+const stopDragPropagation = (event) => {
+    event.stopPropagation();
+};
+
 /**
  * TaskTimeDisplay component - Renders time display for tasks.
  * @param {Object} props
@@ -16,6 +20,7 @@ const TaskTimeDisplay = ({
         return (
             <button
                 onClick={onShowTimeEntries}
+                    onPointerDownCapture={stopDragPropagation}
                 className="hover:bg-muted px-2 py-1 rounded-md transition-colors"
                 title="Click to edit time"
                 disabled={isCompleted}
@@ -32,6 +37,7 @@ const TaskTimeDisplay = ({
                     {mainTaskTime > 0 && (
                         <button
                             onClick={onShowTimeEntries}
+                            onPointerDownCapture={stopDragPropagation}
                             className="hover:bg-muted rounded-md transition-colors"
                             title="Click to edit time entries"
                             disabled={isCompleted}

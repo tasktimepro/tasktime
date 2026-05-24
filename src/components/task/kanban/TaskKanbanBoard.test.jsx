@@ -1,0 +1,228 @@
+import React from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import TaskKanbanBoard from './TaskKanbanBoard';
+
+const kanbanMocks = vi.hoisted(() => ({
+    updateTask: vi.fn(),
+    createEntry: vi.fn(),
+    getTimerForTask: vi.fn(() => null),
+    clearTimer: vi.fn(),
+    projects: [{ id: 'project-1', title: 'Client Work', isPersonal: false }],
+}));
+
+vi.mock('@dnd-kit/core', async () => {
+    const actual = await vi.importActual('@dnd-kit/core');
+    return {
+        ...actual,
+        DndContext: ({ children }) => <>{children}</>,
+        DragOverlay: ({ children }) => <>{children}</>,
+        useDroppable: vi.fn(() => ({
+            setNodeRef: vi.fn(),
+            isOver: false,
+        })),
+        useSensor: vi.fn(() => ({})),
+        useSensors: vi.fn(() => []),
+    };
+});
+
+vi.mock('@dnd-kit/sortable', async () => {
+    const actual = await vi.importActual('@dnd-kit/sortable');
+    return {
+        ...actual,
+        SortableContext: ({ children }) => <>{children}</>,
+        useSortable: () => ({
+            attributes: {},
+            listeners: {},
+            setActivatorNodeRef: vi.fn(),
+            setNodeRef: vi.fn(),
+            transform: null,
+            transition: undefined,
+            isDragging: false,
+        }),
+    };
+});
+
+vi.mock('@/hooks/useIsMobileLayout', () => ({
+    default: () => false,
+}));
+
+vi.mock('@/hooks/useTasks', () => ({
+    useTasks: () => ({
+        updateTask: kanbanMocks.updateTask,
+    }),
+}));
+
+vi.mock('@/hooks/useTimeEntries', () => ({
+    useTimeEntries: () => ({
+        createEntry: kanbanMocks.createEntry,
+    }),
+}));
+
+vi.mock('@/hooks/useTimers', () => ({
+    useTimers: () => ({
+        getTimerForTask: kanbanMocks.getTimerForTask,
+        clearTimer: kanbanMocks.clearTimer,
+        timers: [],
+        startTimer: vi.fn(),
+        pauseTimer: vi.fn(),
+        resumeTimer: vi.fn(),
+    }),
+}));
+
+vi.mock('@/hooks/useProjects', () => ({
+    useProjects: () => ({
+        projects: kanbanMocks.projects,
+    }),
+}));
+
+vi.mock('../../TaskTimer', () => ({
+    default: () => <div>Task timer</div>,
+}));
+
+describe('TaskKanbanBoard', () => {
+    const parentTask = {
+        id: 'parent-1',
+        title: 'Planning',
+        note: 'Main task note',
+        projectId: 'project-1',
+        archived: false,
+        recurring: null,
+        completed: false,
+        billable: true,
+    };
+
+    const subtasks = [
+        {
+            id: 'subtask-1',
+            title: 'Initial draft',
+            note: 'Write the draft',
+            projectId: 'project-1',
+            parentTaskId: 'parent-1',
+            archived: false,
+            recurring: null,
+            completed: false,
+            billable: true,
+            lastActive: 20,
+        },
+        {
+            id: 'subtask-2',
+            title: 'Review',
+            projectId: 'project-1',
+            parentTaskId: 'parent-1',
+            archived: false,
+            recurring: null,
+            completed: true,
+            billable: false,
+            lastActive: 10,
+        },
+    ];
+
+    it('renders parent task columns and subtask cards', () => {
+        render(
+            <TaskKanbanBoard
+                parentTasks={[parentTask]}
+                tasks={[parentTask, ...subtasks]}
+                onCreateSubtask={vi.fn()}
+                onViewTask={vi.fn()}
+                onUpdateTask={vi.fn()}
+                showBillableBadges={true}
+            />
+        );
+
+        expect(screen.getByTestId('task-kanban-board')).toBeInTheDocument();
+        expect(screen.getByTestId('task-kanban-column-parent-1')).toBeInTheDocument();
+        expect(screen.getByTestId('task-kanban-card-subtask-1')).toBeInTheDocument();
+        expect(screen.queryByText('Billable')).not.toBeInTheDocument();
+    });
+
+    it('opens the task view for columns and cards', () => {
+        const onViewTask = vi.fn();
+
+        render(
+            <TaskKanbanBoard
+                parentTasks={[parentTask]}
+                tasks={[parentTask, ...subtasks]}
+                onCreateSubtask={vi.fn()}
+                onViewTask={onViewTask}
+                onUpdateTask={vi.fn()}
+                showBillableBadges={false}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Planning' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Initial draft' }));
+
+        expect(onViewTask).toHaveBeenNthCalledWith(1, parentTask, { dateStr: null });
+        expect(onViewTask).toHaveBeenNthCalledWith(2, subtasks[0], { dateStr: null });
+    });
+
+    it('creates a subtask from a column using the existing create payload shape', () => {
+        const onCreateSubtask = vi.fn();
+
+        render(
+            <TaskKanbanBoard
+                parentTasks={[parentTask]}
+                tasks={[parentTask, ...subtasks]}
+                onCreateSubtask={onCreateSubtask}
+                onViewTask={vi.fn()}
+                onUpdateTask={vi.fn()}
+                showBillableBadges={false}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add subtask' }));
+        fireEvent.change(screen.getByPlaceholderText('Enter subtask title'), { target: { value: 'New subtask' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+        expect(onCreateSubtask).toHaveBeenCalledWith({
+            parentTaskId: 'parent-1',
+            title: 'New subtask',
+            note: '',
+            startDate: null,
+            recurring: null,
+        });
+    });
+
+    it('renders a leading create column when the kanban task form is open', () => {
+        render(
+            <TaskKanbanBoard
+                parentTasks={[parentTask]}
+                tasks={[parentTask, ...subtasks]}
+                onCreateSubtask={vi.fn()}
+                onViewTask={vi.fn()}
+                onUpdateTask={vi.fn()}
+                showBillableBadges={false}
+                createColumnProps={{
+                    newTaskTitle: '',
+                    setNewTaskTitle: vi.fn(),
+                    newTaskNote: '',
+                    setNewTaskNote: vi.fn(),
+                    newTaskStartDate: '',
+                    setNewTaskStartDate: vi.fn(),
+                    newTaskRecurring: null,
+                    setNewTaskRecurring: vi.fn(),
+                    onSubmit: vi.fn((event) => event.preventDefault()),
+                    onCancel: vi.fn(),
+                }}
+            />
+        );
+
+        expect(screen.getByTestId('task-kanban-create-column')).toBeInTheDocument();
+    });
+
+    it('does not render an empty-state subtask message for empty columns', () => {
+        render(
+            <TaskKanbanBoard
+                parentTasks={[parentTask]}
+                tasks={[parentTask]}
+                onCreateSubtask={vi.fn()}
+                onViewTask={vi.fn()}
+                onUpdateTask={vi.fn()}
+                showBillableBadges={false}
+            />
+        );
+
+        expect(screen.queryByText('No subtasks yet.')).not.toBeInTheDocument();
+    });
+});

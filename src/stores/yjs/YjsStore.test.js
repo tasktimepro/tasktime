@@ -437,6 +437,8 @@ describe('YjsStore timer reconciliation', () => {
         coreDoc.getMap('projects').set('project-1', objectToYMap({
             id: 'project-1',
             title: 'Project One',
+            taskView: 'kanban',
+            taskSort: 'manual',
             notes: {
                 version: 1,
                 type: 'tiptap-json',
@@ -448,7 +450,7 @@ describe('YjsStore timer reconciliation', () => {
                 updatedAt: Date.UTC(2026, 3, 22),
             },
         }))
-        coreDoc.getMap('tasks').set('task-active', objectToYMap({ id: 'task-active', title: 'Active Task', projectId: 'project-1' }))
+        coreDoc.getMap('tasks').set('task-active', objectToYMap({ id: 'task-active', title: 'Active Task', projectId: 'project-1', sortOrder: 1000, sortOrderUpdatedAt: Date.UTC(2026, 3, 20) }))
         coreDoc.getMap('clients').set('client-1', objectToYMap({ id: 'client-1', title: 'Client One' }))
         coreDoc.getMap('businessInfos').set('business-1', objectToYMap({ id: 'business-1', title: 'Business One' }))
         coreDoc.getMap('invoiceTemplates').set('invoice-template-1', objectToYMap({ id: 'invoice-template-1', name: 'Invoice Template' }))
@@ -462,7 +464,7 @@ describe('YjsStore timer reconciliation', () => {
         coreDoc.getMap('preferences').set('currency', 'EUR')
 
         activeEntriesDoc.getMap('timeEntries').set('entry-active', objectToYMap({ id: 'entry-active', taskId: 'task-active', start: Date.UTC(2026, 3, 1), end: Date.UTC(2026, 3, 1, 1) }))
-        archivedTasksDoc.getMap('tasks').set('task-archived', objectToYMap({ id: 'task-archived', title: 'Archived Task', projectId: 'project-1', archived: true }))
+        archivedTasksDoc.getMap('tasks').set('task-archived', objectToYMap({ id: 'task-archived', title: 'Archived Task', projectId: 'project-1', archived: true, sortOrder: 2000, sortOrderUpdatedAt: Date.UTC(2026, 3, 21) }))
         archivedInvoicesDoc.getMap('invoices').set('invoice-archived', objectToYMap({ id: 'invoice-archived', projectId: 'project-1', clientId: 'client-1', date: '2025-01-01', dueDate: '2025-01-15', status: 'paid', subtotal: 20, tax: 0, total: 20, currency: 'EUR', items: [] }))
         archivedExpensesDoc.getMap('expenses').set('expense-archived', objectToYMap({ id: 'expense-archived', title: 'Archived Expense', date: '2025-01-01', amount: 20, currency: 'EUR', paymentStatus: 'paid', billingStatus: 'unbilled', isPersonal: true, billable: false }))
         historicalEntriesDoc.getMap('timeEntries').set('entry-2024', objectToYMap({ id: 'entry-2024', taskId: 'task-active', start: Date.UTC(2024, 0, 1), end: Date.UTC(2024, 0, 1, 1) }))
@@ -475,6 +477,8 @@ describe('YjsStore timer reconciliation', () => {
         expect(payload.projects).toEqual(expect.arrayContaining([
             expect.objectContaining({
                 id: 'project-1',
+                taskView: 'kanban',
+                taskSort: 'manual',
                 notes: expect.objectContaining({
                     type: 'tiptap-json',
                     plainTextPreview: 'Project note',
@@ -482,8 +486,8 @@ describe('YjsStore timer reconciliation', () => {
             }),
         ]))
         expect(payload.tasks).toEqual(expect.arrayContaining([
-            expect.objectContaining({ id: 'task-active' }),
-            expect.objectContaining({ id: 'task-archived' }),
+            expect.objectContaining({ id: 'task-active', sortOrder: 1000 }),
+            expect.objectContaining({ id: 'task-archived', sortOrder: 2000 }),
         ]))
         expect(payload.invoices).toEqual(expect.arrayContaining([
             expect.objectContaining({ id: 'invoice-active' }),
@@ -510,6 +514,8 @@ describe('YjsStore timer reconciliation', () => {
             projects: [{
                 id: 'project-1',
                 title: 'Project One',
+                taskView: 'kanban',
+                taskSort: 'manual',
                 notes: {
                     version: 1,
                     type: 'tiptap-json',
@@ -522,8 +528,8 @@ describe('YjsStore timer reconciliation', () => {
                 },
             }],
             tasks: [
-                { id: 'task-active', title: 'Active Task', projectId: 'project-1' },
-                { id: 'task-archived', title: 'Archived Task', projectId: 'project-1', archived: true, archivedOnDate: '2026-04-22' },
+                { id: 'task-active', title: 'Active Task', projectId: 'project-1', sortOrder: 1000, sortOrderUpdatedAt: Date.UTC(2026, 3, 20) },
+                { id: 'task-archived', title: 'Archived Task', projectId: 'project-1', archived: true, archivedOnDate: '2026-04-22', sortOrder: 2000, sortOrderUpdatedAt: Date.UTC(2026, 3, 21) },
             ],
             timeEntries: [
                 { id: 'entry-active', taskId: 'task-active', start: Date.now(), end: Date.now() + 1_000 },
@@ -553,8 +559,12 @@ describe('YjsStore timer reconciliation', () => {
             type: 'tiptap-json',
             plainTextPreview: 'Imported note',
         }))
+        expect(store.projects.get('project-1').get('taskView')).toBe('kanban')
+        expect(store.projects.get('project-1').get('taskSort')).toBe('manual')
         expect(store.tasks.has('task-active')).toBe(true)
+        expect(store.tasks.get('task-active').get('sortOrder')).toBe(1000)
         expect((await store.loadArchivedTasks()).has('task-archived')).toBe(true)
+        expect((await store.loadArchivedTasks()).get('task-archived').get('sortOrder')).toBe(2000)
         expect(store.activeTimeEntries.has('entry-active')).toBe(true)
         expect((await store.loadEntriesForYear(2024)).has('entry-2024')).toBe(true)
         expect(store.invoices.has('invoice-active')).toBe(true)

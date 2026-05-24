@@ -40,6 +40,7 @@ export {
     Folder as FolderIcon,
     FunnelX as FunnelXIcon,
     Target as GoalIcon,
+    GripVertical as GripVerticalIcon,
     Info as InformationCircleIcon,
     HandCoins as HandCoinsIcon,
     Kanban as KanbanIcon,

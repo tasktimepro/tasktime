@@ -2,6 +2,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
+const stopDragPropagation = (event) => {
+    event.stopPropagation();
+};
+
 /**
  * CustomCheckbox component - Uses shadcn/ui Checkbox
  * @param {Object} props - Component props
@@ -39,6 +43,7 @@ const CustomCheckbox = ({
                 onCheckedChange={handleCheckedChange}
                 disabled={disabled}
                 className={cn("h-5 w-5", className)}
+                onPointerDownCapture={stopDragPropagation}
             />
         );
     }
@@ -52,6 +57,7 @@ const CustomCheckbox = ({
                 onCheckedChange={handleCheckedChange}
                 disabled={disabled}
                 className="h-5 w-5"
+                onPointerDownCapture={stopDragPropagation}
             />
             <Label
                 htmlFor={checkboxId}

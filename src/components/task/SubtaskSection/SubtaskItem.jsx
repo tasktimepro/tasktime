@@ -10,6 +10,7 @@ import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
 import { useProjects } from '../../../hooks/useProjects';
 import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
+import { cn } from '@/lib/utils';
 import { buildBillableDurationFields, getBillableDurationMs } from '../../../utils/timeEntryDurationUtils.ts';
 
 /**
@@ -24,7 +25,12 @@ const SubtaskItem = ({
     onUnarchive,
     onDelete,
     onEditTask,
-    onViewTask
+    onViewTask,
+    dragHandle = null,
+    dragActivatorRef = null,
+    dragAttributes = {},
+    dragListeners = {},
+    isDragging = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
     const [isEditing, setIsEditing] = useState(false);
@@ -162,10 +168,18 @@ const SubtaskItem = ({
         onViewTask(task, { dateStr: null });
     }, [onViewTask, task]);
 
+    const dragInteractionProps = dragHandle
+        ? {
+            ref: dragActivatorRef,
+            ...dragAttributes,
+            ...dragListeners,
+        }
+        : {};
+
     return (
-        <div className={`rounded-md px-2 py-2 transition-colors hover:bg-muted ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
+        <div className={`rounded-md px-2 py-2 transition-colors hover:bg-muted ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''} ${isDragging ? 'shadow-sm' : ''}`}>
             {isMobileLayout ? (
-                <>
+                <div className={dragHandle ? 'cursor-grab active:cursor-grabbing' : ''} {...dragInteractionProps}>
                     <TaskHeader
                         task={task}
                         isEditing={isEditing}
@@ -182,6 +196,7 @@ const SubtaskItem = ({
                         isSubtask={true}
                         showTimeDisplay={false}
                         onTitleClick={handleViewTask}
+                        leadingAccessory={dragHandle}
                     />
 
                     <div className="mt-1.5 flex w-full flex-wrap items-center justify-end gap-2" data-testid={`subtask-item-secondary-${task.id}`}>
@@ -215,9 +230,9 @@ const SubtaskItem = ({
                             onEdit={handleEditTask}
                         />
                     </div>
-                </>
+                </div>
             ) : (
-                <div className="flex items-center justify-between gap-3">
+                <div className={cn('flex items-center justify-between gap-3', dragHandle && 'cursor-grab active:cursor-grabbing')} {...dragInteractionProps}>
                     <TaskHeader
                         task={task}
                         isEditing={isEditing}
@@ -234,6 +249,7 @@ const SubtaskItem = ({
                         isSubtask={true}
                         showTimeDisplay={false}
                         onTitleClick={handleViewTask}
+                        leadingAccessory={dragHandle}
                     />
 
                     {(task.startDate || task.recurring) && (

@@ -21,6 +21,7 @@ const hookMocks = vi.hoisted(() => ({
     isMobileLayout: false,
     starterKitConfigure: vi.fn((options) => ({ name: 'starterKit', options })),
     linkConfigure: vi.fn((options) => ({ name: 'link', options })),
+    useEditorOptions: null,
 }));
 
 vi.mock('@tiptap/starter-kit', () => ({
@@ -36,12 +37,28 @@ vi.mock('@tiptap/extension-link', () => ({
 }));
 
 vi.mock('@tiptap/react', () => ({
-    useEditor: () => ({
-        on: vi.fn(),
-        off: vi.fn(),
-        isActive: vi.fn(() => false),
-        can: vi.fn(() => ({
-            chain: () => ({
+    useEditor: (options) => {
+        hookMocks.useEditorOptions = options;
+
+        return {
+            on: vi.fn(),
+            off: vi.fn(),
+            isActive: vi.fn(() => false),
+            can: vi.fn(() => ({
+                chain: () => ({
+                    focus: () => ({
+                        toggleBold: () => ({ run: () => true }),
+                        toggleItalic: () => ({ run: () => true }),
+                        toggleHeading: () => ({ run: () => true }),
+                        toggleBulletList: () => ({ run: () => true }),
+                        toggleOrderedList: () => ({ run: () => true }),
+                        toggleTaskList: () => ({ run: () => true }),
+                        undo: () => ({ run: () => true }),
+                        redo: () => ({ run: () => true }),
+                    }),
+                }),
+            })),
+            chain: vi.fn(() => ({
                 focus: () => ({
                     toggleBold: () => ({ run: () => true }),
                     toggleItalic: () => ({ run: () => true }),
@@ -52,21 +69,9 @@ vi.mock('@tiptap/react', () => ({
                     undo: () => ({ run: () => true }),
                     redo: () => ({ run: () => true }),
                 }),
-            }),
-        })),
-        chain: vi.fn(() => ({
-            focus: () => ({
-                toggleBold: () => ({ run: () => true }),
-                toggleItalic: () => ({ run: () => true }),
-                toggleHeading: () => ({ run: () => true }),
-                toggleBulletList: () => ({ run: () => true }),
-                toggleOrderedList: () => ({ run: () => true }),
-                toggleTaskList: () => ({ run: () => true }),
-                undo: () => ({ run: () => true }),
-                redo: () => ({ run: () => true }),
-            }),
-        })),
-    }),
+            })),
+        };
+    },
     EditorContent: () => <div data-testid="project-notes-editor-content" />,
 }));
 
@@ -79,6 +84,13 @@ vi.mock('@/hooks/useIsMobileLayout', () => ({
 }));
 
 describe('ProjectNotesEditor', () => {
+    it('keeps the notes editor at a mobile-safe font size', () => {
+        render(<ProjectNotesEditor project={{ id: 'project-1', notes: null }} />);
+
+        expect(hookMocks.useEditorOptions.editorProps.attributes.class).toContain('text-base');
+        expect(hookMocks.useEditorOptions.editorProps.attributes.class).toContain('md:text-sm');
+    });
+
     it('configures note links to open on click in a new tab', () => {
         render(<ProjectNotesEditor project={{ id: 'project-1', notes: null }} />);
 
@@ -150,7 +162,7 @@ describe('ProjectNotesEditor', () => {
         const { container } = render(<ProjectNotesEditor project={{ id: 'project-1', notes: null }} />);
 
         expect(screen.getByTestId('project-notes-save-status')).toHaveTextContent('Saved locally');
-    expect(screen.getByTestId('project-notes-save-status').parentElement).toHaveClass('flex', 'min-w-0', 'items-center', 'justify-end', 'gap-2');
+        expect(screen.getByTestId('project-notes-save-status').parentElement).toHaveClass('flex', 'min-w-0', 'items-center', 'justify-end', 'gap-2');
 
         const header = container.querySelector('.px-3.py-3');
         const content = container.querySelector('.px-3.pb-3.pt-0');

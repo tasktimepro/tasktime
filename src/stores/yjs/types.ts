@@ -29,6 +29,10 @@ export interface Project {
     color?: string | null;
     /** Round timer-created billable time up in these minute increments */
     billableTimeIncrementMinutes?: number | null;
+    /** Preferred task view for this project */
+    taskView?: 'list' | 'kanban';
+    /** Preferred task sort order for this project */
+    taskSort?: 'createdAt' | 'lastActive' | 'name' | 'manual';
 }
 
 export interface TipTapJsonNode {
@@ -63,6 +67,8 @@ export interface Task {
     archivedOnDate?: string | null;
     billable?: boolean;
     billableSetByUser?: boolean;
+    sortOrder?: number | null;
+    sortOrderUpdatedAt?: number | null;
     lastActive?: number;
     createdAt?: number;
     lastBilledAt?: number | null;

@@ -8,7 +8,7 @@ import React, { useMemo, useCallback, useState } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ClockIcon } from '@/components/ui/icons';
+import { ClockIcon, CurrencyDollarIcon } from '@/components/ui/icons';
 import { RedoDot, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
@@ -299,6 +299,10 @@ const TaskViewModal = ({
             && billableTotal > 0;
     }, [billableRateInfo.currency, billableTotal, isTimerActive]);
 
+    const canToggleBillable = useMemo(() => {
+        return Boolean(project && !project.isPersonal && !currentTask?.archived);
+    }, [project, currentTask?.archived]);
+
     const liveTaskTime = useMemo(() => {
         if (!currentTask) return 0;
         const timerTime = isTimerActive ? (projectTimer?.elapsedTime || 0) : 0;
@@ -350,6 +354,20 @@ const TaskViewModal = ({
         showSuccess('Skipped until next recurring date');
         onClose();
     }, [currentTask, effectiveDateStr, skipRecurringOccurrence, showSuccess, onClose]);
+
+    const handleToggleBillable = useCallback(() => {
+        if (!currentTask || !project || project.isPersonal || currentTask.archived) return;
+
+        const nextBillable = currentTask.billable !== true;
+
+        updateTask(currentTask.id, {
+            billable: nextBillable,
+            billableSetByUser: true,
+            lastActive: Date.now(),
+        });
+
+        showSuccess(`Task marked as ${nextBillable ? 'billable' : 'not billable'}`);
+    }, [currentTask, project, updateTask, showSuccess]);
 
     const handleOpenTimeEntries = useCallback(() => {
         if (!currentTask) return;
@@ -483,6 +501,18 @@ const TaskViewModal = ({
                         onClick={handleOpenTimeEntries}
                     >
                         <ClockIcon className="h-5 w-5" />
+                    </Button>
+                )}
+                {canToggleBillable && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-8 w-8 ${currentTask.billable ? 'text-foreground bg-muted' : 'text-muted-foreground'} hover:text-foreground hover:bg-accent`}
+                        title={currentTask.billable ? 'Mark as not billable' : 'Mark as billable'}
+                        aria-label={currentTask.billable ? 'Mark as not billable' : 'Mark as billable'}
+                        onClick={handleToggleBillable}
+                    >
+                        <CurrencyDollarIcon className="h-5 w-5" />
                     </Button>
                 )}
                 <TaskActionsMenu

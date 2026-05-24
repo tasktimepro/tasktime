@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import TaskViewModal from './TaskViewModal'
 import { toDisplayDate } from '@/utils/dateUtils'
 
@@ -240,5 +240,74 @@ describe('TaskViewModal recurring actions', () => {
         expect(projectSection?.className).not.toContain('sm:grid-cols-2')
         expect(footer?.className).toContain('flex-wrap')
         expect(footer?.className).not.toContain('flex-col')
+    })
+})
+
+describe('TaskViewModal billable toggle', () => {
+    const task = {
+        id: 'task-billable-1',
+        title: 'Billable task',
+        recurring: null,
+        archived: false,
+        completed: false,
+        projectId: 'project-1',
+        billable: false,
+    }
+
+    const renderModal = (props = {}) => {
+        render(
+            <TaskViewModal
+                isOpen={true}
+                onClose={vi.fn()}
+                task={task}
+                dateStr={null}
+                attachment={null}
+                onEdit={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onNavigateToProject={vi.fn()}
+                onOpenTimeEntries={vi.fn()}
+                onOpenPlannerOptions={vi.fn()}
+                {...props}
+            />
+        )
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        hookMocks.tasks = [task]
+        hookMocks.projects = [{ id: 'project-1', title: 'Client Work', isPersonal: false }]
+    })
+
+    it('shows the billable toggle for non-personal project tasks', () => {
+        renderModal()
+
+        expect(screen.getByRole('button', { name: 'Mark as billable' })).toBeInTheDocument()
+        expect(screen.queryByText('Billing')).not.toBeInTheDocument()
+    })
+
+    it('hides the billable toggle for personal project tasks', () => {
+        hookMocks.projects = [{ id: 'project-1', title: 'Personal Work', isPersonal: true }]
+
+        renderModal()
+
+        expect(screen.queryByRole('button', { name: 'Mark as billable' })).not.toBeInTheDocument()
+    })
+
+    it('updates billable state from the modal using the existing task update behavior', () => {
+        const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(123)
+
+        renderModal()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Mark as billable' }))
+
+        expect(hookMocks.updateTask).toHaveBeenCalledWith('task-billable-1', {
+            billable: true,
+            billableSetByUser: true,
+            lastActive: 123,
+        })
+        expect(hookMocks.showSuccess).toHaveBeenCalledWith('Task marked as billable')
+
+        dateNowSpy.mockRestore()
     })
 })

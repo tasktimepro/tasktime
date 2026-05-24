@@ -31,7 +31,15 @@ const TaskItem = ({
     onUnarchive,
     onToggleBillable,
     onEditTask,
-    onViewTask
+    onViewTask,
+    dragHandle = null,
+    dragActivatorRef = null,
+    dragAttributes = {},
+    dragListeners = {},
+    isDragging = false,
+    manualSortEnabled = false,
+    subtaskDragPreview = null,
+    showDecorativeSubtaskDragHandles = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
 
@@ -277,11 +285,19 @@ const TaskItem = ({
         setShowCreateSubtaskForm(false);
     }, []);
 
+    const dragInteractionProps = dragHandle
+        ? {
+            ref: dragActivatorRef,
+            ...dragAttributes,
+            ...dragListeners,
+        }
+        : {};
+
     return (
-        <div className={`bg-card border border-border rounded-lg overflow-hidden ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''}`}>
+        <div className={`bg-card border border-border rounded-lg overflow-hidden ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''} ${isDragging ? 'shadow-md' : ''}`}>
             <div className={cn(isMobileLayout ? 'p-3' : 'p-4')}>
                 {isMobileLayout ? (
-                    <>
+                    <div className={cn(dragHandle && 'cursor-grab active:cursor-grabbing')} {...dragInteractionProps}>
                         <TaskHeader
                             task={task}
                             isEditing={isEditing}
@@ -299,6 +315,7 @@ const TaskItem = ({
                             showTimeDisplay={false}
                             showCheckbox={!task.recurring || Boolean(recurringCompletionDate)}
                             onTitleClick={handleViewTask}
+                            leadingAccessory={dragHandle}
                         />
 
                         <div className="mt-1.5 flex w-full flex-wrap items-center justify-end gap-2" data-testid={`task-item-secondary-${task.id}`}>
@@ -332,9 +349,9 @@ const TaskItem = ({
                                 onEdit={handleEditTask}
                             />
                         </div>
-                    </>
+                    </div>
                 ) : (
-                    <div className="flex items-center justify-between space-x-3">
+                    <div className={cn('flex items-center justify-between gap-3', dragHandle && 'cursor-grab active:cursor-grabbing')} {...dragInteractionProps}>
                         <TaskHeader
                             task={task}
                             isEditing={isEditing}
@@ -352,6 +369,7 @@ const TaskItem = ({
                             showTimeDisplay={false}
                             showCheckbox={!task.recurring || Boolean(recurringCompletionDate)}
                             onTitleClick={handleViewTask}
+                            leadingAccessory={dragHandle}
                         />
 
                         {(task.startDate || task.recurring) && (
@@ -425,6 +443,10 @@ const TaskItem = ({
                     showSuccess={showSuccess}
                     onEditTask={onEditTask}
                     onViewTask={onViewTask}
+                    manualSortEnabled={manualSortEnabled}
+                    useExternalDragContext={manualSortEnabled}
+                    dragPreview={subtaskDragPreview}
+                    showDecorativeDragHandles={showDecorativeSubtaskDragHandles}
                 />
             )}
         </div>

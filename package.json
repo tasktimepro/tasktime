@@ -21,6 +21,9 @@
     "release": "npm run lint && npm run test:coverage && npm run test:e2e:smoke && npm run test:e2e:pwa:smoke && npm run build"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.15",

@@ -109,7 +109,7 @@ test.describe('Invoices smoke', () => {
         await expect(reloadedPaidInvoiceCard).not.toContainText('Mark as Paid');
     });
 
-    test('freezes paid invoice earned totals after exchange rates change', async ({ page }) => {
+    test('freezes paid invoice received totals after exchange rates change', async ({ page }) => {
         const now = Date.now();
         const projectTitle = `Playwright Frozen Snapshot Project ${now}`;
         const clientTitle = `Playwright Frozen Snapshot Client ${now}`;
@@ -132,7 +132,7 @@ test.describe('Invoices smoke', () => {
             clientCurrency: 'USD',
         });
         const invoiceAmount = Number(expectedTotal.replace(/[^\d.]/g, ''));
-        const frozenEarnedAmount = `€${(invoiceAmount * 0.5).toFixed(2)}`;
+        const frozenReceivedAmount = `€${(invoiceAmount * 0.5).toFixed(2)}`;
         const liveConvertedAmountAfterRateChange = `€${(invoiceAmount * 0.25).toFixed(2)}`;
 
         const invoiceCard = getInvoiceCardByProject(page, projectTitle);
@@ -144,16 +144,16 @@ test.describe('Invoices smoke', () => {
         await expect(page.getByText('Reports Overview')).toBeVisible();
 
         const thisMonthCard = page.getByRole('heading', { name: 'This Month', exact: true }).locator('xpath=ancestor::div[contains(@class, "rounded-lg")][1]');
-        await expect(thisMonthCard).toContainText('earned');
-        await expect(thisMonthCard).toContainText(frozenEarnedAmount);
+        await expect(thisMonthCard).toContainText('received');
+        await expect(thisMonthCard).toContainText(frozenReceivedAmount);
 
         await updateExchangeRateCache(page, { USD: 1, EUR: 0.25 });
         await page.reload();
 
         await expect(page.getByText('Reports Overview')).toBeVisible();
         const reloadedThisMonthCard = page.getByRole('heading', { name: 'This Month', exact: true }).locator('xpath=ancestor::div[contains(@class, "rounded-lg")][1]');
-        await expect(reloadedThisMonthCard).toContainText('earned');
-        await expect(reloadedThisMonthCard).toContainText(frozenEarnedAmount);
+        await expect(reloadedThisMonthCard).toContainText('received');
+        await expect(reloadedThisMonthCard).toContainText(frozenReceivedAmount);
         await expect(reloadedThisMonthCard).not.toContainText(liveConvertedAmountAfterRateChange);
     });
 

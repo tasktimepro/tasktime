@@ -116,6 +116,8 @@ const projectSchema = z.object({
     color: z.string().nullable().optional(),
     invoiceIds: z.array(nonEmptyStringSchema).optional(),
     billableTimeIncrementMinutes: z.number().int().positive().nullable().optional(),
+    taskView: z.enum(['list', 'kanban']).optional(),
+    taskSort: z.enum(['createdAt', 'lastActive', 'name', 'manual']).optional(),
 }).passthrough() satisfies z.ZodType<Project>;
 
 const taskSchema = z.object({
@@ -129,6 +131,8 @@ const taskSchema = z.object({
     archivedOnDate: storageDateSchema.nullable().optional(),
     billable: z.boolean().optional(),
     billableSetByUser: z.boolean().optional(),
+    sortOrder: finiteNumberSchema.nullable().optional(),
+    sortOrderUpdatedAt: finiteNumberSchema.nullable().optional(),
     lastActive: finiteNumberSchema.optional(),
     createdAt: finiteNumberSchema.optional(),
     lastBilledAt: finiteNumberSchema.nullable().optional(),

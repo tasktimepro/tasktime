@@ -49,7 +49,7 @@ describe('MetricsCards', () => {
         expect(screen.getAllByText('spent').length).toBeGreaterThan(0)
     })
 
-    it('labels paid invoice totals as earned in the reports overview', () => {
+    it('labels paid invoice totals as received in the reports overview', () => {
         render(
             <MetricsCards
                 thisMonthMetrics={{
@@ -76,8 +76,9 @@ describe('MetricsCards', () => {
         )
 
         expect(screen.getByText('$250.00')).toBeInTheDocument()
-        expect(screen.getByText('earned')).toBeInTheDocument()
+        expect(screen.getByText('received')).toBeInTheDocument()
         expect(screen.queryByText('paid')).not.toBeInTheDocument()
+        expect(screen.queryByText('earned')).not.toBeInTheDocument()
     })
 
     it('does not show spent tag for zero expense totals', () => {

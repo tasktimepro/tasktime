@@ -31,6 +31,30 @@ describe('Yjs validation', () => {
         })
 
         expect(validateCollectionEntity('projects', {
+            id: 'project-kanban-1',
+            title: 'Kanban Project',
+            taskView: 'kanban',
+            taskSort: 'manual',
+        }, 'test project task view')).toEqual({
+            id: 'project-kanban-1',
+            title: 'Kanban Project',
+            taskView: 'kanban',
+            taskSort: 'manual',
+        })
+
+        expect(validateCollectionEntity('tasks', {
+            id: 'task-ordered-1',
+            title: 'Ordered Task',
+            sortOrder: 1000,
+            sortOrderUpdatedAt: 123456,
+        }, 'test ordered task')).toEqual({
+            id: 'task-ordered-1',
+            title: 'Ordered Task',
+            sortOrder: 1000,
+            sortOrderUpdatedAt: 123456,
+        })
+
+        expect(validateCollectionEntity('projects', {
             id: 'project-with-notes',
             title: 'Project with notes',
             notes: {

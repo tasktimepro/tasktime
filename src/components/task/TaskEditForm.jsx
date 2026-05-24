@@ -1,6 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+const stopDragPropagation = (event) => {
+    event.stopPropagation();
+};
+
 /**
  * TaskEditForm component - Inline edit form for task title.
  * @param {Object} props
@@ -13,7 +17,7 @@ const TaskEditForm = ({
     isCompleted
 }) => {
     return (
-        <form onSubmit={onSave} className="flex items-center space-x-2">
+        <form onSubmit={onSave} className="flex items-center space-x-2" onPointerDownCapture={stopDragPropagation}>
             <Input
                 type="text"
                 value={editTitle}

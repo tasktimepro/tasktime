@@ -17,9 +17,11 @@ const SubtaskCreateForm = ({
     setNewSubtaskStartDate,
     onCreateSubtask,
     onCancel,
-    isDisabled
+    isDisabled,
+    forceStackedLayout = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
+    const isStackedLayout = isMobileLayout || forceStackedLayout;
 
     if (isDisabled) {
         return null;
@@ -28,16 +30,16 @@ const SubtaskCreateForm = ({
     return (
         <form
             onSubmit={onCreateSubtask}
-            className={cn('space-y-3', isMobileLayout && 'rounded-lg border border-border bg-card p-3')}
+            className={cn('space-y-3', isStackedLayout && 'rounded-lg border border-border bg-card p-3')}
             data-testid="subtask-create-form"
         >
-            <div className={cn(isMobileLayout ? 'space-y-3' : 'flex items-center space-x-3')}>
+            <div className={cn(isStackedLayout ? 'space-y-3' : 'flex items-center space-x-3')}>
                 <Input
                     type="text"
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
                     placeholder="Enter subtask title"
-                    className={cn(!isMobileLayout && 'flex-1')}
+                    className={cn(!isStackedLayout && 'flex-1')}
                     autoFocus
                 />
                 <Input
@@ -45,19 +47,16 @@ const SubtaskCreateForm = ({
                     value={newSubtaskNote}
                     onChange={(e) => setNewSubtaskNote(e.target.value)}
                     placeholder="Note"
-                    className={cn(!isMobileLayout && 'flex-1')}
+                    className={cn(!isStackedLayout && 'flex-1')}
                 />
                 <NativeDateInput
                     value={newSubtaskStartDate}
                     onChange={(e) => {
                         setNewSubtaskStartDate(e.target.value);
                     }}
-                    className={cn(isMobileLayout ? 'w-full dark:[color-scheme:dark]' : 'w-40 dark:[color-scheme:dark]')}
+                    className={cn(isStackedLayout ? 'w-full dark:[color-scheme:dark]' : 'w-40 dark:[color-scheme:dark]')}
                 />
-                <div className={cn('flex gap-2', isMobileLayout && 'justify-end')}>
-                    <Button type="submit" size="sm">
-                        Add
-                    </Button>
+                <div className={cn('flex gap-2', isStackedLayout ? 'justify-end' : 'ml-auto shrink-0')}>
                     <Button
                         type="button"
                         variant="secondary"
@@ -65,6 +64,9 @@ const SubtaskCreateForm = ({
                         onClick={onCancel}
                     >
                         Cancel
+                    </Button>
+                    <Button type="submit" size="sm">
+                        Add
                     </Button>
                 </div>
             </div>
