@@ -311,3 +311,48 @@ describe('TaskViewModal billable toggle', () => {
         dateNowSpy.mockRestore()
     })
 })
+
+describe('TaskViewModal archived footer actions', () => {
+    const archivedTask = {
+        id: 'task-archived-1',
+        title: 'Archived task',
+        recurring: null,
+        archived: true,
+        completed: true,
+        projectId: null,
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        hookMocks.tasks = [archivedTask]
+    })
+
+    it('shows delete on the left side of the archived footer and keeps unarchive available', () => {
+        const onClose = vi.fn()
+        const onDelete = vi.fn()
+
+        render(
+            <TaskViewModal
+                isOpen={true}
+                onClose={onClose}
+                task={archivedTask}
+                dateStr={null}
+                attachment={null}
+                onEdit={vi.fn()}
+                onDelete={onDelete}
+                onArchive={vi.fn()}
+                onNavigateToProject={vi.fn()}
+                onOpenTimeEntries={vi.fn()}
+                onOpenPlannerOptions={vi.fn()}
+            />
+        )
+
+        expect(screen.getByRole('button', { name: 'Unarchive' })).toBeInTheDocument()
+        expect(screen.getByTestId('archived-task-modal-footer').className).toContain('justify-between')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete task' }))
+
+        expect(onClose).toHaveBeenCalledTimes(1)
+        expect(onDelete).toHaveBeenCalledWith(archivedTask)
+    })
+})

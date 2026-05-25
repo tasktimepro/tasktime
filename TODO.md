@@ -2,7 +2,7 @@
 
 ## Priority
 
-[ ] Create new blog post about the new features we added for tasks about notes and kanban views support
+[x] Create new blog post about the new features we added for tasks about notes and kanban views support
 
 ---
 

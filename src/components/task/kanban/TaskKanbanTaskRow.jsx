@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { GripVerticalIcon } from '@/components/ui/icons';
+import { Button } from '@/components/ui/button';
+import { ArchiveBoxIcon, ArchiveRestoreIcon, GripVerticalIcon, TrashIcon } from '@/components/ui/icons';
 import { useProjects } from '@/hooks/useProjects';
 import { useTasks } from '@/hooks/useTasks';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
@@ -13,9 +13,16 @@ import TaskHeader from '../TaskHeader';
 
 const noop = () => {};
 
+const stopDragPropagation = (event) => {
+    event.stopPropagation();
+};
+
 const TaskKanbanTaskRow = ({
     task,
     onOpen,
+    onArchive = null,
+    onUnarchive = null,
+    onDelete = null,
     dragActivatorRef,
     dragAttributes = {},
     dragListeners = {},
@@ -88,6 +95,9 @@ const TaskKanbanTaskRow = ({
             ...dragAttributes,
             ...dragListeners,
         };
+    const itemLabel = task.parentTaskId ? 'Subtask' : 'Task';
+    const showArchiveAction = !task.archived && !task.recurring && task.completed && Boolean(onArchive);
+    const showArchivedActions = task.archived && (Boolean(onUnarchive) || Boolean(onDelete));
 
     return (
         <div
@@ -116,14 +126,53 @@ const TaskKanbanTaskRow = ({
                     stopTitleDragPropagation={false}
                 />
 
-                {task.completed ? null : <TaskTimer task={task} showTimeDisplay={false} />}
-            </div>
+                {!task.completed && !task.archived ? <TaskTimer task={task} showTimeDisplay={false} /> : null}
 
-            {task.completed ? (
-                <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">Done</Badge>
-                </div>
-            ) : null}
+                {showArchivedActions ? (
+                    <div className="flex items-center space-x-2" onPointerDownCapture={stopDragPropagation}>
+                        {onUnarchive ? (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={onUnarchive}
+                                className="h-8 w-8"
+                                title={`Unarchive ${itemLabel}`}
+                                aria-label={`Unarchive ${itemLabel}`}
+                            >
+                                <ArchiveRestoreIcon className="h-5 w-5" />
+                            </Button>
+                        ) : null}
+
+                        {onDelete ? (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={onDelete}
+                                className="status-danger-action h-8 w-8 status-danger-text-strong"
+                                title={`Delete ${itemLabel}`}
+                                aria-label={`Delete ${itemLabel}`}
+                            >
+                                <TrashIcon className="h-5 w-5" />
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : null}
+
+                {showArchiveAction ? (
+                    <div className="flex items-center space-x-2" onPointerDownCapture={stopDragPropagation}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onArchive}
+                            className="status-warning-action h-8 w-8 status-warning-text-strong"
+                            title={`Archive ${itemLabel}`}
+                            aria-label={`Archive ${itemLabel}`}
+                        >
+                            <ArchiveBoxIcon className="h-5 w-5" />
+                        </Button>
+                    </div>
+                ) : null}
+            </div>
         </div>
     );
 };

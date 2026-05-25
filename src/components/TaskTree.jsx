@@ -918,6 +918,9 @@ const TaskTree = ({
                             onCreateSubtask={handleCreateTask}
                             onViewTask={onViewTask}
                             onUpdateTask={updateTask}
+                            onArchiveTask={handleArchiveTask}
+                            onUnarchiveTask={handleUnarchiveTask}
+                            onDeleteTask={handleDeleteTask}
                             showBillableBadges={allowBillableToggle}
                             fallbackSortBy={secondaryTaskSort}
                             createColumnProps={showCreateForm ? {
@@ -986,20 +989,35 @@ const TaskTree = ({
                             </button>
 
                             {showArchivedTasks && (
-                                <div className="space-y-2 scrollable-container">
-                                    {sortedArchivedTasks.map((task) => (
-                                        <TaskItem
-                                            key={task.id}
-                                            task={task}
-                                            onDelete={() => handleDeleteTask(task.id)}
-                                            onCreateSubtask={task.recurring ? null : handleCreateTask}
-                                            onUnarchive={() => handleUnarchiveTask(task.id)}
-                                            onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
-                                            onEditTask={onEditTask}
-                                            onViewTask={onViewTask}
-                                        />
-                                    ))}
-                                </div>
+                                taskDisplay === 'kanban' ? (
+                                    <TaskKanbanBoard
+                                        parentTasks={sortedArchivedTasks}
+                                        tasks={sortedArchivedTasks}
+                                        onCreateSubtask={null}
+                                        onViewTask={onViewTask}
+                                        onUpdateTask={updateTask}
+                                        onUnarchiveTask={handleUnarchiveTask}
+                                        onDeleteTask={handleDeleteTask}
+                                        showBillableBadges={allowBillableToggle}
+                                        fallbackSortBy={secondaryTaskSort}
+                                        dragDisabled={true}
+                                    />
+                                ) : (
+                                    <div className="space-y-2 scrollable-container">
+                                        {sortedArchivedTasks.map((task) => (
+                                            <TaskItem
+                                                key={task.id}
+                                                task={task}
+                                                onDelete={() => handleDeleteTask(task.id)}
+                                                onCreateSubtask={task.recurring ? null : handleCreateTask}
+                                                onUnarchive={() => handleUnarchiveTask(task.id)}
+                                                onToggleBillable={allowBillableToggle ? handleToggleBillable : null}
+                                                onEditTask={onEditTask}
+                                                onViewTask={onViewTask}
+                                            />
+                                        ))}
+                                    </div>
+                                )
                             )}
                         </div>
                     )}

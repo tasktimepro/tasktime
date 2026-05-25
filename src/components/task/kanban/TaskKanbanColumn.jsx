@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
-import { PlusIcon } from '@/components/ui/icons';
+import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 import SubtaskCreateForm from '../SubtaskSection/SubtaskCreateForm';
 import TaskKanbanCard from './TaskKanbanCard';
@@ -22,9 +22,13 @@ const TaskKanbanColumn = ({
     subtasks,
     onCreateSubtask,
     onViewTask,
+    onArchiveTask,
+    onUnarchiveTask,
+    onDeleteTask,
     showBillableBadges = false,
     className,
     dragPreview = null,
+    dragDisabled = false,
 }) => {
     const {
         attributes,
@@ -40,7 +44,7 @@ const TaskKanbanColumn = ({
             type: 'column',
             taskId: task.id,
         },
-        disabled: Boolean(task.completed),
+        disabled: dragDisabled || Boolean(task.completed) || Boolean(task.archived),
     });
     const {
         setNodeRef: setDropzoneNodeRef,
@@ -53,9 +57,12 @@ const TaskKanbanColumn = ({
         },
     });
     const [showCreateSubtaskForm, setShowCreateSubtaskForm] = useState(false);
+    const [showArchivedSubtasks, setShowArchivedSubtasks] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
     const [newSubtaskNote, setNewSubtaskNote] = useState('');
     const [newSubtaskStartDate, setNewSubtaskStartDate] = useState('');
+
+    void isColumnDropzoneOver;
 
     const style = {
         transform: CSS.Translate.toString(transform),
@@ -100,11 +107,17 @@ const TaskKanbanColumn = ({
     const dragGhostTaskId = isCrossColumnPreview && dragPreview.sourceParentTaskId === task.id
         ? dragPreview.taskId
         : null;
+    const activeSubtasks = useMemo(() => {
+        return subtasks.filter((subtask) => !subtask.archived);
+    }, [subtasks]);
+    const archivedSubtasks = useMemo(() => {
+        return subtasks.filter((subtask) => subtask.archived);
+    }, [subtasks]);
 
     const renderedCards = [];
     let previewInserted = false;
 
-    subtasks.forEach((subtask) => {
+    activeSubtasks.forEach((subtask) => {
         if (showDropPreview && dragPreview.overTaskId === subtask.id) {
             renderedCards.push(renderKanbanDropPlaceholder(`kanban-drop-placeholder-${subtask.id}`));
             previewInserted = true;
@@ -115,9 +128,13 @@ const TaskKanbanColumn = ({
                 key={subtask.id}
                 task={subtask}
                 onOpen={() => openTask(subtask)}
+                onArchive={onArchiveTask ? () => onArchiveTask(subtask.id) : null}
+                onUnarchive={onUnarchiveTask ? () => onUnarchiveTask(subtask.id) : null}
+                onDelete={onDeleteTask ? () => onDeleteTask(subtask.id) : null}
                 showBillableBadge={showBillableBadges}
                 isDragGhost={dragGhostTaskId === subtask.id}
                 disableTransform={showDropPreview}
+                dragDisabled={dragDisabled}
             />
         );
     });
@@ -142,16 +159,19 @@ const TaskKanbanColumn = ({
             <TaskKanbanTaskRow
                 task={task}
                 onOpen={() => openTask(task)}
+                onArchive={onArchiveTask ? () => onArchiveTask(task.id) : null}
+                onUnarchive={onUnarchiveTask ? () => onUnarchiveTask(task.id) : null}
+                onDelete={onDeleteTask ? () => onDeleteTask(task.id) : null}
                 subtaskCount={subtasks.length}
                 showBillableBadge={showBillableBadges}
                 dragActivatorRef={setActivatorNodeRef}
                 dragAttributes={attributes}
                 dragListeners={listeners}
-                dragDisabled={Boolean(task.completed)}
+                dragDisabled={dragDisabled || Boolean(task.completed) || Boolean(task.archived)}
             />
 
             {hasRenderedCards ? (
-                <SortableContext items={subtasks.map((subtask) => `card:${subtask.id}`)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={activeSubtasks.map((subtask) => `card:${subtask.id}`)} strategy={verticalListSortingStrategy}>
                     <div
                         ref={setDropzoneNodeRef}
                         className="flex flex-col gap-2 rounded-lg transition-colors"
@@ -161,7 +181,7 @@ const TaskKanbanColumn = ({
                 </SortableContext>
             ) : null}
 
-            {onCreateSubtask && !task.completed ? (
+            {onCreateSubtask && !task.completed && !task.archived ? (
                 showCreateSubtaskForm ? (
                     <SubtaskCreateForm
                         newSubtaskTitle={newSubtaskTitle}
@@ -187,6 +207,40 @@ const TaskKanbanColumn = ({
                         Add subtask
                     </Button>
                 )
+            ) : null}
+
+            {archivedSubtasks.length > 0 ? (
+                <div className="pt-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowArchivedSubtasks((prev) => !prev)}
+                        className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                        {showArchivedSubtasks ? (
+                            <ChevronDownIcon className="mr-1 h-4 w-4" />
+                        ) : (
+                            <ChevronRightIcon className="mr-1 h-4 w-4" />
+                        )}
+                        Archived Subtasks ({archivedSubtasks.length})
+                    </button>
+
+                    {showArchivedSubtasks ? (
+                        <div className="mt-2 flex flex-col gap-2">
+                            {archivedSubtasks.map((subtask) => (
+                                <TaskKanbanCard
+                                    key={subtask.id}
+                                    task={subtask}
+                                    onOpen={() => openTask(subtask)}
+                                    onArchive={onArchiveTask ? () => onArchiveTask(subtask.id) : null}
+                                    onUnarchive={onUnarchiveTask ? () => onUnarchiveTask(subtask.id) : null}
+                                    onDelete={onDeleteTask ? () => onDeleteTask(subtask.id) : null}
+                                    showBillableBadge={showBillableBadges}
+                                    dragDisabled={true}
+                                />
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
             ) : null}
         </section>
     );

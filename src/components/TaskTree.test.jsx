@@ -97,7 +97,17 @@ vi.mock('./task/drag/SortableTaskItem', () => ({
         </div>
     )
 }));
-vi.mock('./task/kanban/TaskKanbanBoard', () => ({ default: () => <div>Kanban board</div> }));
+vi.mock('./task/kanban/TaskKanbanBoard', () => ({
+    default: ({ parentTasks = [], dragDisabled = false, onUnarchiveTask = null, onDeleteTask = null }) => (
+        <div
+            data-testid={`kanban-board-${parentTasks.map((task) => task.id).join('-') || 'empty'}`}
+            data-has-unarchive={String(Boolean(onUnarchiveTask))}
+            data-has-delete={String(Boolean(onDeleteTask))}
+        >
+            Kanban board{dragDisabled ? ' archived' : ''}
+        </div>
+    )
+}));
 vi.mock('./Modal', () => ({ default: () => null }));
 vi.mock('./task/RecurringPicker', () => ({
     default: ({ onChange }) => (
@@ -379,6 +389,103 @@ describe('TaskTree', () => {
             'Newer activity',
             'Older activity',
         ]);
+    });
+
+    it('keeps recurring tasks list-rendered while kanban mode is active', () => {
+        taskTreeMocks.tasks = [
+            {
+                id: 'recurring-1',
+                projectId: 'project-1',
+                title: 'Weekly check-in',
+                parentTaskId: null,
+                archived: false,
+                recurring: { type: 'monthly', monthlyType: 'specific', monthlyDay: 12 },
+                createdAt: 100,
+                lastActive: 100,
+            },
+        ];
+
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false, taskView: 'kanban' }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Recurring Tasks (1)' }));
+
+        expect(screen.getByTestId('task-item-recurring-1')).toBeInTheDocument();
+        expect(screen.queryByTestId('kanban-board-recurring-1')).not.toBeInTheDocument();
+    });
+
+    it('renders archived parent tasks in a separate kanban section when kanban mode is active', () => {
+        taskTreeMocks.tasks = [
+            {
+                id: 'task-1',
+                projectId: 'project-1',
+                title: 'Parent task',
+                parentTaskId: null,
+                archived: false,
+                recurring: null,
+            },
+            {
+                id: 'archived-1',
+                projectId: 'project-1',
+                title: 'Archived parent',
+                parentTaskId: null,
+                archived: true,
+                recurring: null,
+            },
+        ];
+
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false, taskView: 'kanban' }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Archived Tasks (1)' }));
+
+        expect(screen.getByTestId('kanban-board-task-1')).toBeInTheDocument();
+        expect(screen.getByTestId('kanban-board-archived-1')).toBeInTheDocument();
+        expect(screen.queryByTestId('task-item-archived-1')).not.toBeInTheDocument();
+    });
+
+    it('passes unarchive and delete handlers into the active kanban board for archived subtasks', () => {
+        taskTreeMocks.tasks = [
+            {
+                id: 'task-1',
+                projectId: 'project-1',
+                title: 'Parent task',
+                parentTaskId: null,
+                archived: false,
+                recurring: null,
+            },
+            {
+                id: 'archived-subtask-1',
+                projectId: 'project-1',
+                title: 'Archived subtask',
+                parentTaskId: 'task-1',
+                archived: true,
+                recurring: null,
+            },
+        ];
+
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false, taskView: 'kanban' }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        const activeBoard = screen.getByTestId('kanban-board-task-1');
+
+        expect(activeBoard).toHaveAttribute('data-has-unarchive', 'true');
+        expect(activeBoard).toHaveAttribute('data-has-delete', 'true');
     });
 
     it('keeps desktop create actions aligned to the right edge', () => {

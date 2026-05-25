@@ -6,9 +6,13 @@ import TaskKanbanTaskRow from './TaskKanbanTaskRow';
 const TaskKanbanCard = ({
     task,
     onOpen,
+    onArchive = null,
+    onUnarchive = null,
+    onDelete = null,
     showBillableBadge = false,
     isDragGhost = false,
     disableTransform = false,
+    dragDisabled = false,
 }) => {
     const {
         attributes,
@@ -25,6 +29,7 @@ const TaskKanbanCard = ({
             taskId: task.id,
             parentTaskId: task.parentTaskId || null,
         },
+        disabled: dragDisabled || Boolean(task.archived),
     });
 
     const style = {
@@ -48,10 +53,14 @@ const TaskKanbanCard = ({
             <TaskKanbanTaskRow
                 task={task}
                 onOpen={onOpen}
+                onArchive={onArchive}
+                onUnarchive={onUnarchive}
+                onDelete={onDelete}
                 showBillableBadge={showBillableBadge}
                 dragActivatorRef={setActivatorNodeRef}
                 dragAttributes={attributes}
                 dragListeners={listeners}
+                dragDisabled={dragDisabled || Boolean(task.archived)}
             />
         </div>
     );

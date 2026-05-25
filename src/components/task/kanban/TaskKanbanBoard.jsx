@@ -148,9 +148,13 @@ const TaskKanbanBoard = ({
     onCreateSubtask,
     onViewTask,
     onUpdateTask,
+    onArchiveTask,
+    onUnarchiveTask,
+    onDeleteTask,
     showBillableBadges = false,
     fallbackSortBy = 'lastActive',
     createColumnProps = null,
+    dragDisabled = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
     const [activeColumnDragId, setActiveColumnDragId] = useState(null);
@@ -170,7 +174,7 @@ const TaskKanbanBoard = ({
         return sortKanbanColumns(parentTasks, fallbackSortBy).map((parentTask) => ({
             task: parentTask,
             subtasks: sortKanbanCards(
-                tasks.filter((candidate) => candidate.parentTaskId === parentTask.id && !candidate.archived && !candidate.recurring)
+                tasks.filter((candidate) => candidate.parentTaskId === parentTask.id && !candidate.recurring)
             ),
         }));
     }, [parentTasks, tasks, fallbackSortBy]);
@@ -365,9 +369,13 @@ const TaskKanbanBoard = ({
                                 subtasks={column.subtasks}
                                 onCreateSubtask={onCreateSubtask}
                                 onViewTask={onViewTask}
+                                onArchiveTask={onArchiveTask}
+                                onUnarchiveTask={onUnarchiveTask}
+                                onDeleteTask={onDeleteTask}
                                 showBillableBadges={showBillableBadges}
                                 dragPreview={cardDragPreview}
                                 className={cn(isMobileLayout && 'snap-start')}
+                                dragDisabled={dragDisabled}
                             />
                         ))}
                     </SortableContext>
@@ -380,8 +388,12 @@ const TaskKanbanBoard = ({
                         <TaskKanbanTaskRow
                             task={activeColumnDragColumn.task}
                             onOpen={() => {}}
+                            onArchive={onArchiveTask ? () => onArchiveTask(activeColumnDragColumn.task.id) : null}
+                            onUnarchive={onUnarchiveTask ? () => onUnarchiveTask(activeColumnDragColumn.task.id) : null}
+                            onDelete={onDeleteTask ? () => onDeleteTask(activeColumnDragColumn.task.id) : null}
                             subtaskCount={activeColumnDragColumn.subtasks.length}
                             showBillableBadge={showBillableBadges}
+                            dragDisabled={true}
                         />
 
                         {activeColumnDragColumn.subtasks.length > 0 ? (
@@ -397,14 +409,18 @@ const TaskKanbanBoard = ({
                                         <TaskKanbanTaskRow
                                             task={subtask}
                                             onOpen={() => {}}
+                                            onArchive={onArchiveTask ? () => onArchiveTask(subtask.id) : null}
+                                            onUnarchive={onUnarchiveTask ? () => onUnarchiveTask(subtask.id) : null}
+                                            onDelete={onDeleteTask ? () => onDeleteTask(subtask.id) : null}
                                             showBillableBadge={showBillableBadges}
+                                            dragDisabled={true}
                                         />
                                     </div>
                                 ))}
                             </div>
                         ) : null}
 
-                        {onCreateSubtask && !activeColumnDragColumn.task.completed ? (
+                        {onCreateSubtask && !activeColumnDragColumn.task.completed && !activeColumnDragColumn.task.archived ? (
                             <Button
                                 variant="ghost"
                                 className={cn(
@@ -423,7 +439,11 @@ const TaskKanbanBoard = ({
                         <TaskKanbanTaskRow
                             task={activeCardTask}
                             onOpen={() => {}}
+                            onArchive={onArchiveTask ? () => onArchiveTask(activeCardTask.id) : null}
+                            onUnarchive={onUnarchiveTask ? () => onUnarchiveTask(activeCardTask.id) : null}
+                            onDelete={onDeleteTask ? () => onDeleteTask(activeCardTask.id) : null}
                             showBillableBadge={showBillableBadges}
+                            dragDisabled={true}
                         />
                     </div>
                 ) : null}

@@ -225,4 +225,64 @@ describe('TaskKanbanBoard', () => {
 
         expect(screen.queryByText('No subtasks yet.')).not.toBeInTheDocument();
     });
+
+    it('shows the archive action for completed tasks instead of a done badge', () => {
+        const onArchiveTask = vi.fn();
+
+        render(
+            <TaskKanbanBoard
+                parentTasks={[{ ...parentTask, completed: true }]}
+                tasks={[{ ...parentTask, completed: true }]}
+                onCreateSubtask={vi.fn()}
+                onViewTask={vi.fn()}
+                onUpdateTask={vi.fn()}
+                onArchiveTask={onArchiveTask}
+                showBillableBadges={false}
+            />
+        );
+
+        expect(screen.queryByText('Done')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Archive Task' }));
+
+        expect(onArchiveTask).toHaveBeenCalledWith('parent-1');
+    });
+
+    it('keeps archived subtasks in a collapsible section', () => {
+        render(
+            <TaskKanbanBoard
+                parentTasks={[parentTask]}
+                tasks={[
+                    parentTask,
+                    ...subtasks,
+                    {
+                        id: 'subtask-archived',
+                        title: 'Archived note pass',
+                        projectId: 'project-1',
+                        parentTaskId: 'parent-1',
+                        archived: true,
+                        recurring: null,
+                        completed: true,
+                        billable: false,
+                        lastActive: 5,
+                    },
+                ]}
+                onCreateSubtask={vi.fn()}
+                onViewTask={vi.fn()}
+                onUpdateTask={vi.fn()}
+                onUnarchiveTask={vi.fn()}
+                onDeleteTask={vi.fn()}
+                showBillableBadges={false}
+            />
+        );
+
+        expect(screen.getByRole('button', { name: 'Archived Subtasks (1)' })).toBeInTheDocument();
+        expect(screen.queryByTestId('task-kanban-card-subtask-archived')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Archived Subtasks (1)' }));
+
+        expect(screen.getByTestId('task-kanban-card-subtask-archived')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Unarchive Subtask' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete Subtask' })).toBeInTheDocument();
+    });
 });

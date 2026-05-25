@@ -451,9 +451,20 @@ const TaskViewModal = ({
     const completedDateLabel = completedDateValue
         ? toDisplayDate(completedDateValue, { month: 'short', day: 'numeric', year: 'numeric' })
         : '';
+    const deleteActionLabel = currentTask.parentTaskId ? 'Delete subtask' : 'Delete task';
 
     const modalFooter = currentTask.archived ? (
-        <div className="flex items-center justify-end w-full">
+        <div data-testid="archived-task-modal-footer" className="flex w-full items-center justify-between gap-3">
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDelete}
+                className="status-danger-action h-8 w-8 status-danger-text-strong"
+                title={deleteActionLabel}
+                aria-label={deleteActionLabel}
+            >
+                <Trash2 className="h-5 w-5" />
+            </Button>
             <Button onClick={handleUnarchive}>
                 Unarchive
             </Button>
