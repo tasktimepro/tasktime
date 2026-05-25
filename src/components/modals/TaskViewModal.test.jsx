@@ -8,6 +8,7 @@ const hookMocks = vi.hoisted(() => ({
 
     projects: [],
     tasks: [],
+    timeEntries: [],
     recurringStatus: null,
     isCompleted: false,
     showSuccess: vi.fn(),
@@ -97,7 +98,7 @@ vi.mock('@/hooks/useTasks', () => ({
 vi.mock('@/hooks/useTimeEntries', () => ({
 
     useTimeEntries: () => ({
-        entries: [],
+        entries: hookMocks.timeEntries,
         createEntry: hookMocks.createEntry,
     })
 }))
@@ -153,6 +154,7 @@ describe('TaskViewModal recurring actions', () => {
         vi.clearAllMocks()
         hookMocks.projects = []
         hookMocks.tasks = [recurringTask]
+        hookMocks.timeEntries = []
         hookMocks.isCompleted = false
         hookMocks.recurringStatus = {
             isDueToday: false,
@@ -277,6 +279,7 @@ describe('TaskViewModal billable toggle', () => {
         vi.clearAllMocks()
         hookMocks.tasks = [task]
         hookMocks.projects = [{ id: 'project-1', title: 'Client Work', isPersonal: false }]
+        hookMocks.timeEntries = []
     })
 
     it('shows the billable toggle for non-personal project tasks', () => {
@@ -325,6 +328,7 @@ describe('TaskViewModal archived footer actions', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         hookMocks.tasks = [archivedTask]
+        hookMocks.timeEntries = []
     })
 
     it('shows delete on the left side of the archived footer and keeps unarchive available', () => {
@@ -354,5 +358,50 @@ describe('TaskViewModal archived footer actions', () => {
 
         expect(onClose).toHaveBeenCalledTimes(1)
         expect(onDelete).toHaveBeenCalledWith(archivedTask)
+    })
+})
+
+describe('TaskViewModal time display', () => {
+    const task = {
+        id: 'task-time-1',
+        title: 'Timed task',
+        recurring: null,
+        archived: false,
+        completed: false,
+        projectId: null,
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        hookMocks.projects = []
+        hookMocks.tasks = [task]
+        hookMocks.timeEntries = [
+            {
+                id: 'entry-1',
+                taskId: 'task-time-1',
+                start: 0,
+                end: 65000,
+            },
+        ]
+    })
+
+    it('shows seconds in the task time summary', () => {
+        render(
+            <TaskViewModal
+                isOpen={true}
+                onClose={vi.fn()}
+                task={task}
+                dateStr={null}
+                attachment={null}
+                onEdit={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onNavigateToProject={vi.fn()}
+                onOpenTimeEntries={vi.fn()}
+                onOpenPlannerOptions={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('1m 5s')).toBeInTheDocument()
     })
 })

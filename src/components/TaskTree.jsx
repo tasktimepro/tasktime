@@ -911,7 +911,7 @@ const TaskTree = ({
                         )
                     )}
 
-                    {sortedParentTasks.length > 0 && taskDisplay === 'kanban' && (
+                    {(sortedParentTasks.length > 0 || showCreateForm) && taskDisplay === 'kanban' && (
                         <TaskKanbanBoard
                             parentTasks={sortedParentTasks}
                             tasks={projectTasks}

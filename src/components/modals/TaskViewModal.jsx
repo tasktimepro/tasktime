@@ -16,7 +16,7 @@ import { useClients } from '@/hooks/useClients';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useToast } from '@/hooks/useToast';
 import { formatRecurringLabel } from '@/utils/recurringUtils';
-import { formatDuration, formatDurationWithSeconds, getTodayString, millisecondsToHours, toDisplayDate } from '@/utils/dateUtils';
+import { formatDurationWithSeconds, getTodayString, millisecondsToHours, toDisplayDate } from '@/utils/dateUtils';
 import { formatCurrency, getProjectCurrency } from '@/utils/currencyUtils';
 import { differenceInCalendarDays, endOfDay, parseISO, startOfDay } from 'date-fns';
 import TimerControls from '../TimerControls';
@@ -556,13 +556,13 @@ const TaskViewModal = ({
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Time</p>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                 <span>
-                                    Total: <span className="font-medium text-foreground">{formatDuration(totalTimeWithSubtasks)}</span>
+                                    Total: <span className="font-medium text-foreground">{formatDurationWithSeconds(totalTimeWithSubtasks)}</span>
                                 </span>
                                 {(currentTask.recurring || dateStr) && (
                                     <>
                                         <span className="text-muted-foreground">•</span>
                                         <span>
-                                            {dayTimeLabel}: <span className="font-medium text-foreground">{formatDuration(dateStr ? dateTotalWithSubtasks : todayTotalWithSubtasks)}</span>
+                                            {dayTimeLabel}: <span className="font-medium text-foreground">{formatDurationWithSeconds(dateStr ? dateTotalWithSubtasks : todayTotalWithSubtasks)}</span>
                                         </span>
                                     </>
                                 )}

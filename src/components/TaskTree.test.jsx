@@ -98,11 +98,12 @@ vi.mock('./task/drag/SortableTaskItem', () => ({
     )
 }));
 vi.mock('./task/kanban/TaskKanbanBoard', () => ({
-    default: ({ parentTasks = [], dragDisabled = false, onUnarchiveTask = null, onDeleteTask = null }) => (
+    default: ({ parentTasks = [], dragDisabled = false, onUnarchiveTask = null, onDeleteTask = null, createColumnProps = null }) => (
         <div
             data-testid={`kanban-board-${parentTasks.map((task) => task.id).join('-') || 'empty'}`}
             data-has-unarchive={String(Boolean(onUnarchiveTask))}
             data-has-delete={String(Boolean(onDeleteTask))}
+            data-has-create-column={String(Boolean(createColumnProps))}
         >
             Kanban board{dragDisabled ? ' archived' : ''}
         </div>
@@ -167,6 +168,22 @@ describe('TaskTree', () => {
         expect(screen.queryByText('Task item')).not.toBeInTheDocument();
         expect(taskTreeMocks.updateProject).toHaveBeenCalledWith('project-1', { taskView: 'kanban' });
         expect(screen.queryByRole('combobox', { name: 'Sort tasks' })).not.toBeInTheDocument();
+    });
+
+    it('renders the kanban create column for a new empty project', () => {
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false, taskView: 'kanban' }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'New Task' }));
+
+        expect(screen.getByTestId('kanban-board-empty')).toBeInTheDocument();
+        expect(screen.getByTestId('kanban-board-empty')).toHaveAttribute('data-has-create-column', 'true');
+        expect(screen.queryByText('No tasks yet')).not.toBeInTheDocument();
     });
 
     it('uses persisted project task view when provided', () => {
