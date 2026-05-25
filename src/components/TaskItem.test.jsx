@@ -18,7 +18,11 @@ const hookState = vi.hoisted(() => ({
 }));
 
 vi.mock('./task/TaskHeader', () => ({
-    default: () => <div data-testid="task-header" />,
+    default: ({ leadingAccessory = null }) => (
+        <div data-testid="task-header">
+            {leadingAccessory}
+        </div>
+    ),
 }));
 
 vi.mock('./task/TaskActions', () => ({
@@ -217,5 +221,39 @@ describe('TaskItem subtask creation', () => {
         expect(screen.getByTestId('task-start-date')).toBeInTheDocument();
         expect(screen.getByText('2h')).toBeInTheDocument();
         expect(screen.getByTestId('task-actions')).toBeInTheDocument();
+    });
+
+    it('attaches manual-sort drag attributes to the handle instead of the row', () => {
+        setMatchMedia(false);
+        hookState.tasks = [];
+        hookState.entries = [];
+        hookState.getTimerForTask.mockReturnValue(null);
+
+        const { container } = render(
+            <TaskItem
+                task={{
+                    id: 'task-3',
+                    projectId: 'project-1',
+                    title: 'Draggable task',
+                    recurring: null,
+                    completed: false,
+                    archived: false,
+                    createdAt: Date.now(),
+                }}
+                onCreateSubtask={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onUnarchive={vi.fn()}
+                onToggleBillable={vi.fn()}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+                dragHandle={<span>Drag handle</span>}
+                dragAttributes={{ 'data-drag-anchor': 'true' }}
+                dragListeners={{}}
+            />
+        );
+
+        expect(screen.getByText('Drag handle').closest('[data-drag-anchor="true"]')).toBeInTheDocument();
+        expect(container.querySelector(':scope > [data-drag-anchor="true"]')).toBeNull();
     });
 });

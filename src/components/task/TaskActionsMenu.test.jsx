@@ -101,6 +101,22 @@ describe('TaskActionsMenu', () => {
         expect(onEdit).toHaveBeenCalledWith(task)
     })
 
+    it('uses the same square trigger shape as other task action buttons', () => {
+
+        const task = { id: 't1', title: 'Task' }
+
+        hookState.tasks = [task]
+        hookState.entries = []
+        hookState.projects = []
+
+        render(<TaskActionsMenu task={task} onEdit={vi.fn()} onDelete={vi.fn()} />)
+
+        const trigger = screen.getByRole('button', { name: 'More actions' })
+
+        expect(trigger.className.includes('rounded-md')).toBe(true)
+        expect(trigger.className.includes('rounded-full')).toBe(false)
+    })
+
     it('confirms delete before calling onDelete', async () => {
 
         const onEdit = vi.fn()

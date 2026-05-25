@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import Reports from './Reports';
 
 const mockUpdateUrl = vi.fn();
@@ -96,6 +96,7 @@ const mockTaxReturnPeriods = [
     },
 ];
 let mockSection = null;
+let mockLoadingHistoricalEntries = false;
 
 vi.mock('@/hooks/useUrlState.ts', () => ({
     useUrlState: () => ({
@@ -131,7 +132,7 @@ vi.mock('@/hooks/useTimeEntries.ts', () => ({
                 billedInvoiceId: null,
             },
         ],
-        isLoadingMore: false,
+        isLoadingMore: mockLoadingHistoricalEntries,
     }),
 }));
 
@@ -293,7 +294,43 @@ describe('Reports', () => {
             endDate: '2026-04-30',
             status: 'draft',
         });
+        mockLoadingHistoricalEntries = false;
         mockSection = null;
+    });
+
+    it('keeps a centered loader visible until historical entries finish loading and the report content has painted', async () => {
+        vi.useFakeTimers();
+
+        const onReadyChange = vi.fn();
+
+        const originalRequestAnimationFrame = window.requestAnimationFrame;
+        const originalCancelAnimationFrame = window.cancelAnimationFrame;
+
+        window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(performance.now()), 16);
+        window.cancelAnimationFrame = (handle) => window.clearTimeout(handle);
+
+        try {
+            mockLoadingHistoricalEntries = true;
+
+            const { rerender } = render(<Reports onReadyChange={onReadyChange} />);
+
+            expect(onReadyChange).toHaveBeenLastCalledWith(false);
+
+            mockLoadingHistoricalEntries = false;
+            rerender(<Reports onReadyChange={onReadyChange} />);
+
+            expect(onReadyChange).toHaveBeenLastCalledWith(false);
+
+            act(() => {
+                vi.runAllTimers();
+            });
+
+            expect(onReadyChange).toHaveBeenLastCalledWith(true);
+        } finally {
+            window.requestAnimationFrame = originalRequestAnimationFrame;
+            window.cancelAnimationFrame = originalCancelAnimationFrame;
+            vi.useRealTimers();
+        }
     });
 
     it('renders the reports dashboard with last month selected by default', async () => {

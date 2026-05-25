@@ -6,7 +6,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 
@@ -77,6 +77,11 @@ const googleAuthHookState = vi.hoisted(() => ({
     hadPreviousSession: false,
     isLoading: false,
     isSignedIn: false,
+}))
+
+const reportsComponentState = vi.hoisted(() => ({
+    autoReady: true,
+    readyHandler: null,
 }))
 
 const onboardingModalMock = vi.hoisted(() => vi.fn(({ isOpen, onComplete }) => (
@@ -338,6 +343,23 @@ vi.mock('./components/Dashboard', () => ({
 }))
 vi.mock('./components/Account', () => ({ default: () => <div data-testid="account" /> }))
 vi.mock('./components/Invoices', () => ({ default: () => <div data-testid="invoices" /> }))
+vi.mock('./components/Reports', () => ({
+    default: ({ onReadyChange }) => {
+        React.useEffect(() => {
+            reportsComponentState.readyHandler = onReadyChange || null
+
+            if (reportsComponentState.autoReady) {
+                onReadyChange?.(true)
+            }
+
+            return () => {
+                reportsComponentState.readyHandler = null
+            }
+        }, [onReadyChange])
+
+        return <div data-testid="reports-view">Reports view</div>
+    },
+}))
 vi.mock('./components/timer/GlobalTimerStack', () => ({ default: () => <div data-testid="global-timer" /> }))
 vi.mock('./components/modals/ModalManager', () => ({
     default: ({ activeModal, modalOptions }) => (
@@ -419,6 +441,8 @@ describe('App component', () => {
         tasksHookState.createTask.mockClear()
         clientsHookState.clients.length = 0
         timersHookState.timers.length = 0
+        reportsComponentState.autoReady = true
+        reportsComponentState.readyHandler = null
         urlHookState.urlParams = { view: 'dashboard', projectId: null, clientId: null }
         urlHookState.navigateToProjects.mockReset()
         urlHookState.navigateToProject.mockReset()
@@ -440,6 +464,24 @@ describe('App component', () => {
     it('renders the dashboard view by default', async () => {
         render(<App />)
         expect(await screen.findByTestId('dashboard')).toBeInTheDocument()
+    })
+
+    it('keeps the page-level reports loader visible until the reports view signals ready', async () => {
+        reportsComponentState.autoReady = false
+        urlHookState.urlParams = { view: 'reports', projectId: null, clientId: null }
+
+        render(<App />)
+
+        expect(screen.getByRole('status')).toHaveTextContent('Loading reports')
+        expect(await screen.findByTestId('reports-view')).toBeInTheDocument()
+
+        act(() => {
+            reportsComponentState.readyHandler?.(true)
+        })
+
+        await waitFor(() => {
+            expect(screen.queryByRole('status')).not.toBeInTheDocument()
+        })
     })
 
     it('seeds the first onboarding task when onboarding is shown', () => {

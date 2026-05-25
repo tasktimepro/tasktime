@@ -2,9 +2,7 @@
 
 ## Priority
 
-[ ] When I switch to kanban view on a fresh new project with no tasks, and I click on create task, nothing is visible - can you check what's happening - it works for list view for the first task in the project, just kanban is broken
 
-[ ] In the task modal, we should always show the seconds as well, not just minutes
 
 ---
 

@@ -285,19 +285,22 @@ const TaskItem = ({
         setShowCreateSubtaskForm(false);
     }, []);
 
-    const dragInteractionProps = dragHandle
-        ? {
-            ref: dragActivatorRef,
-            ...dragAttributes,
-            ...dragListeners,
-        }
-        : {};
+    const resolvedDragHandle = dragHandle ? (
+        <span
+            ref={dragActivatorRef}
+            className="inline-flex cursor-grab active:cursor-grabbing"
+            {...dragAttributes}
+            {...dragListeners}
+        >
+            {dragHandle}
+        </span>
+    ) : null;
 
     return (
         <div className={`bg-card border border-border rounded-lg overflow-hidden ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''} ${isDragging ? 'shadow-md' : ''}`}>
             <div className={cn(isMobileLayout ? 'p-3' : 'p-4')}>
                 {isMobileLayout ? (
-                    <div className={cn(dragHandle && 'cursor-grab active:cursor-grabbing')} {...dragInteractionProps}>
+                    <div>
                         <TaskHeader
                             task={task}
                             isEditing={isEditing}
@@ -315,7 +318,7 @@ const TaskItem = ({
                             showTimeDisplay={false}
                             showCheckbox={!task.recurring || Boolean(recurringCompletionDate)}
                             onTitleClick={handleViewTask}
-                            leadingAccessory={dragHandle}
+                            leadingAccessory={resolvedDragHandle}
                         />
 
                         <div className="mt-1.5 flex w-full flex-wrap items-center justify-end gap-2" data-testid={`task-item-secondary-${task.id}`}>
@@ -351,7 +354,7 @@ const TaskItem = ({
                         </div>
                     </div>
                 ) : (
-                    <div className={cn('flex items-center justify-between gap-3', dragHandle && 'cursor-grab active:cursor-grabbing')} {...dragInteractionProps}>
+                    <div className="flex items-center justify-between gap-3">
                         <TaskHeader
                             task={task}
                             isEditing={isEditing}
@@ -369,7 +372,7 @@ const TaskItem = ({
                             showTimeDisplay={false}
                             showCheckbox={!task.recurring || Boolean(recurringCompletionDate)}
                             onTitleClick={handleViewTask}
-                            leadingAccessory={dragHandle}
+                            leadingAccessory={resolvedDragHandle}
                         />
 
                         {(task.startDate || task.recurring) && (

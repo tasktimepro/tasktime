@@ -65,7 +65,7 @@ const TaskActionsMenu = ({ task, onEdit, onDelete, onArchive = null }) => {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:bg-muted rounded-full transition-colors"
+                        className="h-8 w-8 rounded-md text-muted-foreground transition-colors hover:bg-accent"
                         title="More actions"
                         aria-label="More actions"
                     >

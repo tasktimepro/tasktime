@@ -101,6 +101,7 @@ const EMPTY_CLIENT = 'No client';
 const EMPTY_PROJECT = 'No project';
 const EMPTY_CATEGORY = 'No category';
 const NEW_TAX_RETURN_PERIOD_VALUE = '__new_tax_return_period__';
+const REPORTS_LOADER_SETTLE_DELAY_MS = 120;
 
 const formatPercent = (value) => `${value.toFixed(0)}%`;
 const slugifyFilePart = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'statement';
@@ -398,7 +399,7 @@ const buildBreakdownRows = ({
         }));
 };
 
-function Reports() {
+function Reports({ onReadyChange = null }) {
     const isMobileLayout = useIsMobileLayout();
     const { urlParams, updateUrl } = useUrlState();
     const { showError, showSuccess } = useToast();
@@ -458,6 +459,45 @@ function Reports() {
         startDate: startOfDay(parseStoredDate(resolvedRange.startDate) || new Date()).getTime(),
         endDate: endOfDay(parseStoredDate(resolvedRange.endDate) || new Date()).getTime(),
     });
+    const [isReportContentPaintReady, setIsReportContentPaintReady] = useState(false);
+
+    useEffect(() => {
+        if (loadingHistoricalEntries) {
+            setIsReportContentPaintReady(false);
+            return;
+        }
+
+        const scheduleFrame = globalThis.requestAnimationFrame
+            ? globalThis.requestAnimationFrame.bind(globalThis)
+            : (callback) => window.setTimeout(callback, 16);
+        const cancelFrame = globalThis.cancelAnimationFrame
+            ? globalThis.cancelAnimationFrame.bind(globalThis)
+            : (handle) => window.clearTimeout(handle);
+
+        let secondFrameHandle = 0;
+        let settleTimeoutHandle = 0;
+        const firstFrameHandle = scheduleFrame(() => {
+            secondFrameHandle = scheduleFrame(() => {
+                settleTimeoutHandle = window.setTimeout(() => {
+                    setIsReportContentPaintReady(true);
+                }, REPORTS_LOADER_SETTLE_DELAY_MS);
+            });
+        });
+
+        return () => {
+            cancelFrame(firstFrameHandle);
+            if (secondFrameHandle) {
+                cancelFrame(secondFrameHandle);
+            }
+            if (settleTimeoutHandle) {
+                window.clearTimeout(settleTimeoutHandle);
+            }
+        };
+    }, [loadingHistoricalEntries]);
+
+    useEffect(() => {
+        onReadyChange?.(!loadingHistoricalEntries && isReportContentPaintReady);
+    }, [isReportContentPaintReady, loadingHistoricalEntries, onReadyChange]);
 
     const allTasks = useMemo(() => [...activeTasks, ...archivedTasks], [activeTasks, archivedTasks]);
     const invoicesById = useMemo(() => new Map(invoices.map((invoice) => [invoice.id, invoice])), [invoices]);
@@ -2023,22 +2063,15 @@ function Reports() {
                     />
                 ) : null}
 
-                {loadingHistoricalEntries ? (
-                    <Notice
-                        title="Loading historical time entries"
-                        description="The reports page is pulling older entry documents for the selected period."
-                        compact
-                    />
-                ) : null}
+                <div className="min-h-[24rem]">
+                        {activeTab === 'overview' && (
+                            <div className={buildSectionClassName(isMobileLayout)}>
+                                <ReportSummaryCards cards={summaryCards} />
+                            </div>
+                        )}
 
-                {activeTab === 'overview' && (
-                    <div className={buildSectionClassName(isMobileLayout)}>
-                        <ReportSummaryCards cards={summaryCards} />
-                    </div>
-                )}
-
-                {activeTab === 'monthly' && (
-                    <div className={buildSectionClassName(isMobileLayout)}>
+                        {activeTab === 'monthly' && (
+                            <div className={buildSectionClassName(isMobileLayout)}>
                         <ReportSection
                             title="Monthly summary"
                             action={(
@@ -3384,6 +3417,7 @@ function Reports() {
                         )}
                     </ReportSection>
                 )}
+                </div>
 
                 <Dialog open={isClaimDialogOpen} onOpenChange={(open) => {
                     if (!open) {

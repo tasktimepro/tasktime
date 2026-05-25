@@ -59,9 +59,30 @@ import { useDarkModePreference } from './hooks/useDarkModePreference.ts';
 import { SYNC_WORKER_CONFIG } from './config/google.ts';
 import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon, ChartBarIcon } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { APP_VERSION, TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
 const Reports = lazy(() => import('./components/Reports'));
+
+function ReportsPageLoader() {
+    return (
+        <div
+            className={cn(
+                'absolute inset-0 z-10 flex items-center justify-center bg-background px-6 py-10'
+            )}
+            role="status"
+            aria-live="polite"
+        >
+            <div className="flex flex-col items-center justify-center gap-4 text-center">
+                <div className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-foreground" aria-hidden="true" />
+                <div className="space-y-1">
+                    <p className="text-base font-semibold text-foreground">Loading reports</p>
+                    <p className="text-sm text-muted-foreground">Preparing the reports workspace.</p>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 /** Original browser tab title */
 const ORIGINAL_TITLE = "TaskTime";
@@ -135,6 +156,7 @@ function AppContent() {
     });
     const [showMobileSyncButton, setShowMobileSyncButton] = useState(false);
     const [isMobileSyncButtonFadingOut, setIsMobileSyncButtonFadingOut] = useState(false);
+    const [isReportsViewReady, setIsReportsViewReady] = useState(false);
     const mobileSyncHideTimeoutRef = useRef(null);
     const mobileSyncFadeTimeoutRef = useRef(null);
     const mobileSyncedFlashShownRef = useRef(false);
@@ -941,6 +963,13 @@ function AppContent() {
     }, [authLoading, hadPreviousSession, isSignedIn, mobileSyncStatus.kind, showMobileSyncButton]);
     
     const activeView = urlParams.view;
+
+    useEffect(() => {
+        if (activeView !== 'reports') {
+            setIsReportsViewReady(false);
+        }
+    }, [activeView]);
+
     const hasPersistedWorkspaceData = (
         projects.length > 0
         || activeTasks.length > 0
@@ -1769,9 +1798,14 @@ function AppContent() {
 
                     {activeView === 'reports' && (
                             <ErrorBoundary>
-                            <Suspense fallback={<div className="px-6 py-8 text-sm text-muted-foreground">Loading reports...</div>}>
-                                <Reports />
-                            </Suspense>
+                                <div className="relative min-h-[calc(100vh-16rem)]" aria-busy={!isReportsViewReady}>
+                                    {!isReportsViewReady ? <ReportsPageLoader /> : null}
+                                    <Suspense fallback={null}>
+                                        <div className={cn(!isReportsViewReady && 'pointer-events-none opacity-0')}>
+                                            <Reports onReadyChange={setIsReportsViewReady} />
+                                        </div>
+                                    </Suspense>
+                                </div>
                             </ErrorBoundary>
                         )}
 

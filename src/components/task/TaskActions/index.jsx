@@ -4,10 +4,6 @@ import TaskTimer from '../../TaskTimer';
 import TaskDropdown from './TaskDropdown';
 import { useTimers } from '../../../hooks/useTimers';
 
-const stopDragPropagation = (event) => {
-    event.stopPropagation();
-};
-
 /**
  * TaskActions component - Right-side action buttons and timer controls.
  * Now uses Yjs hooks directly for timer state.
@@ -50,7 +46,7 @@ const TaskActions = ({
     }
 
     return (
-        <div className="flex items-center space-x-1" onPointerDownCapture={stopDragPropagation}>
+        <div className="flex items-center space-x-1">
             {isArchived ? (
                 <div className="flex items-center space-x-2">
                     {onUnarchive && (

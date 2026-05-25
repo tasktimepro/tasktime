@@ -168,18 +168,21 @@ const SubtaskItem = ({
         onViewTask(task, { dateStr: null });
     }, [onViewTask, task]);
 
-    const dragInteractionProps = dragHandle
-        ? {
-            ref: dragActivatorRef,
-            ...dragAttributes,
-            ...dragListeners,
-        }
-        : {};
+    const resolvedDragHandle = dragHandle ? (
+        <span
+            ref={dragActivatorRef}
+            className="inline-flex cursor-grab active:cursor-grabbing"
+            {...dragAttributes}
+            {...dragListeners}
+        >
+            {dragHandle}
+        </span>
+    ) : null;
 
     return (
         <div className={`rounded-md px-2 py-2 transition-colors hover:bg-muted ${shouldDimTask ? 'opacity-50 pointer-events-none' : ''} ${isCompleted ? 'bg-muted/50' : ''} ${isDragging ? 'shadow-sm' : ''}`}>
             {isMobileLayout ? (
-                <div className={dragHandle ? 'cursor-grab active:cursor-grabbing' : ''} {...dragInteractionProps}>
+                <div>
                     <TaskHeader
                         task={task}
                         isEditing={isEditing}
@@ -196,7 +199,7 @@ const SubtaskItem = ({
                         isSubtask={true}
                         showTimeDisplay={false}
                         onTitleClick={handleViewTask}
-                        leadingAccessory={dragHandle}
+                        leadingAccessory={resolvedDragHandle}
                     />
 
                     <div className="mt-1.5 flex w-full flex-wrap items-center justify-end gap-2" data-testid={`subtask-item-secondary-${task.id}`}>
@@ -232,7 +235,7 @@ const SubtaskItem = ({
                     </div>
                 </div>
             ) : (
-                <div className={cn('flex items-center justify-between gap-3', dragHandle && 'cursor-grab active:cursor-grabbing')} {...dragInteractionProps}>
+                <div className="flex items-center justify-between gap-3">
                     <TaskHeader
                         task={task}
                         isEditing={isEditing}
@@ -249,7 +252,7 @@ const SubtaskItem = ({
                         isSubtask={true}
                         showTimeDisplay={false}
                         onTitleClick={handleViewTask}
-                        leadingAccessory={dragHandle}
+                        leadingAccessory={resolvedDragHandle}
                     />
 
                     {(task.startDate || task.recurring) && (
