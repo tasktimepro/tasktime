@@ -20,7 +20,7 @@ import { BACKUP_VERSION } from '../utils/backupData.ts';
  * Provides JSON export/import functionality for all application data including:
  * - Projects, tasks, time entries, and invoices
  * - Payment methods, business info, clients, invoice templates, and email templates
- * - User preferences (currency, etc.)
+ * - Expense categories, tax return periods, planner data, and user preferences
  * 
  * Note: Timer state is intentionally excluded from export/import
  */
@@ -238,6 +238,16 @@ function ExportImport({
                 throw new Error('Invalid data format: expenses must be an array');
             }
 
+            // Validate expenseCategories if present
+            if (parsedData.expenseCategories && !Array.isArray(parsedData.expenseCategories)) {
+                throw new Error('Invalid data format: expenseCategories must be an array');
+            }
+
+            // Validate taxReturnPeriods if present
+            if (parsedData.taxReturnPeriods && !Array.isArray(parsedData.taxReturnPeriods)) {
+                throw new Error('Invalid data format: taxReturnPeriods must be an array');
+            }
+
             // Validate expenseRecurrences if present
             if (parsedData.expenseRecurrences && !Array.isArray(parsedData.expenseRecurrences)) {
                 throw new Error('Invalid data format: expenseRecurrences must be an array');
@@ -265,6 +275,8 @@ function ExportImport({
                 timeEntries: parsedData.timeEntries || [],
                 invoices: parsedData.invoices || [],
                 paymentMethods: parsedData.paymentMethods || [],
+                expenseCategories: parsedData.expenseCategories || [],
+                taxReturnPeriods: parsedData.taxReturnPeriods || [],
                 businessInfos: parsedData.businessInfos || [],
                 clients: parsedData.clients || [],
                 invoiceTemplates: parsedData.invoiceTemplates || [],

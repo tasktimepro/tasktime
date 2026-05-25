@@ -1242,7 +1242,6 @@ function Reports({ onReadyChange = null }) {
         outputTaxByCurrency,
         paidInvoicesInRange.length,
         preferredCurrency,
-        resolvedRange,
         revenueIssuedByCurrency,
         revenuePaidByCurrency,
         toInvoiceRows.length,

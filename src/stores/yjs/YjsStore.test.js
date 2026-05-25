@@ -75,6 +75,16 @@ vi.mock('./providers/BackupManager', () => ({
 
 import { YjsStore } from './YjsStore.ts'
 
+function objectToYMap(data) {
+    const map = new Y.Map()
+    Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined) {
+            map.set(key, value)
+        }
+    })
+    return map
+}
+
 describe('YjsStore reconnect sync tracking', () => {
     beforeEach(() => {
         storage.clear()
@@ -200,16 +210,6 @@ describe('YjsStore timer reconciliation', () => {
         docs.clear()
         providerInstances.length = 0
     })
-
-    function objectToYMap(data) {
-        const map = new Y.Map()
-        Object.entries(data).forEach(([key, value]) => {
-            if (value !== undefined) {
-                map.set(key, value)
-            }
-        })
-        return map
-    }
 
     it('deletes orphaned timers that have a matching stopped timer instance', async () => {
         const store = new YjsStore()
@@ -593,6 +593,98 @@ describe('YjsStore timer reconciliation', () => {
         expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('invoices-archived', { allowPull: true })
         expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('expenses-archived', { allowPull: true })
         expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('entries-2024', { allowPull: true })
+
+        store.destroy()
+    })
+})
+
+describe('YjsStore task hierarchy archiving', () => {
+    beforeEach(() => {
+        storage.clear()
+        localStorage.getItem.mockImplementation((key) => storage.get(key))
+        localStorage.setItem.mockImplementation((key, value) => {
+            storage.set(key, String(value))
+        })
+        localStorage.removeItem.mockImplementation((key) => {
+            storage.delete(key)
+        })
+        localStorage.clear.mockImplementation(() => {
+            storage.clear()
+        })
+
+        localStorage.clear()
+
+        docs.forEach((doc) => doc.destroy())
+        docs.clear()
+        providerInstances.length = 0
+    })
+
+    it('archives a parent task together with descendant subtasks', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const coreDoc = docs.get('core')
+        coreDoc.getMap('tasks').set('parent', objectToYMap({
+            id: 'parent',
+            title: 'Parent task',
+            projectId: null,
+            parentTaskId: null,
+            archived: false,
+        }))
+        coreDoc.getMap('tasks').set('child', objectToYMap({
+            id: 'child',
+            title: 'Child task',
+            projectId: null,
+            parentTaskId: 'parent',
+            archived: false,
+        }))
+
+        await store.archiveTask('parent')
+
+        const archivedMap = await store.loadArchivedTasks()
+
+        expect(coreDoc.getMap('tasks').has('parent')).toBe(false)
+        expect(coreDoc.getMap('tasks').has('child')).toBe(false)
+        expect(archivedMap.has('parent')).toBe(true)
+        expect(archivedMap.has('child')).toBe(true)
+        expect(archivedMap.get('parent').get('archived')).toBe(true)
+        expect(archivedMap.get('child').get('parentTaskId')).toBe('parent')
+
+        store.destroy()
+    })
+
+    it('unarchives a parent task together with descendant subtasks', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const archivedMap = await store.loadArchivedTasks()
+        archivedMap.set('parent', objectToYMap({
+            id: 'parent',
+            title: 'Parent task',
+            projectId: null,
+            parentTaskId: null,
+            archived: true,
+            archivedOnDate: '2026-05-25',
+        }))
+        archivedMap.set('child', objectToYMap({
+            id: 'child',
+            title: 'Child task',
+            projectId: null,
+            parentTaskId: 'parent',
+            archived: true,
+            archivedOnDate: '2026-05-25',
+        }))
+
+        await store.unarchiveTask('parent')
+
+        const coreDoc = docs.get('core')
+
+        expect(archivedMap.has('parent')).toBe(false)
+        expect(archivedMap.has('child')).toBe(false)
+        expect(coreDoc.getMap('tasks').has('parent')).toBe(true)
+        expect(coreDoc.getMap('tasks').has('child')).toBe(true)
+        expect(coreDoc.getMap('tasks').get('parent').get('archived')).toBe(false)
+        expect(coreDoc.getMap('tasks').get('child').get('parentTaskId')).toBe('parent')
 
         store.destroy()
     })

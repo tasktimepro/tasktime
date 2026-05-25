@@ -343,8 +343,8 @@ vi.mock('./components/Dashboard', () => ({
 }))
 vi.mock('./components/Account', () => ({ default: () => <div data-testid="account" /> }))
 vi.mock('./components/Invoices', () => ({ default: () => <div data-testid="invoices" /> }))
-vi.mock('./components/Reports', () => ({
-    default: ({ onReadyChange }) => {
+vi.mock('./components/Reports', () => {
+    const MockReportsView = ({ onReadyChange }) => {
         React.useEffect(() => {
             reportsComponentState.readyHandler = onReadyChange || null
 
@@ -358,8 +358,10 @@ vi.mock('./components/Reports', () => ({
         }, [onReadyChange])
 
         return <div data-testid="reports-view">Reports view</div>
-    },
-}))
+    }
+
+    return { default: MockReportsView }
+})
 vi.mock('./components/timer/GlobalTimerStack', () => ({ default: () => <div data-testid="global-timer" /> }))
 vi.mock('./components/modals/ModalManager', () => ({
     default: ({ activeModal, modalOptions }) => (

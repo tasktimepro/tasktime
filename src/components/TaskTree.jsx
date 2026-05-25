@@ -33,7 +33,7 @@ import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import DeleteTaskWarnings from './task/DeleteTaskWarnings';
-import { getTaskDeletionBillingSummary, getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import { getTaskDeletionBillingSummary, getTaskIdsToDelete, getTaskIdsWithDescendants } from '../utils/taskUtils.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { buildTaskAppendOrderPlan, buildTaskContainerMoveOrderUpdates, buildTaskMoveOrderUpdates, reorderTaskItems, sortTasksByManualOrder } from '../utils/taskOrderingUtils.ts';
 import { isRecurringTaskDueOnDate } from '../utils/recurringUtils.ts';
@@ -571,23 +571,42 @@ const TaskTree = ({
      * Archive a task
      */
     const handleArchiveTask = useCallback((taskId) => {
-        updateTask(taskId, {
-            archived: true,
-            archivedOnDate: toStorageDate(new Date()),
-            lastActive: Date.now()
+        const taskIdsToArchive = getTaskIdsWithDescendants(taskId, tasks);
+        const archivedOnDate = toStorageDate(new Date());
+        const lastActive = Date.now();
+
+        taskIdsToArchive.forEach((candidateTaskId) => {
+            updateTask(candidateTaskId, {
+                archived: true,
+                archivedOnDate,
+                lastActive,
+            });
         });
-    }, [updateTask]);
+
+        showSuccess(taskIdsToArchive.length > 1
+            ? `Task and ${taskIdsToArchive.length - 1} subtask(s) archived successfully`
+            : 'Task archived successfully');
+    }, [tasks, updateTask, showSuccess]);
 
     /**
      * Unarchive a task
      */
     const handleUnarchiveTask = useCallback((taskId) => {
-        updateTask(taskId, {
-            archived: false,
-            archivedOnDate: null,
-            lastActive: Date.now()
+        const taskIdsToUnarchive = getTaskIdsWithDescendants(taskId, tasks);
+        const lastActive = Date.now();
+
+        taskIdsToUnarchive.forEach((candidateTaskId) => {
+            updateTask(candidateTaskId, {
+                archived: false,
+                archivedOnDate: null,
+                lastActive,
+            });
         });
-    }, [updateTask]);
+
+        showSuccess(taskIdsToUnarchive.length > 1
+            ? `Task and ${taskIdsToUnarchive.length - 1} subtask(s) unarchived successfully`
+            : 'Task unarchived successfully');
+    }, [tasks, updateTask, showSuccess]);
 
     /**
      * Toggle billable status for a task

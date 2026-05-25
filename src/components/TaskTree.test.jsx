@@ -56,7 +56,7 @@ vi.mock('../hooks/useDayRollover', () => ({
 }));
 
 vi.mock('./TaskItem', () => ({
-    default: ({ task, onCreateSubtask }) => (
+    default: ({ task, onCreateSubtask, onArchive, onUnarchive }) => (
         <div data-testid={`task-item-${task.id}`}>
             <span data-testid={`task-title-${task.id}`}>{task.title}</span>
             {onCreateSubtask ? (
@@ -73,11 +73,21 @@ vi.mock('./TaskItem', () => ({
                     Create subtask for {task.title}
                 </button>
             ) : null}
+            {onArchive ? (
+                <button type="button" onClick={onArchive}>
+                    Archive {task.title}
+                </button>
+            ) : null}
+            {onUnarchive ? (
+                <button type="button" onClick={onUnarchive}>
+                    Unarchive {task.title}
+                </button>
+            ) : null}
         </div>
     )
 }));
 vi.mock('./task/drag/SortableTaskItem', () => ({
-    default: ({ task, onCreateSubtask }) => (
+    default: ({ task, onCreateSubtask, onArchive, onUnarchive }) => (
         <div data-testid={`sortable-task-item-${task.id}`}>
             <span data-testid={`task-title-${task.id}`}>{task.title}</span>
             {onCreateSubtask ? (
@@ -92,6 +102,16 @@ vi.mock('./task/drag/SortableTaskItem', () => ({
                     })}
                 >
                     Create subtask for {task.title}
+                </button>
+            ) : null}
+            {onArchive ? (
+                <button type="button" onClick={onArchive}>
+                    Archive {task.title}
+                </button>
+            ) : null}
+            {onUnarchive ? (
+                <button type="button" onClick={onUnarchive}>
+                    Unarchive {task.title}
                 </button>
             ) : null}
         </div>
@@ -328,6 +348,33 @@ describe('TaskTree', () => {
         expect(taskTreeMocks.updateTask).toHaveBeenCalledWith('parent-1', expect.objectContaining({
             lastActive: expect.any(Number),
         }));
+    });
+
+    it('archives a parent task together with its subtasks', () => {
+        taskTreeMocks.tasks = [
+            { id: 'parent-1', projectId: 'project-1', title: 'Parent task', parentTaskId: null, archived: false, recurring: null },
+            { id: 'child-1', projectId: 'project-1', title: 'Child task', parentTaskId: 'parent-1', archived: false, recurring: null },
+        ];
+
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Archive Parent task' }));
+
+        expect(taskTreeMocks.updateTask).toHaveBeenCalledWith('parent-1', expect.objectContaining({
+            archived: true,
+            archivedOnDate: expect.any(String),
+        }));
+        expect(taskTreeMocks.updateTask).toHaveBeenCalledWith('child-1', expect.objectContaining({
+            archived: true,
+            archivedOnDate: expect.any(String),
+        }));
+        expect(taskTreeMocks.showSuccess).toHaveBeenCalledWith('Task and 1 subtask(s) archived successfully');
     });
 
     it('keeps due recurring tasks on most-recent order when project sort is manual', () => {

@@ -9,6 +9,8 @@ import { BACKUP_VERSION } from '../../utils/backupData'
 const mockTimers = [];
 const mockExpenses = [];
 const mockExportBackupData = vi.fn();
+const mockExpenseCategories = [];
+const mockTaxReturnPeriods = [];
 
 vi.mock('../../hooks/useTimers.ts', () => ({
     useTimers: () => ({ timers: mockTimers })
@@ -40,6 +42,8 @@ describe('Import/Export integration', () => {
         timeEntries: [{ id: 'entry-1', taskId: 'task-1', start: 0, end: 1000 }],
         invoices: [],
         paymentMethods: [],
+        expenseCategories: [],
+        taxReturnPeriods: [],
         businessInfos: [],
         clients: [],
         invoiceTemplates: [],
@@ -51,6 +55,8 @@ describe('Import/Export integration', () => {
 
         mockTimers.length = 0
         mockExpenses.length = 0
+        mockExpenseCategories.length = 0
+        mockTaxReturnPeriods.length = 0
         mockExportBackupData.mockResolvedValue({
             version: BACKUP_VERSION,
             exportDate: '2026-04-22T12:14:07.792Z',
@@ -60,6 +66,8 @@ describe('Import/Export integration', () => {
             timeEntries: baseProps.timeEntries,
             invoices: baseProps.invoices,
             paymentMethods: baseProps.paymentMethods,
+            expenseCategories: mockExpenseCategories,
+            taxReturnPeriods: mockTaxReturnPeriods,
             businessInfos: baseProps.businessInfos,
             clients: baseProps.clients,
             invoiceTemplates: baseProps.invoiceTemplates,
@@ -153,6 +161,8 @@ describe('Import/Export integration', () => {
         expect(parsed.timeEntries).toEqual(baseProps.timeEntries)
         expect(parsed.invoices).toEqual(baseProps.invoices)
         expect(parsed.paymentMethods).toEqual(baseProps.paymentMethods)
+        expect(parsed.expenseCategories).toEqual(mockExpenseCategories)
+        expect(parsed.taxReturnPeriods).toEqual(mockTaxReturnPeriods)
         expect(parsed.businessInfos).toEqual(baseProps.businessInfos)
         expect(parsed.clients).toEqual(baseProps.clients)
         expect(parsed.invoiceTemplates).toEqual(baseProps.invoiceTemplates)
@@ -183,6 +193,8 @@ describe('Import/Export integration', () => {
             timeEntries: [],
             invoices: [],
             paymentMethods: [],
+            expenseCategories: [{ id: 'category-1', name: 'Travel' }],
+            taxReturnPeriods: [{ id: 'period-1', title: 'Q1 2026', startDate: '2026-01-01', endDate: '2026-03-31' }],
             businessInfos: [],
             clients: [],
             invoiceTemplates: [],
@@ -201,6 +213,8 @@ describe('Import/Export integration', () => {
             timeEntries: [],
             invoices: [],
             paymentMethods: [],
+            expenseCategories: payload.expenseCategories,
+            taxReturnPeriods: payload.taxReturnPeriods,
             businessInfos: [],
             clients: [],
             invoiceTemplates: [],

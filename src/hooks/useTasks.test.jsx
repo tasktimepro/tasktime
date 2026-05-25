@@ -188,6 +188,50 @@ describe('useTasks', () => {
         expect(plannerAttachments.has('att-2')).toBe(true)
     })
 
+    it('cascades descendant deletes across active and archived task collections', async () => {
+        const plannerAttachments = createTestYMap({
+            'att-parent': { id: 'att-parent', type: 'task', referenceId: 'parent' },
+            'att-child': { id: 'att-child', type: 'task', referenceId: 'child' },
+            'att-grandchild': { id: 'att-grandchild', type: 'task', referenceId: 'grandchild' },
+        })
+        const archivedMap = createTestYMap({
+            grandchild: { id: 'grandchild', projectId: null, archived: true, parentTaskId: 'child' },
+        })
+        const remove = vi.fn((id) => id === 'parent' || id === 'child')
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: archivedMap, archiveTask: vi.fn(), unarchiveTask: vi.fn(), plannerAttachments },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+        mockUseYjsCollection.mockReturnValue({
+            items: [
+                { id: 'parent', projectId: null, archived: false, parentTaskId: null },
+                { id: 'child', projectId: null, archived: false, parentTaskId: 'parent' },
+            ],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove,
+        })
+
+        const { result } = renderHook(() => useTasks({ includeArchived: true }))
+        await waitFor(() => expect(result.current.archivedLoaded).toBe(true))
+
+        await act(async () => {
+            await result.current.deleteTask('parent')
+        })
+
+        expect(remove).toHaveBeenCalledWith('parent')
+        expect(remove).toHaveBeenCalledWith('child')
+        expect(remove).toHaveBeenCalledWith('grandchild')
+        expect(archivedMap.has('grandchild')).toBe(false)
+        expect(plannerAttachments.has('att-parent')).toBe(false)
+        expect(plannerAttachments.has('att-child')).toBe(false)
+        expect(plannerAttachments.has('att-grandchild')).toBe(false)
+    })
+
     it('cleans up planner attachments when deleting an archived task', async () => {
         const plannerAttachments = createTestYMap({
             'att-1': { id: 'att-1', type: 'task', referenceId: 'archivedTask' },
@@ -221,6 +265,30 @@ describe('useTasks', () => {
 
         expect(plannerAttachments.has('att-1')).toBe(false)
         expect(plannerAttachments.has('att-2')).toBe(true)
+    })
+
+    it('repairs orphaned active subtasks once archived tasks are available', async () => {
+        const update = vi.fn()
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: createTestYMap(), archiveTask: vi.fn(), unarchiveTask: vi.fn(), plannerAttachments: createTestYMap() },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+        mockUseYjsCollection.mockReturnValue({
+            items: [
+                { id: 'orphan-child', projectId: null, archived: false, parentTaskId: 'missing-parent' },
+            ],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        renderHook(() => useTasks({ includeArchived: true }))
+
+        await waitFor(() => expect(update).toHaveBeenCalledWith('orphan-child', expect.objectContaining({ parentTaskId: null })))
     })
 
     it('filters standalone, overdue, today, and upcoming tasks', () => {

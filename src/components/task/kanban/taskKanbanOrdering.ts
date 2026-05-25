@@ -3,10 +3,9 @@ import {
     buildTaskContainerMoveOrderUpdates,
     buildTaskMoveOrderUpdates,
     hasManualTaskOrder,
-    insertTaskItem,
     reorderTaskItems,
     sortTasksByManualOrder,
-} from '@/utils/taskOrderingUtils.ts';
+} from '@/utils/taskOrderingUtils';
 
 type KanbanTask = {
     id: string;
