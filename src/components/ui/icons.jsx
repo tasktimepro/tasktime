@@ -36,6 +36,7 @@ export {
     Eye as EyeIcon,
     EyeOff as EyeOffIcon,
     FileCheck as DocumentCheckIcon,
+    FileBraces as FileBracesIcon,
     FileText as DocumentTextIcon,
     Folder as FolderIcon,
     FunnelX as FunnelXIcon,

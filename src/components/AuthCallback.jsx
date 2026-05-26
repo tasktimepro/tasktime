@@ -6,6 +6,7 @@
  */
 
 import { useEffect } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 
 export const AuthCallback = () => {
 
@@ -71,7 +72,7 @@ export const AuthCallback = () => {
     return (
         <div className="app-viewport-shell flex items-center justify-center">
             <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                <Spinner className="mx-auto mb-4 h-8 w-8 text-gray-900" />
                 <p className="text-gray-600">Completing authentication...</p>
             </div>
         </div>

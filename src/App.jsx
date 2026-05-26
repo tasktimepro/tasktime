@@ -59,6 +59,7 @@ import { useTodayString } from './hooks/useDayRollover';
 import { useDarkModePreference } from './hooks/useDarkModePreference.ts';
 import { SYNC_WORKER_CONFIG } from './config/google.ts';
 import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon, ChartBarIcon } from '@/components/ui/icons';
+import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { APP_VERSION, TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
@@ -75,7 +76,7 @@ function ReportsPageLoader() {
             aria-live="polite"
         >
             <div className="flex flex-col items-center justify-center gap-4 text-center">
-                <div className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-foreground" aria-hidden="true" />
+                <Spinner className="h-9 w-9 text-foreground" />
                 <div className="space-y-1">
                     <p className="text-base font-semibold text-foreground">Loading reports</p>
                     <p className="text-sm text-muted-foreground">Preparing the reports workspace.</p>

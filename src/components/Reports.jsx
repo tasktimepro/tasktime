@@ -36,7 +36,7 @@ import { ACCOUNTANT_PACK_MANIFEST_COLUMNS, buildAccountantPackManifestRows } fro
 import { downloadZipFile } from '@/utils/reportZipUtils';
 import { formatCurrency, getProjectCurrency } from '@/utils/currencyUtils';
 import { formatDuration, millisecondsToHours, parseStoredDate, toDisplayDate, toStorageDate } from '@/utils/dateUtils';
-import { getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '@/utils/invoiceUtils';
+import { getInvoicePaidAtTimestamp, getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '@/utils/invoiceUtils';
 import { buildMonthlyReportHtml, exportClientStatementPdf, exportExpensesReportPdf, exportInvoicesReportPdf, exportMonthlyReportPdf, exportOutstandingReportPdf, exportProjectWorkSummaryPdf } from '@/utils/reportPdfUtils';
 import { generatePDFBlob, getCurrentInvoiceHtmlContent } from '@/utils/pdfUtils.ts';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
@@ -171,6 +171,16 @@ const matchesStoredDateRange = (dateValue, startDate, endDate) => {
 
 const getTimestampDateString = (timestamp) => {
     return typeof timestamp === 'number' ? toStorageDate(timestamp) : null;
+};
+
+const getInvoicePaymentDateString = (invoice) => {
+    return getTimestampDateString(getInvoicePaidAtTimestamp(invoice));
+};
+
+const getInvoicePaymentDisplayDate = (invoice) => {
+    const paidAt = getInvoicePaidAtTimestamp(invoice);
+
+    return typeof paidAt === 'number' ? toDisplayDate(paidAt) : '';
 };
 
 const getStatusBadgeVariant = (status) => {
@@ -641,7 +651,7 @@ function Reports({ onReadyChange = null }) {
     const filteredInvoices = useMemo(() => {
         return entityFilteredInvoices.filter((invoice) => {
             const dateValue = incomeDateBasis === 'paid-date'
-                ? getTimestampDateString(invoice.paidAt)
+                ? getInvoicePaymentDateString(invoice)
                 : invoice.date;
 
             return matchesStoredDateRange(dateValue, resolvedRange.startDate, resolvedRange.endDate);
@@ -658,7 +668,7 @@ function Reports({ onReadyChange = null }) {
                 return false;
             }
 
-            return matchesStoredDateRange(getTimestampDateString(invoice.paidAt), resolvedRange.startDate, resolvedRange.endDate);
+            return matchesStoredDateRange(getInvoicePaymentDateString(invoice), resolvedRange.startDate, resolvedRange.endDate);
         });
     }, [entityFilteredInvoices, resolvedRange.endDate, resolvedRange.startDate]);
 
@@ -1260,7 +1270,7 @@ function Reports({ onReadyChange = null }) {
             business: invoice.businessInfoId ? (businessInfosById.get(invoice.businessInfoId)?.businessName || businessInfosById.get(invoice.businessInfoId)?.name || businessInfosById.get(invoice.businessInfoId)?.title || EMPTY_BUSINESS) : EMPTY_BUSINESS,
             invoiceDate: invoice.date,
             dueDate: invoice.dueDate || '',
-            paidDate: getTimestampDateString(invoice.paidAt) || '',
+            paidDate: getInvoicePaymentDateString(invoice) || '',
             status: getInvoiceStatus(invoice),
             currency: invoice.currency || preferredCurrency,
             subtotal: invoice.subtotal || 0,
@@ -1715,7 +1725,7 @@ function Reports({ onReadyChange = null }) {
             invoiceNumber: invoice.invoiceNumber,
             date: invoice.date,
             dueDate: invoice.dueDate || '',
-            paidDate: typeof invoice.paidAt === 'number' ? toStorageDate(invoice.paidAt) || '' : '',
+            paidDate: getInvoicePaymentDateString(invoice) || '',
             status: getInvoiceStatus(invoice, reportReferenceDate),
             currency: invoice.currency || preferredCurrency,
             total: getInvoiceTotal(invoice),
@@ -1726,7 +1736,7 @@ function Reports({ onReadyChange = null }) {
             invoiceNumber: invoice.invoiceNumber,
             date: invoice.date,
             dueDate: invoice.dueDate || '',
-            paidDate: typeof invoice.paidAt === 'number' ? toStorageDate(invoice.paidAt) || '' : '',
+            paidDate: getInvoicePaymentDateString(invoice) || '',
             status: 'paid',
             currency: invoice.currency || preferredCurrency,
             total: getInvoiceTotal(invoice),
@@ -2360,7 +2370,7 @@ function Reports({ onReadyChange = null }) {
                                                 })),
                                                 paymentRows: (clientStatementSummary?.paymentsRecordedInRange || []).map((invoice) => ({
                                                     invoiceNumber: invoice.invoiceNumber,
-                                                    paidDate: typeof invoice.paidAt === 'number' ? toDisplayDate(invoice.paidAt) : '',
+                                                    paidDate: getInvoicePaymentDisplayDate(invoice),
                                                     amount: formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency),
                                                 })),
                                                 outstandingRows: (clientStatementSummary?.outstandingInvoices || []).map((invoice) => ({
@@ -2448,7 +2458,7 @@ function Reports({ onReadyChange = null }) {
                                                         <div className="min-w-0 flex-1">
                                                             <p className="text-sm font-semibold text-foreground">{invoice.invoiceNumber}</p>
                                                             <p className="mt-1 text-xs text-muted-foreground">
-                                                                Paid {typeof invoice.paidAt === 'number' ? toDisplayDate(invoice.paidAt) : ''}
+                                                                Paid {getInvoicePaymentDisplayDate(invoice)}
                                                             </p>
                                                         </div>
                                                         <p className="text-sm font-semibold text-foreground">{formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency)}</p>

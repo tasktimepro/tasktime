@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@/components/ui/icons';
+import React, { useRef, useState } from 'react';
+import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon, FileBracesIcon } from '@/components/ui/icons';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
@@ -9,6 +9,7 @@ import { useYjs } from '../contexts/YjsContext.tsx';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Notice } from '@/components/ui/notice';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
@@ -48,6 +49,19 @@ function ExportImport({
     const [importData, setImportData] = useState('');
     const [importError, setImportError] = useState('');
     const [isExporting, setIsExporting] = useState(false);
+    const [selectedImportFileName, setSelectedImportFileName] = useState('');
+    const fileInputRef = useRef(null);
+
+    const resetImportState = () => {
+        setShowImportModal(false);
+        setImportData('');
+        setImportError('');
+        setSelectedImportFileName('');
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
     
     /**
      * Calculate total time across all projects
@@ -302,6 +316,8 @@ function ExportImport({
         const file = event.target.files[0];
         if (!file) return;
 
+        setSelectedImportFileName(file.name);
+
         const reader = new FileReader();
         reader.onload = (e) => {
             setImportData(e.target.result);
@@ -314,11 +330,7 @@ function ExportImport({
         <div className="flex justify-end gap-3">
             <Button
                 variant="secondary"
-                onClick={() => {
-                    setShowImportModal(false);
-                    setImportData('');
-                    setImportError('');
-                }}
+                onClick={resetImportState}
             >
                 Cancel
             </Button>
@@ -346,10 +358,11 @@ function ExportImport({
                     <Button
                         variant="outline"
                         onClick={handleExport}
-                        disabled={isExporting}
                         leadingIcon={ArrowUpTrayIcon}
+                        loading={isExporting}
+                        loadingText="Exporting..."
                     >
-                        {isExporting ? 'Exporting...' : 'Export'}
+                        Export
                     </Button>
                 </div>
 
@@ -393,11 +406,7 @@ function ExportImport({
             {/* Import Modal */}
             <Modal 
                 isOpen={showImportModal}
-                onClose={() => {
-                    setShowImportModal(false);
-                    setImportData('');
-                    setImportError('');
-                }}
+                onClose={resetImportState}
                 title="Import Data"
                 size="2xl"
                 footer={importModalFooter}
@@ -407,12 +416,25 @@ function ExportImport({
                     <div className="space-y-2">
                         <Label htmlFor="file-upload">Upload JSON File</Label>
                         <input
+                            ref={fileInputRef}
                             id="file-upload"
                             type="file"
                             accept=".json"
                             onChange={handleFileUpload}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="sr-only"
                         />
+                        <div className="flex flex-wrap items-center gap-3">
+                            <Button
+                                variant="outline"
+                                leadingIcon={FileBracesIcon}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                Choose File
+                            </Button>
+                            <span className="max-w-full truncate text-sm text-muted-foreground">
+                                {selectedImportFileName || 'No file selected'}
+                            </span>
+                        </div>
                     </div>
 
                     {/* Manual Input */}
@@ -437,23 +459,24 @@ function ExportImport({
 
                     {/* Active Timer Warning */}
                     {isTimerActive && (
-                        <div className="flex items-start gap-2 p-3 bg-muted border border-border rounded-lg">
-                            <ExclamationTriangleIcon className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-foreground">
-                                <p className="font-medium">Active Timer Detected!</p>
-                                <p className="text-muted-foreground">You have an active timer running. Importing data will <strong>stop and discard</strong> any unsaved timer progress. Please stop your timer first to save the time entry, or proceed knowing the current timer session will be lost.</p>
-                            </div>
-                        </div>
+                        <Notice
+                            variant="warning"
+                            icon={ExclamationTriangleIcon}
+                            title="Active Timer Detected!"
+                        >
+                            <p>
+                                You have an active timer running. Importing data will <strong>stop and discard</strong> any unsaved timer progress. Please stop your timer first to save the time entry, or proceed knowing the current timer session will be lost.
+                            </p>
+                        </Notice>
                     )}
 
                     {/* Warning */}
-                    <div className="flex items-start gap-2 p-3 bg-muted border border-border rounded-lg">
-                        <ExclamationTriangleIcon className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        <div className="text-sm text-foreground">
-                            <p className="font-medium">Warning:</p>
-                            <p className="text-muted-foreground">Importing will replace all current data including projects, tasks, invoices, payment methods, business info, clients, templates, and preferences. Make sure to export your current data first if you want to keep it.</p>
-                        </div>
-                    </div>
+                    <Notice
+                        variant="warning"
+                        icon={ExclamationTriangleIcon}
+                        title="Warning"
+                        description="Importing will replace all current data including projects, tasks, invoices, payment methods, business info, clients, templates, and preferences. Make sure to export your current data first if you want to keep it."
+                    />
                 </div>
             </Modal>
             </CardContent>

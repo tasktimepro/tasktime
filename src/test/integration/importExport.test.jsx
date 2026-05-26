@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExportImport from '../../components/ExportImport'
 import { BACKUP_VERSION } from '../../utils/backupData'
@@ -131,6 +131,52 @@ describe('Import/Export integration', () => {
         expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:mock')
     })
 
+    it('shows exporting state while the backup is in progress', async () => {
+
+        let resolveExport
+        mockExportBackupData.mockReturnValueOnce(new Promise((resolve) => {
+            resolveExport = resolve
+        }))
+
+        const user = userEvent.setup()
+        setupExportMocks()
+
+        render(
+            <ExportImport
+                {...baseProps}
+                onImport={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Export' }))
+
+        expect(screen.getByRole('button', { name: 'Exporting...' })).toBeDisabled()
+
+        await act(async () => {
+            resolveExport({
+                version: BACKUP_VERSION,
+                exportDate: '2026-04-22T12:14:07.792Z',
+                backupType: 'manual',
+                projects: baseProps.projects,
+                tasks: baseProps.tasks,
+                timeEntries: baseProps.timeEntries,
+                invoices: baseProps.invoices,
+                paymentMethods: baseProps.paymentMethods,
+                expenseCategories: mockExpenseCategories,
+                taxReturnPeriods: mockTaxReturnPeriods,
+                businessInfos: baseProps.businessInfos,
+                clients: baseProps.clients,
+                invoiceTemplates: baseProps.invoiceTemplates,
+                emailTemplates: baseProps.emailTemplates,
+                expenses: mockExpenses,
+                expenseRecurrences: [],
+                dailyGoals: [],
+                plannerAttachments: [],
+                preferences: baseProps.preferences,
+            })
+        })
+    })
+
     it('exports all collections', async () => {
 
         const user = userEvent.setup()
@@ -246,6 +292,29 @@ describe('Import/Export integration', () => {
         await user.click(screen.getByRole('button', { name: 'Import Data' }))
 
         expect(screen.getByText(/invalid/i)).toBeInTheDocument()
+    })
+
+    it('shows the selected import file name next to the choose file button', async () => {
+
+        const user = userEvent.setup()
+
+        render(
+            <ExportImport
+                {...baseProps}
+                onImport={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Import' }))
+
+        const fileInput = screen.getByLabelText('Upload JSON File')
+        const file = new File([
+            JSON.stringify({ version: BACKUP_VERSION, projects: baseProps.projects })
+        ], 'backup.json', { type: 'application/json' })
+
+        await user.upload(fileInput, file)
+
+        expect(screen.getByText('backup.json')).toBeInTheDocument()
     })
 
     it('shows active timer warning when timer is active', async () => {

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
     createInvoicePaymentCurrencySnapshot,
     extractSequentialNumber,
+    getInvoicePaidAtTimestamp,
     getInvoicePaymentCurrencySnapshot,
     getInvoiceStatusAfterMarkingUnpaid,
     getInvoicesForProject,
@@ -230,6 +231,47 @@ describe('invoiceUtils', () => {
             success: false,
             usedSnapshot: true,
         })
+    })
+
+    it('resolves effective payment timestamps for paid invoices without paidAt', () => {
+
+        expect(getInvoicePaidAtTimestamp({
+            status: 'paid',
+            paidAt: 123,
+            date: '2026-04-01',
+        })).toBe(123)
+
+        expect(getInvoicePaidAtTimestamp({
+            status: 'paid',
+            paymentCurrencySnapshot: {
+                capturedAt: 456,
+                sourceCurrency: 'EUR',
+                sourceAmount: 50,
+                preferredCurrencyAtPayment: 'EUR',
+                preferredCurrencyAmount: 50,
+            },
+            date: '2026-04-01',
+        })).toBe(456)
+
+        expect(getInvoicePaidAtTimestamp({
+            status: 'paid',
+            date: '2026-04-15',
+        })).toBe(new Date('2026-04-15T00:00:00').getTime())
+
+        expect(getInvoicePaidAtTimestamp({
+            status: 'paid',
+            updatedAt: 789,
+        })).toBe(789)
+
+        expect(getInvoicePaidAtTimestamp({
+            status: 'paid',
+            createdAt: 999,
+        })).toBe(999)
+
+        expect(getInvoicePaidAtTimestamp({
+            status: 'sent',
+            date: '2026-04-15',
+        })).toBeNull()
     })
 
     it('does not create an invoice payment snapshot when source and preferred currencies match', () => {
