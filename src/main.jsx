@@ -2,14 +2,28 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
+import { initializeDebugBundle } from './utils/debugbundle'
 import { registerAppServiceWorker } from './utils/serviceWorkerRegistration'
 
 const VIEWPORT_HEIGHT_PROPERTY = '--viewport-height'
+
+initializeDebugBundle()
 
 const isStandalonePWA = typeof window !== 'undefined' && (
   window.navigator.standalone === true ||
   (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches)
 )
+
+function isTouchViewportEnvironment() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return false
+  }
+
+  const hasCoarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+  const maxTouchPoints = Number.isFinite(navigator.maxTouchPoints) ? navigator.maxTouchPoints : 0
+
+  return hasCoarsePointer || maxTouchPoints > 0
+}
 
 function getViewportHeight() {
   if (typeof window === 'undefined') {
@@ -27,8 +41,13 @@ function getViewportHeight() {
     // as the base unless the keyboard is open (visualViewport significantly shorter).
     const keyboardLikelyOpen = visualHeight < innerH * 0.85
     viewportHeight = keyboardLikelyOpen ? visualHeight : innerH
+  } else if (visualHeight != null && isTouchViewportEnvironment()) {
+    // On touch devices, visualViewport tracks browser chrome and on-screen keyboard changes.
+    viewportHeight = visualHeight
   } else {
-    viewportHeight = visualHeight ?? innerH
+    // Desktop zoom can shrink visualViewport independently and leave blank space at the bottom
+    // if we size the full app shell from it. Use the layout viewport there instead.
+    viewportHeight = innerH
   }
 
   if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) {

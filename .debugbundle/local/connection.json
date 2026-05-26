@@ -1,0 +1,19 @@
+{
+  "mode": "connected",
+  "cloud_project_id": "23bf8e03-0d65-4b4e-a6f6-9a9d90cea7ef",
+  "cloud_base_url": "https://api.debugbundle.com",
+  "environments": {
+    "local": {
+      "delivery": "local-only"
+    },
+    "development": {
+      "delivery": "local-only"
+    },
+    "staging": {
+      "delivery": "local-only"
+    },
+    "production": {
+      "delivery": "cloud-enabled"
+    }
+  }
+}

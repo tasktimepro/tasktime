@@ -1,6 +1,7 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { MouseSensor, TouchSensor, useSensor } from '@dnd-kit/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import TaskKanbanBoard from './TaskKanbanBoard';
 
 const kanbanMocks = vi.hoisted(() => ({
@@ -9,13 +10,17 @@ const kanbanMocks = vi.hoisted(() => ({
     getTimerForTask: vi.fn(() => null),
     clearTimer: vi.fn(),
     projects: [{ id: 'project-1', title: 'Client Work', isPersonal: false }],
+    dndContextProps: null,
 }));
 
 vi.mock('@dnd-kit/core', async () => {
     const actual = await vi.importActual('@dnd-kit/core');
     return {
         ...actual,
-        DndContext: ({ children }) => <>{children}</>,
+        DndContext: (props) => {
+            kanbanMocks.dndContextProps = props;
+            return <>{props.children}</>;
+        },
         DragOverlay: ({ children }) => <>{children}</>,
         useDroppable: vi.fn(() => ({
             setNodeRef: vi.fn(),
@@ -32,7 +37,7 @@ vi.mock('@dnd-kit/sortable', async () => {
         ...actual,
         SortableContext: ({ children }) => <>{children}</>,
         useSortable: () => ({
-            attributes: {},
+            attributes: { 'data-drag-anchor': 'true' },
             listeners: {},
             setActivatorNodeRef: vi.fn(),
             setNodeRef: vi.fn(),
@@ -81,6 +86,12 @@ vi.mock('../../TaskTimer', () => ({
 }));
 
 describe('TaskKanbanBoard', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        kanbanMocks.getTimerForTask.mockReturnValue(null);
+        kanbanMocks.dndContextProps = null;
+    });
+
     const parentTask = {
         id: 'parent-1',
         title: 'Planning',
@@ -226,6 +237,51 @@ describe('TaskKanbanBoard', () => {
         expect(screen.queryByText('No subtasks yet.')).not.toBeInTheDocument();
     });
 
+    it('keeps the card drag activator on the handle with touch scrolling disabled there', () => {
+        render(
+            <TaskKanbanBoard
+                parentTasks={[parentTask]}
+                tasks={[parentTask, ...subtasks]}
+                onCreateSubtask={vi.fn()}
+                onViewTask={vi.fn()}
+                onUpdateTask={vi.fn()}
+                showBillableBadges={false}
+            />
+        );
+
+        const card = screen.getByTestId('task-kanban-card-subtask-1');
+        const dragHandle = card.querySelector('[data-drag-anchor="true"]');
+
+        expect(dragHandle).toBeInTheDocument();
+        expect(dragHandle).toHaveClass('touch-none');
+        expect(card.querySelector(':scope > [data-drag-anchor="true"]')).toBeNull();
+    });
+
+    it('registers mouse and touch sensors for kanban drag', () => {
+        render(
+            <TaskKanbanBoard
+                parentTasks={[parentTask]}
+                tasks={[parentTask, ...subtasks]}
+                onCreateSubtask={vi.fn()}
+                onViewTask={vi.fn()}
+                onUpdateTask={vi.fn()}
+                showBillableBadges={false}
+            />
+        );
+
+        expect(useSensor).toHaveBeenCalledWith(MouseSensor, {
+            activationConstraint: {
+                distance: 6,
+            },
+        });
+        expect(useSensor).toHaveBeenCalledWith(TouchSensor, {
+            activationConstraint: {
+                delay: 120,
+                tolerance: 8,
+            },
+        });
+    });
+
     it('shows the archive action for completed tasks instead of a done badge', () => {
         const onArchiveTask = vi.fn();
 
@@ -284,5 +340,51 @@ describe('TaskKanbanBoard', () => {
         expect(screen.getByTestId('task-kanban-card-subtask-archived')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Unarchive Subtask' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Delete Subtask' })).toBeInTheDocument();
+    });
+
+    it('keeps archived subtasks collapsed in the column drag overlay', () => {
+        render(
+            <TaskKanbanBoard
+                parentTasks={[parentTask]}
+                tasks={[
+                    parentTask,
+                    ...subtasks,
+                    {
+                        id: 'subtask-archived',
+                        title: 'Archived note pass',
+                        projectId: 'project-1',
+                        parentTaskId: 'parent-1',
+                        archived: true,
+                        recurring: null,
+                        completed: true,
+                        billable: false,
+                        lastActive: 5,
+                    },
+                ]}
+                onCreateSubtask={vi.fn()}
+                onViewTask={vi.fn()}
+                onUpdateTask={vi.fn()}
+                onUnarchiveTask={vi.fn()}
+                onDeleteTask={vi.fn()}
+                showBillableBadges={false}
+            />
+        );
+
+        act(() => {
+            kanbanMocks.dndContextProps.onDragStart({
+                active: {
+                    id: 'column:parent-1',
+                    data: {
+                        current: {
+                            type: 'column',
+                            taskId: 'parent-1',
+                        },
+                    },
+                },
+            });
+        });
+
+        expect(screen.queryByText('Archived note pass')).not.toBeInTheDocument();
+        expect(screen.getAllByText('Archived Subtasks (1)')).toHaveLength(2);
     });
 });

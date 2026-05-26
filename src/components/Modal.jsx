@@ -59,6 +59,7 @@ const Modal = ({
     className = '',
     footer,
     contentRef,
+    onOpenAutoFocus,
 }) => {
 
     // Map size prop to max-width classes
@@ -86,6 +87,7 @@ const Modal = ({
                 )}
                 // Hide default close button if showCloseButton is false
                 onPointerDownOutside={(e) => e.preventDefault()}
+                onOpenAutoFocus={onOpenAutoFocus}
                 hideCloseButton
             >
                 {/* Header */}
@@ -161,6 +163,7 @@ Modal.propTypes = {
         PropTypes.func,
         PropTypes.shape({ current: PropTypes.any }),
     ]),
+    onOpenAutoFocus: PropTypes.func,
 };
 
 export default Modal;

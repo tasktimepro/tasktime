@@ -1,0 +1,153 @@
+{
+  "profile_version": "v1",
+  "project": {
+    "name": "tasktime",
+    "repo_url": "",
+    "primary_languages": [
+      "TypeScript",
+      "JavaScript"
+    ],
+    "package_managers": [
+      "npm"
+    ],
+    "deployment_targets": [
+      "docker-compose",
+      "cloudflare-pages",
+      "cloudflare-workers"
+    ]
+  },
+  "services": [
+    {
+      "name": "tasktime-web",
+      "kind": "frontend",
+      "runtime": "Browser",
+      "framework": "React",
+      "paths": [
+        "src",
+        "public"
+      ],
+      "owns_routes": [
+        "/",
+        "/projects",
+        "/projects/:id",
+        "/clients",
+        "/clients/:id",
+        "/invoices",
+        "/reports",
+        "/expenses",
+        "/account",
+        "/auth/callback"
+      ],
+      "depends_on": [
+        "tasktime-sync-worker"
+      ]
+    },
+    {
+      "name": "tasktime-sync-worker",
+      "kind": "worker",
+      "runtime": "Cloudflare Workers",
+      "framework": "Cloudflare Workers",
+      "paths": [
+        "cloudflare/src"
+      ],
+      "owns_routes": [
+        "/auth/init",
+        "/auth/callback",
+        "/auth/revoke",
+        "/auth/status",
+        "/drive/*",
+        "/email/invoice",
+        "/metrics/batch",
+        "/health"
+      ],
+      "depends_on": []
+    },
+    {
+      "name": "tasktime-blog",
+      "kind": "frontend",
+      "runtime": "Browser",
+      "framework": "Astro",
+      "paths": [
+        "blog/src"
+      ],
+      "owns_routes": [
+        "/blog",
+        "/blog/:slug",
+        "/privacy",
+        "/terms",
+        "/contact"
+      ],
+      "depends_on": []
+    }
+  ],
+  "infrastructure": {
+    "databases": [],
+    "queues": [],
+    "object_storage": [],
+    "external_services": []
+  },
+  "critical_paths": [
+    {
+      "name": "Browser app bootstrap and global runtime capture",
+      "owner_service": "tasktime-web",
+      "notes": "Entry point and top-level render path for the production SPA; browser SDK initialization belongs here."
+    },
+    {
+      "name": "Client routing and auth callback flow",
+      "owner_service": "tasktime-web",
+      "notes": "Path-based routing, including /auth/callback handling, is owned by the SPA hooks and App shell."
+    },
+    {
+      "name": "Google Drive sync auth and session lifecycle",
+      "owner_service": "tasktime-sync-worker",
+      "notes": "OAuth exchange, session persistence, and Drive proxy behavior span the browser auth hook and Cloudflare Worker auth routes."
+    },
+    {
+      "name": "Cloudflare Worker API surface",
+      "owner_service": "tasktime-sync-worker",
+      "notes": "The worker handles auth, Drive proxying, invoice email delivery, usage metrics, and health checks."
+    },
+    {
+      "name": "Production build and Pages deployment pipeline",
+      "owner_service": "tasktime-web",
+      "notes": "The merged app+blog artifact is built in GitHub Actions and deployed to Cloudflare Pages, so hosted browser tokens must be injected at build time."
+    }
+  ],
+  "repo": {
+    "root_paths": [
+      "blog",
+      "cloudflare",
+      "coverage",
+      "dist",
+      "docs",
+      "e2e",
+      "public",
+      "scripts",
+      "src",
+      "test-results"
+    ],
+    "generated_paths": [
+      ".debugbundle",
+      ".agents/skills/debugbundle"
+    ],
+    "do_not_edit_paths": [
+      ".debugbundle/bundles",
+      ".debugbundle/local/events",
+      ".debugbundle/local/state.json",
+      ".debugbundle/local/browser-relay-spool"
+    ]
+  },
+  "developer_workflows": {
+    "install": "docker compose run --rm app npm install",
+    "build": "docker compose run --rm app npm run build",
+    "test": "docker compose run --rm app npm run test:run",
+    "lint": "make lint"
+  },
+  "debugbundle": {
+    "profile_owner": "unassigned",
+    "last_reviewed_at": "2026-05-26T18:40:00.000Z",
+    "validation_status": "agent-validated",
+    "skill_path": ".agents/skills/debugbundle",
+    "notes": "Validated for the Cloudflare Pages React SPA, Astro public site, and Cloudflare Worker deployment used by TaskTime."
+  }
+}

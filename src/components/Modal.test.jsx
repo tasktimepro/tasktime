@@ -65,6 +65,48 @@ describe('Modal', () => {
         expect(dialog.className.includes('rounded-lg')).toBe(true)
     })
 
+    it('focuses the first form field instead of the close button on open', () => {
+
+        render(
+            <Modal isOpen onClose={vi.fn()} title="Edit Task">
+                <label>
+                    Task name
+                    <input type="text" aria-label="Task name" />
+                </label>
+            </Modal>
+        )
+
+        expect(screen.getByRole('textbox', { name: 'Task name' })).toBe(document.activeElement)
+        expect(screen.getByRole('button', { name: 'Close dialog' })).not.toBe(document.activeElement)
+    })
+
+    it('respects explicit autofocus targets when opening', () => {
+
+        render(
+            <Modal isOpen onClose={vi.fn()} title="Welcome" footer={<button type="button" autoFocus>Continue</button>}>
+                <div>Content</div>
+            </Modal>
+        )
+
+        expect(screen.getByRole('button', { name: 'Continue' })).toBe(document.activeElement)
+    })
+
+    it('forwards open autofocus overrides to the dialog content', () => {
+
+        const onOpenAutoFocus = vi.fn()
+
+        render(
+            <Modal isOpen onClose={vi.fn()} title="Edit Task" onOpenAutoFocus={onOpenAutoFocus}>
+                <label>
+                    Task name
+                    <input type="text" aria-label="Task name" />
+                </label>
+            </Modal>
+        )
+
+        expect(onOpenAutoFocus).toHaveBeenCalledTimes(1)
+    })
+
     it('keeps the title aligned with the close button and footer actions on one row', () => {
         render(
             <Modal

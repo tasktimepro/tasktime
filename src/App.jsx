@@ -46,6 +46,7 @@ import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { buildExpenseFromRecurrence } from './utils/expenseUtils.ts';
+import { isVirtualKeyboardOpen } from './utils/viewportUtils';
 import {
     hasCompletedOnboarding,
     hasPendingOnboarding,
@@ -1112,6 +1113,7 @@ function AppContent() {
 
         return window.matchMedia('(max-width: 767px)').matches;
     });
+    const [isVirtualKeyboardVisible, setIsVirtualKeyboardVisible] = useState(false);
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
     useEffect(() => {
@@ -1136,14 +1138,52 @@ function AppContent() {
     }, []);
 
     useEffect(() => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') {
+            return undefined;
+        }
+
+        const syncVirtualKeyboardVisibility = () => {
+            setIsVirtualKeyboardVisible(isVirtualKeyboardOpen({
+                activeElement: document.activeElement,
+                innerHeight: window.innerHeight,
+                visualViewportHeight: window.visualViewport?.height ?? window.innerHeight,
+            }));
+        };
+
+        syncVirtualKeyboardVisibility();
+
+        const visualViewport = window.visualViewport;
+
+        window.addEventListener('resize', syncVirtualKeyboardVisibility);
+        document.addEventListener('focusin', syncVirtualKeyboardVisibility);
+        document.addEventListener('focusout', syncVirtualKeyboardVisibility);
+        visualViewport?.addEventListener('resize', syncVirtualKeyboardVisibility);
+        visualViewport?.addEventListener('scroll', syncVirtualKeyboardVisibility);
+
+        return () => {
+            window.removeEventListener('resize', syncVirtualKeyboardVisibility);
+            document.removeEventListener('focusin', syncVirtualKeyboardVisibility);
+            document.removeEventListener('focusout', syncVirtualKeyboardVisibility);
+            visualViewport?.removeEventListener('resize', syncVirtualKeyboardVisibility);
+            visualViewport?.removeEventListener('scroll', syncVirtualKeyboardVisibility);
+        };
+    }, []);
+
+    useEffect(() => {
         setIsMoreMenuOpen(false);
     }, [activeView, selectedProject, selectedClient]);
+
+    useEffect(() => {
+        if (isVirtualKeyboardVisible) {
+            setIsMoreMenuOpen(false);
+        }
+    }, [isVirtualKeyboardVisible]);
 
     const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'reports', 'expenses', 'account'].includes(activeView);
     const isMoreViewActive = ['clients', 'invoices', 'reports', 'account'].includes(activeView);
     const isMobilePrimarySelectionVisible = !isMoreMenuOpen;
     const mobileTopPadding = showGlobalTimer && timerIsActive ? '5.5rem' : '1rem';
-    const mobileBottomPadding = '7rem';
+    const mobileBottomPadding = isVirtualKeyboardVisible ? '1rem' : '7rem';
     const desktopTopPadding = showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem';
     const desktopBottomPadding = '1.5rem';
     const mobilePrimaryNavItems = [
@@ -1840,7 +1880,7 @@ function AppContent() {
                         setModalOptions={setModalOptions}
                     />
 
-                    {(!isMobileLayout || activeView !== 'auth-callback') && (
+                    {(!isMobileLayout || activeView !== 'auth-callback') && (!isMobileLayout || !isVirtualKeyboardVisible) && (
                         <FloatingActionButton
                             onTaskClick={handleQuickCreateTask}
                             onExpenseClick={handleQuickCreateExpense}
@@ -1891,7 +1931,7 @@ function AppContent() {
         </div>
         </div>
 
-        {isMobileLayout && (
+        {isMobileLayout && !isVirtualKeyboardVisible && (
             <>
                 <MobileBottomNav
                     items={mobilePrimaryNavItems}

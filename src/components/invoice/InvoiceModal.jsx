@@ -239,6 +239,12 @@ const InvoiceModal = ({
         />
     );
 
+    const handleOpenAutoFocus = useCallback((event) => {
+        if (!editingInvoice) {
+            event.preventDefault();
+        }
+    }, [editingInvoice]);
+
     return (
         <Modal 
             isOpen={showInvoiceForm}
@@ -247,6 +253,7 @@ const InvoiceModal = ({
             size="2xl"
             headerActions={headerActions}
             footer={footer}
+            onOpenAutoFocus={handleOpenAutoFocus}
         >
             <form id="invoice-form" onSubmit={handleSave} className="space-y-5">
                 {/* Client & Project Details */}
