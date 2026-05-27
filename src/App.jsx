@@ -46,7 +46,6 @@ import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
 import { buildExpenseFromRecurrence } from './utils/expenseUtils.ts';
-import { isVirtualKeyboardOpen } from './utils/viewportUtils';
 import {
     hasCompletedOnboarding,
     hasPendingOnboarding,
@@ -892,28 +891,13 @@ function AppContent() {
         };
     }, []);
 
-    const handleMobileSyncButtonAction = useCallback(async (event) => {
-        if (!mobileSyncStatus.onClick) {
-            return;
-        }
-
-        event.currentTarget.blur();
-
-        try {
-            await mobileSyncStatus.onClick();
-        } catch (error) {
-            console.error('[App] Mobile sync action failed:', error);
-            toast?.showError(error instanceof Error ? error.message : 'Google Drive action failed.');
-        }
-    }, [mobileSyncStatus, toast]);
-
     const mobileMoreButton = useMemo(() => {
         if (!showMobileSyncButton) {
             return null;
         }
 
         return {
-            ariaLabel: mobileSyncStatus.text,
+            ariaLabel: `More. ${mobileSyncStatus.text}`,
             Icon: mobileSyncStatus.icon,
             isFadingOut: isMobileSyncButtonFadingOut,
             label: mobileSyncStatus.kind === SYNC_STATUS_KIND.SYNCED
@@ -921,10 +905,9 @@ function AppContent() {
                 : mobileSyncStatus.kind === SYNC_STATUS_KIND.PENDING
                     ? 'Sync'
                     : 'Syncing',
-            onClick: handleMobileSyncButtonAction,
             toneClassName: `${mobileSyncStatus.tone} hover:bg-accent hover:text-accent-foreground`,
         };
-    }, [handleMobileSyncButtonAction, isMobileSyncButtonFadingOut, mobileSyncStatus, showMobileSyncButton]);
+    }, [isMobileSyncButtonFadingOut, mobileSyncStatus, showMobileSyncButton]);
 
     const mobileMoreButtonBadge = useMemo(() => {
         if (showMobileSyncButton) {
@@ -1114,7 +1097,6 @@ function AppContent() {
 
         return window.matchMedia('(max-width: 767px)').matches;
     });
-    const [isVirtualKeyboardVisible, setIsVirtualKeyboardVisible] = useState(false);
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
     useEffect(() => {
@@ -1139,52 +1121,28 @@ function AppContent() {
     }, []);
 
     useEffect(() => {
-        if (typeof window === 'undefined' || typeof document === 'undefined') {
+        if (typeof document === 'undefined') {
             return undefined;
         }
 
-        const syncVirtualKeyboardVisibility = () => {
-            setIsVirtualKeyboardVisible(isVirtualKeyboardOpen({
-                activeElement: document.activeElement,
-                innerHeight: window.innerHeight,
-                visualViewportHeight: window.visualViewport?.height ?? window.innerHeight,
-            }));
-        };
-
-        syncVirtualKeyboardVisibility();
-
-        const visualViewport = window.visualViewport;
-
-        window.addEventListener('resize', syncVirtualKeyboardVisibility);
-        document.addEventListener('focusin', syncVirtualKeyboardVisibility);
-        document.addEventListener('focusout', syncVirtualKeyboardVisibility);
-        visualViewport?.addEventListener('resize', syncVirtualKeyboardVisibility);
-        visualViewport?.addEventListener('scroll', syncVirtualKeyboardVisibility);
+        document.documentElement.classList.toggle('mobile-layout', isMobileLayout);
+        document.body.classList.toggle('mobile-layout', isMobileLayout);
 
         return () => {
-            window.removeEventListener('resize', syncVirtualKeyboardVisibility);
-            document.removeEventListener('focusin', syncVirtualKeyboardVisibility);
-            document.removeEventListener('focusout', syncVirtualKeyboardVisibility);
-            visualViewport?.removeEventListener('resize', syncVirtualKeyboardVisibility);
-            visualViewport?.removeEventListener('scroll', syncVirtualKeyboardVisibility);
+            document.documentElement.classList.remove('mobile-layout');
+            document.body.classList.remove('mobile-layout');
         };
-    }, []);
+    }, [isMobileLayout]);
 
     useEffect(() => {
         setIsMoreMenuOpen(false);
     }, [activeView, selectedProject, selectedClient]);
 
-    useEffect(() => {
-        if (isVirtualKeyboardVisible) {
-            setIsMoreMenuOpen(false);
-        }
-    }, [isVirtualKeyboardVisible]);
-
     const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'reports', 'expenses', 'account'].includes(activeView);
     const isMoreViewActive = ['clients', 'invoices', 'reports', 'account'].includes(activeView);
     const isMobilePrimarySelectionVisible = !isMoreMenuOpen;
     const mobileTopPadding = showGlobalTimer && timerIsActive ? '5.5rem' : '1rem';
-    const mobileBottomPadding = isVirtualKeyboardVisible ? '1rem' : '7rem';
+    const mobileBottomPadding = '7rem';
     const desktopTopPadding = showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem';
     const desktopBottomPadding = '1.5rem';
     const mobilePrimaryNavItems = [
@@ -1881,11 +1839,11 @@ function AppContent() {
                         setModalOptions={setModalOptions}
                     />
 
-                    {(!isMobileLayout || activeView !== 'auth-callback') && (!isMobileLayout || !isVirtualKeyboardVisible) && (
+                    {(!isMobileLayout || activeView !== 'auth-callback') && (
                         <FloatingActionButton
                             onTaskClick={handleQuickCreateTask}
                             onExpenseClick={handleQuickCreateExpense}
-                            className={isMobileLayout ? 'bottom-safe-fab right-4' : ''}
+                            className={isMobileLayout ? 'mobile-floating-action-button bottom-safe-fab right-4' : ''}
                         />
                     )}
                 </div>
@@ -1932,7 +1890,7 @@ function AppContent() {
         </div>
         </div>
 
-        {isMobileLayout && !isVirtualKeyboardVisible && (
+        {isMobileLayout && (
             <>
                 <MobileBottomNav
                     items={mobilePrimaryNavItems}

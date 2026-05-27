@@ -2,7 +2,9 @@
 
 ## Priority
 
+[ ] Invoice template - upload logo and choose a primary colour - optional - we can start with one colour which will be used as a “highlight” colour inside the Invoice template - invoice templates should have a preview mode as well that uses the same preview invoice functionality ideally
 
+[ ] "Quote mode" within client projects
 
 ---
 
@@ -16,8 +18,6 @@
 ---
 
 ## Project updates
-
-[ ] Business info - upload logo and choose colour - optional - we can start with one colour which will be used as a “highlight” colour inside the Invoice template.
 
 [ ] Task Templates - Create “global” tasks which are assigned a category/tag and these can be assigned to all projects for that category by default (or at a click of a button → import default tasks for this project category)
     [ ] This would be a button under projects page “Create task templates”, then when creating a new project, we can choose a task template to be added

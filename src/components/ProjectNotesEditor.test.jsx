@@ -91,6 +91,13 @@ describe('ProjectNotesEditor', () => {
         expect(hookMocks.useEditorOptions.editorProps.attributes.class).toContain('md:text-sm');
     });
 
+    it('uses a shorter notes surface on mobile without changing editor behavior in JavaScript', () => {
+        render(<ProjectNotesEditor project={{ id: 'project-1', notes: null }} />);
+
+        expect(hookMocks.useEditorOptions.editorProps.attributes.class).toContain('min-h-[12rem]');
+        expect(hookMocks.useEditorOptions.editorProps.attributes.class).toContain('md:min-h-[18rem]');
+    });
+
     it('configures note links to open on click in a new tab', () => {
         render(<ProjectNotesEditor project={{ id: 'project-1', notes: null }} />);
 

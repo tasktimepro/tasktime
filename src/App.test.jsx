@@ -681,9 +681,24 @@ describe('App component', () => {
 
         render(<App />)
 
-        expect(screen.getByRole('button', { name: 'Syncing changes...' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'More. Syncing changes...' })).toBeInTheDocument()
         expect(screen.getByText('Syncing')).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+    })
+
+    it('opens the more sheet from the sync-state mobile slot', async () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+        yjsHookState.isDriveConnected = true
+        yjsHookState.syncPhase = 'uploading'
+
+        const user = userEvent.setup()
+
+        render(<App />)
+
+        await user.click(screen.getByRole('button', { name: 'More. Syncing changes...' }))
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
     it('shows the sync button on mobile during the connecting phase', () => {
@@ -694,8 +709,7 @@ describe('App component', () => {
 
         render(<App />)
 
-        expect(screen.getByRole('button', { name: 'Syncing...' })).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'More. Syncing...' })).toBeInTheDocument()
     })
 
     it('keeps the More button neutral during connecting in manual mode on mobile', () => {
@@ -737,7 +751,7 @@ describe('App component', () => {
 
             const { rerender } = render(<App />)
 
-            expect(screen.getByRole('button', { name: 'Syncing changes...' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'More. Syncing changes...' })).toBeInTheDocument()
 
             yjsHookState.syncPhase = 'idle'
             yjsHookState.hasSynced = true
@@ -745,17 +759,32 @@ describe('App component', () => {
                 rerender(<App />)
             })
 
-            expect(screen.getByRole('button', { name: 'In sync' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'More. In sync' })).toBeInTheDocument()
 
             act(() => {
                 vi.advanceTimersByTime(1200)
             })
 
             expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
-            expect(screen.queryByRole('button', { name: 'In sync' })).not.toBeInTheDocument()
+            expect(screen.queryByRole('button', { name: 'More. In sync' })).not.toBeInTheDocument()
         } finally {
             vi.useRealTimers()
         }
+    })
+
+    it('keeps document scrolling enabled without keyboard-specific shell state on mobile', () => {
+        window.matchMedia = createMatchMedia({
+            '(max-width: 767px)': true,
+        })
+
+        const { container } = render(<App />)
+
+        const shell = container.querySelector('.app-shell-content')
+
+        expect(shell?.style.getPropertyValue('--app-content-padding-bottom')).toBe('7rem')
+        expect(document.documentElement.classList.contains('mobile-layout')).toBe(true)
+        expect(document.body.classList.contains('mobile-layout')).toBe(true)
+        expect(screen.getByRole('navigation', { name: 'Mobile navigation' })).toBeInTheDocument()
     })
 
     it('shows a yellow More-button dot when mobile sync is offline', () => {
@@ -907,6 +936,8 @@ describe('App component', () => {
         expect(main).not.toBeNull()
         expect(main?.className).toContain('app-viewport-shell')
         expect(main?.className).not.toContain('min-h-screen')
+        expect(document.documentElement.classList.contains('mobile-layout')).toBe(true)
+        expect(document.body.classList.contains('mobile-layout')).toBe(true)
     })
 
     it('resets the main content scroll position when navigating to a different route', () => {
