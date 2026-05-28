@@ -8,6 +8,7 @@ const baseInput = {
     invoices: [],
     paymentMethods: [],
     businessInfos: [],
+    businessBrandAssets: [],
     clients: [],
     invoiceTemplates: [],
     emailTemplates: [],

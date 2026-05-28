@@ -1,14 +1,28 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@/components/ui/icons';
+import { PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon, EyeIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
+import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
+import { useBusinessInfos } from '../hooks/useBusinessInfos.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
+import { usePreferences } from '../hooks/usePreferences.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
+import {
+    DEFAULT_INVOICE_LAYOUT_STYLE,
+    DEFAULT_INVOICE_LOGO_PLACEMENT,
+    INVOICE_LAYOUT_STYLE_LABELS,
+    INVOICE_LOGO_PLACEMENT_LABELS,
+    normalizeInvoiceLayoutStyle,
+    normalizeInvoiceLogoPlacement,
+} from '../utils/invoiceBranding.ts';
+import { getBillingPeriodRange } from '../utils/billingPeriodUtils.ts';
+import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import Modal from './Modal';
+import InvoicePreviewModal from './invoice/InvoicePreviewModal';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import {
@@ -28,9 +42,13 @@ const InvoiceTemplates = ({
     editTemplateModal = null
 }) => {
     const isMobileLayout = useIsMobileLayout();
-    const { showSuccess } = useToast();
+    const { showSuccess, showError } = useToast();
     const { invoiceTemplates, deleteInvoiceTemplate } = useInvoiceTemplates();
+    const { defaultBusinessInfo } = useBusinessInfos();
+    const { businessBrandAssets, getBusinessBrandAsset } = useBusinessBrandAssets();
+    const { preferences } = usePreferences();
     const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
+    const [previewTemplate, setPreviewTemplate] = useState(null);
 
     // Auto-open create modal when autoOpenCreate prop changes
     useEffect(() => {
@@ -104,7 +122,7 @@ const InvoiceTemplates = ({
                 const days = parseInt(template.dueDateDays) || 0;
                 const daysDate = new Date(today);
                 daysDate.setDate(daysDate.getDate() + days);
-                return `Due date: ${toDisplayDate(daysDate)} (${days} ${days === 1 ? 'day' : 'days'} from invoice date)`;
+                return `Due date: ${toDisplayDate(daysDate)}`;
             }
             
             case 'fixed-weeks': {
@@ -114,7 +132,7 @@ const InvoiceTemplates = ({
                 const weeks = parseInt(template.dueDateWeeks) || 0;
                 const weeksDate = new Date(today);
                 weeksDate.setDate(weeksDate.getDate() + (weeks * 7));
-                return `Due date: ${toDisplayDate(weeksDate)} (${weeks} ${weeks === 1 ? 'week' : 'weeks'} from invoice date)`;
+                return `Due date: ${toDisplayDate(weeksDate)}`;
             }
             
             case 'precise-date': {
@@ -133,6 +151,122 @@ const InvoiceTemplates = ({
             }
         }
     }, [staticDate]);
+
+    const previewInvoice = useMemo(() => {
+        if (!previewTemplate) {
+            return null;
+        }
+
+        const logoAsset = defaultBusinessInfo?.branding?.logoAssetId
+            ? getBusinessBrandAsset(defaultBusinessInfo.branding.logoAssetId)
+            : null;
+        const dueDatePreview = calculateDueDatePreview(previewTemplate);
+        const sampleBillingPeriod = getBillingPeriodRange({
+            preset: 'month',
+            today: staticDate,
+        });
+
+        return {
+            id: `template-preview-${previewTemplate.id}`,
+            invoiceNumber: generatePreviewInvoiceNumber(previewTemplate),
+            client: {
+                name: 'Sample Client Ltd',
+                address: '42 Sample Street',
+                city: 'London',
+                state: '',
+                zip: 'SW1A 1AA',
+                country: 'United Kingdom',
+            },
+            project: {
+                title: 'Website redesign',
+                hourlyRate: 95,
+            },
+            tasks: [{
+                id: 'template-preview-task',
+                title: 'Design and implementation',
+                hours: 12,
+                hourlyRate: 95,
+                useFlatRate: false,
+            }],
+            additionalTasks: [{
+                id: 'template-preview-extra',
+                title: 'Project setup',
+                flatRate: 180,
+                quantity: 1,
+                useFlatRate: true,
+            }],
+            expenseItems: [],
+            note: previewTemplate.defaultNotes || '',
+            totalHours: 12,
+            subtotal: 1320,
+            total: 1320,
+            discount: 0,
+            shipping: 0,
+            tax: 0,
+            taxRate: 0,
+            taxLabel: 'Tax',
+            paymentMethod: {
+                fullName: 'Owen Farrugia',
+                bank: 'TaskTime Bank',
+                iban: 'GB29NWBK60161331926819',
+                swift: 'TTIMEGB2L',
+                custom: [{ label: 'Reference', value: 'Use invoice number as payment reference' }],
+            },
+            businessInfo: defaultBusinessInfo || null,
+            businessInfoId: defaultBusinessInfo?.id || null,
+            template: previewTemplate,
+            templateId: previewTemplate.id,
+            brandingSnapshot: {
+                businessInfoId: defaultBusinessInfo?.id || null,
+                templateId: previewTemplate.id,
+                layoutStyle: normalizeInvoiceLayoutStyle(previewTemplate.layoutStyle || DEFAULT_INVOICE_LAYOUT_STYLE),
+                logoPlacement: normalizeInvoiceLogoPlacement(previewTemplate.logoPlacement || DEFAULT_INVOICE_LOGO_PLACEMENT),
+                showBusinessLogo: previewTemplate.brandingOptions?.showBusinessLogo ?? true,
+                useBusinessPrimaryColor: previewTemplate.brandingOptions?.useBusinessPrimaryColor ?? true,
+                primaryColor: defaultBusinessInfo?.branding?.primaryColor || null,
+                logoAssetId: logoAsset?.id || null,
+                logoAssetMeta: logoAsset ? {
+                    mimeType: logoAsset.mimeType,
+                    width: logoAsset.width,
+                    height: logoAsset.height,
+                    byteSize: logoAsset.byteSize,
+                    contentHash: logoAsset.contentHash,
+                } : null,
+            },
+            date: toDisplayDate(staticDate),
+            dueDate: dueDatePreview.startsWith('Due date: ') ? dueDatePreview.slice('Due date: '.length) : null,
+            billingPeriodPreset: 'month',
+            billingPeriodStart: sampleBillingPeriod.startDate,
+            billingPeriodEnd: sampleBillingPeriod.endDate,
+            currency: preferences.currency,
+            htmlContent: null,
+        };
+    }, [calculateDueDatePreview, defaultBusinessInfo, generatePreviewInvoiceNumber, getBusinessBrandAsset, preferences.currency, previewTemplate, staticDate]);
+
+    const previewHtmlContent = useMemo(() => {
+        if (!previewInvoice) {
+            return '';
+        }
+
+        return getCurrentInvoiceHtmlContent(previewInvoice, [], businessBrandAssets);
+    }, [businessBrandAssets, previewInvoice]);
+
+    const handleDownloadPreviewSample = async () => {
+        if (!previewTemplate || !previewHtmlContent) {
+            return;
+        }
+
+        try {
+            const templateSlug = previewTemplate.name
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '') || 'template-preview';
+
+            await generatePDF(previewHtmlContent, `${templateSlug}-sample.pdf`);
+        } catch {
+            showError('Failed to download sample PDF');
+        }
+    };
 
     // Sort templates - default first, then by name
     const sortedTemplates = useMemo(() => {
@@ -206,6 +340,9 @@ const InvoiceTemplates = ({
                                                         <p>Next Sequential: #{template.currentSequentialNumber.toString().padStart(template.sequentialNumberDigits || 4, '0')}</p>
                                                     )}
                                                     <p>{calculateDueDatePreview(template)}</p>
+                                                    <p>
+                                                        {INVOICE_LAYOUT_STYLE_LABELS[normalizeInvoiceLayoutStyle(template.layoutStyle || DEFAULT_INVOICE_LAYOUT_STYLE)]} layout • Header {template.brandingOptions?.showBusinessLogo === false ? 'without logo' : INVOICE_LOGO_PLACEMENT_LABELS[normalizeInvoiceLogoPlacement(template.logoPlacement || DEFAULT_INVOICE_LOGO_PLACEMENT)]} • {template.brandingOptions?.useBusinessPrimaryColor === false ? 'Neutral styling' : 'Uses business color'}
+                                                    </p>
                                                 </div>
                                                 <p className="mt-2 text-xs text-muted-foreground">
                                                     Created {toDisplayDate(template.createdAt)}
@@ -229,6 +366,13 @@ const InvoiceTemplates = ({
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                onClick={() => setPreviewTemplate(template)}
+                                                className="cursor-pointer"
+                                            >
+                                                <EyeIcon className="h-4 w-4" />
+                                                <span>Preview</span>
+                                            </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => editTemplateModal && editTemplateModal(template)}
                                                 className="status-warning-action cursor-pointer"
@@ -282,6 +426,16 @@ const InvoiceTemplates = ({
                     variant="destructive"
                 />
             </Modal>
+
+            <InvoicePreviewModal
+                isOpen={Boolean(previewTemplate && previewInvoice)}
+                onClose={() => setPreviewTemplate(null)}
+                title={previewTemplate ? `Template Preview - ${previewTemplate.name}` : 'Template Preview'}
+                invoice={previewInvoice}
+                htmlContent={previewHtmlContent}
+                onDownload={handleDownloadPreviewSample}
+                downloadLabel="Download Sample PDF"
+            />
         </div>
     );
 };

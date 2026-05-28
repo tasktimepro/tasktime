@@ -12,6 +12,11 @@ const invoiceHookMocks = vi.hoisted(() => ({
     markAsUnpaid: vi.fn(),
 }))
 
+const businessBrandAssetHookMocks = vi.hoisted(() => ({
+
+    businessBrandAssets: [],
+}))
+
 const pdfMocks = vi.hoisted(() => ({
 
     generatePDF: vi.fn(),
@@ -45,6 +50,12 @@ vi.mock('../hooks/useInvoices.ts', () => ({
 
 vi.mock('../hooks/useToast.ts', () => ({
     useToast: () => ({ showToast: vi.fn() })
+}))
+
+vi.mock('../hooks/useBusinessBrandAssets.ts', () => ({
+    useBusinessBrandAssets: () => ({
+        businessBrandAssets: businessBrandAssetHookMocks.businessBrandAssets,
+    })
 }))
 
 describe('InvoicesList', () => {

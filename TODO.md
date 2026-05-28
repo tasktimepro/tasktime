@@ -2,9 +2,12 @@
 
 ## Priority
 
-[ ] Invoice template - upload logo and choose a primary colour - optional - we can start with one colour which will be used as a “highlight” colour inside the Invoice template - invoice templates should have a preview mode as well that uses the same preview invoice functionality ideally
-
-[ ] "Quote mode" within client projects
+[ ] Project status mode update:
+- When a project has a client selected, a new option appears:
+    Project status: Quote / Active (default)
+- Active will leave the project behave exactly as it is today, but if Quote is selected, we'll do a couple of things:
+    1. In the project page next to the title we should have a tag "Quote stage" so that it's clear currently we're in quote mode
+    2. You cannot generate an invoice, during quote mode the button and the invoice modal will say quote instead of incoice, and the generated PDF has QUOTE instead of invoice as well. 
 
 ---
 
@@ -24,11 +27,10 @@
 
 [ ] System notifications for to do today tasks that were upcoming including recurring expenses
 
-[ ] Budgeting (could also be time, not just money)
-
 ---
 
 ## Ideas
 
 [ ] Timed sessions with sound alerts - I want to work on this for 1hour
     - We must think were this should be placed, as a setting, or a global option in a project for example, and we choose which task we want to work on
+    [ ] This can also be an alert reminder settings in account that when a time passes a certain amount, we ping with a sound, and when we have push notifications, also have that choice

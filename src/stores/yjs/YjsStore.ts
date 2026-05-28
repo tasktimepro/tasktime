@@ -17,10 +17,11 @@ import type { BackupInfo } from './providers/BackupManager';
 import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
 import { createBackupPayload, type BackupImportPayload, type BackupPayload } from '@/utils/backupData';
 import { parseStoredDate } from '@/utils/dateUtils';
-import { getTaskIdsWithDescendants } from '@/utils/taskUtils.ts';
+import { getTaskIdsWithDescendants } from '@/utils/taskUtils';
 import { readEntity, objectToYMap, collectEntities, forEachEntity } from './entityUtils';
 import { validateCollectionEntity } from './validation';
 import type {
+    BusinessBrandAsset,
     DocName,
     SyncState,
     SyncPhase,
@@ -135,6 +136,11 @@ export class YjsStore {
     get businessInfos(): Y.Map<string, BusinessInfo> {
         this.assertReady();
         return this._coreDoc!.getMap('businessInfos');
+    }
+
+    get businessBrandAssets(): Y.Map<string, BusinessBrandAsset> {
+        this.assertReady();
+        return this._coreDoc!.getMap('businessBrandAssets');
     }
 
     get invoiceTemplates(): Y.Map<string, InvoiceTemplate> {
@@ -1010,6 +1016,7 @@ export class YjsStore {
             expenseCategories: collectEntities(this.expenseCategories as any),
             taxReturnPeriods: collectEntities(this.taxReturnPeriods as any),
             businessInfos: collectEntities(this.businessInfos as any),
+            businessBrandAssets: collectEntities(this.businessBrandAssets as any),
             clients: collectEntities(this.clients as any),
             invoiceTemplates: collectEntities(this.invoiceTemplates as any),
             emailTemplates: collectEntities(this.emailTemplates as any),
@@ -1096,6 +1103,11 @@ export class YjsStore {
         for (const info of data.businessInfos || []) {
             const validated = validateCollectionEntity<BusinessInfo>('businessInfos', info, `import business info ${info.id}`);
             (this.businessInfos as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const asset of data.businessBrandAssets || []) {
+            const validated = validateCollectionEntity<BusinessBrandAsset>('businessBrandAssets', asset, `import business brand asset ${asset.id}`);
+            (this.businessBrandAssets as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
         }
 
         for (const client of data.clients || []) {

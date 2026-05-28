@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { InlineFieldHeader } from '@/components/ui/inline-field-header';
 import { Send } from 'lucide-react';
 import { useYjs } from '@/contexts/YjsContext';
+import { useBusinessBrandAssets } from '@/hooks/useBusinessBrandAssets.ts';
 import { useInvoices } from '@/hooks/useInvoices.ts';
 import { useEmailTemplates } from '@/hooks/useEmailTemplates.ts';
 import { useToast } from '@/hooks/useToast.ts';
@@ -47,6 +48,7 @@ const EmailPreviewModal = ({
     const NO_TEMPLATE_ID = '__no_email_template__';
 
     const { driveSessionId } = useYjs();
+    const { businessBrandAssets } = useBusinessBrandAssets();
     const { updateInvoice } = useInvoices();
     const { getByType, getDefaultForType } = useEmailTemplates();
     const { showSuccess } = useToast();
@@ -190,7 +192,7 @@ const EmailPreviewModal = ({
         setError(null);
 
         try {
-            const htmlContent = getCurrentInvoiceHtmlContent(invoice, clients);
+            const htmlContent = getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets);
             const pdfBase64 = await generatePDFBase64(htmlContent);
 
             const result = await sendInvoiceEmail({
@@ -257,7 +259,7 @@ const EmailPreviewModal = ({
         } finally {
             setSending(false);
         }
-    }, [driveSessionId, to, fromName, invoice, clients, subject, body, attachmentTitle, replyTo, sendType, updateInvoice, showSuccess, onClose]);
+    }, [attachmentTitle, body, businessBrandAssets, clients, driveSessionId, fromName, invoice, onClose, replyTo, sendType, showSuccess, subject, to, updateInvoice]);
 
     const handleClose = useCallback(() => {
         setError(null);

@@ -262,6 +262,7 @@ describe('Import/Export integration', () => {
             expenseCategories: payload.expenseCategories,
             taxReturnPeriods: payload.taxReturnPeriods,
             businessInfos: [],
+            businessBrandAssets: [],
             clients: [],
             invoiceTemplates: [],
             emailTemplates: [],

@@ -6,7 +6,13 @@ import InvoiceGenerator from './InvoiceGenerator'
 
 const pdfMocks = vi.hoisted(() => ({
 
-    createInvoiceHTML: vi.fn(() => '<html />')
+    getCurrentInvoiceHtmlContent: vi.fn(() => '<html />')
+}))
+
+const businessBrandAssetHookMocks = vi.hoisted(() => ({
+
+    businessBrandAssets: [],
+    getBusinessBrandAsset: vi.fn(() => null)
 }))
 
 const toastMocks = vi.hoisted(() => ({
@@ -243,7 +249,15 @@ vi.mock('./invoice/InvoiceModal', () => {
 
 vi.mock('../utils/pdfUtils.ts', () => ({
 
-    createInvoiceHTML: pdfMocks.createInvoiceHTML
+    getCurrentInvoiceHtmlContent: pdfMocks.getCurrentInvoiceHtmlContent
+}))
+
+vi.mock('../hooks/useBusinessBrandAssets.ts', () => ({
+
+    useBusinessBrandAssets: () => ({
+        businessBrandAssets: businessBrandAssetHookMocks.businessBrandAssets,
+        getBusinessBrandAsset: businessBrandAssetHookMocks.getBusinessBrandAsset
+    })
 }))
 
 vi.mock('../utils/currencyUtils.ts', async () => {
@@ -296,7 +310,8 @@ describe('InvoiceGenerator', () => {
         expenseHookMocks.expenses = []
         expenseHookMocks.markAsBilled.mockClear()
         expenseHookMocks.markAsUnbilled.mockClear()
-        pdfMocks.createInvoiceHTML.mockClear()
+        pdfMocks.getCurrentInvoiceHtmlContent.mockClear()
+        businessBrandAssetHookMocks.getBusinessBrandAsset.mockClear()
         taskHookMocks.tasks = [{ id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 }]
         modalConfig = {
             applyDateOverride: false,
@@ -710,7 +725,7 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.tasks.map(task => task.id)).toEqual(['parent-1', 'child-1', 'root-1'])
     })
 
-    it('omits selected tasks that compute to zero from saved invoices and preview html', async () => {
+    it('omits selected tasks that compute to zero from saved invoices', async () => {
 
         invoiceHookMocks.createInvoice.mockClear()
         taskHookMocks.tasks = [
@@ -733,10 +748,7 @@ describe('InvoiceGenerator', () => {
         expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
         const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
         expect(invoiceData.tasks.map(task => task.id)).toEqual(['task-1'])
-
-        expect(pdfMocks.createInvoiceHTML).toHaveBeenCalledWith(expect.objectContaining({
-            tasks: [expect.objectContaining({ id: 'task-1' })]
-        }))
+        expect(invoiceData.htmlContent).toBeNull()
     })
 
     it('shows a warning and skips invoice generation when total is zero', async () => {
@@ -816,7 +828,7 @@ describe('InvoiceGenerator', () => {
         }
     })
 
-    it('persists custom billing periods into saved invoice data and generated html', async () => {
+    it('persists custom billing periods into saved invoice data', async () => {
 
         modalConfig.billingPeriodPreset = 'custom'
         modalConfig.billingPeriodStart = '2026-03-10'
@@ -841,11 +853,6 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.billingPeriodPreset).toBe('custom')
         expect(invoiceData.billingPeriodStart).toBe('2026-03-10')
         expect(invoiceData.billingPeriodEnd).toBe('2026-03-31')
-
-        expect(pdfMocks.createInvoiceHTML).toHaveBeenCalledWith(expect.objectContaining({
-            billingPeriodPreset: 'custom',
-            billingPeriodStart: '2026-03-10',
-            billingPeriodEnd: '2026-03-31',
-        }))
+        expect(invoiceData.htmlContent).toBeNull()
     })
 })

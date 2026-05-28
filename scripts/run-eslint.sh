@@ -11,9 +11,9 @@ warm_bind_mount
 if output=$(eslint . 2>&1); then
     printf '%s\n' "$output"
     exit 0
+else
+    status=$?
 fi
-
-status=$?
 
 case "$output" in
     *"ENOENT: no such file or directory, scandir '/app/src/"*)

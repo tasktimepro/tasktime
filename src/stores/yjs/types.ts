@@ -171,6 +171,30 @@ export interface BusinessInfo {
     taxEnabled?: boolean;
     taxLabel?: string;
     taxRate?: number;
+    branding?: BusinessBranding;
+}
+
+export type BrandAssetMimeType = 'image/svg+xml' | 'image/png' | 'image/jpeg' | 'image/webp';
+
+export interface BusinessBranding {
+    primaryColor?: string | null;
+    logoAssetId?: string | null;
+}
+
+export interface BusinessBrandAsset {
+    id: string;
+    businessInfoId: string;
+    kind: 'logo';
+    dataUrl: string;
+    mimeType: BrandAssetMimeType;
+    fileName?: string | null;
+    width: number;
+    height: number;
+    byteSize: number;
+    contentHash: string;
+    createdAt: number;
+    updatedAt?: number | null;
+    archivedAt?: number | null;
 }
 
 export interface InvoiceItem {
@@ -222,6 +246,37 @@ export interface Invoice {
     paymentCurrencySnapshot?: InvoicePaymentCurrencySnapshot | null;
     sentAt?: number | null;
     sentToEmail?: string | null;
+    brandingSnapshot?: InvoiceBrandingSnapshot | null;
+}
+
+export type InvoiceTemplateLogoPlacement =
+    | 'invoice-left-logo-right'
+    | 'invoice-center-logo-center'
+    | 'invoice-right-logo-left';
+
+export type InvoiceTemplateLayoutStyle = 'classic' | 'neutral';
+
+export interface InvoiceTemplateBrandingOptions {
+    showBusinessLogo?: boolean;
+    useBusinessPrimaryColor?: boolean;
+}
+
+export interface InvoiceBrandingSnapshot {
+    businessInfoId?: string | null;
+    templateId?: string | null;
+    layoutStyle?: InvoiceTemplateLayoutStyle;
+    logoPlacement: InvoiceTemplateLogoPlacement;
+    showBusinessLogo: boolean;
+    useBusinessPrimaryColor: boolean;
+    primaryColor?: string | null;
+    logoAssetId?: string | null;
+    logoAssetMeta?: {
+        mimeType: BrandAssetMimeType;
+        width: number;
+        height: number;
+        byteSize: number;
+        contentHash: string;
+    } | null;
 }
 
 export interface InvoiceTemplate {
@@ -234,6 +289,11 @@ export interface InvoiceTemplate {
     defaultTaxRate?: number;
     defaultDueDays?: number;
     isDefault?: boolean;
+    brandingOptions?: InvoiceTemplateBrandingOptions;
+    layoutStyle?: InvoiceTemplateLayoutStyle;
+    logoPlacement?: InvoiceTemplateLogoPlacement;
+    showBillingPeriod?: boolean;
+    showProjectTitle?: boolean;
 }
 
 export interface EmailTemplate {

@@ -2,6 +2,7 @@ import * as Y from 'yjs';
 import { z } from 'zod';
 import { collectEntities, readEntity } from './entityUtils';
 import type {
+    BusinessBrandAsset,
     BusinessInfo,
     Client,
     DailyGoal,
@@ -24,6 +25,8 @@ import type {
 import type { YjsDocManager } from './YjsDocManager';
 
 const STORAGE_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const HEX_COLOR_REGEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const IMAGE_DATA_URL_REGEX = /^data:image\/(svg\+xml|png|jpeg|webp)(;charset=[^;,]+)?(;base64)?,/i;
 
 const storageDateSchema = z.string().regex(STORAGE_DATE_REGEX);
 const nullableStorageDateSchema = z.preprocess(
@@ -35,6 +38,18 @@ const integerNumberSchema = z.number().int();
 const nonNegativeNumberSchema = z.number().finite().min(0);
 const nonEmptyStringSchema = z.string().trim().min(1);
 const optionalNullableIdSchema = z.string().trim().min(1).nullable().optional();
+const hexColorSchema = z.string().regex(HEX_COLOR_REGEX);
+const imageDataUrlSchema = z.string().regex(IMAGE_DATA_URL_REGEX);
+const brandAssetMimeTypeSchema = z.enum(['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp']);
+const invoiceTemplateLayoutStyleSchema = z.enum([
+    'classic',
+    'neutral',
+]);
+const invoiceTemplateLogoPlacementSchema = z.enum([
+    'invoice-left-logo-right',
+    'invoice-center-logo-center',
+    'invoice-right-logo-left',
+]);
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
@@ -222,6 +237,10 @@ const businessInfoSchema = z.object({
     taxEnabled: z.boolean().optional(),
     taxLabel: z.string().optional(),
     taxRate: finiteNumberSchema.optional(),
+    branding: z.object({
+        primaryColor: hexColorSchema.nullable().optional(),
+        logoAssetId: optionalNullableIdSchema,
+    }).passthrough().optional(),
 }).superRefine((value: BusinessInfo, ctx: z.RefinementCtx) => {
     if (!value.title && !value.name) {
         ctx.addIssue({
@@ -239,6 +258,22 @@ const businessInfoSchema = z.object({
         });
     }
 }).passthrough() satisfies z.ZodType<BusinessInfo>;
+
+const businessBrandAssetSchema = z.object({
+    id: nonEmptyStringSchema,
+    businessInfoId: nonEmptyStringSchema,
+    kind: z.literal('logo'),
+    dataUrl: imageDataUrlSchema,
+    mimeType: brandAssetMimeTypeSchema,
+    fileName: z.string().nullable().optional(),
+    width: integerNumberSchema.positive(),
+    height: integerNumberSchema.positive(),
+    byteSize: integerNumberSchema.positive(),
+    contentHash: nonEmptyStringSchema,
+    createdAt: finiteNumberSchema,
+    updatedAt: finiteNumberSchema.nullable().optional(),
+    archivedAt: finiteNumberSchema.nullable().optional(),
+}).passthrough() satisfies z.ZodType<BusinessBrandAsset>;
 
 const invoiceItemSchema = z.object({
     description: z.string(),
@@ -287,6 +322,23 @@ const invoiceSchema = z.object({
     paymentCurrencySnapshot: paymentCurrencySnapshotSchema.nullable().optional(),
     sentAt: finiteNumberSchema.nullable().optional(),
     sentToEmail: z.string().nullable().optional(),
+    brandingSnapshot: z.object({
+        businessInfoId: optionalNullableIdSchema,
+        templateId: optionalNullableIdSchema,
+        layoutStyle: invoiceTemplateLayoutStyleSchema.optional(),
+        logoPlacement: invoiceTemplateLogoPlacementSchema,
+        showBusinessLogo: z.boolean(),
+        useBusinessPrimaryColor: z.boolean(),
+        primaryColor: hexColorSchema.nullable().optional(),
+        logoAssetId: optionalNullableIdSchema,
+        logoAssetMeta: z.object({
+            mimeType: brandAssetMimeTypeSchema,
+            width: integerNumberSchema.positive(),
+            height: integerNumberSchema.positive(),
+            byteSize: integerNumberSchema.positive(),
+            contentHash: nonEmptyStringSchema,
+        }).nullable().optional(),
+    }).passthrough().nullable().optional(),
 }).passthrough() satisfies z.ZodType<Invoice>;
 
 const invoiceTemplateSchema = z.object({
@@ -299,6 +351,14 @@ const invoiceTemplateSchema = z.object({
     defaultTaxRate: finiteNumberSchema.optional(),
     defaultDueDays: integerNumberSchema.optional(),
     isDefault: z.boolean().optional(),
+    brandingOptions: z.object({
+        showBusinessLogo: z.boolean().optional(),
+        useBusinessPrimaryColor: z.boolean().optional(),
+    }).passthrough().optional(),
+    layoutStyle: invoiceTemplateLayoutStyleSchema.optional(),
+    logoPlacement: invoiceTemplateLogoPlacementSchema.optional(),
+    showBillingPeriod: z.boolean().optional(),
+    showProjectTitle: z.boolean().optional(),
 }).passthrough() satisfies z.ZodType<InvoiceTemplate>;
 
 const emailTemplateSchema = z.object({
@@ -511,6 +571,7 @@ export const collectionSchemas = {
     timeEntries: timeEntrySchema,
     clients: clientSchema,
     businessInfos: businessInfoSchema,
+    businessBrandAssets: businessBrandAssetSchema,
     invoices: invoiceSchema,
     invoiceTemplates: invoiceTemplateSchema,
     emailTemplates: emailTemplateSchema,
@@ -533,6 +594,7 @@ type ValidationSnapshot = {
     timeEntries: TimeEntry[];
     clients: Client[];
     businessInfos: BusinessInfo[];
+    businessBrandAssets: BusinessBrandAsset[];
     invoices: Invoice[];
     invoiceTemplates: InvoiceTemplate[];
     emailTemplates: EmailTemplate[];
@@ -611,6 +673,7 @@ function emptySnapshot(): ValidationSnapshot {
         timeEntries: [],
         clients: [],
         businessInfos: [],
+        businessBrandAssets: [],
         invoices: [],
         invoiceTemplates: [],
         emailTemplates: [],
@@ -655,6 +718,7 @@ function buildSnapshotFromDocs(docs: {
         snapshot.tasks = collectValidatedEntities<Task>('tasks', core.getMap('tasks') as Y.Map<string, unknown>, 'core.tasks');
         snapshot.clients = collectValidatedEntities<Client>('clients', core.getMap('clients') as Y.Map<string, unknown>, 'core.clients');
         snapshot.businessInfos = collectValidatedEntities<BusinessInfo>('businessInfos', core.getMap('businessInfos') as Y.Map<string, unknown>, 'core.businessInfos');
+        snapshot.businessBrandAssets = collectValidatedEntities<BusinessBrandAsset>('businessBrandAssets', core.getMap('businessBrandAssets') as Y.Map<string, unknown>, 'core.businessBrandAssets');
         snapshot.invoiceTemplates = collectValidatedEntities<InvoiceTemplate>('invoiceTemplates', core.getMap('invoiceTemplates') as Y.Map<string, unknown>, 'core.invoiceTemplates');
         snapshot.emailTemplates = collectValidatedEntities<EmailTemplate>('emailTemplates', core.getMap('emailTemplates') as Y.Map<string, unknown>, 'core.emailTemplates');
         snapshot.paymentMethods = collectValidatedEntities<PaymentMethod>('paymentMethods', core.getMap('paymentMethods') as Y.Map<string, unknown>, 'core.paymentMethods');
@@ -712,6 +776,7 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
     const projectIds = new Set(snapshot.projects.map((item) => item.id));
     const clientIds = new Set(snapshot.clients.map((item) => item.id));
     const businessInfoIds = new Set(snapshot.businessInfos.map((item) => item.id));
+    const businessBrandAssetIds = new Set(snapshot.businessBrandAssets.map((item) => item.id));
     const paymentMethodIds = new Set(snapshot.paymentMethods.map((item) => item.id));
     const expenseCategoryIds = new Set(snapshot.expenseCategories.map((item) => item.id));
     const taxReturnPeriodIds = new Set(snapshot.taxReturnPeriods.map((item) => item.id));
@@ -752,6 +817,36 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
         if (invoice.paymentMethodId) {
             assertReference(paymentMethodIds.has(invoice.paymentMethodId), `${context}: invoice ${invoice.id} references missing payment method ${invoice.paymentMethodId}`);
         }
+
+        if (invoice.brandingSnapshot?.businessInfoId) {
+            assertReference(
+                businessInfoIds.has(invoice.brandingSnapshot.businessInfoId),
+                `${context}: invoice ${invoice.id} references missing branding business info ${invoice.brandingSnapshot.businessInfoId}`
+            );
+        }
+
+        if (invoice.brandingSnapshot?.logoAssetId) {
+            assertReference(
+                businessBrandAssetIds.has(invoice.brandingSnapshot.logoAssetId),
+                `${context}: invoice ${invoice.id} references missing branding logo asset ${invoice.brandingSnapshot.logoAssetId}`
+            );
+        }
+    }
+
+    for (const businessInfo of snapshot.businessInfos) {
+        if (businessInfo.branding?.logoAssetId) {
+            assertReference(
+                businessBrandAssetIds.has(businessInfo.branding.logoAssetId),
+                `${context}: business info ${businessInfo.id} references missing logo asset ${businessInfo.branding.logoAssetId}`
+            );
+        }
+    }
+
+    for (const businessBrandAsset of snapshot.businessBrandAssets) {
+        assertReference(
+            businessInfoIds.has(businessBrandAsset.businessInfoId),
+            `${context}: business brand asset ${businessBrandAsset.id} references missing business info ${businessBrandAsset.businessInfoId}`
+        );
     }
 
     for (const expense of snapshot.expenses) {

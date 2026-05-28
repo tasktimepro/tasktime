@@ -25,7 +25,7 @@ import { BACKUP_VERSION } from '../utils/backupData.ts';
  * 
  * Note: Timer state is intentionally excluded from export/import
  */
-const SUPPORTED_VERSIONS = ['1.0', '1.1', BACKUP_VERSION];
+const SUPPORTED_VERSIONS = Array.from(new Set(['1.0', '1.1', '1.3', BACKUP_VERSION]));
 
 function ExportImport({ 
     projects, 
@@ -232,6 +232,11 @@ function ExportImport({
                 throw new Error('Invalid data format: businessInfos must be an array');
             }
 
+            // Validate businessBrandAssets if present
+            if (parsedData.businessBrandAssets && !Array.isArray(parsedData.businessBrandAssets)) {
+                throw new Error('Invalid data format: businessBrandAssets must be an array');
+            }
+
             // Validate clients if present
             if (parsedData.clients && !Array.isArray(parsedData.clients)) {
                 throw new Error('Invalid data format: clients must be an array');
@@ -292,6 +297,7 @@ function ExportImport({
                 expenseCategories: parsedData.expenseCategories || [],
                 taxReturnPeriods: parsedData.taxReturnPeriods || [],
                 businessInfos: parsedData.businessInfos || [],
+                businessBrandAssets: parsedData.businessBrandAssets || [],
                 clients: parsedData.clients || [],
                 invoiceTemplates: parsedData.invoiceTemplates || [],
                 emailTemplates: parsedData.emailTemplates || [],

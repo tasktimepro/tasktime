@@ -8,6 +8,7 @@ import { useTasks } from '@/hooks/useTasks.ts';
 import { useProjects } from '@/hooks/useProjects.ts';
 import { useClients } from '@/hooks/useClients.ts';
 import { useBusinessInfos } from '@/hooks/useBusinessInfos.ts';
+import { useBusinessBrandAssets } from '@/hooks/useBusinessBrandAssets.ts';
 import { useExpenseCategories } from '@/hooks/useExpenseCategories.ts';
 import { useTaxReturnPeriods } from '@/hooks/useTaxReturnPeriods.ts';
 import { useToast } from '@/hooks/useToast.ts';
@@ -422,6 +423,7 @@ function Reports({ onReadyChange = null }) {
     const { projects } = useProjects();
     const { clients } = useClients();
     const { businessInfos } = useBusinessInfos();
+    const { businessBrandAssets } = useBusinessBrandAssets();
     const { allExpenseCategories } = useExpenseCategories();
     const {
         taxReturnPeriods,
@@ -1901,9 +1903,9 @@ function Reports({ onReadyChange = null }) {
                 invoiceId: invoice.id,
                 invoiceNumber: invoice.invoiceNumber,
                 filename: `invoice-${invoice.invoiceNumber}.pdf`,
-                htmlContent: getCurrentInvoiceHtmlContent(invoice, clients),
+                htmlContent: getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets),
             }));
-    }, [clients, filteredInvoices]);
+    }, [businessBrandAssets, clients, filteredInvoices]);
 
     const accountantPackManifestRows = useMemo(() => {
         return buildAccountantPackManifestRows({

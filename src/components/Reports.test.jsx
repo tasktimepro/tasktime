@@ -97,6 +97,7 @@ const mockTaxReturnPeriods = [
 ];
 let mockSection = null;
 let mockLoadingHistoricalEntries = false;
+const mockBusinessBrandAssets = [];
 
 vi.mock('@/hooks/useUrlState.ts', () => ({
     useUrlState: () => ({
@@ -110,6 +111,12 @@ vi.mock('@/hooks/useUrlState.ts', () => ({
 vi.mock('@/hooks/useInvoices.ts', () => ({
     useInvoices: () => ({
         invoices: mockInvoices,
+    }),
+}));
+
+vi.mock('@/hooks/useBusinessBrandAssets.ts', () => ({
+    useBusinessBrandAssets: () => ({
+        businessBrandAssets: mockBusinessBrandAssets,
     }),
 }));
 

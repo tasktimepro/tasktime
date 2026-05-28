@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { createInvoiceHTML } from '../utils/pdfUtils.ts';
-import { millisecondsToHours, toStorageDate, toDisplayDate, timestampToDateString } from '../utils/dateUtils.ts';
+import { getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
+import { millisecondsToHours, toStorageDate, timestampToDateString } from '../utils/dateUtils.ts';
+import {
+    DEFAULT_INVOICE_LAYOUT_STYLE,
+    DEFAULT_INVOICE_LOGO_PLACEMENT,
+    normalizeInvoiceLayoutStyle,
+    normalizeInvoiceLogoPlacement,
+} from '../utils/invoiceBranding.ts';
 import { getCurrencySymbol, getPreferredCurrency, fetchExchangeRates, convertCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import InvoiceModal from './invoice/InvoiceModal';
@@ -17,6 +23,7 @@ import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
+import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import {
@@ -103,6 +110,7 @@ const InvoiceGenerator = ({
     const { createEntry, updateEntry, deleteEntry } = useTimeEntries();
     const { expenses, markAsBilled, markAsUnbilled } = useExpenses();
     const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
+    const { businessBrandAssets, getBusinessBrandAsset } = useBusinessBrandAssets();
     const { getTimerForProject } = useTimers();
     
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
@@ -1504,6 +1512,27 @@ const InvoiceGenerator = ({
             }))
             .filter((task) => getInvoiceTaskAmount(task) > 0);
 
+        const resolvedBrandAsset = resolvedBusinessInfo?.branding?.logoAssetId
+            ? getBusinessBrandAsset(resolvedBusinessInfo.branding.logoAssetId)
+            : null;
+        const brandingSnapshot = {
+            businessInfoId: resolvedBusinessInfo?.id || null,
+            templateId: resolvedTemplate?.id || null,
+            layoutStyle: normalizeInvoiceLayoutStyle(resolvedTemplate?.layoutStyle || DEFAULT_INVOICE_LAYOUT_STYLE),
+            logoPlacement: normalizeInvoiceLogoPlacement(resolvedTemplate?.logoPlacement || DEFAULT_INVOICE_LOGO_PLACEMENT),
+            showBusinessLogo: resolvedTemplate?.brandingOptions?.showBusinessLogo ?? true,
+            useBusinessPrimaryColor: resolvedTemplate?.brandingOptions?.useBusinessPrimaryColor ?? true,
+            primaryColor: resolvedBusinessInfo?.branding?.primaryColor || null,
+            logoAssetId: resolvedBrandAsset?.id || null,
+            logoAssetMeta: resolvedBrandAsset ? {
+                mimeType: resolvedBrandAsset.mimeType,
+                width: resolvedBrandAsset.width,
+                height: resolvedBrandAsset.height,
+                byteSize: resolvedBrandAsset.byteSize,
+                contentHash: resolvedBrandAsset.contentHash,
+            } : null,
+        };
+
         return {
             id: invoiceId,
             project: selectedProject,
@@ -1543,6 +1572,7 @@ const InvoiceGenerator = ({
             paymentMethodId: resolvedPaymentMethod?.id || null,
             businessInfo: resolvedBusinessInfo ? { ...resolvedBusinessInfo } : null,
             businessInfoId: resolvedBusinessInfo?.id || null,
+            brandingSnapshot,
             billingPeriodPreset,
             billingPeriodStart: activeBillingPeriodStart || null,
             billingPeriodEnd: activeBillingPeriodEnd || null,
@@ -1561,52 +1591,7 @@ const InvoiceGenerator = ({
                 : null,
             dueDate: dueDate,
             createdAt: editingInvoice ? editingInvoice.createdAt : Date.now(),
-            htmlContent: createInvoiceHTML({
-                id: editingInvoice ? editingInvoice.id : `INV-${selectedProject?.id?.slice(-8) || Date.now()}-${Date.now()}`,
-                project: selectedProject,
-                client: {
-                    name: selectedClient?.clientName || '',
-                    contactPerson: selectedClient?.contactPerson || '',
-                    email: selectedClient?.email || '',
-                    address: selectedClient?.address || '',
-                    city: selectedClient?.city || '',
-                    state: selectedClient?.state || '',
-                    zip: selectedClient?.zip || '',
-                    country: selectedClient?.country || ''
-                },
-                tasks: normalizedSelectedInvoiceTasks,
-                additionalTasks: normalizedAdditionalTasks,
-                expenseItems: allExpenseItems,
-                taskFlatRates: taskFlatRates,
-                useFlatRate: useFlatRate,
-                taskQuantities: taskQuantities, // Include quantities in PDF data
-                mergedSubtasks: mergedSubtasks, // Include merged subtasks in PDF data
-                note: invoiceNote,
-                totalHours: totalHours,
-                total: pricing.total,
-                subtotal: pricing.subtotal,
-                discount: pricing.discount,
-                shipping: pricing.shipping,
-                tax: pricing.tax,
-                taxRate: pricing.taxRate,
-                taxLabel: pricing.taxLabel,
-                paymentMethod: resolvedPaymentMethod,
-                paymentMethodId: resolvedPaymentMethod?.id || null,
-                businessInfo: resolvedBusinessInfo,
-                businessInfoId: resolvedBusinessInfo?.id || null,
-                template: resolvedTemplate,
-                templateId: resolvedTemplate?.id || null,
-                invoiceNumber: invoiceNumber,
-                // Display dates in locale format for PDF
-                date: useInvoiceDateOverride && invoiceDateOverride 
-                    ? toDisplayDate(new Date(invoiceDateOverride))
-                    : (editingInvoice ? toDisplayDate(editingInvoice.date) : toDisplayDate(new Date())),
-                dueDate: dueDate ? toDisplayDate(dueDate) : null,
-                billingPeriodPreset,
-                billingPeriodStart: activeBillingPeriodStart || null,
-                billingPeriodEnd: activeBillingPeriodEnd || null,
-                currency: selectedClient?.defaultCurrency || getPreferredCurrency()
-            })
+            htmlContent: null,
         };
     };
 
@@ -2224,7 +2209,7 @@ const InvoiceGenerator = ({
                 onClose={() => setShowPreview(false)}
                 title={previewInvoice ? `Invoice Preview - ${previewInvoice.invoiceNumber}` : ''}
                 invoice={previewInvoice}
-                htmlContent={previewInvoice?.htmlContent}
+                htmlContent={previewInvoice ? getCurrentInvoiceHtmlContent(previewInvoice, clients, businessBrandAssets) : ''}
             />
         </div>
     );

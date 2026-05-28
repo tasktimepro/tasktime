@@ -44,6 +44,7 @@ export {
     GripVertical as GripVerticalIcon,
     Info as InformationCircleIcon,
     HandCoins as HandCoinsIcon,
+    Image as ImageIcon,
     Kanban as KanbanIcon,
     LayoutDashboard as LayoutDashboardIcon,
     LayoutList as LayoutListIcon,

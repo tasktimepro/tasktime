@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../Modal';
+import { ArrowDownTrayIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
+import { Notice } from '@/components/ui/notice';
 import { toDisplayDate } from '../../utils/dateUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../../utils/currencyUtils.ts';
 import { getInvoiceTotal } from '../../utils/invoiceUtils.ts';
 
 const A4_PREVIEW_WIDTH_PX = 794;
 const A4_PREVIEW_HEIGHT_PX = 1123;
+const PREVIEW_HEIGHT_BUFFER_PX = 16;
+const PREVIEW_TOP_PADDING_PX = 12;
 
 /**
  * InvoicePreviewModal component - Displays invoice preview HTML or fallback summary.
@@ -17,6 +21,8 @@ const A4_PREVIEW_HEIGHT_PX = 1123;
  * @param {Object|null} props.invoice
  * @param {string|null} props.htmlContent
  * @param {React.ReactNode} props.footer
+ * @param {Function} props.onDownload
+ * @param {string} props.downloadLabel
  */
 const InvoicePreviewModal = ({
     isOpen,
@@ -24,7 +30,9 @@ const InvoicePreviewModal = ({
     title,
     invoice,
     htmlContent,
-    footer
+    footer,
+    onDownload,
+    downloadLabel = 'Download PDF'
 }) => {
     const previewHtml = htmlContent || invoice?.htmlContent || '';
     const previewTitle = title || (invoice ? `Invoice Preview - ${invoice.invoiceNumber}` : 'Invoice Preview');
@@ -46,7 +54,7 @@ const InvoicePreviewModal = ({
             const nextHeight = previewPageRef.current?.scrollHeight || A4_PREVIEW_HEIGHT_PX;
 
             setPreviewScale(nextScale > 0 ? nextScale : 1);
-            setPreviewHeight(Math.max(nextHeight, A4_PREVIEW_HEIGHT_PX));
+            setPreviewHeight(Math.max(nextHeight + PREVIEW_HEIGHT_BUFFER_PX, A4_PREVIEW_HEIGHT_PX + PREVIEW_HEIGHT_BUFFER_PX));
         };
 
         syncPreviewLayout();
@@ -74,7 +82,15 @@ const InvoicePreviewModal = ({
     }, [isOpen, previewHtml]);
 
     const modalFooter = footer || (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+            {onDownload ? (
+                <Button
+                    onClick={onDownload}
+                    leadingIcon={ArrowDownTrayIcon}
+                >
+                    {downloadLabel}
+                </Button>
+            ) : null}
             <Button
                 onClick={onClose}
                 variant="secondary"
@@ -94,27 +110,37 @@ const InvoicePreviewModal = ({
             contentRef={modalContentRef}
         >
             {previewHtml ? (
-                <div className="overflow-auto rounded-lg border border-slate-200 bg-white p-2 text-black sm:p-3" data-testid="invoice-preview-shell">
-                    <div
-                        className="mx-auto"
-                        data-testid="invoice-preview-frame"
-                        style={{
-                            width: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
-                            minWidth: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
-                            height: `${previewHeight * previewScale}px`,
-                        }}
-                    >
+                <div className="space-y-3">
+                    <Notice
+                        compact
+                        title="Preview note"
+                        description="The final generated PDF can vary slightly from the preview below."
+                    />
+                    <div className="overflow-auto rounded-lg border border-slate-200 bg-white p-2 text-black sm:p-3" data-testid="invoice-preview-shell">
                         <div
-                            ref={previewPageRef}
-                            className="origin-top-left overflow-hidden bg-white text-black"
-                            data-testid="invoice-preview-page"
+                            className="mx-auto"
+                            data-testid="invoice-preview-frame"
+                            style={{
+                                width: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
+                                minWidth: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
+                                height: `${previewHeight * previewScale}px`,
+                            }}
+                        >
+                            <div
+                                ref={previewPageRef}
+                                className="origin-top-left overflow-visible bg-white text-black"
+                                data-testid="invoice-preview-page"
                             style={{
                                 width: `${A4_PREVIEW_WIDTH_PX}px`,
                                 minHeight: `${A4_PREVIEW_HEIGHT_PX}px`,
                                 transform: `scale(${previewScale})`,
                             }}
                         >
-                            <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                                <div
+                                    style={{ paddingTop: `${PREVIEW_TOP_PADDING_PX}px` }}
+                                    dangerouslySetInnerHTML={{ __html: previewHtml }}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
