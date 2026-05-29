@@ -61,6 +61,12 @@ const SubtaskSection = ({
     setNewSubtaskNote,
     newSubtaskStartDate,
     setNewSubtaskStartDate,
+    newSubtaskEstimatedHours,
+    setNewSubtaskEstimatedHours,
+    newSubtaskEstimatedFlatAmount,
+    setNewSubtaskEstimatedFlatAmount,
+    showEstimateFields = false,
+    isFlatRateProject = false,
     handleCreateSubtask,
     cancelCreateSubtask,
     isArchived,
@@ -338,6 +344,12 @@ const SubtaskSection = ({
                             setNewSubtaskNote={setNewSubtaskNote}
                             newSubtaskStartDate={newSubtaskStartDate}
                             setNewSubtaskStartDate={setNewSubtaskStartDate}
+                            newSubtaskEstimatedHours={newSubtaskEstimatedHours}
+                            setNewSubtaskEstimatedHours={setNewSubtaskEstimatedHours}
+                            newSubtaskEstimatedFlatAmount={newSubtaskEstimatedFlatAmount}
+                            setNewSubtaskEstimatedFlatAmount={setNewSubtaskEstimatedFlatAmount}
+                            showEstimateFields={showEstimateFields}
+                            isFlatRateProject={isFlatRateProject}
                             onCreateSubtask={handleCreateSubtask}
                             onCancel={cancelCreateSubtask}
                         />

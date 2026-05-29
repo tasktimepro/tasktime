@@ -133,6 +133,10 @@ const projectSchema = z.object({
     billableTimeIncrementMinutes: z.number().int().positive().nullable().optional(),
     taskView: z.enum(['list', 'kanban']).optional(),
     taskSort: z.enum(['createdAt', 'lastActive', 'name', 'manual']).optional(),
+    statusMode: z.enum(['active', 'quote']).optional(),
+    deadline: storageDateSchema.nullable().optional(),
+    deadlineResolvedAt: finiteNumberSchema.nullable().optional(),
+    budgetAmount: nonNegativeNumberSchema.nullable().optional(),
 }).passthrough() satisfies z.ZodType<Project>;
 
 const taskSchema = z.object({
@@ -158,6 +162,8 @@ const taskSchema = z.object({
     skippedOccurrenceDate: storageDateSchema.nullable().optional(),
     completedDatesByYear: z.record(z.string(), z.record(z.string(), z.array(z.number().int().min(1).max(31)))).optional(),
     completedOnDate: storageDateSchema.nullable().optional(),
+    estimatedHours: nonNegativeNumberSchema.nullable().optional(),
+    estimatedFlatAmount: nonNegativeNumberSchema.nullable().optional(),
 }).passthrough() satisfies z.ZodType<Task>;
 
 const timeEntrySchema = z.object({
@@ -364,7 +370,7 @@ const invoiceTemplateSchema = z.object({
 const emailTemplateSchema = z.object({
     id: nonEmptyStringSchema,
     name: nonEmptyStringSchema,
-    type: z.literal('invoice'),
+    type: z.enum(['invoice', 'quote']),
     fromName: z.string().max(200).optional(),
     replyTo: z.string().email().max(320).optional(),
     subject: z.string().max(500),

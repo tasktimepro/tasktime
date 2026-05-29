@@ -230,4 +230,66 @@ describe('ProjectList', () => {
         expect(menuButtons[0].className).toBe(menuButtons[1].className)
     })
 
+    it('shows quote stage and deadline context for quoted client projects', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-03-24T12:00:00Z'))
+
+        projectsHookMocks.projects = [
+            {
+                id: 'project-1',
+                title: 'Project One',
+                createdAt: Date.now(),
+                archived: false,
+                preferredClientId: 'client-1',
+                statusMode: 'quote',
+                deadline: '2026-03-28',
+            }
+        ]
+
+        render(
+            <ProjectList
+                onSelectProject={vi.fn()}
+                clients={[{ id: 'client-1', title: 'Acme Co' }]}
+                openProjectModal={vi.fn()}
+                editProjectModal={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Quote stage')).toBeInTheDocument()
+        expect(screen.getByText(/Deadline/i)).toBeInTheDocument()
+        expect(screen.getByText(/4 days remaining/i)).toBeInTheDocument()
+
+        vi.useRealTimers()
+    })
+
+    it('shows an overdue deadline badge in the project card footer', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-03-24T12:00:00Z'))
+
+        projectsHookMocks.projects = [
+            {
+                id: 'project-1',
+                title: 'Project One',
+                createdAt: Date.now(),
+                archived: false,
+                preferredClientId: 'client-1',
+                deadline: '2026-03-20',
+            }
+        ]
+
+        render(
+            <ProjectList
+                onSelectProject={vi.fn()}
+                clients={[{ id: 'client-1', title: 'Acme Co' }]}
+                openProjectModal={vi.fn()}
+                editProjectModal={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Overdue')).toBeInTheDocument()
+        expect(screen.getByText(/4 days overdue/i)).toBeInTheDocument()
+
+        vi.useRealTimers()
+    })
+
 })

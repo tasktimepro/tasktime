@@ -3,6 +3,7 @@
  */
 
 import { SYNC_WORKER_CONFIG } from '@/config/google';
+import type { EmailSendType } from './emailTemplateUtils';
 
 export interface SendInvoiceEmailParams {
     sessionId: string;
@@ -14,7 +15,7 @@ export interface SendInvoiceEmailParams {
     bodyText: string;
     replyTo?: string;
     pdfBase64: string;
-    sendType: 'invoice' | 'reminder';
+    sendType: EmailSendType;
     attachmentTitle?: string;
 }
 
@@ -78,7 +79,7 @@ export async function sendInvoiceEmail(
     }
 
     // Parse structured error from Worker
-    let errorData: { error?: string; details?: string; remaining?: number } | undefined;
+    let errorData: { error?: string; details?: string; message?: string; remaining?: number } | undefined;
 
     try {
         errorData = await response.json();
@@ -87,7 +88,7 @@ export async function sendInvoiceEmail(
     }
 
     const errorCode = errorData?.error || '';
-    const details = errorData?.details || '';
+    const details = errorData?.details || errorData?.message || errorData?.error || '';
 
     if (response.status === 401 || response.status === 403) {
         throw createEmailError('auth', details || 'Session expired. Please reconnect cloud sync.');

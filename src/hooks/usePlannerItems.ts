@@ -67,6 +67,7 @@ export interface PlannerProjectItem extends PlannerItemBase {
     type: 'project';
     entity: Project;
     attachment: PlannerAttachment;
+    isDeadlineItem?: boolean;
 }
 
 export interface PlannerTaskItem extends PlannerItemBase {
@@ -492,6 +493,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
                 return isProjectVisibleOnDate(item.entity, dateStr);
             })
             .sort((a, b) => a.entity.title.localeCompare(b.entity.title));
+        const attachedProjectIds = new Set(projectAttachments.map(({ entity }) => entity.id));
 
         projectAttachments.forEach(({ attachment, entity }) => {
             items.push({
@@ -507,10 +509,30 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         });
 
+        // 3. Projects due on this day (unless already attached here)
+        const deadlineProjects = projects
+            .filter((project) => project.deadline === dateStr && !project.deadlineResolvedAt && !attachedProjectIds.has(project.id))
+            .filter((project) => isProjectVisibleOnDate(project, dateStr))
+            .sort((a, b) => a.title.localeCompare(b.title));
+
+        deadlineProjects.forEach((entity) => {
+            items.push({
+                key: `project-deadline-${entity.id}-${dateStr}`,
+                type: 'project',
+                title: `Deadline: ${entity.title}`,
+                isCompleted: false,
+                color: getProjectColor(entity),
+                estimatedHours: null,
+                actualTimeMs: getProjectTimeOnDate(entity.id, dateStr),
+                entity,
+                isDeadlineItem: true,
+            });
+        });
+
         // Track task IDs already added via attachments
         const addedTaskIds = new Set<string>();
 
-        // 3. Attached tasks (sorted alphabetically)
+        // 4. Attached tasks (sorted alphabetically)
         const taskAttachments = attachments
             .filter((a) => a.type === 'task')
             .map((a) => ({ attachment: a, entity: tasks.find((t) => t.id === a.referenceId) }))
@@ -540,7 +562,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         });
 
-        // 4. Recurring tasks matching this day (sorted alphabetically)
+        // 5. Recurring tasks matching this day (sorted alphabetically)
         const recurringTasks = tasks
             .filter((t) => t.recurring && !addedTaskIds.has(t.id))
             .filter((t) => isTaskVisibleOnDate(t, dateStr) && isRecurringTaskDueOnDate(date, t.recurring))
@@ -562,7 +584,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         });
 
-        // 5. Tasks with startDate matching this day (sorted alphabetically)
+        // 6. Tasks with startDate matching this day (sorted alphabetically)
         const dueTasks = tasks
             .filter((t) => t.startDate === dateStr && !t.recurring && !addedTaskIds.has(t.id))
             .filter((t) => isTaskVisibleOnDate(t, dateStr))
@@ -584,7 +606,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         });
 
-        // 6. Tasks with time entries on this day (sorted alphabetically)
+        // 7. Tasks with time entries on this day (sorted alphabetically)
         const workedTasks = Array.from(taskTimeMap.entries())
             .map(([taskId, timeMs]) => ({ task: tasksById.get(taskId), timeMs }))
             .filter((item): item is { task: Task; timeMs: number } => Boolean(item.task))
@@ -613,7 +635,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         });
 
-        // 7. Tasks with active timers (only for today, sorted alphabetically)
+        // 8. Tasks with active timers (only for today, sorted alphabetically)
         if (dateStr === safeTodayStr) {
             const timerTasks = tasks
                 .filter((t) => activeTimerTaskIds.has(t.id) && !addedTaskIds.has(t.id))
@@ -635,7 +657,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         }
 
-        // 8. Expenses for this day (unpaid first, then paid)
+        // 9. Expenses for this day (unpaid first, then paid)
         const dayExpenses = expenses
             .filter((expense) => expense.date === dateStr)
             .sort((a, b) => {
@@ -660,7 +682,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
             });
         });
 
-        // 9. Recurring expense previews (no instance yet)
+        // 10. Recurring expense previews (no instance yet)
         const recurringPreviews = recurrences
             .filter((recurrence) => recurrence.active)
             .filter(() => dateStr >= safeTodayStr)
@@ -792,7 +814,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
                 isActualBased: base.isActualBased,
             };
         });
-    }, [getForDate, clientsById, projectsById, tasks, tasksById, entries, expenses, recurrences, expenseDatesByRecurrence, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getProjectColor, getTaskColor, getExpenseColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs, projectClientMap, defaultCurrency]);
+    }, [getForDate, clientsById, projects, projectsById, tasks, tasksById, entries, expenses, recurrences, expenseDatesByRecurrence, isTaskCompletedOnDate, isTaskVisibleOnDate, isClientVisibleOnDate, isProjectVisibleOnDate, getProjectColor, getTaskColor, getExpenseColor, getClientTimeOnDate, getProjectTimeOnDate, getTaskTimeOnDate, activeTimerTaskIds, safeTodayStr, getEntryOverlapMs, projectClientMap, defaultCurrency]);
 
     // Build the full week
     const weekDays = useMemo((): PlannerDay[] => {

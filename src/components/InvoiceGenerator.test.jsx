@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InvoiceGenerator from './InvoiceGenerator'
 
@@ -160,6 +160,7 @@ vi.mock('./invoice/InvoiceModal', () => {
         handleHoursChange,
         handleSaveInvoice,
         handleTemplateSelection,
+        calculatePricing,
         selectedBusinessInfo,
         setInvoiceDateOverride,
         setUseInvoiceDateOverride,
@@ -216,6 +217,7 @@ vi.mock('./invoice/InvoiceModal', () => {
                         ? `${selectedBusinessInfo.taxLabel} ${selectedBusinessInfo.taxRate}%`
                         : 'no tax configured'}
                 </div>
+                <div data-testid="pricing-subtotal">{calculatePricing?.subtotal ?? 0}</div>
                 {modalConfig.applyDateOverride && (
                     <button
                         type="button"
@@ -356,6 +358,54 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.date).toBe('2026-01-10')
         expect(invoiceData.dateOverride).toBe('2026-01-10')
         expect(invoiceData.currency).toBe('EUR')
+    })
+
+    it('preloads flat-rate quote task amounts for flat-rate projects', async () => {
+
+        taskHookMocks.tasks = [
+            {
+                id: 'task-1',
+                projectId: 'project-1',
+                title: 'Task',
+                estimatedHours: 3,
+                estimatedFlatAmount: 500
+            }
+        ]
+        const user = userEvent.setup()
+
+        renderGenerator({
+            mode: 'quote',
+            project: { ...baseProject, flatRate: true, statusMode: 'quote' }
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        expect(await screen.findByTestId('pricing-subtotal')).toHaveTextContent('500')
+    })
+
+    it('preloads flat-rate quote task amounts when a flat-rate project becomes active', async () => {
+
+        taskHookMocks.tasks = [
+            {
+                id: 'task-1',
+                projectId: 'project-1',
+                title: 'Task',
+                billable: true,
+                estimatedHours: 3,
+                estimatedFlatAmount: 500
+            }
+        ]
+        const user = userEvent.setup()
+
+        renderGenerator({
+            project: { ...baseProject, flatRate: true, statusMode: 'active' }
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        await waitFor(() => {
+            expect(screen.getByTestId('pricing-subtotal')).toHaveTextContent('500')
+        })
     })
 
     it('creates invoice adjustment entries when hours increase', async () => {

@@ -288,6 +288,29 @@ describe('TaskTree', () => {
         expect(taskTreeMocks.updateTask).not.toHaveBeenCalled();
     });
 
+    it('includes inline estimate fields when creating a client task', () => {
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false, preferredClientId: 'client-1', flatRate: true }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'New Task' }));
+        fireEvent.change(screen.getByPlaceholderText('Enter task title'), { target: { value: 'Quoted task' } });
+        fireEvent.pointerDown(screen.getByRole('button', { name: 'Estimate' }), { button: 0, ctrlKey: false });
+        fireEvent.change(screen.getByLabelText('Estimated Hours'), { target: { value: '3.5' } });
+        fireEvent.change(screen.getByLabelText('Quote Amount'), { target: { value: '900' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+        expect(taskTreeMocks.createTask).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Quoted task',
+            estimatedHours: 3.5,
+            estimatedFlatAmount: 900,
+        }));
+    });
+
     it('does not assign active-list manual rank when creating a recurring task', () => {
         taskTreeMocks.tasks = [
             { id: 'task-1', projectId: 'project-1', title: 'First task', parentTaskId: null, archived: false, recurring: null, sortOrder: 1000, lastActive: 100 },

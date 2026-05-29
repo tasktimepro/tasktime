@@ -42,4 +42,40 @@ describe('backupData', () => {
         expect(payload).not.toHaveProperty('backupType');
         expect(payload.emailTemplates).toEqual([]);
     });
+
+    it('preserves additive project and task planning fields', () => {
+        const payload = createBackupPayload({
+            ...baseInput,
+            projects: [{
+                id: 'project-1',
+                title: 'Quoted project',
+                statusMode: 'quote',
+                deadline: '2026-06-15',
+                budgetAmount: 2400,
+            }],
+            tasks: [{
+                id: 'task-1',
+                title: 'Discovery',
+                projectId: 'project-1',
+                estimatedHours: 6,
+                estimatedFlatAmount: 900,
+            }],
+        });
+
+        expect(payload.projects).toEqual([
+            expect.objectContaining({
+                id: 'project-1',
+                statusMode: 'quote',
+                deadline: '2026-06-15',
+                budgetAmount: 2400,
+            }),
+        ]);
+        expect(payload.tasks).toEqual([
+            expect.objectContaining({
+                id: 'task-1',
+                estimatedHours: 6,
+                estimatedFlatAmount: 900,
+            }),
+        ]);
+    });
 });

@@ -22,7 +22,10 @@ import {
     DEFAULT_SUBJECT,
     DEFAULT_SEND_BODY,
     DEFAULT_REMINDER_BODY,
+    DEFAULT_QUOTE_SUBJECT,
+    DEFAULT_QUOTE_BODY,
     DEFAULT_ATTACHMENT_TITLE,
+    DEFAULT_QUOTE_ATTACHMENT_TITLE,
 } from '@/utils/emailTemplateUtils';
 import { sendInvoiceEmail, isEmailSendError } from '@/utils/emailService';
 import { getCurrentInvoiceHtmlContent, generatePDFBase64 } from '@/utils/pdfUtils.ts';
@@ -73,17 +76,29 @@ const EmailPreviewModal = ({
     const invoiceCurrency = invoice?.currency || getPreferredCurrency();
     const currencySymbol = getCurrencySymbol(invoiceCurrency);
     const invoiceTotal = invoice ? getInvoiceTotal(invoice) : 0;
+    const isQuoteSend = sendType === 'quote';
+    const isReminderSend = sendType === 'reminder';
+    const templateType = isQuoteSend ? 'quote' : 'invoice';
+    const documentLabel = isQuoteSend ? 'quote' : 'invoice';
 
     const templateValues = useMemo(() => ({
         invoiceNumber: invoice?.invoiceNumber || '',
-        clientName: client?.contactPerson || client?.clientName || client?.title || '',
+        clientName: client?.contactPerson || client?.clientName || client?.title || client?.name || '',
         amount: invoiceTotal.toFixed(2),
         currency: currencySymbol,
         dueDate: invoice?.dueDate ? toDisplayDate(invoice.dueDate) : 'N/A',
         businessName,
     }), [invoice, client, invoiceTotal, currencySymbol, businessName]);
 
-    const invoiceTemplates = useMemo(() => getByType('invoice'), [getByType]);
+    const defaultSubjectTemplate = isQuoteSend ? DEFAULT_QUOTE_SUBJECT : DEFAULT_SUBJECT;
+    const defaultBodyTemplate = isQuoteSend
+        ? DEFAULT_QUOTE_BODY
+        : (isReminderSend ? DEFAULT_REMINDER_BODY : DEFAULT_SEND_BODY);
+    const defaultAttachmentTitleTemplate = isQuoteSend
+        ? DEFAULT_QUOTE_ATTACHMENT_TITLE
+        : DEFAULT_ATTACHMENT_TITLE;
+
+    const invoiceTemplates = useMemo(() => getByType(templateType), [getByType, templateType]);
     const availableTemplates = useMemo(() => {
         if (!pendingTemplate) {
             return invoiceTemplates;
@@ -95,8 +110,8 @@ const EmailPreviewModal = ({
     }, [invoiceTemplates, pendingTemplate]);
 
     const defaultTemplate = useMemo(
-        () => availableTemplates.find((template) => template.isDefault) || getDefaultForType('invoice') || availableTemplates[0],
-        [availableTemplates, getDefaultForType]
+        () => availableTemplates.find((template) => template.isDefault) || getDefaultForType(templateType) || availableTemplates[0],
+        [availableTemplates, getDefaultForType, templateType]
     );
 
     /** Apply a template's values to the editable fields */
@@ -104,29 +119,29 @@ const EmailPreviewModal = ({
         if (!template) {
             setFromName(businessName);
             setReplyTo(defaultReplyToEmail);
-            setSubject('');
-            setBody('');
-            setAttachmentTitle(normalizeAttachmentTitle(resolveAttachmentTitle(DEFAULT_ATTACHMENT_TITLE, templateValues)));
+            setSubject(isQuoteSend ? resolveSubject(defaultSubjectTemplate, sendType, templateValues) : '');
+            setBody(isQuoteSend ? resolveTemplate(defaultBodyTemplate, templateValues) : '');
+            setAttachmentTitle(normalizeAttachmentTitle(resolveAttachmentTitle(defaultAttachmentTitleTemplate, templateValues)));
             return;
         }
 
         setFromName(template.fromName || businessName);
         setReplyTo(template.replyTo || defaultReplyToEmail);
-        setSubject(resolveSubject(template.subject || DEFAULT_SUBJECT, sendType, templateValues));
+        setSubject(resolveSubject(template.subject || defaultSubjectTemplate, sendType, templateValues));
         setBody(resolveTemplate(
-            sendType === 'reminder'
+            isReminderSend
                 ? (template.reminderBody || DEFAULT_REMINDER_BODY)
-                : (template.sendBody || DEFAULT_SEND_BODY),
+                : (template.sendBody || defaultBodyTemplate),
             templateValues
         ));
-        setAttachmentTitle(normalizeAttachmentTitle(resolveAttachmentTitle(template.attachmentTitle || DEFAULT_ATTACHMENT_TITLE, templateValues)));
-    }, [businessName, defaultReplyToEmail, sendType, templateValues]);
+        setAttachmentTitle(normalizeAttachmentTitle(resolveAttachmentTitle(template.attachmentTitle || defaultAttachmentTitleTemplate, templateValues)));
+    }, [businessName, defaultAttachmentTitleTemplate, defaultBodyTemplate, defaultReplyToEmail, defaultSubjectTemplate, isQuoteSend, isReminderSend, sendType, templateValues]);
 
     // Initialise fields when modal opens or invoice/sendType changes
     useEffect(() => {
         if (!isOpen || !invoice) return;
 
-        setTo(client?.email || '');
+        setTo(client?.email || invoice?.client?.email || '');
         setError(null);
         setSending(false);
 
@@ -174,7 +189,7 @@ const EmailPreviewModal = ({
     const handleSend = useCallback(async () => {
 
         if (!driveSessionId) {
-            setError('Connect cloud sync to enable invoice emailing.');
+            setError(`Connect cloud sync to enable ${documentLabel} emailing.`);
             return;
         }
 
@@ -194,10 +209,11 @@ const EmailPreviewModal = ({
         try {
             const htmlContent = getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets);
             const pdfBase64 = await generatePDFBase64(htmlContent);
+            const documentId = invoice.id || invoice.projectId || invoice.invoiceNumber;
 
             const result = await sendInvoiceEmail({
                 sessionId: driveSessionId,
-                invoiceId: invoice.id,
+                invoiceId: documentId,
                 invoiceNumber: invoice.invoiceNumber,
                 to,
                 fromName: fromName || undefined,
@@ -210,20 +226,24 @@ const EmailPreviewModal = ({
             });
 
             if (result.success) {
-                const updates = {
-                    sentAt: Date.now(),
-                    sentToEmail: to,
-                };
+                if (!isQuoteSend) {
+                    const updates = {
+                        sentAt: Date.now(),
+                        sentToEmail: to,
+                    };
 
-                if (sendType === 'invoice' && invoice.status === 'draft') {
-                    updates.status = 'sent';
+                    if (sendType === 'invoice' && invoice.status === 'draft') {
+                        updates.status = 'sent';
+                    }
+
+                    updateInvoice(invoice.id, updates);
                 }
-
-                updateInvoice(invoice.id, updates);
 
                 const remaining = result.remaining != null ? ` (${result.remaining} emails remaining this month)` : '';
                 showSuccess(
-                    sendType === 'reminder'
+                    isQuoteSend
+                        ? `Quote emailed to ${to}${remaining}`
+                        : sendType === 'reminder'
                         ? `Reminder sent to ${to}${remaining}`
                         : `Invoice emailed to ${to}${remaining}`
                 );
@@ -259,7 +279,7 @@ const EmailPreviewModal = ({
         } finally {
             setSending(false);
         }
-    }, [attachmentTitle, body, businessBrandAssets, clients, driveSessionId, fromName, invoice, onClose, replyTo, sendType, showSuccess, subject, to, updateInvoice]);
+    }, [attachmentTitle, body, businessBrandAssets, clients, documentLabel, driveSessionId, fromName, invoice, isQuoteSend, onClose, replyTo, sendType, showSuccess, subject, to, updateInvoice]);
 
     const handleClose = useCallback(() => {
         setError(null);
@@ -270,9 +290,11 @@ const EmailPreviewModal = ({
 
     if (!invoice) return null;
 
-    const title = sendType === 'reminder'
-        ? `Send Reminder — ${invoice.invoiceNumber}`
-        : `Send Invoice — ${invoice.invoiceNumber}`;
+    const title = isQuoteSend
+        ? `Send Quote — ${invoice.invoiceNumber}`
+        : sendType === 'reminder'
+            ? `Send Reminder — ${invoice.invoiceNumber}`
+            : `Send Invoice — ${invoice.invoiceNumber}`;
 
     const hasTemplates = availableTemplates.length > 0;
 
@@ -286,7 +308,7 @@ const EmailPreviewModal = ({
                 disabled={sending || !to}
                 leadingIcon={Send}
             >
-                {sending ? 'Sending...' : (sendType === 'reminder' ? 'Send Reminder' : 'Send Invoice')}
+                {sending ? 'Sending...' : (isQuoteSend ? 'Send Quote' : (sendType === 'reminder' ? 'Send Reminder' : 'Send Invoice'))}
             </Button>
         </div>
     );
@@ -304,7 +326,7 @@ const EmailPreviewModal = ({
                 {/* Precondition warnings */}
                 {!driveSessionId && (
                     <Notice variant="warning" title="Cloud sync required">
-                        Connect cloud sync in Account settings to enable invoice emailing.
+                        Connect cloud sync in Account settings to enable {documentLabel} emailing.
                     </Notice>
                 )}
 
@@ -357,7 +379,7 @@ const EmailPreviewModal = ({
                             </SelectContent>
                         </Select>
                     )}
-                </div>
+                    </div>
 
                 {/* To */}
                 <div className="space-y-1">
@@ -432,6 +454,8 @@ const EmailPreviewModal = ({
                 isOpen={isTemplateModalOpen}
                 onClose={() => setIsTemplateModalOpen(false)}
                 onSaved={handleTemplateSaved}
+                allowedTypes={[templateType]}
+                initialType={templateType}
             />
         </>
     );

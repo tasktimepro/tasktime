@@ -7,7 +7,11 @@
 
 // ── Default field values for new invoice email templates ─────────────────────
 
+export type EmailSendType = 'invoice' | 'reminder' | 'quote';
+
 export const DEFAULT_SUBJECT = 'Invoice {invoiceNumber} from {businessName}';
+
+export const DEFAULT_QUOTE_SUBJECT = 'Quote {invoiceNumber} from {businessName}';
 
 export const DEFAULT_SEND_BODY = `Hi {clientName},
 
@@ -27,7 +31,18 @@ Please let me know if you have any questions.
 Thank you,
 {businessName}`;
 
+export const DEFAULT_QUOTE_BODY = `Hi {clientName},
+
+Please find attached quote {invoiceNumber} for {currency}{amount}.
+
+Let me know if you would like to review any of the scope or pricing details.
+
+Thank you,
+{businessName}`;
+
 export const DEFAULT_ATTACHMENT_TITLE = 'invoice-{invoiceNumber}';
+
+export const DEFAULT_QUOTE_ATTACHMENT_TITLE = 'quote-{invoiceNumber}';
 
 // ── Placeholder metadata (for the "Available Variables" UI) ──────────────────
 
@@ -80,7 +95,7 @@ export function resolveTemplate(template: string, values: EmailTemplatePlacehold
  */
 export function resolveSubject(
     subjectTemplate: string,
-    sendType: 'invoice' | 'reminder',
+    sendType: EmailSendType,
     values: EmailTemplatePlaceholders,
 ): string {
 

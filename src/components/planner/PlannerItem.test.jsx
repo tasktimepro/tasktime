@@ -193,4 +193,65 @@ describe('PlannerItem', () => {
         expect(screen.queryByText('Landlord')).not.toBeInTheDocument();
         expect(screen.queryByText(/€1,200.00 EUR|€1200.00 EUR|€1,200 EUR|€1200 EUR/)).not.toBeInTheDocument();
     });
+
+    it('shows quote stage and deadline metadata for project items', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-03-24T12:00:00Z'));
+
+        render(
+            <PlannerItem
+                type="project"
+                title="Quoted project"
+                projectStatusMode="quote"
+                projectDeadline="2026-03-28"
+                onClick={() => {}}
+            />
+        );
+
+        expect(screen.getByText('Quote stage')).toBeInTheDocument();
+        expect(screen.getByText('Due Mar 28')).toBeInTheDocument();
+
+        vi.useRealTimers();
+    });
+
+    it('shows completed metadata for resolved project deadlines', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-03-30T12:00:00Z'));
+
+        render(
+            <PlannerItem
+                type="project"
+                title="Resolved project"
+                projectDeadline="2026-03-28"
+                projectDeadlineResolvedAt={Date.UTC(2026, 2, 29)}
+                onClick={() => {}}
+            />
+        );
+
+        expect(screen.getByText('Completed')).toBeInTheDocument();
+        expect(screen.queryByText('2d overdue')).not.toBeInTheDocument();
+
+        vi.useRealTimers();
+    });
+
+    it('renders deadline marker projects as a single-line project deadline label without extra metadata', () => {
+        render(
+            <PlannerItem
+                type="project"
+                title="Deadline: Quoted project"
+                projectStatusMode="quote"
+                projectDeadline="2026-03-28"
+                isProjectDeadlineItem={true}
+                layout="mobile"
+                onClick={() => {}}
+            />
+        );
+
+        const title = screen.getByText('Deadline: Quoted project');
+
+        expect(title).toHaveClass('truncate');
+        expect(title).toHaveClass('whitespace-nowrap');
+        expect(screen.queryByText('Quote stage')).not.toBeInTheDocument();
+        expect(screen.queryByText('Due Mar 28')).not.toBeInTheDocument();
+    });
 });

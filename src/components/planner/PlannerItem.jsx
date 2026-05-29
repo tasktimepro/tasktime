@@ -16,6 +16,7 @@ import {
     PlayIcon,
     ArrowPathIcon,
     CalendarDaysIcon,
+    FlagIcon,
     HandCoinsIcon,
 } from '@/components/ui/icons';
 import {
@@ -27,6 +28,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-react';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
+import { toDisplayDate } from '@/utils/dateUtils.ts';
+import { getProjectDeadlineStatus, isProjectInQuoteMode } from '@/utils/projectPlanningUtils.ts';
 
 /**
  * @param {Object} props
@@ -44,6 +47,10 @@ import { formatCurrency } from '@/utils/currencyUtils.ts';
  * @param {string} props.currency - Expense currency
  * @param {string | null} props.supplierName - Expense supplier
  * @param {boolean} props.hasAttachment - Whether item has a planner attachment (can be removed)
+ * @param {'active' | 'quote' | undefined} props.projectStatusMode - Project status mode (projects only)
+ * @param {string | null | undefined} props.projectDeadline - Project deadline YYYY-MM-DD (projects only)
+ * @param {number | null | undefined} props.projectDeadlineResolvedAt - Resolved deadline timestamp (projects only)
+ * @param {boolean} props.isProjectDeadlineItem - Whether this is the auto-generated project deadline marker
  * @param {boolean} props.isPreview - Whether item is a non-interactive preview
  * @param {() => void} props.onClick - Click handler
  * @param {() => void} props.onEdit - Called when user wants to edit planner options
@@ -65,6 +72,10 @@ const PlannerItem = ({
     currency,
     supplierName,
     hasAttachment = false,
+    projectStatusMode,
+    projectDeadline,
+    projectDeadlineResolvedAt,
+    isProjectDeadlineItem = false,
     isPreview = false,
     onClick,
     onEdit,
@@ -89,6 +100,9 @@ const PlannerItem = ({
         }
         if (type === 'expense') {
             return HandCoinsIcon;
+        }
+        if (type === 'project' && isProjectDeadlineItem) {
+            return FlagIcon;
         }
         return {
             client: UserIcon,
@@ -144,7 +158,27 @@ const PlannerItem = ({
                     : subtype === 'attached'
                         ? 'Attached'
                         : null;
-    const metaParts = isMobileLayout
+    const projectDeadlineStatus = type === 'project' && projectDeadline
+        ? getProjectDeadlineStatus({ deadline: projectDeadline, deadlineResolvedAt: projectDeadlineResolvedAt ?? null })
+        : null;
+    const isProjectQuoteStage = type === 'project' && isProjectInQuoteMode({ statusMode: projectStatusMode, isPersonal: false });
+    const projectMetaParts = type === 'project' && !isProjectDeadlineItem
+        ? [
+            isProjectQuoteStage ? 'Quote stage' : null,
+            projectDeadlineStatus?.hasDeadline
+                ? (projectDeadlineStatus.isResolved
+                    ? 'Completed'
+                    : projectDeadlineStatus.isOverdue
+                    ? `${Math.abs(projectDeadlineStatus.daysRemaining || 0)}d overdue`
+                    : projectDeadlineStatus.isToday
+                        ? 'Due today'
+                        : `Due ${toDisplayDate(projectDeadlineStatus.deadline, { month: 'short', day: 'numeric' })}`)
+                : null,
+        ].filter(Boolean)
+        : [];
+    const metaParts = isProjectDeadlineItem
+        ? []
+        : isMobileLayout
         ? (isExpense
             ? [amountLabel, supplierName].filter(Boolean)
             : [taskSubtypeLabel, hasTarget ? `${estimatedHours}h plan` : null, actualTimeMs > 0 ? `${formatTime(actualTimeMs)} worked` : null].filter(Boolean))
@@ -249,11 +283,36 @@ const PlannerItem = ({
                 
                 <div className={cn('min-w-0 flex-1', isMobileLayout && 'space-y-0.5')}>
                     <div className={cn(
-                        isMobileLayout ? 'text-sm font-medium whitespace-normal break-words' : 'text-sm truncate',
+                        isProjectDeadlineItem
+                            ? 'text-sm font-medium truncate whitespace-nowrap'
+                            : (isMobileLayout ? 'text-sm font-medium whitespace-normal break-words' : 'text-sm truncate'),
                         isCompleted && "line-through text-muted-foreground"
                     )}>
                         {title}
                     </div>
+                    {projectMetaParts.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                            {projectMetaParts.map((part) => (
+                                <span
+                                    key={part}
+                                    className={cn(
+                                        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                        part === 'Quote stage'
+                                            ? 'bg-amber-100 text-amber-800'
+                                            : part === 'Completed'
+                                                ? 'bg-emerald-100 text-emerald-800'
+                                            : part === 'Due today'
+                                                ? 'bg-amber-100 text-amber-800'
+                                                : part.includes('overdue')
+                                                    ? 'bg-destructive/10 text-destructive'
+                                                    : 'bg-muted text-muted-foreground'
+                                    )}
+                                >
+                                    {part}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                     {metaParts.length > 0 && (
                         <div className={cn(
                             'text-xs text-muted-foreground',

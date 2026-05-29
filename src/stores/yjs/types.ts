@@ -33,6 +33,14 @@ export interface Project {
     taskView?: 'list' | 'kanban';
     /** Preferred task sort order for this project */
     taskSort?: 'createdAt' | 'lastActive' | 'name' | 'manual';
+    /** Quote-stage projects change document/UI mode without creating billing records */
+    statusMode?: 'active' | 'quote';
+    /** Optional project deadline stored as YYYY-MM-DD */
+    deadline?: string | null;
+    /** Optional timestamp when the project deadline was marked complete */
+    deadlineResolvedAt?: number | null;
+    /** Optional project budget or earnings target in project currency */
+    budgetAmount?: number | null;
 }
 
 export interface TipTapJsonNode {
@@ -83,6 +91,10 @@ export interface Task {
     completedDatesByYear?: Record<string, Record<string, number[]>>;
     /** Completion date for non-recurring tasks (YYYY-MM-DD) */
     completedOnDate?: string | null;
+    /** Optional estimate used for quote and project progress calculations */
+    estimatedHours?: number | null;
+    /** Optional flat estimate amount for flat-rate client projects */
+    estimatedFlatAmount?: number | null;
 }
 
 export interface RecurringConfig {
@@ -299,7 +311,7 @@ export interface InvoiceTemplate {
 export interface EmailTemplate {
     id: string;
     name: string;
-    type: 'invoice';
+    type: 'invoice' | 'quote';
     fromName?: string;
     replyTo?: string;
     subject: string;

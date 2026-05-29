@@ -7,6 +7,7 @@ import { toDisplayDate } from '@/utils/dateUtils'
 const hookMocks = vi.hoisted(() => ({
 
     projects: [],
+    clients: [],
     tasks: [],
     timeEntries: [],
     recurringStatus: null,
@@ -78,7 +79,7 @@ vi.mock('@/hooks/useProjects', () => ({
 vi.mock('@/hooks/useClients', () => ({
 
     useClients: () => ({
-        clients: [],
+        clients: hookMocks.clients,
     })
 }))
 
@@ -152,6 +153,7 @@ describe('TaskViewModal recurring actions', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.clients = []
         hookMocks.projects = []
         hookMocks.tasks = [recurringTask]
         hookMocks.timeEntries = []
@@ -277,6 +279,7 @@ describe('TaskViewModal billable toggle', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.clients = []
         hookMocks.tasks = [task]
         hookMocks.projects = [{ id: 'project-1', title: 'Client Work', isPersonal: false }]
         hookMocks.timeEntries = []
@@ -327,6 +330,7 @@ describe('TaskViewModal archived footer actions', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.clients = []
         hookMocks.tasks = [archivedTask]
         hookMocks.timeEntries = []
     })
@@ -373,6 +377,7 @@ describe('TaskViewModal time display', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.clients = []
         hookMocks.projects = []
         hookMocks.tasks = [task]
         hookMocks.timeEntries = [
@@ -403,5 +408,58 @@ describe('TaskViewModal time display', () => {
         )
 
         expect(screen.getByText('1m 5s')).toBeInTheDocument()
+    })
+
+    it('shows estimate progress when a task has estimated hours', () => {
+        hookMocks.projects = [{ id: 'project-1', title: 'Client Work', preferredClientId: 'client-1', flatRate: false, hourlyRate: 100 }]
+        hookMocks.clients = [{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }]
+        hookMocks.tasks = [{ ...task, projectId: 'project-1', estimatedHours: 2 }]
+
+        render(
+            <TaskViewModal
+                isOpen={true}
+                onClose={vi.fn()}
+                task={hookMocks.tasks[0]}
+                dateStr={null}
+                attachment={null}
+                onEdit={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onNavigateToProject={vi.fn()}
+                onOpenTimeEntries={vi.fn()}
+                onOpenPlannerOptions={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Estimate progress')).toBeInTheDocument()
+        expect(screen.getByText((_, node) => node?.textContent === '0.02 of 2 hours tracked')).toBeInTheDocument()
+        expect(screen.getByText('Estimated value:')).toBeInTheDocument()
+        expect(screen.getByText('$200.00')).toBeInTheDocument()
+    })
+
+    it('shows quote amount details for flat-rate task estimates', () => {
+        hookMocks.projects = [{ id: 'project-1', title: 'Quoted Work', preferredClientId: 'client-1', flatRate: true, hourlyRate: null }]
+        hookMocks.clients = [{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }]
+        hookMocks.tasks = [{ ...task, projectId: 'project-1', estimatedFlatAmount: 900 }]
+
+        render(
+            <TaskViewModal
+                isOpen={true}
+                onClose={vi.fn()}
+                task={hookMocks.tasks[0]}
+                dateStr={null}
+                attachment={null}
+                onEdit={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onNavigateToProject={vi.fn()}
+                onOpenTimeEntries={vi.fn()}
+                onOpenPlannerOptions={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Estimate progress')).toBeInTheDocument()
+        expect(screen.getByText('Quote amount:')).toBeInTheDocument()
+        expect(screen.getByText('CHF900.00')).toBeInTheDocument()
     })
 })

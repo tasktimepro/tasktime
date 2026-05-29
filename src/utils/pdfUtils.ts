@@ -90,6 +90,7 @@ type PaymentMethodInfo = {
 };
 
 type InvoiceData = {
+    documentMode?: 'invoice' | 'quote';
     project?: ProjectInfo;
     client: ClientInfo;
     tasks: InvoiceTask[];
@@ -387,6 +388,7 @@ const getHeaderPlacement = (logoPlacement: InvoiceTemplateLogoPlacement) => {
  */
 export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     const {
+        documentMode = 'invoice',
         project,
         client,
         tasks: originalTasks,
@@ -416,6 +418,9 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         brandingLogoDataUrl = null,
     } = invoiceData;
     const resolvedTotal = typeof total === 'number' ? total : (typeof totalAmount === 'number' ? totalAmount : 0);
+    const isQuoteDocument = documentMode === 'quote';
+    const documentTitle = isQuoteDocument ? 'QUOTE' : 'INVOICE';
+    const documentLabel = isQuoteDocument ? 'Quote' : 'Invoice';
 
     // Filter out subtasks that are already merged into parent tasks
     const mergedTaskIds = new Set<string>();
@@ -449,7 +454,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     const headerPlacement = getHeaderPlacement(branding.logoPlacement);
     const isCenteredHeader = headerPlacement.justifyContent === 'center';
     const isMinimalLayout = branding.layoutStyle === 'neutral';
-    const showBillingPeriod = invoiceData.template?.showBillingPeriod ?? true;
+    const showBillingPeriod = isQuoteDocument ? false : (invoiceData.template?.showBillingPeriod ?? true);
     const showProjectTitle = invoiceData.template?.showProjectTitle ?? true;
     const billingPeriodLabel = showBillingPeriod
         ? formatBillingPeriodLabel({
@@ -470,13 +475,13 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         : '';
     const dateMetaParts = [
         date ? `Date: ${date}` : '',
-        dueDate ? `Due Date: ${dueDate}` : '',
+        !isQuoteDocument && dueDate ? `Due Date: ${dueDate}` : '',
     ].filter(Boolean);
     const dateMetaMarkup = isCenteredHeader && dateMetaParts.length > 0
         ? `<p style="color: #666; margin: 0;">${dateMetaParts.join(' &bull; ')}</p>`
         : `
             ${date ? `<p style="color: #666; margin: 0;">Date: ${date}</p>` : ''}
-            ${dueDate ? `<p style="color: #666; margin: 0;">Due Date: ${dueDate}</p>` : ''}
+            ${!isQuoteDocument && dueDate ? `<p style="color: #666; margin: 0;">Due Date: ${dueDate}</p>` : ''}
         `;
     const billingPeriodMarkup = billingPeriodLabel
         ? `<p style="color: #666; margin: 0;">Billing Period: ${billingPeriodLabel}</p>`
@@ -486,8 +491,8 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         : '';
     const invoiceMetaMarkup = `
         <div style="text-align: ${headerPlacement.invoiceAlign};">
-            <h1 style="${invoiceTitleStyle}">INVOICE</h1>
-            <p style="color: #666; margin: 0;">Invoice: #${invoiceNumber}</p>
+            <h1 style="${invoiceTitleStyle}">${documentTitle}</h1>
+            ${invoiceNumber ? `<p style="color: #666; margin: 0;">${documentLabel}: #${invoiceNumber}</p>` : ''}
             ${dateMetaMarkup}
             ${billingPeriodMarkup}
             ${projectMarkup}
@@ -980,6 +985,7 @@ export const buildInvoiceHtmlContent = (
     } : (invoice.client || { name: '' });
 
     return createInvoiceHTML({
+        documentMode: invoice.documentMode,
         project: invoice.project,
         client: clientData,
         tasks: invoice.tasks || [],

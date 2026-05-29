@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
+import { buildInvoiceHtmlContent, generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
 import { millisecondsToHours, toStorageDate, timestampToDateString } from '../utils/dateUtils.ts';
 import {
     DEFAULT_INVOICE_LAYOUT_STYLE,
@@ -12,6 +12,7 @@ import { useToast } from '../hooks/useToast.ts';
 import InvoiceModal from './invoice/InvoiceModal';
 import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
+import EmailPreviewModal from './invoice/EmailPreviewModal';
 import * as InvoiceHandler from './invoice/InvoiceHandler.ts';
 import useInvoicePricing from './invoice/hooks/useInvoicePricing.ts';
 import { calculateDueDate, generateInvoiceNumber } from './invoice/utils/invoiceDateUtils.ts';
@@ -32,6 +33,12 @@ import {
     getNextSequentialNumberForTemplate,
     resolveCurrentInvoiceTemplate,
 } from '../utils/invoiceUtils.ts';
+import {
+    buildProjectQuoteLineItems,
+    buildQuoteDocumentData,
+    getQuoteNumberTimestamp,
+    getQuoteDownloadFilename,
+} from '../utils/quoteUtils.ts';
 import {
     getBillingPeriodRange,
     getDefaultInvoiceBillingPeriodState,
@@ -101,8 +108,10 @@ const InvoiceGenerator = ({
     openBusinessModal,
     openPaymentMethodModal,
     openTemplateModal,
-    activeModal = null
+    activeModal = null,
+    mode = 'invoice'
 }) => {
+    const isQuoteMode = mode === 'quote';
     // Yjs hooks for data access
     const { invoices, createInvoice, updateInvoice } = useInvoices();
     const { projects } = useProjects();
@@ -116,6 +125,8 @@ const InvoiceGenerator = ({
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
     const [previewInvoice, setPreviewInvoice] = useState(null);
+    const [quoteEmailDocument, setQuoteEmailDocument] = useState(null);
+        const [quoteNumberTimestamp, setQuoteNumberTimestamp] = useState('');
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
     const [selectedClient, setSelectedClient] = useState(client); // Initialize with client prop if provided
@@ -150,8 +161,12 @@ const InvoiceGenerator = ({
         if (!showInvoiceForm) {
             setShowPreview(false);
             setPreviewInvoice(null);
+
+            if (!isHiddenForNestedModal) {
+                setQuoteNumberTimestamp('');
+            }
         }
-    }, [showInvoiceForm]);
+    }, [isHiddenForNestedModal, showInvoiceForm]);
 
     useEffect(() => {
         if (isHiddenForNestedModal && !activeModal) {
@@ -943,6 +958,10 @@ const InvoiceGenerator = ({
             return;
         }
 
+        if (isQuoteMode) {
+            return;
+        }
+
         const projectForInvoice = selectedProject
             || (editingInvoice?.projectId ? projects.find((item) => item.id === editingInvoice.projectId) : null)
             || project
@@ -1004,7 +1023,7 @@ const InvoiceGenerator = ({
 
             return areBooleanMapsEqual(prev, next) ? prev : next;
         });
-    }, [editingInvoice, invoiceTasks, prepareInvoiceData, project, projects, selectedProject, showInvoiceForm]);
+    }, [editingInvoice, invoiceTasks, isQuoteMode, prepareInvoiceData, project, projects, selectedProject, showInvoiceForm]);
 
     useEffect(() => {
         if (!showInvoiceForm) {
@@ -1044,6 +1063,12 @@ const InvoiceGenerator = ({
             return;
         }
 
+        const taskEstimateMap = new Map(
+            tasks
+                .filter((task) => task.projectId === selectedProject.id)
+                .map((task) => [task.id, task.estimatedFlatAmount])
+        );
+
         setUseFlatRate((prev) => {
             const next = { ...prev };
             let hasChanges = false;
@@ -1072,8 +1097,28 @@ const InvoiceGenerator = ({
             return hasChanges ? next : prev;
         });
 
+        setTaskFlatRates((prev) => {
+            const next = { ...prev };
+            let hasChanges = false;
+
+            invoiceTasks.forEach((task) => {
+                if (next[task.id] !== undefined) {
+                    return;
+                }
+
+                const estimatedFlatAmount = taskEstimateMap.get(task.id);
+
+                if (typeof estimatedFlatAmount === 'number' && Number.isFinite(estimatedFlatAmount)) {
+                    next[task.id] = estimatedFlatAmount;
+                    hasChanges = true;
+                }
+            });
+
+            return hasChanges ? next : prev;
+        });
+
         setNewTaskUseFlatRate(true);
-    }, [invoiceTasks, selectedProject, showInvoiceForm]);
+    }, [invoiceTasks, selectedProject, showInvoiceForm, tasks]);
 
     // Handler assignments (replace function definitions)
     const handleTaskSelectionForBilling = InvoiceHandler.handleTaskSelectionForBilling(setSelectedTasksForBilling);
@@ -1320,6 +1365,80 @@ const InvoiceGenerator = ({
         return taskAmount;
     }, [parseInvoiceNumber, selectedClient?.hourlyRate, selectedProject?.hourlyRate]);
 
+    const getNormalizedDocumentTasks = useCallback(() => {
+        const orderedSelectedInvoiceTasks = orderTasksWithSubtasks(
+            invoiceTasks.filter(task => task && task.id && selectedTasksForBilling[task.id])
+        );
+
+        return orderedSelectedInvoiceTasks
+            .map(task => ({
+                ...task,
+                hours: editableHours[task?.id] || task?.originalHours || 0,
+                flatRate: taskFlatRates[task.id] || 0,
+                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                useFlatRate: useFlatRate[task.id] || false,
+                quantity: taskQuantities[task.id] || 1,
+                isMerged: (task && task.id && mergedSubtasks[task.id]) || false,
+                mergedSubtasks: (task && task.id && mergedSubtasks[task.id])
+                    ? invoiceTasks
+                        .filter(subtask => subtask && subtask.parentTaskId === task.id)
+                        .map(subtask => ({
+                            ...subtask,
+                            hours: editableHours[subtask.id] || subtask.originalHours || 0,
+                            flatRate: taskFlatRates[subtask.id] || 0,
+                            hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                            useFlatRate: useFlatRate[subtask.id] || false,
+                            quantity: taskQuantities[subtask.id] || 1
+                        }))
+                    : []
+            }))
+            .filter((task) => getInvoiceTaskAmount(task, task.isMerged ? task.mergedSubtasks : []) > 0);
+    }, [editableHours, getInvoiceTaskAmount, invoiceTasks, mergedSubtasks, selectedClient?.hourlyRate, selectedProject?.hourlyRate, selectedTasksForBilling, taskFlatRates, taskHourlyRates, taskQuantities, useFlatRate]);
+
+    const getNormalizedAdditionalDocumentTasks = useCallback(() => {
+        return additionalTasks
+            .filter(task => task)
+            .map(task => ({
+                ...task,
+                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
+            }))
+            .filter((task) => getInvoiceTaskAmount(task) > 0);
+    }, [additionalTasks, getInvoiceTaskAmount, selectedClient?.hourlyRate, selectedProject?.hourlyRate]);
+
+    const buildQuoteData = useCallback(() => {
+        if (!selectedProject) {
+            showError('Please select a project before generating a quote.');
+            return null;
+        }
+
+        try {
+            const quoteDate = useInvoiceDateOverride && invoiceDateOverride
+                ? toStorageDate(new Date(invoiceDateOverride))
+                : toStorageDate(new Date());
+
+            return buildQuoteDocumentData({
+                project: selectedProject,
+                tasks,
+                clients,
+                businessInfos,
+                paymentMethods,
+                invoiceTemplates,
+                client: selectedClient || null,
+                businessInfo: resolveCurrentBusinessInfo(selectedBusinessInfo),
+                paymentMethod: selectedPaymentMethod || null,
+                template: selectedTemplate || null,
+                note: invoiceNote,
+                quoteTasks: getNormalizedDocumentTasks(),
+                additionalTasks: getNormalizedAdditionalDocumentTasks(),
+                quoteDate,
+                quoteTimestamp: quoteNumberTimestamp || getQuoteNumberTimestamp(),
+            });
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Unable to prepare quote.');
+            return null;
+        }
+    }, [businessInfos, clients, getNormalizedAdditionalDocumentTasks, getNormalizedDocumentTasks, invoiceDateOverride, invoiceNote, invoiceTemplates, paymentMethods, quoteNumberTimestamp, resolveCurrentBusinessInfo, selectedBusinessInfo, selectedClient, selectedPaymentMethod, selectedProject, selectedTemplate, showError, tasks, useInvoiceDateOverride]);
+
     /**
      * Build invoice data for preview or save
      */
@@ -1476,41 +1595,8 @@ const InvoiceGenerator = ({
             supplierName: expense.supplierName || null
         }));
 
-        const orderedSelectedInvoiceTasks = orderTasksWithSubtasks(
-            invoiceTasks.filter(task => task && task.id && selectedTasksForBilling[task.id])
-        );
-
-        const normalizedSelectedInvoiceTasks = orderedSelectedInvoiceTasks
-            .map(task => ({
-                ...task,
-                hours: editableHours[task?.id] || task?.originalHours || 0,
-                flatRate: taskFlatRates[task.id] || 0,
-                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
-                useFlatRate: useFlatRate[task.id] || false,
-                quantity: taskQuantities[task.id] || 1,
-                isMerged: (task && task.id && mergedSubtasks[task.id]) || false,
-                mergedSubtasks: (task && task.id && mergedSubtasks[task.id])
-                    ? invoiceTasks
-                        .filter(subtask => subtask && subtask.parentTaskId === task.id)
-                        .map(subtask => ({
-                            ...subtask,
-                            hours: editableHours[subtask.id] || subtask.originalHours || 0,
-                            flatRate: taskFlatRates[subtask.id] || 0,
-                            hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
-                            useFlatRate: useFlatRate[subtask.id] || false,
-                            quantity: taskQuantities[subtask.id] || 1
-                        }))
-                    : []
-            }))
-            .filter((task) => getInvoiceTaskAmount(task, task.isMerged ? task.mergedSubtasks : []) > 0);
-
-        const normalizedAdditionalTasks = additionalTasks
-            .filter(task => task)
-            .map(task => ({
-                ...task,
-                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
-            }))
-            .filter((task) => getInvoiceTaskAmount(task) > 0);
+        const normalizedSelectedInvoiceTasks = getNormalizedDocumentTasks();
+        const normalizedAdditionalTasks = getNormalizedAdditionalDocumentTasks();
 
         const resolvedBrandAsset = resolvedBusinessInfo?.branding?.logoAssetId
             ? getBusinessBrandAsset(resolvedBusinessInfo.branding.logoAssetId)
@@ -1814,14 +1900,37 @@ const InvoiceGenerator = ({
      * Preview invoice in modal
      */
     const handlePreviewInvoice = () => {
-        const invoiceData = buildInvoiceData({ applyTemplateSequentialUpdate: false });
-        if (!invoiceData) {
+        const documentData = isQuoteMode
+            ? buildQuoteData()
+            : buildInvoiceData({ applyTemplateSequentialUpdate: false });
+
+        if (!documentData) {
             return;
         }
 
-        setPreviewInvoice(invoiceData);
+        setPreviewInvoice(documentData);
         setShowPreview(true);
     };
+
+    const handleSendQuote = useCallback(() => {
+        const quoteData = buildQuoteData();
+        if (!quoteData) {
+            return;
+        }
+
+        setQuoteEmailDocument(quoteData);
+    }, [buildQuoteData]);
+
+    const handleDownloadQuote = useCallback(async () => {
+        const quoteData = buildQuoteData();
+        if (!quoteData) {
+            return;
+        }
+
+        const htmlContent = buildInvoiceHtmlContent(quoteData, clients, businessBrandAssets);
+        await generatePDF(htmlContent, getQuoteDownloadFilename(selectedProject?.title || 'quote', quoteData.date));
+        showSuccess('Quote downloaded');
+    }, [buildQuoteData, businessBrandAssets, clients, selectedProject?.title, showSuccess]);
 
     /**
      * Open invoice form with prepared data or for editing
@@ -1832,7 +1941,7 @@ const InvoiceGenerator = ({
         
         // Check if a timer is currently active (running, not paused)
         if (isTimerActive && !isTimerPaused) {
-            showError('Cannot generate an invoice while a timer is active. Please pause the timer first.');
+            showError(`Cannot generate a ${isQuoteMode ? 'quote' : 'invoice'} while a timer is active. Please pause the timer first.`);
             return;
         }
         
@@ -1934,8 +2043,17 @@ const InvoiceGenerator = ({
             // When editing, project selection is allowed
             setIsProjectContextFixed(false);
         } else {
+            if (isQuoteMode && !quoteNumberTimestamp) {
+                setQuoteNumberTimestamp(getQuoteNumberTimestamp());
+            }
+
             // Open form with new invoice data
-            const tasksData = prepareInvoiceData();
+            const quoteLineItems = isQuoteMode && selectedProject
+                ? buildProjectQuoteLineItems({ project: selectedProject, tasks, clients })
+                : null;
+            const tasksData = isQuoteMode
+                ? (quoteLineItems?.quoteTasks || [])
+                : prepareInvoiceData();
             
             // Even if there are no billable tasks, we still open the form
             // This allows users to manually add tasks with the "New Task" feature
@@ -1944,6 +2062,7 @@ const InvoiceGenerator = ({
                 // Initialize editable hours with original hours
                 const initialHours = {};
                 const initialTaskSelection = {};
+                const initialTaskFlatRates = {};
                 const initialFlatRateToggles = {};
                 const initialTaskQuantities = {};
                 
@@ -1953,7 +2072,14 @@ const InvoiceGenerator = ({
                     
                     // For flat rate projects, pre-toggle all tasks to flat rate
                     if (selectedProject && selectedProject.flatRate) {
+                        const sourceTask = tasks.find((candidate) => candidate.id === task.id);
+                        const estimatedFlatAmount = sourceTask?.estimatedFlatAmount;
+                        const flatRateAmount = typeof task.flatRate === 'number' && Number.isFinite(task.flatRate)
+                            ? task.flatRate
+                            : (typeof estimatedFlatAmount === 'number' && Number.isFinite(estimatedFlatAmount) ? estimatedFlatAmount : 0);
+
                         initialFlatRateToggles[task.id] = true;
+                        initialTaskFlatRates[task.id] = flatRateAmount;
                         initialTaskQuantities[task.id] = 1;
                     }
                 });
@@ -1961,15 +2087,23 @@ const InvoiceGenerator = ({
                 setEditableHours(initialHours);
                 setSelectedTasksForBilling(initialTaskSelection);
 
+                if (isQuoteMode) {
+                    setAdditionalTasks(quoteLineItems?.additionalTasks || []);
+                    setAdditionalExpenses([]);
+                }
+
                 const initialExpenseSelection = {};
-                availableExpensesWithConversion.forEach((expense) => {
-                    if (!expense.isConvertible) return;
-                    initialExpenseSelection[expense.id] = true;
-                });
+                if (!isQuoteMode) {
+                    availableExpensesWithConversion.forEach((expense) => {
+                        if (!expense.isConvertible) return;
+                        initialExpenseSelection[expense.id] = true;
+                    });
+                }
                 setSelectedExpensesForBilling(initialExpenseSelection);
                 
                 // Apply flat rate toggles for flat rate projects
                 if (selectedProject && selectedProject.flatRate) {
+                    setTaskFlatRates(initialTaskFlatRates);
                     setUseFlatRate(initialFlatRateToggles);
                     setTaskQuantities(initialTaskQuantities);
                     
@@ -1991,6 +2125,10 @@ const InvoiceGenerator = ({
                 setTaskHourlyRates({});
                 setSelectedTasksForBilling({});
                 setSelectedExpensesForBilling({});
+                if (isQuoteMode) {
+                    setAdditionalTasks(quoteLineItems?.additionalTasks || []);
+                    setAdditionalExpenses([]);
+                }
                 
                 // Set new task flat rate toggle based on project setting even when no billable tasks
                 if (selectedProject && selectedProject.flatRate) {
@@ -2011,7 +2149,7 @@ const InvoiceGenerator = ({
             }
         }
         setShowInvoiceForm(true);
-    }, [editingInvoice, prepareInvoiceData, showInvoiceForm, projects, setIsProjectContextFixed, selectedProject, selectedClient, isTimerActive, isTimerPaused, showError, client, availableExpensesWithConversion, expenses]);
+    }, [availableExpensesWithConversion, client, clients, editingInvoice, expenses, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceData, projects, quoteNumberTimestamp, selectedClient, selectedProject, setIsProjectContextFixed, showError, showInvoiceForm, tasks]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {
@@ -2087,6 +2225,7 @@ const InvoiceGenerator = ({
                     unbilledHours={unbilledHours}
                     unbilledAmount={unbilledAmount}
                     clients={clients}
+                    mode={mode}
                 />
             )}
             {/* Invoice Generation Modal */}
@@ -2097,6 +2236,9 @@ const InvoiceGenerator = ({
                     handleCancel={handleCancel}
                     handleSaveInvoice={handleSaveInvoice}
                     handlePreviewInvoice={handlePreviewInvoice}
+                    handleSendQuote={handleSendQuote}
+                    handleDownloadQuote={handleDownloadQuote}
+                    mode={mode}
                     isProjectContextFixed={isProjectContextFixed}
                     isClientContextFixed={isClientContextFixed}
                     projects={projects}
@@ -2204,10 +2346,21 @@ const InvoiceGenerator = ({
                     clearSavedState={clearInvoiceFormState}
                 />
             )}
+            {quoteEmailDocument && (
+                <EmailPreviewModal
+                    isOpen={true}
+                    onClose={() => setQuoteEmailDocument(null)}
+                    invoice={quoteEmailDocument}
+                    client={selectedClient || client || null}
+                    businessInfo={quoteEmailDocument.businessInfo || null}
+                    clients={clients}
+                    sendType="quote"
+                />
+            )}
             <InvoicePreviewModal
                 isOpen={showPreview && !!previewInvoice}
                 onClose={() => setShowPreview(false)}
-                title={previewInvoice ? `Invoice Preview - ${previewInvoice.invoiceNumber}` : ''}
+                title={previewInvoice ? `${previewInvoice.documentMode === 'quote' ? 'Quote' : 'Invoice'} Preview - ${previewInvoice.invoiceNumber}` : ''}
                 invoice={previewInvoice}
                 htmlContent={previewInvoice ? getCurrentInvoiceHtmlContent(previewInvoice, clients, businessBrandAssets) : ''}
             />

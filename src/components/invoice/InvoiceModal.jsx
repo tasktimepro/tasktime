@@ -22,6 +22,9 @@ const InvoiceModal = ({
     handleCancel,
     handleSaveInvoice,
     handlePreviewInvoice,
+    handleSendQuote,
+    handleDownloadQuote,
+    mode = 'invoice',
     isProjectContextFixed,
     isClientContextFixed,
     projects,
@@ -128,6 +131,8 @@ const InvoiceModal = ({
     getSavedState,
     clearSavedState
 }) => {
+    const isQuoteMode = mode === 'quote';
+
     // Set default expanded section based on context:
     // - 'projectClient' when opened from Invoices view (standalone mode)
     // - 'tasksTime' when opened from Project Dashboard view
@@ -219,10 +224,13 @@ const InvoiceModal = ({
             editingInvoice={editingInvoice}
             handleCancel={handleCancel}
             onPreview={handlePreviewInvoice}
+            mode={mode}
+            onSend={handleSendQuote}
+            onDownload={handleDownloadQuote}
         />
     );
 
-    const headerActions = (
+    const headerActions = isQuoteMode ? null : (
         <PeriodRangePicker
             value={billingPeriodPreset}
             onValueChange={setBillingPeriodPreset}
@@ -249,7 +257,7 @@ const InvoiceModal = ({
         <Modal 
             isOpen={showInvoiceForm}
             onClose={handleCancel}
-            title={editingInvoice ? 'Edit Invoice' : 'New Invoice'}
+            title={isQuoteMode ? 'Quote' : (editingInvoice ? 'Edit Invoice' : 'New Invoice')}
             size="2xl"
             headerActions={headerActions}
             footer={footer}
@@ -329,7 +337,7 @@ const InvoiceModal = ({
                                         </Select>
                                         {selectedClient && (
                                             <Notice
-                                                title={`${selectedClient?.title || 'Selected client'} will be included as "Invoice To" in the invoice.`}
+                                                title={`${selectedClient?.title || 'Selected client'} will be included as "${isQuoteMode ? 'Quote To' : 'Invoice To'}" in the ${isQuoteMode ? 'quote' : 'invoice'}.`}
                                                 description={
                                                     !isClientContextFixed && !isProjectContextFixed && selectedProject?.preferredClientId
                                                         ? `Client cannot be changed because this project is associated with ${clients.find(c => c.id === selectedProject.preferredClientId)?.title || 'a specific client'}.`
@@ -501,30 +509,32 @@ const InvoiceModal = ({
                     setNewTaskUseFlatRate={setNewTaskUseFlatRate}
                 />
 
-                <InvoiceExpenseSelector
-                    activeSection={activeSection}
-                    toggleSection={toggleSection}
-                    expenses={availableExpenses}
-                    selectedExpensesForBilling={selectedExpensesForBilling}
-                    setSelectedExpensesForBilling={setSelectedExpensesForBilling}
-                    additionalExpenses={additionalExpenses}
-                    showAddExpenseForm={showAddExpenseForm}
-                    setShowAddExpenseForm={setShowAddExpenseForm}
-                    newExpenseTitle={newExpenseTitle}
-                    setNewExpenseTitle={setNewExpenseTitle}
-                    newExpenseAmount={newExpenseAmount}
-                    setNewExpenseAmount={setNewExpenseAmount}
-                    newExpenseCurrency={newExpenseCurrency}
-                    setNewExpenseCurrency={setNewExpenseCurrency}
-                    newExpenseSupplierName={newExpenseSupplierName}
-                    setNewExpenseSupplierName={setNewExpenseSupplierName}
-                    handleAddAdditionalExpense={handleAddAdditionalExpense}
-                    handleRemoveAdditionalExpense={handleRemoveAdditionalExpense}
-                    getInvoiceCurrency={getInvoiceCurrency}
-                    conversionUnavailableCount={conversionUnavailableCount}
-                    exchangeRatesError={exchangeRatesError}
-                    exchangeRatesLoading={exchangeRatesLoading}
-                />
+                {!isQuoteMode && (
+                    <InvoiceExpenseSelector
+                        activeSection={activeSection}
+                        toggleSection={toggleSection}
+                        expenses={availableExpenses}
+                        selectedExpensesForBilling={selectedExpensesForBilling}
+                        setSelectedExpensesForBilling={setSelectedExpensesForBilling}
+                        additionalExpenses={additionalExpenses}
+                        showAddExpenseForm={showAddExpenseForm}
+                        setShowAddExpenseForm={setShowAddExpenseForm}
+                        newExpenseTitle={newExpenseTitle}
+                        setNewExpenseTitle={setNewExpenseTitle}
+                        newExpenseAmount={newExpenseAmount}
+                        setNewExpenseAmount={setNewExpenseAmount}
+                        newExpenseCurrency={newExpenseCurrency}
+                        setNewExpenseCurrency={setNewExpenseCurrency}
+                        newExpenseSupplierName={newExpenseSupplierName}
+                        setNewExpenseSupplierName={setNewExpenseSupplierName}
+                        handleAddAdditionalExpense={handleAddAdditionalExpense}
+                        handleRemoveAdditionalExpense={handleRemoveAdditionalExpense}
+                        getInvoiceCurrency={getInvoiceCurrency}
+                        conversionUnavailableCount={conversionUnavailableCount}
+                        exchangeRatesError={exchangeRatesError}
+                        exchangeRatesLoading={exchangeRatesLoading}
+                    />
+                )}
 
                 <InvoicePreview
                     activeSection={activeSection}
@@ -594,7 +604,7 @@ const InvoiceModal = ({
                                 {businessInfos.length === 0 ? (
                                     <Notice
                                         title="No businesses found"
-                                        description="Create one to include your business details in the invoice."
+                                        description={`Create one to include your business details in the ${isQuoteMode ? 'quote' : 'invoice'}.`}
                                     />
                                 ) : (
                                     <div className="space-y-2">
@@ -626,7 +636,7 @@ const InvoiceModal = ({
 
                                         {selectedBusinessInfo && (
                                             <Notice
-                                                title={`${selectedBusinessInfo.title} will be included as "Invoice From" in the invoice.`}
+                                                title={`${selectedBusinessInfo.title} will be included as "${isQuoteMode ? 'Quote From' : 'Invoice From'}" in the ${isQuoteMode ? 'quote' : 'invoice'}.`}
                                                 className="py-2 px-3"
                                             />
                                         )}
@@ -663,7 +673,7 @@ const InvoiceModal = ({
                                 {paymentMethods.length === 0 ? (
                                     <Notice
                                         title="No payment methods found"
-                                        description="Create one to include payment details in your invoice."
+                                        description={`Create one to include payment details in your ${isQuoteMode ? 'quote' : 'invoice'}.`}
                                     />
                                 ) : (
                                     <div className="space-y-2">
@@ -695,7 +705,7 @@ const InvoiceModal = ({
 
                                         {selectedPaymentMethod && (
                                             <Notice
-                                                title={`${selectedPaymentMethod.title} will be included as "Payment Details" in the invoice.`}
+                                                title={`${selectedPaymentMethod.title} will be included as "Payment Details" in the ${isQuoteMode ? 'quote' : 'invoice'}.`}
                                                 className="py-2 px-3"
                                             />
                                         )}
@@ -714,7 +724,7 @@ const InvoiceModal = ({
                         className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'invoiceSettings' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
                         <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-foreground">Invoice Settings</h4>
+                            <h4 className="text-sm font-medium text-foreground">{isQuoteMode ? 'Quote Settings' : 'Invoice Settings'}</h4>
                             <svg
                                 className={`w-5 h-5 text-muted-foreground transform transition-transform ${activeSection === 'invoiceSettings' ? 'rotate-180' : ''}`}
                                 fill="none"
@@ -749,14 +759,14 @@ const InvoiceModal = ({
                                     )}
                                 >
                                     <h4 className="text-sm font-medium text-foreground">
-                                        Invoice Template <span className="text-destructive-strong">*</span>
+                                        {isQuoteMode ? 'Document Template' : 'Invoice Template'} {!isQuoteMode && <span className="text-destructive-strong">*</span>}
                                     </h4>
                                 </InlineFieldHeader>
 
                                 {invoiceTemplates.length === 0 ? (
                                     <Notice
-                                        title="No invoice templates found"
-                                        description="Create a template to continue with invoice generation."
+                                        title={isQuoteMode ? 'No document templates found' : 'No invoice templates found'}
+                                        description={isQuoteMode ? 'You can still continue with the default quote layout.' : 'Create a template to continue with invoice generation.'}
                                     />
                                 ) : (
                                     <div className="space-y-2">
@@ -781,27 +791,33 @@ const InvoiceModal = ({
                                                 title={selectedTemplate.name}
                                                 className="py-2 px-3"
                                             >
-                                                <div className="text-sm">
-                                                    Invoice Format: {selectedTemplate.invoiceNumberFormat}<br />
-                                                    Due Date: {(() => {
-                                                        switch (selectedTemplate.dueDateType) {
-                                                            case 'fixed-days': {
-                                                                const days = parseInt(selectedTemplate.dueDateDays) || 0;
-                                                                return `${days} ${days === 1 ? 'day' : 'days'} from invoice date`;
+                                                {isQuoteMode ? (
+                                                    <div className="text-sm">
+                                                        Quote layout and branding will use this template.
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-sm">
+                                                        Invoice Format: {selectedTemplate.invoiceNumberFormat}<br />
+                                                        Due Date: {(() => {
+                                                            switch (selectedTemplate.dueDateType) {
+                                                                case 'fixed-days': {
+                                                                    const days = parseInt(selectedTemplate.dueDateDays) || 0;
+                                                                    return `${days} ${days === 1 ? 'day' : 'days'} from invoice date`;
+                                                                }
+                                                                case 'fixed-weeks': {
+                                                                    const weeks = parseInt(selectedTemplate.dueDateWeeks) || 0;
+                                                                    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} from invoice date`;
+                                                                }
+                                                                case 'precise-date':
+                                                                    return `Precise date: ${selectedTemplate.dueDatePrecise ? toDisplayDate(selectedTemplate.dueDatePrecise) : 'Not set'}`;
+                                                                case 'none':
+                                                                    return 'Not shown';
+                                                                default:
+                                                                    return 'Not shown';
                                                             }
-                                                            case 'fixed-weeks': {
-                                                                const weeks = parseInt(selectedTemplate.dueDateWeeks) || 0;
-                                                                return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} from invoice date`;
-                                                            }
-                                                            case 'precise-date':
-                                                                return `Precise date: ${selectedTemplate.dueDatePrecise ? toDisplayDate(selectedTemplate.dueDatePrecise) : 'Not set'}`;
-                                                            case 'none':
-                                                                return 'Not shown';
-                                                            default:
-                                                                return 'Not shown';
-                                                        }
-                                                    })()}
-                                                </div>
+                                                        })()}
+                                                    </div>
+                                                )}
                                             </Notice>
                                         )}
                                     </div>
@@ -810,13 +826,13 @@ const InvoiceModal = ({
 
                             {/* Invoice notes */}
                             <div className="mt-2 space-y-2">
-                                <Label htmlFor="invoice-note">Invoice Note</Label>
+                                <Label htmlFor="invoice-note">{isQuoteMode ? 'Quote Note' : 'Invoice Note'}</Label>
                                 <Textarea
                                     id="invoice-note"
                                     value={invoiceNote}
                                     onChange={(e) => setInvoiceNote(e.target.value)}
                                     rows="3"
-                                    placeholder="Add any additional notes for the invoice here..."
+                                    placeholder={`Add any additional notes for the ${isQuoteMode ? 'quote' : 'invoice'} here...`}
                                 />
                             </div>
 
@@ -826,7 +842,7 @@ const InvoiceModal = ({
                                     <CustomCheckbox
                                         checked={useInvoiceDateOverride}
                                         onChange={(checked) => setUseInvoiceDateOverride(checked)}
-                                        label="Override invoice date"
+                                        label={isQuoteMode ? 'Override quote date' : 'Override invoice date'}
                                         labelClassName="text-sm font-medium text-foreground"
                                     />
                                 </div>
@@ -841,7 +857,7 @@ const InvoiceModal = ({
                                             required={useInvoiceDateOverride}
                                         />
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            When enabled, this date will be used instead of today's date for the invoice. Future dates are not allowed.
+                                            When enabled, this date will be used instead of today's date for the {isQuoteMode ? 'quote' : 'invoice'}. Future dates are not allowed.
                                         </p>
                                     </div>
                                 )}

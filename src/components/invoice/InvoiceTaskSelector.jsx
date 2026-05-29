@@ -1,4 +1,5 @@
 import { TrashIcon } from '@/components/ui/icons';
+import { getCurrencySymbol } from '../../utils/currencyUtils.ts';
 import { formatDurationWithSeconds, hoursToMinutes } from '../../utils/dateUtils.ts';
 import CustomCheckbox from '../CustomCheckbox';
 import { Button } from '@/components/ui/button';
@@ -157,8 +158,19 @@ const InvoiceTaskSelector = ({
                             {orderedInvoiceTasks.map((task) => {
                                 const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
                                 const currentFlatRate = taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : '';
-                                // For existing invoices, calculate originalTimeMs from originalHours if not present
-                                const originalTimeMs = task.originalTimeMs || (task.originalHours * 60 * 60 * 1000);
+                                const hasOriginalTimeMs = Number.isFinite(task.originalTimeMs);
+                                const hasOriginalHours = Number.isFinite(task.originalHours);
+                                const originalTimeMs = hasOriginalTimeMs
+                                    ? task.originalTimeMs
+                                    : (hasOriginalHours ? task.originalHours * 60 * 60 * 1000 : null);
+                                const hasOriginalDuration = Number.isFinite(originalTimeMs);
+                                const originalFlatRate = Number.isFinite(task.flatRate) ? task.flatRate : null;
+                                const originalQuantity = Number.isFinite(task.quantity) && task.quantity > 0 ? task.quantity : 1;
+                                const originalSummary = hasOriginalDuration
+                                    ? `Original: ${formatDurationWithSeconds(originalTimeMs)}`
+                                    : (originalFlatRate !== null
+                                        ? `Original: ${originalQuantity > 1 ? `${originalQuantity} x ` : ''}${getCurrencySymbol(getInvoiceCurrency())}${originalFlatRate.toFixed(2)} flat rate`
+                                        : null);
 
                                 // Check if this task uses flat rate
                                 const isUsingFlatRate = useFlatRate[task.id] || false;
@@ -207,12 +219,14 @@ const InvoiceTaskSelector = ({
                                                         </span>
                                                     )}
                                                 </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Original: {formatDurationWithSeconds(originalTimeMs)}
-                                                    {task.isEdited && (
-                                                        <span className="status-info-text-strong ml-2">(Modified)</span>
-                                                    )}
-                                                </p>
+                                                {originalSummary && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {originalSummary}
+                                                        {task.isEdited && (
+                                                            <span className="status-info-text-strong ml-2">(Modified)</span>
+                                                        )}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
 

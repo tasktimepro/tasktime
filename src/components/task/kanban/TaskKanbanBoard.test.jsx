@@ -213,6 +213,12 @@ describe('TaskKanbanBoard', () => {
                     setNewTaskStartDate: vi.fn(),
                     newTaskRecurring: null,
                     setNewTaskRecurring: vi.fn(),
+                    newTaskEstimatedHours: '',
+                    setNewTaskEstimatedHours: vi.fn(),
+                    newTaskEstimatedFlatAmount: '',
+                    setNewTaskEstimatedFlatAmount: vi.fn(),
+                    showEstimateFields: true,
+                    isFlatRateProject: true,
                     onSubmit: vi.fn((event) => event.preventDefault()),
                     onCancel: vi.fn(),
                 }}
@@ -220,6 +226,11 @@ describe('TaskKanbanBoard', () => {
         );
 
         expect(screen.getByTestId('task-kanban-create-column')).toBeInTheDocument();
+        expect(screen.getByLabelText('Estimated Hours')).toBeInTheDocument();
+        expect(screen.getByLabelText('Quote Amount')).toBeInTheDocument();
+        expect(screen.queryByText('Estimate')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Set repeat' })).toBeInTheDocument();
+        expect(screen.getByTestId('task-kanban-create-action-row')).not.toHaveClass('flex-wrap');
     });
 
     it('does not render an empty-state subtask message for empty columns', () => {

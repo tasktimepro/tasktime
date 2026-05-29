@@ -35,11 +35,17 @@ describe('Yjs validation', () => {
             title: 'Kanban Project',
             taskView: 'kanban',
             taskSort: 'manual',
+            statusMode: 'quote',
+            deadline: '2026-06-01',
+            budgetAmount: 1200,
         }, 'test project task view')).toEqual({
             id: 'project-kanban-1',
             title: 'Kanban Project',
             taskView: 'kanban',
             taskSort: 'manual',
+            statusMode: 'quote',
+            deadline: '2026-06-01',
+            budgetAmount: 1200,
         })
 
         expect(validateCollectionEntity('tasks', {
@@ -47,11 +53,15 @@ describe('Yjs validation', () => {
             title: 'Ordered Task',
             sortOrder: 1000,
             sortOrderUpdatedAt: 123456,
+            estimatedHours: 4.5,
+            estimatedFlatAmount: 300,
         }, 'test ordered task')).toEqual({
             id: 'task-ordered-1',
             title: 'Ordered Task',
             sortOrder: 1000,
             sortOrderUpdatedAt: 123456,
+            estimatedHours: 4.5,
+            estimatedFlatAmount: 300,
         })
 
         expect(validateCollectionEntity('projects', {
@@ -202,6 +212,23 @@ describe('Yjs validation', () => {
             title: 'Bank Transfer',
             custom: [{ label: 'Reference', value: 'INV-001' }],
             isDefault: true,
+        }))
+    })
+
+    it('accepts quote email templates in the persisted app shape', () => {
+        expect(validateCollectionEntity('emailTemplates', {
+            id: 'email-template-quote-1',
+            name: 'Quote Template',
+            type: 'quote',
+            subject: 'Quote {invoiceNumber}',
+            sendBody: 'Hello {clientName}',
+            reminderBody: '',
+            attachmentTitle: 'quote-{invoiceNumber}',
+            isDefault: true,
+        }, 'test email template')).toEqual(expect.objectContaining({
+            id: 'email-template-quote-1',
+            type: 'quote',
+            attachmentTitle: 'quote-{invoiceNumber}',
         }))
     })
 

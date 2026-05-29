@@ -2,12 +2,7 @@
 
 ## Priority
 
-[ ] Project status mode update:
-- When a project has a client selected, a new option appears:
-    Project status: Quote / Active (default)
-- Active will leave the project behave exactly as it is today, but if Quote is selected, we'll do a couple of things:
-    1. In the project page next to the title we should have a tag "Quote stage" so that it's clear currently we're in quote mode
-    2. You cannot generate an invoice, during quote mode the button and the invoice modal will say quote instead of incoice, and the generated PDF has QUOTE instead of invoice as well. 
+[ ] docs/todo/project-quote-budget-plan.md
 
 ---
 

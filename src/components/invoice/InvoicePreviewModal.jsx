@@ -34,8 +34,9 @@ const InvoicePreviewModal = ({
     onDownload,
     downloadLabel = 'Download PDF'
 }) => {
+    const isQuoteMode = invoice?.documentMode === 'quote';
     const previewHtml = htmlContent || invoice?.htmlContent || '';
-    const previewTitle = title || (invoice ? `Invoice Preview - ${invoice.invoiceNumber}` : 'Invoice Preview');
+    const previewTitle = title || (invoice ? `${isQuoteMode ? 'Quote' : 'Invoice'} Preview - ${invoice.invoiceNumber}` : `${isQuoteMode ? 'Quote' : 'Invoice'} Preview`);
     const modalContentRef = useRef(null);
     const previewPageRef = useRef(null);
     const [previewScale, setPreviewScale] = useState(1);
@@ -147,14 +148,14 @@ const InvoicePreviewModal = ({
             ) : (
                 <div className="space-y-4">
                     <div className="text-center border-b pb-4">
-                        <h1 className="text-2xl font-bold text-foreground">INVOICE</h1>
-                        <p className="text-muted-foreground">Invoice #{invoice?.invoiceNumber}</p>
+                        <h1 className="text-2xl font-bold text-foreground">{isQuoteMode ? 'QUOTE' : 'INVOICE'}</h1>
+                        <p className="text-muted-foreground">{isQuoteMode ? 'Quote' : 'Invoice'} #{invoice?.invoiceNumber}</p>
                         <p className="text-muted-foreground">Date: {invoice?.date ? toDisplayDate(invoice.date) : '—'}</p>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <h3 className="text-sm font-medium text-foreground mb-2">Invoice To:</h3>
+                            <h3 className="text-sm font-medium text-foreground mb-2">{isQuoteMode ? 'Quote To:' : 'Invoice To:'}</h3>
                             <div className="text-sm text-muted-foreground">
                                 <p>{invoice?.client?.name}</p>
                                 {invoice?.client?.address && (

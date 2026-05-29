@@ -2,7 +2,13 @@ import { render, screen } from '@testing-library/react';
 import MobileDayCard from './MobileDayCard';
 
 vi.mock('./PlannerItem', () => ({
-    default: ({ title }) => <div>{title}</div>
+    default: ({ title, projectStatusMode, projectDeadline }) => (
+        <div>
+            <div>{title}</div>
+            {projectStatusMode && <div>{projectStatusMode}</div>}
+            {projectDeadline && <div>{projectDeadline}</div>}
+        </div>
+    )
 }));
 
 vi.mock('./AddItemPopover', () => ({
@@ -51,5 +57,28 @@ describe('MobileDayCard', () => {
         expect(card.className).toContain('bg-muted/80');
         expect(card.className).not.toContain('border-t-2');
         expect(card.getAttribute('style')).toBeNull();
+    });
+
+    it('passes project quote and deadline context through to planner items', () => {
+        render(
+            <MobileDayCard
+                {...baseProps}
+                items={[
+                    {
+                        key: 'project-1',
+                        title: 'Website refresh',
+                        type: 'project',
+                        entity: {
+                            id: 'project-1',
+                            statusMode: 'quote',
+                            deadline: '2026-03-28',
+                        },
+                    },
+                ]}
+            />
+        );
+
+        expect(screen.getByText('quote')).toBeInTheDocument();
+        expect(screen.getByText('2026-03-28')).toBeInTheDocument();
     });
 });

@@ -16,10 +16,23 @@ import { useToast } from '../../hooks/useToast.ts';
 import { useTasks } from '../../hooks/useTasks.ts';
 import { useTimeEntries } from '../../hooks/useTimeEntries.ts';
 import { useProjects } from '../../hooks/useProjects.ts';
+import { useClients } from '../../hooks/useClients.ts';
+import { parseOptionalNumberInput } from '@/utils/numberInputUtils.ts';
+import { getTaskEstimateAmount } from '@/utils/projectPlanningUtils.ts';
 import RecurringPicker from '../task/RecurringPicker';
 import CustomCheckbox from '../CustomCheckbox';
 
 const NO_PROJECT_VALUE = 'no-project';
+
+function parseOptionalNonNegativeNumberInput(value) {
+    const parsedValue = parseOptionalNumberInput(value);
+
+    if (parsedValue === null || parsedValue < 0) {
+        return null;
+    }
+
+    return parsedValue;
+}
 
 /**
  * @param {Object} props
@@ -44,6 +57,7 @@ const TaskModal = ({
 }) => {
     const { showSuccess, showError } = useToast();
     const { projects } = useProjects();
+    const { clients } = useClients();
     const { createTask, updateTask } = useTasks();
     const { entries: timeEntries } = useTimeEntries();
 
@@ -57,8 +71,47 @@ const TaskModal = ({
         startDate: '',
         recurring: null,
         promptTimeEntry: false,
-        note: ''
+        note: '',
+        estimatedHours: '',
+        estimatedFlatAmount: ''
     });
+
+    const selectedProject = useMemo(() => {
+        if (!formData.projectId || formData.projectId === NO_PROJECT_VALUE) {
+            return null;
+        }
+
+        return projects.find((project) => project.id === formData.projectId) ?? null;
+    }, [formData.projectId, projects]);
+
+    const selectedClient = useMemo(() => {
+        if (!selectedProject?.preferredClientId) {
+            return null;
+        }
+
+        return clients.find((client) => client.id === selectedProject.preferredClientId) ?? null;
+    }, [clients, selectedProject]);
+
+    const showEstimateFields = Boolean(selectedProject && !selectedProject.isPersonal && selectedProject.preferredClientId);
+    const isFlatRateProject = Boolean(selectedProject?.flatRate);
+    const estimatedHoursValue = parseOptionalNonNegativeNumberInput(formData.estimatedHours);
+    const estimatedFlatAmountValue = parseOptionalNonNegativeNumberInput(formData.estimatedFlatAmount);
+    const estimatedAmount = showEstimateFields
+        ? getTaskEstimateAmount({
+            estimatedHours: estimatedHoursValue,
+            estimatedFlatAmount: estimatedFlatAmountValue,
+        }, selectedProject, selectedClient)
+        : 0;
+    const hasEstimateRate = Boolean(
+        !isFlatRateProject
+        && (
+            selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined
+        ) || (
+            selectedClient?.defaultHourlyRate !== null && selectedClient?.defaultHourlyRate !== undefined
+        ) || (
+            selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined
+        )
+    );
 
     const hasBilledEntries = useMemo(() => {
         if (!editingTask) return false;
@@ -105,7 +158,9 @@ const TaskModal = ({
                 startDate: savedState.startDate || '',
                 recurring: savedState.recurring || null,
                 promptTimeEntry: savedState.promptTimeEntry || false,
-                note: savedState.note || ''
+                note: savedState.note || '',
+                estimatedHours: savedState.estimatedHours || '',
+                estimatedFlatAmount: savedState.estimatedFlatAmount || ''
             });
             return;
         }
@@ -117,7 +172,13 @@ const TaskModal = ({
                 startDate: editingTask.recurring ? '' : (editingTask.startDate || ''),
                 recurring: editingTask.recurring || null,
                 promptTimeEntry: editingTask.promptTimeEntry || false,
-                note: editingTask.note || ''
+                note: editingTask.note || '',
+                estimatedHours: editingTask.estimatedHours !== null && editingTask.estimatedHours !== undefined
+                    ? editingTask.estimatedHours.toString()
+                    : '',
+                estimatedFlatAmount: editingTask.estimatedFlatAmount !== null && editingTask.estimatedFlatAmount !== undefined
+                    ? editingTask.estimatedFlatAmount.toString()
+                    : ''
             });
             return;
         }
@@ -128,7 +189,9 @@ const TaskModal = ({
             startDate: modalOptions?.startDate || '',
             recurring: null,
             promptTimeEntry: false,
-            note: ''
+            note: '',
+            estimatedHours: '',
+            estimatedFlatAmount: ''
         });
     }, [isOpen, editingTask, getSavedState, modalOptions]);
 
@@ -198,6 +261,8 @@ const TaskModal = ({
             recurring: formData.recurring || null,
             promptTimeEntry: formData.promptTimeEntry,
             note: formData.note.trim() ? formData.note.trim() : null,
+            estimatedHours: showEstimateFields ? estimatedHoursValue : null,
+            estimatedFlatAmount: showEstimateFields && isFlatRateProject ? estimatedFlatAmountValue : null,
             lastActive: Date.now()
         };
 
@@ -320,6 +385,52 @@ const TaskModal = ({
                         rows={3}
                     />
                 </div>
+
+                {showEstimateFields && (
+                    <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+                        <h4 className="text-sm font-medium text-foreground">Estimate</h4>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="task-estimated-hours">Estimated Hours</Label>
+                            <Input
+                                id="task-estimated-hours"
+                                type="number"
+                                min="0"
+                                step="0.25"
+                                value={formData.estimatedHours}
+                                onChange={(event) => handleChange('estimatedHours', event.target.value)}
+                                placeholder="0.00"
+                                className="sensitive-data"
+                            />
+                            {!isFlatRateProject && (
+                                <p className="text-xs text-muted-foreground">
+                                    {hasEstimateRate
+                                        ? `Estimated amount from project rate: ${estimatedAmount.toFixed(2)}`
+                                        : 'Set a project or client hourly rate to calculate the estimate amount.'}
+                                </p>
+                            )}
+                        </div>
+
+                        {isFlatRateProject && (
+                            <div className="space-y-2">
+                                <Label htmlFor="task-estimated-flat-amount">Quote Amount</Label>
+                                <Input
+                                    id="task-estimated-flat-amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={formData.estimatedFlatAmount}
+                                    onChange={(event) => handleChange('estimatedFlatAmount', event.target.value)}
+                                    placeholder="0.00"
+                                    className="sensitive-data"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Flat-rate projects can track both internal hours and quote pricing.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="space-y-2">
                     <InlineFieldHeader

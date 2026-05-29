@@ -52,6 +52,8 @@ const TaskItem = ({
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
     const [newSubtaskNote, setNewSubtaskNote] = useState('');
     const [newSubtaskStartDate, setNewSubtaskStartDate] = useState('');
+    const [newSubtaskEstimatedHours, setNewSubtaskEstimatedHours] = useState('');
+    const [newSubtaskEstimatedFlatAmount, setNewSubtaskEstimatedFlatAmount] = useState('');
     const { showSuccess } = useToast();
     
     // Yjs hooks for state
@@ -95,6 +97,12 @@ const TaskItem = ({
 
         return projects.find((project) => project.id === task.projectId) || null;
     }, [projects, task.projectId]);
+    const showSubtaskEstimateFields = Boolean(
+        currentProject
+        && !currentProject.isPersonal
+        && currentProject.preferredClientId
+    );
+    const isFlatRateProject = Boolean(currentProject?.flatRate);
 
     const getEntryOverlapMs = useCallback((entry, dayStart, dayEnd) => {
         if (!entry || typeof entry.end !== 'number') return 0;
@@ -265,15 +273,21 @@ const TaskItem = ({
                 title: newSubtaskTitle,
                 note: newSubtaskNote,
                 startDate: newSubtaskStartDate || null,
-                recurring: null
+                recurring: null,
+                ...(showSubtaskEstimateFields ? {
+                    estimatedHours: newSubtaskEstimatedHours,
+                    estimatedFlatAmount: isFlatRateProject ? newSubtaskEstimatedFlatAmount : undefined,
+                } : {})
             });
 
             setNewSubtaskTitle('');
             setNewSubtaskNote('');
             setNewSubtaskStartDate('');
+            setNewSubtaskEstimatedHours('');
+            setNewSubtaskEstimatedFlatAmount('');
             setShowCreateSubtaskForm(false);
         }
-    }, [newSubtaskTitle, newSubtaskNote, newSubtaskStartDate, task.id, onCreateSubtask]);
+    }, [isFlatRateProject, newSubtaskEstimatedFlatAmount, newSubtaskEstimatedHours, newSubtaskNote, newSubtaskStartDate, newSubtaskTitle, onCreateSubtask, showSubtaskEstimateFields, task.id]);
 
     /**
      * Cancel subtask creation.
@@ -282,6 +296,8 @@ const TaskItem = ({
         setNewSubtaskTitle('');
         setNewSubtaskNote('');
         setNewSubtaskStartDate('');
+        setNewSubtaskEstimatedHours('');
+        setNewSubtaskEstimatedFlatAmount('');
         setShowCreateSubtaskForm(false);
     }, []);
 
@@ -438,6 +454,12 @@ const TaskItem = ({
                     setNewSubtaskNote={setNewSubtaskNote}
                     newSubtaskStartDate={newSubtaskStartDate}
                     setNewSubtaskStartDate={setNewSubtaskStartDate}
+                    newSubtaskEstimatedHours={newSubtaskEstimatedHours}
+                    setNewSubtaskEstimatedHours={setNewSubtaskEstimatedHours}
+                    newSubtaskEstimatedFlatAmount={newSubtaskEstimatedFlatAmount}
+                    setNewSubtaskEstimatedFlatAmount={setNewSubtaskEstimatedFlatAmount}
+                    showEstimateFields={showSubtaskEstimateFields}
+                    isFlatRateProject={isFlatRateProject}
                     handleCreateSubtask={handleCreateSubtask}
                     cancelCreateSubtask={cancelCreateSubtask}
                     isArchived={isArchived}

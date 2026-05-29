@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Notice } from '@/components/ui/notice';
 import Modal from './Modal';
 import RecurringPicker from './task/RecurringPicker';
+import TaskEstimateDropdown from './task/TaskEstimateDropdown';
 import { useToast } from '../hooks/useToast.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
@@ -39,6 +40,7 @@ import { buildTaskAppendOrderPlan, buildTaskContainerMoveOrderUpdates, buildTask
 import { isRecurringTaskDueOnDate } from '../utils/recurringUtils.ts';
 import { useTodayDate, useTodayString } from '../hooks/useDayRollover';
 import { toStorageDate } from '../utils/dateUtils.ts';
+import { parseOptionalNumberInput } from '../utils/numberInputUtils.ts';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +52,16 @@ const TASK_SORT_VALUES = new Set(TASK_SORT_OPTIONS.map((option) => option.value)
 
 const getProjectTaskSort = (taskSort) => {
     return TASK_SORT_VALUES.has(taskSort) ? taskSort : 'lastActive';
+};
+
+const parseOptionalNonNegativeNumberInput = (value) => {
+    const parsedValue = parseOptionalNumberInput(value);
+
+    if (parsedValue === null || parsedValue < 0) {
+        return null;
+    }
+
+    return parsedValue;
 };
 
 const getDroppableContainersByType = (args, typeMatcher) => {
@@ -137,6 +149,8 @@ const TaskTree = ({
     const [newTaskNote, setNewTaskNote] = useState('');
     const [newTaskStartDate, setNewTaskStartDate] = useState('');
     const [newTaskRecurring, setNewTaskRecurring] = useState(null);
+    const [newTaskEstimatedHours, setNewTaskEstimatedHours] = useState('');
+    const [newTaskEstimatedFlatAmount, setNewTaskEstimatedFlatAmount] = useState('');
     const [showRecurringTasks, setShowRecurringTasks] = useState(false);
     const [showArchivedTasks, setShowArchivedTasks] = useState(false);
     const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState(null);
@@ -166,6 +180,8 @@ const TaskTree = ({
     );
 
     const allowBillableToggle = !project.isPersonal;
+    const showEstimateFields = Boolean(!project.isPersonal && project.preferredClientId);
+    const isFlatRateProject = Boolean(project.flatRate);
 
     React.useEffect(() => {
         setTaskDisplay(project.taskView === 'kanban' ? 'kanban' : 'list');
@@ -491,6 +507,16 @@ const TaskTree = ({
         return getTaskDeletionBillingSummary(pendingDeleteTaskIds, tasks, timeEntries, [project]);
     }, [pendingDeleteTaskIds, tasks, timeEntries, project]);
 
+    const resetCreateTaskForm = useCallback(() => {
+        setNewTaskTitle('');
+        setNewTaskNote('');
+        setNewTaskStartDate('');
+        setNewTaskRecurring(null);
+        setNewTaskEstimatedHours('');
+        setNewTaskEstimatedFlatAmount('');
+        setShowCreateForm(false);
+    }, []);
+
     /**
      * Create a new task
      */
@@ -517,6 +543,12 @@ const TaskTree = ({
             note: taskData.note ? taskData.note.trim() : null,
             startDate: taskData.recurring ? null : (taskData.startDate || null),
             recurring: taskData.recurring || null,
+            estimatedHours: showEstimateFields
+                ? parseOptionalNonNegativeNumberInput(taskData.estimatedHours)
+                : null,
+            estimatedFlatAmount: showEstimateFields && isFlatRateProject
+                ? parseOptionalNonNegativeNumberInput(taskData.estimatedFlatAmount)
+                : null,
             lastActive: now,
             lastBilledAt: null,
             billable: false,
@@ -538,7 +570,7 @@ const TaskTree = ({
         }
         
         return newTask;
-    }, [createTask, project.id, projectTasks, taskSort, updateTask]);
+    }, [createTask, isFlatRateProject, project.id, projectTasks, showEstimateFields, taskSort, updateTask]);
 
     /**
      * Create a new main task
@@ -553,18 +585,16 @@ const TaskTree = ({
             title: newTaskTitle,
             note: newTaskNote,
             startDate: newTaskStartDate,
-            recurring: newTaskRecurring
+            recurring: newTaskRecurring,
+            estimatedHours: newTaskEstimatedHours,
+            estimatedFlatAmount: newTaskEstimatedFlatAmount,
         });
 
         if (newTaskRecurring) {
             setShowRecurringTasks(true);
         }
 
-        setNewTaskTitle('');
-        setNewTaskNote('');
-        setNewTaskStartDate('');
-        setNewTaskRecurring(null);
-        setShowCreateForm(false);
+        resetCreateTaskForm();
     };
 
     /**
@@ -685,11 +715,7 @@ const TaskTree = ({
      * Cancel task creation
      */
     const cancelCreate = () => {
-        setShowCreateForm(false);
-        setNewTaskTitle('');
-        setNewTaskNote('');
-        setNewTaskStartDate('');
-        setNewTaskRecurring(null);
+        resetCreateTaskForm();
     };
 
     return (
@@ -753,58 +779,72 @@ const TaskTree = ({
                         Create New Task
                     </h3>
 
-                    <form onSubmit={handleCreateMainTask} className={cn(isMobileLayout ? 'space-y-3' : 'flex items-center space-x-3')}>
-                        <Input
-                            type="text"
-                            value={newTaskTitle}
-                            onChange={(e) => setNewTaskTitle(e.target.value)}
-                            placeholder="Enter task title"
-                            className={cn(!isMobileLayout && 'flex-1')}
-                            autoFocus
-                        />
+                    <form onSubmit={handleCreateMainTask} className="space-y-3">
+                        <div className={cn(isMobileLayout ? 'space-y-3' : 'flex items-center space-x-3')}>
+                            <Input
+                                type="text"
+                                value={newTaskTitle}
+                                onChange={(e) => setNewTaskTitle(e.target.value)}
+                                placeholder="Enter task title"
+                                className={cn(!isMobileLayout && 'flex-1')}
+                                autoFocus
+                            />
 
-                        <Input
-                            type="text"
-                            value={newTaskNote}
-                            onChange={(e) => setNewTaskNote(e.target.value)}
-                            placeholder="Note"
-                            className={cn(!isMobileLayout && 'flex-1')}
-                        />
+                            <Input
+                                type="text"
+                                value={newTaskNote}
+                                onChange={(e) => setNewTaskNote(e.target.value)}
+                                placeholder="Note"
+                                className={cn(!isMobileLayout && 'flex-1')}
+                            />
 
-                        <NativeDateInput
-                            value={newTaskStartDate}
-                            onChange={(e) => {
-                                setNewTaskStartDate(e.target.value);
-                                if (e.target.value) {
-                                    setNewTaskRecurring(null);
-                                }
-                            }}
-                            className={cn(isMobileLayout ? 'w-full dark:[color-scheme:dark]' : 'w-40 dark:[color-scheme:dark]')}
-                            disabled={Boolean(newTaskRecurring)}
-                        />
+                            <NativeDateInput
+                                value={newTaskStartDate}
+                                onChange={(e) => {
+                                    setNewTaskStartDate(e.target.value);
+                                    if (e.target.value) {
+                                        setNewTaskRecurring(null);
+                                    }
+                                }}
+                                className={cn(isMobileLayout ? 'w-full dark:[color-scheme:dark]' : 'w-40 dark:[color-scheme:dark]')}
+                                disabled={Boolean(newTaskRecurring)}
+                            />
 
-                        <RecurringPicker
-                            value={newTaskRecurring}
-                            onChange={(config) => {
-                                setNewTaskRecurring(config);
-                                setNewTaskStartDate('');
-                            }}
-                            onClear={() => setNewTaskRecurring(null)}
-                            inactiveVariant="ghost"
-                        />
+                            {showEstimateFields && (
+                                <TaskEstimateDropdown
+                                    idPrefix="task-inline-create"
+                                    estimatedHours={newTaskEstimatedHours}
+                                    onEstimatedHoursChange={setNewTaskEstimatedHours}
+                                    estimatedFlatAmount={newTaskEstimatedFlatAmount}
+                                    onEstimatedFlatAmountChange={setNewTaskEstimatedFlatAmount}
+                                    isFlatRateProject={isFlatRateProject}
+                                    className={cn(isMobileLayout && 'w-full justify-start')}
+                                />
+                            )}
 
-                        <div className={cn('flex gap-2', isMobileLayout ? 'justify-end' : 'ml-auto shrink-0')}>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={cancelCreate}
-                            >
-                                Cancel
-                            </Button>
+                            <RecurringPicker
+                                value={newTaskRecurring}
+                                onChange={(config) => {
+                                    setNewTaskRecurring(config);
+                                    setNewTaskStartDate('');
+                                }}
+                                onClear={() => setNewTaskRecurring(null)}
+                                inactiveVariant="ghost"
+                            />
 
-                            <Button type="submit">
-                                Create
-                            </Button>
+                            <div className={cn('flex gap-2', isMobileLayout ? 'justify-end' : 'ml-auto shrink-0')}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={cancelCreate}
+                                >
+                                    Cancel
+                                </Button>
+
+                                <Button type="submit">
+                                    Create
+                                </Button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -951,6 +991,12 @@ const TaskTree = ({
                                 setNewTaskStartDate,
                                 newTaskRecurring,
                                 setNewTaskRecurring,
+                                newTaskEstimatedHours,
+                                setNewTaskEstimatedHours,
+                                newTaskEstimatedFlatAmount,
+                                setNewTaskEstimatedFlatAmount,
+                                showEstimateFields,
+                                isFlatRateProject,
                                 onSubmit: handleCreateMainTask,
                                 onCancel: cancelCreate,
                             } : null}

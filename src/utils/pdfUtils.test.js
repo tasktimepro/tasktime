@@ -548,6 +548,29 @@ describe('createInvoiceHTML', () => {
         expect(html).toBe('<div>Draft invoice</div>')
     })
 
+    it('renders quote labels without due date or billing period', () => {
+
+        const html = createInvoiceHTML({
+            documentMode: 'quote',
+            project: { title: 'Website Refresh', hourlyRate: 120 },
+            client: { name: 'Client Name' },
+            tasks: [{ id: 'task', title: 'Discovery', hours: 2, hourlyRate: 120 }],
+            totalHours: 2,
+            totalAmount: 240,
+            invoiceNumber: '29112233',
+            date: '2026-05-29',
+            dueDate: '2026-06-10',
+            billingPeriodStart: '2026-05-01',
+            billingPeriodEnd: '2026-05-31',
+            currency: 'USD'
+        })
+
+        expect(html).toContain('QUOTE')
+        expect(html).toContain('Quote: #29112233')
+        expect(html).not.toContain('Due Date: 2026-06-10')
+        expect(html).not.toContain('Billing Period:')
+    })
+
     it('renders business info, payment method, and note', () => {
 
         const html = createInvoiceHTML({

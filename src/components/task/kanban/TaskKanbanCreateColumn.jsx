@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { NativeDateInput } from '@/components/ui/native-date-input';
 import { cn } from '@/lib/utils';
 import RecurringPicker from '../RecurringPicker';
+import TaskInlineEstimateFields from '../TaskInlineEstimateFields';
 
 const TaskKanbanCreateColumn = ({
     newTaskTitle,
@@ -13,6 +14,12 @@ const TaskKanbanCreateColumn = ({
     setNewTaskStartDate,
     newTaskRecurring,
     setNewTaskRecurring,
+    newTaskEstimatedHours = '',
+    setNewTaskEstimatedHours,
+    newTaskEstimatedFlatAmount = '',
+    setNewTaskEstimatedFlatAmount,
+    showEstimateFields = false,
+    isFlatRateProject = false,
     onSubmit,
     onCancel,
 }) => {
@@ -53,19 +60,37 @@ const TaskKanbanCreateColumn = ({
                     disabled={Boolean(newTaskRecurring)}
                 />
 
-                <RecurringPicker
-                    value={newTaskRecurring}
-                    onChange={(config) => {
-                        setNewTaskRecurring(config);
-                        setNewTaskStartDate('');
-                    }}
-                    onClear={() => setNewTaskRecurring(null)}
-                    inactiveVariant="ghost"
-                />
+                {showEstimateFields && (
+                    <TaskInlineEstimateFields
+                        idPrefix="task-kanban-create"
+                        estimatedHours={newTaskEstimatedHours}
+                        onEstimatedHoursChange={setNewTaskEstimatedHours}
+                        estimatedFlatAmount={newTaskEstimatedFlatAmount}
+                        onEstimatedFlatAmountChange={setNewTaskEstimatedFlatAmount}
+                        isFlatRateProject={isFlatRateProject}
+                        variant="plain"
+                        showHeading={false}
+                    />
+                )}
 
-                <div className={cn('flex gap-2 justify-end')}>
-                    <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-                    <Button type="submit">Create</Button>
+                <div
+                    className={cn('flex items-center gap-2', showEstimateFields && 'pt-1')}
+                    data-testid="task-kanban-create-action-row"
+                >
+                    <RecurringPicker
+                        value={newTaskRecurring}
+                        onChange={(config) => {
+                            setNewTaskRecurring(config);
+                            setNewTaskStartDate('');
+                        }}
+                        onClear={() => setNewTaskRecurring(null)}
+                        inactiveVariant="ghost"
+                    />
+
+                    <div className={cn('ml-auto flex shrink-0 gap-2 justify-end')}>
+                        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+                        <Button type="submit">Create</Button>
+                    </div>
                 </div>
             </form>
         </section>

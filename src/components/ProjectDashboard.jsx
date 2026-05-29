@@ -1,13 +1,14 @@
-import { ArrowLeftIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon } from '@/components/ui/icons';
+import { ArrowLeftIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon, CheckIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
-import { millisecondsToHours } from '../utils/dateUtils.ts';
+import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
@@ -34,6 +35,21 @@ import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProjectNotesEditor from './ProjectNotesEditor';
+import {
+    getProjectDeadlineStatus,
+    getProjectEstimateSummary,
+    isProjectInQuoteMode,
+} from '@/utils/projectPlanningUtils.ts';
+
+function formatHoursMetric(value) {
+    if (!Number.isFinite(value)) {
+        return '0';
+    }
+
+    const roundedValue = Math.round(value * 100) / 100;
+
+    return Number.isInteger(roundedValue) ? roundedValue.toString() : roundedValue.toFixed(2);
+}
 
 /**
  * ProjectDashboard component - Main dashboard view for a selected project
@@ -67,9 +83,10 @@ const ProjectDashboard = ({
     const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [activeTab, setActiveTab] = useState('tasks');
+    const [mobileDocumentGenerator, setMobileDocumentGenerator] = useState(null);
     const { showError, showSuccess } = useToast();
     const { getTimerForProject, clearTimer } = useTimers();
-    const { deleteProject, archiveProject, unarchiveProject } = useProjects();
+    const { deleteProject, archiveProject, unarchiveProject, updateProject } = useProjects();
     const { deleteTask } = useTasks();
     const { deleteEntry } = useTimeEntries();
     const { deleteInvoice } = useInvoices();
@@ -212,7 +229,44 @@ const ProjectDashboard = ({
     const handleCloseDeleteModal = () => {
         setShowDeleteModal(false);
     };
-    
+
+    const handleOpenMobileDocumentGenerator = useCallback((mode) => {
+        setMobileDocumentGenerator((previous) => ({
+            mode,
+            key: (previous?.key || 0) + 1,
+        }));
+    }, []);
+
+    const handleResolveDeadline = useCallback(() => {
+        if (!project.deadline) {
+            return;
+        }
+
+        updateProject(project.id, { deadlineResolvedAt: Date.now() });
+        showSuccess('Project deadline marked complete.');
+    }, [project.deadline, project.id, showSuccess, updateProject]);
+
+    const handleReopenDeadline = useCallback(() => {
+        if (!project.deadline) {
+            return;
+        }
+
+        updateProject(project.id, { deadlineResolvedAt: null });
+        showSuccess('Project deadline reopened.');
+    }, [project.deadline, project.id, showSuccess, updateProject]);
+
+    const projectIsQuoteMode = isProjectInQuoteMode(project);
+    const showActivateProjectActions = projectIsQuoteMode && !project.archived && !project.isPersonal;
+
+    const handleActivateProject = useCallback(() => {
+        if (!showActivateProjectActions) {
+            return;
+        }
+
+        updateProject(project.id, { statusMode: 'active' });
+        showSuccess('Project is now active and ready to generate invoices.');
+    }, [project.id, showActivateProjectActions, showSuccess, updateProject]);
+
     // Get tasks for this project
     const projectTasks = tasks.filter(task => task.projectId === project.id);
 
@@ -298,6 +352,35 @@ const ProjectDashboard = ({
         return clients.find(client => client.id === project.preferredClientId) || null;
     }, [clients, project.preferredClientId]);
 
+    const planningSummary = useMemo(() => {
+        return getProjectEstimateSummary(
+            project,
+            tasks,
+            timeEntries,
+            clients,
+            preferences.currency || getPreferredCurrency()
+        );
+    }, [clients, preferences.currency, project, tasks, timeEntries]);
+
+    const deadlineStatus = useMemo(() => getProjectDeadlineStatus(project), [project]);
+    const hasPlanningMetrics = !project.isPersonal && (
+        planningSummary.hasTaskEstimates
+        || planningSummary.hasBudgetAmount
+        || deadlineStatus.hasDeadline
+    );
+    const estimateProgressRatio = planningSummary.estimatedHours > 0
+        ? planningSummary.actualHours / planningSummary.estimatedHours
+        : null;
+    const projectedEarnings = Math.max(
+        projectMetrics.totalRevenue + projectMetrics.pendingAmount + projectMetrics.potentialRevenue,
+        planningSummary.estimatedAmount
+    );
+    const targetProgressRatio = planningSummary.effectiveTargetAmount && planningSummary.effectiveTargetAmount > 0
+        ? projectedEarnings / planningSummary.effectiveTargetAmount
+        : null;
+    const targetAmountDelta = planningSummary.effectiveTargetAmount !== null
+        ? planningSummary.effectiveTargetAmount - projectedEarnings
+        : null;
     return (
         <div className={cn('space-y-6', isMobileLayout && 'space-y-4')}>
             {/* Header */}
@@ -325,6 +408,11 @@ const ProjectDashboard = ({
                                 />
                             )}
                             <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
+                            {projectIsQuoteMode && (
+                                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                    Quote stage
+                                </span>
+                            )}
                             {project.archived && (
                                 <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                                     Archived
@@ -332,7 +420,7 @@ const ProjectDashboard = ({
                             )}
                         </div>
 
-                        {project.hourlyRate && (
+                        {(projectClient || (project.hourlyRate && !project.flatRate)) && (
                             <p className="text-sm text-muted-foreground">
                                 {projectClient && (
                                     <>
@@ -343,12 +431,16 @@ const ProjectDashboard = ({
                                         >
                                             {projectClient.title}
                                         </button>
-                                        <span className="mx-1">•</span>
+                                        {project.hourlyRate && !project.flatRate && (
+                                            <span className="mx-1">•</span>
+                                        )}
                                     </>
                                 )}
-                                <span className="sensitive-data">
-                                    {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
-                                </span>
+                                {project.hourlyRate && !project.flatRate && (
+                                    <span className="sensitive-data">
+                                        {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                    </span>
+                                )}
                             </p>
                         )}
                     </div>
@@ -368,9 +460,27 @@ const ProjectDashboard = ({
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            {!project.isPersonal && isMobileLayout && (
+                                <DropdownMenuItem
+                                    onSelect={() => handleOpenMobileDocumentGenerator(projectIsQuoteMode ? 'quote' : 'invoice')}
+                                    className="flex items-center space-x-2 pr-5"
+                                >
+                                    <DocumentTextIcon className="h-4 w-4" />
+                                    <span>{projectIsQuoteMode ? 'Generate Quote' : 'Generate Invoice'}</span>
+                                </DropdownMenuItem>
+                            )}
+                            {showActivateProjectActions && (
+                                <DropdownMenuItem
+                                    onClick={handleActivateProject}
+                                    className="status-success-action flex items-center space-x-2 pr-5"
+                                >
+                                    <CheckIcon className="h-4 w-4" />
+                                    <span>Activate Project</span>
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                                 onClick={handleEditProject}
-                                className="status-warning-action flex items-center space-x-2"
+                                className="status-warning-action flex items-center space-x-2 pr-5"
                             >
                                 <PencilIcon className="h-4 w-4" />
                                 <span>Edit</span>
@@ -378,7 +488,7 @@ const ProjectDashboard = ({
                             {project.archived ? (
                                 <DropdownMenuItem
                                     onClick={handleUnarchiveProject}
-                                    className="status-info-action flex items-center space-x-2"
+                                    className="status-info-action flex items-center space-x-2 pr-5"
                                 >
                                     <ArchiveBoxIcon className="h-4 w-4" />
                                     <span>Unarchive</span>
@@ -386,7 +496,7 @@ const ProjectDashboard = ({
                             ) : (
                                 <DropdownMenuItem
                                     onClick={handleArchiveProject}
-                                    className="status-info-action flex items-center space-x-2"
+                                    className="status-info-action flex items-center space-x-2 pr-5"
                                 >
                                     <ArchiveBoxIcon className="h-4 w-4" />
                                     <span>Archive</span>
@@ -394,7 +504,7 @@ const ProjectDashboard = ({
                             )}
                             <DropdownMenuItem
                                 onClick={handleDeleteProject}
-                                className="status-danger-action flex items-center space-x-2"
+                                className="status-danger-action flex items-center space-x-2 pr-5"
                             >
                                 <TrashIcon className="h-4 w-4" />
                                 <span>Delete</span>
@@ -402,8 +512,7 @@ const ProjectDashboard = ({
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Invoice Generator - Only show for non-personal projects */}
-                    {!project.isPersonal && !isMobileLayout && (
+                    {!project.isPersonal && (!isMobileLayout && (
                         <InvoiceGenerator
                             project={project}
                             timeEntries={projectTimeEntries}
@@ -411,6 +520,7 @@ const ProjectDashboard = ({
                             businessInfos={businessInfos}
                             clients={clients}
                             activeModal={activeModal}
+                            mode={projectIsQuoteMode ? 'quote' : 'invoice'}
                             // Modal functions
                             openClientModal={openClientModal}
                             openProjectModal={openProjectModal}
@@ -418,7 +528,7 @@ const ProjectDashboard = ({
                             openPaymentMethodModal={openPaymentMethodModal}
                             openTemplateModal={openTemplateModal}
                         />
-                    )}
+                    ))}
                 </div>
             </div>
 
@@ -434,6 +544,25 @@ const ProjectDashboard = ({
                 }}
                 onForceDelete={handleForceDelete}
             />
+
+            {mobileDocumentGenerator && (
+                <InvoiceGenerator
+                    key={`mobile-document-generator-${mobileDocumentGenerator.mode}-${mobileDocumentGenerator.key}`}
+                    project={project}
+                    timeEntries={projectTimeEntries}
+                    paymentMethods={paymentMethods}
+                    businessInfos={businessInfos}
+                    clients={clients}
+                    activeModal={activeModal}
+                    showButton={false}
+                    mode={mobileDocumentGenerator.mode}
+                    openClientModal={openClientModal}
+                    openProjectModal={openProjectModal}
+                    openBusinessModal={openBusinessModal}
+                    openPaymentMethodModal={openPaymentMethodModal}
+                    openTemplateModal={openTemplateModal}
+                />
+            )}
 
             {/* Project Metrics - Only show for non-personal projects */}
             {!project.isPersonal && (
@@ -585,6 +714,127 @@ const ProjectDashboard = ({
                 </TabsContent>
             </Tabs>
 
+            {hasPlanningMetrics && (
+                <Card data-testid="planning-progress-card">
+                    <CardHeader className={cn(isMobileLayout && 'px-3 py-3')}>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <CardTitle className="text-lg">Planning &amp; Progress</CardTitle>
+                            {showActivateProjectActions && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    leadingIcon={CheckIcon}
+                                    className="ml-auto"
+                                    onClick={handleActivateProject}
+                                >
+                                    Activate Project
+                                </Button>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent className={cn(isMobileLayout ? 'space-y-4 px-3 pb-3 pt-0' : 'space-y-4')}>
+                        <div className={cn('grid gap-4', isMobileLayout ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3')}>
+                            {planningSummary.hasTaskEstimates && (
+                                <div className="space-y-2 rounded-lg border border-border p-4">
+                                    <p className="text-sm font-medium text-foreground">Estimated hours</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {formatHoursMetric(planningSummary.actualHours)} of {formatHoursMetric(planningSummary.estimatedHours)} hours tracked
+                                    </p>
+                                    {estimateProgressRatio !== null && (
+                                        <>
+                                            <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                                <div
+                                                    className="h-full rounded-full bg-primary"
+                                                    style={{ width: `${Math.min(estimateProgressRatio * 100, 100)}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                {Math.round(estimateProgressRatio * 100)}% of estimated hours used
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {(planningSummary.estimatedAmount > 0 || planningSummary.hasBudgetAmount) && (
+                                <div className="space-y-2 rounded-lg border border-border p-4">
+                                    <p className="text-sm font-medium text-foreground">Target amount</p>
+                                    {planningSummary.effectiveTargetAmount !== null && (
+                                        <p className="text-sm text-muted-foreground sensitive-data">
+                                            Target amount: {formatCurrency(planningSummary.effectiveTargetAmount, planningSummary.currency)}
+                                        </p>
+                                    )}
+                                    {targetProgressRatio !== null && (
+                                        <>
+                                            <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                                <div
+                                                    className="h-full rounded-full bg-foreground"
+                                                    style={{ width: `${Math.min(targetProgressRatio * 100, 100)}%` }}
+                                                />
+                                            </div>
+                                            {targetAmountDelta !== null && (
+                                                <p className="text-xs text-muted-foreground sensitive-data">
+                                                    {targetAmountDelta > 0
+                                                        ? `Remaining to target: ${formatCurrency(targetAmountDelta, planningSummary.currency)}`
+                                                        : targetAmountDelta < 0
+                                                            ? `Ahead of target by ${formatCurrency(Math.abs(targetAmountDelta), planningSummary.currency)}`
+                                                            : 'On target'}
+                                                </p>
+                                            )}
+                                            <p className="text-xs text-muted-foreground sensitive-data">
+                                                Projected earnings: {formatCurrency(projectedEarnings, planningSummary.currency)}
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {deadlineStatus.hasDeadline && (
+                                <div className="space-y-2 rounded-lg border border-border p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <p className="text-sm font-medium text-foreground">Deadline</p>
+                                        {deadlineStatus.isResolved && (
+                                            <Badge variant="success" className="gap-1 whitespace-nowrap">
+                                                <CheckIcon className="h-3 w-3" />
+                                                Completed {toDisplayDate(deadlineStatus.resolvedAt, { month: 'short', day: 'numeric' })}
+                                            </Badge>
+                                        )}
+                                        {!deadlineStatus.isResolved && deadlineStatus.isOverdue && (
+                                            <Badge variant="warning" className="whitespace-nowrap">
+                                                Overdue
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <p className="text-sm font-medium text-foreground">
+                                        {deadlineStatus.deadline}
+                                    </p>
+                                    {!deadlineStatus.isResolved && (
+                                        <p className="text-sm text-muted-foreground">
+                                            {deadlineStatus.isOverdue
+                                                ? `${Math.abs(deadlineStatus.daysRemaining || 0)} day${Math.abs(deadlineStatus.daysRemaining || 0) === 1 ? '' : 's'} overdue`
+                                                : deadlineStatus.isToday
+                                                    ? 'Due today'
+                                                    : `${deadlineStatus.daysRemaining} day${deadlineStatus.daysRemaining === 1 ? '' : 's'} remaining`}
+                                        </p>
+                                    )}
+                                    {!project.archived && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="mt-1"
+                                            onClick={deadlineStatus.isResolved ? handleReopenDeadline : handleResolveDeadline}
+                                        >
+                                            {deadlineStatus.isResolved ? 'Reopen deadline' : 'Mark complete'}
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             <ExpensesSection
                 clientId={projectClient?.id}
                 projectId={project.id}
@@ -592,8 +842,8 @@ const ProjectDashboard = ({
                 openExpenseView={openExpenseView}
             />
 
-            {/* Invoices Section - Only show for non-personal projects */}
-            {!project.isPersonal && (
+            {/* Invoices Section - Only show for active non-personal projects */}
+            {!project.isPersonal && !projectIsQuoteMode && (
                 <Card>
                     <CardHeader className={cn(isMobileLayout && 'px-3 py-3')}>
                         <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>

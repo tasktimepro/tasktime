@@ -217,4 +217,29 @@ describe('InvoiceTaskSelector', () => {
         expect(headerActionRow?.className.includes('justify-between')).toBe(true);
         expect(headerActionRow?.className.includes('flex-col')).toBe(false);
     });
+
+    it('shows the original flat-rate summary instead of NaN for flat-rate tasks', () => {
+        render(
+            <InvoiceTaskSelector
+                {...createBaseProps({
+                    invoiceTasks: [
+                        {
+                            id: 'task-1',
+                            title: 'Flat task',
+                            parentTaskId: null,
+                            flatRate: 500,
+                            quantity: 1,
+                        }
+                    ],
+                    selectedTasksForBilling: { 'task-1': true },
+                    useFlatRate: { 'task-1': true },
+                    selectedProject: { hourlyRate: null, flatRate: true },
+                    getInvoiceCurrency: () => 'CHF',
+                })}
+            />
+        );
+
+        expect(screen.queryByText(/NaN/i)).not.toBeInTheDocument();
+        expect(screen.getByText('Original: CHF500.00 flat rate')).toBeInTheDocument();
+    });
 });
