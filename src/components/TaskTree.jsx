@@ -163,7 +163,7 @@ const TaskTree = ({
     const [subtaskDragPreview, setSubtaskDragPreview] = useState(null);
     
     // Yjs hooks for state
-    const { tasks, createTask, updateTask, deleteTask } = useTasks({ projectId: project.id });
+    const { tasks, createTask, updateTask, deleteTask } = useTasks({ projectId: project.id, includeArchived: true });
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { getTimerForProject, clearTimer } = useTimers();
     const todayStr = useTodayString();
@@ -867,6 +867,7 @@ const TaskTree = ({
                                 <TaskItem
                                     key={task.id}
                                     task={task}
+                                    taskCollection={projectTasks}
                                     recurringCompletionDate={todayStr}
                                     onDelete={() => handleDeleteTask(task.id)}
                                     onCreateSubtask={null}
@@ -896,6 +897,7 @@ const TaskTree = ({
                                             <SortableTaskItem
                                                 key={task.id}
                                                 task={task}
+                                                taskCollection={projectTasks}
                                                 onDelete={() => handleDeleteTask(task.id)}
                                                 onCreateSubtask={handleCreateTask}
                                                 onArchive={() => handleArchiveTask(task.id)}
@@ -917,6 +919,7 @@ const TaskTree = ({
                                         >
                                             <TaskItem
                                                 task={activeTaskDragTask}
+                                                taskCollection={projectTasks}
                                                 onDelete={() => {}}
                                                 onCreateSubtask={handleCreateTask}
                                                 onArchive={() => {}}
@@ -957,6 +960,7 @@ const TaskTree = ({
                                     <TaskItem
                                         key={task.id}
                                         task={task}
+                                        taskCollection={projectTasks}
                                         onDelete={() => handleDeleteTask(task.id)}
                                         onCreateSubtask={handleCreateTask}
                                         onArchive={() => handleArchiveTask(task.id)}
@@ -1024,6 +1028,7 @@ const TaskTree = ({
                                         <TaskItem
                                             key={task.id}
                                             task={task}
+                                            taskCollection={projectTasks}
                                             onDelete={() => handleDeleteTask(task.id)}
                                             onCreateSubtask={null}
                                             onArchive={() => handleArchiveTask(task.id)}
@@ -1057,7 +1062,7 @@ const TaskTree = ({
                                 taskDisplay === 'kanban' ? (
                                     <TaskKanbanBoard
                                         parentTasks={sortedArchivedTasks}
-                                        tasks={sortedArchivedTasks}
+                                        tasks={projectTasks}
                                         onCreateSubtask={null}
                                         onViewTask={onViewTask}
                                         onUpdateTask={updateTask}
@@ -1073,6 +1078,7 @@ const TaskTree = ({
                                             <TaskItem
                                                 key={task.id}
                                                 task={task}
+                                                taskCollection={projectTasks}
                                                 onDelete={() => handleDeleteTask(task.id)}
                                                 onCreateSubtask={task.recurring ? null : handleCreateTask}
                                                 onUnarchive={() => handleUnarchiveTask(task.id)}

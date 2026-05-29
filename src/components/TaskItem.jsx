@@ -24,6 +24,7 @@ import { startOfDay, endOfDay } from 'date-fns';
  */
 const TaskItem = ({
     task,
+    taskCollection,
     recurringCompletionDate,
     onDelete,
     onCreateSubtask,
@@ -63,8 +64,10 @@ const TaskItem = ({
     const { projects } = useProjects();
 
     const subtasks = useMemo(() => {
-        return tasks.filter((t) => t.parentTaskId === task.id);
-    }, [tasks, task.id]);
+        const sourceTasks = taskCollection || tasks;
+
+        return sourceTasks.filter((candidate) => candidate.parentTaskId === task.id);
+    }, [taskCollection, tasks, task.id]);
 
     // Compute task state
     const timerKey = task.projectId || task.id;

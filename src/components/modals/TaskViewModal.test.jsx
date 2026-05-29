@@ -9,6 +9,7 @@ const hookMocks = vi.hoisted(() => ({
     projects: [],
     clients: [],
     tasks: [],
+    useTasks: vi.fn(),
     timeEntries: [],
     recurringStatus: null,
     isCompleted: false,
@@ -85,15 +86,19 @@ vi.mock('@/hooks/useClients', () => ({
 
 vi.mock('@/hooks/useTasks', () => ({
 
-    useTasks: () => ({
-        tasks: hookMocks.tasks,
-        updateTask: hookMocks.updateTask,
-        unarchiveTask: hookMocks.unarchiveTask,
-        toggleRecurringCompletion: hookMocks.toggleRecurringCompletion,
-        skipRecurringOccurrence: hookMocks.skipRecurringOccurrence,
-        isCompletedOnDate: () => hookMocks.isCompleted,
-        getRecurringStatus: () => hookMocks.recurringStatus,
-    })
+    useTasks: (options) => {
+        hookMocks.useTasks(options)
+
+        return {
+            tasks: hookMocks.tasks,
+            updateTask: hookMocks.updateTask,
+            unarchiveTask: hookMocks.unarchiveTask,
+            toggleRecurringCompletion: hookMocks.toggleRecurringCompletion,
+            skipRecurringOccurrence: hookMocks.skipRecurringOccurrence,
+            isCompletedOnDate: () => hookMocks.isCompleted,
+            getRecurringStatus: () => hookMocks.recurringStatus,
+        }
+    }
 }))
 
 vi.mock('@/hooks/useTimeEntries', () => ({
@@ -153,6 +158,7 @@ describe('TaskViewModal recurring actions', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.useTasks.mockReset()
         hookMocks.clients = []
         hookMocks.projects = []
         hookMocks.tasks = [recurringTask]
@@ -174,6 +180,12 @@ describe('TaskViewModal recurring actions', () => {
         const expectedDateLabel = toDisplayDate('2026-02-21', { month: 'short', day: 'numeric' })
         expect(screen.getByRole('button', { name: `Done for ${expectedDateLabel}` })).toBeInTheDocument()
         expect(screen.queryByTitle('Skip until next recurring')).not.toBeInTheDocument()
+    })
+
+    it('requests archived tasks so archived subtasks remain available in the modal', () => {
+        renderModal()
+
+        expect(hookMocks.useTasks).toHaveBeenCalledWith({ includeArchived: true })
     })
 
     it('hides skip button for already skipped occurrence and keeps date-specific done label', () => {

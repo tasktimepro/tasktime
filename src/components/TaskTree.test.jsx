@@ -6,6 +6,7 @@ import TaskTree from './TaskTree';
 const taskTreeMocks = vi.hoisted(() => ({
     isMobileLayout: false,
     tasks: [],
+    useTasks: vi.fn(),
     updateProject: vi.fn(),
     createTask: vi.fn(),
     updateTask: vi.fn(),
@@ -31,12 +32,16 @@ vi.mock('../hooks/useProjects.ts', () => ({
 }));
 
 vi.mock('../hooks/useTasks.ts', () => ({
-    useTasks: () => ({
-        tasks: taskTreeMocks.tasks,
-        createTask: taskTreeMocks.createTask,
-        updateTask: taskTreeMocks.updateTask,
-        deleteTask: taskTreeMocks.deleteTask,
-    })
+    useTasks: (options) => {
+        taskTreeMocks.useTasks(options)
+
+        return {
+            tasks: taskTreeMocks.tasks,
+            createTask: taskTreeMocks.createTask,
+            updateTask: taskTreeMocks.updateTask,
+            deleteTask: taskTreeMocks.deleteTask,
+        }
+    }
 }));
 
 vi.mock('../hooks/useTimeEntries.ts', () => ({
@@ -146,6 +151,7 @@ describe('TaskTree', () => {
     beforeEach(() => {
         taskTreeMocks.isMobileLayout = false;
         taskTreeMocks.tasks = [];
+        taskTreeMocks.useTasks.mockReset();
         taskTreeMocks.createTask.mockReset();
         taskTreeMocks.createTask.mockImplementation((data) => ({ id: data.id || 'created-task', ...data }));
         taskTreeMocks.updateTask.mockReset();
@@ -167,6 +173,18 @@ describe('TaskTree', () => {
 
         expect(screen.getByTestId('task-item-task-1')).toBeInTheDocument();
         expect(screen.queryByText('Kanban board')).not.toBeInTheDocument();
+    });
+
+    it('requests archived project tasks for the project tree', () => {
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        expect(taskTreeMocks.useTasks).toHaveBeenCalledWith({ projectId: 'project-1', includeArchived: true });
     });
 
     it('switches to the Kanban view when requested', () => {
