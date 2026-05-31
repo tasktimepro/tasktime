@@ -10,7 +10,6 @@ import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
 import { useProjects } from '../../../hooks/useProjects';
 import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
-import { cn } from '@/lib/utils';
 import { buildBillableDurationFields, getBillableDurationMs } from '../../../utils/timeEntryDurationUtils.ts';
 
 /**

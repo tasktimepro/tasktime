@@ -87,7 +87,6 @@ const SubtaskSection = ({
     );
     const {
         setNodeRef: setSubtaskContainerNodeRef,
-        isOver: isSubtaskContainerOver,
     } = useDroppable({
         id: `subtask-container:${task.id}`,
         data: {

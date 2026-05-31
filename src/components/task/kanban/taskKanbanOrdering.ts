@@ -3,7 +3,6 @@ import {
     buildTaskContainerMoveOrderUpdates,
     buildTaskMoveOrderUpdates,
     hasManualTaskOrder,
-    insertTaskItem,
     reorderTaskItems,
     sortTasksByManualOrder,
 } from '@/utils/taskOrderingUtils.ts';

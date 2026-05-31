@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildTodoNotificationSchedules } from './todoNotificationSchedule';
+import {
+    buildTodoNotificationSchedules,
+    getTodoNotificationReplaceHorizonUntil,
+} from './todoNotificationSchedule';
 
 const baseDate = new Date(2026, 4, 30, 10, 0, 0, 0);
 
@@ -28,6 +31,35 @@ describe('todoNotificationSchedule', () => {
             localDate: '2026-06-01',
             timezone: 'Europe/Ljubljana',
         });
+        expect(schedules[0].dueAt).toBe('2026-06-01T09:30:00.000Z');
+    });
+
+    it('uses createdAt for recurring tasks without a start date and falls back to the default notification time', () => {
+        const schedules = buildTodoNotificationSchedules({
+            startDate: baseDate,
+            horizonDays: 7,
+            notificationTime: '99:99',
+            tasks: [
+                {
+                    id: 'task-created-at',
+                    title: 'Created from timestamp',
+                    createdAt: new Date(2026, 5, 1, 15, 45, 0, 0).getTime(),
+                    recurring: { type: 'weekly', weeklyDays: [1] },
+                },
+            ],
+            expenses: [],
+            expenseRecurrences: [],
+        });
+
+        expect(schedules).toEqual([
+            {
+                scheduleKey: 'todo-today:2026-06-01',
+                type: 'todo_today',
+                localDate: '2026-06-01',
+                dueAt: '2026-06-01T09:00:00.000Z',
+                timezone: 'UTC',
+            },
+        ]);
     });
 
     it('includes recurring tasks and skips completed or skipped occurrences', () => {
@@ -55,6 +87,12 @@ describe('todoNotificationSchedule', () => {
                     title: 'Monthly',
                     startDate: '2026-05-01',
                     recurring: { type: 'monthly', monthlyType: 'specific', monthlyDay: 3 },
+                },
+                {
+                    id: 'future',
+                    title: 'Future',
+                    startDate: '2026-06-15',
+                    recurring: { type: 'weekly', weeklyDays: [1] },
                 },
             ],
             expenses: [],
@@ -112,9 +150,57 @@ describe('todoNotificationSchedule', () => {
                 { id: 'auto', title: 'Auto', date: '2026-06-01', paymentStatus: 'unpaid', paymentMode: 'auto', amountType: 'fixed' },
                 { id: 'variable', title: 'Variable', date: '2026-06-02', paymentStatus: 'unpaid', paymentMode: 'auto', amountType: 'variable' },
             ],
-            expenseRecurrences: [],
+            expenseRecurrences: [
+                {
+                    id: 'ignored-auto',
+                    title: 'Ignored Auto',
+                    currency: 'EUR',
+                    amount: 10,
+                    amountType: 'fixed',
+                    paymentMode: 'auto',
+                    repeat: 'monthly',
+                    monthlyType: 'specific',
+                    monthlyDay: 4,
+                    startDate: '2026-06-04',
+                    isPersonal: false,
+                    billable: false,
+                    isTaxExempt: false,
+                    active: true,
+                },
+            ],
         });
 
         expect(schedules.map((schedule) => schedule.localDate)).toEqual(['2026-06-02']);
+    });
+
+    it('returns no schedules when the date range is invalid and filters malformed schedule dates', () => {
+        expect(buildTodoNotificationSchedules({
+            startDate: new Date(Number.NaN),
+            tasks: [],
+            expenses: [],
+            expenseRecurrences: [],
+        })).toEqual([]);
+
+        const schedules = buildTodoNotificationSchedules({
+            startDate: baseDate,
+            horizonDays: 7,
+            tasks: [
+                {
+                    id: 'bad-date',
+                    title: 'Bad Date',
+                    startDate: '2026-06-0 ',
+                    completed: false,
+                },
+            ],
+            expenses: [],
+            expenseRecurrences: [],
+        });
+
+        expect(schedules).toEqual([]);
+    });
+
+    it('computes the replacement horizon date and handles invalid input safely', () => {
+        expect(getTodoNotificationReplaceHorizonUntil(baseDate, 7)).toBe('2026-06-06');
+        expect(getTodoNotificationReplaceHorizonUntil(new Date(Number.NaN), 7)).toBe('');
     });
 });

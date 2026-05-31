@@ -344,7 +344,7 @@ vi.mock('./components/Dashboard', () => ({
 vi.mock('./components/Account', () => ({ default: () => <div data-testid="account" /> }))
 vi.mock('./components/Invoices', () => ({ default: () => <div data-testid="invoices" /> }))
 vi.mock('./components/Reports', () => ({
-    default: ({ onReadyChange }) => {
+    default: function ReportsMock({ onReadyChange }) {
         React.useEffect(() => {
             reportsComponentState.readyHandler = onReadyChange || null
 
