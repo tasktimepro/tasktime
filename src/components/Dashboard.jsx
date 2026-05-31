@@ -40,6 +40,7 @@ import AddTimeEntryModal from '@/components/modals/AddTimeEntryModal';
 import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
 
 const STALE_EXCHANGE_RATES_WARNING_DATE_KEY = 'tasktime-stale-exchange-rates-warning-date';
+const NOTIFICATION_PERMISSION_UNSUPPORTED = 'unsupported';
 
 const getStaleExchangeRatesWarningDate = (todayStr) => {
     return todayStr || toStorageDate(new Date()) || null;
@@ -67,6 +68,34 @@ const markStaleExchangeRatesWarningShown = (dateStr) => {
     } catch {
         // Ignore localStorage failures and continue showing the warning.
     }
+};
+
+const getNotificationPermission = () => {
+    if (typeof window === 'undefined' || typeof window.Notification === 'undefined') {
+        return NOTIFICATION_PERMISSION_UNSUPPORTED;
+    }
+
+    return window.Notification.permission;
+};
+
+const buildTodoNotificationBody = ({ taskCount, expenseCount, firstTitle }) => {
+    const parts = [];
+
+    if (taskCount > 0) {
+        parts.push(`${taskCount} ${taskCount === 1 ? 'task' : 'tasks'}`);
+    }
+
+    if (expenseCount > 0) {
+        parts.push(`${expenseCount} ${expenseCount === 1 ? 'expense' : 'expenses'}`);
+    }
+
+    const itemSummary = parts.join(' and ');
+
+    if (firstTitle && taskCount + expenseCount === 1) {
+        return `${firstTitle} is due today.`;
+    }
+
+    return `${itemSummary} are due today.`;
 };
 
 /**
@@ -117,6 +146,9 @@ const Dashboard = ({
     const { getForDate } = usePlannerAttachments();
     const [conversionWarningShown, setConversionWarningShown] = useState(false);
     const lastWarningKeyRef = useRef(null);
+    const notificationSeenKeysRef = useRef(new Set());
+    const notificationSeenDayRef = useRef(null);
+    const [notificationPermission] = useState(getNotificationPermission);
     const todayStr = useTodayString();
     const [showAddEntryModal, setShowAddEntryModal] = useState(false);
     const [addEntryTask, setAddEntryTask] = useState(null);
@@ -935,6 +967,80 @@ const Dashboard = ({
     const upcomingTasks = useMemo(() => {
         return enhanceTaskList(getUpcomingTasks(7));
     }, [getUpcomingTasks, enhanceTaskList]);
+
+    const todoNotificationItems = useMemo(() => {
+        if (!todayStr) {
+            return [];
+        }
+
+        const itemsByKey = new Map();
+        const addTask = (task) => {
+            if (!task || getTaskCompletedStatus(task)) return;
+            if (task.recurring && task.recurringStatus && !task.recurringStatus.isDueToday) return;
+            if (!task.recurring && task.startDate && task.startDate !== todayStr) return;
+
+            const effectiveDateStr = task.recurring
+                ? (task.recurringStatus?.effectiveDateStr || todayStr)
+                : (task.startDate || todayStr);
+
+            itemsByKey.set(`task:${task.id}:${effectiveDateStr}`, {
+                key: `task:${task.id}:${effectiveDateStr}`,
+                type: 'task',
+                title: task.title || 'Task',
+            });
+        };
+
+        tasksForToday.forEach(addTask);
+
+        expenses.forEach((expense) => {
+            if (!expense || expense.paymentStatus === 'paid') return;
+            if (expense.date !== todayStr) return;
+            if (expense.paymentMode === 'auto' && expense.amountType !== 'variable') return;
+
+            itemsByKey.set(`expense:${expense.id}:${expense.date}`, {
+                key: `expense:${expense.id}:${expense.date}`,
+                type: 'expense',
+                title: expense.title || 'Expense',
+            });
+        });
+
+        return Array.from(itemsByKey.values());
+    }, [expenses, getTaskCompletedStatus, tasksForToday, todayStr]);
+
+    useEffect(() => {
+        if (preferences.systemNotificationsEnabled !== true || notificationPermission !== 'granted' || !todayStr) {
+            return;
+        }
+
+        if (typeof window === 'undefined' || typeof window.Notification === 'undefined') {
+            return;
+        }
+
+        if ('PushManager' in window) {
+            return;
+        }
+
+        if (notificationSeenDayRef.current !== todayStr) {
+            notificationSeenDayRef.current = todayStr;
+            notificationSeenKeysRef.current = new Set();
+        }
+
+        const unseenItems = todoNotificationItems.filter((item) => !notificationSeenKeysRef.current.has(item.key));
+        if (unseenItems.length === 0) {
+            return;
+        }
+
+        unseenItems.forEach((item) => notificationSeenKeysRef.current.add(item.key));
+
+        const taskCount = unseenItems.filter((item) => item.type === 'task').length;
+        const expenseCount = unseenItems.filter((item) => item.type === 'expense').length;
+        const firstTitle = unseenItems[0]?.title || '';
+
+        new window.Notification('TaskTime', {
+            body: buildTodoNotificationBody({ taskCount, expenseCount, firstTitle }),
+            tag: `tasktime-todo-${todayStr}`,
+        });
+    }, [notificationPermission, preferences.systemNotificationsEnabled, todayStr, todoNotificationItems]);
 
     const handleDeleteTask = useCallback((task) => {
         if (!task) return;

@@ -44,11 +44,15 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'favicon.ico', 'favicon-96x96.png', 'icons/*.png'],
       manifest: false, // Use our custom manifest.json in public/
-      workbox: {
+      injectManifest: {
+        injectionPoint: undefined,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      },
+      workbox: {
         navigateFallbackDenylist: PUBLIC_STATIC_ROUTE_DENYLIST,
         runtimeCaching: [
           {

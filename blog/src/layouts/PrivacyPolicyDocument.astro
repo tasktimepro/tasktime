@@ -2,13 +2,13 @@
 import PublicPageLayout from './PublicPageLayout.astro';
 
 const { canonicalPath = '/privacy' } = Astro.props;
-const LAST_UPDATED = '14 April 2026';
+const LAST_UPDATED = '31 May 2026';
 ---
 
 <PublicPageLayout
     pageKey="privacy"
     title="Privacy Policy"
-    summary="TaskTime is a local-first app. Your data lives in your browser and, if you choose, in your own Google Drive. We cannot see it, we do not collect it, and we have no server that stores it."
+    summary="TaskTime is a local-first app. Your data lives in your browser and, if you choose, in your own Google Drive. We cannot see it, we do not collect it, and optional services are designed to avoid storing personal app data."
     lastUpdated={LAST_UPDATED}
     highlights={[
         'Your data never touches our servers. It stays in your browser and your own Google Drive.',
@@ -60,6 +60,9 @@ const LAST_UPDATED = '14 April 2026';
         </p>
         <p>
             When you send an invoice by email, a minimal audit record is saved: a hashed identifier derived from your sync session, a hashed form of the recipient&apos;s address, and a timestamp. This is used only to enforce monthly sending limits and prevent duplicate sends. No invoice content, PDF data, or message body is stored server-side.
+        </p>
+        <p>
+            If you enable system reminders, TaskTime stores only the browser push subscription needed for delivery and generic reminder timestamps. We do not store task names, expense details, notes, amounts, client or project names, or other personal app data for this service. Turning reminders off removes the device subscription and cancels future scheduled reminders.
         </p>
         <p>
             That is the complete list. There is no user database, no email list, and no third-party analytics.

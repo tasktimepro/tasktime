@@ -10,7 +10,7 @@ include $(WORKER_ENV_FILE)
 export CLOUDFLARE_API_TOKEN
 endif
 
-.PHONY: help dev stop build preview preview-build install lint clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build worker-kv-create worker-kv-create-preview worker-secret worker-deploy worker-logs worker-d1-list worker-d1-create worker-d1-apply worker-metrics-weekly worker-metrics-monthly worker-metrics-action-weekly worker-metrics-action-monthly
+.PHONY: help dev dev-push-local preview-push-local preview-push-cloud stop build preview preview-build install lint clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build worker-dev-push-local worker-d1-apply-local worker-kv-create worker-kv-create-preview worker-secret worker-deploy worker-logs worker-d1-list worker-d1-create worker-d1-apply worker-metrics-weekly worker-metrics-monthly worker-metrics-action-weekly worker-metrics-action-monthly
 
 PREVIEW_PORT ?= 3101
 
@@ -20,6 +20,9 @@ help:
 	@echo "=============================="
 	@echo ""
 	@echo "  make dev      - Start development server (docker compose up)"
+	@echo "  make dev-push-local - Start app dev server using local Worker at http://localhost:8787"
+	@echo "  make preview-push-local - Build production preview using local Worker at http://localhost:8787"
+	@echo "  make preview-push-cloud - Build production preview using deployed Worker at https://sync.tasktime.pro"
 	@echo "  make stop     - Stop development server"
 	@echo "  make build    - Build for production"
 	@echo "  make preview  - Stop current dev containers, build merged app+blog output, and serve it locally on PREVIEW_PORT ($(PREVIEW_PORT))"
@@ -43,6 +46,8 @@ help:
 	@echo "  make worker-d1-list - List Cloudflare D1 databases"
 	@echo "  make worker-d1-create NAME=<db-name> - Create a Cloudflare D1 database"
 	@echo "  make worker-d1-apply DB=<db-name> SQL=<file.sql> - Apply SQL to a remote D1 database"
+	@echo "  make worker-d1-apply-local DB=<db-name> SQL=<file.sql> - Apply SQL to local Wrangler D1"
+	@echo "  make worker-dev-push-local - Start local Worker on http://localhost:8787"
 	@echo "  make worker-metrics-weekly - Query weekly active usage totals from D1"
 	@echo "  make worker-metrics-monthly - Query monthly active usage totals from D1"
 	@echo "  make worker-metrics-action-weekly ACTION=project_create - Query weekly totals for a specific action"
@@ -54,6 +59,32 @@ dev:
 	docker compose up -d
 	@echo "Development server running at http://localhost:3101"
 	@echo "Blog dev server is available through the same origin at http://localhost:3101/blog"
+
+# Start local app dev server wired to local Wrangler Worker
+dev-push-local:
+	docker compose run --rm -p 3101:3101 \
+		-e VITE_SYNC_WORKER_URL=http://localhost:8787 \
+		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
+		app sh -lc 'sh ./scripts/start-dev-servers.sh'
+
+# Build and preview production app wired to local Wrangler Worker.
+# Use this for service-worker/Web Push testing; Vite dev mode unregisters service workers.
+preview-push-local:
+	docker compose run --rm -p 3101:3101 \
+		-e VITE_SYNC_WORKER_URL=http://localhost:8787 \
+		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
+		app sh -lc 'npm run build && npm run preview -- --host 0.0.0.0 --port 3101'
+
+# Build and preview production app wired to the deployed Cloudflare Worker.
+# This verifies the real edge route and browser CORS path before release.
+preview-push-cloud:
+	-docker compose down --remove-orphans
+	@leftovers=$$(docker ps -aq --filter "name=tasktime-app-run-"); \
+	if [ -n "$$leftovers" ]; then docker rm -f $$leftovers; fi
+	docker compose run --rm -p $(PREVIEW_PORT):$(PREVIEW_PORT) \
+		-e VITE_SYNC_WORKER_URL=https://sync.tasktime.pro \
+		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
+		app sh -lc 'npm run build && npm run preview -- --host 0.0.0.0 --port $(PREVIEW_PORT)'
 
 # Stop development server
 stop:
@@ -180,6 +211,18 @@ npm:
 # Also ensure the token's Account Resources include the target Cloudflare account.
 # Example .env.worker.local contents:
 # CLOUDFLARE_API_TOKEN=your-token-here
+
+# Start local Worker for push testing. Requires cloudflare/.dev.vars.
+worker-dev-push-local:
+	cd cloudflare && npx wrangler dev --local --port 8787
+
+# Apply SQL to local Wrangler D1 (usage: make worker-d1-apply-local DB=tasktime-push SQL=cloudflare/sql/004_push_notifications.sql)
+worker-d1-apply-local:
+	@if [ -z "$(DB)" ] || [ -z "$(SQL)" ]; then \
+		echo "Usage: make worker-d1-apply-local DB=<database-name> SQL=<sql-file>"; \
+		exit 1; \
+	fi
+	@cd cloudflare && npx wrangler d1 execute $(DB) --local --file $(patsubst cloudflare/%,%,$(SQL))
 
 # Create KV namespaces (run once)
 worker-kv-create:

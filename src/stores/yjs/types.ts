@@ -463,6 +463,8 @@ export interface Preferences {
     autoSyncMode?: 'backup' | 'sync';
     weeklyGoalTargetHours?: number | null;
     weeklyGoalTargetEarnings?: number | null;
+    systemNotificationsEnabled?: boolean;
+    systemNotificationTime?: string;
     backupEnabled?: boolean;
     backupFrequencyHours?: number;
 }

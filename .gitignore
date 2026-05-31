@@ -12,6 +12,9 @@ dist
 dist-ssr
 .astro
 *.local
+.dev.vars
+.dev.vars.*
+.wrangler
 coverage
 playwright-report
 test-results

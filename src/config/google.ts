@@ -64,6 +64,10 @@ export const SYNC_WORKER_CONFIG = {
             authStatus: `${base}/auth/status`,
             drive: `${base}/drive`,
             metricsBatch: `${base}/metrics/batch`,
+            pushVapidPublicKey: `${base}/push/vapid-public-key`,
+            pushSubscription: `${base}/push/subscription`,
+            pushSchedules: `${base}/push/schedules`,
+            pushTest: `${base}/push/test`,
         };
     },
 };

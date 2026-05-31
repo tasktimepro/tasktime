@@ -58,12 +58,15 @@ describe('usePreferences', () => {
 
         expect(result.current.preferences.currency).toBe('USD')
         expect(result.current.preferences.showCompletedTasks).toBe(false)
+        expect(result.current.preferences.systemNotificationsEnabled).toBe(false)
+        expect(result.current.preferences.systemNotificationTime).toBe('09:00')
 
         act(() => {
-            result.current.updatePreferences({ currency: 'GBP', timeFormat: undefined })
+            result.current.updatePreferences({ currency: 'GBP', systemNotificationsEnabled: false, timeFormat: undefined })
         })
 
         expect(preferences.set).toHaveBeenCalledWith('currency', 'GBP')
+        expect(preferences.set).toHaveBeenCalledWith('systemNotificationsEnabled', false)
         expect(preferences.set.mock.calls.some(([key]) => key === 'timeFormat')).toBe(false)
 
         act(() => {
@@ -71,5 +74,7 @@ describe('usePreferences', () => {
         })
 
         expect(preferences.set).toHaveBeenCalledWith('currency', 'EUR')
+        expect(preferences.set).toHaveBeenCalledWith('systemNotificationsEnabled', false)
+        expect(preferences.set).toHaveBeenCalledWith('systemNotificationTime', '09:00')
     })
 })

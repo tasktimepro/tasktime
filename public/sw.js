@@ -49,6 +49,77 @@ self.addEventListener('message', (event) => {
     }
 });
 
+function getNotificationUrl(data) {
+    if (data && typeof data.url === 'string' && data.url.startsWith('/')) {
+        return data.url;
+    }
+
+    return '/?notification=reminder';
+}
+
+function getPushNotificationData(event) {
+    if (!event.data) {
+        return {};
+    }
+
+    try {
+        return event.data.json();
+    } catch {
+        return {};
+    }
+}
+
+self.addEventListener('push', (event) => {
+    const data = getPushNotificationData(event);
+    const title = typeof data.title === 'string' ? data.title : 'TaskTime';
+    const body = typeof data.body === 'string' ? data.body : 'TaskTime has a reminder for you.';
+
+    event.waitUntil(
+        self.registration.showNotification(title, {
+            body,
+            tag: 'tasktime-reminder',
+            renotify: false,
+            data: {
+                url: getNotificationUrl(data),
+            },
+            icon: '/icons/web-app-manifest-192x192.png',
+            badge: '/favicon-96x96.png',
+        })
+    );
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const targetUrl = new URL(
+        getNotificationUrl(event.notification?.data),
+        self.location.origin
+    ).href;
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then((clients) => {
+                const appClient = clients.find((client) => {
+                    try {
+                        return new URL(client.url).origin === self.location.origin;
+                    } catch {
+                        return false;
+                    }
+                });
+
+                if (appClient) {
+                    if ('navigate' in appClient) {
+                        return appClient.navigate(targetUrl).then(() => appClient.focus());
+                    }
+
+                    return appClient.focus();
+                }
+
+                return self.clients.openWindow(targetUrl);
+            })
+    );
+});
+
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const requestUrl = getRequestUrl(request);

@@ -20,13 +20,23 @@ describe('service worker caching', () => {
         handlers.install = null
         handlers.activate = null
         handlers.fetch = null
+        handlers.push = null
+        handlers.notificationclick = null
 
         globalThis.self = {
             addEventListener: (type, handler) => {
                 handlers[type] = handler
             },
             skipWaiting: vi.fn(),
-            clients: { claim: vi.fn() }
+            registration: {
+                showNotification: vi.fn().mockResolvedValue(undefined)
+            },
+            clients: {
+                claim: vi.fn(),
+                matchAll: vi.fn().mockResolvedValue([]),
+                openWindow: vi.fn().mockResolvedValue(undefined)
+            },
+            location: { origin: 'https://tasktime.pro' }
         }
 
         globalThis.caches = {
@@ -74,5 +84,47 @@ describe('service worker caching', () => {
 
         const response = await event.respondWith.mock.calls[0][0]
         expect(response).toBe(cachedResponse)
+    })
+
+    it('shows a generic notification for empty push events', async () => {
+
+        const event = {
+            data: null,
+            waitUntil: vi.fn()
+        }
+
+        handlers.push(event)
+
+        expect(event.waitUntil).toHaveBeenCalled()
+        await event.waitUntil.mock.calls[0][0]
+
+        expect(globalThis.self.registration.showNotification).toHaveBeenCalledWith('TaskTime', {
+            body: 'TaskTime has a reminder for you.',
+            tag: 'tasktime-reminder',
+            renotify: false,
+            data: {
+                url: '/?notification=reminder'
+            },
+            icon: '/icons/web-app-manifest-192x192.png',
+            badge: '/favicon-96x96.png'
+        })
+    })
+
+    it('opens TaskTime when a notification is clicked and no client is open', async () => {
+
+        const event = {
+            notification: {
+                close: vi.fn(),
+                data: { url: '/?notification=reminder' }
+            },
+            waitUntil: vi.fn()
+        }
+
+        handlers.notificationclick(event)
+
+        expect(event.notification.close).toHaveBeenCalled()
+        await event.waitUntil.mock.calls[0][0]
+
+        expect(globalThis.self.clients.openWindow).toHaveBeenCalledWith('https://tasktime.pro/?notification=reminder')
     })
 })

@@ -54,6 +54,8 @@ import {
 } from './utils/onboardingUtils.ts';
 import { getTaskIdsToDelete } from './utils/taskUtils.ts';
 import { setUsageMetricsSessionId, startUsageMetrics } from './utils/usageMetrics.ts';
+import { buildTodoNotificationSchedules, getTodoNotificationReplaceHorizonUntil } from './utils/todoNotificationSchedule.ts';
+import { getCurrentPushSubscription, getPushSupportState, uploadPushSchedules } from './utils/pushNotificationClient.ts';
 import { useTodayString } from './hooks/useDayRollover';
 import { useDarkModePreference } from './hooks/useDarkModePreference.ts';
 import { SYNC_WORKER_CONFIG } from './config/google.ts';
@@ -97,6 +99,7 @@ const MOBILE_SYNC_VISIBLE_KINDS = new Set([
     SYNC_STATUS_KIND.SYNCED,
 ]);
 const ONBOARDING_SEED_TASK_TITLE = 'Create my first project';
+const PUSH_SCHEDULE_SYNC_DEBOUNCE_MS = 2000;
 
 const PAGE_TITLE_MAP = {
     dashboard: 'Dashboard',
@@ -313,6 +316,56 @@ function AppContent() {
     const isLoading = !isReady || projectsLoading || tasksLoading || entriesLoading || 
         clientsLoading || invoicesLoading || businessLoading || templatesLoading || 
         paymentsLoading || preferencesLoading || timerLoading;
+
+    useEffect(() => {
+        if (
+            isLoading
+            || preferences.systemNotificationsEnabled !== true
+            || !todayStr
+            || typeof window === 'undefined'
+            || typeof window.Notification === 'undefined'
+            || window.Notification.permission !== 'granted'
+        ) {
+            return undefined;
+        }
+
+        if (!getPushSupportState().supported) {
+            return undefined;
+        }
+
+        let canceled = false;
+        const timeoutId = window.setTimeout(() => {
+            getCurrentPushSubscription()
+                .then((subscription) => {
+                    if (canceled || !subscription) {
+                        return;
+                    }
+
+                    const startDate = new Date();
+                    const schedules = buildTodoNotificationSchedules({
+                        tasks: activeTasks,
+                        expenses,
+                        expenseRecurrences: recurrences,
+                        startDate,
+                        notificationTime: preferences.systemNotificationTime || '09:00',
+                    });
+
+                    return uploadPushSchedules({
+                        subscriptionEndpoint: subscription.endpoint,
+                        schedules,
+                        replaceHorizonUntil: getTodoNotificationReplaceHorizonUntil(startDate),
+                    });
+                })
+                .catch((error) => {
+                    console.warn('[Push] Failed to sync notification schedules:', error);
+                });
+        }, PUSH_SCHEDULE_SYNC_DEBOUNCE_MS);
+
+        return () => {
+            canceled = true;
+            window.clearTimeout(timeoutId);
+        };
+    }, [activeTasks, expenses, isLoading, preferences.systemNotificationTime, preferences.systemNotificationsEnabled, recurrences, todayStr]);
 
     // Show a one-time toast if the user mouses out while uploads are in-flight
     const syncToastShownRef = useRef(false);

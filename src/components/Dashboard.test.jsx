@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import Dashboard from './Dashboard';
 import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
 
@@ -13,6 +13,7 @@ const {
     mockTimeEntries,
     mockExpenses,
     mockRecurrences,
+    mockPreferences,
 } = vi.hoisted(() => ({
     mockShowWarning: vi.fn(),
     mockShowSuccess: vi.fn(),
@@ -21,6 +22,7 @@ const {
     mockTimeEntries: [],
     mockExpenses: [],
     mockRecurrences: [],
+    mockPreferences: { currency: 'USD' },
     mockUseTasks: vi.fn(() => ({
         activeTasks: [],
         archivedTasks: [],
@@ -96,7 +98,7 @@ vi.mock('../hooks/useExpenseRecurrences', () => ({
 
 vi.mock('../hooks/usePreferences', () => ({
     usePreferences: () => ({
-        preferences: { currency: 'USD' },
+        preferences: mockPreferences,
     }),
 }));
 
@@ -170,6 +172,11 @@ describe('Dashboard', () => {
         mockTimeEntries.length = 0;
         mockExpenses.length = 0;
         mockRecurrences.length = 0;
+        Object.keys(mockPreferences).forEach((key) => {
+            delete mockPreferences[key];
+        });
+        mockPreferences.currency = 'USD';
+        mockPreferences.systemNotificationsEnabled = false;
         mockUseCurrencyConversion.mockReturnValue({
             preferredCurrency: 'USD',
             exchangeRates: null,
@@ -204,6 +211,122 @@ describe('Dashboard', () => {
 
         expect(todo.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(metrics.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('sends a system notification for due todo items when notifications are enabled', async () => {
+        const notifications = [];
+        const originalNotification = window.Notification;
+        function MockNotification(title, options) {
+            notifications.push({ title, options });
+        }
+        MockNotification.permission = 'granted';
+        MockNotification.requestPermission = vi.fn();
+        window.Notification = MockNotification;
+        mockPreferences.systemNotificationsEnabled = true;
+
+        mockUseTasks.mockReturnValueOnce({
+            activeTasks: [],
+            archivedTasks: [],
+            updateTask: vi.fn(),
+            deleteTask: vi.fn(),
+            archiveTask: vi.fn(),
+            getOverdueTasks: vi.fn(() => []),
+            getTasksForToday: vi.fn(() => [{ id: 'task-1', title: 'Send estimate', startDate: '2026-03-24', completed: false }]),
+            getUpcomingTasks: vi.fn(() => []),
+            toggleRecurringCompletion: vi.fn(),
+            isCompletedOnDate: vi.fn(() => false),
+            resetExpiredSkips: vi.fn(),
+            isLoading: false,
+            archivedLoading: false,
+            archivedLoaded: true,
+            getRecurringStatus: vi.fn(() => ({
+                effectiveDateStr: null,
+                isDueToday: false,
+                isOverdue: false,
+                lastDueDateStr: null,
+            })),
+        });
+        mockExpenses.push({
+            id: 'expense-1',
+            title: 'Hosting',
+            date: '2026-03-24',
+            paymentStatus: 'unpaid',
+            paymentMode: 'manual',
+            amountType: 'fixed',
+        });
+
+        try {
+            renderDashboard();
+
+            await waitFor(() => {
+                expect(notifications).toHaveLength(1);
+            });
+        } finally {
+            if (typeof originalNotification === 'undefined') {
+                delete window.Notification;
+            } else {
+                window.Notification = originalNotification;
+            }
+        }
+
+        expect(notifications[0]).toEqual({
+            title: 'TaskTime',
+            options: {
+                body: '1 task and 1 expense are due today.',
+                tag: 'tasktime-todo-2026-03-24',
+            },
+        });
+    });
+
+    it('does not send todo notifications when the preference is disabled', async () => {
+        const notifications = [];
+        const originalNotification = window.Notification;
+        function MockNotification(title, options) {
+            notifications.push({ title, options });
+        }
+        MockNotification.permission = 'granted';
+        MockNotification.requestPermission = vi.fn();
+        window.Notification = MockNotification;
+        mockPreferences.systemNotificationsEnabled = false;
+
+        mockUseTasks.mockReturnValueOnce({
+            activeTasks: [],
+            archivedTasks: [],
+            updateTask: vi.fn(),
+            deleteTask: vi.fn(),
+            archiveTask: vi.fn(),
+            getOverdueTasks: vi.fn(() => []),
+            getTasksForToday: vi.fn(() => [{ id: 'task-1', title: 'Send estimate', startDate: '2026-03-24', completed: false }]),
+            getUpcomingTasks: vi.fn(() => []),
+            toggleRecurringCompletion: vi.fn(),
+            isCompletedOnDate: vi.fn(() => false),
+            resetExpiredSkips: vi.fn(),
+            isLoading: false,
+            archivedLoading: false,
+            archivedLoaded: true,
+            getRecurringStatus: vi.fn(() => ({
+                effectiveDateStr: null,
+                isDueToday: false,
+                isOverdue: false,
+                lastDueDateStr: null,
+            })),
+        });
+
+        try {
+            renderDashboard();
+
+            await waitFor(() => {
+                expect(screen.getByTestId('todo-today')).toBeInTheDocument();
+            });
+        } finally {
+            if (typeof originalNotification === 'undefined') {
+                delete window.Notification;
+            } else {
+                window.Notification = originalNotification;
+            }
+        }
+
+        expect(notifications).toHaveLength(0);
     });
 
     it('passes the default dashboard filters to the overview cards', () => {

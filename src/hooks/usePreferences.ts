@@ -26,6 +26,8 @@ const DEFAULT_PREFERENCES: Preferences = {
     autoSyncMode: 'backup',
     weeklyGoalTargetHours: null,
     weeklyGoalTargetEarnings: null,
+    systemNotificationsEnabled: false,
+    systemNotificationTime: '09:00',
 };
 
 export function usePreferences() {

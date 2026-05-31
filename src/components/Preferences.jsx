@@ -1,9 +1,16 @@
 import { useState } from 'react';
 import { useToast } from '../hooks/useToast.ts';
 import { DEFAULT_CURRENCY } from '../utils/currencyUtils.ts';
+import {
+    getPushSupportState,
+    savePushSubscription,
+    subscribeToTaskTimePush,
+    unsubscribeFromTaskTimePush,
+} from '@/utils/pushNotificationClient';
 import CurrencySelect from '@/components/ui/currency-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import CustomCheckbox from './CustomCheckbox';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
@@ -14,9 +21,12 @@ import { cn } from '@/lib/utils';
 const Preferences = ({ preferences = {}, updatePreferences }) => {
     const isMobileLayout = useIsMobileLayout();
     const [preferredCurrency, setPreferredCurrency] = useState(preferences.currency || DEFAULT_CURRENCY);
-    const { showSuccess } = useToast();
+    const [isSavingNotificationDevice, setIsSavingNotificationDevice] = useState(false);
+    const { showSuccess, showError } = useToast();
     const weekStartsOnSunday = (preferences.weekStartsOn ?? 1) === 0;
     const autoHideTotalsOnRevisit = preferences.autoHideTotalsOnRevisit === true;
+    const systemNotificationsEnabled = preferences.systemNotificationsEnabled === true;
+    const pushSupport = getPushSupportState();
 
     // Save preferred currency to preferences state
     const handleCurrencyChange = (newCurrency) => {
@@ -47,6 +57,45 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
             updatePreferences({ autoHideTotalsOnRevisit: checked });
         }
         showSuccess('Totals visibility preference updated!');
+    };
+
+    const handleSystemNotificationsToggle = async (checked) => {
+        if (updatePreferences) {
+            updatePreferences({ systemNotificationsEnabled: checked });
+        }
+
+        if (!checked) {
+            try {
+                await unsubscribeFromTaskTimePush();
+            } catch {
+                // Local preference still wins; schedule cleanup will retry when possible.
+            }
+        }
+
+        showSuccess('Reminder preference updated!');
+    };
+
+    const handleEnableNotificationDevice = async () => {
+        const support = getPushSupportState();
+        if (!support.supported) {
+            showError('System reminders are not supported on this device or app origin.');
+            return;
+        }
+
+        setIsSavingNotificationDevice(true);
+
+        try {
+            const subscription = await subscribeToTaskTimePush();
+            await savePushSubscription(subscription);
+            if (updatePreferences) {
+                updatePreferences({ systemNotificationsEnabled: true });
+            }
+            showSuccess('System reminders enabled on this device');
+        } catch (error) {
+            showError(error?.message || 'Unable to enable system reminders on this device');
+        } finally {
+            setIsSavingNotificationDevice(false);
+        }
     };
 
     return (
@@ -105,6 +154,33 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
                             <p className="text-sm text-muted-foreground">
                                 Totals will hide again whenever you revisit the tab.
                             </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <CustomCheckbox
+                                checked={systemNotificationsEnabled}
+                                onChange={handleSystemNotificationsToggle}
+                                label="System reminders"
+                            />
+                            <p className="text-sm text-muted-foreground">
+                                Receive generic system reminders for due tasks & expenses.
+                            </p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleEnableNotificationDevice}
+                                disabled={!systemNotificationsEnabled || isSavingNotificationDevice || !pushSupport.supported}
+                            >
+                                {isSavingNotificationDevice ? 'Enabling...' : 'Enable reminders on this device'}
+                            </Button>
+                            {!pushSupport.supported && (
+                                <p className="text-sm text-muted-foreground">
+                                    {pushSupport.reason === 'dev-server'
+                                        ? 'Closed-app reminders require the preview or deployed app. The local Vite dev server disables the service worker.'
+                                        : 'Closed-app reminders are not supported on this device or app origin.'}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </CardContent>

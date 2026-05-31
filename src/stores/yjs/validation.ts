@@ -490,6 +490,8 @@ const preferencesSchema = z.object({
     autoSyncMode: z.enum(['backup', 'sync']).optional(),
     weeklyGoalTargetHours: finiteNumberSchema.nullable().optional(),
     weeklyGoalTargetEarnings: finiteNumberSchema.nullable().optional(),
+    systemNotificationsEnabled: z.boolean().optional(),
+    systemNotificationTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
     backupEnabled: z.boolean().optional(),
     backupFrequencyHours: integerNumberSchema.min(1).optional(),
 }).passthrough() satisfies z.ZodType<Preferences>;
