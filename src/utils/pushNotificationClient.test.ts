@@ -280,7 +280,9 @@ describe('pushNotificationClient', () => {
 
         installPushGlobals({ permission: 'denied' });
 
-        await expect(subscribeToTaskTimePush()).rejects.toThrow('Notification permission was not granted');
+        await expect(subscribeToTaskTimePush()).rejects.toThrow(
+            'Allow notifications in site settings and try again.',
+        );
     });
 
     it('persists, deletes, uploads, and test-sends push data through the worker', async () => {

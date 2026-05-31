@@ -376,7 +376,6 @@ vi.mock('./components/modals/ExpenseViewModal', () => ({
 vi.mock('./components/OnboardingModal.jsx', () => ({ default: onboardingModalMock }))
 vi.mock('./components/ErrorBoundary', () => ({ default: ({ children }) => children }))
 vi.mock('./components/OfflineIndicator', () => ({ default: () => <div data-testid="offline-indicator" /> }))
-vi.mock('./components/InstallPrompt', () => ({ default: () => <div data-testid="install-prompt" /> }))
 vi.mock('./components/ToastContainer', () => ({ ToastProvider: ({ children }) => children }))
 vi.mock('./components/sync/YjsSyncStatus', () => ({ default: () => <div data-testid="sync-status" /> }))
 

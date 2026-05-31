@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Preferences from './Preferences';
 
 const pushMocks = vi.hoisted(() => ({
+    getCurrentPushSubscription: vi.fn(),
+    getNotificationPermissionFailureMessage: vi.fn(),
     getPushSupportState: vi.fn(),
     savePushSubscription: vi.fn(),
     subscribeToTaskTimePush: vi.fn(),
@@ -42,6 +44,12 @@ vi.mock('@/components/ui/currency-select', () => ({
 describe('Preferences', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        pushMocks.getCurrentPushSubscription.mockResolvedValue(null);
+        pushMocks.getNotificationPermissionFailureMessage.mockImplementation((permission) => (
+            permission === 'denied'
+                ? 'Allow notifications in site settings and try again.'
+                : 'Check the address bar permission prompt or allow notifications in site settings.'
+        ));
         pushMocks.getPushSupportState.mockReturnValue({ supported: true });
         pushMocks.subscribeToTaskTimePush.mockResolvedValue({
             endpoint: 'https://push.example.test/subscription',
@@ -123,12 +131,38 @@ describe('Preferences', () => {
         expect(pushMocks.subscribeToTaskTimePush).not.toHaveBeenCalled();
     });
 
-    it('shows a notice when closed-app push is unavailable in local development', () => {
+    it('keeps the notification section quiet when reminders are off and closed-app push is unavailable', () => {
         pushMocks.getPushSupportState.mockReturnValue({ supported: false, reason: 'dev-server' });
 
         render(<Preferences preferences={{ systemNotificationsEnabled: false }} updatePreferences={vi.fn()} />);
 
-        expect(screen.getByText('Closed-app reminders are unavailable in local development')).toBeInTheDocument();
-        expect(screen.getByText('Use the preview or deployed app. The local Vite dev server disables the service worker.')).toBeInTheDocument();
+        expect(screen.queryByText(/^Device:/)).not.toBeInTheDocument();
+    });
+
+    it('shows a simple device issue when enabled reminders cannot use closed-app push', () => {
+        pushMocks.getPushSupportState.mockReturnValue({ supported: false, reason: 'dev-server' });
+
+        render(<Preferences preferences={{ systemNotificationsEnabled: true }} updatePreferences={vi.fn()} />);
+
+        expect(screen.getByText('Device: Unavailable. Closed-app reminders are not available here.')).toBeInTheDocument();
+    });
+
+    it('shows a simple browser issue when permission is not granted', async () => {
+        const updatePreferences = vi.fn();
+        const user = userEvent.setup();
+        pushMocks.subscribeToTaskTimePush.mockRejectedValue(new Error('Check the address bar permission prompt or allow notifications in site settings.'));
+        Object.defineProperty(window, 'Notification', {
+            configurable: true,
+            value: {
+                permission: 'default',
+                requestPermission: vi.fn().mockResolvedValue('default'),
+            },
+        });
+
+        render(<Preferences preferences={{ systemNotificationsEnabled: false }} updatePreferences={updatePreferences} />);
+
+        await user.click(screen.getByRole('checkbox', { name: 'System reminders' }));
+
+        expect(await screen.findByText('Browser: Ask. Check the address bar permission prompt or allow notifications in site settings.')).toBeInTheDocument();
     });
 });

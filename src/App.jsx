@@ -37,7 +37,6 @@ import GlobalTimerStack from './components/timer/GlobalTimerStack';
 import ModalManager from './components/modals/ModalManager';
 import FloatingActionButton from './components/FloatingActionButton';
 import ErrorBoundary from './components/ErrorBoundary';
-import InstallPrompt from './components/InstallPrompt';
 import CloudSyncStatusPanel from './components/sync/CloudSyncStatusPanel';
 import { getYjsSyncStatusDescriptor, SYNC_STATUS_KIND } from './components/sync/syncStatusDescriptor';
 import MobileBottomNav from './components/app/MobileBottomNav';
@@ -2024,8 +2023,6 @@ function AppContent() {
             onComplete={handleCompleteOnboarding}
         />
         
-        {/* PWA Components */}
-        <InstallPrompt />
         </div>
     );
 }

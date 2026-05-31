@@ -114,6 +114,14 @@ export async function getVapidPublicKey(): Promise<string> {
     return data.publicKey;
 }
 
+export function getNotificationPermissionFailureMessage(permission: NotificationPermission): string {
+    if (permission === 'denied') {
+        return 'Allow notifications in site settings and try again.';
+    }
+
+    return 'Check the address bar permission prompt or allow notifications in site settings.';
+}
+
 function getServiceWorkerUnavailableMessage(isDev: boolean): string {
     if (isDev) {
         return 'TaskTime push reminders require the preview or deployed app. The Vite dev server disables the app service worker.';
@@ -172,7 +180,7 @@ export async function subscribeToTaskTimePush(): Promise<PushSubscription> {
 
     const permission = await window.Notification.requestPermission();
     if (permission !== 'granted') {
-        throw new Error('Notification permission was not granted');
+        throw new Error(getNotificationPermissionFailureMessage(permission));
     }
 
     const registration = await getReadyServiceWorkerRegistration();

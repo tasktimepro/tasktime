@@ -253,7 +253,6 @@ vi.mock('../../components/timer/GlobalTimerStack', () => ({ default: () => <div 
 vi.mock('../../components/FloatingActionButton', () => ({ default: () => null }))
 vi.mock('../../components/ErrorBoundary', () => ({ default: ({ children }) => children }))
 vi.mock('../../components/OfflineIndicator', () => ({ default: () => null }))
-vi.mock('../../components/InstallPrompt', () => ({ default: () => null }))
 vi.mock('../../components/sync/YjsSyncStatus', () => ({ default: () => null }))
 vi.mock('../../components/ToastContainer', () => ({ ToastProvider: ({ children }) => children }))
 
