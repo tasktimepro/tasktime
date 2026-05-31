@@ -390,4 +390,25 @@ describe('pushNotificationClient', () => {
         expect(Array.from(pushNotificationClientInternalsForTest.base64UrlToUint8Array('AQIDBA')))
             .toEqual([1, 2, 3, 4]);
     });
+
+    it('times out push service requests that do not resolve', async () => {
+        const { pushNotificationClientInternalsForTest } = await loadPushClient();
+        vi.useFakeTimers();
+        vi.stubGlobal('fetch', vi.fn((_input, init) => new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+                reject(new DOMException('Aborted', 'AbortError'));
+            });
+        })));
+
+        const request = pushNotificationClientInternalsForTest.fetchWithTimeout(
+            'https://sync.tasktime.pro/push/subscription',
+            {},
+            100,
+        );
+        void request.catch(() => {});
+
+        await vi.advanceTimersByTimeAsync(100);
+
+        await expect(request).rejects.toThrow('Push service request timed out');
+    });
 });

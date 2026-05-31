@@ -2,7 +2,6 @@
 
 ## Priority
 
-[ ] Regarding the targets - think a bit about whether they should restart after invoice generation? or? Just think about when a project is a recurring monthly one
 
 ---
 
@@ -20,8 +19,6 @@
 
 [ ] Task Templates - Create “global” tasks which are assigned a category/tag and these can be assigned to all projects for that category by default (or at a click of a button → import default tasks for this project category)
     [ ] This would be a button under projects page “Create task templates”, then when creating a new project, we can choose a task template to be added
-
-[ ] System notifications for to do today tasks that were upcoming including recurring expenses
 
 ---
 

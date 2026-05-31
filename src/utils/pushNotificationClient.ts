@@ -27,6 +27,8 @@ type ReadyServiceWorkerRegistrationOptions = {
     timeoutMs?: number;
 };
 
+const PUSH_REQUEST_TIMEOUT_MS = 10000;
+
 function base64UrlToUint8Array(value: string): Uint8Array {
     const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
@@ -38,6 +40,30 @@ function base64UrlToUint8Array(value: string): Uint8Array {
     }
 
     return output;
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = PUSH_REQUEST_TIMEOUT_MS): Promise<Response> {
+    if (typeof AbortController === 'undefined') {
+        return fetch(input, init);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await fetch(input, {
+            ...init,
+            signal: controller.signal,
+        });
+    } catch (error) {
+        if ((error as { name?: string })?.name === 'AbortError') {
+            throw new Error('Push service request timed out');
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
 }
 
 export function getPushSupportState({
@@ -75,7 +101,7 @@ export function getPushSupportState({
 }
 
 export async function getVapidPublicKey(): Promise<string> {
-    const response = await fetch(SYNC_WORKER_CONFIG.endpoints.pushVapidPublicKey);
+    const response = await fetchWithTimeout(SYNC_WORKER_CONFIG.endpoints.pushVapidPublicKey);
     if (!response.ok) {
         throw new Error('Unable to load push configuration');
     }
@@ -163,7 +189,7 @@ export async function subscribeToTaskTimePush(): Promise<PushSubscription> {
 }
 
 export async function savePushSubscription(subscription: PushSubscription): Promise<void> {
-    const response = await fetch(SYNC_WORKER_CONFIG.endpoints.pushSubscription, {
+    const response = await fetchWithTimeout(SYNC_WORKER_CONFIG.endpoints.pushSubscription, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,7 +215,7 @@ export async function unsubscribeFromTaskTimePush(): Promise<void> {
 }
 
 export async function deletePushSubscription(subscriptionEndpoint: string): Promise<void> {
-    const response = await fetch(SYNC_WORKER_CONFIG.endpoints.pushSubscription, {
+    const response = await fetchWithTimeout(SYNC_WORKER_CONFIG.endpoints.pushSubscription, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subscriptionEndpoint }),
@@ -201,7 +227,7 @@ export async function deletePushSubscription(subscriptionEndpoint: string): Prom
 }
 
 export async function uploadPushSchedules(payload: PushScheduleUploadPayload): Promise<void> {
-    const response = await fetch(SYNC_WORKER_CONFIG.endpoints.pushSchedules, {
+    const response = await fetchWithTimeout(SYNC_WORKER_CONFIG.endpoints.pushSchedules, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -213,7 +239,7 @@ export async function uploadPushSchedules(payload: PushScheduleUploadPayload): P
 }
 
 export async function sendTestPush(subscription: PushSubscription): Promise<void> {
-    const response = await fetch(SYNC_WORKER_CONFIG.endpoints.pushTest, {
+    const response = await fetchWithTimeout(SYNC_WORKER_CONFIG.endpoints.pushTest, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subscription: subscription.toJSON() }),
@@ -226,5 +252,6 @@ export async function sendTestPush(subscription: PushSubscription): Promise<void
 
 export const pushNotificationClientInternalsForTest = {
     base64UrlToUint8Array,
+    fetchWithTimeout,
     getServiceWorkerUnavailableMessage,
 };

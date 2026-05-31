@@ -10,7 +10,7 @@ import {
 import CurrencySelect from '@/components/ui/currency-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import { Notice } from '@/components/ui/notice';
 import CustomCheckbox from './CustomCheckbox';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
@@ -59,43 +59,63 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
         showSuccess('Totals visibility preference updated!');
     };
 
-    const handleSystemNotificationsToggle = async (checked) => {
-        if (updatePreferences) {
-            updatePreferences({ systemNotificationsEnabled: checked });
+    const requestNotificationPermission = async () => {
+        if (typeof window === 'undefined' || typeof window.Notification === 'undefined') {
+            throw new Error('System reminders are not supported on this device or app origin.');
         }
 
-        if (!checked) {
-            try {
-                await unsubscribeFromTaskTimePush();
-            } catch {
-                // Local preference still wins; schedule cleanup will retry when possible.
-            }
-        }
-
-        showSuccess('Reminder preference updated!');
-    };
-
-    const handleEnableNotificationDevice = async () => {
-        const support = getPushSupportState();
-        if (!support.supported) {
-            showError('System reminders are not supported on this device or app origin.');
+        if (window.Notification.permission === 'granted') {
             return;
         }
+
+        const permission = await window.Notification.requestPermission();
+        if (permission !== 'granted') {
+            throw new Error('Notification permission was not granted');
+        }
+    };
+
+    const enableSystemNotifications = async () => {
+        const support = getPushSupportState();
 
         setIsSavingNotificationDevice(true);
 
         try {
-            const subscription = await subscribeToTaskTimePush();
-            await savePushSubscription(subscription);
+            if (support.supported) {
+                const subscription = await subscribeToTaskTimePush();
+                await savePushSubscription(subscription);
+            } else {
+                await requestNotificationPermission();
+            }
+
             if (updatePreferences) {
                 updatePreferences({ systemNotificationsEnabled: true });
             }
+
             showSuccess('System reminders enabled on this device');
         } catch (error) {
             showError(error?.message || 'Unable to enable system reminders on this device');
         } finally {
             setIsSavingNotificationDevice(false);
         }
+    };
+
+    const handleSystemNotificationsToggle = async (checked) => {
+        if (checked) {
+            await enableSystemNotifications();
+            return;
+        }
+
+        if (updatePreferences) {
+            updatePreferences({ systemNotificationsEnabled: false });
+        }
+
+        try {
+            await unsubscribeFromTaskTimePush();
+        } catch {
+            // Local preference still wins; schedule cleanup will retry when possible.
+        }
+
+        showSuccess('Reminder preference updated!');
     };
 
     return (
@@ -160,26 +180,23 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
                             <CustomCheckbox
                                 checked={systemNotificationsEnabled}
                                 onChange={handleSystemNotificationsToggle}
+                                disabled={isSavingNotificationDevice}
                                 label="System reminders"
                             />
                             <p className="text-sm text-muted-foreground">
                                 Receive generic system reminders for due tasks & expenses.
                             </p>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleEnableNotificationDevice}
-                                disabled={!systemNotificationsEnabled || isSavingNotificationDevice || !pushSupport.supported}
-                            >
-                                {isSavingNotificationDevice ? 'Enabling...' : 'Enable reminders on this device'}
-                            </Button>
                             {!pushSupport.supported && (
-                                <p className="text-sm text-muted-foreground">
-                                    {pushSupport.reason === 'dev-server'
-                                        ? 'Closed-app reminders require the preview or deployed app. The local Vite dev server disables the service worker.'
-                                        : 'Closed-app reminders are not supported on this device or app origin.'}
-                                </p>
+                                <Notice
+                                    compact
+                                    variant={pushSupport.reason === 'dev-server' ? 'warning' : 'default'}
+                                    title={pushSupport.reason === 'dev-server'
+                                        ? 'Closed-app reminders are unavailable in local development'
+                                        : 'Closed-app reminders are unavailable here'}
+                                    description={pushSupport.reason === 'dev-server'
+                                        ? 'Use the preview or deployed app. The local Vite dev server disables the service worker.'
+                                        : 'This device or app origin does not support closed-app push reminders.'}
+                                />
                             )}
                         </div>
                     </div>
