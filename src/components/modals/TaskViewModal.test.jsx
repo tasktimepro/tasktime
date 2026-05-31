@@ -7,7 +7,9 @@ import { toDisplayDate } from '@/utils/dateUtils'
 const hookMocks = vi.hoisted(() => ({
 
     projects: [],
+    clients: [],
     tasks: [],
+    useTasks: vi.fn(),
     timeEntries: [],
     recurringStatus: null,
     isCompleted: false,
@@ -78,21 +80,25 @@ vi.mock('@/hooks/useProjects', () => ({
 vi.mock('@/hooks/useClients', () => ({
 
     useClients: () => ({
-        clients: [],
+        clients: hookMocks.clients,
     })
 }))
 
 vi.mock('@/hooks/useTasks', () => ({
 
-    useTasks: () => ({
-        tasks: hookMocks.tasks,
-        updateTask: hookMocks.updateTask,
-        unarchiveTask: hookMocks.unarchiveTask,
-        toggleRecurringCompletion: hookMocks.toggleRecurringCompletion,
-        skipRecurringOccurrence: hookMocks.skipRecurringOccurrence,
-        isCompletedOnDate: () => hookMocks.isCompleted,
-        getRecurringStatus: () => hookMocks.recurringStatus,
-    })
+    useTasks: (options) => {
+        hookMocks.useTasks(options)
+
+        return {
+            tasks: hookMocks.tasks,
+            updateTask: hookMocks.updateTask,
+            unarchiveTask: hookMocks.unarchiveTask,
+            toggleRecurringCompletion: hookMocks.toggleRecurringCompletion,
+            skipRecurringOccurrence: hookMocks.skipRecurringOccurrence,
+            isCompletedOnDate: () => hookMocks.isCompleted,
+            getRecurringStatus: () => hookMocks.recurringStatus,
+        }
+    }
 }))
 
 vi.mock('@/hooks/useTimeEntries', () => ({
@@ -152,6 +158,8 @@ describe('TaskViewModal recurring actions', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.useTasks.mockReset()
+        hookMocks.clients = []
         hookMocks.projects = []
         hookMocks.tasks = [recurringTask]
         hookMocks.timeEntries = []
@@ -172,6 +180,12 @@ describe('TaskViewModal recurring actions', () => {
         const expectedDateLabel = toDisplayDate('2026-02-21', { month: 'short', day: 'numeric' })
         expect(screen.getByRole('button', { name: `Done for ${expectedDateLabel}` })).toBeInTheDocument()
         expect(screen.queryByTitle('Skip until next recurring')).not.toBeInTheDocument()
+    })
+
+    it('requests archived tasks so archived subtasks remain available in the modal', () => {
+        renderModal()
+
+        expect(hookMocks.useTasks).toHaveBeenCalledWith({ includeArchived: true })
     })
 
     it('hides skip button for already skipped occurrence and keeps date-specific done label', () => {
@@ -277,6 +291,7 @@ describe('TaskViewModal billable toggle', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.clients = []
         hookMocks.tasks = [task]
         hookMocks.projects = [{ id: 'project-1', title: 'Client Work', isPersonal: false }]
         hookMocks.timeEntries = []
@@ -327,6 +342,7 @@ describe('TaskViewModal archived footer actions', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.clients = []
         hookMocks.tasks = [archivedTask]
         hookMocks.timeEntries = []
     })
@@ -373,6 +389,7 @@ describe('TaskViewModal time display', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        hookMocks.clients = []
         hookMocks.projects = []
         hookMocks.tasks = [task]
         hookMocks.timeEntries = [
@@ -403,5 +420,58 @@ describe('TaskViewModal time display', () => {
         )
 
         expect(screen.getByText('1m 5s')).toBeInTheDocument()
+    })
+
+    it('shows estimate progress when a task has estimated hours', () => {
+        hookMocks.projects = [{ id: 'project-1', title: 'Client Work', preferredClientId: 'client-1', flatRate: false, hourlyRate: 100 }]
+        hookMocks.clients = [{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }]
+        hookMocks.tasks = [{ ...task, projectId: 'project-1', estimatedHours: 2 }]
+
+        render(
+            <TaskViewModal
+                isOpen={true}
+                onClose={vi.fn()}
+                task={hookMocks.tasks[0]}
+                dateStr={null}
+                attachment={null}
+                onEdit={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onNavigateToProject={vi.fn()}
+                onOpenTimeEntries={vi.fn()}
+                onOpenPlannerOptions={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Estimate progress')).toBeInTheDocument()
+        expect(screen.getByText((_, node) => node?.textContent === '0.02 of 2 hours tracked')).toBeInTheDocument()
+        expect(screen.getByText('Estimated value:')).toBeInTheDocument()
+        expect(screen.getByText('$200.00')).toBeInTheDocument()
+    })
+
+    it('shows quote amount details for flat-rate task estimates', () => {
+        hookMocks.projects = [{ id: 'project-1', title: 'Quoted Work', preferredClientId: 'client-1', flatRate: true, hourlyRate: null }]
+        hookMocks.clients = [{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }]
+        hookMocks.tasks = [{ ...task, projectId: 'project-1', estimatedFlatAmount: 900 }]
+
+        render(
+            <TaskViewModal
+                isOpen={true}
+                onClose={vi.fn()}
+                task={hookMocks.tasks[0]}
+                dateStr={null}
+                attachment={null}
+                onEdit={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onNavigateToProject={vi.fn()}
+                onOpenTimeEntries={vi.fn()}
+                onOpenPlannerOptions={vi.fn()}
+            />
+        )
+
+        expect(screen.getByText('Estimate progress')).toBeInTheDocument()
+        expect(screen.getByText('Quote amount:')).toBeInTheDocument()
+        expect(screen.getByText('CHF900.00')).toBeInTheDocument()
     })
 })

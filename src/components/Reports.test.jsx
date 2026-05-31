@@ -97,6 +97,7 @@ const mockTaxReturnPeriods = [
 ];
 let mockSection = null;
 let mockLoadingHistoricalEntries = false;
+const mockBusinessBrandAssets = [];
 
 vi.mock('@/hooks/useUrlState.ts', () => ({
     useUrlState: () => ({
@@ -110,6 +111,12 @@ vi.mock('@/hooks/useUrlState.ts', () => ({
 vi.mock('@/hooks/useInvoices.ts', () => ({
     useInvoices: () => ({
         invoices: mockInvoices,
+    }),
+}));
+
+vi.mock('@/hooks/useBusinessBrandAssets.ts', () => ({
+    useBusinessBrandAssets: () => ({
+        businessBrandAssets: mockBusinessBrandAssets,
     }),
 }));
 
@@ -346,6 +353,34 @@ describe('Reports', () => {
         await waitFor(() => {
             expect(mockUpdateUrl).toHaveBeenCalledWith({ section: 'overview' });
         });
+    });
+
+    it('counts paid invoices without paidAt in the overview received totals', () => {
+        mockInvoices.splice(0, mockInvoices.length,
+            {
+                id: 'invoice-legacy-paid',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                businessInfoId: 'business-1',
+                invoiceNumber: 'INV-LEGACY',
+                date: '2026-04-12',
+                dueDate: '2026-04-26',
+                status: 'paid',
+                subtotal: 1000,
+                tax: 220,
+                total: 1220,
+                currency: 'EUR',
+            },
+        );
+
+        render(<Reports />);
+
+        const receivedCard = screen.getByRole('heading', { name: 'Received' }).closest('div.rounded-lg');
+        const estimatedProfitCard = screen.getByRole('heading', { name: 'Estimated Profit' }).closest('div.rounded-lg');
+
+        expect(within(receivedCard).getByText('€1220.00')).toBeInTheDocument();
+        expect(within(receivedCard).getByText('1 invoice paid')).toBeInTheDocument();
+        expect(within(estimatedProfitCard).getByText('€1100.00')).toBeInTheDocument();
     });
 
     it('shows review issues as a header tag and opens details on click', () => {

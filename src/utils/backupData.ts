@@ -1,4 +1,5 @@
 import type {
+    BusinessBrandAsset,
     BusinessInfo,
     Client,
     DailyGoal,
@@ -17,7 +18,7 @@ import type {
     TimeEntry,
 } from '@/stores/yjs/types';
 
-export const BACKUP_VERSION = '1.3';
+export const BACKUP_VERSION = '1.4';
 
 export interface BackupPayload {
     version: string;
@@ -31,6 +32,7 @@ export interface BackupPayload {
     expenseCategories?: ExpenseCategory[];
     taxReturnPeriods?: TaxReturnPeriod[];
     businessInfos: BusinessInfo[];
+    businessBrandAssets: BusinessBrandAsset[];
     clients: Client[];
     invoiceTemplates: InvoiceTemplate[];
     emailTemplates: EmailTemplate[];
@@ -58,6 +60,7 @@ export function createBackupPayload({
     expenseCategories,
     taxReturnPeriods,
     businessInfos,
+    businessBrandAssets,
     clients,
     invoiceTemplates,
     emailTemplates,
@@ -79,6 +82,7 @@ export function createBackupPayload({
         expenseCategories,
         taxReturnPeriods,
         businessInfos,
+        businessBrandAssets,
         clients,
         invoiceTemplates,
         emailTemplates,

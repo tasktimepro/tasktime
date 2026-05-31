@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import InvoicePreviewModal from './InvoicePreviewModal';
 
 describe('InvoicePreviewModal', () => {
@@ -38,10 +38,13 @@ describe('InvoicePreviewModal', () => {
             expect(previewPage.style.transform).toContain('scale(');
         });
 
+        expect(screen.getByText('Preview note')).toBeInTheDocument();
+        expect(screen.getByText('The final generated PDF can vary slightly from the preview below.')).toBeInTheDocument();
         expect(previewShell).toHaveClass('bg-white');
         expect(previewPage.style.width).toBe('794px');
         expect(previewPage.style.minHeight).toBe('1123px');
         expect(previewFrame.style.width).toBe('375px');
+        expect(previewPage).toHaveClass('overflow-visible');
         expect(previewPage).toHaveTextContent('Invoice: #INV-0160');
     });
 
@@ -75,5 +78,24 @@ describe('InvoicePreviewModal', () => {
         expect(screen.getByText('Alte Langackerstrasse 89')).toBeInTheDocument();
         expect(screen.queryByText('Urs Wittwer')).not.toBeInTheDocument();
         expect(screen.queryByText('uwittwer@gmail.com')).not.toBeInTheDocument();
+    });
+
+    it('renders an optional download action in the default footer', () => {
+        const onDownload = vi.fn();
+
+        render(
+            <InvoicePreviewModal
+                isOpen
+                onClose={vi.fn()}
+                title="Template Preview"
+                htmlContent={'<div><h1>INVOICE</h1></div>'}
+                onDownload={onDownload}
+                downloadLabel="Download Sample PDF"
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Download Sample PDF' }));
+
+        expect(onDownload).toHaveBeenCalledTimes(1);
     });
 });

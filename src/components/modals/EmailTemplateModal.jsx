@@ -13,7 +13,10 @@ import {
     DEFAULT_SUBJECT,
     DEFAULT_SEND_BODY,
     DEFAULT_REMINDER_BODY,
+    DEFAULT_QUOTE_SUBJECT,
+    DEFAULT_QUOTE_BODY,
     DEFAULT_ATTACHMENT_TITLE,
+    DEFAULT_QUOTE_ATTACHMENT_TITLE,
     EMAIL_PLACEHOLDER_VARIABLES,
     normalizeAttachmentTitle,
 } from '../../utils/emailTemplateUtils.ts';
@@ -28,19 +31,21 @@ const EmailTemplateModal = ({
     onClose,
     editingTemplate = null,
     onSaved = null,
+    allowedTypes = ['invoice', 'quote'],
+    initialType = 'invoice',
 }) => {
     const { showSuccess, showError } = useToast();
     const { createEmailTemplate, updateEmailTemplate, setDefault } = useEmailTemplates();
 
     const [formData, setFormData] = useState({
         name: '',
-        type: 'invoice',
+        type: initialType,
         fromName: '',
         replyTo: '',
-        subject: DEFAULT_SUBJECT,
-        sendBody: DEFAULT_SEND_BODY,
-        reminderBody: DEFAULT_REMINDER_BODY,
-        attachmentTitle: DEFAULT_ATTACHMENT_TITLE,
+        subject: initialType === 'quote' ? DEFAULT_QUOTE_SUBJECT : DEFAULT_SUBJECT,
+        sendBody: initialType === 'quote' ? DEFAULT_QUOTE_BODY : DEFAULT_SEND_BODY,
+        reminderBody: initialType === 'quote' ? DEFAULT_QUOTE_BODY : DEFAULT_REMINDER_BODY,
+        attachmentTitle: initialType === 'quote' ? DEFAULT_QUOTE_ATTACHMENT_TITLE : DEFAULT_ATTACHMENT_TITLE,
         isDefault: false,
     });
 
@@ -49,29 +54,40 @@ const EmailTemplateModal = ({
         if (editingTemplate) {
             setFormData({
                 name: editingTemplate.name || '',
-                type: editingTemplate.type || 'invoice',
+                type: editingTemplate.type || initialType,
                 fromName: editingTemplate.fromName || '',
                 replyTo: editingTemplate.replyTo || '',
-                subject: editingTemplate.subject || DEFAULT_SUBJECT,
-                sendBody: editingTemplate.sendBody || DEFAULT_SEND_BODY,
-                reminderBody: editingTemplate.reminderBody || DEFAULT_REMINDER_BODY,
-                attachmentTitle: normalizeAttachmentTitle(editingTemplate.attachmentTitle || DEFAULT_ATTACHMENT_TITLE),
+                subject: editingTemplate.subject || (editingTemplate.type === 'quote' ? DEFAULT_QUOTE_SUBJECT : DEFAULT_SUBJECT),
+                sendBody: editingTemplate.sendBody || (editingTemplate.type === 'quote' ? DEFAULT_QUOTE_BODY : DEFAULT_SEND_BODY),
+                reminderBody: editingTemplate.reminderBody || (editingTemplate.type === 'quote' ? DEFAULT_QUOTE_BODY : DEFAULT_REMINDER_BODY),
+                attachmentTitle: normalizeAttachmentTitle(editingTemplate.attachmentTitle || (editingTemplate.type === 'quote' ? DEFAULT_QUOTE_ATTACHMENT_TITLE : DEFAULT_ATTACHMENT_TITLE)),
                 isDefault: editingTemplate.isDefault || false,
             });
         } else {
             setFormData({
                 name: '',
-                type: 'invoice',
+                type: initialType,
                 fromName: '',
                 replyTo: '',
-                subject: DEFAULT_SUBJECT,
-                sendBody: DEFAULT_SEND_BODY,
-                reminderBody: DEFAULT_REMINDER_BODY,
-                attachmentTitle: normalizeAttachmentTitle(DEFAULT_ATTACHMENT_TITLE),
+                subject: initialType === 'quote' ? DEFAULT_QUOTE_SUBJECT : DEFAULT_SUBJECT,
+                sendBody: initialType === 'quote' ? DEFAULT_QUOTE_BODY : DEFAULT_SEND_BODY,
+                reminderBody: initialType === 'quote' ? DEFAULT_QUOTE_BODY : DEFAULT_REMINDER_BODY,
+                attachmentTitle: normalizeAttachmentTitle(initialType === 'quote' ? DEFAULT_QUOTE_ATTACHMENT_TITLE : DEFAULT_ATTACHMENT_TITLE),
                 isDefault: false,
             });
         }
-    }, [editingTemplate, isOpen]);
+    }, [editingTemplate, initialType, isOpen]);
+
+    const handleTypeChange = useCallback((value) => {
+        setFormData((prev) => ({
+            ...prev,
+            type: value,
+            subject: value === 'quote' ? DEFAULT_QUOTE_SUBJECT : DEFAULT_SUBJECT,
+            sendBody: value === 'quote' ? DEFAULT_QUOTE_BODY : DEFAULT_SEND_BODY,
+            reminderBody: value === 'quote' ? DEFAULT_QUOTE_BODY : DEFAULT_REMINDER_BODY,
+            attachmentTitle: normalizeAttachmentTitle(value === 'quote' ? DEFAULT_QUOTE_ATTACHMENT_TITLE : DEFAULT_ATTACHMENT_TITLE),
+        }));
+    }, []);
 
     const handleSubmit = useCallback((e) => {
         e.preventDefault();
@@ -220,12 +236,13 @@ const EmailTemplateModal = ({
                         {/* Template Type */}
                         <div className="space-y-2">
                             <Label htmlFor="email-tpl-type">Template Type</Label>
-                            <Select value={formData.type} disabled>
+                            <Select value={formData.type} onValueChange={handleTypeChange} disabled={Boolean(editingTemplate && !allowedTypes.includes(editingTemplate.type))}>
                                 <SelectTrigger id="email-tpl-type">
                                     <SelectValue placeholder="Select template type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="invoice">Invoice</SelectItem>
+                                    {allowedTypes.includes('invoice') && <SelectItem value="invoice">Invoice</SelectItem>}
+                                    {allowedTypes.includes('quote') && <SelectItem value="quote">Quote</SelectItem>}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -275,7 +292,7 @@ const EmailTemplateModal = ({
 
                 {/* Invoice Send Body */}
                 <div className="space-y-2">
-                    <Label htmlFor="email-tpl-sendBody">Invoice Body</Label>
+                    <Label htmlFor="email-tpl-sendBody">{formData.type === 'quote' ? 'Quote Body' : 'Invoice Body'}</Label>
                     <Textarea
                         id="email-tpl-sendBody"
                         value={formData.sendBody}
@@ -285,17 +302,18 @@ const EmailTemplateModal = ({
                     />
                 </div>
 
-                {/* Reminder Body */}
-                <div className="space-y-2">
-                    <Label htmlFor="email-tpl-reminderBody">Reminder Body</Label>
-                    <Textarea
-                        id="email-tpl-reminderBody"
-                        value={formData.reminderBody}
-                        onChange={(e) => setFormData(prev => ({ ...prev, reminderBody: e.target.value }))}
-                        rows={6}
-                        className="font-mono text-sm resize-y"
-                    />
-                </div>
+                {formData.type !== 'quote' && (
+                    <div className="space-y-2">
+                        <Label htmlFor="email-tpl-reminderBody">Reminder Body</Label>
+                        <Textarea
+                            id="email-tpl-reminderBody"
+                            value={formData.reminderBody}
+                            onChange={(e) => setFormData(prev => ({ ...prev, reminderBody: e.target.value }))}
+                            rows={6}
+                            className="font-mono text-sm resize-y"
+                        />
+                    </div>
+                )}
 
                 {/* Attachment Title */}
                 <div className="space-y-2">

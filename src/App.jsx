@@ -60,6 +60,7 @@ import { useTodayString } from './hooks/useDayRollover';
 import { useDarkModePreference } from './hooks/useDarkModePreference.ts';
 import { SYNC_WORKER_CONFIG } from './config/google.ts';
 import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon, ChartBarIcon } from '@/components/ui/icons';
+import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { APP_VERSION, TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
@@ -76,7 +77,7 @@ function ReportsPageLoader() {
             aria-live="polite"
         >
             <div className="flex flex-col items-center justify-center gap-4 text-center">
-                <div className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-foreground" aria-hidden="true" />
+                <Spinner className="h-9 w-9 text-foreground" />
                 <div className="space-y-1">
                     <p className="text-base font-semibold text-foreground">Loading reports</p>
                     <p className="text-sm text-muted-foreground">Preparing the reports workspace.</p>
@@ -943,28 +944,13 @@ function AppContent() {
         };
     }, []);
 
-    const handleMobileSyncButtonAction = useCallback(async (event) => {
-        if (!mobileSyncStatus.onClick) {
-            return;
-        }
-
-        event.currentTarget.blur();
-
-        try {
-            await mobileSyncStatus.onClick();
-        } catch (error) {
-            console.error('[App] Mobile sync action failed:', error);
-            toast?.showError(error instanceof Error ? error.message : 'Google Drive action failed.');
-        }
-    }, [mobileSyncStatus, toast]);
-
     const mobileMoreButton = useMemo(() => {
         if (!showMobileSyncButton) {
             return null;
         }
 
         return {
-            ariaLabel: mobileSyncStatus.text,
+            ariaLabel: `More. ${mobileSyncStatus.text}`,
             Icon: mobileSyncStatus.icon,
             isFadingOut: isMobileSyncButtonFadingOut,
             label: mobileSyncStatus.kind === SYNC_STATUS_KIND.SYNCED
@@ -972,10 +958,9 @@ function AppContent() {
                 : mobileSyncStatus.kind === SYNC_STATUS_KIND.PENDING
                     ? 'Sync'
                     : 'Syncing',
-            onClick: handleMobileSyncButtonAction,
             toneClassName: `${mobileSyncStatus.tone} hover:bg-accent hover:text-accent-foreground`,
         };
-    }, [handleMobileSyncButtonAction, isMobileSyncButtonFadingOut, mobileSyncStatus, showMobileSyncButton]);
+    }, [isMobileSyncButtonFadingOut, mobileSyncStatus, showMobileSyncButton]);
 
     const mobileMoreButtonBadge = useMemo(() => {
         if (showMobileSyncButton) {
@@ -1187,6 +1172,20 @@ function AppContent() {
         mediaQuery.addListener(handleChange);
         return () => mediaQuery.removeListener(handleChange);
     }, []);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') {
+            return undefined;
+        }
+
+        document.documentElement.classList.toggle('mobile-layout', isMobileLayout);
+        document.body.classList.toggle('mobile-layout', isMobileLayout);
+
+        return () => {
+            document.documentElement.classList.remove('mobile-layout');
+            document.body.classList.remove('mobile-layout');
+        };
+    }, [isMobileLayout]);
 
     useEffect(() => {
         setIsMoreMenuOpen(false);
@@ -1897,7 +1896,7 @@ function AppContent() {
                         <FloatingActionButton
                             onTaskClick={handleQuickCreateTask}
                             onExpenseClick={handleQuickCreateExpense}
-                            className={isMobileLayout ? 'bottom-safe-fab right-4' : ''}
+                            className={isMobileLayout ? 'mobile-floating-action-button bottom-safe-fab right-4' : ''}
                         />
                     )}
                 </div>

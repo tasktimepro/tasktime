@@ -438,16 +438,25 @@ describe('reportCalculations', () => {
                     currency: 'USD',
                     paidAt: new Date('2026-04-20T10:00:00Z').getTime(),
                 },
+                {
+                    id: 'legacy-paid-in-range',
+                    invoiceNumber: 'INV-LEGACY',
+                    date: '2026-04-15',
+                    dueDate: '2026-04-25',
+                    status: 'paid',
+                    total: 70,
+                    currency: 'EUR',
+                },
             ],
         });
 
         expect(summary.openingBalanceInvoices.map((invoice) => invoice.invoiceNumber)).toEqual(['INV-OPEN', 'INV-PAID']);
-        expect(summary.invoicesIssuedInRange.map((invoice) => invoice.invoiceNumber)).toEqual(['INV-APR-PAID', 'INV-APR']);
-        expect(summary.paymentsRecordedInRange.map((invoice) => invoice.invoiceNumber)).toEqual(['INV-PAID', 'INV-APR-PAID']);
+        expect(summary.invoicesIssuedInRange.map((invoice) => invoice.invoiceNumber)).toEqual(['INV-APR-PAID', 'INV-APR', 'INV-LEGACY']);
+        expect(summary.paymentsRecordedInRange.map((invoice) => invoice.invoiceNumber)).toEqual(['INV-PAID', 'INV-LEGACY', 'INV-APR-PAID']);
         expect(summary.outstandingInvoices.map((invoice) => invoice.invoiceNumber)).toEqual(['INV-OPEN', 'INV-APR']);
         expect(summary.totalsByCurrency.openingBalance).toEqual({ EUR: 180 });
-        expect(summary.totalsByCurrency.issued).toEqual({ EUR: 120, USD: 40 });
-        expect(summary.totalsByCurrency.payments).toEqual({ EUR: 80, USD: 40 });
+        expect(summary.totalsByCurrency.issued).toEqual({ EUR: 190, USD: 40 });
+        expect(summary.totalsByCurrency.payments).toEqual({ EUR: 150, USD: 40 });
         expect(summary.totalsByCurrency.closingBalance).toEqual({ EUR: 220 });
     });
 

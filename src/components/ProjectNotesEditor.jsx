@@ -149,7 +149,7 @@ const ProjectNotesEditor = ({ project }) => {
         editorProps: {
             attributes: {
                 class: cn(
-                    'min-h-[18rem] w-full text-base text-foreground outline-none md:text-sm',
+                    'min-h-[12rem] w-full text-base text-foreground outline-none md:min-h-[18rem] md:text-sm',
                     'prose prose-sm max-w-none dark:prose-invert',
                     '[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-semibold',
                     '[&>h2:first-child]:mt-0',

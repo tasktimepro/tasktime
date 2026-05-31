@@ -24,6 +24,12 @@ const expenseHookMocks = vi.hoisted(() => ({
     markAsUnbilled: vi.fn()
 }))
 
+const businessBrandAssetHookMocks = vi.hoisted(() => ({
+
+    businessBrandAssets: [],
+    getBusinessBrandAsset: vi.fn(() => null)
+}))
+
 const invoiceOnlyTestState = vi.hoisted(() => ({
     enabled: false
 }))
@@ -98,6 +104,14 @@ vi.mock('../../hooks/useExpenses.ts', () => ({
         expenses: expenseHookMocks.expenses,
         markAsBilled: expenseHookMocks.markAsBilled,
         markAsUnbilled: expenseHookMocks.markAsUnbilled
+    })
+}))
+
+vi.mock('../../hooks/useBusinessBrandAssets.ts', () => ({
+
+    useBusinessBrandAssets: () => ({
+        businessBrandAssets: businessBrandAssetHookMocks.businessBrandAssets,
+        getBusinessBrandAsset: businessBrandAssetHookMocks.getBusinessBrandAsset
     })
 }))
 

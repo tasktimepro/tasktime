@@ -19,8 +19,17 @@ const taskMocks = vi.hoisted(() => ({
 const projectsMocks = vi.hoisted(() => ({
 
     projects: [
-        { id: 'p1', title: 'Project Alpha', archived: false },
-        { id: 'p2', title: 'Archived', archived: true }
+        { id: 'p1', title: 'Project Alpha', archived: false, preferredClientId: 'client-1', flatRate: false, hourlyRate: 120, isPersonal: false },
+        { id: 'p2', title: 'Archived', archived: true },
+        { id: 'p3', title: 'Project Fixed', archived: false, preferredClientId: 'client-2', flatRate: true, isPersonal: false }
+    ]
+}))
+
+const clientsMocks = vi.hoisted(() => ({
+
+    clients: [
+        { id: 'client-1', title: 'Client One', defaultHourlyRate: 100, hourlyRate: 90 },
+        { id: 'client-2', title: 'Client Two', defaultHourlyRate: 80, hourlyRate: 80 }
     ]
 }))
 
@@ -49,6 +58,13 @@ vi.mock('../../hooks/useProjects.ts', () => ({
 
     useProjects: () => ({
         projects: projectsMocks.projects
+    })
+}))
+
+vi.mock('../../hooks/useClients.ts', () => ({
+
+    useClients: () => ({
+        clients: clientsMocks.clients
     })
 }))
 
@@ -218,5 +234,69 @@ describe('TaskModal', () => {
         expect(screen.getByLabelText(/Start Date/i).className).toContain('w-full')
         expect(screen.getByRole('button', { name: 'Cancel' }).className).not.toContain('w-full')
         expect(screen.getByRole('button', { name: 'Create' }).className).not.toContain('w-full')
+    })
+
+    it('shows hourly estimate fields and saves estimated hours for hourly client projects', async () => {
+
+        const user = userEvent.setup()
+
+        render(
+            <TaskModal
+                isOpen
+                onClose={vi.fn()}
+                modalOptions={{ preselectedProjectId: 'p1' }}
+            />
+        )
+
+        expect(screen.getByLabelText('Estimated Hours')).toBeInTheDocument()
+        expect(screen.queryByLabelText('Quote Amount')).not.toBeInTheDocument()
+
+        await user.type(screen.getByLabelText(/Task Title/i), 'Estimated hourly task')
+        await user.type(screen.getByLabelText('Estimated Hours'), '3.5')
+
+        expect(screen.getByText('Estimated amount from project rate: 420.00')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Create' }))
+
+        expect(taskMocks.createTask).toHaveBeenCalledWith(expect.objectContaining({
+            projectId: 'p1',
+            estimatedHours: 3.5,
+            estimatedFlatAmount: null,
+        }))
+    })
+
+    it('shows flat estimate fields and saves quote amount for flat-rate client projects', async () => {
+
+        const user = userEvent.setup()
+
+        render(
+            <TaskModal
+                isOpen
+                onClose={vi.fn()}
+                modalOptions={{ preselectedProjectId: 'p3' }}
+            />
+        )
+
+        expect(screen.getByLabelText('Estimated Hours')).toBeInTheDocument()
+        expect(screen.getByLabelText('Quote Amount')).toBeInTheDocument()
+
+        await user.type(screen.getByLabelText(/Task Title/i), 'Flat quote task')
+        await user.type(screen.getByLabelText('Estimated Hours'), '5')
+        await user.type(screen.getByLabelText('Quote Amount'), '900')
+        await user.click(screen.getByRole('button', { name: 'Create' }))
+
+        expect(taskMocks.createTask).toHaveBeenCalledWith(expect.objectContaining({
+            projectId: 'p3',
+            estimatedHours: 5,
+            estimatedFlatAmount: 900,
+        }))
+    })
+
+    it('hides estimate fields for standalone tasks', () => {
+
+        render(<TaskModal isOpen onClose={vi.fn()} />)
+
+        expect(screen.queryByLabelText('Estimated Hours')).not.toBeInTheDocument()
+        expect(screen.queryByLabelText('Quote Amount')).not.toBeInTheDocument()
     })
 })

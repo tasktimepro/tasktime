@@ -222,6 +222,74 @@ describe('usePlannerItems', () => {
         expect(taskItem?.actualTimeMs).toBe(entryEnd - entryStart);
     });
 
+    it('auto-includes projects on their deadline day', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const deadlineDateStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+
+        mockProjects.push({
+            id: 'p-deadline',
+            title: 'Deadline Project',
+            preferredClientId: 'c1',
+            deadline: deadlineDateStr,
+        });
+        mockClients.push({ id: 'c1', title: 'Client A' });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const deadlineDay = result.current.weekDays.find((d) => d.dateStr === deadlineDateStr);
+        const projectItems = deadlineDay.items.filter((item) => item.type === 'project' && item.isDeadlineItem);
+
+        expect(projectItems).toHaveLength(1);
+        expect(projectItems[0].title).toBe('Deadline: Deadline Project');
+    });
+
+    it('does not duplicate a project on its deadline day when already attached', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const deadlineDateStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+
+        mockProjects.push({
+            id: 'p-deadline',
+            title: 'Deadline Project',
+            preferredClientId: 'c1',
+            deadline: deadlineDateStr,
+        });
+        mockClients.push({ id: 'c1', title: 'Client A' });
+        mockAttachments.push({
+            id: 'a-project',
+            type: 'project',
+            referenceId: 'p-deadline',
+            mode: 'date',
+            date: deadlineDateStr,
+            estimatedHours: 2,
+        });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const deadlineDay = result.current.weekDays.find((d) => d.dateStr === deadlineDateStr);
+        const projectItems = deadlineDay.items.filter((item) => item.type === 'project');
+
+        expect(projectItems).toHaveLength(1);
+        expect(projectItems[0].title).toBe('Deadline Project');
+    });
+
+    it('does not auto-include resolved project deadlines', () => {
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const deadlineDateStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+
+        mockProjects.push({
+            id: 'p-deadline',
+            title: 'Deadline Project',
+            preferredClientId: 'c1',
+            deadline: deadlineDateStr,
+            deadlineResolvedAt: Date.UTC(2026, 4, 29),
+        });
+        mockClients.push({ id: 'c1', title: 'Client A' });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const deadlineDay = result.current.weekDays.find((d) => d.dateStr === deadlineDateStr);
+        const projectItems = deadlineDay.items.filter((item) => item.type === 'project' && item.isDeadlineItem);
+
+        expect(projectItems).toHaveLength(0);
+    });
+
     it('includes recurring tasks due on date and marks completion', () => {
         const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
         const dateStr = format(weekStart, 'yyyy-MM-dd');

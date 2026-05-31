@@ -39,12 +39,12 @@ Every project now has a Notes tab next to Tasks.
 
 You can use it for:
 
-- quick project plans
-- checklists
-- meeting notes
-- links
-- headings and bullet lists
-- client reminders
+- Quick project plans
+- Checklists
+- Meeting notes
+- Links
+- Headings and bullet lists
+- Client reminders
 
 Notes save locally right away so writing stays fast. If you use Google Drive sync, you can save notes to the cloud and keep them synced without moving your project details into a separate document tool.
 
@@ -54,10 +54,10 @@ Planning works better when the task board, the notes, the timer, and the invoice
 
 That means:
 
-- less context switching
-- fewer missed billable tasks
-- cleaner handoff from planning to time tracking
-- clearer project status when you come back later
+- Less context switching
+- Fewer missed billable tasks
+- Cleaner handoff from planning to time tracking
+- Clearer project status when you come back later
 
 This update gives TaskTime a better task management workflow without changing what makes it useful in the first place.
 
@@ -65,11 +65,11 @@ This update gives TaskTime a better task management workflow without changing wh
 
 TaskTime is still:
 
-- local-first
-- private by default
-- usable offline
-- optional sync, not account-first
-- built for freelancers and solo work
+- Local-first
+- Private by default
+- Usable offline
+- Optional sync, not account-first
+- Built for freelancers and solo work
 
 Kanban and project notes add structure, but they do not turn the app into a heavy project management system.
 

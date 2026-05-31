@@ -7,6 +7,13 @@ vi.mock('./App', () => ({
     default: () => null,
 }))
 
+vi.mock('@debugbundle/sdk-browser', () => ({
+    createDebugBundleBrowserSdk: () => ({
+        init: vi.fn(),
+        captureException: vi.fn(),
+    }),
+}))
+
 vi.mock('react-dom/client', () => ({
     createRoot: createRootSpy,
 }))
@@ -15,8 +22,14 @@ describe('main entrypoint', () => {
     beforeEach(() => {
         vi.resetModules()
         vi.clearAllMocks()
+        vi.unstubAllEnvs()
         document.body.innerHTML = '<div id="root"></div>'
         document.documentElement.style.removeProperty('--viewport-height')
+
+        Object.defineProperty(window, 'innerHeight', {
+            configurable: true,
+            value: 900,
+        })
 
         Object.defineProperty(window, 'visualViewport', {
             configurable: true,
@@ -31,6 +44,11 @@ describe('main entrypoint', () => {
             value: {
                 getRegistrations: vi.fn(() => Promise.resolve([])),
             },
+        })
+
+        Object.defineProperty(navigator, 'maxTouchPoints', {
+            configurable: true,
+            value: 0,
         })
     })
 
@@ -61,7 +79,23 @@ describe('main entrypoint', () => {
         consoleErrorSpy.mockRestore()
     })
 
-    it('syncs the viewport height CSS variable from the visual viewport', async () => {
+    it('uses innerHeight for non-touch desktop viewports even when visualViewport exists', async () => {
+        await import('./main.jsx')
+
+        expect(document.documentElement.style.getPropertyValue('--viewport-height')).toBe('900px')
+
+        window.visualViewport.height = 680
+        window.dispatchEvent(new Event('resize'))
+
+        expect(document.documentElement.style.getPropertyValue('--viewport-height')).toBe('900px')
+    })
+
+    it('syncs the viewport height CSS variable from the visual viewport on touch devices', async () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', {
+            configurable: true,
+            value: 5,
+        })
+
         await import('./main.jsx')
 
         expect(document.documentElement.style.getPropertyValue('--viewport-height')).toBe('724px')

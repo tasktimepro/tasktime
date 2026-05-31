@@ -10,6 +10,11 @@ const invoiceHookMocks = vi.hoisted(() => ({
     markAsUnpaid: vi.fn(),
 }))
 
+const businessBrandAssetHookMocks = vi.hoisted(() => ({
+
+    businessBrandAssets: [],
+}))
+
 const urlStateMocks = vi.hoisted(() => ({
 
     updateUrl: vi.fn()
@@ -32,6 +37,12 @@ vi.mock('../../hooks/useUrlState.ts', () => ({
 
 vi.mock('../../hooks/useToast.ts', () => ({
     useToast: () => ({ showToast: vi.fn() })
+}))
+
+vi.mock('../../hooks/useBusinessBrandAssets.ts', () => ({
+    useBusinessBrandAssets: () => ({
+        businessBrandAssets: businessBrandAssetHookMocks.businessBrandAssets,
+    })
 }))
 
 describe('Invoice payment workflow integration', () => {

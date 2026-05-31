@@ -6,6 +6,7 @@ import TaskTree from './TaskTree';
 const taskTreeMocks = vi.hoisted(() => ({
     isMobileLayout: false,
     tasks: [],
+    useTasks: vi.fn(),
     updateProject: vi.fn(),
     createTask: vi.fn(),
     updateTask: vi.fn(),
@@ -31,12 +32,16 @@ vi.mock('../hooks/useProjects.ts', () => ({
 }));
 
 vi.mock('../hooks/useTasks.ts', () => ({
-    useTasks: () => ({
-        tasks: taskTreeMocks.tasks,
-        createTask: taskTreeMocks.createTask,
-        updateTask: taskTreeMocks.updateTask,
-        deleteTask: taskTreeMocks.deleteTask,
-    })
+    useTasks: (options) => {
+        taskTreeMocks.useTasks(options)
+
+        return {
+            tasks: taskTreeMocks.tasks,
+            createTask: taskTreeMocks.createTask,
+            updateTask: taskTreeMocks.updateTask,
+            deleteTask: taskTreeMocks.deleteTask,
+        }
+    }
 }));
 
 vi.mock('../hooks/useTimeEntries.ts', () => ({
@@ -56,7 +61,7 @@ vi.mock('../hooks/useDayRollover', () => ({
 }));
 
 vi.mock('./TaskItem', () => ({
-    default: ({ task, onCreateSubtask }) => (
+    default: ({ task, onCreateSubtask, onArchive, onUnarchive }) => (
         <div data-testid={`task-item-${task.id}`}>
             <span data-testid={`task-title-${task.id}`}>{task.title}</span>
             {onCreateSubtask ? (
@@ -73,11 +78,21 @@ vi.mock('./TaskItem', () => ({
                     Create subtask for {task.title}
                 </button>
             ) : null}
+            {onArchive ? (
+                <button type="button" onClick={onArchive}>
+                    Archive {task.title}
+                </button>
+            ) : null}
+            {onUnarchive ? (
+                <button type="button" onClick={onUnarchive}>
+                    Unarchive {task.title}
+                </button>
+            ) : null}
         </div>
     )
 }));
 vi.mock('./task/drag/SortableTaskItem', () => ({
-    default: ({ task, onCreateSubtask }) => (
+    default: ({ task, onCreateSubtask, onArchive, onUnarchive }) => (
         <div data-testid={`sortable-task-item-${task.id}`}>
             <span data-testid={`task-title-${task.id}`}>{task.title}</span>
             {onCreateSubtask ? (
@@ -92,6 +107,16 @@ vi.mock('./task/drag/SortableTaskItem', () => ({
                     })}
                 >
                     Create subtask for {task.title}
+                </button>
+            ) : null}
+            {onArchive ? (
+                <button type="button" onClick={onArchive}>
+                    Archive {task.title}
+                </button>
+            ) : null}
+            {onUnarchive ? (
+                <button type="button" onClick={onUnarchive}>
+                    Unarchive {task.title}
                 </button>
             ) : null}
         </div>
@@ -126,6 +151,7 @@ describe('TaskTree', () => {
     beforeEach(() => {
         taskTreeMocks.isMobileLayout = false;
         taskTreeMocks.tasks = [];
+        taskTreeMocks.useTasks.mockReset();
         taskTreeMocks.createTask.mockReset();
         taskTreeMocks.createTask.mockImplementation((data) => ({ id: data.id || 'created-task', ...data }));
         taskTreeMocks.updateTask.mockReset();
@@ -147,6 +173,18 @@ describe('TaskTree', () => {
 
         expect(screen.getByTestId('task-item-task-1')).toBeInTheDocument();
         expect(screen.queryByText('Kanban board')).not.toBeInTheDocument();
+    });
+
+    it('requests archived project tasks for the project tree', () => {
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        expect(taskTreeMocks.useTasks).toHaveBeenCalledWith({ projectId: 'project-1', includeArchived: true });
     });
 
     it('switches to the Kanban view when requested', () => {
@@ -268,6 +306,29 @@ describe('TaskTree', () => {
         expect(taskTreeMocks.updateTask).not.toHaveBeenCalled();
     });
 
+    it('includes inline estimate fields when creating a client task', () => {
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false, preferredClientId: 'client-1', flatRate: true }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'New Task' }));
+        fireEvent.change(screen.getByPlaceholderText('Enter task title'), { target: { value: 'Quoted task' } });
+        fireEvent.pointerDown(screen.getByRole('button', { name: 'Estimate' }), { button: 0, ctrlKey: false });
+        fireEvent.change(screen.getByLabelText('Estimated Hours'), { target: { value: '3.5' } });
+        fireEvent.change(screen.getByLabelText('Quote Amount'), { target: { value: '900' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+        expect(taskTreeMocks.createTask).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Quoted task',
+            estimatedHours: 3.5,
+            estimatedFlatAmount: 900,
+        }));
+    });
+
     it('does not assign active-list manual rank when creating a recurring task', () => {
         taskTreeMocks.tasks = [
             { id: 'task-1', projectId: 'project-1', title: 'First task', parentTaskId: null, archived: false, recurring: null, sortOrder: 1000, lastActive: 100 },
@@ -328,6 +389,33 @@ describe('TaskTree', () => {
         expect(taskTreeMocks.updateTask).toHaveBeenCalledWith('parent-1', expect.objectContaining({
             lastActive: expect.any(Number),
         }));
+    });
+
+    it('archives a parent task together with its subtasks', () => {
+        taskTreeMocks.tasks = [
+            { id: 'parent-1', projectId: 'project-1', title: 'Parent task', parentTaskId: null, archived: false, recurring: null },
+            { id: 'child-1', projectId: 'project-1', title: 'Child task', parentTaskId: 'parent-1', archived: false, recurring: null },
+        ];
+
+        render(
+            <TaskTree
+                project={{ id: 'project-1', title: 'Project', isPersonal: false }}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Archive Parent task' }));
+
+        expect(taskTreeMocks.updateTask).toHaveBeenCalledWith('parent-1', expect.objectContaining({
+            archived: true,
+            archivedOnDate: expect.any(String),
+        }));
+        expect(taskTreeMocks.updateTask).toHaveBeenCalledWith('child-1', expect.objectContaining({
+            archived: true,
+            archivedOnDate: expect.any(String),
+        }));
+        expect(taskTreeMocks.showSuccess).toHaveBeenCalledWith('Task and 1 subtask(s) archived successfully');
     });
 
     it('keeps due recurring tasks on most-recent order when project sort is manual', () => {

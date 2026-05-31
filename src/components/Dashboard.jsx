@@ -925,7 +925,7 @@ const Dashboard = ({
     const enhanceTaskList = useCallback((list) => {
         return list.map((task) => {
             const project = task.projectId ? projects.find(p => p.id === task.projectId) : null;
-            const parentTask = task.parentTaskId ? activeTasks.find(t => t.id === task.parentTaskId) : null;
+            const parentTask = task.parentTaskId ? (tasksById.get(task.parentTaskId) || null) : null;
             const recurringStatus = task.recurring && todayStr ? getRecurringStatus(task, todayStr) : null;
 
             return {
@@ -936,7 +936,7 @@ const Dashboard = ({
                 recurringStatus
             };
         });
-    }, [projects, activeTasks, taskTimeTotals, getRecurringStatus, todayStr]);
+    }, [projects, tasksById, taskTimeTotals, getRecurringStatus, todayStr]);
 
     const overdueTasks = useMemo(() => {
         return enhanceTaskList(getOverdueTasks());

@@ -17,9 +17,11 @@ import type { BackupInfo } from './providers/BackupManager';
 import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
 import { createBackupPayload, type BackupImportPayload, type BackupPayload } from '@/utils/backupData';
 import { parseStoredDate } from '@/utils/dateUtils';
+import { getTaskIdsWithDescendants } from '@/utils/taskUtils';
 import { readEntity, objectToYMap, collectEntities, forEachEntity } from './entityUtils';
 import { validateCollectionEntity } from './validation';
 import type {
+    BusinessBrandAsset,
     DocName,
     SyncState,
     SyncPhase,
@@ -134,6 +136,11 @@ export class YjsStore {
     get businessInfos(): Y.Map<string, BusinessInfo> {
         this.assertReady();
         return this._coreDoc!.getMap('businessInfos');
+    }
+
+    get businessBrandAssets(): Y.Map<string, BusinessBrandAsset> {
+        this.assertReady();
+        return this._coreDoc!.getMap('businessBrandAssets');
     }
 
     get invoiceTemplates(): Y.Map<string, InvoiceTemplate> {
@@ -367,24 +374,29 @@ export class YjsStore {
      * Archive a task (move from active to archived doc)
      */
     async archiveTask(taskId: string): Promise<void> {
-        const task = readEntity<Task>(this.tasks.get(taskId));
-        if (!task) return;
-
         const archivedMap = await this.loadArchivedTasks();
+        const activeTasks = collectEntities<Task>(this.tasks as any);
+        const archivedTasks = collectEntities<Task>(archivedMap as any);
+        const taskIdsToArchive = getTaskIdsWithDescendants(taskId, [...activeTasks, ...archivedTasks]);
+
+        if (taskIdsToArchive.length === 0) return;
+
         const archivedOnDate = new Date().toISOString().slice(0, 10);
 
-        // Add to archived doc as nested Y.Map
-        const entityMap = objectToYMap({
-            ...task,
-            archived: true,
-            archivedOnDate,
-        } as unknown as Record<string, unknown>);
-        (archivedMap as any).set(taskId, entityMap);
+        taskIdsToArchive.forEach((candidateTaskId) => {
+            const task = readEntity<Task>(this.tasks.get(candidateTaskId));
+            if (!task) return;
 
-        // Remove from active
-        this.tasks.delete(taskId);
+            const entityMap = objectToYMap({
+                ...task,
+                archived: true,
+                archivedOnDate,
+            } as unknown as Record<string, unknown>);
+            (archivedMap as any).set(candidateTaskId, entityMap);
+            this.tasks.delete(candidateTaskId);
+        });
 
-        console.log(`[YjsStore] Archived task ${taskId}`);
+        console.log(`[YjsStore] Archived task subtree ${taskId} (${taskIdsToArchive.length} task(s))`);
     }
 
     /**
@@ -392,21 +404,26 @@ export class YjsStore {
      */
     async unarchiveTask(taskId: string): Promise<void> {
         const archivedMap = await this.loadArchivedTasks();
-        const task = readEntity<Task>(archivedMap.get(taskId));
-        if (!task) return;
+        const activeTasks = collectEntities<Task>(this.tasks as any);
+        const archivedTasks = collectEntities<Task>(archivedMap as any);
+        const taskIdsToUnarchive = getTaskIdsWithDescendants(taskId, [...activeTasks, ...archivedTasks]);
 
-        // Add back to active doc as nested Y.Map
-        const entityMap = objectToYMap({
-            ...task,
-            archived: false,
-            archivedOnDate: null,
-        } as unknown as Record<string, unknown>);
-        (this.tasks as any).set(taskId, entityMap);
+        if (taskIdsToUnarchive.length === 0) return;
 
-        // Remove from archived
-        archivedMap.delete(taskId);
+        taskIdsToUnarchive.forEach((candidateTaskId) => {
+            const task = readEntity<Task>(archivedMap.get(candidateTaskId));
+            if (!task) return;
 
-        console.log(`[YjsStore] Unarchived task ${taskId}`);
+            const entityMap = objectToYMap({
+                ...task,
+                archived: false,
+                archivedOnDate: null,
+            } as unknown as Record<string, unknown>);
+            (this.tasks as any).set(candidateTaskId, entityMap);
+            archivedMap.delete(candidateTaskId);
+        });
+
+        console.log(`[YjsStore] Unarchived task subtree ${taskId} (${taskIdsToUnarchive.length} task(s))`);
     }
 
     // =========================================================================
@@ -999,6 +1016,7 @@ export class YjsStore {
             expenseCategories: collectEntities(this.expenseCategories as any),
             taxReturnPeriods: collectEntities(this.taxReturnPeriods as any),
             businessInfos: collectEntities(this.businessInfos as any),
+            businessBrandAssets: collectEntities(this.businessBrandAssets as any),
             clients: collectEntities(this.clients as any),
             invoiceTemplates: collectEntities(this.invoiceTemplates as any),
             emailTemplates: collectEntities(this.emailTemplates as any),
@@ -1085,6 +1103,11 @@ export class YjsStore {
         for (const info of data.businessInfos || []) {
             const validated = validateCollectionEntity<BusinessInfo>('businessInfos', info, `import business info ${info.id}`);
             (this.businessInfos as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const asset of data.businessBrandAssets || []) {
+            const validated = validateCollectionEntity<BusinessBrandAsset>('businessBrandAssets', asset, `import business brand asset ${asset.id}`);
+            (this.businessBrandAssets as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
         }
 
         for (const client of data.clients || []) {

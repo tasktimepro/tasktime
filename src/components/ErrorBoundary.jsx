@@ -1,5 +1,6 @@
 import React from 'react';
 import { ExclamationTriangleIcon, ArrowPathIcon } from '@/components/ui/icons';
+import { captureDebugBundleException } from '@/utils/debugbundle';
 /* eslint-disable react-refresh/only-export-components */
 
 /**
@@ -80,6 +81,8 @@ class ErrorBoundary extends React.Component {
     }
 
     componentDidCatch(error, errorInfo) {
+        captureDebugBundleException(error);
+
         // Log the error to console in development
         if (import.meta.env.DEV) {
             console.error('ErrorBoundary caught an error:', error, errorInfo);

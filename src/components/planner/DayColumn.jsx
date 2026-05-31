@@ -71,6 +71,7 @@ const DayColumn = ({
     };
 
     const popoverAlign = isLastColumn ? 'end' : 'start';
+    const columnBackgroundClass = isToday ? 'bg-muted/80 dark:bg-muted/10' : 'bg-card';
 
     // Format total time as Xh Ym
     const formatTotalTime = (ms) => {
@@ -110,9 +111,10 @@ const DayColumn = ({
             <ContextMenuTrigger asChild>
                 <div
                     className={cn(
-                        "group flex flex-col h-full rounded-lg border bg-card relative",
+                        "group flex flex-col h-full rounded-lg border relative",
                         "transition-shadow",
-                        isToday && "border-t-2 border-t-black dark:border-t-white bg-muted/80 dark:bg-muted/10"
+                        columnBackgroundClass,
+                        isToday && "border-t-2 border-t-black dark:border-t-white"
                     )}
                 >
                     {/* Header */}
@@ -170,6 +172,10 @@ const DayColumn = ({
                                 amountType={item.amountType}
                                 currency={item.currency}
                                 supplierName={item.supplierName}
+                                projectStatusMode={item.type === 'project' ? item.entity.statusMode : undefined}
+                                projectDeadline={item.type === 'project' ? item.entity.deadline : undefined}
+                                projectDeadlineResolvedAt={item.type === 'project' ? item.entity.deadlineResolvedAt : undefined}
+                                isProjectDeadlineItem={item.type === 'project' ? item.isDeadlineItem : false}
                                 isPreview={item.isPreview}
                                 hasAttachment={!!item.attachment}
                                 onClick={!item.isPreview || item.type === 'expense'
@@ -185,7 +191,8 @@ const DayColumn = ({
                     {shouldShowProgress && (
                         <div
                             className={cn(
-                                "px-2 pb-2 transition-opacity absolute bottom-0 left-0 w-full z-10",
+                                "px-2 pb-2 transition-opacity absolute bottom-0 left-0 w-full z-10 rounded-b-lg",
+                                columnBackgroundClass,
                                 isToday ? "opacity-100" : "opacity-0 group-hover:opacity-100",
                                 !isToday && "pointer-events-none group-hover:pointer-events-auto"
                             )}

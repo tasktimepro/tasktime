@@ -1,6 +1,7 @@
-import { differenceInCalendarDays, endOfDay, startOfDay } from 'date-fns';
+import { endOfDay, startOfDay } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns/differenceInCalendarDays';
 import { parseStoredDate } from './dateUtils';
-import { getInvoiceStatus, getInvoiceTotal, isInvoicePaid } from './invoiceUtils';
+import { getInvoicePaidAtTimestamp, getInvoiceStatus, getInvoiceTotal, isInvoicePaid } from './invoiceUtils';
 import { getBillableDurationMs } from './timeEntryDurationUtils';
 
 const EU_COUNTRY_CODES = new Set([
@@ -267,8 +268,9 @@ const sumRecordsByCurrency = (items: any[], getCurrency: (item: any) => string, 
 };
 
 const isInvoicePaidOnOrBefore = (invoice: any, timestamp: number) => {
-    if (typeof invoice?.paidAt === 'number' && Number.isFinite(invoice.paidAt)) {
-        return invoice.paidAt <= timestamp;
+    const paidAt = getInvoicePaidAtTimestamp(invoice);
+    if (typeof paidAt === 'number' && Number.isFinite(paidAt)) {
+        return paidAt <= timestamp;
     }
 
     return invoice?.status === 'paid' || invoice?.paymentProcessed === true;
@@ -623,8 +625,12 @@ export const buildClientStatementSummary = ({
         .sort((invoiceA, invoiceB) => invoiceA.date.localeCompare(invoiceB.date));
 
     const paymentsRecordedInRange = nonDraftInvoices
-        .filter((invoice) => typeof invoice?.paidAt === 'number' && invoice.paidAt >= rangeStart && invoice.paidAt <= rangeEnd)
-        .sort((invoiceA, invoiceB) => (invoiceA.paidAt || 0) - (invoiceB.paidAt || 0));
+        .filter((invoice) => {
+            const paidAt = getInvoicePaidAtTimestamp(invoice);
+
+            return typeof paidAt === 'number' && paidAt >= rangeStart && paidAt <= rangeEnd;
+        })
+        .sort((invoiceA, invoiceB) => (getInvoicePaidAtTimestamp(invoiceA) || 0) - (getInvoicePaidAtTimestamp(invoiceB) || 0));
 
     const outstandingInvoices = nonDraftInvoices
         .filter((invoice) => invoice?.date && invoice.date <= endDate)

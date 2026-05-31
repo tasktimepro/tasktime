@@ -11,6 +11,7 @@ import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts'
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
+import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '../utils/invoiceUtils.ts';
@@ -37,6 +38,7 @@ const InvoicesList = ({
 }) => {
     const isMobileLayout = useIsMobileLayout();
     const { showToast } = useToast();
+    const { businessBrandAssets } = useBusinessBrandAssets();
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
     const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
@@ -160,7 +162,7 @@ const InvoicesList = ({
      */
     const handleDownload = async (invoice) => {
         try {
-            const htmlContent = getCurrentInvoiceHtmlContent(invoice, clients);
+            const htmlContent = getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets);
             
             const filename = `invoice-${invoice.invoiceNumber}.pdf`;
             
@@ -588,7 +590,7 @@ const InvoicesList = ({
                 onClose={() => setShowPreview(false)}
                 title={selectedInvoice ? `Invoice Preview - ${selectedInvoice.invoiceNumber}` : ''}
                 invoice={selectedInvoice}
-                htmlContent={selectedInvoice ? getCurrentInvoiceHtmlContent(selectedInvoice, clients) : ''}
+                htmlContent={selectedInvoice ? getCurrentInvoiceHtmlContent(selectedInvoice, clients, businessBrandAssets) : ''}
                 footer={previewModalFooter}
             />
         );

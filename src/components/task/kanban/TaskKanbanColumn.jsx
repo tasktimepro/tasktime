@@ -4,6 +4,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from '@/components/ui/icons';
+import { useProjects } from '@/hooks/useProjects';
 import { cn } from '@/lib/utils';
 import SubtaskCreateForm from '../SubtaskSection/SubtaskCreateForm';
 import TaskKanbanCard from './TaskKanbanCard';
@@ -30,6 +31,7 @@ const TaskKanbanColumn = ({
     dragPreview = null,
     dragDisabled = false,
 }) => {
+    const { projects } = useProjects();
     const {
         attributes,
         listeners,
@@ -61,8 +63,25 @@ const TaskKanbanColumn = ({
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
     const [newSubtaskNote, setNewSubtaskNote] = useState('');
     const [newSubtaskStartDate, setNewSubtaskStartDate] = useState('');
+    const [newSubtaskEstimatedHours, setNewSubtaskEstimatedHours] = useState('');
+    const [newSubtaskEstimatedFlatAmount, setNewSubtaskEstimatedFlatAmount] = useState('');
 
     void isColumnDropzoneOver;
+
+    const currentProject = useMemo(() => {
+        if (!task.projectId) {
+            return null;
+        }
+
+        return projects.find((project) => project.id === task.projectId) || null;
+    }, [projects, task.projectId]);
+
+    const showEstimateFields = Boolean(
+        currentProject
+        && !currentProject.isPersonal
+        && currentProject.preferredClientId
+    );
+    const isFlatRateProject = Boolean(currentProject?.flatRate);
 
     const style = {
         transform: CSS.Translate.toString(transform),
@@ -80,18 +99,26 @@ const TaskKanbanColumn = ({
             note: newSubtaskNote,
             startDate: newSubtaskStartDate || null,
             recurring: null,
+            ...(showEstimateFields ? {
+                estimatedHours: newSubtaskEstimatedHours,
+                estimatedFlatAmount: isFlatRateProject ? newSubtaskEstimatedFlatAmount : undefined,
+            } : {}),
         });
 
         setNewSubtaskTitle('');
         setNewSubtaskNote('');
         setNewSubtaskStartDate('');
+        setNewSubtaskEstimatedHours('');
+        setNewSubtaskEstimatedFlatAmount('');
         setShowCreateSubtaskForm(false);
-    }, [newSubtaskTitle, newSubtaskNote, newSubtaskStartDate, onCreateSubtask, task.id]);
+    }, [isFlatRateProject, newSubtaskEstimatedFlatAmount, newSubtaskEstimatedHours, newSubtaskNote, newSubtaskStartDate, newSubtaskTitle, onCreateSubtask, showEstimateFields, task.id]);
 
     const handleCancelCreateSubtask = useCallback(() => {
         setNewSubtaskTitle('');
         setNewSubtaskNote('');
         setNewSubtaskStartDate('');
+        setNewSubtaskEstimatedHours('');
+        setNewSubtaskEstimatedFlatAmount('');
         setShowCreateSubtaskForm(false);
     }, []);
 
@@ -190,6 +217,12 @@ const TaskKanbanColumn = ({
                         setNewSubtaskNote={setNewSubtaskNote}
                         newSubtaskStartDate={newSubtaskStartDate}
                         setNewSubtaskStartDate={setNewSubtaskStartDate}
+                        newSubtaskEstimatedHours={newSubtaskEstimatedHours}
+                        setNewSubtaskEstimatedHours={setNewSubtaskEstimatedHours}
+                        newSubtaskEstimatedFlatAmount={newSubtaskEstimatedFlatAmount}
+                        setNewSubtaskEstimatedFlatAmount={setNewSubtaskEstimatedFlatAmount}
+                        showEstimateFields={showEstimateFields}
+                        isFlatRateProject={isFlatRateProject}
                         onCreateSubtask={handleCreateSubtask}
                         onCancel={handleCancelCreateSubtask}
                         forceStackedLayout={true}

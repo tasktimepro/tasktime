@@ -17,6 +17,35 @@ const stopDragPropagation = (event) => {
     event.stopPropagation();
 };
 
+const buildDragHandle = ({
+    dragActivatorRef,
+    dragAttributes,
+    dragListeners,
+    dragDisabled,
+}) => {
+    const dragInteractionProps = dragDisabled
+        ? {}
+        : {
+            ref: dragActivatorRef,
+            ...dragAttributes,
+            ...dragListeners,
+        };
+
+    return (
+        <span
+            aria-hidden="true"
+            className={cn(
+                'inline-flex h-8 shrink-0 items-center justify-center text-muted-foreground',
+                !dragDisabled && 'touch-none cursor-grab active:cursor-grabbing',
+                dragDisabled && 'opacity-50'
+            )}
+            {...dragInteractionProps}
+        >
+            <GripVerticalIcon className="h-4 w-4" />
+        </span>
+    );
+};
+
 const TaskKanbanTaskRow = ({
     task,
     onOpen,
@@ -76,33 +105,20 @@ const TaskKanbanTaskRow = ({
         });
     }, [clearTimer, createEntry, currentProject?.billableTimeIncrementMinutes, isTimerActive, projectTimer, task.archived, task.id, task.recurring, timerKey, updateTask]);
 
-    const dragHandle = (
-        <span
-            aria-hidden="true"
-            className={cn(
-                'inline-flex h-8 shrink-0 items-center justify-center text-muted-foreground',
-                dragDisabled ? 'opacity-50' : ''
-            )}
-        >
-            <GripVerticalIcon className="h-4 w-4" />
-        </span>
-    );
+    const dragHandle = buildDragHandle({
+        dragActivatorRef,
+        dragAttributes,
+        dragListeners,
+        dragDisabled,
+    });
 
-    const dragInteractionProps = dragDisabled
-        ? {}
-        : {
-            ref: dragActivatorRef,
-            ...dragAttributes,
-            ...dragListeners,
-        };
     const itemLabel = task.parentTaskId ? 'Subtask' : 'Task';
     const showArchiveAction = !task.archived && !task.recurring && task.completed && Boolean(onArchive);
     const showArchivedActions = task.archived && (Boolean(onUnarchive) || Boolean(onDelete));
 
     return (
         <div
-            className={cn('space-y-2 select-none', !dragDisabled && 'cursor-grab active:cursor-grabbing')}
-            {...dragInteractionProps}
+            className="space-y-2 select-none"
         >
             <div className="flex items-center gap-4">
                 <TaskHeader

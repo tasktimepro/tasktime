@@ -32,6 +32,12 @@ const BusinessInfo = ({
     const { businessInfos, deleteBusinessInfo } = useBusinessInfos();
     const [pendingDeleteBusinessId, setPendingDeleteBusinessId] = useState(null);
 
+    const getBusinessBorderStyle = (businessInfo) => {
+        const color = businessInfo.branding?.primaryColor;
+
+        return color ? { borderLeftColor: color } : {};
+    };
+
     // Auto-open create modal when autoOpenCreate prop changes
     useEffect(() => {
         if (autoOpenCreate && openBusinessModal) {
@@ -110,7 +116,8 @@ const BusinessInfo = ({
                     {businessInfos.map((info) => (
                         <Card
                             key={info.id}
-                            className="hover:shadow-md transition-shadow"
+                            className="hover:shadow-md transition-shadow border-l-4"
+                            style={getBusinessBorderStyle(info)}
                         >
                             <CardContent className={cn(isMobileLayout ? 'p-4' : 'pt-5')}>
                                 <div className={cn('justify-between gap-3', isMobileLayout ? 'space-y-3' : 'flex items-center')}>

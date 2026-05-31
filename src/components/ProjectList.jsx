@@ -10,7 +10,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon, SortIcon } from '@/components/ui/icons';
+import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon, SortIcon, CheckIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
@@ -29,6 +29,7 @@ import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { getInvoicesForProject } from '../utils/invoiceUtils.ts';
 import { buildProjectRecentUpdateMap } from '../utils/activityUtils.ts';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
+import { getProjectDeadlineStatus, isProjectInQuoteMode } from '@/utils/projectPlanningUtils.ts';
 
 import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
 /**
@@ -365,15 +366,35 @@ const ProjectList = ({
         const client = getProjectClient(project);
         const projectValueChip = renderProjectValueChip(project);
         const lastActive = projectLastActiveMap.get(project.id);
+        const deadlineStatus = getProjectDeadlineStatus(project);
+        const deadlineSummary = deadlineStatus.hasDeadline
+            ? (deadlineStatus.isResolved
+                ? null
+                : deadlineStatus.isOverdue
+                ? `${Math.abs(deadlineStatus.daysRemaining || 0)} day${Math.abs(deadlineStatus.daysRemaining || 0) === 1 ? '' : 's'} overdue`
+                : deadlineStatus.isToday
+                    ? 'Due today'
+                    : `${deadlineStatus.daysRemaining} day${deadlineStatus.daysRemaining === 1 ? '' : 's'} remaining`)
+            : null;
+        const deadlineBadge = deadlineStatus.isResolved ? (
+            <Badge variant="success" className="gap-1 whitespace-nowrap">
+                <CheckIcon className="h-3 w-3" />
+                Completed {toDisplayDate(deadlineStatus.resolvedAt, { month: 'short', day: 'numeric' })}
+            </Badge>
+        ) : deadlineStatus.isOverdue ? (
+            <Badge variant="warning" className="whitespace-nowrap">
+                Overdue
+            </Badge>
+        ) : null;
 
         return (
             <Card
                 key={project.id}
-                className="relative cursor-pointer border-l-4 transition-shadow hover:shadow-md"
+                className="relative flex h-full cursor-pointer border-l-4 transition-shadow hover:shadow-md"
                 style={getProjectBorderStyle(project)}
                 onClick={() => onSelectProject(project)}
             >
-                <CardContent className="p-4 sm:pt-5">
+                <CardContent className="flex min-h-full flex-1 flex-col p-4 sm:pt-5">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
@@ -385,6 +406,9 @@ const ProjectList = ({
                                 )}
                                 {project.isPersonal && (
                                     <Badge variant="secondary">Personal</Badge>
+                                )}
+                                {!project.isPersonal && isProjectInQuoteMode(project) && (
+                                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Quote stage</Badge>
                                 )}
                             </div>
 
@@ -406,6 +430,13 @@ const ProjectList = ({
                                     <span className="sensitive-data">
                                         {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
                                     </span>
+                                </p>
+                            )}
+
+                            {deadlineStatus.hasDeadline && (
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    Deadline <span className="font-medium text-foreground">{toDisplayDate(deadlineStatus.deadline, { month: 'short', day: 'numeric' })}</span>
+                                    {deadlineSummary ? ` · ${deadlineSummary}` : ''}
                                 </p>
                             )}
                         </div>
@@ -454,8 +485,9 @@ const ProjectList = ({
                         </DropdownMenu>
                     </div>
 
-                    {projectValueChip && (
-                        <div className="mt-4 flex justify-start sm:justify-end">
+                    {(deadlineBadge || projectValueChip) && (
+                        <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-4">
+                            {deadlineBadge}
                             {projectValueChip}
                         </div>
                     )}

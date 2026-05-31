@@ -8,7 +8,8 @@ describe('taskUtils', () => {
         { id: 'task-2', parentTaskId: 'task-1' },
         { id: 'task-3', parentTaskId: 'task-1' },
         { id: 'task-4', parentTaskId: null },
-        { id: 'task-5', parentTaskId: 'task-4' }
+        { id: 'task-5', parentTaskId: 'task-4' },
+        { id: 'task-6', parentTaskId: 'task-5' }
     ]
 
     describe('getTaskIdsToDelete', () => {
@@ -33,6 +34,16 @@ describe('taskUtils', () => {
             const ids = getTaskIdsToDelete('task-1', mockTasks)
             expect(ids).not.toContain('task-4')
             expect(ids).not.toContain('task-5')
+            expect(ids).not.toContain('task-6')
+        })
+
+        it('includes nested descendants recursively', () => {
+
+            const ids = getTaskIdsToDelete('task-4', mockTasks)
+            expect(ids).toContain('task-4')
+            expect(ids).toContain('task-5')
+            expect(ids).toContain('task-6')
+            expect(ids.length).toBe(3)
         })
     })
 

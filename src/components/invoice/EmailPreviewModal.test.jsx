@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EmailPreviewModal from './EmailPreviewModal';
@@ -11,6 +11,8 @@ const mockShowSuccess = vi.fn();
 const mockOnClose = vi.fn();
 let mockDriveSessionId = 'sess-abc';
 let mockEmailTemplates = [];
+const mockGetByType = vi.fn((type) => mockEmailTemplates.filter((template) => template.type === type));
+const mockGetDefaultForType = vi.fn((type) => mockEmailTemplates.find((template) => template.type === type && template.isDefault) || null);
 const mockDefaultTemplate = {
     id: 'tpl-default',
     name: 'Default Invoice Template',
@@ -48,14 +50,15 @@ vi.mock('../Modal', () => ({
 }));
 
 vi.mock('../modals/EmailTemplateModal.jsx', () => ({
-    default: ({ isOpen, onClose, onSaved }) => (
+    default: ({ isOpen, onClose, onSaved, initialType = 'invoice' }) => (
         isOpen ? (
             <div data-testid="email-template-modal">
                 <button
                     type="button"
                     onClick={() => {
-                        mockEmailTemplates = [...mockEmailTemplates, mockCreatedTemplate];
-                        onSaved?.(mockCreatedTemplate);
+                        const createdTemplate = { ...mockCreatedTemplate, type: initialType };
+                        mockEmailTemplates = [...mockEmailTemplates, createdTemplate];
+                        onSaved?.(createdTemplate);
                         onClose?.();
                     }}
                 >
@@ -76,8 +79,8 @@ vi.mock('@/hooks/useInvoices.ts', () => ({
 
 vi.mock('@/hooks/useEmailTemplates.ts', () => ({
     useEmailTemplates: () => ({
-        getByType: () => mockEmailTemplates,
-        getDefaultForType: () => mockEmailTemplates.find(t => t.isDefault) || null,
+        getByType: mockGetByType,
+        getDefaultForType: mockGetDefaultForType,
     }),
 }));
 
@@ -126,6 +129,21 @@ const invoice = {
     currency: 'USD',
 };
 
+const quoteDocument = {
+    id: 'quote-project-1-2026-05-28',
+    invoiceNumber: '28123045',
+    projectId: 'proj-1',
+    clientId: 'client-1',
+    date: '2026-05-28',
+    dueDate: null,
+    total: 800,
+    subtotal: 800,
+    currency: 'USD',
+    documentMode: 'quote',
+    tasks: [],
+    additionalTasks: [],
+};
+
 const client = {
     id: 'client-1',
     title: 'Acme Corp',
@@ -155,6 +173,9 @@ describe('EmailPreviewModal', () => {
         vi.clearAllMocks();
         mockDriveSessionId = 'sess-abc';
         mockEmailTemplates = [];
+        mockSendInvoiceEmail.mockReset();
+        mockGetByType.mockClear();
+        mockGetDefaultForType.mockClear();
     });
 
     it('renders email preview with correct fields', () => {
@@ -285,8 +306,8 @@ describe('EmailPreviewModal', () => {
 
         render(<EmailPreviewModal {...defaultProps} />);
 
-        await user.clear(screen.getByLabelText('Attachment Filename'));
-        await user.type(screen.getByLabelText('Attachment Filename'), 'custom-file.pdf');
+        fireEvent.change(screen.getByLabelText('Attachment Filename'), { target: { value: 'custom-file.pdf' } });
+        expect(screen.getByLabelText('Attachment Filename').value).toBe('custom-file');
         await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
 
         await waitFor(() => {
@@ -357,6 +378,88 @@ describe('EmailPreviewModal', () => {
         expect(subjectInput.value).toContain('Reminder:');
     });
 
+    it('uses quote wording and defaults without invoice templates', () => {
+
+        render(
+            <EmailPreviewModal
+                {...defaultProps}
+                invoice={quoteDocument}
+                sendType="quote"
+            />
+        );
+
+        expect(screen.getByRole('dialog', { name: /Send Quote/i })).toBeTruthy();
+        expect(screen.getByRole('button', { name: /Send Quote/i })).toBeTruthy();
+        expect(screen.getByText('Email Template')).toBeTruthy();
+        expect(screen.getByText('No email template')).toBeTruthy();
+        expect(screen.getByLabelText('Subject').value).toBe('Quote 28123045 from MyBiz');
+        expect(screen.getByLabelText('Message').value).toContain('Please find attached quote 28123045');
+        expect(screen.getByLabelText('Attachment Filename').value).toBe('quote-28123045');
+    });
+
+    it('filters quote sends to quote templates only', () => {
+
+        mockEmailTemplates = [
+            mockDefaultTemplate,
+            {
+                id: 'tpl-quote',
+                name: 'Default Quote Template',
+                type: 'quote',
+                fromName: 'Quotes at Acme',
+                replyTo: 'quotes@acme.com',
+                subject: 'Quote {invoiceNumber} from {businessName}',
+                sendBody: 'Quote body for {clientName}',
+                reminderBody: '',
+                attachmentTitle: 'quote-{invoiceNumber}',
+                isDefault: true,
+            },
+        ];
+
+        render(
+            <EmailPreviewModal
+                {...defaultProps}
+                invoice={quoteDocument}
+                sendType="quote"
+            />
+        );
+
+        expect(screen.getByLabelText('From Name').value).toBe('Quotes at Acme');
+        expect(screen.getByLabelText('Reply-To').value).toBe('quotes@acme.com');
+        expect(screen.getByLabelText('Subject').value).toBe('Quote 28123045 from MyBiz');
+        expect(screen.getByLabelText('Message').value).toBe('Quote body for Acme Corp');
+    });
+
+    it('sends a quote without updating invoice state', async () => {
+
+        const user = userEvent.setup();
+
+        mockSendInvoiceEmail.mockResolvedValue({ success: true, remaining: 9 });
+
+        render(
+            <EmailPreviewModal
+                {...defaultProps}
+                invoice={quoteDocument}
+                sendType="quote"
+            />
+        );
+
+        await user.click(screen.getByRole('button', { name: /Send Quote/i }));
+
+        await waitFor(() => {
+            expect(mockSendInvoiceEmail).toHaveBeenCalledOnce();
+        });
+
+        expect(mockSendInvoiceEmail).toHaveBeenCalledWith(expect.objectContaining({
+            invoiceId: 'quote-project-1-2026-05-28',
+            invoiceNumber: '28123045',
+            sendType: 'quote',
+            attachmentTitle: 'quote-28123045',
+        }));
+        expect(mockUpdateInvoice).not.toHaveBeenCalled();
+        expect(mockShowSuccess).toHaveBeenCalledWith(expect.stringContaining('Quote emailed to billing@acme.com'));
+        expect(mockOnClose).toHaveBeenCalledOnce();
+    });
+
     it('displays error from service and keeps modal open', async () => {
 
         const user = userEvent.setup();
@@ -374,7 +477,7 @@ describe('EmailPreviewModal', () => {
         await user.click(sendButton);
 
         await waitFor(() => {
-            expect(screen.getByText(/Monthly email limit reached/)).toBeTruthy();
+            expect(screen.getByText((content) => content.includes('Monthly email limit reached'))).toBeTruthy();
         });
 
         // Modal should still be open (onClose not called)
@@ -396,7 +499,7 @@ describe('EmailPreviewModal', () => {
         await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
 
         await waitFor(() => {
-            expect(screen.getByText(/already been emailed/)).toBeTruthy();
+            expect(screen.getByText((content) => content.includes('already been emailed'))).toBeTruthy();
         });
     });
 
@@ -411,7 +514,7 @@ describe('EmailPreviewModal', () => {
         await user.click(sendButton);
 
         await waitFor(() => {
-            expect(screen.getByText(/Connect cloud sync to enable/)).toBeTruthy();
+            expect(screen.getAllByText((content) => content.includes('Connect cloud sync')).length).toBeGreaterThan(0);
         });
 
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
@@ -429,7 +532,7 @@ describe('EmailPreviewModal', () => {
         await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
 
         await waitFor(() => {
-            expect(screen.getByText(/Subject is required/)).toBeTruthy();
+            expect(screen.getByText((content) => content.includes('Subject is required'))).toBeTruthy();
         });
 
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();

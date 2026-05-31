@@ -1,13 +1,14 @@
-import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon } from '@/components/ui/icons';
+import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon, CheckIcon } from '@/components/ui/icons';
 import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
 import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
-import { millisecondsToHours, formatDuration, toStorageDate } from '../utils/dateUtils.ts';
+import { millisecondsToHours, formatDuration, toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoicePaid } from '../utils/invoiceUtils.ts';
@@ -19,6 +20,7 @@ import { useExpenses } from '../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
+import { getProjectDeadlineStatus, isProjectInQuoteMode } from '../utils/projectPlanningUtils.ts';
 import ExpensesSection from './expenses/ExpensesSection';
 import {
     DropdownMenu,
@@ -501,37 +503,71 @@ const ClientDashboard = ({
         ));
         const totalTime = projectTimeEntriesForCard.reduce((total, entry) => total + (entry.end - entry.start), 0);
         const actionChip = renderProjectActionChip(project);
+        const deadlineStatus = getProjectDeadlineStatus(project);
+        const deadlineSummary = deadlineStatus.hasDeadline
+            ? (deadlineStatus.isResolved
+                ? null
+                : deadlineStatus.isOverdue
+                ? `${Math.abs(deadlineStatus.daysRemaining || 0)} day${Math.abs(deadlineStatus.daysRemaining || 0) === 1 ? '' : 's'} overdue`
+                : deadlineStatus.isToday
+                    ? 'Due today'
+                    : `${deadlineStatus.daysRemaining} day${deadlineStatus.daysRemaining === 1 ? '' : 's'} remaining`)
+            : null;
+        const deadlineBadge = deadlineStatus.isResolved ? (
+            <Badge variant="success" className="gap-1 whitespace-nowrap">
+                <CheckIcon className="h-3 w-3" />
+                Completed {toDisplayDate(deadlineStatus.resolvedAt, { month: 'short', day: 'numeric' })}
+            </Badge>
+        ) : deadlineStatus.isOverdue ? (
+            <Badge variant="warning" className="whitespace-nowrap">
+                Overdue
+            </Badge>
+        ) : null;
 
         return (
             <Card
                 key={project.id}
-                className="relative cursor-pointer border-l-4 transition-shadow hover:shadow-md"
+                className="relative flex h-full cursor-pointer border-l-4 transition-shadow hover:shadow-md"
                 style={getProjectBorderStyle(project)}
                 onClick={() => navigateToProject(project.id)}
             >
-                <CardContent className={cn('space-y-2', isMobileLayout ? 'p-4' : 'pt-5')}>
-                    <div className="flex min-w-0 items-center gap-2">
-                        <h3 className="truncate font-medium text-foreground">{project.title}</h3>
-                        {archived && (
-                            <span className="inline-flex items-center whitespace-nowrap rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                                Archived
-                            </span>
+                <CardContent className={cn('flex min-h-full flex-1 flex-col', isMobileLayout ? 'p-4' : 'p-4 pt-5')}>
+                    <div className="space-y-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                            <h3 className="truncate font-medium text-foreground">{project.title}</h3>
+                            {isProjectInQuoteMode(project) && (
+                                <span className="inline-flex items-center whitespace-nowrap rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                    Quote stage
+                                </span>
+                            )}
+                            {archived && (
+                                <span className="inline-flex items-center whitespace-nowrap rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                    Archived
+                                </span>
+                            )}
+                        </div>
+                        {project.hourlyRate && !project.flatRate && (
+                            <p className="text-sm text-muted-foreground">
+                                <span className="sensitive-data">
+                                    {getCurrencySymbol(getProjectCurrency(project, clients))}
+                                    {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
+                                </span>
+                            </p>
+                        )}
+                        <div className="text-sm text-muted-foreground">
+                            <p>{projectTasksForCard.filter((task) => !task.completed && !task.archived).length} active tasks</p>
+                            <p>{formatDuration(totalTime)} total time</p>
+                        </div>
+                        {deadlineStatus.hasDeadline && (
+                            <p className="text-sm text-muted-foreground">
+                                Deadline <span className="font-medium text-foreground">{toDisplayDate(deadlineStatus.deadline, { month: 'short', day: 'numeric' })}</span>
+                                {deadlineSummary ? ` · ${deadlineSummary}` : ''}
+                            </p>
                         )}
                     </div>
-                    {project.hourlyRate && (
-                        <p className="text-sm text-muted-foreground">
-                            <span className="sensitive-data">
-                                {getCurrencySymbol(getProjectCurrency(project, clients))}
-                                {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
-                            </span>
-                        </p>
-                    )}
-                    <div className="text-sm text-muted-foreground">
-                        <p>{projectTasksForCard.filter((task) => !task.completed && !task.archived).length} active tasks</p>
-                        <p>{formatDuration(totalTime)} total time</p>
-                    </div>
-                    {actionChip && (
-                        <div className={cn(isMobileLayout ? 'mt-3 flex justify-end' : 'absolute bottom-4 right-4')}>
+                    {(deadlineBadge || actionChip) && (
+                        <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-4">
+                            {deadlineBadge}
                             {actionChip}
                         </div>
                     )}

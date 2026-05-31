@@ -5,7 +5,7 @@ import {
     hasManualTaskOrder,
     reorderTaskItems,
     sortTasksByManualOrder,
-} from '@/utils/taskOrderingUtils.ts';
+} from '@/utils/taskOrderingUtils';
 
 type KanbanTask = {
     id: string;

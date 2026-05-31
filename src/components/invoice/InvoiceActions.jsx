@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { EyeIcon } from '@/components/ui/icons';
+import { EyeIcon, PaperAirplaneIcon } from '@/components/ui/icons';
 
 /**
  * InvoiceActions component - Footer action buttons for the invoice modal.
@@ -8,15 +8,24 @@ import { EyeIcon } from '@/components/ui/icons';
  * @param {Function} props.handleCancel
  * @param {Function} props.onPreview
  */
-const InvoiceActions = ({ editingInvoice, handleCancel, onPreview }) => {
+const InvoiceActions = ({
+    editingInvoice,
+    handleCancel,
+    onPreview,
+    mode = 'invoice',
+    onSend,
+    onDownload,
+}) => {
+    const isQuoteMode = mode === 'quote';
+
     return (
-        <div className="flex w-full items-center justify-between">
+        <div className="flex w-full items-center justify-between gap-2">
             {onPreview ? (
                 <Button
                     type="button"
                     variant="outline"
                     onClick={onPreview}
-                    aria-label="Preview invoice"
+                    aria-label={isQuoteMode ? 'Preview quote' : 'Preview invoice'}
                     className="gap-0 px-2.5 sm:gap-2 sm:px-4"
                     leadingIcon={EyeIcon}
                 >
@@ -25,7 +34,7 @@ const InvoiceActions = ({ editingInvoice, handleCancel, onPreview }) => {
             ) : (
                 <div />
             )}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-2 sm:gap-3">
                 <Button
                     type="button"
                     variant="secondary"
@@ -34,12 +43,33 @@ const InvoiceActions = ({ editingInvoice, handleCancel, onPreview }) => {
                     Cancel
                 </Button>
 
-                <Button
-                    type="submit"
-                    form="invoice-form"
-                >
-                    {editingInvoice ? 'Update Invoice' : 'Generate Invoice'}
-                </Button>
+                {isQuoteMode ? (
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onSend}
+                            aria-label="Send Quote"
+                            className="gap-0 px-2.5 sm:gap-2 sm:px-4"
+                            leadingIcon={PaperAirplaneIcon}
+                        >
+                            <span className="hidden sm:inline">Send Quote</span>
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={onDownload}
+                        >
+                            Download Quote
+                        </Button>
+                    </>
+                ) : (
+                    <Button
+                        type="submit"
+                        form="invoice-form"
+                    >
+                        {editingInvoice ? 'Update Invoice' : 'Generate Invoice'}
+                    </Button>
+                )}
             </div>
         </div>
     );

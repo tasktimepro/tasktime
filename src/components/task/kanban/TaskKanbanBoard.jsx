@@ -4,7 +4,8 @@ import {
     DndContext,
     DragOverlay,
     KeyboardSensor,
-    PointerSensor,
+    MouseSensor,
+    TouchSensor,
     pointerWithin,
     useSensor,
     useSensors,
@@ -16,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { Button } from '@/components/ui/button';
-import { PlusIcon } from '@/components/ui/icons';
+import { ChevronRightIcon, PlusIcon } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 import TaskKanbanColumn from './TaskKanbanColumn';
 import TaskKanbanCreateColumn from './TaskKanbanCreateColumn';
@@ -160,9 +161,15 @@ const TaskKanbanBoard = ({
     const [activeColumnDragId, setActiveColumnDragId] = useState(null);
     const [cardDragPreview, setCardDragPreview] = useState(null);
     const sensors = useSensors(
-        useSensor(PointerSensor, {
+        useSensor(MouseSensor, {
             activationConstraint: {
                 distance: 6,
+            },
+        }),
+        useSensor(TouchSensor, {
+            activationConstraint: {
+                delay: 120,
+                tolerance: 8,
             },
         }),
         useSensor(KeyboardSensor, {
@@ -194,6 +201,22 @@ const TaskKanbanBoard = ({
 
         return columns.find((column) => column.task.id === activeColumnDragId) || null;
     }, [activeColumnDragId, columns]);
+
+    const activeColumnOverlaySubtasks = useMemo(() => {
+        if (!activeColumnDragColumn) {
+            return [];
+        }
+
+        return activeColumnDragColumn.subtasks.filter((subtask) => !subtask.archived);
+    }, [activeColumnDragColumn]);
+
+    const activeColumnOverlayArchivedCount = useMemo(() => {
+        if (!activeColumnDragColumn) {
+            return 0;
+        }
+
+        return activeColumnDragColumn.subtasks.filter((subtask) => subtask.archived).length;
+    }, [activeColumnDragColumn]);
 
     const handleDragStart = useCallback((event) => {
         const activeData = event.active.data.current || null;
@@ -391,14 +414,14 @@ const TaskKanbanBoard = ({
                             onArchive={onArchiveTask ? () => onArchiveTask(activeColumnDragColumn.task.id) : null}
                             onUnarchive={onUnarchiveTask ? () => onUnarchiveTask(activeColumnDragColumn.task.id) : null}
                             onDelete={onDeleteTask ? () => onDeleteTask(activeColumnDragColumn.task.id) : null}
-                            subtaskCount={activeColumnDragColumn.subtasks.length}
+                            subtaskCount={activeColumnOverlaySubtasks.length + activeColumnOverlayArchivedCount}
                             showBillableBadge={showBillableBadges}
                             dragDisabled={true}
                         />
 
-                        {activeColumnDragColumn.subtasks.length > 0 ? (
+                        {activeColumnOverlaySubtasks.length > 0 ? (
                             <div className="flex flex-col gap-2 rounded-lg">
-                                {activeColumnDragColumn.subtasks.map((subtask) => (
+                                {activeColumnOverlaySubtasks.map((subtask) => (
                                     <div
                                         key={subtask.id}
                                         className={cn(
@@ -425,13 +448,22 @@ const TaskKanbanBoard = ({
                                 variant="ghost"
                                 className={cn(
                                     'h-auto min-h-10 justify-start rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground',
-                                    activeColumnDragColumn.subtasks.length === 0 && 'mt-1 min-h-12'
+                                    activeColumnOverlaySubtasks.length === 0 && 'mt-1 min-h-12'
                                 )}
                                 leadingIcon={PlusIcon}
                                 tabIndex={-1}
                             >
                                 Add subtask
                             </Button>
+                        ) : null}
+
+                        {activeColumnOverlayArchivedCount > 0 ? (
+                            <div className="pt-2">
+                                <div className="flex items-center text-sm font-medium text-muted-foreground" aria-hidden="true">
+                                    <ChevronRightIcon className="mr-1 h-4 w-4" />
+                                    Archived Subtasks ({activeColumnOverlayArchivedCount})
+                                </div>
+                            </div>
                         ) : null}
                     </section>
                 ) : activeCardTask ? (

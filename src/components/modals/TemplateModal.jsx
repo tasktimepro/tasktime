@@ -1,17 +1,68 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../Modal';
-import { PlusIcon } from '@/components/ui/icons';
+import { EyeIcon } from '@/components/ui/icons';
 import { useToast } from '../../hooks/useToast.ts';
+import { useBusinessBrandAssets } from '../../hooks/useBusinessBrandAssets.ts';
+import { useBusinessInfos } from '../../hooks/useBusinessInfos.ts';
 import { useInvoiceTemplates } from '../../hooks/useInvoiceTemplates.ts';
+import { usePreferences } from '../../hooks/usePreferences.ts';
 import { toDisplayDate } from '../../utils/dateUtils.ts';
+import {
+    DEFAULT_INVOICE_LAYOUT_STYLE,
+    DEFAULT_INVOICE_LOGO_PLACEMENT,
+    normalizeInvoiceLayoutStyle,
+    normalizeInvoiceLogoPlacement,
+} from '../../utils/invoiceBranding.ts';
+import { generatePDF, getCurrentInvoiceHtmlContent } from '../../utils/pdfUtils.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TemplateVariablesPanel } from '@/components/ui/template-variables-panel';
+import InvoicePreviewModal from '../invoice/InvoicePreviewModal';
 import CustomCheckbox from '../CustomCheckbox';
 import { parseIntegerInputWithFallback } from '@/utils/numberInputUtils.ts';
+import { getBillingPeriodRange } from '@/utils/billingPeriodUtils.ts';
+
+const createDefaultFormData = () => ({
+    name: '',
+    invoiceNumberFormat: 'INV-{projectId}-{timestamp}',
+    invoiceNumberPrefix: 'INV',
+    invoiceNumberSuffix: '',
+    useSequentialNumbers: false,
+    sequentialNumberStart: 1,
+    sequentialNumberDigits: 4,
+    sequentialResetYearly: false,
+    dueDateDays: 30,
+    dueDateType: 'fixed-days',
+    dueDateWeeks: 1,
+    dueDatePrecise: '',
+    isDefault: false,
+    layoutStyle: 'neutral',
+    logoPlacement: DEFAULT_INVOICE_LOGO_PLACEMENT,
+    showBusinessLogo: true,
+    useBusinessPrimaryColor: true,
+    showBillingPeriod: true,
+    showProjectTitle: true,
+});
+
+const createInitialFormData = (template) => {
+    if (!template) {
+        return createDefaultFormData();
+    }
+
+    return {
+        ...createDefaultFormData(),
+        ...template,
+        layoutStyle: normalizeInvoiceLayoutStyle(template.layoutStyle || DEFAULT_INVOICE_LAYOUT_STYLE),
+        logoPlacement: normalizeInvoiceLogoPlacement(template.logoPlacement || DEFAULT_INVOICE_LOGO_PLACEMENT),
+        showBusinessLogo: template.brandingOptions?.showBusinessLogo ?? true,
+        useBusinessPrimaryColor: template.brandingOptions?.useBusinessPrimaryColor ?? true,
+        showBillingPeriod: template.showBillingPeriod ?? true,
+        showProjectTitle: template.showProjectTitle ?? true,
+    };
+};
 
 /**
  * TemplateModal - Modal for creating and editing invoice templates
@@ -23,22 +74,12 @@ const TemplateModal = ({
 }) => {
     const { showSuccess, showError } = useToast();
     const { invoiceTemplates, createInvoiceTemplate, updateInvoiceTemplate, setDefault } = useInvoiceTemplates();
+    const { defaultBusinessInfo } = useBusinessInfos();
+    const { businessBrandAssets, getBusinessBrandAsset } = useBusinessBrandAssets();
+    const { preferences } = usePreferences();
     
-    const [formData, setFormData] = useState({
-        name: '',
-        invoiceNumberFormat: 'INV-{projectId}-{timestamp}',
-        invoiceNumberPrefix: 'INV',
-        invoiceNumberSuffix: '',
-        useSequentialNumbers: false,
-        sequentialNumberStart: 1,
-        sequentialNumberDigits: 4,
-        sequentialResetYearly: false,
-        dueDateDays: 30,
-        dueDateType: 'fixed-days',
-        dueDateWeeks: 1,
-        dueDatePrecise: '',
-        isDefault: false
-    });
+    const [formData, setFormData] = useState(createDefaultFormData);
+    const [showPreview, setShowPreview] = useState(false);
 
     // Available format variables for invoice numbers
     const formatVariables = [
@@ -53,25 +94,7 @@ const TemplateModal = ({
 
     // Initialize form data when editing
     useEffect(() => {
-        if (editingTemplate) {
-            setFormData({ ...editingTemplate });
-        } else {
-            setFormData({
-                name: '',
-                invoiceNumberFormat: 'INV-{projectId}-{timestamp}',
-                invoiceNumberPrefix: 'INV',
-                invoiceNumberSuffix: '',
-                useSequentialNumbers: false,
-                sequentialNumberStart: 1,
-                sequentialNumberDigits: 4,
-                sequentialResetYearly: false,
-                dueDateDays: 30,
-                dueDateType: 'fixed-days',
-                dueDateWeeks: 1,
-                dueDatePrecise: '',
-                isDefault: false
-            });
-        }
+        setFormData(createInitialFormData(editingTemplate));
     }, [editingTemplate, isOpen]);
 
     // Generate a static timestamp for previews
@@ -114,7 +137,7 @@ const TemplateModal = ({
                 const days = parseIntegerInputWithFallback(template.dueDateDays, 0, { min: 0 });
                 const daysDate = new Date(today);
                 daysDate.setDate(daysDate.getDate() + days);
-                return `Due date: ${toDisplayDate(daysDate)} (${days} ${days === 1 ? 'day' : 'days'} from invoice date)`;
+                return `Due date: ${toDisplayDate(daysDate)}`;
             }
             
             case 'fixed-weeks': {
@@ -124,7 +147,7 @@ const TemplateModal = ({
                 const weeks = parseIntegerInputWithFallback(template.dueDateWeeks, 0, { min: 0 });
                 const weeksDate = new Date(today);
                 weeksDate.setDate(weeksDate.getDate() + (weeks * 7));
-                return `Due date: ${toDisplayDate(weeksDate)} (${weeks} ${weeks === 1 ? 'week' : 'weeks'} from invoice date)`;
+                return `Due date: ${toDisplayDate(weeksDate)}`;
             }
             
             case 'precise-date': {
@@ -141,7 +164,7 @@ const TemplateModal = ({
             default: {
                 const defaultDate = new Date(today);
                 defaultDate.setDate(defaultDate.getDate() + (template.dueDateDays || 30));
-                return `Due date: ${toDisplayDate(defaultDate)} (${template.dueDateDays || 30} days from invoice date)`;
+                return `Due date: ${toDisplayDate(defaultDate)}`;
             }
         }
     }, [staticDate]);
@@ -154,6 +177,116 @@ const TemplateModal = ({
     const formPreviewDueDate = useMemo(() => {
         return calculateDueDatePreview(formData);
     }, [formData, calculateDueDatePreview]);
+
+    const previewInvoice = useMemo(() => {
+        const logoAsset = defaultBusinessInfo?.branding?.logoAssetId
+            ? getBusinessBrandAsset(defaultBusinessInfo.branding.logoAssetId)
+            : null;
+        const sampleBillingPeriod = getBillingPeriodRange({
+            preset: 'month',
+            today: staticDate,
+        });
+
+        return {
+            id: `template-preview-${editingTemplate?.id || 'draft'}`,
+            invoiceNumber: formPreviewInvoiceNumber,
+            client: {
+                name: 'Sample Client Ltd',
+                address: '42 Sample Street',
+                city: 'London',
+                state: '',
+                zip: 'SW1A 1AA',
+                country: 'United Kingdom',
+            },
+            project: {
+                title: 'Website redesign',
+                hourlyRate: 95,
+            },
+            tasks: [{
+                id: 'template-preview-task',
+                title: 'Design and implementation',
+                hours: 12,
+                hourlyRate: 95,
+                useFlatRate: false,
+            }],
+            additionalTasks: [{
+                id: 'template-preview-extra',
+                title: 'Project setup',
+                flatRate: 180,
+                quantity: 1,
+                useFlatRate: true,
+            }],
+            expenseItems: [],
+            note: formData.defaultNotes || '',
+            totalHours: 12,
+            subtotal: 1320,
+            total: 1320,
+            discount: 0,
+            shipping: 0,
+            tax: 0,
+            taxRate: 0,
+            taxLabel: 'Tax',
+            paymentMethod: {
+                fullName: 'Owen Farrugia',
+                bank: 'TaskTime Bank',
+                iban: 'GB29NWBK60161331926819',
+                swift: 'TTIMEGB2L',
+                custom: [{ label: 'Reference', value: 'Use invoice number as payment reference' }],
+            },
+            businessInfo: defaultBusinessInfo || null,
+            businessInfoId: defaultBusinessInfo?.id || null,
+            template: {
+                ...formData,
+                id: editingTemplate?.id || 'template-preview',
+                brandingOptions: {
+                    showBusinessLogo: formData.showBusinessLogo,
+                    useBusinessPrimaryColor: formData.useBusinessPrimaryColor,
+                },
+            },
+            templateId: editingTemplate?.id || null,
+            brandingSnapshot: {
+                businessInfoId: defaultBusinessInfo?.id || null,
+                templateId: editingTemplate?.id || null,
+                layoutStyle: normalizeInvoiceLayoutStyle(formData.layoutStyle || DEFAULT_INVOICE_LAYOUT_STYLE),
+                logoPlacement: normalizeInvoiceLogoPlacement(formData.logoPlacement || DEFAULT_INVOICE_LOGO_PLACEMENT),
+                showBusinessLogo: formData.showBusinessLogo ?? true,
+                useBusinessPrimaryColor: formData.useBusinessPrimaryColor ?? true,
+                primaryColor: defaultBusinessInfo?.branding?.primaryColor || null,
+                logoAssetId: logoAsset?.id || null,
+                logoAssetMeta: logoAsset ? {
+                    mimeType: logoAsset.mimeType,
+                    width: logoAsset.width,
+                    height: logoAsset.height,
+                    byteSize: logoAsset.byteSize,
+                    contentHash: logoAsset.contentHash,
+                } : null,
+            },
+            date: toDisplayDate(staticDate),
+            dueDate: formPreviewDueDate.startsWith('Due date: ') ? formPreviewDueDate.slice('Due date: '.length) : null,
+            billingPeriodPreset: 'month',
+            billingPeriodStart: sampleBillingPeriod.startDate,
+            billingPeriodEnd: sampleBillingPeriod.endDate,
+            currency: preferences.currency,
+            htmlContent: null,
+        };
+    }, [defaultBusinessInfo, editingTemplate?.id, formData, formPreviewDueDate, formPreviewInvoiceNumber, getBusinessBrandAsset, preferences.currency, staticDate]);
+
+    const previewHtmlContent = useMemo(() => {
+        return getCurrentInvoiceHtmlContent(previewInvoice, [], businessBrandAssets);
+    }, [businessBrandAssets, previewInvoice]);
+
+    const handleDownloadSample = async () => {
+        try {
+            const templateSlug = (formData.name || 'untitled-template')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '') || 'untitled-template';
+
+            await generatePDF(previewHtmlContent, `${templateSlug}-sample.pdf`);
+        } catch {
+            showError('Failed to download sample PDF');
+        }
+    };
 
     /**
      * Handle form submission
@@ -193,11 +326,21 @@ const TemplateModal = ({
             return;
         }
 
+        const {
+            showBusinessLogo,
+            useBusinessPrimaryColor,
+            ...templatePayload
+        } = formData;
+
         if (editingTemplate) {
             // Update existing template
             updateInvoiceTemplate(editingTemplate.id, {
-                ...formData,
-                name: formData.name.trim(),
+                ...templatePayload,
+                name: templatePayload.name.trim(),
+                brandingOptions: {
+                    showBusinessLogo,
+                    useBusinessPrimaryColor,
+                },
                 currentSequentialNumber: editingTemplate.currentSequentialNumber || formData.sequentialNumberStart,
                 lastSequentialYear: editingTemplate.lastSequentialYear || null
             });
@@ -212,8 +355,12 @@ const TemplateModal = ({
             // Add new template
             const newTemplate = createInvoiceTemplate({
                 id: `template-${Date.now()}`,
-                ...formData,
-                name: formData.name.trim(),
+                ...templatePayload,
+                name: templatePayload.name.trim(),
+                brandingOptions: {
+                    showBusinessLogo,
+                    useBusinessPrimaryColor,
+                },
                 currentSequentialNumber: formData.sequentialNumberStart,
                 lastSequentialYear: null
             });
@@ -236,33 +383,49 @@ const TemplateModal = ({
         onClose();
     };
 
+    const handlePreview = () => {
+        setShowPreview(true);
+    };
+
     // Modal footer with action buttons
     const modalFooter = (
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
-            {/* Default Checkbox */}
-            <div className="flex items-center">
-                <CustomCheckbox
-                    checked={formData.isDefault}
-                    onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
-                    label="Set as default template"
-                    labelClassName="block text-sm text-foreground"
-                />
-            </div>
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <Button
+                type="button"
+                variant="outline"
+                onClick={handlePreview}
+                aria-label="Preview invoice"
+                className="gap-0 self-start px-2.5 sm:gap-2 sm:px-4"
+                leadingIcon={EyeIcon}
+            >
+                <span className="hidden sm:inline">Preview</span>
+            </Button>
 
-            <div className="flex flex-row flex-wrap justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCancel}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    form="template-form"
-                >
-                    {editingTemplate ? 'Update Template' : 'Create Template'}
-                </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+                <div className="flex items-center">
+                    <CustomCheckbox
+                        checked={formData.isDefault}
+                        onChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked }))}
+                        label="Set as default template"
+                        labelClassName="block text-sm text-foreground"
+                    />
+                </div>
+
+                <div className="flex flex-row flex-wrap justify-end gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancel}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        form="template-form"
+                    >
+                        {editingTemplate ? 'Update Template' : 'Create Template'}
+                    </Button>
+                </div>
             </div>
         </div>
     );
@@ -286,7 +449,46 @@ const TemplateModal = ({
                         onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                         placeholder="e.g., Standard Invoice, Project Invoice"
                         required
-                    />
+            />
+        </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                        <Label>
+                            Layout Style
+                        </Label>
+                        <Select
+                            value={formData.layoutStyle}
+                            onValueChange={(value) => setFormData(prev => ({ ...prev, layoutStyle: value }))}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="neutral">Minimal</SelectItem>
+                                <SelectItem value="classic">Classic</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>
+                            Header Alignment
+                        </Label>
+                        <Select
+                            value={formData.logoPlacement}
+                            onValueChange={(value) => setFormData(prev => ({ ...prev, logoPlacement: value }))}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="invoice-left-logo-right">Invoice Left, Logo Right</SelectItem>
+                                <SelectItem value="invoice-center-logo-center">Invoice & Logo Center</SelectItem>
+                                <SelectItem value="invoice-right-logo-left">Invoice Right, Logo Left</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 <div className="space-y-4">
@@ -370,14 +572,35 @@ const TemplateModal = ({
                         </div>
                     )}
 
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+                    <h4 className="text-sm font-medium text-foreground">Invoice Content</h4>
+                    <div className="flex items-center">
+                        <CustomCheckbox
+                            checked={formData.showBillingPeriod}
+                            onChange={(checked) => setFormData(prev => ({ ...prev, showBillingPeriod: checked }))}
+                            label="Show billing period"
+                            labelClassName="block text-sm text-foreground"
+                        />
+                    </div>
+                    <div className="flex items-center">
+                        <CustomCheckbox
+                            checked={formData.showProjectTitle}
+                            onChange={(checked) => setFormData(prev => ({ ...prev, showProjectTitle: checked }))}
+                            label="Show project title"
+                            labelClassName="block text-sm text-foreground"
+                        />
+                    </div>
+
                     <div className="space-y-2 pt-2">
                         <Label>
                             Due Date Type
                         </Label>
                         <Select
                             value={formData.dueDateType}
-                            onValueChange={(value) => setFormData(prev => ({ 
-                                ...prev, 
+                            onValueChange={(value) => setFormData(prev => ({
+                                ...prev,
                                 dueDateType: value,
                                 // Reset related fields when type changes
                                 dueDateDays: value === 'fixed-days' ? prev.dueDateDays : 0,
@@ -397,7 +620,6 @@ const TemplateModal = ({
                         </Select>
                     </div>
 
-                    {/* Days input - only show for fixed-days type */}
                     {formData.dueDateType === 'fixed-days' && (
                         <div className="space-y-2">
                             <Label>
@@ -413,7 +635,6 @@ const TemplateModal = ({
                         </div>
                     )}
 
-                    {/* Weeks input - only show for fixed-weeks type */}
                     {formData.dueDateType === 'fixed-weeks' && (
                         <div className="space-y-2">
                             <Label>
@@ -429,7 +650,6 @@ const TemplateModal = ({
                         </div>
                     )}
 
-                    {/* Date picker - only show for precise-date type */}
                     {formData.dueDateType === 'precise-date' && (
                         <div className="space-y-2">
                             <Label>
@@ -443,14 +663,43 @@ const TemplateModal = ({
                         </div>
                     )}
 
-                    {/* Preview - show for all types */}
                     <div className="bg-muted border border-border rounded-md p-3">
                         <p className="text-sm text-foreground">
                             <strong>Preview:</strong> {formPreviewDueDate}
                         </p>
                     </div>
                 </div>
+
+                <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+                    <h4 className="text-sm font-medium text-foreground">Branding Display</h4>
+                    <div className="flex items-center">
+                        <CustomCheckbox
+                            checked={formData.showBusinessLogo}
+                            onChange={(checked) => setFormData(prev => ({ ...prev, showBusinessLogo: checked }))}
+                            label="Show business logo"
+                            labelClassName="block text-sm text-foreground"
+                        />
+                    </div>
+                    <div className="flex items-center">
+                        <CustomCheckbox
+                            checked={formData.useBusinessPrimaryColor}
+                            onChange={(checked) => setFormData(prev => ({ ...prev, useBusinessPrimaryColor: checked }))}
+                            label="Use business primary color"
+                            labelClassName="block text-sm text-foreground"
+                        />
+                    </div>
+                </div>
             </form>
+
+            <InvoicePreviewModal
+                isOpen={showPreview}
+                onClose={() => setShowPreview(false)}
+                title={`Template Preview - ${formData.name || 'Untitled Template'}`}
+                invoice={previewInvoice}
+                htmlContent={previewHtmlContent}
+                onDownload={handleDownloadSample}
+                downloadLabel="Download Sample PDF"
+            />
         </Modal>
     );
 };

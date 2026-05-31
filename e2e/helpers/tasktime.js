@@ -667,6 +667,32 @@ export async function createPersonalProject(page, projectTitle) {
     await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
 }
 
+export async function createBusinessInfo(page, {
+    title,
+    businessName,
+    email = null,
+}) {
+    await page.goto('/invoices?section=business-info');
+    await expect(page.getByRole('heading', { name: 'Your Business' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'New Business' }).first().click();
+
+    const businessDialog = page.getByRole('dialog', { name: 'New Business' });
+    await expect(businessDialog).toBeVisible();
+
+    await businessDialog.getByLabel(/Business Title/i).fill(title);
+    await businessDialog.getByLabel(/Business\/Name/i).fill(businessName);
+
+    if (email) {
+        await businessDialog.getByLabel(/^Email$/i).fill(email);
+    }
+
+    await businessDialog.getByRole('button', { name: 'Create Business' }).click();
+
+    await expect(businessDialog).not.toBeVisible();
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+}
+
 export async function syncNowFromAccount(page) {
     await page.goto('/account?section=sync');
     await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
@@ -743,6 +769,9 @@ export async function createBillableProject(page, {
     clientHourlyRate,
     clientCurrency = null,
     billableTimeIncrementOption = null,
+    statusMode = 'active',
+    deadline = null,
+    budgetAmount = null,
 }) {
     await page.goto('/projects');
 
@@ -780,6 +809,22 @@ export async function createBillableProject(page, {
         projectDialog.locator('button[role="combobox"]').first(),
         clientTitle,
     );
+
+    if (statusMode === 'quote') {
+        await selectComboboxOption(
+            page,
+            projectDialog.getByRole('combobox', { name: 'Project Status' }),
+            'Quote',
+        );
+    }
+
+    if (deadline) {
+        await projectDialog.getByLabel(/^Deadline$/i).fill(deadline);
+    }
+
+    if (budgetAmount !== null && budgetAmount !== undefined) {
+        await projectDialog.getByLabel(/Target budget/i).fill(String(budgetAmount));
+    }
 
     if (billableTimeIncrementOption) {
         await selectComboboxOption(

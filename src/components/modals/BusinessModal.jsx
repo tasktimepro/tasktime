@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../Modal';
-import { PlusIcon, TrashIcon } from '@/components/ui/icons';
+import { ImageIcon, PlusIcon, TrashIcon } from '@/components/ui/icons';
+import { useYjs } from '@/contexts/YjsContext';
+import { collectEntities } from '@/stores/yjs/entityUtils';
 import { useToast } from '../../hooks/useToast.ts';
+import { useBusinessBrandAssets } from '../../hooks/useBusinessBrandAssets.ts';
 import { useBusinessInfos } from '../../hooks/useBusinessInfos.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
 import { parseOptionalNumberInput } from '@/utils/numberInputUtils.ts';
+import { normalizeBrandColor, prepareBusinessLogoAsset } from '@/utils/businessBranding.ts';
 
 const createDefaultFormData = () => ({
     title: '',
@@ -27,7 +31,8 @@ const createDefaultFormData = () => ({
     isDefault: false,
     taxEnabled: false,
     taxLabel: 'Tax',
-    taxRate: 0
+    taxRate: 0,
+    primaryColor: ''
 });
 
 const createInitialFormData = (businessInfo) => {
@@ -52,12 +57,14 @@ const createInitialFormData = (businessInfo) => {
         isDefault: businessInfo.isDefault || false,
         taxEnabled: businessInfo.taxEnabled || false,
         taxLabel: businessInfo.taxLabel || 'Tax',
-        taxRate: businessInfo.taxRate || 0
+        taxRate: businessInfo.taxRate || 0,
+        primaryColor: businessInfo.branding?.primaryColor || ''
     };
 };
 
 const createInitialExpandedSections = () => ({
-    businessInfo: false
+    businessInfo: false,
+    branding: false
 });
 
 /**
@@ -68,12 +75,34 @@ const BusinessModal = ({
     onClose,
     editingBusinessInfo = null
 }) => {
-    const { showSuccess } = useToast();
+    const { showSuccess, showError } = useToast();
+    const { store, loadArchivedInvoices } = useYjs();
     const { createBusinessInfo, updateBusinessInfo, setDefault } = useBusinessInfos();
+    const { createBusinessBrandAsset, deleteBusinessBrandAsset, findLogoAssetByHash, getAssetsForBusiness, getBusinessBrandAsset } = useBusinessBrandAssets();
     
     const [formData, setFormData] = useState(() => createInitialFormData(editingBusinessInfo));
 
     const [expandedSections, setExpandedSections] = useState(() => createInitialExpandedSections());
+    const [pendingLogoAsset, setPendingLogoAsset] = useState(null);
+    const [logoPreviewUrl, setLogoPreviewUrl] = useState('');
+    const [removeLogo, setRemoveLogo] = useState(false);
+    const [isProcessingLogo, setIsProcessingLogo] = useState(false);
+    const logoInputRef = useRef(null);
+
+    const currentLogoAsset = editingBusinessInfo?.branding?.logoAssetId
+        ? getBusinessBrandAsset(editingBusinessInfo.branding.logoAssetId)
+        : null;
+    const selectedLogoLabel = removeLogo
+        ? 'No file selected'
+        : pendingLogoAsset?.fileName || currentLogoAsset?.fileName || 'No file selected';
+
+    useEffect(() => {
+        setFormData(createInitialFormData(editingBusinessInfo));
+        setExpandedSections(createInitialExpandedSections());
+        setPendingLogoAsset(null);
+        setRemoveLogo(false);
+        setLogoPreviewUrl(currentLogoAsset?.dataUrl || '');
+    }, [currentLogoAsset?.dataUrl, editingBusinessInfo, isOpen]);
 
     /**
      * Handle form input changes
@@ -134,10 +163,88 @@ const BusinessModal = ({
         return emailRegex.test(email);
     };
 
+    const handlePrimaryColorChange = (value) => {
+        setFormData(prev => ({
+            ...prev,
+            primaryColor: value
+        }));
+    };
+
+    const handleLogoFileChange = async (event) => {
+        const file = event.target.files?.[0];
+
+        event.target.value = '';
+
+        if (!file) {
+            return;
+        }
+
+        setIsProcessingLogo(true);
+
+        try {
+            const asset = await prepareBusinessLogoAsset(file);
+            setPendingLogoAsset(asset);
+            setLogoPreviewUrl(asset.dataUrl);
+            setRemoveLogo(false);
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Unable to process the selected logo.');
+        } finally {
+            setIsProcessingLogo(false);
+        }
+    };
+
+    const handleRemoveLogo = () => {
+        setPendingLogoAsset(null);
+        setLogoPreviewUrl('');
+        setRemoveLogo(true);
+    };
+
+    const buildBrandingPayload = (logoAssetId, primaryColor) => {
+        if (!logoAssetId && !primaryColor) {
+            return undefined;
+        }
+
+        return {
+            primaryColor,
+            logoAssetId: logoAssetId || null,
+        };
+    };
+
+    const cleanupUnusedLogoAssets = async (businessInfoId, nextLogoAssetId) => {
+        if (!businessInfoId) {
+            return;
+        }
+
+        try {
+            await loadArchivedInvoices();
+
+            const activeInvoices = collectEntities(store.invoices);
+            const archivedInvoices = store.archivedInvoicesSync
+                ? collectEntities(store.archivedInvoicesSync)
+                : [];
+            const referencedLogoAssetIds = new Set(
+                [...activeInvoices, ...archivedInvoices]
+                    .map((invoice) => invoice?.brandingSnapshot?.logoAssetId)
+                    .filter(Boolean)
+            );
+            const removableAssets = getAssetsForBusiness(businessInfoId, { includeArchived: true }).filter((asset) => {
+                return asset.kind === 'logo'
+                    && asset.id !== nextLogoAssetId
+                    && !referencedLogoAssetIds.has(asset.id);
+            });
+
+            removableAssets.forEach((asset) => {
+                deleteBusinessBrandAsset(asset.id);
+            });
+        } catch {
+            // Preserve the retired asset if invoice reference checks are unavailable.
+        }
+    };
+
     /**
      * Handle form submission
      */
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (!formData.title.trim()) {
@@ -156,27 +263,53 @@ const BusinessModal = ({
             return;
         }
 
+        const normalizedPrimaryColor = formData.primaryColor
+            ? normalizeBrandColor(formData.primaryColor)
+            : null;
+
+        if (formData.primaryColor.trim() && !normalizedPrimaryColor) {
+            showError('Please enter a valid hex color for the business branding.');
+            return;
+        }
+
+        const basePayload = {
+            title: formData.title.trim(),
+            businessName: formData.businessName.trim(),
+            address: formData.address.trim(),
+            city: formData.city.trim(),
+            state: formData.state.trim(),
+            zip: formData.zip.trim(),
+            country: formData.country.trim(),
+            registrationNumber: formData.registrationNumber.trim(),
+            vat: formData.vat.trim(),
+            taxNumber: formData.taxNumber.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone.trim(),
+            custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
+            isDefault: formData.isDefault,
+            taxEnabled: formData.taxEnabled,
+            taxLabel: formData.taxLabel,
+            taxRate: parseOptionalNumberInput(formData.taxRate) ?? 0
+        };
+
         if (editingBusinessInfo) {
-            // Update existing business info
+            let logoAssetId = removeLogo ? null : editingBusinessInfo.branding?.logoAssetId || null;
+
+            if (pendingLogoAsset) {
+                const existingAsset = findLogoAssetByHash(editingBusinessInfo.id, pendingLogoAsset.contentHash);
+                const assetRecord = existingAsset || createBusinessBrandAsset({
+                    businessInfoId: editingBusinessInfo.id,
+                    ...pendingLogoAsset,
+                });
+                logoAssetId = assetRecord.id;
+            }
+
             updateBusinessInfo(editingBusinessInfo.id, {
-                title: formData.title.trim(),
-                businessName: formData.businessName.trim(),
-                address: formData.address.trim(),
-                city: formData.city.trim(),
-                state: formData.state.trim(),
-                zip: formData.zip.trim(),
-                country: formData.country.trim(),
-                registrationNumber: formData.registrationNumber.trim(),
-                vat: formData.vat.trim(),
-                taxNumber: formData.taxNumber.trim(),
-                email: formData.email.trim(),
-                phone: formData.phone.trim(),
-                custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
-                isDefault: formData.isDefault,
-                taxEnabled: formData.taxEnabled,
-                taxLabel: formData.taxLabel,
-                taxRate: parseOptionalNumberInput(formData.taxRate) ?? 0
+                ...basePayload,
+                branding: buildBrandingPayload(logoAssetId, normalizedPrimaryColor),
             });
+
+            await cleanupUnusedLogoAssets(editingBusinessInfo.id, logoAssetId);
 
             // If this business info is set as default, remove default from others
             if (formData.isDefault) {
@@ -185,26 +318,22 @@ const BusinessModal = ({
 
             showSuccess('Business info updated successfully');
         } else {
-            // Create new business info
             const newBusinessInfo = createBusinessInfo({
-                title: formData.title.trim(),
-                businessName: formData.businessName.trim(),
-                address: formData.address.trim(),
-                city: formData.city.trim(),
-                state: formData.state.trim(),
-                zip: formData.zip.trim(),
-                country: formData.country.trim(),
-                registrationNumber: formData.registrationNumber.trim(),
-                vat: formData.vat.trim(),
-                taxNumber: formData.taxNumber.trim(),
-                email: formData.email.trim(),
-                phone: formData.phone.trim(),
-                custom: formData.custom.filter(item => item.label.trim() && item.value.trim()),
-                isDefault: formData.isDefault,
-                taxEnabled: formData.taxEnabled,
-                taxLabel: formData.taxLabel,
-                taxRate: parseOptionalNumberInput(formData.taxRate) ?? 0
+                ...basePayload,
+                branding: buildBrandingPayload(null, normalizedPrimaryColor),
             });
+
+            if (pendingLogoAsset) {
+                const existingAsset = findLogoAssetByHash(newBusinessInfo.id, pendingLogoAsset.contentHash);
+                const assetRecord = existingAsset || createBusinessBrandAsset({
+                    businessInfoId: newBusinessInfo.id,
+                    ...pendingLogoAsset,
+                });
+
+                updateBusinessInfo(newBusinessInfo.id, {
+                    branding: buildBrandingPayload(assetRecord.id, normalizedPrimaryColor),
+                });
+            }
 
             // If this business info is set as default, remove default from others
             if (formData.isDefault) {
@@ -515,6 +644,114 @@ const BusinessModal = ({
                         <p className="text-sm text-muted-foreground italic">
                             No custom fields added. Click "Add Field" to add custom business details.
                         </p>
+                    )}
+                </div>
+
+                <div className="border border-border rounded-lg">
+                    <button
+                        type="button"
+                        onClick={() => toggleSection('branding')}
+                        className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${expandedSections.branding ? 'rounded-t-lg' : 'rounded-lg'}`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-medium text-foreground">Branding</h4>
+                            <svg
+                                className={`w-5 h-5 text-muted-foreground transform transition-transform ${expandedSections.branding ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </button>
+                    {expandedSections.branding && (
+                        <div className="p-4 space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="business-logo-upload">
+                                    Logo
+                                </Label>
+                                <input
+                                    ref={logoInputRef}
+                                    id="business-logo-upload"
+                                    type="file"
+                                    accept="image/svg+xml,image/png,image/jpeg,image/webp"
+                                    onChange={handleLogoFileChange}
+                                    disabled={isProcessingLogo}
+                                    className="sr-only"
+                                />
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        leadingIcon={ImageIcon}
+                                        onClick={() => logoInputRef.current?.click()}
+                                        disabled={isProcessingLogo}
+                                    >
+                                        {isProcessingLogo ? 'Processing Logo...' : 'Choose Logo'}
+                                    </Button>
+                                    <span className="max-w-full truncate text-sm text-muted-foreground">
+                                        {selectedLogoLabel}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Upload an SVG, PNG, JPEG, or WebP logo. Logos are processed for invoice headers before saving.
+                                </p>
+                            </div>
+
+                            {logoPreviewUrl ? (
+                                <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+                                    <div className="rounded-md border border-border bg-white p-4">
+                                        <img
+                                            src={logoPreviewUrl}
+                                            alt="Business logo preview"
+                                            className="mx-auto max-h-20 max-w-full object-contain"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <p className="text-xs text-muted-foreground">
+                                            {pendingLogoAsset ? 'New logo will be saved with this business.' : 'This logo is currently attached to the business branding.'}
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleRemoveLogo}
+                                        >
+                                            Remove Logo
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">
+                                    No logo selected. Invoices can still use the business name without a logo.
+                                </p>
+                            )}
+
+                            <div className="space-y-2">
+                                <Label htmlFor="primaryColor">
+                                    Primary Color
+                                </Label>
+                                <div className="flex max-w-full items-center gap-3 sm:max-w-md">
+                                    <Input
+                                        id="primaryColor"
+                                        type="text"
+                                        value={formData.primaryColor}
+                                        onChange={(e) => handlePrimaryColorChange(e.target.value)}
+                                        className="min-w-0 flex-1"
+                                        placeholder="#1f2937"
+                                    />
+                                    <input
+                                        id="primaryColorPicker"
+                                        aria-label="Primary color swatch"
+                                        type="color"
+                                        value={normalizeBrandColor(formData.primaryColor) || '#1f2937'}
+                                        onChange={(e) => handlePrimaryColorChange(e.target.value)}
+                                        className="h-10 w-10 shrink-0 cursor-pointer rounded-md border border-input bg-background p-0.5"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
 

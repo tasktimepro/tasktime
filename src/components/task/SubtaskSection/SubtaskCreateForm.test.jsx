@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import SubtaskCreateForm from './SubtaskCreateForm';
 
 const hookState = vi.hoisted(() => ({
@@ -18,6 +18,12 @@ const defaultProps = {
     setNewSubtaskNote: vi.fn(),
     newSubtaskStartDate: '',
     setNewSubtaskStartDate: vi.fn(),
+    newSubtaskEstimatedHours: '',
+    setNewSubtaskEstimatedHours: vi.fn(),
+    newSubtaskEstimatedFlatAmount: '',
+    setNewSubtaskEstimatedFlatAmount: vi.fn(),
+    showEstimateFields: false,
+    isFlatRateProject: false,
     onCreateSubtask: vi.fn((event) => event.preventDefault()),
     onCancel: vi.fn(),
     isDisabled: false,
@@ -91,5 +97,43 @@ describe('SubtaskCreateForm', () => {
         expect(dateInput?.className.includes('w-full')).toBe(true);
         expect(actions?.className.includes('justify-end')).toBe(true);
         expect(Array.from(actions?.children || []).map((item) => item.textContent)).toEqual(['Cancel', 'Add']);
+    });
+
+    it('shows estimates behind a dropdown in the inline desktop layout', () => {
+        hookState.isMobileLayout = false;
+
+        render(
+            <SubtaskCreateForm
+                {...defaultProps}
+                showEstimateFields={true}
+                isFlatRateProject={true}
+            />
+        );
+
+        expect(screen.getByRole('button', { name: 'Estimate' })).toBeInTheDocument();
+        expect(screen.queryByLabelText('Estimated Hours')).not.toBeInTheDocument();
+
+        fireEvent.pointerDown(screen.getByRole('button', { name: 'Estimate' }), { button: 0, ctrlKey: false });
+
+        expect(screen.getByLabelText('Estimated Hours')).toBeInTheDocument();
+        expect(screen.getByLabelText('Quote Amount')).toBeInTheDocument();
+    });
+
+    it('renders estimates directly in the stacked layout', () => {
+        hookState.isMobileLayout = true;
+
+        render(
+            <SubtaskCreateForm
+                {...defaultProps}
+                showEstimateFields={true}
+                isFlatRateProject={true}
+            />
+        );
+
+        expect(screen.queryByRole('button', { name: 'Estimate' })).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Estimated Hours')).toBeInTheDocument();
+        expect(screen.getByLabelText('Quote Amount')).toBeInTheDocument();
+
+        hookState.isMobileLayout = false;
     });
 });

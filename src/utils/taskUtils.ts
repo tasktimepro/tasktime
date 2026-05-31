@@ -40,20 +40,56 @@ type TaskDeletionBillingSummary = {
 };
 
 /**
+ * Get a task ID plus all descendant task IDs.
+ * Uses stored parentTaskId links recursively so malformed legacy data can be
+ * cleaned up safely even though the UI only exposes one subtask level.
+ * @param {string} taskId - The root task ID
+ * @param {Array} allTasks - Array of all tasks
+ * @returns {Array} Root task ID plus all descendant task IDs
+ */
+export const getTaskIdsWithDescendants = (taskId: string, allTasks: Task[]): string[] => {
+    const childIdsByParent = new Map<string, string[]>();
+
+    allTasks.forEach((task) => {
+        if (!task.parentTaskId) {
+            return;
+        }
+
+        const childIds = childIdsByParent.get(task.parentTaskId) || [];
+        childIds.push(task.id);
+        childIdsByParent.set(task.parentTaskId, childIds);
+    });
+
+    const collectedIds: string[] = [];
+    const seen = new Set<string>();
+    const pending = [taskId];
+
+    while (pending.length > 0) {
+        const currentTaskId = pending.pop();
+
+        if (!currentTaskId || seen.has(currentTaskId)) {
+            continue;
+        }
+
+        seen.add(currentTaskId);
+        collectedIds.push(currentTaskId);
+
+        const childIds = childIdsByParent.get(currentTaskId) || [];
+        childIds.forEach((childId) => pending.push(childId));
+    }
+
+    return collectedIds;
+};
+
+/**
  * Get all task IDs that should be deleted when a main task is deleted
- * This includes the main task and all its direct subtasks
+ * This includes the main task and all descendant subtasks
  * @param {string} taskId - The ID of the main task to delete
  * @param {Array} allTasks - Array of all tasks
  * @returns {Array} Array of task IDs to delete
  */
 export const getTaskIdsToDelete = (taskId: string, allTasks: Task[]): string[] => {
-    // Find all direct subtasks of this task
-    const subtaskIds = allTasks
-        .filter(task => task.parentTaskId === taskId)
-        .map(task => task.id);
-
-    // Return the main task ID plus all subtask IDs
-    return [taskId, ...subtaskIds];
+    return getTaskIdsWithDescendants(taskId, allTasks);
 };
 
 /**

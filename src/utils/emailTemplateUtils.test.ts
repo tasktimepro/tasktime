@@ -5,8 +5,11 @@ import {
     resolveAttachmentTitle,
     DEFAULT_SEND_BODY,
     DEFAULT_REMINDER_BODY,
+    DEFAULT_QUOTE_BODY,
     DEFAULT_SUBJECT,
+    DEFAULT_QUOTE_SUBJECT,
     DEFAULT_ATTACHMENT_TITLE,
+    DEFAULT_QUOTE_ATTACHMENT_TITLE,
     EMAIL_PLACEHOLDER_VARIABLES,
 } from './emailTemplateUtils';
 
@@ -82,6 +85,12 @@ describe('resolveSubject', () => {
         expect(subject).toBe('Reminder: Invoice INV-0042 from Owen Far Studio');
     });
 
+    it('resolves a quote subject without reminder prefixing', () => {
+
+        const subject = resolveSubject(DEFAULT_QUOTE_SUBJECT, 'quote', SAMPLE_VALUES);
+        expect(subject).toBe('Quote INV-0042 from Owen Far Studio');
+    });
+
     it('resolves a custom subject template', () => {
 
         const subject = resolveSubject('Payment for {clientName} - {invoiceNumber}', 'invoice', SAMPLE_VALUES);
@@ -101,6 +110,12 @@ describe('resolveAttachmentTitle', () => {
 
         const title = resolveAttachmentTitle('report.pdf', SAMPLE_VALUES);
         expect(title).toBe('report.pdf');
+    });
+
+    it('resolves the default quote attachment title', () => {
+
+        const title = resolveAttachmentTitle(DEFAULT_QUOTE_ATTACHMENT_TITLE, SAMPLE_VALUES);
+        expect(title).toBe('quote-INV-0042.pdf');
     });
 
     it('resolves placeholders in a custom title', () => {
@@ -132,15 +147,35 @@ describe('default templates', () => {
         expect(DEFAULT_REMINDER_BODY).toContain('{businessName}');
     });
 
+    it('DEFAULT_QUOTE_BODY contains quote placeholders', () => {
+
+        expect(DEFAULT_QUOTE_BODY).toContain('{clientName}');
+        expect(DEFAULT_QUOTE_BODY).toContain('{invoiceNumber}');
+        expect(DEFAULT_QUOTE_BODY).toContain('{currency}');
+        expect(DEFAULT_QUOTE_BODY).toContain('{amount}');
+        expect(DEFAULT_QUOTE_BODY).toContain('{businessName}');
+    });
+
     it('DEFAULT_SUBJECT contains invoice placeholders', () => {
 
         expect(DEFAULT_SUBJECT).toContain('{invoiceNumber}');
         expect(DEFAULT_SUBJECT).toContain('{businessName}');
     });
 
+    it('DEFAULT_QUOTE_SUBJECT contains quote placeholders', () => {
+
+        expect(DEFAULT_QUOTE_SUBJECT).toContain('{invoiceNumber}');
+        expect(DEFAULT_QUOTE_SUBJECT).toContain('{businessName}');
+    });
+
     it('DEFAULT_ATTACHMENT_TITLE contains invoice number placeholder', () => {
 
         expect(DEFAULT_ATTACHMENT_TITLE).toContain('{invoiceNumber}');
+    });
+
+    it('DEFAULT_QUOTE_ATTACHMENT_TITLE contains invoice number placeholder', () => {
+
+        expect(DEFAULT_QUOTE_ATTACHMENT_TITLE).toContain('{invoiceNumber}');
     });
 
     it('EMAIL_PLACEHOLDER_VARIABLES covers all six placeholders', () => {

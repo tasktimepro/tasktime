@@ -4,9 +4,11 @@ import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InlineFieldHeader } from '@/components/ui/inline-field-header';
+import { BanknotesIcon } from '@/components/ui/icons';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Notice } from '@/components/ui/notice';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { generateSlugId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
 import { useProjects } from '../../hooks/useProjects.ts';
@@ -27,6 +29,16 @@ function parseBillableTimeIncrementMinutes(value) {
     const parsedValue = Number.parseInt(value, 10);
 
     if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+        return null;
+    }
+
+    return parsedValue;
+}
+
+function parseOptionalNonNegativeNumberInput(value) {
+    const parsedValue = parseOptionalNumberInput(value);
+
+    if (parsedValue === null || parsedValue < 0) {
         return null;
     }
 
@@ -54,7 +66,10 @@ function createEmptyProjectFormData(modalOptions) {
         overrideRate: false,
         isPersonal: getDefaultIsPersonal(modalOptions),
         color: '',
-        billableTimeIncrementMinutes: '0'
+        billableTimeIncrementMinutes: '0',
+        statusMode: 'active',
+        deadline: '',
+        budgetAmount: ''
     };
 }
 
@@ -66,6 +81,9 @@ function buildProjectUpdatePayload(formData) {
         preferredClientId: formData.isPersonal ? null : (formData.preferredClientId || null),
         isPersonal: formData.isPersonal || false,
         color: formData.color || null,
+        statusMode: formData.isPersonal ? 'active' : (formData.statusMode || 'active'),
+        deadline: formData.isPersonal ? null : (formData.deadline || null),
+        budgetAmount: formData.isPersonal ? null : parseOptionalNonNegativeNumberInput(formData.budgetAmount),
         billableTimeIncrementMinutes: formData.isPersonal || formData.flatRate
             ? null
             : parseBillableTimeIncrementMinutes(formData.billableTimeIncrementMinutes),
@@ -74,6 +92,7 @@ function buildProjectUpdatePayload(formData) {
 
 function buildChangedProjectUpdates(editingProject, formData) {
     const nextProject = buildProjectUpdatePayload(formData);
+    const previousDeadlineResolvedAt = editingProject.isPersonal ? null : (editingProject.deadlineResolvedAt ?? null);
     const previousProject = {
         title: editingProject.title,
         hourlyRate: editingProject.hourlyRate ?? null,
@@ -81,11 +100,23 @@ function buildChangedProjectUpdates(editingProject, formData) {
         preferredClientId: editingProject.isPersonal ? null : (editingProject.preferredClientId || null),
         isPersonal: editingProject.isPersonal || false,
         color: editingProject.color || null,
+        statusMode: editingProject.isPersonal ? 'active' : (editingProject.statusMode || 'active'),
+        deadline: editingProject.isPersonal ? null : (editingProject.deadline || null),
+        budgetAmount: editingProject.isPersonal ? null : (editingProject.budgetAmount ?? null),
+        billableTimeIncrementMinutes: editingProject.isPersonal || editingProject.flatRate
+            ? null
+            : (editingProject.billableTimeIncrementMinutes ?? null),
     };
 
-    return Object.fromEntries(
+    const changedUpdates = Object.fromEntries(
         Object.entries(nextProject).filter(([key, value]) => previousProject[key] !== value)
     );
+
+    if ((previousProject.deadline !== nextProject.deadline || nextProject.isPersonal) && previousDeadlineResolvedAt !== null) {
+        changedUpdates.deadlineResolvedAt = null;
+    }
+
+    return changedUpdates;
 }
 
 /**
@@ -110,6 +141,9 @@ const ProjectModal = ({
     const isClientSelectDisabled = !!modalOptions?.preselectedClientId || activeClients.length === 0;
 
     const [formData, setFormData] = useState(() => createEmptyProjectFormData(modalOptions));
+    const showClientPlanningFields = !formData.isPersonal && Boolean(
+        formData.preferredClientId || modalOptions?.preselectedClientId || editingProject?.preferredClientId
+    );
 
     // Initialize form data when opening or changing context
     useEffect(() => {
@@ -147,6 +181,11 @@ const ProjectModal = ({
                 overrideRate: isOverriding,
                 isPersonal: editingProject.isPersonal || false,
                 color: editingProject.color || '',
+                statusMode: editingProject.isPersonal ? 'active' : (editingProject.statusMode || 'active'),
+                deadline: editingProject.deadline || '',
+                budgetAmount: editingProject.budgetAmount !== null && editingProject.budgetAmount !== undefined
+                    ? editingProject.budgetAmount.toString()
+                    : '',
                 billableTimeIncrementMinutes: editingProject.billableTimeIncrementMinutes
                     ? editingProject.billableTimeIncrementMinutes.toString()
                     : '0'
@@ -171,7 +210,10 @@ const ProjectModal = ({
                             overrideRate: false,
                             isPersonal: false,
                             color: '',
-                            billableTimeIncrementMinutes: '0'
+                            billableTimeIncrementMinutes: '0',
+                            statusMode: 'active',
+                            deadline: '',
+                            budgetAmount: ''
                         };
                     });
                     setSelectedClientRate(preselectedClient);
@@ -188,7 +230,10 @@ const ProjectModal = ({
                         overrideRate: savedState.overrideRate || false,
                         isPersonal: savedState.isPersonal ?? getDefaultIsPersonal(modalOptions),
                         color: savedState.color || '',
-                        billableTimeIncrementMinutes: savedState.billableTimeIncrementMinutes || '0'
+                        billableTimeIncrementMinutes: savedState.billableTimeIncrementMinutes || '0',
+                        statusMode: savedState.statusMode || 'active',
+                        deadline: savedState.deadline || '',
+                        budgetAmount: savedState.budgetAmount || ''
                     });
                     
                     // Restore client rate if needed
@@ -294,6 +339,7 @@ const ProjectModal = ({
         const createdProject = createProject({
             id: generateSlugId(formData.title),
             ...buildProjectUpdatePayload(formData),
+            deadlineResolvedAt: null,
             lastBilledAt: null,
             archived: false
         });
@@ -381,7 +427,7 @@ const ProjectModal = ({
             isOpen={isOpen}
             onClose={handleClose}
             title={editingProject ? 'Edit Project' : 'Create New Project'}
-            size="lg"
+            size="2xl"
             footer={footer}
         >
             <form 
@@ -418,6 +464,7 @@ const ProjectModal = ({
                                     isPersonal: checked,
                                     // Clear client selection when marking as personal
                                     preferredClientId: checked ? '' : prev.preferredClientId,
+                                    statusMode: checked ? 'active' : prev.statusMode,
                                     // Reset override rate when toggling
                                     overrideRate: false,
                                     hourlyRate: checked ? prev.hourlyRate : (selectedClientRate && !prev.overrideRate ? selectedClientRate.hourlyRate?.toString() || '' : prev.hourlyRate),
@@ -588,6 +635,74 @@ const ProjectModal = ({
                             </Select>
                             <p className="text-xs text-muted-foreground mt-2">
                                 Applies when stopping timers for this project. Time entries keep the actual worked timestamps, while billing and invoices use the rounded project minimum.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {showClientPlanningFields && (
+                    <div className="border border-border rounded-lg p-4 bg-card space-y-4">
+                        <h4 className="text-sm font-medium text-foreground">Project Planning</h4>
+
+                        <div>
+                            <Label htmlFor="statusMode">
+                                Project Status
+                            </Label>
+                            <Select
+                                value={formData.statusMode}
+                                onValueChange={(value) => setFormData(prev => ({
+                                    ...prev,
+                                    statusMode: value,
+                                }))}
+                            >
+                                <SelectTrigger id="statusMode" className="mt-1">
+                                    <SelectValue placeholder="Select a project status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="quote">Quote</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Quote mode changes project document actions without creating invoices or billing records.
+                            </p>
+                        </div>
+
+                        <div>
+                            <Label htmlFor="deadline">
+                                Deadline
+                            </Label>
+                            <NativeDateInput
+                                id="deadline"
+                                name="deadline"
+                                value={formData.deadline}
+                                onChange={handleInputChange}
+                                className="mt-1"
+                            />
+                        </div>
+
+                        <div>
+                            <Label htmlFor="budgetAmount">
+                                Target budget
+                            </Label>
+                            <div className="relative mt-1">
+                                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                                    <BanknotesIcon className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <Input
+                                    type="number"
+                                    id="budgetAmount"
+                                    name="budgetAmount"
+                                    value={formData.budgetAmount}
+                                    onChange={handleInputChange}
+                                    min="0"
+                                    step="0.01"
+                                    className="pl-9 sensitive-data"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Compares planned and actual earnings against this target.
                             </p>
                         </div>
                     </div>

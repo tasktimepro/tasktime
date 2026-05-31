@@ -122,6 +122,24 @@ describe('sendInvoiceEmail', () => {
         expect(body.attachmentTitle).toBe('custom-invoice.pdf');
     });
 
+    it('passes quote sendType through unchanged', async () => {
+
+        fetchMock.mockResolvedValue(createJsonResponse({ success: true, remaining: 9 }));
+
+        await sendInvoiceEmail({
+            ...validParams,
+            invoiceId: 'quote-proj-1',
+            invoiceNumber: '28123045',
+            subject: 'Quote 28123045',
+            sendType: 'quote',
+            attachmentTitle: 'quote-28123045.pdf',
+        });
+
+        const body = JSON.parse(String(getFetchCall().options.body));
+        expect(body.sendType).toBe('quote');
+        expect(body.attachmentTitle).toBe('quote-28123045.pdf');
+    });
+
     it('throws auth error on 401', async () => {
 
         fetchMock.mockResolvedValue(createJsonResponse(
@@ -202,6 +220,23 @@ describe('sendInvoiceEmail', () => {
             const error = expectEmailSendError(err);
             expect(error.type).toBe('validation');
             expect(error.message).toBe('Invalid email address');
+        }
+    });
+
+    it('falls back to worker error text on 400 when details is missing', async () => {
+
+        fetchMock.mockResolvedValue(createJsonResponse(
+            { error: 'Invalid invoiceNumber' },
+            { status: 400 }
+        ));
+
+        try {
+            await sendInvoiceEmail(validParams);
+            expect.unreachable('should have thrown');
+        } catch (err) {
+            const error = expectEmailSendError(err);
+            expect(error.type).toBe('validation');
+            expect(error.message).toBe('Invalid invoiceNumber');
         }
     });
 

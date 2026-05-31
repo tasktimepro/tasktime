@@ -2,9 +2,9 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva } from "class-variance-authority"
 /* eslint-disable react-refresh/only-export-components */
-import { Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils.ts"
+import { Spinner } from "@/components/ui/spinner"
 
 const buttonVariants = cva(
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50",
@@ -120,7 +120,7 @@ const Button = React.forwardRef(({
         >
             {/* Loading spinner */}
             {loading && (
-                <Loader2 className={cn(iconSizeClass, "animate-spin")} />
+                <Spinner className={iconSizeClass} />
             )}
 
             {/* Leading icon (hidden when loading) */}

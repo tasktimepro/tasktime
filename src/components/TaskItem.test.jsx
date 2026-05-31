@@ -8,6 +8,7 @@ const hookState = vi.hoisted(() => ({
     tasks: [],
     projects: [],
     entries: [],
+    subtaskSectionProps: null,
     getTimerForTask: vi.fn(() => null),
     clearTimer: vi.fn(),
     createEntry: vi.fn(),
@@ -43,14 +44,19 @@ vi.mock('./modals/AddTimeEntryModal', () => ({
 
 vi.mock('./task/SubtaskSection', () => ({
     default: ({
+        subtasks,
         showCreateSubtaskForm,
         setShowCreateSubtaskForm,
         setNewSubtaskTitle,
         setNewSubtaskNote,
         setNewSubtaskStartDate,
         handleCreateSubtask,
-    }) => (
+    }) => {
+        hookState.subtaskSectionProps = { subtasks }
+
+        return (
         <div>
+            <div data-testid="subtask-count">{subtasks.length}</div>
             <button
                 type="button"
                 onClick={() => setShowCreateSubtaskForm(true)}
@@ -86,7 +92,8 @@ vi.mock('./task/SubtaskSection', () => ({
                 </div>
             )}
         </div>
-    ),
+        )
+    },
 }));
 
 vi.mock('../hooks/useToast', () => ({
@@ -144,6 +151,7 @@ describe('TaskItem subtask creation', () => {
     it('includes note in onCreateSubtask payload', async () => {
         setMatchMedia(false);
         hookState.tasks = [];
+        hookState.subtaskSectionProps = null;
         hookState.entries = [];
         hookState.getTimerForTask.mockReturnValue(null);
 
@@ -189,6 +197,7 @@ describe('TaskItem subtask creation', () => {
     it('uses a right-aligned secondary row on mobile', () => {
         setMatchMedia(true);
         hookState.tasks = [];
+        hookState.subtaskSectionProps = null;
         hookState.entries = [{ taskId: 'task-2', start: 0, end: 7200000 }];
         hookState.getTimerForTask.mockReturnValue(null);
 
@@ -226,6 +235,7 @@ describe('TaskItem subtask creation', () => {
     it('attaches manual-sort drag attributes to the handle instead of the row', () => {
         setMatchMedia(false);
         hookState.tasks = [];
+        hookState.subtaskSectionProps = null;
         hookState.entries = [];
         hookState.getTimerForTask.mockReturnValue(null);
 
@@ -255,5 +265,55 @@ describe('TaskItem subtask creation', () => {
 
         expect(screen.getByText('Drag handle').closest('[data-drag-anchor="true"]')).toBeInTheDocument();
         expect(container.querySelector(':scope > [data-drag-anchor="true"]')).toBeNull();
+    });
+
+    it('derives subtasks from the provided task collection so archived children remain visible', () => {
+        setMatchMedia(false);
+        hookState.tasks = [];
+        hookState.subtaskSectionProps = null;
+        hookState.entries = [];
+        hookState.getTimerForTask.mockReturnValue(null);
+
+        render(
+            <TaskItem
+                task={{
+                    id: 'task-4',
+                    projectId: 'project-1',
+                    title: 'Parent task',
+                    recurring: null,
+                    completed: false,
+                    archived: false,
+                    createdAt: Date.now(),
+                }}
+                taskCollection={[
+                    {
+                        id: 'task-4',
+                        projectId: 'project-1',
+                        title: 'Parent task',
+                        parentTaskId: null,
+                        archived: false,
+                    },
+                    {
+                        id: 'subtask-archived',
+                        projectId: 'project-1',
+                        title: 'Archived child',
+                        parentTaskId: 'task-4',
+                        archived: true,
+                    },
+                ]}
+                onCreateSubtask={vi.fn()}
+                onDelete={vi.fn()}
+                onArchive={vi.fn()}
+                onUnarchive={vi.fn()}
+                onToggleBillable={vi.fn()}
+                onEditTask={vi.fn()}
+                onViewTask={vi.fn()}
+            />
+        );
+
+        expect(screen.getByTestId('subtask-count')).toHaveTextContent('1');
+        expect(hookState.subtaskSectionProps?.subtasks).toEqual([
+            expect.objectContaining({ id: 'subtask-archived', parentTaskId: 'task-4', archived: true })
+        ]);
     });
 });

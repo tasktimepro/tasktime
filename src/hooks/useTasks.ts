@@ -14,7 +14,8 @@ import { getTodayString, toStorageDate } from '@/utils/dateUtils.ts';
 import { findNextRecurringDueDate, findPreviousRecurringDueDate, isRecurringTaskDueOnDate } from '@/utils/recurringUtils.ts';
 import { isRecurringCompletedOnDate, toggleRecurringCompletionDate } from '@/utils/recurringCompletionUtils.ts';
 import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
-import { collectEntities } from '@/stores/yjs/entityUtils';
+import { collectEntities, updateEntityFields } from '@/stores/yjs/entityUtils';
+import { getTaskIdsWithDescendants } from '@/utils/taskUtils.ts';
 
 export interface UseTasksOptions {
     /** Filter to a specific project */
@@ -78,6 +79,42 @@ export function useTasks(options: UseTasksOptions = {}) {
         return () => store.archivedTasks?.unobserveDeep(handler);
     }, [archivedLoaded, store]);
 
+    useEffect(() => {
+        if (!store.archivedTasks) return;
+
+        const archivedMap = store.archivedTasks;
+        const loadedArchivedTasks = collectEntities<Task>(archivedMap as any);
+        const knownTaskIds = new Set([...activeTasks, ...loadedArchivedTasks].map((task) => task.id));
+        const orphanedActiveTasks = activeTasks.filter((task) => (
+            Boolean(task.parentTaskId) && !knownTaskIds.has(task.parentTaskId as string)
+        ));
+        const orphanedArchivedTasks = loadedArchivedTasks.filter((task) => (
+            Boolean(task.parentTaskId) && !knownTaskIds.has(task.parentTaskId as string)
+        ));
+
+        if (orphanedActiveTasks.length === 0 && orphanedArchivedTasks.length === 0) {
+            return;
+        }
+
+        orphanedActiveTasks.forEach((task) => {
+            update(task.id, { parentTaskId: null });
+        });
+
+        if (orphanedArchivedTasks.length > 0) {
+            const updatedAt = Date.now();
+
+            orphanedArchivedTasks.forEach((task) => {
+                updateEntityFields(archivedMap as any, task.id, {
+                    parentTaskId: null,
+                    updatedAt,
+                });
+            });
+
+            setArchivedLoaded(true);
+            setArchivedTasks(collectEntities<Task>(archivedMap as any));
+        }
+    }, [activeTasks, store, update]);
+
     // Combined tasks (if archived are loaded)
     const allTasks = useMemo(() => {
         if (!options.includeArchived) return activeTasks;
@@ -126,13 +163,6 @@ export function useTasks(options: UseTasksOptions = {}) {
     }, [store]);
 
     const deleteTask = useCallback(async (id: string) => {
-        const removedFromActive = remove(id);
-
-        if (removedFromActive) {
-            cleanupAttachmentsForEntity(store.plannerAttachments as any, id);
-            return true;
-        }
-
         let archivedMap = store.archivedTasks;
 
         if (!archivedMap) {
@@ -140,22 +170,38 @@ export function useTasks(options: UseTasksOptions = {}) {
             archivedMap = store.archivedTasks;
         }
 
-        if (!archivedMap) {
-            return false;
-        }
+        const archivedTasksSnapshot = archivedMap
+            ? collectEntities<Task>(archivedMap as any)
+            : [];
+        const taskIdsToDelete = getTaskIdsWithDescendants(id, [...activeTasks, ...archivedTasksSnapshot]);
+        let removedAny = false;
 
-        const removedFromArchive = archivedMap.has(id);
-        archivedMap.delete(id);
+        taskIdsToDelete.forEach((taskId) => {
+            const removedFromActive = remove(taskId);
 
-        if (removedFromArchive) {
+            if (removedFromActive) {
+                cleanupAttachmentsForEntity(store.plannerAttachments as any, taskId);
+                removedAny = true;
+                return;
+            }
+
+            if (!archivedMap?.has(taskId)) {
+                return;
+            }
+
+            archivedMap.delete(taskId);
             markMeaningfulActivity('task_delete');
-            cleanupAttachmentsForEntity(store.plannerAttachments as any, id);
+            cleanupAttachmentsForEntity(store.plannerAttachments as any, taskId);
+            removedAny = true;
+        });
+
+        if (archivedMap) {
             setArchivedLoaded(true);
             setArchivedTasks(collectEntities<Task>(archivedMap as any));
         }
 
-        return removedFromArchive;
-    }, [remove, store, loadArchived]);
+        return removedAny;
+    }, [activeTasks, remove, store, loadArchived]);
 
     // Get task hierarchy
     const getRootTasks = useCallback((projectId?: string) => {

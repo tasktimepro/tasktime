@@ -42,4 +42,30 @@ describe('InvoiceActions', () => {
         expect(screen.queryByRole('button', { name: 'Generate New Invoice' })).not.toBeInTheDocument()
     })
 
+    it('uses an icon-first send quote action with text hidden on mobile classes', async () => {
+        const user = userEvent.setup()
+        const onSend = vi.fn()
+
+        render(
+            <InvoiceActions
+                editingInvoice={null}
+                handleCancel={vi.fn()}
+                onPreview={vi.fn()}
+                mode="quote"
+                onSend={onSend}
+                onDownload={vi.fn()}
+            />
+        )
+
+        const sendButton = screen.getByRole('button', { name: 'Send Quote' })
+        const sendText = screen.getByText('Send Quote')
+
+        expect(sendButton.className).toContain('px-2.5')
+        expect(sendText.className).toContain('hidden')
+        expect(sendText.className).toContain('sm:inline')
+
+        await user.click(sendButton)
+        expect(onSend).toHaveBeenCalledTimes(1)
+    })
+
 })

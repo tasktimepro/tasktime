@@ -276,6 +276,203 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Due Date: 2026-02-01')
     })
 
+    it('shows the billing period and project title by default when invoice data includes them', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            project: { title: 'Website redesign' },
+            tasks: [],
+            totalAmount: 0,
+            billingPeriodPreset: 'all-time',
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Billing Period: All Time')
+        expect(html).toContain('Project: Website redesign')
+    })
+
+    it('hides the billing period and project title when the template disables them', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            project: { title: 'Website redesign' },
+            tasks: [],
+            totalAmount: 0,
+            billingPeriodPreset: 'all-time',
+            currency: 'USD',
+            template: {
+                showBillingPeriod: false,
+                showProjectTitle: false,
+            }
+        })
+
+        expect(html).not.toContain('Billing Period: All Time')
+        expect(html).not.toContain('Project: Website redesign')
+    })
+
+    it('keeps the classic invoice layout styling by default', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            businessInfo: { businessName: 'TaskTime Studio' },
+            tasks: [{ id: 'task', title: 'Classic Task', hours: 2, hourlyRate: 80 }],
+            subtotal: 160,
+            totalAmount: 160,
+            currency: 'USD',
+            paymentMethod: { bank: 'TaskTime Bank' },
+            template: {}
+        })
+
+        expect(html).toContain('Invoice To:')
+        expect(html).toContain('Invoice From:')
+        expect(html).toContain('Payment Details:')
+        expect(html).toContain('background-color: #f8f9fa;')
+        expect(html).toContain('<div style="margin-bottom: 40px;">')
+        expect(html).toContain('justify-content: space-between; align-items: flex-end; gap: 24px;')
+        expect(html).toContain('border-top: 1px solid #ddd; padding-top: 8px;')
+        expect(html).toContain('padding-top: 10px;')
+        expect(html).not.toContain('border-top: 1px solid #ddd; padding-top: 10px;')
+        expect(html).not.toContain('border-bottom: 1px solid #eee;')
+        expect(html).toContain('margin-top: 10px; padding-top: 30px;')
+        expect(html).not.toContain('margin-top: 10px; padding-top: 30px; border-top: 1px solid #ddd;')
+    })
+
+    it('renders a full-width brand bar when business primary color is enabled', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD',
+            businessInfo: {
+                branding: {
+                    primaryColor: '#1f2937',
+                }
+            },
+            template: {}
+        })
+
+        expect(html).toContain('<div style="width: 100%; height: 3px; background-color: #1f2937; margin-bottom: 28px;"></div>')
+        expect(html).toContain('font-size: 24px; color: #374151;')
+        expect(html).not.toContain('font-size: 24px; color: #1f2937;')
+    })
+
+    it('omits the brand bar when business primary color is disabled', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD',
+            businessInfo: {
+                branding: {
+                    primaryColor: '#1f2937',
+                }
+            },
+            template: {
+                brandingOptions: {
+                    useBusinessPrimaryColor: false,
+                }
+            }
+        })
+
+        expect(html).not.toContain('height: 3px; background-color: #1f2937; margin-bottom: 28px;')
+    })
+
+    it('aligns description header padding with the row content in both classic and minimal layouts', () => {
+
+        const classicHtml = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 'task', title: 'Classic Task', hours: 2, hourlyRate: 80 }],
+            totalAmount: 160,
+            currency: 'USD',
+            template: { layoutStyle: 'classic' }
+        })
+
+        const minimalHtml = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 'task', title: 'Minimal Task', hours: 2, hourlyRate: 80 }],
+            totalAmount: 160,
+            currency: 'USD',
+            template: { layoutStyle: 'neutral' }
+        })
+
+        expect(classicHtml).toContain('<th style="padding: 12px 8px; text-align: left; vertical-align: middle; line-height: 1.25;')
+        expect(classicHtml).toContain('<td style="padding: 8px; vertical-align: middle; line-height: 1.25;')
+        expect(minimalHtml).toContain('<th style="padding: 12px 8px; text-align: left; vertical-align: middle; line-height: 1.25;')
+        expect(minimalHtml).toContain('<td style="padding: 8px; vertical-align: middle; line-height: 1.25;')
+    })
+
+    it('removes the classic payment divider when an invoice note is present', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 'task', title: 'Classic Task', hours: 2, hourlyRate: 80 }],
+            totalAmount: 160,
+            currency: 'USD',
+            note: 'Thanks for your business',
+            paymentMethod: { bank: 'TaskTime Bank' },
+            template: { layoutStyle: 'classic' }
+        })
+
+        expect(html).toContain('Thanks for your business')
+        expect(html).toContain('Payment Details:')
+        expect(html).toContain('margin-top: 10px; padding-top: 30px;')
+        expect(html).not.toContain('margin-top: 10px; padding-top: 30px; border-top: 1px solid #ddd;')
+    })
+
+    it('renders the neutral layout without header fill, payment card fill, or row dividers', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [
+                { id: 'task-1', title: 'Task A', hours: 1, hourlyRate: 80 },
+                { id: 'task-2', title: 'Task B', hours: 2, hourlyRate: 80 },
+            ],
+            subtotal: 240,
+            totalAmount: 240,
+            currency: 'USD',
+            paymentMethod: { bank: 'TaskTime Bank' },
+            template: { layoutStyle: 'neutral' }
+        })
+
+        expect(html).toContain('background-color: transparent')
+        expect(html).not.toContain('background-color: #f8f9fa; padding: 15px; border-radius: 5px; display: flex; flex-direction: column; gap: 0;')
+        expect(html).toContain('padding: 0; display: flex; flex-direction: column; gap: 6px;')
+        expect(html).not.toContain('border-bottom: 1px solid #eee;')
+        expect(html).toContain('background-color: transparent; color: #9ca3af;')
+        expect(html).toContain('<h1 style="color: #111827; margin-bottom: 10px; font-size: 25px; font-weight: 400; letter-spacing: 0.12em;">INVOICE</h1>')
+        expect(html).toContain('font-size: 13px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.12em;')
+        expect(html).toContain('<h3 style="color: #9ca3af; font-size: 13px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 15px;">Payment Details:</h3>')
+        expect(html).toContain('<p style="margin: 0; line-height: 1.4;"><span style="color: inherit; font-weight: 400;">Bank:</span> TaskTime Bank</p>')
+        expect(html).toContain('break-inside: avoid;')
+        expect(html).toContain('border-top: 1px solid #ddd; padding-top: 8px;')
+        expect(html).not.toContain('border-top: 1px solid #ddd; padding-top: 10px;')
+        expect(html).not.toContain('margin-top: 10px; padding-top: 30px; border-top: 1px solid #ddd;')
+    })
+
+    it('prefers the saved invoice layout snapshot over the current template layout', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [{ id: 'task-1', title: 'Task A', hours: 1, hourlyRate: 80 }],
+            subtotal: 80,
+            totalAmount: 80,
+            currency: 'USD',
+            paymentMethod: { bank: 'TaskTime Bank' },
+            template: { layoutStyle: 'classic' },
+            brandingSnapshot: {
+                layoutStyle: 'neutral',
+                logoPlacement: 'invoice-left-logo-right',
+                showBusinessLogo: true,
+                useBusinessPrimaryColor: true,
+            }
+        })
+
+        expect(html).toContain('background-color: transparent')
+        expect(html).not.toContain('background-color: #f8f9fa; padding: 15px; border-radius: 5px; display: flex; flex-direction: column; gap: 0;')
+    })
+
     it('rebuilds invoice html from structured invoice data', () => {
 
         const html = buildInvoiceHtmlContent({
@@ -351,6 +548,29 @@ describe('createInvoiceHTML', () => {
         expect(html).toBe('<div>Draft invoice</div>')
     })
 
+    it('renders quote labels without due date or billing period', () => {
+
+        const html = createInvoiceHTML({
+            documentMode: 'quote',
+            project: { title: 'Website Refresh', hourlyRate: 120 },
+            client: { name: 'Client Name' },
+            tasks: [{ id: 'task', title: 'Discovery', hours: 2, hourlyRate: 120 }],
+            totalHours: 2,
+            totalAmount: 240,
+            invoiceNumber: '29112233',
+            date: '2026-05-29',
+            dueDate: '2026-06-10',
+            billingPeriodStart: '2026-05-01',
+            billingPeriodEnd: '2026-05-31',
+            currency: 'USD'
+        })
+
+        expect(html).toContain('QUOTE')
+        expect(html).toContain('Quote: #29112233')
+        expect(html).not.toContain('Due Date: 2026-06-10')
+        expect(html).not.toContain('Billing Period:')
+    })
+
     it('renders business info, payment method, and note', () => {
 
         const html = createInvoiceHTML({
@@ -392,18 +612,57 @@ describe('createInvoiceHTML', () => {
                 paypal: 'paypal@example.com',
                 custom: [{ label: 'PM', value: 'Custom' }]
             },
+            billingPeriodPreset: 'custom',
+            billingPeriodStart: '2026-04-01',
+            billingPeriodEnd: '2026-04-30',
             currency: 'USD'
         })
 
         expect(html).toContain('Invoice To:')
         expect(html).toContain('Invoice From:')
         expect(html).toContain('Payment Details:')
+        expect(html).toContain('Billing Period:')
         expect(html).not.toContain('Contact<br>')
         expect(html).not.toContain('client@example.com')
         expect(html).toContain('vertical-align: middle;')
-        expect(html).toContain('background-color: #f8f9fa; padding: 15px; border-radius: 5px;')
+        expect(html).toContain('background-color: #f8f9fa; padding: 15px; border-radius: 5px; display: flex; flex-direction: column; gap: 0;')
         expect(html).toContain('margin: 0; line-height: 1.4;')
         expect(html).toContain('Thanks for your business')
+    })
+
+    it('keeps sender details only in the invoice from section', () => {
+
+        const businessName = 'Sender Once Ltd'
+        const html = createInvoiceHTML({
+            client: { name: 'Client Name' },
+            tasks: [{ id: 'task', title: 'Task', hours: 1, hourlyRate: 120 }],
+            totalAmount: 120,
+            currency: 'USD',
+            template: { logoPlacement: 'invoice-right-logo-left' },
+            businessInfo: { businessName },
+        })
+
+        expect((html.match(new RegExp(businessName, 'g')) || []).length).toBe(1)
+    })
+
+    it('stacks the logo above the invoice block for the centered logo placement', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client Name' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD',
+            template: { logoPlacement: 'invoice-center-logo-center' },
+            date: '04/05/2026',
+            dueDate: '19/05/2026',
+            brandingLogoDataUrl: 'data:image/png;base64,AAAA',
+        })
+
+        expect(html).toContain('justify-content: center')
+        expect(html).toContain('text-align: center;')
+        expect(html).toContain('flex-direction: column;')
+        expect(html).toContain('gap: 12px;')
+        expect(html).toContain('Date: 04/05/2026 &bull; Due Date: 19/05/2026')
     })
 
     it('shows dashes for flat rate task without tracked hours in hourly table', () => {

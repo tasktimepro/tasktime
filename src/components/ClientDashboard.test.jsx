@@ -154,4 +154,117 @@ describe('ClientDashboard', () => {
         expect(menuButton.className.includes('border')).toBe(true);
         expect(menuButton.className.includes('rounded-full')).toBe(true);
     });
+
+    it('shows the quote stage badge on quote-mode project cards', () => {
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }}
+                projects={[{
+                    id: 'project-1',
+                    title: 'Quote Test Project',
+                    preferredClientId: 'client-1',
+                    defaultCurrency: 'USD',
+                    hourlyRate: 50,
+                    statusMode: 'quote'
+                }]}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('Quote stage')).toBeInTheDocument();
+        expect(screen.getByText('Quote Test Project')).toBeInTheDocument();
+    });
+
+    it('hides the hourly subtitle for flat-rate project cards', () => {
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }}
+                projects={[{
+                    id: 'project-1',
+                    title: 'Quote Test Project',
+                    preferredClientId: 'client-1',
+                    defaultCurrency: 'USD',
+                    hourlyRate: 50,
+                    flatRate: true,
+                }]}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        expect(screen.queryByText(/per hour/i)).not.toBeInTheDocument();
+        expect(screen.getByText('Quote Test Project')).toBeInTheDocument();
+    });
+
+    it('shows an overdue badge on overdue project cards', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-03-24T12:00:00Z'));
+
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }}
+                projects={[{
+                    id: 'project-1',
+                    title: 'Website',
+                    preferredClientId: 'client-1',
+                    defaultCurrency: 'USD',
+                    hourlyRate: 50,
+                    deadline: '2026-03-20'
+                }]}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('Overdue')).toBeInTheDocument();
+        expect(screen.getByText(/4 days overdue/i)).toBeInTheDocument();
+
+        vi.useRealTimers();
+    });
 });

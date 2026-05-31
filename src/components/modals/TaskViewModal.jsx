@@ -25,6 +25,17 @@ import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useTimers } from '@/hooks/useTimers';
 import { linkifyNodes } from '@/utils/linkifyUtils';
 import AddTimeEntryModal from './AddTimeEntryModal';
+import { getTaskEstimateAmount } from '@/utils/projectPlanningUtils.ts';
+
+function formatHoursMetric(value) {
+    if (!Number.isFinite(value)) {
+        return '0';
+    }
+
+    const roundedValue = Math.round(value * 100) / 100;
+
+    return Number.isInteger(roundedValue) ? roundedValue.toString() : roundedValue.toFixed(2);
+}
 
 /**
  * @param {Object} props
@@ -56,7 +67,7 @@ const TaskViewModal = ({
     const { showSuccess } = useToast();
     const { projects } = useProjects();
     const { clients } = useClients();
-    const { tasks, updateTask, unarchiveTask, toggleRecurringCompletion, skipRecurringOccurrence, isCompletedOnDate, getRecurringStatus } = useTasks();
+    const { tasks, updateTask, unarchiveTask, toggleRecurringCompletion, skipRecurringOccurrence, isCompletedOnDate, getRecurringStatus } = useTasks({ includeArchived: true });
     const { entries: timeEntries, createEntry } = useTimeEntries();
     const { getTimerForTask, clearTimer, isTaskTimerActive } = useTimers();
     const { deleteAttachment } = usePlannerAttachments();
@@ -73,6 +84,11 @@ const TaskViewModal = ({
         if (!currentTask?.projectId) return null;
         return projects.find((p) => p.id === currentTask.projectId) || null;
     }, [currentTask, projects]);
+
+    const projectClient = useMemo(() => {
+        if (!project?.preferredClientId) return null;
+        return clients.find((item) => item.id === project.preferredClientId) || null;
+    }, [clients, project]);
 
     const parentTask = useMemo(() => {
         if (!currentTask?.parentTaskId) return null;
@@ -260,9 +276,7 @@ const TaskViewModal = ({
 
     const billableRateInfo = useMemo(() => {
         if (!currentTask || !project) return { rate: 0, currency: null };
-        const client = project?.preferredClientId
-            ? clients.find((item) => item.id === project.preferredClientId)
-            : null;
+        const client = projectClient;
 
         if (project?.flatRate || client?.flatRate) {
             return { rate: 0, currency: null };
@@ -276,7 +290,7 @@ const TaskViewModal = ({
         const currency = project ? getProjectCurrency(project, clients) : null;
 
         return { rate, currency };
-    }, [clients, currentTask, project]);
+    }, [clients, currentTask, project, projectClient]);
 
     const billableTimeMs = useMemo(() => {
         if (!currentTask) return 0;
@@ -311,6 +325,43 @@ const TaskViewModal = ({
         }
         return mainTaskTime + timerTime;
     }, [currentTask, mainTaskTime, todayTaskTime, isTimerActive, projectTimer, effectiveDateStr]);
+
+    const trackedProgressTimeMs = useMemo(() => {
+        return billableTimeMs + (isTimerActive ? (projectTimer?.elapsedTime || 0) : 0);
+    }, [billableTimeMs, isTimerActive, projectTimer]);
+
+    const estimateProgress = useMemo(() => {
+        const estimatedHours = typeof currentTask?.estimatedHours === 'number' && Number.isFinite(currentTask.estimatedHours) && currentTask.estimatedHours > 0
+            ? currentTask.estimatedHours
+            : null;
+        const quotedAmount = project?.flatRate && typeof currentTask?.estimatedFlatAmount === 'number' && Number.isFinite(currentTask.estimatedFlatAmount) && currentTask.estimatedFlatAmount > 0
+            ? currentTask.estimatedFlatAmount
+            : null;
+        const trackedHours = millisecondsToHours(trackedProgressTimeMs);
+        const hoursProgressRatio = estimatedHours && estimatedHours > 0
+            ? trackedHours / estimatedHours
+            : null;
+        const estimatedAmount = currentTask && project
+            ? getTaskEstimateAmount(currentTask, project, projectClient)
+            : 0;
+
+        return {
+            estimatedHours,
+            quotedAmount,
+            trackedHours,
+            hoursProgressRatio,
+            estimatedAmount,
+        };
+    }, [currentTask, project, projectClient, trackedProgressTimeMs]);
+
+    const shouldShowEstimateProgress = Boolean(estimateProgress.estimatedHours || estimateProgress.quotedAmount);
+    const estimateCurrency = useMemo(() => {
+        if (!project) {
+            return null;
+        }
+
+        return getProjectCurrency(project, clients);
+    }, [clients, project]);
 
     const handleToggleComplete = useCallback(() => {
         if (!currentTask) return;
@@ -595,6 +646,52 @@ const TaskViewModal = ({
                             </div>
                         )}
                     </div>
+
+                    {shouldShowEstimateProgress && (
+                        <div className="space-y-2">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Estimate progress</p>
+
+                            {estimateProgress.estimatedHours && (
+                                <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                                        <span>
+                                            <span className="font-medium text-foreground">{formatHoursMetric(estimateProgress.trackedHours)}</span>
+                                            {' '}of{' '}
+                                            <span className="font-medium text-foreground">{formatHoursMetric(estimateProgress.estimatedHours)}</span>
+                                            {' '}hours tracked
+                                        </span>
+                                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                            {Math.round((estimateProgress.hoursProgressRatio || 0) * 100)}%
+                                        </span>
+                                    </div>
+                                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                        <div
+                                            className="h-full rounded-full bg-foreground/80"
+                                            style={{ width: `${Math.min((estimateProgress.hoursProgressRatio || 0) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {estimateProgress.quotedAmount && estimateCurrency && (
+                                <div className="text-sm text-muted-foreground">
+                                    Quote amount:{' '}
+                                    <span className="font-medium text-foreground sensitive-data">
+                                        {formatCurrency(estimateProgress.quotedAmount, estimateCurrency)}
+                                    </span>
+                                </div>
+                            )}
+
+                            {!project?.flatRate && estimateProgress.estimatedAmount > 0 && (
+                                <div className="text-sm text-muted-foreground">
+                                    Estimated value:{' '}
+                                    <span className="font-medium text-foreground sensitive-data">
+                                        {formatCurrency(estimateProgress.estimatedAmount, estimateCurrency)}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {(project || parentTask) && (
                         <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-4">

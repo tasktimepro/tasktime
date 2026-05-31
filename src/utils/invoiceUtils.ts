@@ -81,6 +81,36 @@ const normalizePaymentCurrencySnapshot = (invoice: any): InvoicePaymentCurrencyS
     };
 };
 
+export const getInvoicePaidAtTimestamp = (invoice: any): number | null => {
+    if (!isStoredInvoicePaid(invoice)) {
+        return null;
+    }
+
+    if (typeof invoice?.paidAt === 'number' && Number.isFinite(invoice.paidAt)) {
+        return invoice.paidAt;
+    }
+
+    const snapshot = normalizePaymentCurrencySnapshot(invoice);
+    if (snapshot?.capturedAt) {
+        return snapshot.capturedAt;
+    }
+
+    const invoiceDate = parseStoredDate(getTrimmedString(invoice?.date));
+    if (invoiceDate) {
+        return invoiceDate.getTime();
+    }
+
+    if (typeof invoice?.updatedAt === 'number' && Number.isFinite(invoice.updatedAt)) {
+        return invoice.updatedAt;
+    }
+
+    if (typeof invoice?.createdAt === 'number' && Number.isFinite(invoice.createdAt)) {
+        return invoice.createdAt;
+    }
+
+    return null;
+};
+
 const normalizeExistingInvoiceItem = (item: any, index: number) => {
     const description = getTrimmedString(item?.description)
         || getTrimmedString(item?.title)

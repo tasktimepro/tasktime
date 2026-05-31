@@ -68,7 +68,7 @@ const EmailTemplates = () => {
                         <h2 className="text-2xl font-bold text-foreground">Email Templates</h2>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Create and manage email templates for sending invoices.
+                        Create and manage email templates for sending invoices and quotes.
                     </p>
                 </div>
                 <Button
