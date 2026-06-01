@@ -26,7 +26,7 @@ import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
-import { getInvoicesForProject } from '../utils/invoiceUtils.ts';
+import { getInvoicesForProject, isMultiProjectInvoice } from '../utils/invoiceUtils.ts';
 import { buildProjectRecentUpdateMap } from '../utils/activityUtils.ts';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import { getProjectDeadlineStatus, isProjectInQuoteMode } from '@/utils/projectPlanningUtils.ts';
@@ -44,7 +44,7 @@ const ProjectList = ({
     const [showArchivedProjects, setShowArchivedProjects] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState(null);
-    const { showSuccess } = useToast();
+    const { showError, showSuccess } = useToast();
     const { store } = useYjs();
     
     // Yjs hooks for data access
@@ -144,6 +144,10 @@ const ProjectList = ({
         return getInvoicesForProject(invoices, projectId).length > 0;
     };
 
+    const projectHasSharedInvoices = (projectId) => {
+        return getInvoicesForProject(invoices, projectId).some((invoice) => isMultiProjectInvoice(invoice));
+    };
+
     /**
      * Handle project deletion - check for invoices first
      */
@@ -197,11 +201,18 @@ const ProjectList = ({
             });
         }
 
+        const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
+        const sharedInvoices = projectInvoicesForDelete.filter((invoice) => isMultiProjectInvoice(invoice));
+
+        if (shouldDeleteInvoices && sharedInvoices.length > 0) {
+            showError('This project is referenced by a shared invoice and cannot be hard-deleted. Archive the project instead.');
+            return;
+        }
+
         // Perform core updates in a single atomic transaction (projects, tasks, invoices)
         store.projects.doc.transact(() => {
             // Delete associated invoices if requested
             if (shouldDeleteInvoices) {
-                const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
                 projectInvoicesForDelete.forEach(invoice => unbillExpensesForInvoice(invoice.id));
                 projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
             }
@@ -631,6 +642,7 @@ const ProjectList = ({
                 onClose={handleCancelDelete}
                 project={projectToDelete}
                 hasInvoices={Boolean(projectToDelete && projectHasInvoices(projectToDelete.id))}
+                hasSharedInvoices={Boolean(projectToDelete && projectHasSharedInvoices(projectToDelete.id))}
                 onConfirmDelete={confirmDeleteProject}
                 onArchive={handleArchiveFromModal}
                 onForceDelete={handleForceDelete}

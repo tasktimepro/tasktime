@@ -214,12 +214,17 @@ export interface InvoiceItem {
     quantity: number;
     rate: number;
     amount: number;
+    projectId?: string;
     taskId?: string;
     expenseId?: string;
     supplierName?: string | null;
     originalAmount?: number;
     originalCurrency?: string;
     exchangeRate?: number;
+    lineType?: 'project' | 'project-subtotal' | 'task' | 'expense' | 'custom';
+    rateLabel?: string;
+    quantityLabel?: string;
+    pricingMode?: 'hourly' | 'flat' | 'mixed';
 }
 
 export interface InvoicePaymentCurrencySnapshot {
@@ -232,9 +237,42 @@ export interface InvoicePaymentCurrencySnapshot {
 
 export type ExpensePaymentCurrencySnapshot = InvoicePaymentCurrencySnapshot;
 
+export interface InvoiceProjectBreakdown {
+    projectId: string;
+    projectTitle: string;
+    clientId: string;
+    pricingMode: 'hourly' | 'flat' | 'mixed';
+    tasks?: Array<Record<string, unknown>>;
+    expenseItems?: Array<Record<string, unknown>>;
+    totalHours: number;
+    subtotal: number;
+    allocatedDiscount?: number;
+    allocatedShipping?: number;
+    allocatedTax?: number;
+    allocatedTotal?: number;
+}
+
+export interface InvoiceExpenseBreakdownItem {
+    id: string;
+    title: string;
+    amount: number;
+    date?: string;
+    supplierName?: string | null;
+    projectId?: string | null;
+    projectTitle?: string;
+    currency?: string;
+    originalAmount?: number;
+    originalCurrency?: string;
+    exchangeRate?: number;
+}
+
 export interface Invoice {
     id: string;
-    projectId: string;
+    projectId: string | null;
+    projectIds?: string[];
+    projectBreakdowns?: InvoiceProjectBreakdown[];
+    clientExpenseItems?: InvoiceExpenseBreakdownItem[];
+    invoiceOnlyExpenseItems?: InvoiceExpenseBreakdownItem[];
     clientId: string;
     createdAt?: number;
     updatedAt?: number;

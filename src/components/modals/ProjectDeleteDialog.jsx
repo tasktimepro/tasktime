@@ -11,6 +11,7 @@ const ProjectDeleteDialog = ({
     onClose,
     project,
     hasInvoices,
+    hasSharedInvoices,
     onConfirmDelete,
     onArchive,
     onForceDelete,
@@ -21,7 +22,7 @@ const ProjectDeleteDialog = ({
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={hasInvoices ? 'Project Has Invoices' : 'Confirm Deletion'}
+            title={hasSharedInvoices ? 'Project Has Shared Invoices' : (hasInvoices ? 'Project Has Invoices' : 'Confirm Deletion')}
             size="md"
             footer={
                 hasInvoices ? (
@@ -52,7 +53,26 @@ const ProjectDeleteDialog = ({
                 )
             }
         >
-            {hasInvoices ? (
+            {hasSharedInvoices ? (
+                <>
+                    <p className="text-sm text-foreground mb-4">
+                        The project "<span className="font-semibold">{project.title}</span>" is referenced by one or more shared invoices.
+                    </p>
+
+                    <p className="text-sm text-foreground mb-6">
+                        Archive the project to preserve invoice history. Hard deletion is blocked while shared invoices still reference this project.
+                    </p>
+
+                    <div className="flex flex-col space-y-3">
+                        <Button
+                            onClick={onArchive}
+                            className="w-full"
+                        >
+                            Archive Project
+                        </Button>
+                    </div>
+                </>
+            ) : hasInvoices ? (
                 <>
                     <p className="text-sm text-foreground mb-4">
                         The project "<span className="font-semibold">{project.title}</span>" has invoices attached to it.
@@ -93,6 +113,7 @@ ProjectDeleteDialog.propTypes = {
     onClose: PropTypes.func.isRequired,
     project: PropTypes.object,
     hasInvoices: PropTypes.bool,
+    hasSharedInvoices: PropTypes.bool,
     onConfirmDelete: PropTypes.func,
     onArchive: PropTypes.func,
     onForceDelete: PropTypes.func,
@@ -101,6 +122,7 @@ ProjectDeleteDialog.propTypes = {
 ProjectDeleteDialog.defaultProps = {
     project: null,
     hasInvoices: false,
+    hasSharedInvoices: false,
     onConfirmDelete: () => {},
     onArchive: () => {},
     onForceDelete: () => {},

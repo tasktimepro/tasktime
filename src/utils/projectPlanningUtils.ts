@@ -1,6 +1,7 @@
 import type { Client, Invoice, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { DEFAULT_CURRENCY, normalizeCurrencyCode } from './currencyUtils';
 import { getActualDurationMs } from './timeEntryDurationUtils';
+import { invoiceBelongsToProject } from './invoiceUtils';
 
 export type ProjectStatusMode = 'active' | 'quote';
 
@@ -170,7 +171,7 @@ export const getProjectBudgetProgress = (
 ): ProjectBudgetProgress => {
     const summary = getProjectEstimateSummary(project, tasks, timeEntries, clients, fallbackCurrency);
     const invoicedAmount = invoices.reduce((total, invoice) => {
-        if (invoice.projectId !== project.id || typeof invoice.total !== 'number' || !Number.isFinite(invoice.total)) {
+        if (!invoiceBelongsToProject(invoice, project.id) || typeof invoice.total !== 'number' || !Number.isFinite(invoice.total)) {
             return total;
         }
 

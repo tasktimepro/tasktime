@@ -10,7 +10,7 @@ import InvoicesList from './InvoicesList';
 import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoicePaid } from '../utils/invoiceUtils.ts';
+import { getInvoiceTotal, getPaidInvoiceConvertedAmount, getInvoicesForProject, isInvoicePaid, isMultiProjectInvoice } from '../utils/invoiceUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
@@ -20,7 +20,6 @@ import { useExpenses } from '../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
-import { getInvoicesForProject } from '../utils/invoiceUtils.ts';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import {
     DropdownMenu,
@@ -98,6 +97,9 @@ const ProjectDashboard = ({
     
     // Get invoices for this project
     const projectInvoices = getInvoicesForProject(invoices, project.id);
+    const projectHasSharedInvoices = useMemo(() => {
+        return projectInvoices.some((invoice) => isMultiProjectInvoice(invoice));
+    }, [projectInvoices]);
 
     const projectExpenses = useMemo(() => {
         return expenses.filter((expense) => expense.projectId === project.id);
@@ -167,8 +169,15 @@ const ProjectDashboard = ({
             clearTimer(projectId);
         }
 
+        const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
+        const sharedInvoices = projectInvoicesForDelete.filter((invoice) => isMultiProjectInvoice(invoice));
+
+        if (shouldDeleteInvoices && sharedInvoices.length > 0) {
+            showError('This project is referenced by a shared invoice and cannot be hard-deleted. Archive the project instead.');
+            return;
+        }
+
         if (shouldDeleteInvoices) {
-            const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
             projectInvoicesForDelete.forEach(invoice => unbillExpensesForInvoice(invoice.id));
             projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
         }
@@ -194,7 +203,7 @@ const ProjectDashboard = ({
         const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
         const invoiceMessage = shouldDeleteInvoices ? ' Associated invoices were also deleted.' : '';
         showSuccess(baseMessage + invoiceMessage);
-    }, [tasks, timeEntries, expenses, recurrences, getTimerForProject, clearTimer, invoices, deleteInvoice, deleteProject, deleteTask, deleteEntry, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showSuccess]);
+    }, [tasks, timeEntries, expenses, recurrences, getTimerForProject, clearTimer, invoices, deleteInvoice, deleteProject, deleteTask, deleteEntry, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showError, showSuccess]);
 
     const handleEditProject = () => {
         openProjectModal?.(project);
@@ -537,6 +546,7 @@ const ProjectDashboard = ({
                 onClose={handleCloseDeleteModal}
                 project={project}
                 hasInvoices={projectInvoices.length > 0}
+                hasSharedInvoices={projectHasSharedInvoices}
                 onConfirmDelete={handleConfirmDelete}
                 onArchive={() => {
                     handleArchiveProject();

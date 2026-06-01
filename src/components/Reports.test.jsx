@@ -1,5 +1,5 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import Reports from './Reports';
 
@@ -13,6 +13,30 @@ const mockExportOutstandingReportPdf = vi.fn(() => Promise.resolve());
 const mockExportExpensesReportPdf = vi.fn(() => Promise.resolve());
 const mockGeneratePdfBlob = vi.fn(() => Promise.resolve(new Blob(['pdf'], { type: 'application/pdf' })));
 let mockIsMobileLayout = false;
+const FIXED_REFERENCE_DATE = new Date('2026-05-15T12:00:00Z');
+const RealDate = Date;
+class MockDate extends RealDate {
+    constructor(...args) {
+        if (args.length === 0) {
+            super(FIXED_REFERENCE_DATE);
+            return;
+        }
+
+        super(...args);
+    }
+
+    static now() {
+        return FIXED_REFERENCE_DATE.getTime();
+    }
+
+    static parse(value) {
+        return RealDate.parse(value);
+    }
+
+    static UTC(...args) {
+        return RealDate.UTC(...args);
+    }
+}
 const createDefaultInvoices = () => [
     {
         id: 'invoice-1',
@@ -276,6 +300,7 @@ vi.mock('@/utils/pdfUtils.ts', () => ({
 
 describe('Reports', () => {
     beforeEach(() => {
+        global.Date = MockDate;
         mockIsMobileLayout = false;
         mockUpdateUrl.mockReset();
         mockBuildCsvContent.mockClear();
@@ -303,6 +328,10 @@ describe('Reports', () => {
         });
         mockLoadingHistoricalEntries = false;
         mockSection = null;
+    });
+
+    afterEach(() => {
+        global.Date = RealDate;
     });
 
     it('keeps a centered loader visible until historical entries finish loading and the report content has painted', async () => {

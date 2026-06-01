@@ -152,7 +152,26 @@ describe('Yjs validation', () => {
 
         expect(() => validateCollectionEntity('invoices', {
             id: 'invoice-1',
-            projectId: 'project-1',
+            projectId: null,
+            projectIds: ['project-1', 'project-2'],
+            projectBreakdowns: [
+                {
+                    projectId: 'project-1',
+                    projectTitle: 'Project One',
+                    clientId: 'client-1',
+                    pricingMode: 'hourly',
+                    totalHours: 1,
+                    subtotal: 125,
+                },
+                {
+                    projectId: 'project-2',
+                    projectTitle: 'Project Two',
+                    clientId: 'client-1',
+                    pricingMode: 'flat',
+                    totalHours: 0,
+                    subtotal: 0,
+                },
+            ],
             clientId: 'client-1',
             businessInfoId: null,
             invoiceNumber: 'INV-001',

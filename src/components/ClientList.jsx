@@ -30,6 +30,7 @@ import ClientArchiveDialog from './modals/ClientArchiveDialog';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { buildClientRecentUpdateMap, buildProjectRecentUpdateMap } from '../utils/activityUtils.ts';
+import { invoiceBelongsToProject } from '../utils/invoiceUtils.ts';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -193,7 +194,10 @@ const ClientList = ({
             
             // Delete invoices for related projects (Invoices are in core doc)
             const relatedInvoiceIds = invoices
-                .filter(invoice => relatedProjectIds.includes(invoice.projectId))
+                .filter((invoice) => (
+                    invoice.clientId === clientId
+                    || relatedProjectIds.some((projectId) => invoiceBelongsToProject(invoice, projectId))
+                ))
                 .map(i => i.id);
 
             const relatedExpenseIds = expenses

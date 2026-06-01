@@ -57,6 +57,11 @@ const InvoiceTaskSelector = ({
 }) => {
     const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length + additionalTasks.length;
     const orderedInvoiceTasks = orderTasksWithSubtasks(invoiceTasks);
+    const hasMultipleProjects = new Set(
+        invoiceTasks
+            .map((task) => task?.projectId || '')
+            .filter(Boolean)
+    ).size > 1;
     const taskRowClassName = 'flex flex-col gap-3 rounded border bg-card p-3 md:flex-row md:items-center md:justify-between';
     const taskMetaClassName = 'flex min-w-0 items-start gap-3 md:flex-1 md:items-center';
     const taskControlsClassName = 'flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:gap-4';
@@ -227,6 +232,11 @@ const InvoiceTaskSelector = ({
                                                         )}
                                                     </p>
                                                 )}
+                                                {hasMultipleProjects && task.projectTitle && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {task.projectTitle}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
 
@@ -327,7 +337,7 @@ const InvoiceTaskSelector = ({
                                                             type="number"
                                                             step="0.01"
                                                             min="0"
-                                                            value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
+                                                            value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (task.projectHourlyRate !== null && task.projectHourlyRate !== undefined ? task.projectHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : '')))}
                                                             onChange={(e) => handleTaskHourlyRateChange(task.id, e.target.value)}
                                                             className={`${amountInputClassName} sensitive-data`}
                                                             placeholder="0.00"

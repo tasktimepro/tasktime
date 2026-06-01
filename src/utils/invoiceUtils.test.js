@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest'
 import {
     createInvoicePaymentCurrencySnapshot,
     extractSequentialNumber,
+    getInvoiceProjectFinancials,
+    getInvoiceProjectIds,
+    getInvoiceProjectRevenueBreakdown,
+    getInvoiceProjectTitle,
     getInvoicePaidAtTimestamp,
     getInvoicePaymentCurrencySnapshot,
     getInvoiceStatusAfterMarkingUnpaid,
@@ -34,6 +38,19 @@ describe('invoiceUtils', () => {
             { id: 'c', projectId: 'p1' }
         ])
         expect(getInvoicesForProject(null, 'p1')).toEqual([])
+    })
+
+    it('matches multi-project invoices by any linked project id', () => {
+
+        const invoices = [
+            { id: 'shared', projectId: 'p1', projectIds: ['p1', 'p2'] },
+            { id: 'single', projectId: 'p3' },
+        ]
+
+        expect(getInvoiceProjectIds(invoices[0])).toEqual(['p1', 'p2'])
+        expect(getInvoicesForProject(invoices, 'p2')).toEqual([
+            { id: 'shared', projectId: 'p1', projectIds: ['p1', 'p2'] }
+        ])
     })
 
     it('returns latest invoice by createdAt', () => {
@@ -138,6 +155,160 @@ describe('invoiceUtils', () => {
             projectId: 'p1',
             date: '2026-02-15'
         })
+    })
+
+    it('prefers projectIds and breakdowns when normalizing project relationships', () => {
+
+        const normalized = normalizeInvoiceRecord({
+            id: 'inv-shared',
+            projectId: null,
+            projectIds: ['project-2', 'project-1'],
+            projectBreakdowns: [
+                { projectId: 'project-2', projectTitle: 'Support', clientId: 'client-1', pricingMode: 'flat', totalHours: 0, subtotal: 400 },
+                { projectId: 'project-1', projectTitle: 'Build', clientId: 'client-1', pricingMode: 'hourly', totalHours: 4, subtotal: 500 },
+            ],
+            clientId: 'client-1',
+            status: 'sent',
+            subtotal: 900,
+            total: 900,
+            items: [],
+            date: '2026-04-15',
+        })
+
+        expect(normalized.projectId).toBe('project-2')
+        expect(normalized.projectIds).toEqual(['project-2', 'project-1'])
+        expect(getInvoiceProjectTitle(normalized)).toBe('Support, Build')
+    })
+
+    it('derives per-project financial allocations from shared invoice breakdowns', () => {
+
+        const invoice = {
+            id: 'inv-shared',
+            projectId: 'project-2',
+            projectIds: ['project-2', 'project-1'],
+            projectBreakdowns: [
+                {
+                    projectId: 'project-2',
+                    projectTitle: 'Support',
+                    clientId: 'client-1',
+                    pricingMode: 'flat',
+                    totalHours: 0,
+                    subtotal: 400,
+                    allocatedDiscount: 40,
+                    allocatedShipping: 10,
+                    allocatedTax: 22,
+                    allocatedTotal: 392,
+                },
+                {
+                    projectId: 'project-1',
+                    projectTitle: 'Build',
+                    clientId: 'client-1',
+                    pricingMode: 'hourly',
+                    totalHours: 4,
+                    subtotal: 500,
+                    allocatedDiscount: 50,
+                    allocatedShipping: 12.5,
+                    allocatedTax: 27.5,
+                    allocatedTotal: 490,
+                },
+            ],
+            subtotal: 900,
+            discount: 90,
+            shipping: 22.5,
+            tax: 49.5,
+            total: 882,
+        }
+
+        expect(getInvoiceProjectRevenueBreakdown(invoice)).toEqual([
+            {
+                projectId: 'project-2',
+                projectTitle: 'Support',
+                subtotal: 400,
+                totalHours: 0,
+                allocatedDiscount: 40,
+                allocatedShipping: 10,
+                allocatedTax: 22,
+                allocatedTotal: 392,
+            },
+            {
+                projectId: 'project-1',
+                projectTitle: 'Build',
+                subtotal: 500,
+                totalHours: 4,
+                allocatedDiscount: 50,
+                allocatedShipping: 12.5,
+                allocatedTax: 27.5,
+                allocatedTotal: 490,
+            }
+        ])
+        expect(getInvoiceProjectFinancials(invoice, 'project-1')).toEqual({
+            projectId: 'project-1',
+            projectTitle: 'Build',
+            subtotal: 500,
+            totalHours: 4,
+            allocatedDiscount: 50,
+            allocatedShipping: 12.5,
+            allocatedTax: 27.5,
+            allocatedTotal: 490,
+        })
+    })
+
+    it('leaves client-only invoice rows outside project revenue allocations', () => {
+
+        const invoice = {
+            id: 'inv-shared-with-client-expense',
+            projectId: 'project-1',
+            projectIds: ['project-1', 'project-2'],
+            projectBreakdowns: [
+                {
+                    projectId: 'project-1',
+                    projectTitle: 'Build',
+                    clientId: 'client-1',
+                    pricingMode: 'hourly',
+                    totalHours: 4,
+                    subtotal: 400,
+                },
+                {
+                    projectId: 'project-2',
+                    projectTitle: 'Support',
+                    clientId: 'client-1',
+                    pricingMode: 'flat',
+                    totalHours: 0,
+                    subtotal: 500,
+                },
+            ],
+            clientExpenseItems: [
+                { id: 'expense-1', title: 'Travel', amount: 100 },
+            ],
+            subtotal: 1000,
+            discount: 100,
+            shipping: 0,
+            tax: 220,
+            total: 1120,
+        }
+
+        expect(getInvoiceProjectRevenueBreakdown(invoice)).toEqual([
+            {
+                projectId: 'project-1',
+                projectTitle: 'Build',
+                subtotal: 400,
+                totalHours: 4,
+                allocatedDiscount: 40,
+                allocatedShipping: 0,
+                allocatedTax: 88,
+                allocatedTotal: 448,
+            },
+            {
+                projectId: 'project-2',
+                projectTitle: 'Support',
+                subtotal: 500,
+                totalHours: 0,
+                allocatedDiscount: 50,
+                allocatedShipping: 0,
+                allocatedTax: 110,
+                allocatedTotal: 560,
+            }
+        ])
     })
 
     it('normalizes legacy invoices without items into canonical invoice items', () => {

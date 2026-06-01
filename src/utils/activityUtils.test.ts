@@ -69,4 +69,35 @@ describe('activityUtils', () => {
         expect(clientRecentUpdateMap.get('client-1')).toBe(950);
         expect(clientRecentUpdateMap.get('client-2')).toBe(400);
     });
+
+    it('applies shared invoice updates to each linked project', () => {
+        const projectRecentUpdateMap = buildProjectRecentUpdateMap({
+            projects: [
+                { id: 'project-1', title: 'Alpha', updatedAt: 100 },
+                { id: 'project-2', title: 'Beta', updatedAt: 100 },
+            ],
+            tasks: [],
+            timeEntries: [],
+            invoices: [
+                {
+                    id: 'invoice-shared',
+                    projectId: 'project-1',
+                    projectIds: ['project-1', 'project-2'],
+                    clientId: 'client-1',
+                    invoiceNumber: 'INV-1',
+                    date: '2026-04-14',
+                    status: 'draft',
+                    items: [],
+                    subtotal: 0,
+                    total: 0,
+                    updatedAt: 950,
+                },
+            ],
+            expenses: [],
+            recurrences: [],
+        });
+
+        expect(projectRecentUpdateMap.get('project-1')).toBe(950);
+        expect(projectRecentUpdateMap.get('project-2')).toBe(950);
+    });
 });

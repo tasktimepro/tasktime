@@ -41,6 +41,7 @@ describe('InvoicePreviewModal', () => {
         expect(screen.getByText('Preview note')).toBeInTheDocument();
         expect(screen.getByText('The final generated PDF can vary slightly from the preview below.')).toBeInTheDocument();
         expect(previewShell).toHaveClass('bg-white');
+        expect(previewShell).not.toHaveClass('overflow-auto');
         expect(previewPage.style.width).toBe('794px');
         expect(previewPage.style.minHeight).toBe('1123px');
         expect(previewFrame.style.width).toBe('375px');

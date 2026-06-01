@@ -150,6 +150,88 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('$150.00')
     })
 
+    it('renders multi-project invoices as repeated project sections with separate additional expenses', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            projectBreakdowns: [
+                {
+                    projectId: 'project-1',
+                    projectTitle: 'Website Redesign',
+                    clientId: 'client-1',
+                    pricingMode: 'hourly',
+                    totalHours: 4,
+                    subtotal: 400,
+                    tasks: [{ id: 'task-1', title: 'UX audit', hours: 4, hourlyRate: 100 }],
+                    expenseItems: [{ id: 'expense-1', title: 'Stock assets', amount: 50, supplierName: 'Envato' }],
+                },
+                {
+                    projectId: 'project-2',
+                    projectTitle: 'Maintenance',
+                    clientId: 'client-1',
+                    pricingMode: 'flat',
+                    totalHours: 0,
+                    subtotal: 300,
+                    tasks: [{ id: 'task-2', title: 'Monthly retainer', flatRate: 300, quantity: 1, useFlatRate: true }],
+                    expenseItems: [],
+                },
+            ],
+            clientExpenseItems: [{ id: 'expense-2', title: 'Travel', amount: 75 }],
+            totalAmount: 825,
+            subtotal: 825,
+            currency: 'EUR'
+        })
+
+        expect(html).toContain('Website Redesign')
+        expect(html).toContain('Maintenance')
+        expect(html).toContain('Additional Expenses')
+        expect(html).toContain('Project subtotal: <strong>€400.00</strong>')
+        expect(html).toContain('Additional expenses subtotal: <strong>€75.00</strong>')
+        expect(html).toContain('Travel')
+        expect(html).toContain('Stock assets')
+    })
+
+    it('moves grouped project hours into each project section and hides the document total hours for mixed pricing', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            projectBreakdowns: [
+                {
+                    projectId: 'project-1',
+                    projectTitle: 'Hourly Project',
+                    clientId: 'client-1',
+                    pricingMode: 'hourly',
+                    totalHours: 4,
+                    subtotal: 400,
+                    tasks: [{ id: 'task-1', title: 'Implementation', hours: 4, hourlyRate: 100 }],
+                    expenseItems: [],
+                },
+                {
+                    projectId: 'project-2',
+                    projectTitle: 'Flat Project',
+                    clientId: 'client-1',
+                    pricingMode: 'flat',
+                    totalHours: 0,
+                    subtotal: 300,
+                    tasks: [{ id: 'task-2', title: 'Retainer', flatRate: 300, quantity: 1, useFlatRate: true }],
+                    expenseItems: [],
+                },
+            ],
+            clientExpenseItems: [{ id: 'expense-2', title: 'Travel', amount: 75 }],
+            totalHours: 4,
+            totalAmount: 775,
+            subtotal: 775,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Project total hours: <strong>4.00</strong>')
+        expect(html).toContain('Project subtotal: <strong>$400.00</strong>')
+        expect(html).toContain('Project subtotal: <strong>$300.00</strong>')
+        expect(html).toContain('Additional expenses subtotal: <strong>$75.00</strong>')
+        expect(html).not.toContain('Total hours: <strong>4.00</strong>')
+        expect(html).toContain('Subtotal: <strong>$775.00</strong>')
+    })
+
     it('uses hourly totals when flat rate is disabled', () => {
 
         const html = createInvoiceHTML({
@@ -758,6 +840,22 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('$25.00')
     })
 
+    it('prefers explicit total and omits the supplier separator when an expense has no supplier', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            tasks: [],
+            expenseItems: [{ id: 'exp-1', title: 'Hosting', amount: 25 }],
+            totalAmount: 10,
+            total: 25,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Hosting')
+        expect(html).not.toContain('Hosting •')
+        expect(html).toContain('Total: $25.00')
+    })
+
     it('renders flat additional tasks in simplified table', () => {
 
         const html = createInvoiceHTML({
@@ -894,6 +992,139 @@ describe('createInvoiceHTML', () => {
 
         expect(html).toContain(`Total: $${result.current.total.toFixed(2)}`)
     })
+
+    it('shows grouped document total hours only when all grouped sections are hourly', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            projectBreakdowns: [
+                {
+                    projectId: 'project-1',
+                    projectTitle: 'Discovery',
+                    clientId: 'client-1',
+                    pricingMode: 'hourly',
+                    totalHours: 3,
+                    subtotal: 300,
+                    tasks: [{
+                        id: 'task-1',
+                        title: 'Workshop',
+                        hours: 1,
+                        hourlyRate: 100,
+                        isMerged: true,
+                        mergedSubtasks: [{ id: 'subtask-1', title: 'Follow-up', hours: 2, hourlyRate: 100 }]
+                    }],
+                    expenseItems: [],
+                },
+                {
+                    projectId: 'project-2',
+                    projectTitle: 'Implementation',
+                    clientId: 'client-1',
+                    pricingMode: 'hourly',
+                    subtotal: 300,
+                    tasks: [{ id: 'task-2', title: 'Build', hours: 2, projectHourlyRate: 150 }],
+                    expenseItems: [],
+                },
+            ],
+            totalHours: 5,
+            totalAmount: 600,
+            subtotal: 600,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Discovery')
+        expect(html).toContain('Implementation')
+        expect(html).toContain('Workshop')
+        expect(html).toContain('Build')
+        expect((html.match(/Project total hours:/g) || []).length).toBe(1)
+        expect(html).toContain('Project total hours: <strong>3.00</strong>')
+        expect(html).toContain('Total hours: <strong>5.00</strong>')
+        expect(html).toContain('Subtotal: <strong>$600.00</strong>')
+    })
+
+    it('renders grouped additional items and invoice-only expenses as separate sections', () => {
+
+        const html = createInvoiceHTML({
+            client: { name: 'Client' },
+            projectBreakdowns: [{
+                projectId: 'project-1',
+                projectTitle: 'Main Project',
+                clientId: 'client-1',
+                pricingMode: 'hourly',
+                totalHours: 2,
+                subtotal: 200,
+                tasks: [{ id: 'task-1', title: 'Core work', hours: 2, hourlyRate: 100 }],
+                expenseItems: [],
+            }],
+            additionalTasks: [
+                { title: 'Extra hourly', hours: 1.5, hourlyRate: 80, useFlatRate: false },
+                { title: 'Extra flat', flatRate: 120, quantity: 2, useFlatRate: true }
+            ],
+            invoiceOnlyExpenseItems: [{ id: 'expense-1', title: 'Permit', amount: 30 }],
+            totalHours: 3.5,
+            totalAmount: 590,
+            subtotal: 590,
+            currency: 'USD'
+        })
+
+        expect(html).toContain('Additional Items')
+        expect(html).toContain('Invoice-only Expenses')
+        expect(html).toContain('Extra hourly')
+        expect(html).toContain('Extra flat')
+        expect(html).toContain('Permit')
+        expect(html).toContain('Additional items subtotal: <strong>$360.00</strong>')
+        expect(html).toContain('Invoice-only expenses subtotal: <strong>$30.00</strong>')
+        expect(html).toContain('Qty</th>')
+        expect(html).toContain('Hours</th>')
+        expect(html).not.toContain('Total hours: <strong>3.50</strong>')
+    })
+
+    it('rebuilds stored invoice html with a branding snapshot logo asset', () => {
+
+        const html = buildInvoiceHtmlContent({
+            invoiceNumber: 'INV-0201',
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD',
+            brandingSnapshot: {
+                showBusinessLogo: true,
+                logoAssetId: 'logo-1',
+            }
+        }, [], [{
+            id: 'logo-1',
+            dataUrl: 'data:image/png;base64,LOGO',
+        }])
+
+        expect(html).toContain('data:image/png;base64,LOGO')
+    })
+
+    it('ignores archived stored logo assets and falls back to an empty client shell when needed', () => {
+
+        const html = buildInvoiceHtmlContent({
+            invoiceNumber: 'INV-0202',
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD',
+            businessInfo: {
+                branding: {
+                    logoAssetId: 'logo-archived',
+                }
+            }
+        }, [], [
+            {
+                id: 'other-logo',
+                dataUrl: 'data:image/png;base64,OTHER',
+            },
+            {
+                id: 'logo-archived',
+                dataUrl: 'data:image/png;base64,ARCHIVED',
+                archivedAt: '2026-05-01T00:00:00.000Z',
+            }
+        ])
+
+        expect(html).not.toContain('data:image/png;base64,ARCHIVED')
+        expect(html).toContain('Invoice To:')
+    })
 })
 
 describe('generatePDF', () => {
@@ -918,6 +1149,7 @@ describe('generatePDF', () => {
         }))
         expect(Array.isArray(pdfOptions.margin)).toBe(true)
         expect(pdfOptions.margin).toHaveLength(4)
+        expect(pdfOptions.pagebreak?.avoid).toContain('.invoice-project-section')
         expect(html2pdfMocks.from).toHaveBeenCalledWith('<p>Invoice</p>')
         expect(html2pdfMocks.save).toHaveBeenCalled()
     })

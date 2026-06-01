@@ -126,6 +126,27 @@ describe('projectPlanningUtils', () => {
         }));
     });
 
+    it('counts shared invoices toward every linked project budget', () => {
+        const progress = getProjectBudgetProgress(
+            {
+                id: 'project-2',
+                preferredClientId: 'client-1',
+                flatRate: false,
+                hourlyRate: 100,
+                budgetAmount: 2000,
+            },
+            [{ id: 'task-1', projectId: 'project-2', title: 'Task', estimatedHours: 5 }],
+            [],
+            [
+                { id: 'invoice-shared', projectId: 'project-1', projectIds: ['project-1', 'project-2'], clientId: 'client-1', invoiceNumber: 'INV-SHARED', date: '2026-05-01', status: 'sent', items: [], subtotal: 700, total: 700 },
+            ],
+            [{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }],
+            'EUR'
+        );
+
+        expect(progress.invoicedAmount).toBe(700);
+    });
+
     it('reports deadline states for missing, future, today, and overdue deadlines', () => {
         const referenceDate = new Date('2026-05-28T12:00:00Z');
 

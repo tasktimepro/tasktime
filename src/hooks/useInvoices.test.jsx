@@ -201,6 +201,31 @@ describe('useInvoices', () => {
         expect(result.current.totals).toEqual({ outstanding: 50, paid: 100, total: 150 })
     })
 
+    it('includes shared invoices when filtering by project id', () => {
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: createTestYMap(), preferences: mockPreferences },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [
+                { id: 'shared', status: 'sent', date: '2025-01-06', total: 90, clientId: 'c1', projectId: 'p1', projectIds: ['p1', 'p2'] },
+                { id: 'single', status: 'sent', date: '2025-01-05', total: 40, clientId: 'c1', projectId: 'p3' },
+            ],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices({ projectId: 'p2' }))
+
+        expect(result.current.invoices.map((invoice) => invoice.id)).toEqual(['shared'])
+        expect(result.current.totals).toEqual({ outstanding: 90, paid: 0, total: 90 })
+    })
+
     it('does not load archived invoices when store is not ready', () => {
         const loadArchivedInvoices = vi.fn(async () => {})
 

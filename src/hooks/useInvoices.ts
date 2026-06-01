@@ -12,6 +12,7 @@ import { collectEntities } from '@/stores/yjs/entityUtils';
 import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import {
     createInvoicePaymentCurrencySnapshot,
+    invoiceBelongsToProject,
     getInvoiceStatus,
     getInvoiceStatusAfterMarkingUnpaid,
     getInvoiceTotal,
@@ -97,7 +98,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         let result = allInvoices;
         
         if (options.projectId) {
-            result = result.filter(i => i.projectId === options.projectId);
+            result = result.filter((invoice) => invoiceBelongsToProject(invoice, options.projectId));
         }
         
         if (options.clientId) {

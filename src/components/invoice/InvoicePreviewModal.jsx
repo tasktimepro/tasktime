@@ -9,7 +9,7 @@ import { getInvoiceTotal } from '../../utils/invoiceUtils.ts';
 
 const A4_PREVIEW_WIDTH_PX = 794;
 const A4_PREVIEW_HEIGHT_PX = 1123;
-const PREVIEW_HEIGHT_BUFFER_PX = 16;
+const PREVIEW_HEIGHT_BUFFER_PX = 24;
 const PREVIEW_TOP_PADDING_PX = 12;
 
 /**
@@ -40,25 +40,42 @@ const InvoicePreviewModal = ({
     const modalContentRef = useRef(null);
     const previewPageRef = useRef(null);
     const [previewScale, setPreviewScale] = useState(1);
-    const [previewHeight, setPreviewHeight] = useState(A4_PREVIEW_HEIGHT_PX);
+    const [previewFrameHeight, setPreviewFrameHeight] = useState(A4_PREVIEW_HEIGHT_PX + PREVIEW_HEIGHT_BUFFER_PX);
 
     useEffect(() => {
         if (!isOpen || !previewHtml) {
             setPreviewScale(1);
-            setPreviewHeight(A4_PREVIEW_HEIGHT_PX);
+            setPreviewFrameHeight(A4_PREVIEW_HEIGHT_PX + PREVIEW_HEIGHT_BUFFER_PX);
             return undefined;
         }
 
         const syncPreviewLayout = () => {
             const measuredWidth = modalContentRef.current?.clientWidth || window.innerWidth || A4_PREVIEW_WIDTH_PX;
             const nextScale = Math.min(1, measuredWidth / A4_PREVIEW_WIDTH_PX);
-            const nextHeight = previewPageRef.current?.scrollHeight || A4_PREVIEW_HEIGHT_PX;
+            const invoiceDocumentElement = previewPageRef.current?.querySelector('.invoice-document');
+            const previewContentHeight = invoiceDocumentElement?.scrollHeight
+                || invoiceDocumentElement?.offsetHeight
+                || previewPageRef.current?.scrollHeight
+                || A4_PREVIEW_HEIGHT_PX;
+            const nextUnscaledHeight = Math.max(previewContentHeight, A4_PREVIEW_HEIGHT_PX);
+            const nextFrameHeight = Math.ceil(nextUnscaledHeight * nextScale) + PREVIEW_HEIGHT_BUFFER_PX;
 
             setPreviewScale(nextScale > 0 ? nextScale : 1);
-            setPreviewHeight(Math.max(nextHeight + PREVIEW_HEIGHT_BUFFER_PX, A4_PREVIEW_HEIGHT_PX + PREVIEW_HEIGHT_BUFFER_PX));
+            setPreviewFrameHeight(nextFrameHeight);
         };
 
         syncPreviewLayout();
+
+        let rafIdOne = 0;
+        let rafIdTwo = 0;
+        let timeoutId = 0;
+
+        rafIdOne = window.requestAnimationFrame(() => {
+            syncPreviewLayout();
+            rafIdTwo = window.requestAnimationFrame(syncPreviewLayout);
+        });
+
+        timeoutId = window.setTimeout(syncPreviewLayout, 120);
 
         window.addEventListener('resize', syncPreviewLayout);
 
@@ -77,6 +94,9 @@ const InvoicePreviewModal = ({
         }
 
         return () => {
+            window.cancelAnimationFrame(rafIdOne);
+            window.cancelAnimationFrame(rafIdTwo);
+            window.clearTimeout(timeoutId);
             window.removeEventListener('resize', syncPreviewLayout);
             resizeObserver?.disconnect();
         };
@@ -117,14 +137,14 @@ const InvoicePreviewModal = ({
                         title="Preview note"
                         description="The final generated PDF can vary slightly from the preview below."
                     />
-                    <div className="overflow-auto rounded-lg border border-slate-200 bg-white p-2 text-black sm:p-3" data-testid="invoice-preview-shell">
+                    <div className="rounded-lg border border-slate-200 bg-white p-2 text-black sm:p-3" data-testid="invoice-preview-shell">
                         <div
                             className="mx-auto"
                             data-testid="invoice-preview-frame"
                             style={{
                                 width: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
                                 minWidth: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
-                                height: `${previewHeight * previewScale}px`,
+                                height: `${previewFrameHeight}px`,
                             }}
                         >
                             <div

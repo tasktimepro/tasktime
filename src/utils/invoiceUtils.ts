@@ -42,6 +42,16 @@ const getTrimmedString = (value: any) => {
     return typeof value === 'string' ? value.trim() : '';
 };
 
+const pushUniqueProjectId = (target: string[], value: any) => {
+    const projectId = getTrimmedString(value);
+
+    if (!projectId || target.includes(projectId)) {
+        return;
+    }
+
+    target.push(projectId);
+};
+
 const getFiniteRecord = (value: any) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return undefined;
@@ -56,6 +66,206 @@ const getFiniteRecord = (value: any) => {
     }
 
     return Object.fromEntries(entries) as Record<string, number>;
+};
+
+const getNormalizedProjectBreakdowns = (invoice: any) => {
+    if (!Array.isArray(invoice?.projectBreakdowns)) {
+        return undefined;
+    }
+
+    const normalizedBreakdowns = invoice.projectBreakdowns
+        .filter((breakdown: any) => breakdown && typeof breakdown === 'object')
+        .map((breakdown: any) => ({
+            ...breakdown,
+            projectId: getTrimmedString(breakdown.projectId),
+            projectTitle: getTrimmedString(breakdown.projectTitle),
+            clientId: getTrimmedString(breakdown.clientId || invoice?.clientId || invoice?.client?.id),
+            totalHours: getFiniteNumber(breakdown.totalHours, 0),
+            subtotal: getFiniteNumber(breakdown.subtotal, 0),
+            allocatedDiscount: typeof breakdown.allocatedDiscount === 'number' ? breakdown.allocatedDiscount : undefined,
+            allocatedShipping: typeof breakdown.allocatedShipping === 'number' ? breakdown.allocatedShipping : undefined,
+            allocatedTax: typeof breakdown.allocatedTax === 'number' ? breakdown.allocatedTax : undefined,
+            allocatedTotal: typeof breakdown.allocatedTotal === 'number' ? breakdown.allocatedTotal : undefined,
+        }))
+        .filter((breakdown: any) => breakdown.projectId);
+
+    return normalizedBreakdowns.length > 0 ? normalizedBreakdowns : undefined;
+};
+
+const getNormalizedExpenseBreakdownItems = (items: any) => {
+    if (!Array.isArray(items)) {
+        return undefined;
+    }
+
+    const normalizedItems = items
+        .filter((item: any) => item && typeof item === 'object')
+        .map((item: any) => ({
+            ...item,
+            id: getTrimmedString(item.id),
+            title: getTrimmedString(item.title),
+            date: getTrimmedString(item.date) || undefined,
+            supplierName: item?.supplierName ?? null,
+            projectId: getTrimmedString(item.projectId) || null,
+            projectTitle: getTrimmedString(item.projectTitle) || undefined,
+            amount: getFiniteNumber(item.amount, 0),
+            currency: getTrimmedString(item.currency) || undefined,
+            originalAmount: typeof item?.originalAmount === 'number' ? item.originalAmount : undefined,
+            originalCurrency: getTrimmedString(item.originalCurrency) || undefined,
+            exchangeRate: typeof item?.exchangeRate === 'number' ? item.exchangeRate : undefined,
+        }))
+        .filter((item: any) => item.id && item.title);
+
+    return normalizedItems.length > 0 ? normalizedItems : undefined;
+};
+
+export const getInvoiceProjectIds = (invoice: any): string[] => {
+    if (!invoice || typeof invoice !== 'object') {
+        return [];
+    }
+
+    const projectIds: string[] = [];
+
+    if (Array.isArray(invoice.projectIds)) {
+        invoice.projectIds.forEach((projectId: any) => pushUniqueProjectId(projectIds, projectId));
+    }
+
+    if (Array.isArray(invoice.projectBreakdowns)) {
+        invoice.projectBreakdowns.forEach((breakdown: any) => pushUniqueProjectId(projectIds, breakdown?.projectId));
+    }
+
+    pushUniqueProjectId(projectIds, invoice.projectId);
+    pushUniqueProjectId(projectIds, invoice.project?.id);
+
+    return projectIds;
+};
+
+export const getPrimaryInvoiceProjectId = (invoice: any): string | null => {
+    return getInvoiceProjectIds(invoice)[0] || null;
+};
+
+export const invoiceBelongsToProject = (invoice: any, projectId: string | null | undefined): boolean => {
+    if (!projectId) {
+        return false;
+    }
+
+    return getInvoiceProjectIds(invoice).includes(projectId);
+};
+
+export const isMultiProjectInvoice = (invoice: any): boolean => {
+    return getInvoiceProjectIds(invoice).length > 1;
+};
+
+const resolveProjectTitleFromCollection = (projects: any[] | Map<string, any> | null | undefined, projectId: string) => {
+    if (!projects || !projectId) {
+        return '';
+    }
+
+    if (projects instanceof Map) {
+        return getTrimmedString(projects.get(projectId)?.title);
+    }
+
+    if (Array.isArray(projects)) {
+        return getTrimmedString(projects.find((project) => project?.id === projectId)?.title);
+    }
+
+    return '';
+};
+
+export const getInvoiceProjectTitle = (invoice: any, projects?: any[] | Map<string, any> | null): string => {
+    const projectIds = getInvoiceProjectIds(invoice);
+    const breakdownTitleById = new Map(
+        (Array.isArray(invoice?.projectBreakdowns) ? invoice.projectBreakdowns : [])
+            .filter((breakdown: any) => breakdown?.projectId && breakdown?.projectTitle)
+            .map((breakdown: any) => [breakdown.projectId, getTrimmedString(breakdown.projectTitle)])
+    );
+
+    if (projectIds.length === 0) {
+        return getTrimmedString(invoice?.project?.title) || 'Unknown Project';
+    }
+
+    const titles = projectIds
+        .map((projectId) => breakdownTitleById.get(projectId) || resolveProjectTitleFromCollection(projects, projectId) || (projectId === invoice?.projectId ? getTrimmedString(invoice?.project?.title) : ''))
+        .filter(Boolean);
+
+    if (titles.length === 0) {
+        return projectIds.length > 1 ? 'Multiple projects' : 'Unknown Project';
+    }
+
+    if (titles.length === 1) {
+        return titles[0];
+    }
+
+    if (titles.length === 2) {
+        return titles.join(', ');
+    }
+
+    return `${titles[0]}, ${titles[1]} +${titles.length - 2} more`;
+};
+
+const roundCurrencyAmount = (value: number) => Math.round(value * 100) / 100;
+
+export const getInvoiceProjectRevenueBreakdown = (invoice: any) => {
+    const projectIds = getInvoiceProjectIds(invoice);
+    const invoiceSubtotal = getInvoiceSubtotal(invoice);
+    const invoiceDiscount = getFiniteNumber(invoice?.discount, 0);
+    const invoiceShipping = getFiniteNumber(invoice?.shipping, 0);
+    const invoiceTax = getFiniteNumber(invoice?.tax, 0);
+    const invoiceTotal = getInvoiceTotal(invoice);
+
+    const normalizedBreakdowns = getNormalizedProjectBreakdowns(invoice);
+
+    if (normalizedBreakdowns && normalizedBreakdowns.length > 0) {
+        return normalizedBreakdowns.map((breakdown) => {
+            const ratio = invoiceSubtotal > 0 ? breakdown.subtotal / invoiceSubtotal : 0;
+            const allocatedDiscount = typeof breakdown.allocatedDiscount === 'number'
+                ? breakdown.allocatedDiscount
+                : roundCurrencyAmount(invoiceDiscount * ratio);
+            const allocatedShipping = typeof breakdown.allocatedShipping === 'number'
+                ? breakdown.allocatedShipping
+                : roundCurrencyAmount(invoiceShipping * ratio);
+            const allocatedTax = typeof breakdown.allocatedTax === 'number'
+                ? breakdown.allocatedTax
+                : roundCurrencyAmount(invoiceTax * ratio);
+            const allocatedTotal = typeof breakdown.allocatedTotal === 'number'
+                ? breakdown.allocatedTotal
+                : roundCurrencyAmount(breakdown.subtotal - allocatedDiscount + allocatedShipping + allocatedTax);
+
+            return {
+                projectId: breakdown.projectId,
+                projectTitle: breakdown.projectTitle || '',
+                subtotal: breakdown.subtotal,
+                totalHours: breakdown.totalHours,
+                allocatedDiscount,
+                allocatedShipping,
+                allocatedTax,
+                allocatedTotal,
+            };
+        });
+    }
+
+    if (projectIds.length === 0) {
+        return [];
+    }
+
+    const subtotal = invoiceSubtotal || invoiceTotal;
+    return [{
+        projectId: projectIds[0],
+        projectTitle: getInvoiceProjectTitle(invoice),
+        subtotal,
+        totalHours: getFiniteNumber(invoice?.totalHours, 0),
+        allocatedDiscount: invoiceDiscount,
+        allocatedShipping: invoiceShipping,
+        allocatedTax: invoiceTax,
+        allocatedTotal: invoiceTotal,
+    }];
+};
+
+export const getInvoiceProjectFinancials = (invoice: any, projectId: string | null | undefined) => {
+    if (!projectId) {
+        return null;
+    }
+
+    return getInvoiceProjectRevenueBreakdown(invoice).find((breakdown) => breakdown.projectId === projectId) || null;
 };
 
 const normalizePaymentCurrencySnapshot = (invoice: any): InvoicePaymentCurrencySnapshot | null => {
@@ -125,7 +335,12 @@ const normalizeExistingInvoiceItem = (item: any, index: number) => {
         quantity,
         rate,
         amount,
+        projectId: getTrimmedString(item?.projectId) || undefined,
         supplierName: item?.supplierName ?? null,
+        lineType: item?.lineType,
+        rateLabel: getTrimmedString(item?.rateLabel) || undefined,
+        quantityLabel: getTrimmedString(item?.quantityLabel) || undefined,
+        pricingMode: item?.pricingMode,
     };
 };
 
@@ -352,7 +567,11 @@ export const normalizeInvoiceRecord = (invoice: any, referenceDate?: Date) => {
 
     const normalized = {
         ...invoice,
-        projectId: invoice.projectId ?? invoice.project?.id ?? null,
+        projectId: getPrimaryInvoiceProjectId(invoice),
+        projectIds: getInvoiceProjectIds(invoice),
+        projectBreakdowns: getNormalizedProjectBreakdowns(invoice),
+        clientExpenseItems: getNormalizedExpenseBreakdownItems(invoice.clientExpenseItems),
+        invoiceOnlyExpenseItems: getNormalizedExpenseBreakdownItems(invoice.invoiceOnlyExpenseItems),
         clientId: invoice.clientId ?? invoice.client?.id ?? null,
         items,
         subtotal,
@@ -554,7 +773,7 @@ export const getInvoicesForProject = (invoices: any[] | null | undefined, projec
         return [];
     }
 
-    return (Array.isArray(invoices) ? invoices : []).filter(invoice => invoice?.projectId === projectId);
+    return (Array.isArray(invoices) ? invoices : []).filter(invoice => invoiceBelongsToProject(invoice, projectId));
 };
 
 /**

@@ -34,6 +34,12 @@ const InvoiceExpenseSelector = ({
     exchangeRatesError,
     exchangeRatesLoading
 }) => {
+    const hasMultipleProjects = new Set(
+        expenses
+            .map((expense) => expense?.projectId || '')
+            .filter(Boolean)
+    ).size > 1;
+
     const handleSelectAll = () => {
         const allSelected = {};
         expenses.forEach((expense) => {
@@ -150,6 +156,16 @@ const InvoiceExpenseSelector = ({
                                                 {expense.supplierName && (
                                                     <p className="text-xs text-muted-foreground">
                                                         {expense.supplierName}
+                                                    </p>
+                                                )}
+                                                {expense.projectTitle && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {expense.projectTitle}
+                                                    </p>
+                                                )}
+                                                {!expense.projectTitle && hasMultipleProjects && expense.clientId && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Client expense
                                                     </p>
                                                 )}
                                             </div>

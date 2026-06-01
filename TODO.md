@@ -2,6 +2,10 @@
 
 ## Priority
 
+[ ] Support multiple project option when generating an invoice for the same client - invoice should contain each project in it's own row, and then totals at the end.
+    [ ] Must keep in mind that projects might have different rate types hourly/flat rate
+    [ ] Must keep in mind that now invoice is shared between projects and should appear under all projects
+    [ ] Make sure that this supports everything e2e without breaking what already works well with single project invoice generation and think about other potential claches or critical paths before we proceed with this update
 
 ---
 

@@ -7,6 +7,7 @@ import type {
     Task,
     TimeEntry,
 } from '@/stores/yjs/types';
+import { getInvoiceProjectIds } from '@/utils/invoiceUtils';
 
 type TimestampedEntity = {
     createdAt?: number | null;
@@ -88,7 +89,9 @@ export const buildProjectRecentUpdateMap = ({
     });
 
     invoices.forEach((invoice) => {
-        touchMap(map, invoice.projectId, getInvoiceTimestamp(invoice));
+        getInvoiceProjectIds(invoice).forEach((projectId) => {
+            touchMap(map, projectId, getInvoiceTimestamp(invoice));
+        });
     });
 
     expenses.forEach((expense) => {

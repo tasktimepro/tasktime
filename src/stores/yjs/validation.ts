@@ -286,12 +286,17 @@ const invoiceItemSchema = z.object({
     quantity: finiteNumberSchema,
     rate: finiteNumberSchema,
     amount: finiteNumberSchema,
+    projectId: z.string().optional(),
     taskId: z.string().optional(),
     expenseId: z.string().optional(),
     supplierName: z.string().nullable().optional(),
     originalAmount: finiteNumberSchema.optional(),
     originalCurrency: z.string().optional(),
     exchangeRate: finiteNumberSchema.optional(),
+    lineType: z.enum(['project', 'project-subtotal', 'task', 'expense', 'custom']).optional(),
+    rateLabel: z.string().optional(),
+    quantityLabel: z.string().optional(),
+    pricingMode: z.enum(['hourly', 'flat', 'mixed']).optional(),
 }).passthrough();
 
 const paymentCurrencySnapshotSchema = z.object({
@@ -302,9 +307,26 @@ const paymentCurrencySnapshotSchema = z.object({
     preferredCurrencyAmount: finiteNumberSchema,
 }).passthrough();
 
+const invoiceProjectBreakdownSchema = z.object({
+    projectId: nonEmptyStringSchema,
+    projectTitle: nonEmptyStringSchema,
+    clientId: nonEmptyStringSchema,
+    pricingMode: z.enum(['hourly', 'flat', 'mixed']),
+    tasks: z.array(z.record(z.string(), z.unknown())).optional(),
+    expenseItems: z.array(z.record(z.string(), z.unknown())).optional(),
+    totalHours: finiteNumberSchema,
+    subtotal: finiteNumberSchema,
+    allocatedDiscount: finiteNumberSchema.optional(),
+    allocatedShipping: finiteNumberSchema.optional(),
+    allocatedTax: finiteNumberSchema.optional(),
+    allocatedTotal: finiteNumberSchema.optional(),
+}).passthrough();
+
 const invoiceSchema = z.object({
     id: nonEmptyStringSchema,
-    projectId: nonEmptyStringSchema,
+    projectId: optionalNullableIdSchema,
+    projectIds: z.array(nonEmptyStringSchema).optional(),
+    projectBreakdowns: z.array(invoiceProjectBreakdownSchema).optional(),
     clientId: nonEmptyStringSchema,
     createdAt: finiteNumberSchema.optional(),
     updatedAt: finiteNumberSchema.optional(),
@@ -815,8 +837,34 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
     }
 
     for (const invoice of snapshot.invoices) {
-        assertReference(projectIds.has(invoice.projectId), `${context}: invoice ${invoice.id} references missing project ${invoice.projectId}`);
+        const linkedProjectIds = new Set<string>();
+
+        if (invoice.projectId) {
+            linkedProjectIds.add(invoice.projectId);
+        }
+
+        if (Array.isArray(invoice.projectIds)) {
+            invoice.projectIds.forEach((projectId) => {
+                if (projectId) {
+                    linkedProjectIds.add(projectId);
+                }
+            });
+        }
+
+        for (const projectId of linkedProjectIds) {
+            assertReference(projectIds.has(projectId), `${context}: invoice ${invoice.id} references missing project ${projectId}`);
+        }
+
         assertReference(clientIds.has(invoice.clientId), `${context}: invoice ${invoice.id} references missing client ${invoice.clientId}`);
+
+        if (Array.isArray(invoice.projectBreakdowns)) {
+            invoice.projectBreakdowns.forEach((breakdown) => {
+                assertReference(
+                    projectIds.has(breakdown.projectId),
+                    `${context}: invoice ${invoice.id} breakdown references missing project ${breakdown.projectId}`
+                );
+            });
+        }
 
         if (invoice.businessInfoId) {
             assertReference(businessInfoIds.has(invoice.businessInfoId), `${context}: invoice ${invoice.id} references missing business info ${invoice.businessInfoId}`);

@@ -14,7 +14,7 @@ import { useUrlState } from '../hooks/useUrlState.ts';
 import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '../utils/invoiceUtils.ts';
+import { getInvoiceProjectTitle, getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
@@ -425,7 +425,7 @@ const InvoicesList = ({
                                             </p>
                                             <p>
                                                 Project: <span className="font-medium text-muted-foreground">
-                                                    {invoice.project?.title || 'Unknown Project'}
+                                                    {getInvoiceProjectTitle(invoice) || 'Unknown Project'}
                                                 </span>
                                             </p>
                                             {invoice.template && (() => {

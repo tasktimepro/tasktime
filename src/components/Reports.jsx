@@ -37,7 +37,7 @@ import { ACCOUNTANT_PACK_MANIFEST_COLUMNS, buildAccountantPackManifestRows } fro
 import { downloadZipFile } from '@/utils/reportZipUtils';
 import { formatCurrency, getProjectCurrency } from '@/utils/currencyUtils';
 import { formatDuration, millisecondsToHours, parseStoredDate, toDisplayDate, toStorageDate } from '@/utils/dateUtils';
-import { getInvoicePaidAtTimestamp, getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '@/utils/invoiceUtils';
+import { getInvoicePaidAtTimestamp, getInvoiceProjectFinancials, getInvoiceProjectRevenueBreakdown, getInvoiceProjectTitle, getInvoiceStatus, getInvoiceTotal, invoiceBelongsToProject, isInvoiceOverdue, isInvoicePaid } from '@/utils/invoiceUtils';
 import { buildMonthlyReportHtml, exportClientStatementPdf, exportExpensesReportPdf, exportInvoicesReportPdf, exportMonthlyReportPdf, exportOutstandingReportPdf, exportProjectWorkSummaryPdf } from '@/utils/reportPdfUtils';
 import { generatePDFBlob, getCurrentInvoiceHtmlContent } from '@/utils/pdfUtils.ts';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
@@ -234,6 +234,43 @@ const buildCsvZipEntries = (reports) => {
         filename,
         content: buildCsvContent(columns, rows),
     }));
+};
+
+const scopeInvoiceToProject = (invoice, projectId, projectsById) => {
+    if (!projectId || projectId === 'all') {
+        return invoice;
+    }
+
+    const projectFinancials = getInvoiceProjectFinancials(invoice, projectId);
+
+    if (!projectFinancials) {
+        return null;
+    }
+
+    const project = projectsById.get(projectId);
+
+    return {
+        ...invoice,
+        projectId,
+        projectIds: [projectId],
+        project: project ? { ...(invoice.project || {}), id: projectId, title: project.title } : invoice.project,
+        projectBreakdowns: [{
+            projectId,
+            projectTitle: projectFinancials.projectTitle || project?.title || '',
+            clientId: invoice.clientId,
+            pricingMode: 'mixed',
+            totalHours: projectFinancials.totalHours || 0,
+            subtotal: projectFinancials.subtotal || 0,
+            allocatedDiscount: projectFinancials.allocatedDiscount || 0,
+            allocatedShipping: projectFinancials.allocatedShipping || 0,
+            allocatedTax: projectFinancials.allocatedTax || 0,
+            allocatedTotal: projectFinancials.allocatedTotal || 0,
+        }],
+        subtotal: projectFinancials.subtotal || 0,
+        tax: projectFinancials.allocatedTax || 0,
+        total: projectFinancials.allocatedTotal || 0,
+        totalHours: projectFinancials.totalHours || 0,
+    };
 };
 
 const buildExportFileName = (prefix, startDate, endDate) => `${prefix}-${startDate}-to-${endDate}.csv`;
@@ -603,7 +640,7 @@ function Reports({ onReadyChange = null }) {
                 return false;
             }
 
-            if (projectId !== 'all' && invoice.projectId !== projectId) {
+            if (projectId !== 'all' && !invoiceBelongsToProject(invoice, projectId)) {
                 return false;
             }
 
@@ -628,13 +665,23 @@ function Reports({ onReadyChange = null }) {
         });
     }, [businessId, clientId, invoiceStatus, invoices, projectId]);
 
+    const scopedEntityFilteredInvoices = useMemo(() => {
+        if (projectId === 'all') {
+            return entityFilteredInvoices;
+        }
+
+        return entityFilteredInvoices
+            .map((invoice) => scopeInvoiceToProject(invoice, projectId, projectsById))
+            .filter(Boolean);
+    }, [entityFilteredInvoices, projectId, projectsById]);
+
     const statementClientIds = useMemo(() => {
         return Array.from(new Set(
-            entityFilteredInvoices
+            scopedEntityFilteredInvoices
                 .map((invoice) => invoice.clientId)
                 .filter(Boolean)
         ));
-    }, [entityFilteredInvoices]);
+    }, [scopedEntityFilteredInvoices]);
 
     const selectedStatementClientId = clientId !== 'all'
         ? clientId
@@ -647,42 +694,42 @@ function Reports({ onReadyChange = null }) {
             return [];
         }
 
-        return entityFilteredInvoices.filter((invoice) => invoice.clientId === selectedStatementClientId);
-    }, [entityFilteredInvoices, selectedStatementClientId]);
+        return scopedEntityFilteredInvoices.filter((invoice) => invoice.clientId === selectedStatementClientId);
+    }, [scopedEntityFilteredInvoices, selectedStatementClientId]);
 
     const filteredInvoices = useMemo(() => {
-        return entityFilteredInvoices.filter((invoice) => {
+        return scopedEntityFilteredInvoices.filter((invoice) => {
             const dateValue = incomeDateBasis === 'paid-date'
                 ? getInvoicePaymentDateString(invoice)
                 : invoice.date;
 
             return matchesStoredDateRange(dateValue, resolvedRange.startDate, resolvedRange.endDate);
         });
-    }, [entityFilteredInvoices, incomeDateBasis, resolvedRange.endDate, resolvedRange.startDate]);
+    }, [incomeDateBasis, resolvedRange.endDate, resolvedRange.startDate, scopedEntityFilteredInvoices]);
 
     const issuedInvoicesInRange = useMemo(() => {
-        return entityFilteredInvoices.filter((invoice) => matchesStoredDateRange(invoice.date, resolvedRange.startDate, resolvedRange.endDate));
-    }, [entityFilteredInvoices, resolvedRange.endDate, resolvedRange.startDate]);
+        return scopedEntityFilteredInvoices.filter((invoice) => matchesStoredDateRange(invoice.date, resolvedRange.startDate, resolvedRange.endDate));
+    }, [resolvedRange.endDate, resolvedRange.startDate, scopedEntityFilteredInvoices]);
 
     const paidInvoicesInRange = useMemo(() => {
-        return entityFilteredInvoices.filter((invoice) => {
+        return scopedEntityFilteredInvoices.filter((invoice) => {
             if (!isInvoicePaid(invoice)) {
                 return false;
             }
 
             return matchesStoredDateRange(getInvoicePaymentDateString(invoice), resolvedRange.startDate, resolvedRange.endDate);
         });
-    }, [entityFilteredInvoices, resolvedRange.endDate, resolvedRange.startDate]);
+    }, [resolvedRange.endDate, resolvedRange.startDate, scopedEntityFilteredInvoices]);
 
     const outstandingInvoices = useMemo(() => {
-        return entityFilteredInvoices.filter((invoice) => {
+        return scopedEntityFilteredInvoices.filter((invoice) => {
             if (isInvoicePaid(invoice) || getInvoiceStatus(invoice) === 'draft') {
                 return false;
             }
 
             return invoice.date <= resolvedRange.endDate;
         });
-    }, [entityFilteredInvoices, resolvedRange.endDate]);
+    }, [resolvedRange.endDate, scopedEntityFilteredInvoices]);
 
     const overdueInvoices = useMemo(() => {
         return outstandingInvoices.filter((invoice) => isInvoiceOverdue(invoice, reportReferenceDate));
@@ -1095,16 +1142,40 @@ function Reports({ onReadyChange = null }) {
     }, [clientsById, convertToCurrency, currencyDisplayMode, filteredInvoices, preferredCurrency]);
 
     const topProjectBreakdown = useMemo(() => {
+        const projectRevenueRows = projectId === 'all'
+            ? filteredInvoices.flatMap((invoice) => {
+                const breakdowns = getInvoiceProjectRevenueBreakdown(invoice);
+
+                if (breakdowns.length === 0) {
+                    return [{
+                        projectTitle: getInvoiceProjectTitle(invoice, projectsById) || EMPTY_PROJECT,
+                        amount: getInvoiceTotal(invoice),
+                        currency: invoice.currency || preferredCurrency,
+                    }];
+                }
+
+                return breakdowns.map((breakdown) => ({
+                    projectTitle: breakdown.projectTitle || projectsById.get(breakdown.projectId)?.title || EMPTY_PROJECT,
+                    amount: breakdown.allocatedTotal || 0,
+                    currency: invoice.currency || preferredCurrency,
+                }));
+            })
+            : filteredInvoices.map((invoice) => ({
+                projectTitle: getInvoiceProjectTitle(invoice, projectsById) || EMPTY_PROJECT,
+                amount: getInvoiceTotal(invoice),
+                currency: invoice.currency || preferredCurrency,
+            }));
+
         return buildBreakdownRows({
-            items: filteredInvoices,
-            getLabel: (invoice) => projectsById.get(invoice.projectId)?.title || EMPTY_PROJECT,
-            getAmount: (invoice) => getInvoiceTotal(invoice),
-            getCurrency: (invoice) => invoice.currency || preferredCurrency,
+            items: projectRevenueRows,
+            getLabel: (row) => row.projectTitle || EMPTY_PROJECT,
+            getAmount: (row) => row.amount || 0,
+            getCurrency: (row) => row.currency || preferredCurrency,
             convertToCurrency,
             currencyDisplayMode,
             preferredCurrency,
         });
-    }, [convertToCurrency, currencyDisplayMode, filteredInvoices, preferredCurrency, projectsById]);
+    }, [convertToCurrency, currencyDisplayMode, filteredInvoices, preferredCurrency, projectId, projectsById]);
 
     const topExpenseCategoryBreakdown = useMemo(() => {
         return buildBreakdownRows({
@@ -1278,7 +1349,7 @@ function Reports({ onReadyChange = null }) {
             subtotal: invoice.subtotal || 0,
             tax: invoice.tax || 0,
             total: getInvoiceTotal(invoice),
-            project: projectsById.get(invoice.projectId)?.title || EMPTY_PROJECT,
+            project: getInvoiceProjectTitle(invoice, projectsById) || EMPTY_PROJECT,
         }));
     }, [businessInfosById, clientsById, filteredInvoices, preferredCurrency, projectsById]);
 
@@ -1593,7 +1664,7 @@ function Reports({ onReadyChange = null }) {
         return outstandingInvoices
             .map((invoice) => {
                 const client = clientsById.get(invoice.clientId);
-                const project = projectsById.get(invoice.projectId);
+                const project = invoice.projectId ? projectsById.get(invoice.projectId) : null;
                 const business = invoice.businessInfoId ? businessInfosById.get(invoice.businessInfoId) : null;
                 const daysOverdue = getInvoiceDaysOverdue(invoice, reportReferenceDate);
                 const status = getInvoiceStatus(invoice, reportReferenceDate);
@@ -1603,7 +1674,7 @@ function Reports({ onReadyChange = null }) {
                     invoiceNumber: invoice.invoiceNumber,
                     client: client?.title || EMPTY_CLIENT,
                     business: business?.businessName || business?.name || business?.title || EMPTY_BUSINESS,
-                    project: project?.title || EMPTY_PROJECT,
+                    project: getInvoiceProjectTitle(invoice, projectsById) || project?.title || EMPTY_PROJECT,
                     invoiceDate: invoice.date,
                     dueDate: invoice.dueDate || '',
                     status,
@@ -2937,7 +3008,7 @@ function Reports({ onReadyChange = null }) {
                                     {filteredInvoices.map((invoice) => {
                                         const client = clientsById.get(invoice.clientId);
                                         const business = invoice.businessInfoId ? businessInfosById.get(invoice.businessInfoId) : null;
-                                        const project = projectsById.get(invoice.projectId);
+                                        const project = invoice.projectId ? projectsById.get(invoice.projectId) : null;
                                         const status = getInvoiceStatus(invoice);
 
                                         return (
@@ -2950,7 +3021,7 @@ function Reports({ onReadyChange = null }) {
                                                     <p className="mt-1 text-sm text-muted-foreground">
                                                         {client?.title || EMPTY_CLIENT}
                                                         {' • '}
-                                                        {project?.title || EMPTY_PROJECT}
+                                                        {getInvoiceProjectTitle(invoice, projectsById) || project?.title || EMPTY_PROJECT}
                                                         {' • '}
                                                         {business?.businessName || business?.name || business?.title || EMPTY_BUSINESS}
                                                     </p>

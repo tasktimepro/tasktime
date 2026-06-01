@@ -29,6 +29,8 @@ const InvoiceModal = ({
     isClientContextFixed,
     projects,
     selectedProject,
+    selectedAdditionalProjectIds,
+    setSelectedAdditionalProjectIds,
     handleProjectSelection,
     clients,
     selectedClient,
@@ -152,6 +154,15 @@ const InvoiceModal = ({
     };
 
     const [activeSection, setActiveSection] = useState(getDefaultSection());
+    const availableProjects = projects.filter((proj) => {
+        if (proj.isPersonal) return false;
+
+        if (selectedClient) {
+            return proj.preferredClientId === selectedClient.id;
+        }
+
+        return true;
+    });
 
     // Form state preservation for modal stacking
     const getAllFormData = useCallback(() => {
@@ -386,20 +397,6 @@ const InvoiceModal = ({
                                         description="You can create a project or continue without one."
                                     />
                                 ) : (() => {
-                                    // Filter projects based on selected client
-                                    const availableProjects = projects.filter(proj => {
-                                        // Only show non-personal projects
-                                        if (proj.isPersonal) return false;
-                                        
-                                        // If a client is selected, only show projects for that client
-                                        if (selectedClient) {
-                                            return proj.preferredClientId === selectedClient.id;
-                                        }
-                                        
-                                        // If no client selected, show all non-personal projects
-                                        return true;
-                                    });
-
                                     if (availableProjects.length === 0 && selectedClient) {
                                         return (
                                             <Notice
@@ -428,18 +425,7 @@ const InvoiceModal = ({
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="__none__">Select project (optional)</SelectItem>
-                                                    {projects.filter(proj => {
-                                                        // Only show non-personal projects
-                                                        if (proj.isPersonal) return false;
-                                                        
-                                                        // If a client is selected, only show projects for that client
-                                                        if (selectedClient) {
-                                                            return proj.preferredClientId === selectedClient.id;
-                                                        }
-                                                        
-                                                        // If no client selected, show all non-personal projects
-                                                        return true;
-                                                    }).map(proj => (
+                                                    {availableProjects.map(proj => (
                                                         <SelectItem key={proj.id} value={proj.id}>
                                                             {proj.title}
                                                         </SelectItem>
@@ -455,6 +441,36 @@ const InvoiceModal = ({
                                                     ) : (!selectedProject.flatRate ? 'You can create invoices with custom rates' : undefined)}
                                                     className="py-2 px-3"
                                                 />
+                                            )}
+
+                                            {!isQuoteMode && selectedClient && availableProjects.length > 1 && selectedProject && (
+                                                <div className="rounded-md border border-border bg-card p-3">
+                                                    <div className="mb-2 text-xs font-medium text-muted-foreground">
+                                                        Additional Projects
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {availableProjects
+                                                            .filter((proj) => proj.id !== selectedProject.id)
+                                                            .map((proj) => (
+                                                                <CustomCheckbox
+                                                                    key={proj.id}
+                                                                    checked={selectedAdditionalProjectIds.includes(proj.id)}
+                                                                    onChange={(checked) => {
+                                                                        setSelectedAdditionalProjectIds((prev) => {
+                                                                            if (checked) {
+                                                                                return prev.includes(proj.id) ? prev : [...prev, proj.id];
+                                                                            }
+
+                                                                            return prev.filter((projectId) => projectId !== proj.id);
+                                                                        });
+                                                                    }}
+                                                                    label={proj.title}
+                                                                    labelClassName="text-sm text-foreground"
+                                                                    id={`additional-project-${proj.id}`}
+                                                                />
+                                                            ))}
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
                                     );

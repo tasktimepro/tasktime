@@ -11,7 +11,7 @@ import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurr
 import { millisecondsToHours, formatDuration, toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoicePaid } from '../utils/invoiceUtils.ts';
+import { getInvoiceTotal, getPaidInvoiceConvertedAmount, invoiceBelongsToProject, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
@@ -118,8 +118,9 @@ const ClientDashboard = ({
     // Get invoices for this client (either project-specific or client-specific)
     const clientInvoices = useMemo(() => {
         const projectIds = clientProjects.map(p => p.id);
-        return invoices.filter(invoice => 
-            projectIds.includes(invoice.projectId) || invoice.clientId === client.id
+        return invoices.filter((invoice) =>
+            invoice.clientId === client.id
+            || projectIds.some((projectId) => invoiceBelongsToProject(invoice, projectId))
         );
     }, [invoices, clientProjects, client.id]);
 
@@ -370,7 +371,10 @@ const ClientDashboard = ({
             relatedTimeEntryIds.forEach(id => deleteEntry(id));
 
             const relatedInvoiceIds = invoices
-                .filter(invoice => relatedProjectIds.includes(invoice.projectId))
+                .filter((invoice) => (
+                    invoice.clientId === clientId
+                    || relatedProjectIds.some((projectId) => invoiceBelongsToProject(invoice, projectId))
+                ))
                 .map(i => i.id);
             relatedInvoiceIds.forEach(id => unbillExpensesForInvoice(id));
             relatedInvoiceIds.forEach(id => deleteInvoice(id));

@@ -16,6 +16,19 @@ const clientsHookMocks = vi.hoisted(() => ({
     clients: []
 }))
 
+const projectHookMocks = vi.hoisted(() => ({
+
+    deleteProject: vi.fn(),
+    updateProject: vi.fn(),
+    projects: []
+}))
+
+const invoiceHookMocks = vi.hoisted(() => ({
+
+    deleteInvoice: vi.fn(),
+    invoices: []
+}))
+
 const expensesHookMocks = vi.hoisted(() => ({
 
     deleteExpense: vi.fn(),
@@ -58,9 +71,9 @@ vi.mock('../hooks/useClients.ts', () => ({
 vi.mock('../hooks/useProjects.ts', () => ({
 
     useProjects: () => ({
-        projects: [],
-        updateProject: vi.fn(),
-        deleteProject: vi.fn()
+        projects: projectHookMocks.projects,
+        updateProject: projectHookMocks.updateProject,
+        deleteProject: projectHookMocks.deleteProject
     })
 }))
 
@@ -83,8 +96,8 @@ vi.mock('../hooks/useTimeEntries.ts', () => ({
 vi.mock('../hooks/useInvoices.ts', () => ({
 
     useInvoices: () => ({
-        invoices: [],
-        deleteInvoice: vi.fn()
+        invoices: invoiceHookMocks.invoices,
+        deleteInvoice: invoiceHookMocks.deleteInvoice
     })
 }))
 
@@ -117,12 +130,19 @@ describe('ClientList', () => {
 
     beforeEach(() => {
         clientsHookMocks.deleteClient.mockClear()
+        projectHookMocks.deleteProject.mockClear()
+        projectHookMocks.updateProject.mockClear()
+        invoiceHookMocks.deleteInvoice.mockClear()
         expensesHookMocks.deleteExpense.mockClear()
+        expensesHookMocks.unbillExpensesForInvoice.mockClear()
         recurrencesHookMocks.deleteRecurrence.mockClear()
 
         clientsHookMocks.clients = [
             { id: 'client-1', title: 'Client One', createdAt: Date.now() }
         ]
+
+        projectHookMocks.projects = []
+        invoiceHookMocks.invoices = []
 
         expensesHookMocks.expenses = [
             { id: 'expense-1', clientId: 'client-1', projectId: null }
@@ -193,6 +213,37 @@ describe('ClientList', () => {
 
         expect(menuButtons).toHaveLength(2)
         expect(menuButtons[0].className).toBe(menuButtons[1].className)
+    })
+
+    it('deletes both project-linked and client-only invoices when deleting a client with projects', async () => {
+        const user = userEvent.setup()
+
+        projectHookMocks.projects = [
+            { id: 'project-1', title: 'Project One', preferredClientId: 'client-1' }
+        ]
+        invoiceHookMocks.invoices = [
+            { id: 'invoice-project', clientId: 'client-1', projectIds: ['project-1'] },
+            { id: 'invoice-client-only', clientId: 'client-1', projectId: null },
+            { id: 'invoice-other', clientId: 'client-2', projectId: null },
+        ]
+
+        render(
+            <ClientList
+                onSelectClient={vi.fn()}
+                openClientModal={vi.fn()}
+                editClientModal={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByLabelText('More actions'))
+        await user.click(screen.getByText('Delete'))
+        await user.click(screen.getByText('Delete Client & All Projects'))
+
+        expect(expensesHookMocks.unbillExpensesForInvoice).toHaveBeenCalledWith('invoice-project')
+        expect(expensesHookMocks.unbillExpensesForInvoice).toHaveBeenCalledWith('invoice-client-only')
+        expect(invoiceHookMocks.deleteInvoice).toHaveBeenCalledWith('invoice-project')
+        expect(invoiceHookMocks.deleteInvoice).toHaveBeenCalledWith('invoice-client-only')
+        expect(invoiceHookMocks.deleteInvoice).not.toHaveBeenCalledWith('invoice-other')
     })
 
 })

@@ -126,11 +126,12 @@ const InvoiceGenerator = ({
     const [showPreview, setShowPreview] = useState(false);
     const [previewInvoice, setPreviewInvoice] = useState(null);
     const [quoteEmailDocument, setQuoteEmailDocument] = useState(null);
-        const [quoteNumberTimestamp, setQuoteNumberTimestamp] = useState('');
+    const [quoteNumberTimestamp, setQuoteNumberTimestamp] = useState('');
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
     const [selectedClient, setSelectedClient] = useState(client); // Initialize with client prop if provided
     const [selectedProject, setSelectedProject] = useState(project); // Initialize with current project
+    const [selectedAdditionalProjectIds, setSelectedAdditionalProjectIds] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState(null); // Selected invoice template
     const [isProjectContextFixed, setIsProjectContextFixed] = useState(!!project && !client); // Track if opened from project context (but not client context)
     const [isClientContextFixed, setIsClientContextFixed] = useState(!!client); // Track if opened from client context
@@ -156,6 +157,61 @@ const InvoiceGenerator = ({
             customEnd: billingPeriodEnd,
         });
     }, [billingPeriodEnd, billingPeriodPreset, billingPeriodStart]);
+
+    const selectedProjectIdsForInvoice = useMemo(() => {
+        const ids = [];
+
+        if (selectedProject?.id) {
+            ids.push(selectedProject.id);
+        }
+
+        selectedAdditionalProjectIds.forEach((projectId) => {
+            if (projectId && !ids.includes(projectId)) {
+                ids.push(projectId);
+            }
+        });
+
+        return ids;
+    }, [selectedAdditionalProjectIds, selectedProject?.id]);
+
+    const selectedProjectsForInvoice = useMemo(() => {
+        return selectedProjectIdsForInvoice
+            .map((projectId) => {
+                if (selectedProject?.id === projectId) {
+                    return selectedProject;
+                }
+
+                if (project?.id === projectId) {
+                    return project;
+                }
+
+                return projects.find((item) => item.id === projectId) || null;
+            })
+            .filter(Boolean);
+    }, [project, projects, selectedProject, selectedProjectIdsForInvoice]);
+
+    useEffect(() => {
+        setSelectedAdditionalProjectIds((prev) => {
+            const next = prev.filter((projectId) => {
+                if (!projectId || projectId === selectedProject?.id) {
+                    return false;
+                }
+
+                const matchingProject = projects.find((item) => item.id === projectId);
+                if (!matchingProject) {
+                    return false;
+                }
+
+                if (!selectedClient?.id) {
+                    return true;
+                }
+
+                return matchingProject.preferredClientId === selectedClient.id;
+            });
+
+            return next.length === prev.length ? prev : next;
+        });
+    }, [projects, selectedClient?.id, selectedProject?.id]);
 
     useEffect(() => {
         if (!showInvoiceForm) {
@@ -221,8 +277,14 @@ const InvoiceGenerator = ({
         );
     }, [editingInvoice]);
 
-    const getScopedAvailableExpenses = useCallback((projectForScope = null, clientForScope = null, invoiceId = null) => {
-        if (!projectForScope && !clientForScope) {
+    const getScopedAvailableExpenses = useCallback((projectsForScope = [], clientForScope = null, invoiceId = null) => {
+        const scopedProjectIds = new Set(
+            (Array.isArray(projectsForScope) ? projectsForScope : [])
+                .map((projectItem) => projectItem?.id)
+                .filter(Boolean)
+        );
+
+        if (scopedProjectIds.size === 0 && !clientForScope) {
             return [];
         }
 
@@ -230,12 +292,10 @@ const InvoiceGenerator = ({
             .filter((expense) => {
                 if (!expense || !expense.billable) return false;
 
-                if (projectForScope?.id) {
-                    if (expense.projectId !== projectForScope.id) return false;
-                } else if (clientForScope?.id) {
-                    if (expense.clientId !== clientForScope.id) return false;
+                if (expense.projectId) {
+                    if (!scopedProjectIds.has(expense.projectId)) return false;
                 } else {
-                    return false;
+                    if (!clientForScope?.id || expense.clientId !== clientForScope.id) return false;
                 }
 
                 if (!isStoredDateWithinBillingRange(expense.date, activeBillingPeriodStart, activeBillingPeriodEnd)) {
@@ -250,8 +310,8 @@ const InvoiceGenerator = ({
     }, [activeBillingPeriodEnd, activeBillingPeriodStart, expenses]);
 
     const availableExpenses = useMemo(() => {
-        return getScopedAvailableExpenses(selectedProject, selectedClient, editingInvoice?.id || null);
-    }, [editingInvoice, getScopedAvailableExpenses, selectedClient, selectedProject]);
+        return getScopedAvailableExpenses(selectedProjectsForInvoice, selectedClient, editingInvoice?.id || null);
+    }, [editingInvoice, getScopedAvailableExpenses, selectedClient, selectedProjectsForInvoice]);
 
     const availableExpensesWithConversion = useMemo(() => {
         return availableExpenses.map((expense) => {
@@ -270,6 +330,7 @@ const InvoiceGenerator = ({
 
                 return {
                     ...expense,
+                    projectTitle: expense.projectId ? (projects.find((projectItem) => projectItem.id === expense.projectId)?.title || '') : '',
                     convertedAmount: existingItem.amount,
                     exchangeRate,
                     originalAmount: storedOriginalAmount,
@@ -282,6 +343,7 @@ const InvoiceGenerator = ({
             if (originalCurrency === normalizedInvoiceCurrency) {
                 return {
                     ...expense,
+                    projectTitle: expense.projectId ? (projects.find((projectItem) => projectItem.id === expense.projectId)?.title || '') : '',
                     convertedAmount: originalAmount,
                     exchangeRate: 1,
                     originalAmount,
@@ -301,6 +363,7 @@ const InvoiceGenerator = ({
             if (!conversion.success) {
                 return {
                     ...expense,
+                    projectTitle: expense.projectId ? (projects.find((projectItem) => projectItem.id === expense.projectId)?.title || '') : '',
                     convertedAmount: originalAmount,
                     exchangeRate: undefined,
                     originalAmount,
@@ -317,6 +380,7 @@ const InvoiceGenerator = ({
 
             return {
                 ...expense,
+                projectTitle: expense.projectId ? (projects.find((projectItem) => projectItem.id === expense.projectId)?.title || '') : '',
                 convertedAmount,
                 exchangeRate,
                 originalAmount,
@@ -325,7 +389,7 @@ const InvoiceGenerator = ({
                 conversionError: null
             };
         });
-    }, [availableExpenses, editingExpenseItemMap, exchangeRates, invoiceCurrency, normalizedInvoiceCurrency]);
+    }, [availableExpenses, editingExpenseItemMap, exchangeRates, invoiceCurrency, normalizedInvoiceCurrency, projects]);
 
     const conversionUnavailableCount = useMemo(() => {
         return availableExpensesWithConversion.filter((expense) => !expense.isConvertible).length;
@@ -372,7 +436,7 @@ const InvoiceGenerator = ({
      * Initialize payment method based on previous invoices or editing invoice
      * Prioritizes client-based invoice history over project-based history
      */
-            const [selectedExpensesForBilling, setSelectedExpensesForBilling] = useState({});
+    const [selectedExpensesForBilling, setSelectedExpensesForBilling] = useState({});
     const initializePaymentMethod = useCallback(() => {
         // Don't override if project was manually changed (user may have gotten auto-populated values)
         if (projectManuallyChanged && selectedPaymentMethod !== null) {
@@ -587,6 +651,10 @@ const InvoiceGenerator = ({
             const invoiceProject = projects.find(p => p.id === editingInvoice.projectId);
             if (invoiceProject) {
                 setSelectedProject(invoiceProject);
+                setSelectedAdditionalProjectIds(
+                    (Array.isArray(editingInvoice.projectIds) ? editingInvoice.projectIds : [])
+                        .filter((projectId) => projectId && projectId !== invoiceProject.id)
+                );
                 return;
             }
         }
@@ -595,6 +663,7 @@ const InvoiceGenerator = ({
         // This prevents overriding user selections when opening from invoices view
         if (project) {
             setSelectedProject(project);
+            setSelectedAdditionalProjectIds([]);
         }
         // If project is null (like when opened from invoices view), don't set anything
         // and let the user make their selection
@@ -953,6 +1022,21 @@ const InvoiceGenerator = ({
         });
     }, [activeBillingPeriodEnd, activeBillingPeriodStart, selectedProject, timeEntries, tasks]);
 
+    const prepareInvoiceDataForProjects = useCallback((projectsForData = []) => {
+        return projectsForData.flatMap((projectForData) => {
+            return (prepareInvoiceData(projectForData) || []).map((task) => ({
+                ...task,
+                projectId: projectForData.id,
+                projectTitle: projectForData.title,
+                projectHourlyRate: typeof projectForData.hourlyRate === 'number' ? projectForData.hourlyRate : 0,
+                projectFlatRate: projectForData.flatRate === true,
+                hourlyRate: typeof task.hourlyRate === 'number'
+                    ? task.hourlyRate
+                    : (typeof projectForData.hourlyRate === 'number' ? projectForData.hourlyRate : 0),
+            }));
+        });
+    }, [prepareInvoiceData]);
+
     useEffect(() => {
         if (!showInvoiceForm) {
             return;
@@ -962,18 +1046,22 @@ const InvoiceGenerator = ({
             return;
         }
 
-        const projectForInvoice = selectedProject
-            || (editingInvoice?.projectId ? projects.find((item) => item.id === editingInvoice.projectId) : null)
-            || project
-            || null;
+        const projectsForInvoice = selectedProjectsForInvoice.length > 0
+            ? selectedProjectsForInvoice
+            : [
+                selectedProject
+                || (editingInvoice?.projectId ? projects.find((item) => item.id === editingInvoice.projectId) : null)
+                || project
+                || null
+            ].filter(Boolean);
 
-        if (!projectForInvoice) {
+        if (projectsForInvoice.length === 0) {
             setInvoiceTasks((prev) => (prev.length === 0 ? prev : []));
             setSelectedTasksForBilling((prev) => (Object.keys(prev).length === 0 ? prev : {}));
             return;
         }
 
-        const nextTasks = prepareInvoiceData(projectForInvoice) || [];
+        const nextTasks = prepareInvoiceDataForProjects(projectsForInvoice);
         const editingTaskMap = new Map((editingInvoice?.tasks || []).map((task) => [task.id, task]));
         const previousInvoiceTaskMap = new Map(invoiceTasks.map((task) => [task.id, task]));
 
@@ -1023,7 +1111,7 @@ const InvoiceGenerator = ({
 
             return areBooleanMapsEqual(prev, next) ? prev : next;
         });
-    }, [editingInvoice, invoiceTasks, isQuoteMode, prepareInvoiceData, project, projects, selectedProject, showInvoiceForm]);
+    }, [editingInvoice, invoiceTasks, isQuoteMode, prepareInvoiceDataForProjects, project, projects, selectedProject, selectedProjectsForInvoice, showInvoiceForm]);
 
     useEffect(() => {
         if (!showInvoiceForm) {
@@ -1059,13 +1147,23 @@ const InvoiceGenerator = ({
     }, [availableExpensesWithConversion, editingInvoice, showInvoiceForm]);
 
     useEffect(() => {
-        if (!showInvoiceForm || !selectedProject?.flatRate) {
+        if (!showInvoiceForm) {
+            return;
+        }
+
+        const flatRateProjectIds = new Set(
+            selectedProjectsForInvoice
+                .filter((projectItem) => projectItem?.flatRate)
+                .map((projectItem) => projectItem.id)
+        );
+
+        if (flatRateProjectIds.size === 0) {
             return;
         }
 
         const taskEstimateMap = new Map(
             tasks
-                .filter((task) => task.projectId === selectedProject.id)
+                .filter((task) => task.projectId && flatRateProjectIds.has(task.projectId))
                 .map((task) => [task.id, task.estimatedFlatAmount])
         );
 
@@ -1075,7 +1173,7 @@ const InvoiceGenerator = ({
 
             invoiceTasks.forEach((task) => {
                 if (next[task.id] === undefined) {
-                    next[task.id] = true;
+                    next[task.id] = task.projectFlatRate === true;
                     hasChanges = true;
                 }
             });
@@ -1117,8 +1215,8 @@ const InvoiceGenerator = ({
             return hasChanges ? next : prev;
         });
 
-        setNewTaskUseFlatRate(true);
-    }, [invoiceTasks, selectedProject, showInvoiceForm, tasks]);
+        setNewTaskUseFlatRate(selectedProjectsForInvoice.some((projectItem) => projectItem?.flatRate));
+    }, [invoiceTasks, selectedProjectsForInvoice, showInvoiceForm, tasks]);
 
     // Handler assignments (replace function definitions)
     const handleTaskSelectionForBilling = InvoiceHandler.handleTaskSelectionForBilling(setSelectedTasksForBilling);
@@ -1239,7 +1337,7 @@ const InvoiceGenerator = ({
     const handleAdditionalTaskQuantityChange = InvoiceHandler.handleAdditionalTaskQuantityChange(setAdditionalTasks);
     const handleAdditionalTaskHourlyRateChange = InvoiceHandler.handleAdditionalTaskHourlyRateChange(setAdditionalTasks);
     const handleToggleAdditionalTaskFlatRate = InvoiceHandler.handleToggleAdditionalTaskFlatRate(setAdditionalTasks, setUseFlatRate);
-    const handleClientSelection = InvoiceHandler.handleClientSelection(setSelectedClient, clients);
+    const baseHandleClientSelection = InvoiceHandler.handleClientSelection(setSelectedClient, clients);
     const handleResetInvoiceForm = InvoiceHandler.handleResetInvoiceForm(
         setInvoiceTasks,
         setEditableHours,
@@ -1266,7 +1364,7 @@ const InvoiceGenerator = ({
         setNewExpenseCurrency,
         setNewExpenseSupplierName
     );
-    const handleProjectSelection = InvoiceHandler.handleProjectSelection(
+    const baseHandleProjectSelection = InvoiceHandler.handleProjectSelection(
         setSelectedProject,
         setProjectManuallyChanged,
         handleResetInvoiceForm,
@@ -1288,7 +1386,7 @@ const InvoiceGenerator = ({
         setTaskQuantities,
         setNewTaskUseFlatRate
     );
-    const handleCancel = InvoiceHandler.handleCancel(
+    const baseHandleCancel = InvoiceHandler.handleCancel(
         setShowInvoiceForm,
         handleResetInvoiceForm,
         setProjectManuallyChanged,
@@ -1300,6 +1398,34 @@ const InvoiceGenerator = ({
         setNewTaskQuantity,
         setNewTaskUseFlatRate
     );
+
+    const handleClientSelection = useCallback((clientId) => {
+        const nextClient = clientId
+            ? clients.find((clientItem) => clientItem && clientItem.id === clientId) || null
+            : null;
+        const shouldResetProjectContext = selectedProject && nextClient && selectedProject.preferredClientId !== nextClient.id;
+        const shouldClearProjectContext = selectedProject && !nextClient;
+
+        if (shouldResetProjectContext || shouldClearProjectContext) {
+            setSelectedProject(null);
+            setSelectedAdditionalProjectIds([]);
+            handleResetInvoiceForm();
+        } else if (nextClient?.id !== selectedClient?.id) {
+            setSelectedAdditionalProjectIds([]);
+        }
+
+        baseHandleClientSelection(clientId);
+    }, [baseHandleClientSelection, clients, handleResetInvoiceForm, selectedClient?.id, selectedProject]);
+
+    const handleProjectSelection = useCallback((projectId) => {
+        setSelectedAdditionalProjectIds([]);
+        baseHandleProjectSelection(projectId);
+    }, [baseHandleProjectSelection]);
+
+    const handleCancel = useCallback(() => {
+        setSelectedAdditionalProjectIds([]);
+        baseHandleCancel();
+    }, [baseHandleCancel]);
 
     /**
      * Calculate pricing breakdown: Subtotal → Discount → Shipping → Tax → Total
@@ -1353,7 +1479,7 @@ const InvoiceGenerator = ({
             return parseInvoiceNumber(task?.flatRate) * parseInvoiceNumber(task?.quantity, 1);
         }
 
-        const fallbackHourlyRate = parseInvoiceNumber(selectedProject?.hourlyRate) || parseInvoiceNumber(selectedClient?.hourlyRate);
+        const fallbackHourlyRate = parseInvoiceNumber(task?.projectHourlyRate) || parseInvoiceNumber(selectedProject?.hourlyRate) || parseInvoiceNumber(selectedClient?.hourlyRate);
         const parentHourlyRate = parseInvoiceNumber(task?.hourlyRate) || fallbackHourlyRate;
         let taskAmount = parseInvoiceNumber(task?.hours) * parentHourlyRate;
 
@@ -1373,9 +1499,13 @@ const InvoiceGenerator = ({
         return orderedSelectedInvoiceTasks
             .map(task => ({
                 ...task,
+                projectId: task.projectId || null,
+                projectTitle: task.projectTitle || '',
+                projectHourlyRate: task.projectHourlyRate || 0,
+                projectFlatRate: task.projectFlatRate === true,
                 hours: editableHours[task?.id] || task?.originalHours || 0,
                 flatRate: taskFlatRates[task.id] || 0,
-                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
                 useFlatRate: useFlatRate[task.id] || false,
                 quantity: taskQuantities[task.id] || 1,
                 isMerged: (task && task.id && mergedSubtasks[task.id]) || false,
@@ -1384,9 +1514,13 @@ const InvoiceGenerator = ({
                         .filter(subtask => subtask && subtask.parentTaskId === task.id)
                         .map(subtask => ({
                             ...subtask,
+                            projectId: subtask.projectId || task.projectId || null,
+                            projectTitle: subtask.projectTitle || task.projectTitle || '',
+                            projectHourlyRate: subtask.projectHourlyRate || task.projectHourlyRate || 0,
+                            projectFlatRate: subtask.projectFlatRate === true || task.projectFlatRate === true,
                             hours: editableHours[subtask.id] || subtask.originalHours || 0,
                             flatRate: taskFlatRates[subtask.id] || 0,
-                            hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                            hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || subtask.projectHourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
                             useFlatRate: useFlatRate[subtask.id] || false,
                             quantity: taskQuantities[subtask.id] || 1
                         }))
@@ -1404,6 +1538,85 @@ const InvoiceGenerator = ({
             }))
             .filter((task) => getInvoiceTaskAmount(task) > 0);
     }, [additionalTasks, getInvoiceTaskAmount, selectedClient?.hourlyRate, selectedProject?.hourlyRate]);
+
+    const buildInvoiceProjectBreakdowns = useCallback((documentTasks, expenseItems, pricing) => {
+        const projectById = new Map(selectedProjectsForInvoice.map((projectItem) => [projectItem.id, projectItem]));
+        const taskGroups = new Map();
+
+        (documentTasks || []).forEach((task) => {
+            const projectId = task?.projectId;
+            if (!projectId) {
+                return;
+            }
+
+            const existing = taskGroups.get(projectId) || { tasks: [], expenseItems: [] };
+            existing.tasks.push(task);
+            taskGroups.set(projectId, existing);
+        });
+
+        (expenseItems || []).forEach((expense) => {
+            const projectId = expense.projectId || null;
+            if (!projectId) {
+                return;
+            }
+
+            const existing = taskGroups.get(projectId) || { tasks: [], expenseItems: [] };
+            existing.expenseItems.push(expense);
+            taskGroups.set(projectId, existing);
+        });
+
+        const projectBreakdowns = Array.from(taskGroups.entries()).map(([projectId, group]) => {
+            const projectItem = projectById.get(projectId);
+            const taskSubtotal = group.tasks.reduce((sum, task) => {
+                return sum + getInvoiceTaskAmount(task, task.isMerged ? task.mergedSubtasks : []);
+            }, 0);
+            const expenseSubtotal = group.expenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+            const totalHours = group.tasks
+                .filter((task) => !task.useFlatRate)
+                .reduce((sum, task) => {
+                    const mergedHours = Array.isArray(task.mergedSubtasks)
+                        ? task.mergedSubtasks.reduce((mergedTotal, mergedTask) => mergedTotal + (Number(mergedTask.hours) || 0), 0)
+                        : 0;
+                    return sum + (Number(task.hours) || 0) + mergedHours;
+                }, 0);
+            const pricingModes = new Set(
+                group.tasks.map((task) => (task.useFlatRate ? 'flat' : 'hourly'))
+            );
+            const pricingMode = pricingModes.size > 1
+                ? 'mixed'
+                : (pricingModes.values().next().value || (projectItem?.flatRate ? 'flat' : 'hourly'));
+
+            return {
+                projectId,
+                projectTitle: projectItem?.title || group.tasks[0]?.projectTitle || 'Unknown Project',
+                clientId: selectedClient?.id || '',
+                pricingMode,
+                tasks: group.tasks,
+                expenseItems: group.expenseItems,
+                totalHours: Math.round(totalHours * 100) / 100,
+                subtotal: Math.round((taskSubtotal + expenseSubtotal) * 100) / 100,
+            };
+        });
+        const invoiceSubtotal = Number(pricing?.subtotal) || 0;
+        const invoiceDiscount = Number(pricing?.discount) || 0;
+        const invoiceShipping = Number(pricing?.shipping) || 0;
+        const invoiceTax = Number(pricing?.tax) || 0;
+
+        return projectBreakdowns.map((breakdown) => {
+            const ratio = invoiceSubtotal > 0 ? breakdown.subtotal / invoiceSubtotal : 0;
+            const allocatedDiscount = Math.round(invoiceDiscount * ratio * 100) / 100;
+            const allocatedShipping = Math.round(invoiceShipping * ratio * 100) / 100;
+            const allocatedTax = Math.round(invoiceTax * ratio * 100) / 100;
+
+            return {
+                ...breakdown,
+                allocatedDiscount,
+                allocatedShipping,
+                allocatedTax,
+                allocatedTotal: Math.round((breakdown.subtotal - allocatedDiscount + allocatedShipping + allocatedTax) * 100) / 100,
+            };
+        });
+    }, [getInvoiceTaskAmount, selectedClient?.id, selectedProjectsForInvoice]);
 
     const buildQuoteData = useCallback(() => {
         if (!selectedProject) {
@@ -1551,6 +1764,8 @@ const InvoiceGenerator = ({
             .map((expense) => ({
                 id: expense.id,
                 title: expense.title,
+                projectId: expense.projectId || null,
+                projectTitle: expense.projectId ? (projects.find((projectItem) => projectItem.id === expense.projectId)?.title || '') : '',
                 amount: expense.convertedAmount || 0,
                 date: expense.date,
                 supplierName: expense.supplierName || null,
@@ -1559,6 +1774,9 @@ const InvoiceGenerator = ({
                 originalCurrency: expense.originalCurrency,
                 exchangeRate: expense.exchangeRate
             }));
+
+        const projectExpenseItems = selectedExpenseItems.filter((expense) => expense.projectId);
+        const clientExpenseItems = selectedExpenseItems.filter((expense) => !expense.projectId);
 
         const invoiceOnlyExpenseItems = additionalExpenses.map((expense) => ({
             id: expense.id,
@@ -1597,6 +1815,7 @@ const InvoiceGenerator = ({
 
         const normalizedSelectedInvoiceTasks = getNormalizedDocumentTasks();
         const normalizedAdditionalTasks = getNormalizedAdditionalDocumentTasks();
+        const invoiceProjectBreakdowns = buildInvoiceProjectBreakdowns(normalizedSelectedInvoiceTasks, projectExpenseItems, pricing);
 
         const resolvedBrandAsset = resolvedBusinessInfo?.branding?.logoAssetId
             ? getBusinessBrandAsset(resolvedBusinessInfo.branding.logoAssetId)
@@ -1623,6 +1842,10 @@ const InvoiceGenerator = ({
             id: invoiceId,
             project: selectedProject,
             projectId: selectedProject?.id || null,
+            projectIds: selectedProjectIdsForInvoice,
+            projectBreakdowns: invoiceProjectBreakdowns,
+            clientExpenseItems,
+            invoiceOnlyExpenseItems,
             client: {
                 name: selectedClient?.clientName || '',
                 contactPerson: selectedClient?.contactPerson || '',
@@ -1788,25 +2011,22 @@ const InvoiceGenerator = ({
             }
         });
 
-        // Update tasks to set lastBilledAt for billed tasks and projects
-        if (selectedProject && !editingInvoice) {
+        // Update tasks to set lastBilledAt for billed tasks
+        if (!editingInvoice) {
             const currentTime = adjustmentTimestamp;
             
             // Get all task IDs that should be marked as billed (including merged subtasks)
-            // Make sure we only include tasks from the current project
             const billedTaskIds = [];
-            const projectTasks = tasks.filter(task => task.projectId === selectedProject.id);
-            const projectTaskIds = new Set(projectTasks.map(task => task.id));
+            const invoiceTaskIds = new Set(invoiceTasks.map((task) => task.id));
             
             invoiceTasks.forEach(task => {
-                // Verify this task actually belongs to the current project before adding it
-                if (selectedTasksForBilling[task.id] && projectTaskIds.has(task.id)) {
+                if (selectedTasksForBilling[task.id] && invoiceTaskIds.has(task.id)) {
                     billedTaskIds.push(task.id);
                     
                     // If this parent task has merged subtasks, include them too
                     if (mergedSubtasks[task.id]) {
                         const subtasks = invoiceTasks.filter(subtask => 
-                            subtask.parentTaskId === task.id && projectTaskIds.has(subtask.id)
+                            subtask.parentTaskId === task.id && invoiceTaskIds.has(subtask.id)
                         );
                         subtasks.forEach(subtask => {
                             billedTaskIds.push(subtask.id);
@@ -1865,7 +2085,7 @@ const InvoiceGenerator = ({
                 const previousCutoff = previousBillingCutoffs.get(taskId) || 0;
                 const nextCutoff = nextBillingCutoffs.get(taskId) || 0;
 
-                if (task && task.projectId === selectedProject.id && nextCutoff > previousCutoff) {
+                if (task && nextCutoff > previousCutoff) {
                     updateTask(taskId, { lastBilledAt: nextCutoff });
                 }
             });
@@ -1874,6 +2094,7 @@ const InvoiceGenerator = ({
 
         // Reset form
         setShowInvoiceForm(false);
+        setSelectedAdditionalProjectIds([]);
         
         // Use the centralized reset function
         handleResetInvoiceForm();
@@ -2005,7 +2226,10 @@ const InvoiceGenerator = ({
             setSelectedTasksForBilling(allTasksSelected);
 
             const initialExpenseSelection = {};
-            const editingProjectId = editingInvoice.projectId || selectedProject?.id || null;
+            const editingProjectIds = new Set(
+                (Array.isArray(editingInvoice.projectIds) ? editingInvoice.projectIds : [editingInvoice.projectId || selectedProject?.id || null])
+                    .filter(Boolean)
+            );
             const editingClientId = editingInvoice.clientId || selectedClient?.id || null;
             const editingExpenseIds = new Set(
                 (editingInvoice.items || [])
@@ -2016,8 +2240,8 @@ const InvoiceGenerator = ({
             expenses
                 .filter((expense) => {
                     if (!expense || !expense.billable) return false;
-                    if (editingProjectId) {
-                        if (expense.projectId !== editingProjectId) return false;
+                    if (expense.projectId) {
+                        if (editingProjectIds.size === 0 || !editingProjectIds.has(expense.projectId)) return false;
                     } else if (editingClientId) {
                         if (expense.clientId !== editingClientId) return false;
                     } else {
@@ -2052,8 +2276,17 @@ const InvoiceGenerator = ({
                 ? buildProjectQuoteLineItems({ project: selectedProject, tasks, clients })
                 : null;
             const tasksData = isQuoteMode
-                ? (quoteLineItems?.quoteTasks || [])
-                : prepareInvoiceData();
+                ? (quoteLineItems?.quoteTasks || []).map((task) => ({
+                    ...task,
+                    projectId: selectedProject?.id || null,
+                    projectTitle: selectedProject?.title || '',
+                    projectHourlyRate: typeof selectedProject?.hourlyRate === 'number' ? selectedProject.hourlyRate : 0,
+                    projectFlatRate: selectedProject?.flatRate === true,
+                    hourlyRate: typeof task.hourlyRate === 'number'
+                        ? task.hourlyRate
+                        : (typeof selectedProject?.hourlyRate === 'number' ? selectedProject.hourlyRate : 0),
+                }))
+                : prepareInvoiceDataForProjects(selectedProjectsForInvoice.length > 0 ? selectedProjectsForInvoice : (selectedProject ? [selectedProject] : []));
             
             // Even if there are no billable tasks, we still open the form
             // This allows users to manually add tasks with the "New Task" feature
@@ -2071,7 +2304,7 @@ const InvoiceGenerator = ({
                     initialTaskSelection[task.id] = true; // Select all tasks by default
                     
                     // For flat rate projects, pre-toggle all tasks to flat rate
-                    if (selectedProject && selectedProject.flatRate) {
+                    if (task.projectFlatRate === true) {
                         const sourceTask = tasks.find((candidate) => candidate.id === task.id);
                         const estimatedFlatAmount = sourceTask?.estimatedFlatAmount;
                         const flatRateAmount = typeof task.flatRate === 'number' && Number.isFinite(task.flatRate)
@@ -2102,13 +2335,13 @@ const InvoiceGenerator = ({
                 setSelectedExpensesForBilling(initialExpenseSelection);
                 
                 // Apply flat rate toggles for flat rate projects
-                if (selectedProject && selectedProject.flatRate) {
+                if (selectedProjectsForInvoice.some((projectItem) => projectItem?.flatRate)) {
                     setTaskFlatRates(initialTaskFlatRates);
                     setUseFlatRate(initialFlatRateToggles);
                     setTaskQuantities(initialTaskQuantities);
                     
                     // Also set the new task flat rate toggle to match project setting
-                    setNewTaskUseFlatRate(selectedProject.flatRate);
+                    setNewTaskUseFlatRate(selectedProject?.flatRate || false);
                 } else {
                     // Reset flat rate data for hourly projects
                     setTaskFlatRates({});
@@ -2149,7 +2382,7 @@ const InvoiceGenerator = ({
             }
         }
         setShowInvoiceForm(true);
-    }, [availableExpensesWithConversion, client, clients, editingInvoice, expenses, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceData, projects, quoteNumberTimestamp, selectedClient, selectedProject, setIsProjectContextFixed, showError, showInvoiceForm, tasks]);
+    }, [availableExpensesWithConversion, client, clients, editingInvoice, expenses, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceDataForProjects, projects, quoteNumberTimestamp, selectedClient, selectedProject, selectedProjectsForInvoice, setIsProjectContextFixed, showError, showInvoiceForm, tasks]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {
@@ -2243,6 +2476,8 @@ const InvoiceGenerator = ({
                     isClientContextFixed={isClientContextFixed}
                     projects={projects}
                     selectedProject={selectedProject}
+                    selectedAdditionalProjectIds={selectedAdditionalProjectIds}
+                    setSelectedAdditionalProjectIds={setSelectedAdditionalProjectIds}
                     handleProjectSelection={handleProjectSelection}
                     clients={clients}
                     selectedClient={selectedClient}

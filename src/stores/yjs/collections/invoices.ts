@@ -8,6 +8,7 @@
 import * as Y from 'yjs';
 import type { Invoice } from '../types';
 import { generateId } from '@/utils/idUtils';
+import { invoiceBelongsToProject } from '@/utils/invoiceUtils';
 
 export interface InvoiceHelpers {
 
@@ -96,7 +97,7 @@ export function createInvoiceHelpers(invoices: Y.Map<string, Invoice>): InvoiceH
         },
 
         getByProject(projectId: string): Invoice[] {
-            return getAllInvoices().filter(i => i.projectId === projectId);
+            return getAllInvoices().filter((invoice) => invoiceBelongsToProject(invoice, projectId));
         },
 
         getByClient(clientId: string): Invoice[] {

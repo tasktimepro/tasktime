@@ -6,6 +6,9 @@ type TaskItem = {
     id: string;
     projectId: string;
     title?: string;
+    hourlyRate?: number | null;
+    flatRate?: boolean;
+    projectTitle?: string;
     parentTaskId?: string | null;
     lastBilledAt?: number;
     createdAt?: number;
@@ -33,6 +36,10 @@ type BuildInvoiceTaskParams = {
 
 type InvoiceTaskData = {
     id: string;
+    projectId: string;
+    projectTitle: string;
+    projectHourlyRate: number;
+    projectFlatRate: boolean;
     title: string;
     parentTaskId: string | null | undefined;
     originalHours: number;
@@ -121,6 +128,10 @@ export const buildInvoiceTaskData = ({
         const task = projectTaskMap.get(taskId);
         return {
             id: taskId,
+            projectId: projectToUse.id,
+            projectTitle: projectToUse.title || 'Unknown Project',
+            projectHourlyRate: typeof projectToUse.hourlyRate === 'number' ? projectToUse.hourlyRate : 0,
+            projectFlatRate: projectToUse.flatRate === true,
             title: task ? task.title || 'Unknown Task' : 'Unknown Task',
             parentTaskId: task ? task.parentTaskId : null,
             originalHours: Math.round((millisecondsToHours(totalTime)) * 100) / 100,

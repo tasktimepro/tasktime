@@ -18,6 +18,10 @@ import {
 type InvoiceTask = {
     id: string;
     title: string;
+    projectId?: string | null;
+    projectTitle?: string;
+    projectHourlyRate?: number | string;
+    projectFlatRate?: boolean;
     hours?: number | string;
     hourlyRate?: number | string;
     flatRate?: number | string;
@@ -33,6 +37,26 @@ type InvoiceExpenseItem = {
     amount: number;
     date?: string;
     supplierName?: string | null;
+    projectId?: string | null;
+    projectTitle?: string;
+    originalAmount?: number;
+    originalCurrency?: string;
+    exchangeRate?: number;
+};
+
+type InvoiceProjectBreakdown = {
+    projectId: string;
+    projectTitle: string;
+    clientId: string;
+    pricingMode: 'hourly' | 'flat' | 'mixed';
+    tasks?: InvoiceTask[];
+    expenseItems?: InvoiceExpenseItem[];
+    totalHours: number;
+    subtotal: number;
+    allocatedDiscount?: number;
+    allocatedShipping?: number;
+    allocatedTax?: number;
+    allocatedTotal?: number;
 };
 
 type ProjectInfo = {
@@ -92,6 +116,11 @@ type PaymentMethodInfo = {
 type InvoiceData = {
     documentMode?: 'invoice' | 'quote';
     project?: ProjectInfo;
+    projectId?: string | null;
+    projectIds?: string[];
+    projectBreakdowns?: InvoiceProjectBreakdown[];
+    clientExpenseItems?: InvoiceExpenseItem[];
+    invoiceOnlyExpenseItems?: InvoiceExpenseItem[];
     client: ClientInfo;
     tasks: InvoiceTask[];
     additionalTasks?: InvoiceTask[];
@@ -198,7 +227,7 @@ const buildPdfContext = (
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, onclone: forceLightModeOnClone },
-        pagebreak: { mode: ['css', 'legacy'], avoid: ['.invoice-totals', '.invoice-note', '.invoice-payment-section', '.invoice-task-table tr'] },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.invoice-project-section', '.invoice-totals', '.invoice-note', '.invoice-payment-section', '.invoice-task-table tr'] },
         jsPDF: { unit: 'mm', format: [229, 297], orientation: 'portrait' }
     };
 
@@ -390,8 +419,11 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     const {
         documentMode = 'invoice',
         project,
+        projectBreakdowns = [],
+        clientExpenseItems = [],
+        invoiceOnlyExpenseItems = [],
         client,
-        tasks: originalTasks,
+        tasks: originalTasks = [],
         additionalTasks: originalAdditionalTasks = [],
         expenseItems = [],
         note = '',
@@ -537,6 +569,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     const sectionHeadingStyle = isMinimalLayout
         ? `${minimalLabelStyle} margin-bottom: 10px;`
         : 'color: #333; margin-bottom: 10px;';
+    const groupedSectionHeadingStyle = 'color: #111827; margin-bottom: 10px; font-size: 16px; font-weight: 400;';
     const tableHeaderBackground = layoutTokens.tableHeaderBackground;
     const tableHeaderTextColor = layoutTokens.tableHeaderTextColor;
     const tableHeaderBorderBottom = layoutTokens.tableHeaderBorderBottom;
@@ -570,6 +603,359 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
 
         return `<p style="margin: 0; line-height: ${paymentDetailLineHeight};">${isMinimalLayout ? `<span style="${minimalPaymentLabelStyle}">${label}:</span> ${value}` : `<strong>${label}:</strong> ${value}`}</p>`;
     };
+
+    const renderDocumentShell = (
+        lineItemsMarkup: string,
+        options: {
+            showDocumentTotalHours?: boolean;
+        } = {}
+    ) => `
+        <style>
+            .invoice-document,
+            .invoice-document * {
+                box-sizing: border-box;
+            }
+
+            .invoice-document {
+                width: 100%;
+                max-width: none;
+                margin: 0;
+                padding: ${invoiceDocumentPadding};
+                font-size: 16px;
+                line-height: 1.35;
+                background-color: #ffffff;
+                color: #111827;
+                color-scheme: light;
+                -webkit-text-fill-color: #111827;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                forced-color-adjust: none;
+            }
+
+            .invoice-document p,
+            .invoice-document td,
+            .invoice-document th,
+            .invoice-document table,
+            .invoice-document span,
+            .invoice-document div,
+            .invoice-document strong,
+            .invoice-document h1,
+            .invoice-document h2,
+            .invoice-document h3,
+            .invoice-document h4 {
+                color: inherit;
+                -webkit-text-fill-color: inherit;
+            }
+
+            .invoice-task-table tr,
+            .invoice-project-section,
+            .invoice-totals,
+            .invoice-note,
+            .invoice-payment-section {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+        </style>
+        <div class="invoice-document" style="font-family: ${invoiceDocumentFontFamily}; width: 100%; max-width: none; margin: 0; padding: ${invoiceDocumentPadding}; box-sizing: border-box; background-color: #ffffff; color: #111827; color-scheme: light; -webkit-text-fill-color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; forced-color-adjust: none;">
+            ${topAccentBarMarkup}
+            ${renderHeader()}
+
+            <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+                <div style="${partySectionStyle}">
+                    <h3 style="${sectionHeadingStyle}">${isMinimalLayout ? 'Invoice To:' : '<strong>Invoice To:</strong>'}</h3>
+                    <p style="margin: 0; line-height: 1.5;">
+                        ${client.name}<br>
+                        ${client.address ? client.address + '<br>' : ''}
+                        ${client.city ? client.city + ', ' : ''}${client.state ? client.state + ' ' : ''}${client.zip || ''}${(client.city || client.state || client.zip) && client.country ? '<br>' : ''}
+                        ${client.country ? client.country : ''}
+                    </p>
+                </div>
+                <div style="text-align: right; ${partySectionStyle}">
+                    ${businessInfo ? `
+                        <h3 style="${sectionHeadingStyle}">${isMinimalLayout ? 'Invoice From:' : '<strong>Invoice From:</strong>'}</h3>
+                        <p style="margin: 0; line-height: 1.5;">
+                            ${businessInfo.businessName ? businessInfo.businessName + '<br>' : ''}
+                            ${businessInfo.address ? businessInfo.address + '<br>' : ''}
+                            ${(businessInfo.city || businessInfo.state || businessInfo.zip) ?
+                                `${businessInfo.city ? businessInfo.city + ', ' : ''}${businessInfo.state ? businessInfo.state + ' ' : ''}${businessInfo.zip || ''}<br>` : ''
+                            }
+                            ${businessInfo.country ? businessInfo.country + '<br>' : ''}
+                            ${businessInfo.email ? businessInfo.email + '<br>' : ''}
+                            ${businessInfo.phone ? businessInfo.phone + '<br>' : ''}
+                            ${businessInfo.registrationNumber ? 'Reg: ' + businessInfo.registrationNumber + '<br>' : ''}
+                            ${businessInfo.vat ? 'VAT: ' + businessInfo.vat + '<br>' : ''}
+                            ${businessInfo.taxNumber ? 'Tax: ' + businessInfo.taxNumber + '<br>' : ''}
+                            ${businessInfo.custom && businessInfo.custom.length > 0 ?
+                                businessInfo.custom.map(field => field.label + ': ' + field.value).join('<br>') + '<br>' : ''
+                            }
+                        </p>
+                    ` : ''}
+                </div>
+            </div>
+            ${lineItemsMarkup}
+            <div class="invoice-totals" style="text-align: right; margin-bottom: 10px;">
+                <div style="${totalsContainerStyle}">
+                    ${subtotal ? `
+                        ${(options.showDocumentTotalHours ?? (hasHourlyTasks && hasTotalHoursValue)) ? `
+                            <div style="display: flex; justify-content: flex-end; align-items: baseline; gap: 24px; margin: 5px 0; font-size: 16px;">
+                                <span>Total hours: <strong>${parsedTotalHours.toFixed(2)}</strong></span>
+                                <span>Subtotal: <strong>${getCurrencySymbol(currency)}${subtotal.toFixed(2)}</strong></span>
+                            </div>
+                        ` : `
+                            <p style="margin: 5px 0; font-size: 16px;">Subtotal: <strong>${getCurrencySymbol(currency)}${subtotal.toFixed(2)}</strong></p>
+                        `}
+
+                        ${discount && discount > 0 ? `
+                            <p style="margin: 5px 0; font-size: 16px; color: #dc2626;">Discount: <strong>-${getCurrencySymbol(currency)}${discount.toFixed(2)}</strong></p>
+                        ` : ''}
+
+                        ${shipping && shipping > 0 ? `
+                            <p style="margin: 5px 0; font-size: 16px;">Shipping: <strong>${getCurrencySymbol(currency)}${shipping.toFixed(2)}</strong></p>
+                        ` : ''}
+
+                        ${tax && tax > 0 ? `
+                            <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(currency)}${tax.toFixed(2)}</strong></p>
+                        ` : ''}
+
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: ${totalTextColor}; ${totalDividerStyle}"><strong>Total: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
+                    ` : `
+                        <p style="margin: 10px 0 0 0; font-size: 24px; color: ${totalTextColor};"><strong>Total${totalHours && parseFloat(String(totalHours)) > 0 ? ` (${parseFloat(String(totalHours)).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
+                    `}
+                </div>
+            </div>
+
+            ${note ? `
+            <div class="invoice-note" style="${noteContainerStyle}">
+                <p style="font-style: italic; color: #666; font-size: 14px; line-height: ${noteLineHeight}; margin: 5px 0;">${note}</p>
+            </div>
+            ` : ''}
+
+            ${paymentMethod ? `
+            <div class="invoice-payment-section" style="${paymentSectionStyle}">
+                <h3 style="${paymentHeadingStyle}">${isMinimalLayout ? 'Payment Details:' : '<strong>Payment Details:</strong>'}</h3>
+                <div style="${paymentCardStyle}">
+
+                    ${renderPaymentDetailLine('Account Holder', paymentMethod.fullName)}
+                    ${renderPaymentDetailLine('Bank', paymentMethod.bank)}
+                    ${renderPaymentDetailLine('IBAN', paymentMethod.iban)}
+                    ${renderPaymentDetailLine('SWIFT/BIC', paymentMethod.swift)}
+                    ${renderPaymentDetailLine('Bank Address', paymentMethod.bankAddress)}
+                    ${renderPaymentDetailLine('PayPal', paymentMethod.paypal)}
+
+                    ${paymentMethod.custom && paymentMethod.custom.length > 0 ?
+                        paymentMethod.custom.map(field =>
+                            renderPaymentDetailLine(field.label, field.value)
+                        ).join('') : ''
+                    }
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `;
+
+    const calculateTaskRow = (task: InvoiceTask, fallbackProject?: ProjectInfo | null) => {
+        const hasExplicitFlatRate = task.flatRate !== undefined;
+        const usesFlatRate = task.useFlatRate === true || (task.useFlatRate !== false && hasExplicitFlatRate);
+        let displayHours = parseFloat(String(task.hours)) || 0;
+
+        if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
+            const subtaskHours = task.mergedSubtasks.reduce((sum, subtask) => sum + (parseFloat(String(subtask.hours)) || 0), 0);
+            displayHours += subtaskHours;
+        }
+
+        if (usesFlatRate) {
+            const quantity = parseFloat(String(task.quantity)) || 1;
+            const flatRateValue = parseFloat(String(task.flatRate)) || 0;
+
+            return {
+                usesFlatRate,
+                displayHours,
+                quantity,
+                rateDisplay: `${getCurrencySymbol(currency)}${flatRateValue.toFixed(2)}`,
+                amount: flatRateValue * quantity,
+            };
+        }
+
+        const parentHourlyRate = parseFloat(String(task.hourlyRate))
+            || parseFloat(String(task.projectHourlyRate))
+            || parseFloat(String(fallbackProject?.hourlyRate))
+            || parseFloat(String(project?.hourlyRate))
+            || 0;
+        let amount = (parseFloat(String(task.hours)) || 0) * parentHourlyRate;
+
+        if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
+            task.mergedSubtasks.forEach((subtask) => {
+                const subtaskHours = parseFloat(String(subtask.hours)) || 0;
+                const subtaskHourlyRate = parseFloat(String(subtask.hourlyRate))
+                    || parseFloat(String(subtask.projectHourlyRate))
+                    || parseFloat(String(fallbackProject?.hourlyRate))
+                    || parseFloat(String(project?.hourlyRate))
+                    || 0;
+                amount += subtaskHours * subtaskHourlyRate;
+            });
+        }
+
+        const mergedRates = task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0
+            ? task.mergedSubtasks.map((subtask) => parseFloat(String(subtask.hourlyRate)) || parseFloat(String(subtask.projectHourlyRate)) || parentHourlyRate)
+            : [];
+        const hasMixedRates = mergedRates.some((rate) => rate !== parentHourlyRate);
+
+        return {
+            usesFlatRate,
+            displayHours,
+            quantity: 1,
+            rateDisplay: hasMixedRates ? 'Mixed' : `${getCurrencySymbol(currency)}${parentHourlyRate.toFixed(2)}`,
+            amount,
+        };
+    };
+
+    const renderLineItemsTable = (
+        sectionTasks: InvoiceTask[] = [],
+        sectionExpenses: InvoiceExpenseItem[] = [],
+        subtotalLabel = 'Subtotal',
+        sectionSubtotal?: number,
+        options: {
+            showSubtotalRow?: boolean;
+        } = {}
+    ) => {
+        const normalizedExpenseTasks: InvoiceTask[] = sectionExpenses.map((expense) => ({
+            id: `expense-${expense.id}`,
+            title: `${expense.title}${expense.supplierName ? ` • ${expense.supplierName}` : ''}`,
+            flatRate: expense.amount,
+            quantity: 1,
+            useFlatRate: true,
+        }));
+        const sectionItems = [...sectionTasks, ...normalizedExpenseTasks];
+        const sectionHasFlatTasks = sectionItems.some((task) => calculateTaskRow(task).usesFlatRate);
+        const sectionHasHourlyTasks = sectionItems.some((task) => !calculateTaskRow(task).usesFlatRate);
+        const showHours = sectionHasHourlyTasks;
+        const showQuantity = sectionHasFlatTasks;
+        const resolvedSectionSubtotal = typeof sectionSubtotal === 'number'
+            ? sectionSubtotal
+            : sectionItems.reduce((sum, task) => sum + calculateTaskRow(task).amount, 0);
+        const subtotalRowMarkup = options.showSubtotalRow === false
+            ? ''
+            : `
+                    <tr>
+                        <td colspan="${2 + (showHours ? 1 : 0) + (showQuantity ? 1 : 0)}" style="padding: ${tableHeaderCellPadding}; text-align: right; vertical-align: middle; border-top: ${tableHeaderBorderBottom}; font-weight: 600;">${subtotalLabel}</td>
+                        <td style="padding: ${tableHeaderCellPadding}; text-align: right; vertical-align: middle; border-top: ${tableHeaderBorderBottom}; font-weight: 600;">${getCurrencySymbol(currency)}${resolvedSectionSubtotal.toFixed(2)}</td>
+                    </tr>
+                `;
+
+        return `
+            <table class="invoice-task-table" style="${tableStyle}">
+                <thead>
+                    <tr style="color: ${tableHeaderTextColor};">
+                        <th style="padding: ${tableHeaderCellPadding}; text-align: left; vertical-align: middle; line-height: ${tableHeaderCellLineHeight}; border-bottom: ${tableHeaderBorderBottom}; background-color: ${tableHeaderBackground}; color: ${tableHeaderTextColor}; ${tableHeaderTypographyStyle}">Description</th>
+                        ${showHours ? `<th style="padding: ${tableHeaderCellPadding}; text-align: right; vertical-align: middle; line-height: ${tableHeaderCellLineHeight}; border-bottom: ${tableHeaderBorderBottom}; background-color: ${tableHeaderBackground}; color: ${tableHeaderTextColor}; ${tableHeaderTypographyStyle}">Hours</th>` : ''}
+                        <th style="padding: ${tableHeaderCellPadding}; text-align: right; vertical-align: middle; line-height: ${tableHeaderCellLineHeight}; border-bottom: ${tableHeaderBorderBottom}; background-color: ${tableHeaderBackground}; color: ${tableHeaderTextColor}; ${tableHeaderTypographyStyle}">Rate</th>
+                        ${showQuantity ? `<th style="padding: ${tableHeaderCellPadding}; text-align: right; vertical-align: middle; line-height: ${tableHeaderCellLineHeight}; border-bottom: ${tableHeaderBorderBottom}; background-color: ${tableHeaderBackground}; color: ${tableHeaderTextColor}; ${tableHeaderTypographyStyle}">Qty</th>` : ''}
+                        <th style="padding: ${tableHeaderCellPadding}; text-align: right; vertical-align: middle; line-height: ${tableHeaderCellLineHeight}; border-bottom: ${tableHeaderBorderBottom}; background-color: ${tableHeaderBackground}; color: ${tableHeaderTextColor}; ${tableHeaderTypographyStyle}">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sectionItems.map((task, index) => {
+                        const row = calculateTaskRow(task);
+                        const isLastRow = index === sectionItems.length - 1;
+                        const borderStyle = isLastRow || !rowBorderColor ? '' : `border-bottom: 1px solid ${rowBorderColor};`;
+
+                        return `
+                            <tr>
+                                <td style="padding: ${tableBodyCellPadding}; vertical-align: middle; line-height: ${tableBodyCellLineHeight}; ${borderStyle}">${task.title}</td>
+                                ${showHours ? `<td style="padding: ${tableBodyCellPadding}; text-align: right; vertical-align: middle; line-height: ${tableBodyCellLineHeight}; ${borderStyle}">${row.usesFlatRate ? '—' : row.displayHours.toFixed(2)}</td>` : ''}
+                                <td style="padding: ${tableBodyCellPadding}; text-align: right; vertical-align: middle; line-height: ${tableBodyCellLineHeight}; ${borderStyle}">${row.rateDisplay}</td>
+                                ${showQuantity ? `<td style="padding: ${tableBodyCellPadding}; text-align: right; vertical-align: middle; line-height: ${tableBodyCellLineHeight}; ${borderStyle}">${row.usesFlatRate ? row.quantity.toFixed(0) : '—'}</td>` : ''}
+                                <td style="padding: ${tableBodyCellPadding}; text-align: right; vertical-align: middle; line-height: ${tableBodyCellLineHeight}; ${borderStyle}">${getCurrencySymbol(currency)}${row.amount.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                    ${subtotalRowMarkup}
+                </tbody>
+            </table>
+        `;
+    };
+
+    const renderGroupedSectionSummary = ({
+        label,
+        amount,
+        hoursLabel,
+        hoursValue,
+    }: {
+        label: string;
+        amount: number;
+        hoursLabel?: string;
+        hoursValue?: number;
+    }) => `
+        <div style="text-align: right; margin: -8px 0 24px 0;">
+            ${typeof hoursValue === 'number' && hoursValue > 0 ? `
+                <div style="display: flex; justify-content: flex-end; align-items: baseline; gap: 24px; margin: 5px 0; font-size: 16px;">
+                    <span>${hoursLabel}: <strong>${hoursValue.toFixed(2)}</strong></span>
+                    <span>${label}: <strong>${getCurrencySymbol(currency)}${amount.toFixed(2)}</strong></span>
+                </div>
+            ` : `
+                <p style="margin: 5px 0; font-size: 16px;">${label}: <strong>${getCurrencySymbol(currency)}${amount.toFixed(2)}</strong></p>
+            `}
+        </div>
+    `;
+
+    const shouldRenderProjectSections = projectBreakdowns.length > 0
+        && (projectBreakdowns.length > 1 || clientExpenseItems.length > 0 || invoiceOnlyExpenseItems.length > 0);
+
+    if (shouldRenderProjectSections) {
+        const showGroupedDocumentTotalHours = hasTotalHoursValue
+            && projectBreakdowns.length > 0
+            && projectBreakdowns.every((breakdown) => breakdown.pricingMode === 'hourly')
+            && originalAdditionalTasks.every((task) => !usesFlatRateForTask(task))
+            && clientExpenseItems.length === 0
+            && invoiceOnlyExpenseItems.length === 0;
+        const projectSectionsMarkup = projectBreakdowns.map((breakdown) => `
+            <div class="invoice-project-section" style="margin-bottom: 24px;">
+                <h3 style="${groupedSectionHeadingStyle}">${breakdown.projectTitle}</h3>
+                ${renderLineItemsTable(breakdown.tasks || [], breakdown.expenseItems || [], 'Project subtotal', breakdown.subtotal, { showSubtotalRow: false })}
+                ${renderGroupedSectionSummary({
+                    label: 'Project subtotal',
+                    amount: breakdown.subtotal,
+                    hoursLabel: 'Project total hours',
+                    hoursValue: typeof breakdown.totalHours === 'number' ? breakdown.totalHours : undefined,
+                })}
+            </div>
+        `).join('');
+        const clientExpenseSectionMarkup = clientExpenseItems.length > 0 ? `
+            <div class="invoice-project-section" style="margin-bottom: 24px;">
+                <h3 style="${groupedSectionHeadingStyle}">Additional Expenses</h3>
+                ${renderLineItemsTable([], clientExpenseItems, 'Additional expenses subtotal', clientExpenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0), { showSubtotalRow: false })}
+                ${renderGroupedSectionSummary({
+                    label: 'Additional expenses subtotal',
+                    amount: clientExpenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0),
+                })}
+            </div>
+        ` : '';
+        const invoiceOnlyTaskSectionMarkup = originalAdditionalTasks.length > 0 ? `
+            <div class="invoice-project-section" style="margin-bottom: 24px;">
+                <h3 style="${groupedSectionHeadingStyle}">Additional Items</h3>
+                ${renderLineItemsTable(originalAdditionalTasks, [], 'Additional items subtotal', undefined, { showSubtotalRow: false })}
+                ${renderGroupedSectionSummary({
+                    label: 'Additional items subtotal',
+                    amount: originalAdditionalTasks.reduce((sum, task) => sum + calculateTaskRow(task).amount, 0),
+                })}
+            </div>
+        ` : '';
+        const invoiceOnlyExpenseSectionMarkup = invoiceOnlyExpenseItems.length > 0 ? `
+            <div class="invoice-project-section" style="margin-bottom: 24px;">
+                <h3 style="${groupedSectionHeadingStyle}">Invoice-only Expenses</h3>
+                ${renderLineItemsTable([], invoiceOnlyExpenseItems, 'Invoice-only expenses subtotal', invoiceOnlyExpenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0), { showSubtotalRow: false })}
+                ${renderGroupedSectionSummary({
+                    label: 'Invoice-only expenses subtotal',
+                    amount: invoiceOnlyExpenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0),
+                })}
+            </div>
+        ` : '';
+
+        return renderDocumentShell(
+            `${projectSectionsMarkup}${clientExpenseSectionMarkup}${invoiceOnlyTaskSectionMarkup}${invoiceOnlyExpenseSectionMarkup}`,
+            { showDocumentTotalHours: showGroupedDocumentTotalHours }
+        );
+    }
 
     return `
         <style>
@@ -620,7 +1006,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         <div class="invoice-document" style="font-family: ${invoiceDocumentFontFamily}; width: 100%; max-width: none; margin: 0; padding: ${invoiceDocumentPadding}; box-sizing: border-box; background-color: #ffffff; color: #111827; color-scheme: light; -webkit-text-fill-color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; forced-color-adjust: none;">
             ${topAccentBarMarkup}
             ${renderHeader()}
-            
+
             <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
                 <div style="${partySectionStyle}">
                     <h3 style="${sectionHeadingStyle}">${isMinimalLayout ? 'Invoice To:' : '<strong>Invoice To:</strong>'}</h3>
@@ -637,7 +1023,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         <p style="margin: 0; line-height: 1.5;">
                             ${businessInfo.businessName ? businessInfo.businessName + '<br>' : ''}
                             ${businessInfo.address ? businessInfo.address + '<br>' : ''}
-                            ${(businessInfo.city || businessInfo.state || businessInfo.zip) ? 
+                            ${(businessInfo.city || businessInfo.state || businessInfo.zip) ?
                                 `${businessInfo.city ? businessInfo.city + ', ' : ''}${businessInfo.state ? businessInfo.state + ' ' : ''}${businessInfo.zip || ''}<br>` : ''
                             }
                             ${businessInfo.country ? businessInfo.country + '<br>' : ''}
@@ -646,14 +1032,14 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                             ${businessInfo.registrationNumber ? 'Reg: ' + businessInfo.registrationNumber + '<br>' : ''}
                             ${businessInfo.vat ? 'VAT: ' + businessInfo.vat + '<br>' : ''}
                             ${businessInfo.taxNumber ? 'Tax: ' + businessInfo.taxNumber + '<br>' : ''}
-                            ${businessInfo.custom && businessInfo.custom.length > 0 ? 
+                            ${businessInfo.custom && businessInfo.custom.length > 0 ?
                                 businessInfo.custom.map(field => field.label + ': ' + field.value).join('<br>') + '<br>' : ''
                             }
                         </p>
                     ` : ''}
                 </div>
             </div>
-            
+
             ${(() => {
                 const invoiceCurrency = currency;
 
@@ -679,28 +1065,28 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                     ${tasks.map((task, index) => {
                         const isLastTask = index === tasks.length - 1 && additionalTasks.length === 0;
                         const borderStyle = isLastTask || !rowBorderColor ? '' : `border-bottom: 1px solid ${rowBorderColor};`;
-                        
+
                         // Check if this task uses flat rate
                         const hasExplicitFlatRate = task.flatRate !== undefined;
                         const usesFlatRate = task.useFlatRate === true || (task.useFlatRate !== false && hasExplicitFlatRate);
-                        
+
                         // Calculate task amount and hours (including merged subtasks)
                         let displayHours = parseFloat(String(task.hours)) || 0;
                         const taskTitle = task.title;
-                        
+
                         // Handle merged subtasks display
                         if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                             const subtaskHours = task.mergedSubtasks.reduce((total, subtask) => total + (parseFloat(String(subtask.hours)) || 0), 0);
                             displayHours = displayHours + subtaskHours;
                             // Don't add "including X subtasks" text to the title
                         }
-                        
+
                         // Calculate based on whether it's a flat rate task or hourly
                         let taskAmount: number;
                         if (usesFlatRate) {
                             const quantity = parseFloat(String(task.quantity)) || 1;
-                            const flatRateValue = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
-                                parseFloat(String(taskFlatRates[task.id])) || 0 : 
+                            const flatRateValue = taskFlatRates && taskFlatRates[task.id] !== undefined ?
+                                parseFloat(String(taskFlatRates[task.id])) || 0 :
                                 (parseFloat(String(task.flatRate)) || 0);
                             taskAmount = flatRateValue * quantity;
                         } else {
@@ -708,7 +1094,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                             const parentHours = parseFloat(String(task.hours)) || 0;
                             const parentHourlyRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(taskHourlyRates[task.id])) || parseFloat(String(project?.hourlyRate)) || 0;
                             taskAmount = parentHours * parentHourlyRate;
-                            
+
                             // For merged subtasks, calculate each subtask's amount with its own rate
                             if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                                 task.mergedSubtasks.forEach(subtask => {
@@ -718,7 +1104,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                                 });
                             }
                         }
-                        
+
                         const hours = showHoursAndRate ? (usesFlatRate ? '—' : displayHours.toFixed(2)) : '—';
                         const quantity = showQuantity ? (usesFlatRate ? (parseFloat(String(task.quantity)) || 1).toFixed(0) : '—') : '—';
                         // For merged tasks with different rates, show "Mixed" instead of a single rate
@@ -732,13 +1118,13 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                                 const subtaskRate = parseFloat(String(subtask.hourlyRate)) || parseFloat(String(taskHourlyRates[subtask.id])) || parseFloat(String(project?.hourlyRate)) || 0;
                                 return subtaskRate === parentRate;
                             });
-                            rateDisplay = allRatesSame 
+                            rateDisplay = allRatesSame
                                 ? getCurrencySymbol(invoiceCurrency) + parentRate.toFixed(2)
                                 : 'Mixed';
                         } else {
                             rateDisplay = getCurrencySymbol(invoiceCurrency) + (parseFloat(String(task.hourlyRate)) || parseFloat(String(taskHourlyRates[task.id])) || parseFloat(String(project?.hourlyRate)) || 0).toFixed(2);
                         }
-                        
+
                         return `
                         <tr>
                             <td style="padding: ${tableBodyCellPadding}; vertical-align: middle; line-height: ${tableBodyCellLineHeight}; ${borderStyle}">${taskTitle}</td>
@@ -752,11 +1138,11 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                 ${additionalTasks.map((task, index) => {
                         const isLastTask = index === additionalTasks.length - 1;
                         const borderStyle = isLastTask || !rowBorderColor ? '' : `border-bottom: 1px solid ${rowBorderColor};`;
-                        
+
                         // Check if this additional task uses flat rate
                         const usesFlatRate = task.useFlatRate === true || (task.useFlatRate !== false && task.flatRate !== undefined);
                         const displayHours = parseFloat(String(task.hours)) || 0;
-                        
+
                         // Calculate based on whether it's a flat rate task or hourly
                         let taskAmount: number;
                         if (usesFlatRate) {
@@ -766,14 +1152,14 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                             const hourlyRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0;
                             taskAmount = displayHours * hourlyRate;
                         }
-                        
+
                         // Show hours if we have tracked time, even for flat rate tasks
                         const hours = showHoursAndRate ? (usesFlatRate ? '—' : displayHours.toFixed(2)) : '—';
                         const rate = showHoursAndRate && !usesFlatRate ? getCurrencySymbol(invoiceCurrency) + (parseFloat(String(task.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0).toFixed(2) : '—';
                         const quantity = showQuantity ? (usesFlatRate ? (parseFloat(String(task.quantity)) || 1).toFixed(0) : '—') : '—';
                         // Don't show hours in title when we have Hours column
                         const taskTitle = task.title;
-                        
+
                         return `
                         <tr>
                             <td style="padding: ${tableBodyCellPadding}; vertical-align: middle; line-height: ${tableBodyCellLineHeight}; ${borderStyle}">${taskTitle}</td>
@@ -800,29 +1186,29 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                     ${tasks.map((task, index) => {
                         const isLastTask = index === tasks.length - 1 && additionalTasks.length === 0;
                         const borderStyle = isLastTask || !rowBorderColor ? '' : `border-bottom: 1px solid ${rowBorderColor};`;
-                        
+
                         // Check if this task uses flat rate
                         const hasExplicitFlatRate = task.flatRate !== undefined;
                         const usesFlatRate = task.useFlatRate === true || (task.useFlatRate !== false && hasExplicitFlatRate);
-                                           
+
                         // Handle merged subtasks display
                         let displayHours = parseFloat(String(task.hours)) || 0;
                         const taskTitle = task.title;
-                        
+
                         // Calculate task amount - consider hours for hourly tasks even in simplified table
                         let taskAmount: number;
-                        
+
                         if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                             const subtaskHours = task.mergedSubtasks.reduce((total, subtask) => total + (parseFloat(String(subtask.hours)) || 0), 0);
                             displayHours = displayHours + subtaskHours;
                             // Don't add "including X subtasks" text to the title
                         }
-                        
+
                         // Calculate the task amount based on whether it's flat rate or hourly
                         if (usesFlatRate) {
                             const quantity = parseFloat(String(task.quantity)) || 1;
-                            const flatRateValue = taskFlatRates && taskFlatRates[task.id] !== undefined ? 
-                                parseFloat(String(taskFlatRates[task.id])) || 0 : 
+                            const flatRateValue = taskFlatRates && taskFlatRates[task.id] !== undefined ?
+                                parseFloat(String(taskFlatRates[task.id])) || 0 :
                                 (parseFloat(String(task.flatRate)) || 0);
                             taskAmount = flatRateValue * quantity;
                         } else {
@@ -830,7 +1216,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                             const parentHours = parseFloat(String(task.hours)) || 0;
                             const parentHourlyRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(taskHourlyRates[task.id])) || parseFloat(String(project?.hourlyRate)) || 0;
                             taskAmount = parentHours * parentHourlyRate;
-                            
+
                             // For merged subtasks, calculate each subtask's amount with its own rate
                             if (task.isMerged && task.mergedSubtasks && task.mergedSubtasks.length > 0) {
                                 task.mergedSubtasks.forEach(subtask => {
@@ -840,10 +1226,10 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                                 });
                             }
                         }
-                        
+
                         // Always show hours when they exist, even for flat rate tasks
                         const finalTitle = displayHours > 0 ? `${taskTitle} (${displayHours.toFixed(2)}h)` : taskTitle;
-                        
+
                         return `
                         <tr>
                             <td style="padding: ${tableBodyCellPadding}; vertical-align: middle; line-height: ${tableBodyCellLineHeight}; ${borderStyle}">${finalTitle}</td>
@@ -854,11 +1240,11 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                     ${additionalTasks.map((task, index) => {
                         const isLastTask = index === additionalTasks.length - 1;
                         const borderStyle = isLastTask || !rowBorderColor ? '' : `border-bottom: 1px solid ${rowBorderColor};`;
-                        
+
                         const displayHours = parseFloat(String(task.hours)) || 0;
                         // Check if this additional task uses flat rate
                         const usesFlatRate = task.useFlatRate === true || task.flatRate !== undefined;
-                        
+
                         // Calculate based on whether it's a flat rate task or hourly
                         let taskAmount;
                         if (usesFlatRate) {
@@ -868,10 +1254,10 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                             const hourlyRate = parseFloat(String(task.hourlyRate)) || parseFloat(String(project?.hourlyRate)) || 0;
                             taskAmount = displayHours * hourlyRate;
                         }
-                        
+
                         // Always show hours when they exist, even for flat rate tasks
                         const taskTitle = displayHours > 0 ? `${task.title} (${displayHours.toFixed(2)}h)` : task.title;
-                        
+
                         return `
                         <tr>
                             <td style="padding: ${tableBodyCellPadding}; vertical-align: middle; line-height: ${tableBodyCellLineHeight}; ${borderStyle}">${taskTitle}</td>
@@ -883,7 +1269,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             </table>`;
                 }
             })()}
-            
+
             <div class="invoice-totals" style="text-align: right; margin-bottom: 10px;">
                 <div style="${totalsContainerStyle}">
                     ${subtotal ? `
@@ -895,32 +1281,32 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                         ` : `
                             <p style="margin: 5px 0; font-size: 16px;">Subtotal: <strong>${getCurrencySymbol(currency)}${subtotal.toFixed(2)}</strong></p>
                         `}
-                        
+
                         ${discount && discount > 0 ? `
                             <p style="margin: 5px 0; font-size: 16px; color: #dc2626;">Discount: <strong>-${getCurrencySymbol(currency)}${discount.toFixed(2)}</strong></p>
                         ` : ''}
-                        
+
                         ${shipping && shipping > 0 ? `
                             <p style="margin: 5px 0; font-size: 16px;">Shipping: <strong>${getCurrencySymbol(currency)}${shipping.toFixed(2)}</strong></p>
                         ` : ''}
-                        
+
                         ${tax && tax > 0 ? `
                             <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(currency)}${tax.toFixed(2)}</strong></p>
                         ` : ''}
-                        
+
                         <p style="margin: 10px 0 0 0; font-size: 24px; color: ${totalTextColor}; ${totalDividerStyle}"><strong>Total: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
                     ` : `
                         <p style="margin: 10px 0 0 0; font-size: 24px; color: ${totalTextColor};"><strong>Total${totalHours && parseFloat(String(totalHours)) > 0 ? ` (${parseFloat(String(totalHours)).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
                     `}
                 </div>
             </div>
-            
+
             ${note ? `
             <div class="invoice-note" style="${noteContainerStyle}">
                 <p style="font-style: italic; color: #666; font-size: 14px; line-height: ${noteLineHeight}; margin: 5px 0;">${note}</p>
             </div>
             ` : ''}
-            
+
             ${paymentMethod ? `
             <div class="invoice-payment-section" style="${paymentSectionStyle}">
                 <h3 style="${paymentHeadingStyle}">${isMinimalLayout ? 'Payment Details:' : '<strong>Payment Details:</strong>'}</h3>
@@ -933,8 +1319,8 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                     ${renderPaymentDetailLine('Bank Address', paymentMethod.bankAddress)}
                     ${renderPaymentDetailLine('PayPal', paymentMethod.paypal)}
 
-                    ${paymentMethod.custom && paymentMethod.custom.length > 0 ? 
-                        paymentMethod.custom.map(field => 
+                    ${paymentMethod.custom && paymentMethod.custom.length > 0 ?
+                        paymentMethod.custom.map(field =>
                             renderPaymentDetailLine(field.label, field.value)
                         ).join('') : ''
                     }
@@ -987,6 +1373,11 @@ export const buildInvoiceHtmlContent = (
     return createInvoiceHTML({
         documentMode: invoice.documentMode,
         project: invoice.project,
+        projectId: invoice.projectId,
+        projectIds: invoice.projectIds,
+        projectBreakdowns: invoice.projectBreakdowns || [],
+        clientExpenseItems: invoice.clientExpenseItems || [],
+        invoiceOnlyExpenseItems: invoice.invoiceOnlyExpenseItems || [],
         client: clientData,
         tasks: invoice.tasks || [],
         additionalTasks: invoice.additionalTasks || [],
