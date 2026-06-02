@@ -75,7 +75,11 @@ export const buildProjectQuoteLineItems = ({
         : null;
 
     const quoteTasks = tasks
-        .filter((task) => task.projectId === project.id)
+        .filter((task) => (
+            task.projectId === project.id
+            && task.archived !== true
+            && task.billable === true
+        ))
         .map((task) => {
             const amount = getTaskEstimateAmount(task, project, client);
 

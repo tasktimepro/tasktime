@@ -6,16 +6,15 @@
     [ ] Or should we just add the delete option and then it's up to them?
     [ ] Warning message about deleting
     [ ] Check about sequential numbering and if future invoices were already sent
+    [ ] Undo all billed time entries for tasks under that invoice
+    [ ] Basically undo invoice state as if it was never generated before
 
 [ ] Cancel invoice implementation that should place invoice in a canceled tab and handled properyly in all the reporting areas necessary!
     [ ] Also think about about whether currently billed items will become active again/undo billed state?
     [ ] If you cancel an invoice and there is no other future invoice, should the next one take the same sequential number or not?
 
-[ ] Check about quote issue
-    [ ] If task was created before I switched the project from hourly to then override flat rate, the quoted amount was not showing in the generate invoice modal and it stays as hourly based
-    [ ] Even though the task was not marked as billable, in the generate quote we still showed the quoted amount task as checked and visible as part of the totals
-
-[ ] Billed task with quoted amount still kept showing the total in the invoice generation button and project card - I think this is one of those use-cases where we should automatically switch from billable to not-billable after it was invoiced
+[ ] Billed task with quoted amount still kept showing the total in the invoice generation button and project card - EVEN AFTER THE INVOICE WAS GENERATED - I think this is one of those use-cases where we should automatically switch from billable to not-billable after it was invoiced
+    [ ] I also noticed that if an invoice was generated from a flat rate task, and the invoice is still outstanding, if I mark the same task that is still in the project as unbillable, and I edit the invoice, there are no more tasks visible there... wtf? How is this possible? Aren't we keeping a snapshot of these or not until the invoice is generated? And what can we do to solve this?
 
 ---
 

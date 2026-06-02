@@ -36,6 +36,7 @@ const InvoiceTaskSelector = ({
     handleRemoveAdditionalTask,
     handleTaskSelectionForBilling,
     handleHoursChange,
+    handleToggleFlatRate,
     handleFlatRateChange,
     handleQuantityChange,
     handleTaskHourlyRateChange,
@@ -164,7 +165,9 @@ const InvoiceTaskSelector = ({
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                             {orderedInvoiceTasks.map((task) => {
                                 const currentHours = editableHours[task.id] !== undefined ? editableHours[task.id] : task.hours;
-                                const currentFlatRate = taskFlatRates[task.id] !== undefined ? taskFlatRates[task.id] : '';
+                                const currentFlatRate = taskFlatRates[task.id] !== undefined
+                                    ? taskFlatRates[task.id]
+                                    : (task.flatRate !== undefined ? task.flatRate : '');
                                 const hasOriginalTimeMs = Number.isFinite(task.originalTimeMs);
                                 const hasOriginalHours = Number.isFinite(task.originalHours);
                                 const originalTimeMs = hasOriginalTimeMs
@@ -179,8 +182,9 @@ const InvoiceTaskSelector = ({
                                         ? `Original: ${originalQuantity > 1 ? `${originalQuantity} x ` : ''}${getCurrencySymbol(getInvoiceCurrency())}${originalFlatRate.toFixed(2)} flat rate`
                                         : null);
 
-                                // Check if this task uses flat rate
-                                const isUsingFlatRate = useFlatRate[task.id] || false;
+                                const isUsingFlatRate = Object.prototype.hasOwnProperty.call(useFlatRate, task.id)
+                                    ? useFlatRate[task.id] === true
+                                    : task.useFlatRate === true;
 
                                 // Check if this is a parent task with subtasks in the invoice
                                 // Make sure to check all subtasks, not just selected ones
@@ -261,7 +265,7 @@ const InvoiceTaskSelector = ({
                                                 <div className="flex items-center">
                                                     <CustomCheckbox
                                                         checked={isUsingFlatRate}
-                                                        onChange={(checked) => handleToggleAdditionalTaskFlatRate(task.id, checked)}
+                                                        onChange={(checked) => handleToggleFlatRate(task.id, checked)}
                                                         label="Flat rate"
                                                         labelClassName="text-xs text-foreground"
                                                         id={`flat-rate-${task.id}`}
@@ -278,7 +282,7 @@ const InvoiceTaskSelector = ({
                                                             type="number"
                                                             step="1"
                                                             min="1"
-                                                            value={taskQuantities[task.id] || 1}
+                                                            value={taskQuantities[task.id] || task.quantity || 1}
                                                             onChange={(e) => handleQuantityChange(task.id, e.target.value)}
                                                             className={quantityInputClassName}
                                                             placeholder="1"
@@ -605,7 +609,7 @@ const InvoiceTaskSelector = ({
                             if (totalAvailableTasks === 0) {
                                 return (
                                     <Notice
-                                        title="Please add a task to continue."
+                                        title="No billable tasks selected. Add a task or mark one as billable."
                                     />
                                 );
                             } else if (selectedTasksCount === 0 && additionalTasks.length === 0) {

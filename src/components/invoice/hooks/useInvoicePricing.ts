@@ -6,6 +6,9 @@ type TaskItem = {
     parentTaskId?: string | null;
     hours?: number;
     hourlyRate?: number;
+    flatRate?: number;
+    quantity?: number;
+    useFlatRate?: boolean;
 };
 
 type AdditionalTask = {
@@ -138,10 +141,15 @@ const useInvoicePricing = ({
                 taskHours += subtaskHours;
             }
 
-            if (useFlatRate[task.id]) {
+            const usesTaskFlatRate = Object.prototype.hasOwnProperty.call(useFlatRate, task.id)
+                ? useFlatRate[task.id]
+                : task.useFlatRate === true;
+
+            if (usesTaskFlatRate) {
                 // Use flat rate for this task with quantity
-                const quantity = taskQuantities[task.id] || 1;
-                projectSubtotal += (taskFlatRates[task.id] || 0) * quantity;
+                const quantity = taskQuantities[task.id] || task.quantity || 1;
+                const flatRateValue = taskFlatRates[task.id] ?? task.flatRate ?? 0;
+                projectSubtotal += flatRateValue * quantity;
             } else {
                 // Only count hours for hourly tasks
                 totalHours += taskHours;

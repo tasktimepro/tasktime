@@ -497,6 +497,7 @@ describe('InvoiceGenerator', () => {
                 id: 'task-1',
                 projectId: 'project-1',
                 title: 'Task',
+                billable: true,
                 estimatedHours: 3,
                 estimatedFlatAmount: 500
             }
@@ -536,6 +537,45 @@ describe('InvoiceGenerator', () => {
         await waitFor(() => {
             expect(screen.getByTestId('pricing-subtotal')).toHaveTextContent('500')
         })
+    })
+
+    it('refreshes the selected project when the source project switches to flat rate', async () => {
+
+        taskHookMocks.tasks = [
+            {
+                id: 'task-1',
+                projectId: 'project-1',
+                title: 'Task',
+                billable: true,
+                estimatedHours: 3,
+                estimatedFlatAmount: 500
+            }
+        ]
+
+        const user = userEvent.setup()
+        const { rerender } = renderGenerator({
+            mode: 'quote',
+            project: { ...baseProject, flatRate: false, statusMode: 'quote' }
+        })
+
+        rerender(
+            <InvoiceGenerator
+                project={{ ...baseProject, flatRate: true, statusMode: 'quote' }}
+                client={baseClient}
+                timeEntries={[baseEntry]}
+                editingInvoice={null}
+                onInvoiceSaved={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[baseClient]}
+                showButton={true}
+                mode="quote"
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        expect(await screen.findByTestId('pricing-subtotal')).toHaveTextContent('500')
     })
 
     it('shows client-level project invoice expenses without selecting them by default', async () => {

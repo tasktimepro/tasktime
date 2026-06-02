@@ -90,6 +90,28 @@ const areInvoiceTaskListsEqual = (left, right) => {
     });
 };
 
+const areProjectsEquivalent = (left, right) => {
+    if (left === right) {
+        return true;
+    }
+
+    if (!left || !right) {
+        return false;
+    }
+
+    return left.id === right.id
+        && left.title === right.title
+        && left.hourlyRate === right.hourlyRate
+        && left.flatRate === right.flatRate
+        && left.preferredClientId === right.preferredClientId
+        && left.isPersonal === right.isPersonal
+        && left.statusMode === right.statusMode
+        && left.deadline === right.deadline
+        && left.budgetAmount === right.budgetAmount
+        && left.billableTimeIncrementMinutes === right.billableTimeIncrementMinutes
+        && left.archived === right.archived;
+};
+
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
  */
@@ -214,6 +236,22 @@ const InvoiceGenerator = ({
             return next.length === prev.length ? prev : next;
         });
     }, [projects, selectedClient?.id, selectedProject?.id]);
+
+    useEffect(() => {
+        if (!selectedProject?.id) {
+            return;
+        }
+
+        const latestSelectedProject = (project?.id === selectedProject.id ? project : null)
+            || projects.find((item) => item.id === selectedProject.id)
+            || null;
+
+        if (!latestSelectedProject || areProjectsEquivalent(selectedProject, latestSelectedProject)) {
+            return;
+        }
+
+        setSelectedProject(latestSelectedProject);
+    }, [project, projects, selectedProject]);
 
     useEffect(() => {
         if (!showInvoiceForm) {
@@ -1245,6 +1283,17 @@ const InvoiceGenerator = ({
     const handleFlatRateChange = InvoiceHandler.handleFlatRateChange(setTaskFlatRates);
     const handleQuantityChange = InvoiceHandler.handleQuantityChange(setTaskQuantities);
     const handleTaskHourlyRateChange = InvoiceHandler.handleTaskHourlyRateChange(setTaskHourlyRates);
+    const handleToggleFlatRate = InvoiceHandler.handleToggleFlatRate(
+        setUseFlatRate,
+        setTaskFlatRates,
+        setTaskQuantities,
+        invoiceTasks,
+        editableHours,
+        selectedProject,
+        taskFlatRates,
+        taskQuantities,
+        handleFlatRateChange
+    );
     const handleToggleNewTaskFlatRate = InvoiceHandler.handleToggleNewTaskFlatRate(setNewTaskUseFlatRate);
     const handleToggleMergeSubtasks = InvoiceHandler.handleToggleMergeSubtasks(
         setMergedSubtasks,
@@ -1525,10 +1574,12 @@ const InvoiceGenerator = ({
                 projectHourlyRate: task.projectHourlyRate || 0,
                 projectFlatRate: task.projectFlatRate === true,
                 hours: editableHours[task?.id] || task?.originalHours || 0,
-                flatRate: taskFlatRates[task.id] || 0,
+                flatRate: taskFlatRates[task.id] ?? task.flatRate ?? 0,
                 hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClientHourlyRate || 0,
-                useFlatRate: useFlatRate[task.id] || false,
-                quantity: taskQuantities[task.id] || 1,
+                useFlatRate: Object.prototype.hasOwnProperty.call(useFlatRate, task.id)
+                    ? useFlatRate[task.id]
+                    : task.useFlatRate === true,
+                quantity: taskQuantities[task.id] || task.quantity || 1,
                 isMerged: (task && task.id && mergedSubtasks[task.id]) || false,
                 mergedSubtasks: (task && task.id && mergedSubtasks[task.id])
                     ? invoiceTasks
@@ -1540,10 +1591,12 @@ const InvoiceGenerator = ({
                             projectHourlyRate: subtask.projectHourlyRate || task.projectHourlyRate || 0,
                             projectFlatRate: subtask.projectFlatRate === true || task.projectFlatRate === true,
                             hours: editableHours[subtask.id] || subtask.originalHours || 0,
-                            flatRate: taskFlatRates[subtask.id] || 0,
+                            flatRate: taskFlatRates[subtask.id] ?? subtask.flatRate ?? 0,
                             hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || subtask.projectHourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClientHourlyRate || 0,
-                            useFlatRate: useFlatRate[subtask.id] || false,
-                            quantity: taskQuantities[subtask.id] || 1
+                            useFlatRate: Object.prototype.hasOwnProperty.call(useFlatRate, subtask.id)
+                                ? useFlatRate[subtask.id]
+                                : subtask.useFlatRate === true,
+                            quantity: taskQuantities[subtask.id] || subtask.quantity || 1
                         }))
                     : []
             }))
@@ -2482,6 +2535,7 @@ const InvoiceGenerator = ({
                     handleRemoveAdditionalTask={handleRemoveAdditionalTask}
                     handleTaskSelectionForBilling={handleTaskSelectionForBilling}
                     handleHoursChange={handleHoursChange}
+                    handleToggleFlatRate={handleToggleFlatRate}
                     handleFlatRateChange={handleFlatRateChange}
                     handleQuantityChange={handleQuantityChange}
                     handleTaskHourlyRateChange={handleTaskHourlyRateChange}

@@ -155,6 +155,18 @@ describe('useInvoicePricing', () => {
         expect(result.current.totalHours).toBe(2)
     })
 
+    it('honors task useFlatRate metadata when no explicit override state exists', () => {
+
+        const { result } = renderHook(() => useInvoicePricing({
+            ...baseParams,
+            invoiceTasks: [{ id: 'task-1', hours: 2, flatRate: 150, quantity: 2, useFlatRate: true }],
+            selectedTasksForBilling: { 'task-1': true }
+        }))
+
+        expect(result.current.subtotal).toBe(300)
+        expect(result.current.totalHours).toBe(0)
+    })
+
     it('uses task-level hourly overrides when provided', () => {
 
         const { result } = renderHook(() => useInvoicePricing({

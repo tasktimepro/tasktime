@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { buildProjectQuoteLineItems, buildQuoteDocumentData, getQuoteDownloadFilename } from './quoteUtils';
 import { buildProjectQuoteLineItems, buildQuoteDocumentData, getQuoteDownloadFilename, getQuoteNumberTimestamp } from './quoteUtils';
 
 describe('quoteUtils', () => {
@@ -13,8 +12,8 @@ describe('quoteUtils', () => {
                 flatRate: false,
             },
             tasks: [
-                { id: 'task-1', title: 'Discovery', projectId: 'project-1', estimatedHours: 3 },
-                { id: 'task-2', title: 'Build', projectId: 'project-1', estimatedHours: 5 },
+                { id: 'task-1', title: 'Discovery', projectId: 'project-1', estimatedHours: 3, billable: true },
+                { id: 'task-2', title: 'Build', projectId: 'project-1', estimatedHours: 5, billable: true },
             ],
             clients: [{ id: 'client-1', title: 'Acme', clientName: 'Acme Ltd', defaultCurrency: 'USD' }],
             businessInfos: [{ id: 'business-1', title: 'TaskTime Studio', isDefault: true }],
@@ -69,7 +68,7 @@ describe('quoteUtils', () => {
                 flatRate: false,
             },
             tasks: [
-                { id: 'task-1', title: 'Discovery', projectId: 'project-1', estimatedHours: 3 },
+                { id: 'task-1', title: 'Discovery', projectId: 'project-1', estimatedHours: 3, billable: true },
             ],
             clients: [{ id: 'client-1', title: 'Acme', clientName: 'Acme Ltd', defaultCurrency: 'USD' }],
         });
@@ -79,6 +78,33 @@ describe('quoteUtils', () => {
                 id: 'task-1',
                 title: 'Discovery',
                 originalHours: 3,
+                hours: 3,
+                hourlyRate: 120,
+            }),
+        ]);
+    });
+
+    it('includes only active billable tasks in quote line items', () => {
+        const lineItems = buildProjectQuoteLineItems({
+            project: {
+                id: 'project-1',
+                title: 'Website Refresh',
+                preferredClientId: 'client-1',
+                hourlyRate: 120,
+                flatRate: false,
+            },
+            tasks: [
+                { id: 'task-1', title: 'Billable', projectId: 'project-1', estimatedHours: 3, billable: true },
+                { id: 'task-2', title: 'Non-billable', projectId: 'project-1', estimatedHours: 5, billable: false },
+                { id: 'task-3', title: 'Archived', projectId: 'project-1', estimatedHours: 2, billable: true, archived: true },
+            ],
+            clients: [{ id: 'client-1', title: 'Acme', clientName: 'Acme Ltd', defaultCurrency: 'USD' }],
+        });
+
+        expect(lineItems.quoteTasks).toEqual([
+            expect.objectContaining({
+                id: 'task-1',
+                title: 'Billable',
                 hours: 3,
                 hourlyRate: 120,
             }),

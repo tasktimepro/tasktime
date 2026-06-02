@@ -53,6 +53,7 @@ const InvoiceModal = ({
     handleRemoveAdditionalTask,
     handleTaskSelectionForBilling,
     handleHoursChange,
+    handleToggleFlatRate,
     handleFlatRateChange,
     handleQuantityChange,
     handleTaskHourlyRateChange,
@@ -504,6 +505,7 @@ const InvoiceModal = ({
                     handleRemoveAdditionalTask={handleRemoveAdditionalTask}
                     handleTaskSelectionForBilling={handleTaskSelectionForBilling}
                     handleHoursChange={handleHoursChange}
+                    handleToggleFlatRate={handleToggleFlatRate}
                     handleFlatRateChange={handleFlatRateChange}
                     handleQuantityChange={handleQuantityChange}
                     handleTaskHourlyRateChange={handleTaskHourlyRateChange}

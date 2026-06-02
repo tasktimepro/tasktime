@@ -40,6 +40,7 @@ const createBaseProps = (overrides = {}) => ({
     handleRemoveAdditionalTask: vi.fn(),
     handleTaskSelectionForBilling: vi.fn(),
     handleHoursChange: vi.fn(),
+    handleToggleFlatRate: vi.fn(),
     handleFlatRateChange: vi.fn(),
     handleQuantityChange: vi.fn(),
     handleTaskHourlyRateChange: vi.fn(),
@@ -241,5 +242,83 @@ describe('InvoiceTaskSelector', () => {
 
         expect(screen.queryByText(/NaN/i)).not.toBeInTheDocument();
         expect(screen.getByText('Original: CHF500.00 flat rate')).toBeInTheDocument();
+    });
+
+    it('uses the invoice-task flat-rate toggle handler for existing tasks', () => {
+        const handleToggleFlatRate = vi.fn();
+        const handleToggleAdditionalTaskFlatRate = vi.fn();
+
+        render(
+            <InvoiceTaskSelector
+                {...createBaseProps({
+                    handleToggleFlatRate,
+                    handleToggleAdditionalTaskFlatRate,
+                    invoiceTasks: [
+                        {
+                            id: 'task-1',
+                            title: 'Existing task',
+                            parentTaskId: null,
+                            hours: 2,
+                            originalHours: 2,
+                            originalTimeMs: 7200000
+                        }
+                    ],
+                    selectedTasksForBilling: { 'task-1': true }
+                })}
+            />
+        );
+
+        fireEvent.click(screen.getByLabelText('Flat rate'));
+
+        expect(handleToggleFlatRate).toHaveBeenCalledWith('task-1', true);
+        expect(handleToggleAdditionalTaskFlatRate).not.toHaveBeenCalled();
+    });
+
+    it('honors task useFlatRate and flatRate values when state overrides are missing', () => {
+        render(
+            <InvoiceTaskSelector
+                {...createBaseProps({
+                    invoiceTasks: [
+                        {
+                            id: 'task-1',
+                            title: 'Quoted task',
+                            parentTaskId: null,
+                            useFlatRate: true,
+                            flatRate: 500,
+                            quantity: 2,
+                        }
+                    ],
+                    selectedTasksForBilling: { 'task-1': true },
+                    getInvoiceCurrency: () => 'CHF',
+                })}
+            />
+        );
+
+        expect(screen.getByDisplayValue('2')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('500')).toBeInTheDocument();
+    });
+
+    it('lets explicit flat-rate state override task useFlatRate metadata', () => {
+        render(
+            <InvoiceTaskSelector
+                {...createBaseProps({
+                    invoiceTasks: [
+                        {
+                            id: 'task-1',
+                            title: 'Quoted task',
+                            parentTaskId: null,
+                            useFlatRate: true,
+                            flatRate: 500,
+                            hours: 2,
+                        }
+                    ],
+                    selectedTasksForBilling: { 'task-1': true },
+                    useFlatRate: { 'task-1': false },
+                })}
+            />
+        );
+
+        expect(screen.getByText('Hours (120min)')).toBeInTheDocument();
+        expect(screen.queryByText('Rate (USD)')).not.toBeInTheDocument();
     });
 });

@@ -88,9 +88,10 @@ export const handleToggleFlatRate = (setUseFlatRate, setTaskFlatRates, setTaskQu
     }));
 
     if (value && taskFlatRates[taskId] === undefined) {
-        // Only set a flat rate if one doesn't exist, and only if we have a valid hourly rate
         const task = invoiceTasks.find(t => t.id === taskId);
-        if (task && selectedProject?.hourlyRate) {
+        if (task && task.flatRate !== undefined) {
+            handleFlatRateChange(taskId, task.flatRate);
+        } else if (task && selectedProject?.hourlyRate) {
             const hourlyAmount = (editableHours[taskId] || task.hours) * selectedProject.hourlyRate;
             handleFlatRateChange(taskId, hourlyAmount || '');
         } else {
