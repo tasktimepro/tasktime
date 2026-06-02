@@ -1,6 +1,6 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ClientDashboard from './ClientDashboard';
 
@@ -16,6 +16,7 @@ const hookMocks = vi.hoisted(() => ({
     unbillExpensesForInvoice: vi.fn(),
     deleteRecurrence: vi.fn(),
     preferences: { currency: 'USD' },
+    expenses: [],
     showSuccess: vi.fn(),
 }));
 
@@ -40,7 +41,7 @@ vi.mock('../hooks/useInvoices.ts', () => ({
 }));
 
 vi.mock('../hooks/useExpenses.ts', () => ({
-    useExpenses: () => ({ expenses: [], deleteExpense: hookMocks.deleteExpense, unbillExpensesForInvoice: hookMocks.unbillExpensesForInvoice })
+    useExpenses: () => ({ expenses: hookMocks.expenses, deleteExpense: hookMocks.deleteExpense, unbillExpensesForInvoice: hookMocks.unbillExpensesForInvoice })
 }));
 
 vi.mock('../hooks/useExpenseRecurrences.ts', () => ({
@@ -85,6 +86,12 @@ describe('ClientDashboard', () => {
 
     beforeEach(() => {
         setMatchMedia(false);
+        hookMocks.expenses = [];
+        localStorage.removeItem('exchangeRatesCache');
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('uses a horizontal stats rail on mobile', () => {
@@ -266,6 +273,63 @@ describe('ClientDashboard', () => {
 
         expect(screen.queryByText(/per hour/i)).not.toBeInTheDocument();
         expect(screen.getByText('Quote Test Project')).toBeInTheDocument();
+    });
+
+    it('includes converted project expenses in project card invoice totals', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            json: async () => ({ rates: { USD: 1, EUR: 0.92, CHF: 0.88 } })
+        });
+        hookMocks.expenses = [{
+            id: 'expense-1',
+            title: 'Project expense',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            amount: 40,
+            currency: 'EUR',
+            billable: true,
+            billingStatus: 'unbilled',
+            date: new Date().toISOString().slice(0, 10)
+        }];
+
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }}
+                projects={[{
+                    id: 'project-1',
+                    title: 'Health AI',
+                    preferredClientId: 'client-1',
+                    flatRate: true,
+                }]}
+                tasks={[{
+                    id: 'task-1',
+                    projectId: 'project-1',
+                    title: 'Build',
+                    billable: true,
+                    estimatedFlatAmount: 3000,
+                }]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('CHF3038.26')).toBeInTheDocument();
+        });
     });
 
     it('shows an overdue badge on overdue project cards', () => {

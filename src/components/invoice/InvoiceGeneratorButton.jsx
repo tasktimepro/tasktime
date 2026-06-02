@@ -1,6 +1,6 @@
 import React from 'react';
 import { DocumentTextIcon, ClockIcon } from '@/components/ui/icons';
-import { getCurrencySymbol, getProjectCurrency } from '../../utils/currencyUtils.ts';
+import { formatCurrency, getProjectCurrency } from '../../utils/currencyUtils.ts';
 
 /**
  * InvoiceGeneratorButton - Renders invoice generation button with badge.
@@ -8,12 +8,18 @@ import { getCurrencySymbol, getProjectCurrency } from '../../utils/currencyUtils
 const InvoiceGeneratorButton = ({
     onClick,
     currentProject,
-    unbilledHours,
-    unbilledAmount,
+    invoicePreview,
     clients,
     mode = 'invoice'
 }) => {
     const isQuoteMode = mode === 'quote';
+    const previewAmount = invoicePreview?.total || 0;
+    const previewCurrency = invoicePreview?.currency || (currentProject ? getProjectCurrency(currentProject, clients) : null);
+    const unpricedHours = invoicePreview?.unpricedHours || 0;
+    const excludedExpenseCount = invoicePreview?.excludedExpenseCount || 0;
+    const previewTitle = excludedExpenseCount > 0
+        ? `${excludedExpenseCount} expense${excludedExpenseCount === 1 ? '' : 's'} excluded until exchange rates are available`
+        : 'Estimated invoice total';
 
     return (
         <div className="flex items-center space-x-3">
@@ -23,17 +29,17 @@ const InvoiceGeneratorButton = ({
             >
                 <DocumentTextIcon className="h-5 w-5 mr-2" />
                 {isQuoteMode ? 'Generate Quote' : (currentProject ? 'Generate Invoice' : 'Create Invoice')}
-                {!isQuoteMode && currentProject && unbilledHours > 0 && currentProject.hourlyRate && (
-                    <span className="ml-2 px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full">
+                {!isQuoteMode && currentProject && previewAmount > 0 && (
+                    <span className="ml-2 px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full" title={previewTitle}>
                         <span className="sensitive-data">
-                            {getCurrencySymbol(getProjectCurrency(currentProject, clients))}{unbilledAmount.toFixed(2)}
+                            {formatCurrency(previewAmount, previewCurrency)}
                         </span>
                     </span>
                 )}
-                {!isQuoteMode && currentProject && unbilledHours > 0 && !currentProject.hourlyRate && (
+                {!isQuoteMode && currentProject && previewAmount <= 0 && unpricedHours > 0 && (
                     <span className="ml-2 px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full flex items-center">
                         <ClockIcon className="h-3 w-3 mr-1" />
-                        {unbilledHours.toFixed(2)}h
+                        {unpricedHours.toFixed(2)}h
                     </span>
                 )}
             </button>

@@ -18,6 +18,7 @@ const ExpenseList = ({
     hasAnyExpenses = false,
     hasActiveFilters = false,
     onCreateFirst,
+    showProjectContext = false,
 }) => {
 
     if (!expenses.length) {
@@ -61,6 +62,7 @@ const ExpenseList = ({
                         onView={onView}
                         onEdit={onEdit}
                         onTogglePaid={onTogglePaid}
+                        showProjectContext={showProjectContext}
                     />
                 );
             })}

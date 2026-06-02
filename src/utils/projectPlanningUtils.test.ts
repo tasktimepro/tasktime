@@ -80,7 +80,7 @@ describe('projectPlanningUtils', () => {
         }));
     });
 
-    it('uses estimated totals when no explicit budget is set', () => {
+    it('keeps estimated totals separate when no explicit budget is set', () => {
         const summary = getProjectEstimateSummary(
             {
                 id: 'project-flat',
@@ -98,7 +98,7 @@ describe('projectPlanningUtils', () => {
             'EUR'
         );
 
-        expect(summary.effectiveTargetAmount).toBe(1500);
+        expect(summary.effectiveTargetAmount).toBeNull();
         expect(summary.estimatedAmount).toBe(1500);
         expect(summary.currency).toBe('GBP');
     });

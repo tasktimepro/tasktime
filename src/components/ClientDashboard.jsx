@@ -1,5 +1,5 @@
 import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon, CheckIcon } from '@/components/ui/icons';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
-import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { fetchExchangeRates, formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, formatDuration, toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useToast } from '../hooks/useToast.ts';
@@ -21,6 +21,7 @@ import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import { getProjectDeadlineStatus, isProjectInQuoteMode } from '../utils/projectPlanningUtils.ts';
+import { getProjectInvoicePreview } from '../utils/invoicePreviewUtils.ts';
 import ExpensesSection from './expenses/ExpensesSection';
 import {
     DropdownMenu,
@@ -74,6 +75,7 @@ const ClientDashboard = ({
     const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { preferences } = usePreferences();
     const { showSuccess } = useToast();
+    const [exchangeRates, setExchangeRates] = useState(null);
     // Get client's currency
     const clientCurrency = useMemo(() => {
         return client.defaultCurrency || getPreferredCurrency();
@@ -103,6 +105,48 @@ const ClientDashboard = ({
     const archivedClientProjects = useMemo(() => {
         return clientProjects.filter(project => project.archived);
     }, [clientProjects]);
+
+    const needsExchangeRatesForProjectExpenses = useMemo(() => {
+        const projectsById = new Map(clientProjects.map((project) => [project.id, project]));
+
+        return expenses.some((expense) => {
+            if (!expense || expense.billable !== true || expense.billingStatus !== 'unbilled' || !expense.projectId) {
+                return false;
+            }
+
+            const expenseProject = projectsById.get(expense.projectId);
+            if (!expenseProject) {
+                return false;
+            }
+
+            const projectCurrency = normalizeCurrencyCode(getProjectCurrency(expenseProject, clients));
+            const expenseCurrency = normalizeCurrencyCode(expense.currency || projectCurrency);
+
+            return expenseCurrency !== projectCurrency;
+        });
+    }, [clientProjects, clients, expenses]);
+
+    useEffect(() => {
+        if (!needsExchangeRatesForProjectExpenses) {
+            return;
+        }
+
+        let isActive = true;
+
+        const loadExchangeRates = async () => {
+            const { rates } = await fetchExchangeRates();
+
+            if (isActive) {
+                setExchangeRates(rates);
+            }
+        };
+
+        loadExchangeRates();
+
+        return () => {
+            isActive = false;
+        };
+    }, [needsExchangeRatesForProjectExpenses]);
 
     // Get tasks for client projects
     const clientTasks = useMemo(() => {
@@ -222,105 +266,6 @@ const ClientDashboard = ({
             invoiceCount: clientInvoices.length
         };
     }, [clientCurrency, clientTimeEntries, clientInvoices, clientProjects, clientTasks]);
-
-    /**
-     * Calculate unbilled amount for a project (requires hourly rate)
-     */
-    const calculateUnbilledAmount = (project) => {
-        // If it's a flat rate project or no hourly rate is set, return 0 for the amount
-        if (project.flatRate || !project.hourlyRate) return 0;
-        
-        // Get tasks for this project
-        const projectTasks = clientTasks.filter(task => task.projectId === project.id);
-        
-        // Get explicitly billable tasks (tasks with billable === true)
-        const billableTasks = projectTasks.filter(task => task.billable === true);
-        const billableTaskIds = billableTasks.map(task => task.id);
-        
-        // Get time entries for this project's tasks with task-level billing filtering
-        const unbilledEntries = clientTimeEntries.filter(entry => {
-            // Only include entries for tasks that are explicitly marked as billable
-            if (!billableTaskIds.includes(entry.taskId)) return false;
-            if (entry.source === 'invoice-adjustment') return false;
-            
-            // Find the task for this entry
-            const task = projectTasks.find(t => t.id === entry.taskId);
-            if (!task) return false;
-            if (!entry.end || entry.end <= entry.start) return false;
-            
-            // Use task-specific lastBilledAt - if never billed, all entries are pending
-            const taskLastBilledAt = task.lastBilledAt || 0;
-            
-            // Only include entries created after this task's last billing date
-            return entry.start > taskLastBilledAt;
-        });
-
-        // Group unbilled entries by task and round each task's hours (same logic as invoice)
-        const taskTimeMap = {};
-        unbilledEntries.forEach(entry => {
-            if (!taskTimeMap[entry.taskId]) {
-                taskTimeMap[entry.taskId] = 0;
-            }
-            taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
-        });
-
-        // Calculate total rounded hours (matching invoice calculation)
-        const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
-            const taskHours = millisecondsToHours(taskTime);
-            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
-            return total + roundedTaskHours;
-        }, 0);
-
-        return unbilledHours * project.hourlyRate;
-    };
-
-    /**
-     * Calculate unbilled hours for a project (without rate requirement)
-     */
-    const calculateUnbilledHours = (project) => {
-        // Get tasks for this project
-        const projectTasks = clientTasks.filter(task => task.projectId === project.id);
-        
-        // Get explicitly billable tasks (tasks with billable === true)
-        const billableTasks = projectTasks.filter(task => task.billable === true);
-        const billableTaskIds = billableTasks.map(task => task.id);
-        
-        // Get time entries for this project's tasks with task-level billing filtering
-        const unbilledEntries = clientTimeEntries.filter(entry => {
-            // Only include entries for tasks that are explicitly marked as billable
-            if (!billableTaskIds.includes(entry.taskId)) return false;
-            if (entry.source === 'invoice-adjustment') return false;
-            
-            // Find the task for this entry
-            const task = projectTasks.find(t => t.id === entry.taskId);
-            if (!task) return false;
-            if (!entry.end || entry.end <= entry.start) return false;
-            
-            // Use task-specific lastBilledAt - if never billed, all entries are pending
-            const taskLastBilledAt = task.lastBilledAt || 0;
-            
-            // Only include entries created after this task's last billing date
-            return entry.start > taskLastBilledAt;
-        });
-
-        // Group unbilled entries by task and round each task's hours (same logic as invoice)
-        const taskTimeMap = {};
-        unbilledEntries.forEach(entry => {
-            if (!taskTimeMap[entry.taskId]) {
-                taskTimeMap[entry.taskId] = 0;
-            }
-            taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
-        });
-
-        // Calculate total rounded hours (matching invoice calculation)
-        const unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
-            const taskHours = millisecondsToHours(taskTime);
-            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
-            return total + roundedTaskHours;
-        }, 0);
-
-        return unbilledHours;
-    };
 
     /**
      * Handle generating invoice for a project
@@ -474,32 +419,40 @@ const ClientDashboard = ({
     };
 
     const renderProjectActionChip = (project) => {
-        const unbilledAmount = calculateUnbilledAmount(project);
-        const unbilledHours = calculateUnbilledHours(project);
+        const invoicePreview = getProjectInvoicePreview(project, {
+            clients,
+            tasks,
+            timeEntries,
+            expenses,
+            exchangeRates,
+        });
+        const previewTitle = invoicePreview.excludedExpenseCount > 0
+            ? `${invoicePreview.excludedExpenseCount} expense${invoicePreview.excludedExpenseCount === 1 ? '' : 's'} excluded until exchange rates are available`
+            : 'Estimated invoice total';
 
-        if (unbilledAmount > 0) {
+        if (invoicePreview.total > 0) {
             return (
                 <button
                     onClick={(event) => handleGenerateInvoice(event)}
                     className="inline-flex items-center rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    title="Click to generate invoice"
+                    title={previewTitle}
                 >
                     <span className="sensitive-data">
-                        {getCurrencySymbol(getProjectCurrency(project, clients))}{unbilledAmount.toFixed(2)}
+                        {formatCurrency(invoicePreview.total, invoicePreview.currency)}
                     </span>
                 </button>
             );
         }
 
-        if (!project.hourlyRate && unbilledHours > 0) {
+        if (invoicePreview.unpricedHours > 0) {
             return (
                 <button
                     onClick={(event) => handleGenerateInvoice(event)}
                     className="inline-flex items-center rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    title={`${unbilledHours.toFixed(2)} unbilled hours - Click to set rate and generate invoice`}
+                    title={`${invoicePreview.unpricedHours.toFixed(2)} unpriced hours - Click to set rate and generate invoice`}
                 >
                     <ClockIcon className="mr-1 h-3 w-3" />
-                    {unbilledHours.toFixed(2)}h
+                    {invoicePreview.unpricedHours.toFixed(2)}h
                 </button>
             );
         }
@@ -924,6 +877,8 @@ const ClientDashboard = ({
 
             <ExpensesSection
                 clientId={client.id}
+                clients={clients}
+                projects={clientProjects}
                 openExpenseModal={openExpenseModal}
                 openExpenseView={openExpenseView}
             />

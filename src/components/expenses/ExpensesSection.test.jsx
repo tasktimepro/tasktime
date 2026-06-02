@@ -38,11 +38,18 @@ vi.mock('@/hooks/useExpenseRecurrences.ts', () => ({
 
 vi.mock('./ExpenseList', () => ({
 
-    default: ({ expenses }) => (
+    default: ({ expenses, projectsById, showProjectContext }) => (
         <div data-testid="expense-list">
-            {expenses.map((expense) => (
-                <div key={expense.id}>{expense.title}</div>
-            ))}
+            {expenses.map((expense) => {
+                const project = projectsById.get(expense.projectId || '')
+
+                return (
+                    <div key={expense.id}>
+                        {expense.title}
+                        {showProjectContext && project ? ` Project: ${project.title}` : ''}
+                    </div>
+                )
+            })}
         </div>
     )
 }))
@@ -202,5 +209,35 @@ describe('ExpensesSection', () => {
         const titles = screen.getByTestId('expense-list').textContent
 
         expect(titles).toBe('Unpaid latestUnpaid middlePaid latestPaid older')
+    })
+
+    it('passes project context for mixed client dashboard expenses', async () => {
+        hookMocks.expenses = [
+            {
+                ...baseExpense,
+                id: 'project-expense',
+                title: 'Project expense',
+                projectId: 'project-1'
+            },
+            {
+                ...baseExpense,
+                id: 'client-expense',
+                title: 'Client expense',
+                projectId: null
+            }
+        ]
+
+        render(
+            <ExpensesSection
+                clientId="client-1"
+                projects={[{ id: 'project-1', title: 'Website Build' }]}
+                openExpenseModal={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Expenses (2)' }))
+
+        expect(screen.getByText(/Project expense Project: Website Build/)).toBeInTheDocument()
+        expect(screen.getByText('Client expense')).toBeInTheDocument()
     })
 })

@@ -768,10 +768,17 @@ const ProjectDashboard = ({
 
                             {(planningSummary.estimatedAmount > 0 || planningSummary.hasBudgetAmount) && (
                                 <div className="space-y-2 rounded-lg border border-border p-4">
-                                    <p className="text-sm font-medium text-foreground">Target amount</p>
-                                    {planningSummary.effectiveTargetAmount !== null && (
+                                    <p className="text-sm font-medium text-foreground">
+                                        {planningSummary.hasBudgetAmount ? 'Target amount' : 'Quoted amount'}
+                                    </p>
+                                    {planningSummary.hasBudgetAmount && planningSummary.effectiveTargetAmount !== null && (
                                         <p className="text-sm text-muted-foreground sensitive-data">
                                             Target amount: {formatCurrency(planningSummary.effectiveTargetAmount, planningSummary.currency)}
+                                        </p>
+                                    )}
+                                    {!planningSummary.hasBudgetAmount && planningSummary.estimatedAmount > 0 && (
+                                        <p className="text-sm text-muted-foreground sensitive-data">
+                                            Quoted amount: {formatCurrency(planningSummary.estimatedAmount, planningSummary.currency)}
                                         </p>
                                     )}
                                     {targetProgressRatio !== null && (
@@ -848,6 +855,8 @@ const ProjectDashboard = ({
             <ExpensesSection
                 clientId={projectClient?.id}
                 projectId={project.id}
+                clients={clients}
+                projects={[project]}
                 openExpenseModal={openExpenseModal}
                 openExpenseView={openExpenseView}
             />

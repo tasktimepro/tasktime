@@ -53,4 +53,28 @@ describe('ExpenseRow', () => {
         expect(screen.getByText('Business expense')).toBeInTheDocument();
         expect(screen.queryByText('Client:')).not.toBeInTheDocument();
     });
+
+    it('shows project context in compact mixed client lists', () => {
+        render(
+            <ExpenseRow
+                compact
+                showProjectContext
+                expense={{
+                    id: 'expense-1',
+                    title: 'Project software',
+                    date: '2026-04-12',
+                    amount: 40,
+                    currency: 'EUR',
+                    paymentStatus: 'unpaid',
+                    projectId: 'project-1',
+                }}
+                project={{ id: 'project-1', title: 'Health AI' }}
+                onEdit={vi.fn()}
+                onTogglePaid={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('Project:')).toBeInTheDocument();
+        expect(screen.getByText('Health AI')).toBeInTheDocument();
+    });
 });

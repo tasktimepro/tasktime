@@ -162,6 +162,8 @@ vi.mock('./invoice/InvoiceModal', () => {
         handleSaveInvoice,
         handleTemplateSelection,
         calculatePricing,
+        availableExpenses = [],
+        selectedExpensesForBilling = {},
         selectedBusinessInfo,
         newTaskTitle,
         newTaskHours,
@@ -285,6 +287,16 @@ vi.mock('./invoice/InvoiceModal', () => {
                         : 'no tax configured'}
                 </div>
                 <div data-testid="pricing-subtotal">{calculatePricing?.subtotal ?? 0}</div>
+                <div data-testid="available-expense-ids">
+                    {availableExpenses.map((expense) => expense.id).sort().join(',')}
+                </div>
+                <div data-testid="selected-expense-ids">
+                    {Object.entries(selectedExpensesForBilling)
+                        .filter(([, selected]) => selected)
+                        .map(([expenseId]) => expenseId)
+                        .sort()
+                        .join(',')}
+                </div>
                 {modalConfig.applyDateOverride && (
                     <button
                         type="button"
@@ -523,6 +535,122 @@ describe('InvoiceGenerator', () => {
 
         await waitFor(() => {
             expect(screen.getByTestId('pricing-subtotal')).toHaveTextContent('500')
+        })
+    })
+
+    it('shows client-level project invoice expenses without selecting them by default', async () => {
+
+        expenseHookMocks.expenses = [
+            {
+                id: 'project-expense',
+                title: 'Project expense',
+                date: '2026-04-01',
+                amount: 25,
+                currency: 'EUR',
+                billable: true,
+                billingStatus: 'unbilled',
+                clientId: 'client-1',
+                projectId: 'project-1',
+                isPersonal: false
+            },
+            {
+                id: 'client-expense-a',
+                title: 'Client expense A',
+                date: '2026-04-01',
+                amount: 100,
+                currency: 'EUR',
+                billable: true,
+                billingStatus: 'unbilled',
+                clientId: 'client-1',
+                projectId: null,
+                isPersonal: false
+            },
+            {
+                id: 'client-expense-b',
+                title: 'Client expense B',
+                date: '2026-04-02',
+                amount: 40,
+                currency: 'EUR',
+                billable: true,
+                billingStatus: 'unbilled',
+                clientId: 'client-1',
+                projectId: null,
+                isPersonal: false
+            }
+        ]
+        const user = userEvent.setup()
+
+        renderGenerator({
+            client: null,
+            project: { ...baseProject, preferredClientId: 'client-1' },
+            clients: [baseClient]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        await waitFor(() => {
+            expect(screen.getByTestId('available-expense-ids')).toHaveTextContent('client-expense-a,client-expense-b,project-expense')
+        })
+        await waitFor(() => {
+            expect(screen.getByTestId('selected-expense-ids')).toHaveTextContent('project-expense')
+        })
+    })
+
+    it('selects client-level expenses by default in client invoice context even when a project is selected', async () => {
+
+        expenseHookMocks.expenses = [
+            {
+                id: 'project-expense',
+                title: 'Project expense',
+                date: '2026-04-01',
+                amount: 25,
+                currency: 'EUR',
+                billable: true,
+                billingStatus: 'unbilled',
+                clientId: 'client-1',
+                projectId: 'project-1',
+                isPersonal: false
+            },
+            {
+                id: 'client-expense-a',
+                title: 'Client expense A',
+                date: '2026-04-01',
+                amount: 100,
+                currency: 'EUR',
+                billable: true,
+                billingStatus: 'unbilled',
+                clientId: 'client-1',
+                projectId: null,
+                isPersonal: false
+            },
+            {
+                id: 'client-expense-b',
+                title: 'Client expense B',
+                date: '2026-04-02',
+                amount: 40,
+                currency: 'EUR',
+                billable: true,
+                billingStatus: 'unbilled',
+                clientId: 'client-1',
+                projectId: null,
+                isPersonal: false
+            }
+        ]
+        const user = userEvent.setup()
+
+        renderGenerator({
+            client: baseClient,
+            project: { ...baseProject, preferredClientId: 'client-1' },
+            clients: [baseClient]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        await waitFor(() => {
+            expect(screen.getByTestId('available-expense-ids')).toHaveTextContent('client-expense-a,client-expense-b,project-expense')
+        })
+        await waitFor(() => {
+            expect(screen.getByTestId('selected-expense-ids')).toHaveTextContent('client-expense-a,client-expense-b,project-expense')
         })
     })
 

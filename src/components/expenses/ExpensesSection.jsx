@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils';
 const ExpensesSection = ({
     clientId,
     projectId,
+    clients = [],
+    projects = [],
     openExpenseModal,
     openExpenseView,
 }) => {
@@ -28,6 +30,9 @@ const ExpensesSection = ({
     const { recurrences } = useExpenseRecurrences();
     const { showError } = useToast();
     const [isExpanded, setIsExpanded] = useState(false);
+    const clientsById = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
+    const projectsById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+    const showProjectContext = Boolean(clientId && !projectId);
 
     const filteredExpenses = useMemo(() => {
         return expenses.filter((expense) => {
@@ -196,9 +201,10 @@ const ExpensesSection = ({
                 <CardContent className={cn('space-y-4', isMobileLayout && 'px-3 pb-3 pt-0')}>
                     <ExpenseList
                         expenses={displayedExpenses}
-                        clientsById={new Map()}
-                        projectsById={new Map()}
+                        clientsById={clientsById}
+                        projectsById={projectsById}
                         compact
+                        showProjectContext={showProjectContext}
                         onView={(expense) => openExpenseView?.(expense)}
                         onEdit={(expense) => openExpenseModal(expense)}
                         onTogglePaid={handleTogglePaid}

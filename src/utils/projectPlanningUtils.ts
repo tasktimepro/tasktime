@@ -160,7 +160,7 @@ export const getProjectEstimateSummary = (
         actualHours,
         estimatedAmount,
         budgetAmount,
-        effectiveTargetAmount: budgetAmount ?? (estimatedAmount > 0 ? estimatedAmount : null),
+        effectiveTargetAmount: budgetAmount,
         currency: resolveProjectCurrency(project, clients, fallbackCurrency),
         hasTaskEstimates,
         hasBudgetAmount,

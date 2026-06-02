@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { buildInvoiceHtmlContent, generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
-import { millisecondsToHours, toStorageDate, timestampToDateString } from '../utils/dateUtils.ts';
+import { toStorageDate, timestampToDateString } from '../utils/dateUtils.ts';
 import {
     DEFAULT_INVOICE_LAYOUT_STYLE,
     DEFAULT_INVOICE_LOGO_PLACEMENT,
@@ -26,13 +26,13 @@ import { useExpenses } from '../hooks/useExpenses.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
 import { useTimers } from '../hooks/useTimers.ts';
-import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import {
     getInvoicesForProject,
     getLatestInvoiceForProject,
     getNextSequentialNumberForTemplate,
     resolveCurrentInvoiceTemplate,
 } from '../utils/invoiceUtils.ts';
+import { getProjectInvoicePreview } from '../utils/invoicePreviewUtils.ts';
 import {
     buildProjectQuoteLineItems,
     buildQuoteDocumentData,
@@ -286,8 +286,17 @@ const InvoiceGenerator = ({
                 .map((projectItem) => projectItem?.id)
                 .filter(Boolean)
         );
+        const scopedClientIds = new Set(
+            (Array.isArray(projectsForScope) ? projectsForScope : [])
+                .map((projectItem) => projectItem?.preferredClientId)
+                .filter(Boolean)
+        );
 
-        if (scopedProjectIds.size === 0 && !clientForScope) {
+        if (clientForScope?.id) {
+            scopedClientIds.add(clientForScope.id);
+        }
+
+        if (scopedProjectIds.size === 0 && scopedClientIds.size === 0) {
             return [];
         }
 
@@ -298,7 +307,7 @@ const InvoiceGenerator = ({
                 if (expense.projectId) {
                     if (!scopedProjectIds.has(expense.projectId)) return false;
                 } else {
-                    if (!clientForScope?.id || expense.clientId !== clientForScope.id) return false;
+                    if (!expense.clientId || !scopedClientIds.has(expense.clientId)) return false;
                 }
 
                 if (!isStoredDateWithinBillingRange(expense.date, activeBillingPeriodStart, activeBillingPeriodEnd)) {
@@ -397,6 +406,18 @@ const InvoiceGenerator = ({
     const conversionUnavailableCount = useMemo(() => {
         return availableExpensesWithConversion.filter((expense) => !expense.isConvertible).length;
     }, [availableExpensesWithConversion]);
+
+    const shouldSelectExpenseByDefault = useCallback((expense) => {
+        if (!expense || expense.isConvertible === false) {
+            return false;
+        }
+
+        if (expense.projectId) {
+            return true;
+        }
+
+        return !project || !!client;
+    }, [client, project]);
 
     const resolveCurrentBusinessInfo = useCallback((businessInfoSource) => {
         if (!businessInfoSource) {
@@ -1139,12 +1160,12 @@ const InvoiceGenerator = ({
 
                 next[expense.id] = editingInvoice
                     ? editingExpenseIds.has(expense.id) || expense.invoiceId === editingInvoice.id
-                    : true;
+                    : shouldSelectExpenseByDefault(expense);
             });
 
             return areBooleanMapsEqual(prev, next) ? prev : next;
         });
-    }, [availableExpensesWithConversion, editingInvoice, showInvoiceForm]);
+    }, [availableExpensesWithConversion, editingInvoice, shouldSelectExpenseByDefault, showInvoiceForm]);
 
     useEffect(() => {
         if (!showInvoiceForm) {
@@ -2328,7 +2349,7 @@ const InvoiceGenerator = ({
                 const initialExpenseSelection = {};
                 if (!isQuoteMode) {
                     availableExpensesWithConversion.forEach((expense) => {
-                        if (!expense.isConvertible) return;
+                        if (!shouldSelectExpenseByDefault(expense)) return;
                         initialExpenseSelection[expense.id] = true;
                     });
                 }
@@ -2382,7 +2403,7 @@ const InvoiceGenerator = ({
             }
         }
         setShowInvoiceForm(true);
-    }, [availableExpensesWithConversion, client, clients, editingInvoice, expenses, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceDataForProjects, projects, quoteNumberTimestamp, selectedClient, selectedProject, selectedProjectsForInvoice, setIsProjectContextFixed, showError, showInvoiceForm, tasks]);
+    }, [availableExpensesWithConversion, client, clients, editingInvoice, expenses, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceDataForProjects, projects, quoteNumberTimestamp, selectedClient, selectedProject, selectedProjectsForInvoice, setIsProjectContextFixed, shouldSelectExpenseByDefault, showError, showInvoiceForm, tasks]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {
@@ -2396,57 +2417,19 @@ const InvoiceGenerator = ({
         }
     }, [editingInvoice, openInvoiceForm, showInvoiceForm, handledEditingInvoice]);
 
-    // Calculate unbilled time - initially using the current project (will update when a project is selected)
-    // Don't calculate unbilled time in client context or when editing an invoice
+    // Calculate the project-context invoice preview total before the modal opens.
     const currentProjectForCalculation = (!client && !editingInvoice) ? (selectedProject || project) : null;
-    let unbilledHours = 0;
-    let unbilledAmount = 0;
-
-    // Only calculate unbilled time if we have a project context and not in client dashboard
-    if (currentProjectForCalculation) {
-        // Get all tasks for this project
-        const projectTasks = tasks.filter(task => task.projectId === currentProjectForCalculation.id);
-        
-        // Get explicitly billable tasks (tasks with billable === true)
-        const billableTasks = projectTasks.filter(task => task.billable === true);
-        const billableTaskIds = billableTasks.map(task => task.id);
-        
-        // Filter unbilled entries based on individual task billing dates AND billable status
-        const unbilledEntries = timeEntries.filter(entry => {
-            // Only include entries for tasks that are explicitly marked as billable
-            if (!billableTaskIds.includes(entry.taskId)) return false;
-            if (entry.source === 'invoice-adjustment') return false;
-            
-            // Find the task for this entry
-            const task = projectTasks.find(t => t.id === entry.taskId);
-            if (!task) return false;
-            if (!entry.end || entry.end <= entry.start) return false;
-            
-            // Use task-specific lastBilledAt - if never billed, all entries are pending
-            const taskLastBilledAt = task.lastBilledAt || 0;
-            
-            // Only include entries created after this task's last billing date
-            return entry.start > taskLastBilledAt;
-        });
-
-        // Group unbilled entries by task and round each task's hours (same logic as invoice)
-        const taskTimeMap = {};
-        unbilledEntries.forEach(entry => {
-            if (!taskTimeMap[entry.taskId]) {
-                taskTimeMap[entry.taskId] = 0;
-            }
-            taskTimeMap[entry.taskId] += getBillableDurationMs(entry);
-        });
-
-        // Calculate total rounded hours (matching invoice calculation)
-        unbilledHours = Object.values(taskTimeMap).reduce((total, taskTime) => {
-            const taskHours = millisecondsToHours(taskTime);
-            const roundedTaskHours = Math.round(taskHours * 100) / 100; // Round to 2 decimal places
-            return total + roundedTaskHours;
-        }, 0);
-
-        unbilledAmount = unbilledHours * currentProjectForCalculation.hourlyRate;
-    }
+    const invoicePreview = currentProjectForCalculation
+        ? getProjectInvoicePreview(currentProjectForCalculation, {
+            clients,
+            tasks,
+            timeEntries,
+            expenses,
+            exchangeRates,
+            billingPeriodStart: activeBillingPeriodStart,
+            billingPeriodEnd: activeBillingPeriodEnd,
+        })
+        : null;
 
     // Invoice Modal
     return (
@@ -2455,8 +2438,7 @@ const InvoiceGenerator = ({
                 <InvoiceGeneratorButton
                     onClick={openInvoiceForm}
                     currentProject={currentProjectForCalculation}
-                    unbilledHours={unbilledHours}
-                    unbilledAmount={unbilledAmount}
+                    invoicePreview={invoicePreview}
                     clients={clients}
                     mode={mode}
                 />

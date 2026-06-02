@@ -18,6 +18,7 @@ const ExpenseRow = ({
     onView,
     onEdit,
     onTogglePaid,
+    showProjectContext = false,
 }) => {
     const todayStr = toStorageDate(new Date()) || '';
     const todayStart = parseStoredDate(todayStr);
@@ -144,6 +145,13 @@ const ExpenseRow = ({
                                 </>
                             ) : null}
                         </p>
+                        {compact && showProjectContext && projectName && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Project: <span className="font-medium text-muted-foreground">
+                                    {projectName}
+                                </span>
+                            </p>
+                        )}
                         {!compact && (
                             <div className="text-xs text-muted-foreground mt-1 space-y-1">
                                 <p>

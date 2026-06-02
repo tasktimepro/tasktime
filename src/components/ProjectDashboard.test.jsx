@@ -329,6 +329,51 @@ describe('ProjectDashboard', () => {
         expect(hookMocks.showSuccess).toHaveBeenCalledWith('Project is now active and ready to generate invoices.');
     });
 
+    it('shows quoted amount without target progress when no project budget exists', () => {
+        render(
+            <ProjectDashboard
+                project={{
+                    id: 'project-1',
+                    title: 'Fixed Scope',
+                    hourlyRate: 125,
+                    flatRate: true,
+                    isPersonal: false,
+                    preferredClientId: 'client-1',
+                    budgetAmount: null,
+                }}
+                tasks={[
+                    { id: 'task-1', title: 'Delivery', projectId: 'project-1', billable: true, estimatedFlatAmount: 3000 },
+                ]}
+                timeEntries={[
+                    { id: 'entry-1', taskId: 'task-1', start: 0, end: 4 * 60 * 60 * 1000 },
+                ]}
+                onBackToProjects={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openTaskModal={vi.fn()}
+                onViewTask={vi.fn()}
+                navigateToClient={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('Quoted amount')).toBeInTheDocument();
+        expect(screen.getByText('Quoted amount: CHF3000.00')).toBeInTheDocument();
+        expect(screen.queryByText('Target amount')).not.toBeInTheDocument();
+        expect(screen.queryByText('On target')).not.toBeInTheDocument();
+        expect(screen.queryByText(/Projected earnings:/i)).not.toBeInTheDocument();
+    });
+
     it('shows an activate action in the more-actions menu for quote-stage projects', async () => {
         const user = userEvent.setup();
 
