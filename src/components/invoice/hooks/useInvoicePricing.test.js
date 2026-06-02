@@ -62,6 +62,19 @@ describe('useInvoicePricing', () => {
         expect(result.current.total).toBe(75.5)
     })
 
+    it('uses the client default hourly rate for invoice-only hourly tasks', () => {
+
+        const { result } = renderHook(() => useInvoicePricing({
+            ...baseParams,
+            additionalTasks: [{ hours: 2 }],
+            selectedClient: { defaultHourlyRate: 125 }
+        }))
+
+        expect(result.current.subtotal).toBe(250)
+        expect(result.current.total).toBe(250)
+        expect(result.current.totalHours).toBe(2)
+    })
+
     it('merges subtasks and applies hourly rates', () => {
 
         const { result } = renderHook(() => useInvoicePricing({

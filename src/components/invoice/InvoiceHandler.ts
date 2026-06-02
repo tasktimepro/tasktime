@@ -6,6 +6,7 @@ import {
     getLatestInvoiceForProject,
     resolveCurrentInvoiceTemplate,
 } from '../../utils/invoiceUtils.ts';
+import { getClientHourlyRate } from '../../utils/projectPlanningUtils.ts';
 
 // Handles selecting/deselecting tasks for billing
 export const handleTaskSelectionForBilling = (setSelectedTasksForBilling) => (taskId, selected) => {
@@ -127,7 +128,7 @@ export const handleAddAdditionalTask = (setAdditionalTasks, setUseFlatRate, newT
         title: newTaskTitle.trim(),
         hours: newTaskUseFlatRate ? 0 : roundedValue,
         flatRate: newTaskUseFlatRate ? roundedValue : 0,
-        hourlyRate: newTaskUseFlatRate ? 0 : (newTaskHourlyRate !== '' ? parseFloat(newTaskHourlyRate) : (selectedProject?.hourlyRate !== undefined && selectedProject?.hourlyRate !== null ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== undefined && selectedClient?.hourlyRate !== null ? selectedClient.hourlyRate : 0))),
+        hourlyRate: newTaskUseFlatRate ? 0 : (newTaskHourlyRate !== '' ? parseFloat(newTaskHourlyRate) : (selectedProject?.hourlyRate !== undefined && selectedProject?.hourlyRate !== null ? selectedProject.hourlyRate : getClientHourlyRate(selectedClient))),
         quantity: newTaskUseFlatRate ? newTaskQuantity : 1,
         isCustom: true,
         useFlatRate: newTaskUseFlatRate

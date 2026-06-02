@@ -2,10 +2,7 @@
 
 ## Priority
 
-[ ] Support multiple project option when generating an invoice for the same client - invoice should contain each project in it's own row, and then totals at the end.
-    [ ] Must keep in mind that projects might have different rate types hourly/flat rate
-    [ ] Must keep in mind that now invoice is shared between projects and should appear under all projects
-    [ ] Make sure that this supports everything e2e without breaking what already works well with single project invoice generation and think about other potential claches or critical paths before we proceed with this update
+[ ] I have some customers that have created an invoice by mistake, or made some mistakes, and they don't want to leave it there. I was thinking that the best option for now is that we pass a query in the URL like ?deleteMode=1 and that would enable the current session to allow deleting of invoices?
 
 ---
 

@@ -67,6 +67,18 @@ const resolveProjectCurrency = (
     return normalizeCurrencyCode(client?.defaultCurrency || fallbackCurrency);
 };
 
+export const getClientHourlyRate = (
+    client: Pick<Client, 'hourlyRate' | 'defaultHourlyRate'> | null | undefined
+): number => {
+    const clientDefaultRate = normalizeFiniteNumber(client?.defaultHourlyRate);
+
+    if (clientDefaultRate !== null) {
+        return clientDefaultRate;
+    }
+
+    return normalizeFiniteNumber(client?.hourlyRate) ?? 0;
+};
+
 const resolveHourlyRate = (
     project: Pick<Project, 'hourlyRate'>,
     client: Pick<Client, 'hourlyRate' | 'defaultHourlyRate'> | null
@@ -77,13 +89,7 @@ const resolveHourlyRate = (
         return projectRate;
     }
 
-    const clientDefaultRate = normalizeFiniteNumber(client?.defaultHourlyRate);
-
-    if (clientDefaultRate !== null) {
-        return clientDefaultRate;
-    }
-
-    return normalizeFiniteNumber(client?.hourlyRate) ?? 0;
+    return getClientHourlyRate(client);
 };
 
 const getProjectTasks = (projectId: string, tasks: Task[]): Task[] => tasks.filter((task) => task.projectId === projectId);

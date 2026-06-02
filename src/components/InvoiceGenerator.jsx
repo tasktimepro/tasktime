@@ -46,6 +46,7 @@ import {
     INVOICE_BILLING_PERIOD_OPTIONS,
     isStoredDateWithinBillingRange,
 } from '../utils/billingPeriodUtils.ts';
+import { getClientHourlyRate } from '../utils/projectPlanningUtils.ts';
 
 const areBooleanMapsEqual = (left, right) => {
     const leftKeys = Object.keys(left);
@@ -102,6 +103,7 @@ const InvoiceGenerator = ({
     businessInfos = [],
     clients = [],
     showButton = true,
+    forceOpenOnMount = false,
     // Modal stacking functions
     openClientModal,
     openProjectModal,
@@ -248,6 +250,7 @@ const InvoiceGenerator = ({
 
     const invoiceCurrency = selectedClient?.defaultCurrency || getPreferredCurrency();
     const normalizedInvoiceCurrency = normalizeCurrencyCode(invoiceCurrency);
+    const selectedClientHourlyRate = getClientHourlyRate(selectedClient);
 
     useEffect(() => {
         let isActive = true;
@@ -416,12 +419,9 @@ const InvoiceGenerator = ({
     // Auto-open the form when showButton is false (modal mode)
     useEffect(() => {
         if (!showButton) { // Modal mode (auto-open is possible)
-            // Don't auto-open if:
-            // 1. We've already auto-opened
-            // 2. We're in client context
-            // 3. We're editing an invoice
-            // 4. We're handling an editing invoice (crucial addition)
-            if (!didAutoOpenModalRef.current && !client && !editingInvoice && !handledEditingInvoice) {
+            const canAutoOpenFromContext = !client && !editingInvoice && !handledEditingInvoice;
+
+            if (!didAutoOpenModalRef.current && (forceOpenOnMount || canAutoOpenFromContext)) {
                 setShowInvoiceForm(true);
                 didAutoOpenModalRef.current = true;
             }
@@ -430,7 +430,7 @@ const InvoiceGenerator = ({
             // so it can auto-open next time if props change to modal mode.
             didAutoOpenModalRef.current = false;
         }
-    }, [showButton, client, editingInvoice, handledEditingInvoice]); // Added handledEditingInvoice dependency
+    }, [showButton, client, editingInvoice, handledEditingInvoice, forceOpenOnMount]); // Added handledEditingInvoice dependency
 
     /**
      * Initialize payment method based on previous invoices or editing invoice
@@ -1479,7 +1479,7 @@ const InvoiceGenerator = ({
             return parseInvoiceNumber(task?.flatRate) * parseInvoiceNumber(task?.quantity, 1);
         }
 
-        const fallbackHourlyRate = parseInvoiceNumber(task?.projectHourlyRate) || parseInvoiceNumber(selectedProject?.hourlyRate) || parseInvoiceNumber(selectedClient?.hourlyRate);
+        const fallbackHourlyRate = parseInvoiceNumber(task?.projectHourlyRate) || parseInvoiceNumber(selectedProject?.hourlyRate) || parseInvoiceNumber(selectedClientHourlyRate);
         const parentHourlyRate = parseInvoiceNumber(task?.hourlyRate) || fallbackHourlyRate;
         let taskAmount = parseInvoiceNumber(task?.hours) * parentHourlyRate;
 
@@ -1489,7 +1489,7 @@ const InvoiceGenerator = ({
         });
 
         return taskAmount;
-    }, [parseInvoiceNumber, selectedClient?.hourlyRate, selectedProject?.hourlyRate]);
+    }, [parseInvoiceNumber, selectedClientHourlyRate, selectedProject?.hourlyRate]);
 
     const getNormalizedDocumentTasks = useCallback(() => {
         const orderedSelectedInvoiceTasks = orderTasksWithSubtasks(
@@ -1505,7 +1505,7 @@ const InvoiceGenerator = ({
                 projectFlatRate: task.projectFlatRate === true,
                 hours: editableHours[task?.id] || task?.originalHours || 0,
                 flatRate: taskFlatRates[task.id] || 0,
-                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClientHourlyRate || 0,
                 useFlatRate: useFlatRate[task.id] || false,
                 quantity: taskQuantities[task.id] || 1,
                 isMerged: (task && task.id && mergedSubtasks[task.id]) || false,
@@ -1520,24 +1520,24 @@ const InvoiceGenerator = ({
                             projectFlatRate: subtask.projectFlatRate === true || task.projectFlatRate === true,
                             hours: editableHours[subtask.id] || subtask.originalHours || 0,
                             flatRate: taskFlatRates[subtask.id] || 0,
-                            hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || subtask.projectHourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0,
+                            hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || subtask.projectHourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClientHourlyRate || 0,
                             useFlatRate: useFlatRate[subtask.id] || false,
                             quantity: taskQuantities[subtask.id] || 1
                         }))
                     : []
             }))
             .filter((task) => getInvoiceTaskAmount(task, task.isMerged ? task.mergedSubtasks : []) > 0);
-    }, [editableHours, getInvoiceTaskAmount, invoiceTasks, mergedSubtasks, selectedClient?.hourlyRate, selectedProject?.hourlyRate, selectedTasksForBilling, taskFlatRates, taskHourlyRates, taskQuantities, useFlatRate]);
+    }, [editableHours, getInvoiceTaskAmount, invoiceTasks, mergedSubtasks, selectedClientHourlyRate, selectedProject?.hourlyRate, selectedTasksForBilling, taskFlatRates, taskHourlyRates, taskQuantities, useFlatRate]);
 
     const getNormalizedAdditionalDocumentTasks = useCallback(() => {
         return additionalTasks
             .filter(task => task)
             .map(task => ({
                 ...task,
-                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClient?.hourlyRate || 0
+                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClientHourlyRate || 0
             }))
             .filter((task) => getInvoiceTaskAmount(task) > 0);
-    }, [additionalTasks, getInvoiceTaskAmount, selectedClient?.hourlyRate, selectedProject?.hourlyRate]);
+    }, [additionalTasks, getInvoiceTaskAmount, selectedClientHourlyRate, selectedProject?.hourlyRate]);
 
     const buildInvoiceProjectBreakdowns = useCallback((documentTasks, expenseItems, pricing) => {
         const projectById = new Map(selectedProjectsForInvoice.map((projectItem) => [projectItem.id, projectItem]));

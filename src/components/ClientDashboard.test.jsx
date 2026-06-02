@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ClientDashboard from './ClientDashboard';
 
 const hookMocks = vi.hoisted(() => ({
@@ -54,7 +55,11 @@ vi.mock('../hooks/useToast.ts', () => ({
     useToast: () => ({ showSuccess: hookMocks.showSuccess })
 }));
 
-vi.mock('./InvoiceGenerator', () => ({ default: () => <button type="button">New Invoice</button> }));
+vi.mock('./InvoiceGenerator', () => ({
+    default: ({ showButton = true }) => showButton
+        ? <button type="button">New Invoice</button>
+        : <div data-testid="mobile-generator-invoice">Invoice generator modal</div>
+}));
 vi.mock('./InvoicesList', () => ({ default: () => <div>Invoices list</div> }));
 vi.mock('./MetricsDisplay', () => ({ default: () => <div>Metrics display</div> }));
 vi.mock('./expenses/ExpensesSection', () => ({ default: () => <div>Expenses section</div> }));
@@ -153,6 +158,42 @@ describe('ClientDashboard', () => {
         expect(topHeaderRow?.className.includes('flex-col')).toBe(false);
         expect(menuButton.className.includes('border')).toBe(true);
         expect(menuButton.className.includes('rounded-full')).toBe(true);
+    });
+
+    it('opens invoice generation from the mobile more-actions menu', async () => {
+        const user = userEvent.setup();
+        setMatchMedia(true);
+
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }}
+                projects={[]}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        expect(screen.queryByTestId('mobile-generator-invoice')).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        await user.click(await screen.findByRole('menuitem', { name: 'Generate Invoice' }));
+
+        expect(screen.getByTestId('mobile-generator-invoice')).toBeInTheDocument();
     });
 
     it('shows the quote stage badge on quote-mode project cards', () => {

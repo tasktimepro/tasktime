@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    getClientHourlyRate,
     getProjectBudgetProgress,
     getProjectDeadlineStatus,
     getProjectEstimateSummary,
@@ -28,6 +29,12 @@ describe('projectPlanningUtils', () => {
             { flatRate: false, hourlyRate: null },
             { defaultHourlyRate: 110, hourlyRate: 80 }
         )).toBe(275);
+    });
+
+    it('prefers client default hourly rate over the legacy hourly rate alias', () => {
+        expect(getClientHourlyRate({ defaultHourlyRate: 110, hourlyRate: 80 })).toBe(110);
+        expect(getClientHourlyRate({ hourlyRate: 95 })).toBe(95);
+        expect(getClientHourlyRate(null)).toBe(0);
     });
 
     it('uses flat estimate amounts for flat-rate projects', () => {

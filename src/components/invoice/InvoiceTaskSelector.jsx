@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { orderTasksWithSubtasks } from './utils/taskOrdering.ts';
+import { getClientHourlyRate } from '../../utils/projectPlanningUtils.ts';
 
 /**
  * InvoiceTaskSelector component - Task selection and time inputs for invoicing.
@@ -55,6 +56,7 @@ const InvoiceTaskSelector = ({
     getInvoiceCurrency,
     setNewTaskUseFlatRate
 }) => {
+    const selectedClientHourlyRate = getClientHourlyRate(selectedClient);
     const selectedTasksCount = Object.values(selectedTasksForBilling).filter(Boolean).length + additionalTasks.length;
     const orderedInvoiceTasks = orderTasksWithSubtasks(invoiceTasks);
     const hasMultipleProjects = new Set(
@@ -337,7 +339,7 @@ const InvoiceTaskSelector = ({
                                                             type="number"
                                                             step="0.01"
                                                             min="0"
-                                                            value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (task.projectHourlyRate !== null && task.projectHourlyRate !== undefined ? task.projectHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : '')))}
+                                                            value={taskHourlyRates[task.id] !== undefined ? taskHourlyRates[task.id] : (task.projectHourlyRate !== null && task.projectHourlyRate !== undefined ? task.projectHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClientHourlyRate > 0 ? selectedClientHourlyRate : '')))}
                                                             onChange={(e) => handleTaskHourlyRateChange(task.id, e.target.value)}
                                                             className={`${amountInputClassName} sensitive-data`}
                                                             placeholder="0.00"
@@ -446,7 +448,7 @@ const InvoiceTaskSelector = ({
                                                                         type="number"
                                                                         step="0.01"
                                                                         min="0"
-                                                                        value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
+                                                                        value={task.hourlyRate !== undefined ? task.hourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClientHourlyRate > 0 ? selectedClientHourlyRate : ''))}
                                                                         onChange={(e) => handleAdditionalTaskHourlyRateChange(task.id, e.target.value)}
                                                                         className={`${amountInputClassName} sensitive-data`}
                                                                         placeholder="0.00"
@@ -550,7 +552,7 @@ const InvoiceTaskSelector = ({
                                                             type="number"
                                                             step="0.01"
                                                             min="0"
-                                                            value={newTaskHourlyRate !== '' ? newTaskHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClient?.hourlyRate !== null && selectedClient?.hourlyRate !== undefined ? selectedClient.hourlyRate : ''))}
+                                                            value={newTaskHourlyRate !== '' ? newTaskHourlyRate : (selectedProject?.hourlyRate !== null && selectedProject?.hourlyRate !== undefined ? selectedProject.hourlyRate : (selectedClientHourlyRate > 0 ? selectedClientHourlyRate : ''))}
                                                             onChange={(e) => setNewTaskHourlyRate(e.target.value)}
                                                             placeholder="0.00"
                                                             className="h-9 w-full md:w-32 sensitive-data"

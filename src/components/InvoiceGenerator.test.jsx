@@ -64,6 +64,7 @@ let modalConfig = {
     applyDateOverride: false,
     skipTemplateSelection: false,
     adjustTaskHours: null,
+    additionalTask: null,
     billingPeriodPreset: null,
     billingPeriodStart: null,
     billingPeriodEnd: null
@@ -162,6 +163,16 @@ vi.mock('./invoice/InvoiceModal', () => {
         handleTemplateSelection,
         calculatePricing,
         selectedBusinessInfo,
+        newTaskTitle,
+        newTaskHours,
+        newTaskHourlyRate,
+        newTaskUseFlatRate,
+        setNewTaskTitle,
+        setNewTaskHours,
+        setNewTaskHourlyRate,
+        setNewTaskQuantity,
+        handleToggleNewTaskFlatRate,
+        handleAddAdditionalTask,
         setInvoiceDateOverride,
         setUseInvoiceDateOverride,
         setBillingPeriodPreset,
@@ -169,11 +180,13 @@ vi.mock('./invoice/InvoiceModal', () => {
         setBillingPeriodEnd,
     }) {
         const didApplyAdjustments = React.useRef(false)
+        const didAddAdditionalTask = React.useRef(false)
         const didApplyBillingPeriod = React.useRef(false)
 
         React.useEffect(() => {
             if (!showInvoiceForm) {
                 didApplyAdjustments.current = false
+                didAddAdditionalTask.current = false
                 didApplyBillingPeriod.current = false
                 return
             }
@@ -188,6 +201,60 @@ vi.mock('./invoice/InvoiceModal', () => {
                 modalConfig.adjustTaskHours.hours
             )
         }, [showInvoiceForm, handleHoursChange])
+
+        React.useEffect(() => {
+            if (!showInvoiceForm || !modalConfig.additionalTask || didAddAdditionalTask.current) {
+                return
+            }
+
+            const {
+                title,
+                hours,
+                hourlyRate,
+                quantity,
+                useFlatRate = false,
+            } = modalConfig.additionalTask
+
+            if (newTaskTitle !== title) {
+                setNewTaskTitle(title)
+                return
+            }
+
+            if (String(newTaskHours) !== String(hours)) {
+                setNewTaskHours(String(hours))
+                return
+            }
+
+            const nextHourlyRate = hourlyRate === undefined || hourlyRate === null ? '' : String(hourlyRate)
+            if (String(newTaskHourlyRate) !== nextHourlyRate) {
+                setNewTaskHourlyRate(nextHourlyRate)
+                return
+            }
+
+            if (Boolean(newTaskUseFlatRate) !== Boolean(useFlatRate)) {
+                handleToggleNewTaskFlatRate(Boolean(useFlatRate))
+                return
+            }
+
+            if (quantity !== undefined) {
+                setNewTaskQuantity(String(quantity))
+            }
+
+            didAddAdditionalTask.current = true
+            handleAddAdditionalTask()
+        }, [
+            showInvoiceForm,
+            newTaskHours,
+            newTaskHourlyRate,
+            newTaskTitle,
+            newTaskUseFlatRate,
+            setNewTaskHours,
+            setNewTaskHourlyRate,
+            setNewTaskQuantity,
+            setNewTaskTitle,
+            handleAddAdditionalTask,
+            handleToggleNewTaskFlatRate
+        ])
 
         React.useEffect(() => {
             if (!showInvoiceForm || didApplyBillingPeriod.current || !modalConfig.billingPeriodPreset) {
@@ -319,6 +386,7 @@ describe('InvoiceGenerator', () => {
             applyDateOverride: false,
             skipTemplateSelection: false,
             adjustTaskHours: null,
+            additionalTask: null,
             billingPeriodPreset: null,
             billingPeriodStart: null,
             billingPeriodEnd: null
@@ -358,6 +426,56 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.date).toBe('2026-01-10')
         expect(invoiceData.dateOverride).toBe('2026-01-10')
         expect(invoiceData.currency).toBe('EUR')
+    })
+
+    it('auto-opens in client context when forceOpenOnMount is enabled', async () => {
+
+        renderGenerator({
+            showButton: false,
+            forceOpenOnMount: true,
+        })
+
+        expect(screen.queryByRole('button', { name: 'Open Invoice' })).not.toBeInTheDocument()
+        expect(await screen.findByRole('button', { name: 'Save Invoice' })).toBeInTheDocument()
+        expect(screen.getByTestId('tax-status')).toBeInTheDocument()
+    })
+
+    it('creates invoice-only tasks from the client default hourly rate when no project is selected', async () => {
+
+        modalConfig.additionalTask = {
+            title: 'Client discovery',
+            hours: 2,
+        }
+
+        const user = userEvent.setup()
+
+        renderGenerator({
+            project: null,
+            client: {
+                ...baseClient,
+                defaultHourlyRate: 125,
+            },
+            clients: [{
+                ...baseClient,
+                defaultHourlyRate: 125,
+            }]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.additionalTasks).toEqual([
+            expect.objectContaining({
+                title: 'Client discovery',
+                hours: 2,
+                hourlyRate: 125
+            })
+        ])
+        expect(invoiceData.subtotal).toBe(250)
+        expect(invoiceData.total).toBe(250)
     })
 
     it('preloads flat-rate quote task amounts for flat-rate projects', async () => {

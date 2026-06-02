@@ -64,6 +64,7 @@ const ClientDashboard = ({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showArchiveModal, setShowArchiveModal] = useState(false);
     const [showArchivedProjects, setShowArchivedProjects] = useState(false);
+    const [mobileInvoiceGenerator, setMobileInvoiceGenerator] = useState(null);
     const { updateClient, deleteClient } = useClients();
     const { deleteProject, updateProject } = useProjects();
     const { deleteTask } = useTasks();
@@ -343,6 +344,12 @@ const ClientDashboard = ({
     const toggleInvoicesExpanded = () => {
         setIsInvoicesExpanded((prev) => !prev);
     };
+
+    const handleOpenMobileInvoiceGenerator = useCallback(() => {
+        setMobileInvoiceGenerator((previous) => ({
+            key: (previous?.key || 0) + 1,
+        }));
+    }, []);
 
     /**
      * Handle creating a new project for this client
@@ -638,6 +645,15 @@ const ClientDashboard = ({
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            {isMobileLayout && (
+                                <DropdownMenuItem
+                                    onSelect={handleOpenMobileInvoiceGenerator}
+                                    className="flex items-center space-x-2 pr-5"
+                                >
+                                    <DocumentTextIcon className="h-4 w-4" />
+                                    <span>Generate Invoice</span>
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                                 onClick={handleEditClient}
                                 className="status-warning-action flex items-center space-x-2"
@@ -694,6 +710,30 @@ const ClientDashboard = ({
                     )}
                 </div>
             </div>
+
+            {isMobileLayout && (mobileInvoiceGenerator || editingInvoice) && (
+                <InvoiceGenerator
+                    key={`mobile-client-invoice-generator-${mobileInvoiceGenerator?.key || editingInvoice?.id || 'draft'}`}
+                    client={client}
+                    timeEntries={clientTimeEntries}
+                    editingInvoice={editingInvoice}
+                    onInvoiceSaved={() => {
+                        setEditingInvoice(null);
+                        setMobileInvoiceGenerator(null);
+                    }}
+                    paymentMethods={paymentMethods}
+                    businessInfos={businessInfos}
+                    clients={clients}
+                    activeModal={activeModal}
+                    showButton={false}
+                    forceOpenOnMount={!!mobileInvoiceGenerator}
+                    openClientModal={openClientModal}
+                    openProjectModal={openProjectModal}
+                    openBusinessModal={openBusinessModal}
+                    openPaymentMethodModal={openPaymentMethodModal}
+                    openTemplateModal={openTemplateModal}
+                />
+            )}
 
             <ClientDeleteDialog
                 isOpen={showDeleteModal}
