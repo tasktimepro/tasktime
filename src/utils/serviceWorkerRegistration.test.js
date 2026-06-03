@@ -126,6 +126,10 @@ describe('registerAppServiceWorker', () => {
         await flushPromises();
 
         expect(waitingWorker.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+        expect(postReloadToastMocks.queuePostReloadToast).toHaveBeenCalledWith({
+            level: 'success',
+            message: 'TaskTime was updated',
+        });
     });
 
     it('reloads once when an existing production service worker is replaced', async () => {
@@ -190,6 +194,10 @@ describe('registerAppServiceWorker', () => {
         installingWorker.dispatch('statechange');
 
         expect(installingWorker.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+        expect(postReloadToastMocks.queuePostReloadToast).toHaveBeenCalledWith({
+            level: 'success',
+            message: 'TaskTime was updated',
+        });
     });
 
     it('does not ask a newly found worker to skip waiting when no installing worker exists', async () => {

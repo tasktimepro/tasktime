@@ -1,5 +1,21 @@
 import { queuePostReloadToast } from './postReloadToast.ts';
 
+function queueAppUpdatedToast() {
+    queuePostReloadToast({
+        level: 'success',
+        message: 'TaskTime was updated',
+    });
+}
+
+function requestWaitingWorkerActivation(worker) {
+    if (!worker) {
+        return;
+    }
+
+    queueAppUpdatedToast();
+    worker.postMessage({ type: 'SKIP_WAITING' });
+}
+
 /**
  * Register the production service worker and force-refresh only for actual updates.
  */
@@ -22,7 +38,7 @@ export function registerAppServiceWorker({
                 registration.update();
 
                 if (registration.waiting) {
-                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    requestWaitingWorkerActivation(registration.waiting);
                 }
 
                 registration.addEventListener('updatefound', () => {
@@ -31,7 +47,7 @@ export function registerAppServiceWorker({
 
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && serviceWorker.controller) {
-                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                            requestWaitingWorkerActivation(newWorker);
                         }
                     });
                 });
@@ -42,10 +58,7 @@ export function registerAppServiceWorker({
                 if (!hadControllerOnLoad || refreshing) return;
 
                 refreshing = true;
-                queuePostReloadToast({
-                    level: 'success',
-                    message: 'TaskTime was updated',
-                });
+                queueAppUpdatedToast();
                 windowObject.location.reload();
             });
         });

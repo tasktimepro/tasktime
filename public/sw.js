@@ -25,6 +25,32 @@ function getRequestUrl(request) {
     return new URL(request.url, self.location?.origin ?? 'http://localhost');
 }
 
+function cacheResponse(cacheKey, response) {
+    if (!response || response.status !== 200) {
+        return Promise.resolve();
+    }
+
+    return caches.open(CACHE_NAME)
+        .then((cache) => cache.put(cacheKey, response.clone()))
+        .catch(() => undefined);
+}
+
+function createOfflineNavigationResponse() {
+    return new Response('Offline', {
+        status: 503,
+        statusText: 'Offline',
+        headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+        },
+    });
+}
+
+function getNavigationFallbackResponse() {
+    return caches.match('/index.html')
+        .then((cachedResponse) => cachedResponse || createOfflineNavigationResponse())
+        .catch(() => createOfflineNavigationResponse());
+}
+
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
@@ -144,11 +170,10 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(request)
                 .then((response) => {
-                    const responseClone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', responseClone));
+                    event.waitUntil(cacheResponse('/index.html', response));
                     return response;
                 })
-                .catch(() => caches.match('/index.html'))
+                .catch(() => getNavigationFallbackResponse())
         );
         return;
     }
@@ -159,23 +184,18 @@ self.addEventListener('fetch', (event) => {
             if (cachedResponse) {
                 event.waitUntil(
                     fetch(request)
-                        .then((response) => {
-                            if (response && response.status === 200) {
-                                caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
-                            }
-                        })
+                        .then((response) => cacheResponse(request, response))
                         .catch(() => undefined)
                 );
                 return cachedResponse;
             }
 
-            return fetch(request).then((response) => {
-                if (response && response.status === 200) {
-                    const responseClone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
-                }
-                return response;
-            });
+            return fetch(request)
+                .then((response) => {
+                    event.waitUntil(cacheResponse(request, response));
+                    return response;
+                })
+                .catch(() => createOfflineNavigationResponse());
         })
     );
 });

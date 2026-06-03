@@ -2,7 +2,9 @@
 
 ## Priority
 
-[ ] Would be nice to add a {lastMonth} variable in the email template options, and to also have the option to forward the email to the sender too - that should also count as the sum of total emails left, so a forwarded email would be counted as 2 emails.
+[ ] Update latest DebugBundle packages
+
+[ ] Screenshot mobile UI adjustments
 
 ---
 

@@ -71,6 +71,23 @@ describe('service worker caching', () => {
         expect(response).toBe(cachedResponse)
     })
 
+    it('returns a 503 response for navigation when offline and the app shell cache is unavailable', async () => {
+
+        globalThis.caches.match.mockResolvedValueOnce(undefined)
+        globalThis.fetch.mockRejectedValueOnce(new Error('offline'))
+
+        const event = createEvent()
+        event.request = { mode: 'navigate', method: 'GET' }
+
+        handlers.fetch(event)
+
+        const response = await event.respondWith.mock.calls[0][0]
+
+        expect(response).toBeInstanceOf(Response)
+        expect(response.status).toBe(503)
+        expect(await response.text()).toBe('Offline')
+    })
+
     it('serves cached assets when available', async () => {
 
         const cachedResponse = new Response('cached', { status: 200 })
@@ -84,6 +101,23 @@ describe('service worker caching', () => {
 
         const response = await event.respondWith.mock.calls[0][0]
         expect(response).toBe(cachedResponse)
+    })
+
+    it('returns a 503 response for uncached assets when offline', async () => {
+
+        globalThis.caches.match.mockResolvedValueOnce(undefined)
+        globalThis.fetch.mockRejectedValueOnce(new Error('offline'))
+
+        const event = createEvent()
+        event.request = { mode: 'no-cors', method: 'GET' }
+
+        handlers.fetch(event)
+
+        const response = await event.respondWith.mock.calls[0][0]
+
+        expect(response).toBeInstanceOf(Response)
+        expect(response.status).toBe(503)
+        expect(await response.text()).toBe('Offline')
     })
 
     it('shows a generic notification for empty push events', async () => {

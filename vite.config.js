@@ -45,6 +45,9 @@ export default defineConfig({
     react(),
     VitePWA({
       strategies: 'injectManifest',
+      // The app owns service worker registration in src/utils/serviceWorkerRegistration.js
+      // so the plugin must not inject its own registerSW.js script into production HTML.
+      injectRegister: false,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'favicon.ico', 'favicon-96x96.png', 'icons/*.png'],
       manifest: false, // Use our custom manifest.json in public/
