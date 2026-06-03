@@ -7,16 +7,20 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
-import type { Invoice, Task } from '@/stores/yjs/types';
+import type { Invoice, Task, TimeEntry } from '@/stores/yjs/types';
 import { collectEntities, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import {
+    canUndoInvoice as canUndoInvoiceRecord,
     createInvoicePaymentCurrencySnapshot,
+    getInvoiceSequenceRollback,
     invoiceBelongsToProject,
+    getInvoiceUndoBlockReason as getInvoiceUndoBlockReasonForCollection,
     getInvoiceStatus,
     getInvoiceStatusAfterMarkingUnpaid,
     getInvoiceTotal,
     isInvoicePaid,
+    resolveCurrentInvoiceTemplate,
 } from '@/utils/invoiceUtils';
 
 const shouldStoreInvoicePaymentSnapshot = (invoice: Partial<Invoice>, preferredCurrency: string) => {
@@ -26,6 +30,30 @@ const shouldStoreInvoicePaymentSnapshot = (invoice: Partial<Invoice>, preferredC
 const isPositiveFiniteNumber = (value: unknown): value is number => (
     typeof value === 'number' && Number.isFinite(value) && value > 0
 );
+
+const getInvoiceBillingSnapshotCutoffs = (invoice: Invoice | null | undefined): Record<string, unknown> => {
+    const snapshot = (invoice as any)?.billingStateSnapshot?.taskLastBilledAt;
+
+    return snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)
+        ? snapshot
+        : {};
+};
+
+const getSnapshotCutoff = (snapshotCutoffs: Record<string, unknown>, taskId: string): number | null | undefined => {
+    if (!Object.prototype.hasOwnProperty.call(snapshotCutoffs, taskId)) {
+        return undefined;
+    }
+
+    const value = snapshotCutoffs[taskId];
+
+    if (value === null || value === undefined) {
+        return null;
+    }
+
+    return isPositiveFiniteNumber(value)
+        ? value
+        : null;
+};
 
 export interface UseInvoicesOptions {
     /** Filter to a specific project */
@@ -37,7 +65,15 @@ export interface UseInvoicesOptions {
 }
 
 export function useInvoices(options: UseInvoicesOptions = {}) {
-    const { store, isReady, loadArchivedInvoices: loadArchived, loadArchivedTasks } = useYjs();
+    const {
+        store,
+        isReady,
+        loadArchivedInvoices: loadArchived,
+        loadArchivedTasks,
+        loadArchivedExpenses,
+        loadEntriesForYear,
+        getAvailableYears,
+    } = useYjs();
     
     // Active invoices from core doc
     const { items: activeInvoices, isLoading: activeLoading, get, create, update, remove } = 
@@ -242,6 +278,291 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         return removed;
     }, [releaseQuotedAmountsForInvoice, remove]);
 
+    const getInvoiceUndoBlockReason = useCallback((invoice: Invoice | string | null | undefined) => {
+        const record = typeof invoice === 'string'
+            ? allInvoices.find((candidate) => candidate.id === invoice)
+            : invoice;
+
+        return getInvoiceUndoBlockReasonForCollection(record, allInvoices);
+    }, [allInvoices]);
+
+    const canUndoInvoice = useCallback((invoice: Invoice | string | null | undefined) => {
+        const record = typeof invoice === 'string'
+            ? allInvoices.find((candidate) => candidate.id === invoice)
+            : invoice;
+
+        return canUndoInvoiceRecord(record, allInvoices);
+    }, [allInvoices]);
+
+    const undoLatestInvoice = useCallback(async (id: string) => {
+        const invoice = get(id);
+        const blockReason = getInvoiceUndoBlockReasonForCollection(invoice, allInvoices);
+
+        if (blockReason) {
+            throw new Error(blockReason);
+        }
+
+        await Promise.all([
+            loadArchivedTasks(),
+            loadArchivedExpenses(),
+        ]);
+
+        const availableYears = await getAvailableYears();
+        const yearEntryMaps = new Map<number, any>();
+
+        await Promise.all(availableYears.map(async (year) => {
+            const yearMap = await loadEntriesForYear(year);
+            yearEntryMaps.set(year, yearMap);
+        }));
+
+        const undoTimestamp = Date.now();
+        const loadedEntries = store.getAllTimeEntries();
+        const billedEntries = loadedEntries.filter((entry) => entry?.billedInvoiceId === id);
+        const touchedTaskIds = new Set<string>();
+        const invoiceBilledEntryStartByTaskId = new Map<string, number>();
+        const snapshotCutoffs = getInvoiceBillingSnapshotCutoffs(invoice);
+
+        Object.keys(snapshotCutoffs).forEach((taskId) => {
+            touchedTaskIds.add(taskId);
+        });
+
+        const entriesByMap = new Map<any, { toDelete: TimeEntry[]; toClear: TimeEntry[] }>();
+        const queueEntryMutation = (entryMap: any, action: 'delete' | 'clear', entry: TimeEntry) => {
+            if (!entryMap) {
+                return;
+            }
+
+            const existing = entriesByMap.get(entryMap) || { toDelete: [], toClear: [] };
+
+            if (action === 'delete') {
+                existing.toDelete.push(entry);
+            } else {
+                existing.toClear.push(entry);
+            }
+
+            entriesByMap.set(entryMap, existing);
+        };
+
+        billedEntries.forEach((entry) => {
+            if (entry?.taskId) {
+                touchedTaskIds.add(entry.taskId);
+            }
+
+            if (
+                entry?.taskId
+                && entry.source !== 'invoice-adjustment'
+                && typeof entry.start === 'number'
+            ) {
+                const existingStart = invoiceBilledEntryStartByTaskId.get(entry.taskId);
+
+                if (existingStart === undefined || entry.start < existingStart) {
+                    invoiceBilledEntryStartByTaskId.set(entry.taskId, entry.start);
+                }
+            }
+
+            const entryMap = store.activeTimeEntries.has(entry.id)
+                ? store.activeTimeEntries
+                : yearEntryMaps.get(new Date(entry.start).getFullYear());
+
+            if (entry.source === 'invoice-adjustment') {
+                queueEntryMutation(entryMap, 'delete', entry);
+                return;
+            }
+
+            queueEntryMutation(entryMap, 'clear', entry);
+        });
+
+        const quotedTaskMaps = [store.tasks, store.archivedTasks].filter(Boolean);
+        quotedTaskMaps.forEach((taskMap) => {
+            (taskMap as any).forEach((value: unknown, taskId: string) => {
+                const task = readEntity<Task>(value);
+
+                if (!task || task.quotedAmountBilling?.invoiceId !== id) {
+                    return;
+                }
+
+                touchedTaskIds.add(taskId);
+            });
+        });
+
+        (Array.isArray((invoice as any)?.tasks) ? (invoice as any).tasks : []).forEach((task: any) => {
+            if (task?.id) {
+                touchedTaskIds.add(task.id);
+            }
+        });
+
+        entriesByMap.forEach((mutation, entryMap) => {
+            const parentDoc = entryMap?.doc;
+
+            const applyChanges = () => {
+                mutation.toDelete.forEach((entry) => {
+                    entryMap.delete(entry.id);
+                });
+
+                mutation.toClear.forEach((entry) => {
+                    updateEntityFields(entryMap as any, entry.id, {
+                        billedAt: null,
+                        billedHourlyRate: null,
+                        billedInvoiceId: null,
+                        updatedAt: undoTimestamp,
+                    });
+                });
+            };
+
+            if (parentDoc?.transact) {
+                parentDoc.transact(applyChanges);
+                return;
+            }
+
+            applyChanges();
+        });
+
+        const allExpenseMaps = [store.expenses, store.archivedExpenses].filter(Boolean);
+        let unbilledExpenseCount = 0;
+
+        allExpenseMaps.forEach((expenseMap) => {
+            const parentDoc = (expenseMap as any)?.doc;
+
+            const applyChanges = () => {
+                (expenseMap as any).forEach((value: unknown, expenseId: string) => {
+                    const expense = readEntity<any>(value);
+
+                    if (!expense || expense.invoiceId !== id) {
+                        return;
+                    }
+
+                    updateEntityFields(expenseMap as any, expenseId, {
+                        billingStatus: 'unbilled',
+                        invoiceId: null,
+                        billedAt: null,
+                        updatedAt: undoTimestamp,
+                    });
+                    unbilledExpenseCount += 1;
+                });
+            };
+
+            if (parentDoc?.transact) {
+                parentDoc.transact(applyChanges);
+                return;
+            }
+
+            applyChanges();
+        });
+
+        releaseQuotedAmountsForInvoice(id);
+
+        const allEntriesAfterUndo = store.getAllTimeEntries();
+        const taskMaps = [store.tasks, store.archivedTasks].filter(Boolean);
+
+        taskMaps.forEach((taskMap) => {
+            const parentDoc = (taskMap as any)?.doc;
+
+            const applyChanges = () => {
+                touchedTaskIds.forEach((taskId) => {
+                    if (!(taskMap as any).has(taskId)) {
+                        return;
+                    }
+
+                    const nextBillingCutoff = allEntriesAfterUndo.reduce((latestEnd, entry) => {
+                        if (entry.taskId !== taskId) {
+                            return latestEnd;
+                        }
+
+                        const hasBillingMarker = Boolean(entry.billedInvoiceId)
+                            || typeof entry.billedAt === 'number'
+                            || typeof entry.billedHourlyRate === 'number';
+
+                        if (!hasBillingMarker || typeof entry.end !== 'number' || entry.end <= latestEnd) {
+                            return latestEnd;
+                        }
+
+                        return entry.end;
+                    }, 0);
+
+                    const snapshotCutoff = getSnapshotCutoff(snapshotCutoffs, taskId);
+                    let restoredCutoff: number | null | undefined;
+
+                    if (snapshotCutoff !== undefined) {
+                        restoredCutoff = Math.max(snapshotCutoff || 0, nextBillingCutoff) || null;
+                    } else if (invoiceBilledEntryStartByTaskId.has(taskId)) {
+                        const inferredPreviousCutoff = Math.max(0, (invoiceBilledEntryStartByTaskId.get(taskId) || 0) - 1);
+                        restoredCutoff = Math.max(nextBillingCutoff, inferredPreviousCutoff) || null;
+                    }
+
+                    if (restoredCutoff === undefined) {
+                        return;
+                    }
+
+                    updateEntityFields(taskMap as any, taskId, {
+                        lastBilledAt: restoredCutoff,
+                        updatedAt: undoTimestamp,
+                    });
+                });
+            };
+
+            if (parentDoc?.transact) {
+                parentDoc.transact(applyChanges);
+                return;
+            }
+
+            applyChanges();
+        });
+
+        const template = resolveCurrentInvoiceTemplate(invoice, collectEntities(store.invoiceTemplates as any));
+        const sequenceRollback = getInvoiceSequenceRollback(invoice, template, allInvoices);
+
+        store.coreDoc.transact(() => {
+            store.projects.forEach((value: unknown, projectId: string) => {
+                const project = readEntity<any>(value);
+                const invoiceIds = Array.isArray(project?.invoiceIds) ? project.invoiceIds : null;
+
+                if (!invoiceIds || !invoiceIds.includes(id)) {
+                    return;
+                }
+
+                const nextInvoiceIds = invoiceIds.filter((invoiceId: string) => invoiceId !== id);
+                updateEntityFields(store.projects as any, projectId, {
+                    invoiceIds: nextInvoiceIds,
+                    updatedAt: undoTimestamp,
+                });
+            });
+
+            if (sequenceRollback.canRollback && template?.id) {
+                updateEntityFields(store.invoiceTemplates as any, template.id, {
+                    currentSequentialNumber: sequenceRollback.nextSequentialNumber,
+                    updatedAt: undoTimestamp,
+                });
+            }
+        });
+
+        const removed = store.invoices.has(id);
+
+        if (removed) {
+            store.invoices.delete(id);
+        }
+
+        if (!removed) {
+            throw new Error('Invoice could not be removed.');
+        }
+
+        return {
+            invoiceNumber: invoice?.invoiceNumber || id,
+            clearedTimeEntryCount: billedEntries.filter((entry) => entry.source !== 'invoice-adjustment').length,
+            deletedAdjustmentCount: billedEntries.filter((entry) => entry.source === 'invoice-adjustment').length,
+            unbilledExpenseCount,
+            rewoundSequence: sequenceRollback.canRollback,
+        };
+    }, [
+        allInvoices,
+        get,
+        getAvailableYears,
+        loadArchivedExpenses,
+        loadArchivedTasks,
+        loadEntriesForYear,
+        releaseQuotedAmountsForInvoice,
+        store,
+    ]);
+
     // Get total amounts
     const totals = useMemo(() => {
         const outstanding = filteredInvoices
@@ -271,10 +592,13 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         createInvoice: create,
         updateInvoice: update,
         deleteInvoice,
-        
+        undoLatestInvoice,
+
         // Status helpers
         markAsSent,
         markAsPaid,
         markAsUnpaid,
+        canUndoInvoice,
+        getInvoiceUndoBlockReason,
     };
 }

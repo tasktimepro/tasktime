@@ -19,11 +19,13 @@ import InvoiceActions from './InvoiceActions';
 const InvoiceModal = ({
     showInvoiceForm,
     editingInvoice,
-    handleCancel,
+    handleClose,
     handleSaveInvoice,
     handlePreviewInvoice,
     handleSendQuote,
     handleDownloadQuote,
+    canUndoInvoice = false,
+    handleUndoInvoice = null,
     mode = 'invoice',
     isProjectContextFixed,
     isClientContextFixed,
@@ -131,8 +133,7 @@ const InvoiceModal = ({
     openPaymentMethodModal,
     openTemplateModal,
     saveFormState,
-    getSavedState,
-    clearSavedState
+    getSavedState
 }) => {
     const isQuoteMode = mode === 'quote';
 
@@ -203,6 +204,11 @@ const InvoiceModal = ({
         setActiveSection((prev) => (prev === section ? '' : section));
     };
 
+    const handleCloseWithState = useCallback(() => {
+        saveCurrentFormState();
+        handleClose();
+    }, [handleClose, saveCurrentFormState]);
+
     const handleSave = (e) => {
         e.preventDefault();
         // Validation logic to open the relevant section if required inputs are missing
@@ -222,11 +228,6 @@ const InvoiceModal = ({
             return;
         }
         
-        // Clear saved state on successful submission
-        if (clearSavedState) {
-            clearSavedState();
-        }
-        
         handleSaveInvoice(e);
     };
 
@@ -234,11 +235,13 @@ const InvoiceModal = ({
     const footer = (
         <InvoiceActions
             editingInvoice={editingInvoice}
-            handleCancel={handleCancel}
+            handleClose={handleCloseWithState}
             onPreview={handlePreviewInvoice}
             mode={mode}
             onSend={handleSendQuote}
             onDownload={handleDownloadQuote}
+            canUndoInvoice={canUndoInvoice}
+            onUndoInvoice={handleUndoInvoice}
         />
     );
 
@@ -259,27 +262,21 @@ const InvoiceModal = ({
         />
     );
 
-    const handleOpenAutoFocus = useCallback((event) => {
-        if (!editingInvoice) {
-            event.preventDefault();
-        }
-    }, [editingInvoice]);
-
     return (
         <Modal 
             isOpen={showInvoiceForm}
-            onClose={handleCancel}
+            onClose={handleCloseWithState}
             title={isQuoteMode ? 'Quote' : (editingInvoice ? 'Edit Invoice' : 'New Invoice')}
             size="2xl"
             headerActions={headerActions}
             footer={footer}
-            onOpenAutoFocus={handleOpenAutoFocus}
         >
             <form id="invoice-form" onSubmit={handleSave} className="space-y-5">
                 {/* Client & Project Details */}
                 <div className="border border-border rounded-lg">
                     <button
                         type="button"
+                        data-autofocus
                         onClick={() => toggleSection('projectClient')}
                         className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'projectClient' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >

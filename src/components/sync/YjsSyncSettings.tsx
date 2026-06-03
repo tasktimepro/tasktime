@@ -21,11 +21,16 @@ import { DropdownMenu as DropdownMenuPrimitive, DropdownMenuContent as DropdownM
 import Modal from '@/components/Modal';
 import { format, formatDistanceToNow } from 'date-fns';
 import type { BackupInfo } from '@/stores/yjs';
+import type { AutoSyncMode } from '@/stores/yjs/types';
 import { parseIntegerInputWithFallback } from '@/utils/numberInputUtils';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 
 type ConfirmDialogType = 'disconnect' | 'wipe' | null;
+type PendingBackupModeChange = {
+    autoSyncEnabled: boolean;
+    autoSyncMode: 'backup';
+} | null;
 type UntypedUiComponent = ComponentType<any>;
 
 const Card = CardPrimitive as unknown as UntypedUiComponent;
@@ -58,6 +63,7 @@ export default function YjsSyncSettings() {
     const [backupCreating, setBackupCreating] = useState(false);
     const [restoreConfirmBackup, setRestoreConfirmBackup] = useState<BackupInfo | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
+    const [pendingBackupModeChange, setPendingBackupModeChange] = useState<PendingBackupModeChange>(null);
 
     const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, pendingSyncChanges, forceSyncDrive, disconnectDrive, wipeDriveData, listBackups, createBackup, downloadBackup } = useYjs();
     const { isSignedIn, isLoading: authLoading, user, signIn, signOut, hadPreviousSession } = useGoogleAuth();
@@ -69,7 +75,7 @@ export default function YjsSyncSettings() {
     const showConnectedActions = showAuthActions && !isOffline && isSignedIn && isDriveConnected;
 
     const autoSyncEnabled = preferences.autoSyncEnabled ?? false;
-    const autoSyncMode = preferences.autoSyncMode ?? 'backup';
+    const autoSyncMode = preferences.autoSyncMode ?? 'sync';
     const backupEnabled = preferences.backupEnabled ?? true;
     const backupFrequencyHours = preferences.backupFrequencyHours ?? 24;
     const isManualMode = !autoSyncEnabled;
@@ -136,6 +142,14 @@ export default function YjsSyncSettings() {
         }
 
         if (syncState === 'error') {
+            if (autoSyncEnabled && autoSyncMode === 'backup' && pendingSyncChanges) {
+                return {
+                    text: 'Sync Now needed',
+                    tone: 'status-warning-text-strong',
+                    icon: ExclamationTriangleIcon
+                };
+            }
+
             return {
                 text: 'Sync error',
                 tone: 'status-danger-text-strong',
@@ -207,7 +221,7 @@ export default function YjsSyncSettings() {
             icon: CheckIcon
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is a tick dependency that forces recomputation of relative-time strings
-    }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now, isManualMode, pendingSyncChanges]);
+    }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now, isManualMode, pendingSyncChanges, autoSyncEnabled, autoSyncMode]);
 
     const handleConnect = async () => {
         try {
@@ -285,37 +299,52 @@ export default function YjsSyncSettings() {
         }
     };
 
-    const handleAutoSyncToggle = async (checked: boolean | 'indeterminate') => {
-        const nextEnabled = checked === true;
-        const nextMode = autoSyncMode === 'sync' ? 'sync' : 'backup';
-
-        updatePreferences({ autoSyncEnabled: nextEnabled });
+    const applyAutoSyncPreferences = useCallback(async (nextEnabled: boolean, nextMode: AutoSyncMode) => {
+        updatePreferences({
+            autoSyncEnabled: nextEnabled,
+            autoSyncMode: nextMode,
+        });
         store.setDriveSyncPreferences(nextEnabled, nextMode);
 
         if (isDriveConnected) {
             try {
                 await forceSyncDrive();
             } catch (error) {
-                console.error('[YjsSyncSettings] Sync failed after auto-sync toggle:', error);
+                console.error('[YjsSyncSettings] Sync failed after auto-sync preference change:', error);
                 showError('Sync failed. Please try again.');
             }
         }
+    }, [forceSyncDrive, isDriveConnected, showError, store, updatePreferences]);
+
+    const handleAutoSyncToggle = async (checked: boolean | 'indeterminate') => {
+        const nextEnabled = checked === true;
+        const nextMode: AutoSyncMode = autoSyncMode === 'backup' ? 'backup' : 'sync';
+
+        if (nextEnabled && nextMode === 'backup') {
+            setPendingBackupModeChange({ autoSyncEnabled: true, autoSyncMode: 'backup' });
+            return;
+        }
+
+        await applyAutoSyncPreferences(nextEnabled, nextMode);
     };
 
     const handleAutoSyncModeChange = async (value: string) => {
-        const nextMode = value === 'backup' ? 'backup' : 'sync';
+        const nextMode: AutoSyncMode = value === 'backup' ? 'backup' : 'sync';
 
-        updatePreferences({ autoSyncMode: nextMode });
-        store.setDriveSyncPreferences(autoSyncEnabled, nextMode);
-
-        if (isDriveConnected) {
-            try {
-                await forceSyncDrive();
-            } catch (error) {
-                console.error('[YjsSyncSettings] Sync failed after auto-sync mode change:', error);
-                showError('Sync failed. Please try again.');
-            }
+        if (nextMode === 'backup' && autoSyncMode !== 'backup') {
+            setPendingBackupModeChange({ autoSyncEnabled, autoSyncMode: 'backup' });
+            return;
         }
+
+        await applyAutoSyncPreferences(autoSyncEnabled, nextMode);
+    };
+
+    const confirmBackupModeChange = async () => {
+        if (!pendingBackupModeChange) return;
+
+        const nextChange = pendingBackupModeChange;
+        setPendingBackupModeChange(null);
+        await applyAutoSyncPreferences(nextChange.autoSyncEnabled, nextChange.autoSyncMode);
     };
 
     const loadBackups = useCallback(async () => {
@@ -521,12 +550,12 @@ export default function YjsSyncSettings() {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="backup">Sync with cloud (backup mode)</SelectItem>
-                                            <SelectItem value="sync">Sync between devices (backup + sync)</SelectItem>
+                                            <SelectItem value="sync">Sync between devices (recommended)</SelectItem>
+                                            <SelectItem value="backup">Back up this device only</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <p className="text-xs text-muted-foreground">
-                                        Backup mode auto-uploads when local changes are detected. Backup + sync also does periodic checks for changes.
+                                        Sync between devices uploads and pulls changes automatically. Device backup uploads this device's changes and requires Sync Now to import edits from another device.
                                     </p>
                                 </div>
                             )}
@@ -694,6 +723,36 @@ export default function YjsSyncSettings() {
                     Your data will be synced to Google Drive before disconnecting.
                     Your local data will remain on this device.
                 </p>
+            </Modal>
+
+            {/* Backup Mode Confirmation Modal */}
+            <Modal
+                isOpen={pendingBackupModeChange !== null}
+                onClose={() => setPendingBackupModeChange(null)}
+                title="Use device backup mode?"
+                size="md"
+                footer={
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setPendingBackupModeChange(null)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={confirmBackupModeChange}>
+                            Use Backup Mode
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-3 text-sm text-muted-foreground">
+                    <p>
+                        Device backup is intended for using TaskTime on one device. It uploads this device's changes to Drive, but it does not automatically keep other devices up to date.
+                    </p>
+                    <p>
+                        Use Sync between devices if you use TaskTime on both your phone and computer.
+                    </p>
+                </div>
             </Modal>
 
             {/* Wipe & Disconnect Confirmation Modal */}

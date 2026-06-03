@@ -272,6 +272,12 @@ export interface InvoiceExpenseBreakdownItem {
     exchangeRate?: number;
 }
 
+export interface InvoiceBillingStateSnapshot {
+    version: 1;
+    capturedAt: number;
+    taskLastBilledAt: Record<string, number | null>;
+}
+
 export interface Invoice {
     id: string;
     projectId: string | null;
@@ -303,6 +309,7 @@ export interface Invoice {
     sentAt?: number | null;
     sentToEmail?: string | null;
     brandingSnapshot?: InvoiceBrandingSnapshot | null;
+    billingStateSnapshot?: InvoiceBillingStateSnapshot | null;
 }
 
 export type InvoiceTemplateLogoPlacement =

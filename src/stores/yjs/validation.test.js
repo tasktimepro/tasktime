@@ -16,10 +16,13 @@ function objectToYMap(data) {
     return map
 }
 
-function createDocManager(coreDoc = null, loadedDocs = ['core']) {
+function createDocManager(coreDoc = null, loadedDocs = ['core'], extraDocs = {}) {
     return {
         getLoadedDocs: () => loadedDocs,
-        getDocSync: (name) => (name === 'core' ? coreDoc : null),
+        getDocSync: (name) => {
+            if (name === 'core') return coreDoc
+            return extraDocs[name] ?? null
+        },
     }
 }
 
@@ -323,5 +326,62 @@ describe('Yjs validation', () => {
         }))
 
         expect(() => validateDocManagerState(createDocManager(), 'core', candidateDoc)).not.toThrow()
+    })
+
+    it('defers time entry task reference checks until archived tasks are loaded', () => {
+        const coreDoc = new Y.Doc()
+        coreDoc.getMap('tasks').set('active-task', objectToYMap({
+            id: 'active-task',
+            title: 'Active Task',
+            projectId: null,
+        }))
+
+        const entriesDoc = new Y.Doc()
+        entriesDoc.getMap('timeEntries').set('entry-archived-task', objectToYMap({
+            id: 'entry-archived-task',
+            taskId: 'archived-task',
+            start: 100,
+            end: 200,
+        }))
+
+        expect(() => validateDocManagerState(
+            createDocManager(coreDoc, ['core', 'entries-active'], { 'entries-active': entriesDoc }),
+            'entries-active',
+            entriesDoc,
+        )).not.toThrow()
+    })
+
+    it('rejects time entries with missing tasks once archived tasks are loaded', () => {
+        const coreDoc = new Y.Doc()
+        coreDoc.getMap('tasks').set('active-task', objectToYMap({
+            id: 'active-task',
+            title: 'Active Task',
+            projectId: null,
+        }))
+
+        const archivedTasksDoc = new Y.Doc()
+        archivedTasksDoc.getMap('tasks').set('different-archived-task', objectToYMap({
+            id: 'different-archived-task',
+            title: 'Archived Task',
+            projectId: null,
+            archived: true,
+        }))
+
+        const entriesDoc = new Y.Doc()
+        entriesDoc.getMap('timeEntries').set('entry-missing-task', objectToYMap({
+            id: 'entry-missing-task',
+            taskId: 'missing-task',
+            start: 100,
+            end: 200,
+        }))
+
+        expect(() => validateDocManagerState(
+            createDocManager(coreDoc, ['core', 'tasks-archived', 'entries-active'], {
+                'tasks-archived': archivedTasksDoc,
+                'entries-active': entriesDoc,
+            }),
+            'entries-active',
+            entriesDoc,
+        )).toThrow(/time entry entry-missing-task references missing task missing-task/)
     })
 })

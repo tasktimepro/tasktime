@@ -13,6 +13,7 @@ import InvoiceModal from './invoice/InvoiceModal';
 import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
 import EmailPreviewModal from './invoice/EmailPreviewModal';
+import Modal from './Modal';
 import * as InvoiceHandler from './invoice/InvoiceHandler.ts';
 import useInvoicePricing from './invoice/hooks/useInvoicePricing.ts';
 import { calculateDueDate, generateInvoiceNumber } from './invoice/utils/invoiceDateUtils.ts';
@@ -26,8 +27,14 @@ import { useExpenses } from '../hooks/useExpenses.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
 import { useTimers } from '../hooks/useTimers.ts';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Notice } from '@/components/ui/notice';
 import {
     getInvoicesForProject,
+    getInvoiceSequenceRollback,
+    getInvoiceTotal,
     getLatestInvoiceForProject,
     getNextSequentialNumberForTemplate,
     resolveCurrentInvoiceTemplate,
@@ -47,6 +54,9 @@ import {
     isStoredDateWithinBillingRange,
 } from '../utils/billingPeriodUtils.ts';
 import { getClientHourlyRate } from '../utils/projectPlanningUtils.ts';
+
+const INVOICE_DRAFT_CACHE = new Map();
+const INVOICE_DRAFT_TTL_MS = 12 * 60 * 60 * 1000;
 
 const areBooleanMapsEqual = (left, right) => {
     const leftKeys = Object.keys(left);
@@ -187,6 +197,46 @@ const areProjectsEquivalent = (left, right) => {
         && left.archived === right.archived;
 };
 
+const pruneExpiredInvoiceDrafts = (referenceTime = Date.now()) => {
+    INVOICE_DRAFT_CACHE.forEach((draftState, key) => {
+        if (!draftState?.savedAt || (referenceTime - draftState.savedAt) > INVOICE_DRAFT_TTL_MS) {
+            INVOICE_DRAFT_CACHE.delete(key);
+        }
+    });
+};
+
+const getCachedInvoiceDraft = (contextKey) => {
+    if (!contextKey) {
+        return null;
+    }
+
+    pruneExpiredInvoiceDrafts();
+    return INVOICE_DRAFT_CACHE.get(contextKey) || null;
+};
+
+const setCachedInvoiceDraft = (contextKey, draftState) => {
+    if (!contextKey) {
+        return;
+    }
+
+    pruneExpiredInvoiceDrafts();
+    const previousDraft = INVOICE_DRAFT_CACHE.get(contextKey) || {};
+    INVOICE_DRAFT_CACHE.set(contextKey, {
+        ...previousDraft,
+        ...draftState,
+        contextKey,
+        savedAt: Date.now(),
+    });
+};
+
+const clearCachedInvoiceDraft = (contextKey) => {
+    if (!contextKey) {
+        return;
+    }
+
+    INVOICE_DRAFT_CACHE.delete(contextKey);
+};
+
 /**
  * InvoiceGenerator component - Handles invoice generation and client info collection
  */
@@ -212,7 +262,7 @@ const InvoiceGenerator = ({
 }) => {
     const isQuoteMode = mode === 'quote';
     // Yjs hooks for data access
-    const { invoices, createInvoice, updateInvoice } = useInvoices();
+    const { invoices, createInvoice, updateInvoice, undoLatestInvoice, canUndoInvoice } = useInvoices();
     const { projects } = useProjects();
     const { tasks, updateTask } = useTasks();
     const { createEntry, updateEntry, deleteEntry } = useTimeEntries();
@@ -240,14 +290,17 @@ const InvoiceGenerator = ({
     const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
     const taskInputRef = useRef(null); // Ref for task description input field
     const [isHiddenForNestedModal, setIsHiddenForNestedModal] = useState(false);
-    const [invoiceFormState, setInvoiceFormState] = useState(null);
     const [exchangeRates, setExchangeRates] = useState(null);
     const [exchangeRatesError, setExchangeRatesError] = useState(null);
     const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
+    const [showUndoInvoiceConfirm, setShowUndoInvoiceConfirm] = useState(false);
+    const [undoInvoiceConfirmationText, setUndoInvoiceConfirmationText] = useState('');
+    const [isUndoingInvoice, setIsUndoingInvoice] = useState(false);
     const defaultBillingPeriodState = useMemo(() => getDefaultInvoiceBillingPeriodState(), []);
     const [billingPeriodPreset, setBillingPeriodPreset] = useState(defaultBillingPeriodState.preset);
     const [billingPeriodStart, setBillingPeriodStart] = useState(defaultBillingPeriodState.startDate);
     const [billingPeriodEnd, setBillingPeriodEnd] = useState(defaultBillingPeriodState.endDate);
+    const [pendingDraftRestore, setPendingDraftRestore] = useState(null);
 
     const { startDate: activeBillingPeriodStart, endDate: activeBillingPeriodEnd } = useMemo(() => {
         return getBillingPeriodRange({
@@ -964,36 +1017,135 @@ const InvoiceGenerator = ({
         rate: 0
     });
 
+    const getCurrentDraftPayload = useCallback(() => {
+        return {
+            selectedClientId: selectedClient?.id || null,
+            selectedClientSnapshot: selectedClient ? { ...selectedClient } : null,
+            selectedProjectId: selectedProject?.id || null,
+            selectedProjectSnapshot: selectedProject ? { ...selectedProject } : null,
+            selectedAdditionalProjectIds: [...selectedAdditionalProjectIds],
+            selectedPaymentMethodId: selectedPaymentMethod?.id || null,
+            selectedPaymentMethodSnapshot: selectedPaymentMethod ? { ...selectedPaymentMethod } : null,
+            selectedBusinessInfoId: selectedBusinessInfo?.id || null,
+            selectedBusinessInfoSnapshot: selectedBusinessInfo ? { ...selectedBusinessInfo } : null,
+            selectedTemplateId: selectedTemplate?.id || null,
+            selectedTemplateSnapshot: selectedTemplate ? { ...selectedTemplate } : null,
+            isProjectContextFixed,
+            isClientContextFixed,
+            projectManuallyChanged,
+            quoteNumberTimestamp,
+            billingPeriodPreset,
+            billingPeriodStart,
+            billingPeriodEnd,
+            editableHours: { ...editableHours },
+            taskFlatRates: { ...taskFlatRates },
+            useFlatRate: { ...useFlatRate },
+            taskHourlyRates: { ...taskHourlyRates },
+            taskQuantities: { ...taskQuantities },
+            mergedSubtasks: { ...mergedSubtasks },
+            additionalTasks: [...additionalTasks],
+            additionalExpenses: [...additionalExpenses],
+            selectedTasksForBilling: { ...selectedTasksForBilling },
+            selectedExpensesForBilling: { ...selectedExpensesForBilling },
+            invoiceNote,
+            invoiceDateOverride,
+            useInvoiceDateOverride,
+            discountType,
+            discountValue,
+            shippingAmount,
+            taxOverride: taxOverride ? { ...taxOverride } : null,
+            showAddTaskForm,
+            newTaskTitle,
+            newTaskHours,
+            newTaskUseFlatRate,
+            newTaskHourlyRate,
+            newTaskQuantity,
+            showAddExpenseForm,
+            newExpenseTitle,
+            newExpenseAmount,
+            newExpenseCurrency,
+            newExpenseSupplierName,
+        };
+    }, [
+        additionalExpenses,
+        additionalTasks,
+        billingPeriodEnd,
+        billingPeriodPreset,
+        billingPeriodStart,
+        discountType,
+        discountValue,
+        editableHours,
+        invoiceDateOverride,
+        invoiceNote,
+        isClientContextFixed,
+        isProjectContextFixed,
+        mergedSubtasks,
+        newExpenseAmount,
+        newExpenseCurrency,
+        newExpenseSupplierName,
+        newExpenseTitle,
+        newTaskHourlyRate,
+        newTaskHours,
+        newTaskQuantity,
+        newTaskTitle,
+        newTaskUseFlatRate,
+        projectManuallyChanged,
+        quoteNumberTimestamp,
+        selectedAdditionalProjectIds,
+        selectedBusinessInfo,
+        selectedClient,
+        selectedExpensesForBilling,
+        selectedPaymentMethod,
+        selectedProject,
+        selectedTasksForBilling,
+        selectedTemplate,
+        shippingAmount,
+        showAddExpenseForm,
+        showAddTaskForm,
+        taskFlatRates,
+        taskHourlyRates,
+        taskQuantities,
+        taxOverride,
+        useFlatRate,
+        useInvoiceDateOverride,
+    ]);
+
     const invoiceFormStateKey = useMemo(() => {
         if (editingInvoice?.id) {
-            return `invoice:${editingInvoice.id}`;
+            return `${mode}:invoice:${editingInvoice.id}`;
         }
         if (project?.id) {
-            return `project:${project.id}`;
+            return `${mode}:project:${project.id}`;
         }
         if (client?.id) {
-            return `client:${client.id}`;
+            return `${mode}:client:${client.id}`;
         }
-        return 'standalone';
-    }, [editingInvoice?.id, project?.id, client?.id]);
+        return `${mode}:standalone`;
+    }, [client?.id, editingInvoice?.id, mode, project?.id]);
 
     const saveInvoiceFormState = useCallback((formData) => {
-        setInvoiceFormState({
-            ...formData,
-            contextKey: invoiceFormStateKey
-        });
+        setCachedInvoiceDraft(invoiceFormStateKey, formData);
     }, [invoiceFormStateKey]);
 
     const getInvoiceFormState = useCallback(() => {
-        if (!invoiceFormState || invoiceFormState.contextKey !== invoiceFormStateKey) {
-            return null;
-        }
-        return invoiceFormState;
-    }, [invoiceFormState, invoiceFormStateKey]);
+        return getCachedInvoiceDraft(invoiceFormStateKey);
+    }, [invoiceFormStateKey]);
 
     const clearInvoiceFormState = useCallback(() => {
-        setInvoiceFormState(null);
-    }, []);
+        clearCachedInvoiceDraft(invoiceFormStateKey);
+    }, [invoiceFormStateKey]);
+
+    useEffect(() => {
+        if (!showInvoiceForm) {
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            saveInvoiceFormState(getCurrentDraftPayload());
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
+    }, [getCurrentDraftPayload, saveInvoiceFormState, showInvoiceForm]);
 
     const hideInvoiceFormForNestedModal = useCallback(() => {
         if (!showInvoiceForm) return;
@@ -1025,6 +1177,120 @@ const InvoiceGenerator = ({
         hideInvoiceFormForNestedModal();
         openTemplateModal?.(...args);
     }, [hideInvoiceFormForNestedModal, openTemplateModal]);
+
+    const resolveProjectFromDraft = useCallback((projectId, fallbackProject = null) => {
+        if (!projectId) {
+            return null;
+        }
+
+        if (project?.id === projectId) {
+            return project;
+        }
+
+        return projects.find((projectItem) => projectItem.id === projectId) || fallbackProject || null;
+    }, [project, projects]);
+
+    const resolveClientFromDraft = useCallback((clientId, fallbackClient = null) => {
+        if (!clientId) {
+            return null;
+        }
+
+        if (client?.id === clientId) {
+            return client;
+        }
+
+        return clients.find((clientItem) => clientItem.id === clientId) || fallbackClient || null;
+    }, [client, clients]);
+
+    const resolvePaymentMethodFromDraft = useCallback((paymentMethodId, fallbackPaymentMethod = null) => {
+        if (!paymentMethodId) {
+            return fallbackPaymentMethod || null;
+        }
+
+        return paymentMethods.find((paymentMethod) => paymentMethod.id === paymentMethodId) || fallbackPaymentMethod || null;
+    }, [paymentMethods]);
+
+    const resolveBusinessInfoFromDraft = useCallback((businessInfoId, fallbackBusinessInfo = null) => {
+        if (!businessInfoId) {
+            return fallbackBusinessInfo || null;
+        }
+
+        return businessInfos.find((businessInfo) => businessInfo.id === businessInfoId) || fallbackBusinessInfo || null;
+    }, [businessInfos]);
+
+    const resolveTemplateFromDraft = useCallback((templateId, fallbackTemplate = null) => {
+        if (!templateId) {
+            return fallbackTemplate || null;
+        }
+
+        return invoiceTemplates.find((template) => template.id === templateId) || fallbackTemplate || null;
+    }, [invoiceTemplates]);
+
+    const applyDraftPayload = useCallback((draftState) => {
+        if (!draftState) {
+            return;
+        }
+
+        setSelectedClient(resolveClientFromDraft(draftState.selectedClientId, draftState.selectedClientSnapshot));
+        setSelectedProject(resolveProjectFromDraft(draftState.selectedProjectId, draftState.selectedProjectSnapshot));
+        setSelectedAdditionalProjectIds(
+            (draftState.selectedAdditionalProjectIds || []).filter((projectId) => resolveProjectFromDraft(projectId))
+        );
+        setSelectedPaymentMethod(resolvePaymentMethodFromDraft(draftState.selectedPaymentMethodId, draftState.selectedPaymentMethodSnapshot));
+        setSelectedBusinessInfo(resolveBusinessInfoFromDraft(draftState.selectedBusinessInfoId, draftState.selectedBusinessInfoSnapshot));
+        setSelectedTemplate(resolveTemplateFromDraft(draftState.selectedTemplateId, draftState.selectedTemplateSnapshot));
+        setIsProjectContextFixed(draftState.isProjectContextFixed ?? (!!project && !client));
+        setIsClientContextFixed(draftState.isClientContextFixed ?? !!client);
+        setProjectManuallyChanged(draftState.projectManuallyChanged ?? false);
+        setQuoteNumberTimestamp(draftState.quoteNumberTimestamp || '');
+        setBillingPeriodPreset(draftState.billingPeriodPreset || defaultBillingPeriodState.preset);
+        setBillingPeriodStart(draftState.billingPeriodStart || defaultBillingPeriodState.startDate);
+        setBillingPeriodEnd(draftState.billingPeriodEnd || defaultBillingPeriodState.endDate);
+        setEditableHours(draftState.editableHours || {});
+        setTaskFlatRates(draftState.taskFlatRates || {});
+        setUseFlatRate(draftState.useFlatRate || {});
+        setTaskHourlyRates(draftState.taskHourlyRates || {});
+        setTaskQuantities(draftState.taskQuantities || {});
+        setMergedSubtasks(draftState.mergedSubtasks || {});
+        setAdditionalTasks(draftState.additionalTasks || []);
+        setAdditionalExpenses(draftState.additionalExpenses || []);
+        setSelectedTasksForBilling(draftState.selectedTasksForBilling || {});
+        setSelectedExpensesForBilling(draftState.selectedExpensesForBilling || {});
+        setInvoiceNote(draftState.invoiceNote || '');
+        setInvoiceDateOverride(draftState.invoiceDateOverride || '');
+        setUseInvoiceDateOverride(draftState.useInvoiceDateOverride === true);
+        setDiscountType(draftState.discountType || 'percentage');
+        setDiscountValue(draftState.discountValue ?? 0);
+        setShippingAmount(draftState.shippingAmount ?? 0);
+        setTaxOverride(draftState.taxOverride || {
+            enabled: false,
+            label: '',
+            rate: 0
+        });
+        setShowAddTaskForm(draftState.showAddTaskForm === true);
+        setNewTaskTitle(draftState.newTaskTitle || '');
+        setNewTaskHours(draftState.newTaskHours || '');
+        setNewTaskUseFlatRate(draftState.newTaskUseFlatRate === true);
+        setNewTaskHourlyRate(draftState.newTaskHourlyRate || '');
+        setNewTaskQuantity(draftState.newTaskQuantity ?? 1);
+        setShowAddExpenseForm(draftState.showAddExpenseForm === true);
+        setNewExpenseTitle(draftState.newExpenseTitle || '');
+        setNewExpenseAmount(draftState.newExpenseAmount || '');
+        setNewExpenseCurrency(draftState.newExpenseCurrency || normalizedInvoiceCurrency);
+        setNewExpenseSupplierName(draftState.newExpenseSupplierName || '');
+    }, [
+        client,
+        defaultBillingPeriodState.endDate,
+        defaultBillingPeriodState.preset,
+        defaultBillingPeriodState.startDate,
+        normalizedInvoiceCurrency,
+        project,
+        resolveBusinessInfoFromDraft,
+        resolveClientFromDraft,
+        resolvePaymentMethodFromDraft,
+        resolveProjectFromDraft,
+        resolveTemplateFromDraft,
+    ]);
 
     /**
      * Initialize pricing state when editing an invoice
@@ -1357,6 +1623,15 @@ const InvoiceGenerator = ({
         setNewTaskUseFlatRate(selectedProjectsForInvoice.some((projectItem) => projectItem?.flatRate));
     }, [invoiceTasks, selectedProjectsForInvoice, showInvoiceForm, tasks]);
 
+    useEffect(() => {
+        if (!showInvoiceForm || !pendingDraftRestore) {
+            return;
+        }
+
+        applyDraftPayload(pendingDraftRestore);
+        setPendingDraftRestore(null);
+    }, [applyDraftPayload, pendingDraftRestore, showInvoiceForm]);
+
     // Handler assignments (replace function definitions)
     const handleTaskSelectionForBilling = InvoiceHandler.handleTaskSelectionForBilling(setSelectedTasksForBilling);
     const handleHoursChange = InvoiceHandler.handleHoursChange(setEditableHours);
@@ -1572,10 +1847,87 @@ const InvoiceGenerator = ({
         baseHandleProjectSelection(projectId);
     }, [baseHandleProjectSelection]);
 
-    const handleCancel = useCallback(() => {
+    const handleCloseInvoice = useCallback(() => {
+        saveInvoiceFormState(getCurrentDraftPayload());
         setSelectedAdditionalProjectIds([]);
         baseHandleCancel();
-    }, [baseHandleCancel]);
+    }, [baseHandleCancel, getCurrentDraftPayload, saveInvoiceFormState]);
+
+    const handleCloseInvoiceWithoutDraft = useCallback(() => {
+        clearInvoiceFormState();
+        setPendingDraftRestore(null);
+        setSelectedAdditionalProjectIds([]);
+        baseHandleCancel();
+    }, [baseHandleCancel, clearInvoiceFormState]);
+
+    const canUndoEditingInvoice = useMemo(() => {
+        if (isQuoteMode || !editingInvoice) {
+            return false;
+        }
+
+        return canUndoInvoice(editingInvoice);
+    }, [canUndoInvoice, editingInvoice, isQuoteMode]);
+
+    const closeUndoInvoiceConfirm = useCallback(() => {
+        if (isUndoingInvoice) {
+            return;
+        }
+
+        setShowUndoInvoiceConfirm(false);
+        setUndoInvoiceConfirmationText('');
+    }, [isUndoingInvoice]);
+
+    const openUndoInvoiceConfirm = useCallback(() => {
+        if (!canUndoEditingInvoice) {
+            return;
+        }
+
+        setUndoInvoiceConfirmationText('');
+        setShowUndoInvoiceConfirm(true);
+    }, [canUndoEditingInvoice]);
+
+    const handleConfirmUndoInvoice = useCallback(async () => {
+        if (!editingInvoice) {
+            return;
+        }
+
+        const invoiceToUndo = editingInvoice;
+        const expectedConfirmation = invoiceToUndo.invoiceNumber || '';
+        if (undoInvoiceConfirmationText.trim() !== expectedConfirmation) {
+            showError(`Type ${expectedConfirmation} to confirm.`);
+            return;
+        }
+
+        setIsUndoingInvoice(true);
+        setShowUndoInvoiceConfirm(false);
+        setUndoInvoiceConfirmationText('');
+        setShowPreview(false);
+        setPreviewInvoice(null);
+        handleCloseInvoiceWithoutDraft();
+
+        try {
+            const result = await undoLatestInvoice(invoiceToUndo.id);
+
+            const sequenceMessage = result?.rewoundSequence
+                ? ' Next invoice number was restored.'
+                : '';
+
+            showSuccess(
+                `Invoice ${result?.invoiceNumber || invoiceToUndo.invoiceNumber} undone. ${result?.clearedTimeEntryCount || 0} billed entr${result?.clearedTimeEntryCount === 1 ? 'y' : 'ies'} restored, ${result?.deletedAdjustmentCount || 0} invoice adjustment${result?.deletedAdjustmentCount === 1 ? '' : 's'} removed, and ${result?.unbilledExpenseCount || 0} expense${result?.unbilledExpenseCount === 1 ? '' : 's'} unbilled.${sequenceMessage}`
+            );
+        } catch (error) {
+            showError(error.message || 'Unable to undo this invoice.');
+        } finally {
+            setIsUndoingInvoice(false);
+        }
+    }, [
+        editingInvoice,
+        handleCloseInvoiceWithoutDraft,
+        showError,
+        showSuccess,
+        undoInvoiceConfirmationText,
+        undoLatestInvoice,
+    ]);
 
     /**
      * Calculate pricing breakdown: Subtotal → Discount → Shipping → Tax → Total
@@ -2124,6 +2476,44 @@ const InvoiceGenerator = ({
         });
     }, [timeEntries, createEntry, updateEntry, deleteEntry]);
 
+    const getBilledTaskIdsForInvoiceCreation = () => {
+        const billedTaskIds = new Set();
+        const invoiceTaskIds = new Set(invoiceTasks.map((task) => task.id));
+
+        invoiceTasks.forEach(task => {
+            if (selectedTasksForBilling[task.id] && invoiceTaskIds.has(task.id)) {
+                billedTaskIds.add(task.id);
+
+                if (mergedSubtasks[task.id]) {
+                    const subtasks = invoiceTasks.filter(subtask =>
+                        subtask.parentTaskId === task.id && invoiceTaskIds.has(subtask.id)
+                    );
+                    subtasks.forEach(subtask => {
+                        billedTaskIds.add(subtask.id);
+                    });
+                }
+            }
+        });
+
+        return Array.from(billedTaskIds);
+    };
+
+    const buildBillingStateSnapshot = (snapshotTimestamp) => {
+        const taskLastBilledAt = {};
+        const billedTaskIds = getBilledTaskIdsForInvoiceCreation();
+
+        billedTaskIds.forEach(taskId => {
+            const task = tasks.find(t => t.id === taskId);
+            taskLastBilledAt[taskId] = task?.lastBilledAt || null;
+        });
+
+        return {
+            version: 1,
+            capturedAt: snapshotTimestamp,
+            taskLastBilledAt,
+        };
+    };
+
     /**
      * Save invoice (create new or update existing)
      */
@@ -2135,6 +2525,11 @@ const InvoiceGenerator = ({
         }
 
         const invoiceId = invoiceData.id;
+        const adjustmentTimestamp = Date.now();
+
+        if (!editingInvoice && !isQuoteMode) {
+            invoiceData.billingStateSnapshot = buildBillingStateSnapshot(adjustmentTimestamp);
+        }
 
         // Store invoice in the invoices collection
         if (editingInvoice) {
@@ -2145,7 +2540,6 @@ const InvoiceGenerator = ({
             createInvoice(invoiceData);
         }
 
-        const adjustmentTimestamp = Date.now();
         syncInvoiceAdjustments(invoiceData, adjustmentTimestamp);
 
         const selectedExpenseIds = new Set(
@@ -2209,26 +2603,7 @@ const InvoiceGenerator = ({
         // Update tasks to set lastBilledAt for billed tasks
         if (!editingInvoice) {
             const currentTime = adjustmentTimestamp;
-            
-            // Get all task IDs that should be marked as billed (including merged subtasks)
-            const billedTaskIds = [];
-            const invoiceTaskIds = new Set(invoiceTasks.map((task) => task.id));
-            
-            invoiceTasks.forEach(task => {
-                if (selectedTasksForBilling[task.id] && invoiceTaskIds.has(task.id)) {
-                    billedTaskIds.push(task.id);
-                    
-                    // If this parent task has merged subtasks, include them too
-                    if (mergedSubtasks[task.id]) {
-                        const subtasks = invoiceTasks.filter(subtask => 
-                            subtask.parentTaskId === task.id && invoiceTaskIds.has(subtask.id)
-                        );
-                        subtasks.forEach(subtask => {
-                            billedTaskIds.push(subtask.id);
-                        });
-                    }
-                }
-            });
+            const billedTaskIds = getBilledTaskIdsForInvoiceCreation();
 
             const billedRateByTaskId = new Map();
             (invoiceData.tasks || []).forEach(task => {
@@ -2290,6 +2665,8 @@ const InvoiceGenerator = ({
         // Reset form
         setShowInvoiceForm(false);
         setSelectedAdditionalProjectIds([]);
+        clearInvoiceFormState();
+        setPendingDraftRestore(null);
         
         // Use the centralized reset function
         handleResetInvoiceForm();
@@ -2576,8 +2953,9 @@ const InvoiceGenerator = ({
                 setIsClientContextFixed(true);
             }
         }
+        setPendingDraftRestore(getInvoiceFormState());
         setShowInvoiceForm(true);
-    }, [availableExpensesWithConversion, client, clients, editingInvoice, expenses, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceDataForProjects, projects, quoteNumberTimestamp, selectedClient, selectedProject, selectedProjectsForInvoice, setIsProjectContextFixed, shouldSelectExpenseByDefault, showError, showInvoiceForm, tasks]);
+    }, [availableExpensesWithConversion, client, clients, editingInvoice, expenses, getInvoiceFormState, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceDataForProjects, projects, quoteNumberTimestamp, selectedClient, selectedProject, selectedProjectsForInvoice, setIsProjectContextFixed, shouldSelectExpenseByDefault, showError, showInvoiceForm, tasks]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {
@@ -2622,11 +3000,13 @@ const InvoiceGenerator = ({
                 <InvoiceModal
                     showInvoiceForm={showInvoiceForm}
                     editingInvoice={editingInvoice}
-                    handleCancel={handleCancel}
+                    handleClose={handleCloseInvoice}
                     handleSaveInvoice={handleSaveInvoice}
                     handlePreviewInvoice={handlePreviewInvoice}
                     handleSendQuote={handleSendQuote}
                     handleDownloadQuote={handleDownloadQuote}
+                    canUndoInvoice={canUndoEditingInvoice}
+                    handleUndoInvoice={openUndoInvoiceConfirm}
                     mode={mode}
                     isProjectContextFixed={isProjectContextFixed}
                     isClientContextFixed={isClientContextFixed}
@@ -2735,7 +3115,6 @@ const InvoiceGenerator = ({
                     openTemplateModal={handleOpenTemplateModal}
                     saveFormState={saveInvoiceFormState}
                     getSavedState={getInvoiceFormState}
-                    clearSavedState={clearInvoiceFormState}
                 />
             )}
             {quoteEmailDocument && (
@@ -2756,6 +3135,82 @@ const InvoiceGenerator = ({
                 invoice={previewInvoice}
                 htmlContent={previewInvoice ? getCurrentInvoiceHtmlContent(previewInvoice, clients, businessBrandAssets) : ''}
             />
+            <Modal
+                isOpen={showUndoInvoiceConfirm}
+                onClose={closeUndoInvoiceConfirm}
+                title="Undo latest invoice?"
+                footer={(
+                    <div className="flex justify-end space-x-3">
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmUndoInvoice}
+                            loading={isUndoingInvoice}
+                            loadingText="Undoing Invoice"
+                            disabled={undoInvoiceConfirmationText.trim() !== (editingInvoice?.invoiceNumber || '')}
+                        >
+                            Undo Invoice
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={closeUndoInvoiceConfirm}
+                            disabled={isUndoingInvoice}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                )}
+            >
+                {editingInvoice && (() => {
+                    const template = resolveCurrentInvoiceTemplate(editingInvoice, invoiceTemplates);
+                    const sequenceRollback = getInvoiceSequenceRollback(editingInvoice, template, invoices);
+
+                    return (
+                        <div className="space-y-4">
+                            <Notice
+                                title="This will restore billing state as if the invoice was never generated."
+                                variant="warning"
+                            >
+                                <p>
+                                    The invoice record will be removed, billed time entries will be restored, invoice adjustments deleted, quoted flat amounts released, and linked expenses marked unbilled again.
+                                </p>
+                            </Notice>
+
+                            <div className="space-y-1 text-sm text-muted-foreground">
+                                <p>
+                                    Invoice: <span className="font-medium text-foreground">{editingInvoice.invoiceNumber}</span>
+                                </p>
+                                <p>
+                                    Total: <span className="font-medium text-foreground">
+                                        {getCurrencySymbol(editingInvoice.currency || getPreferredCurrency())}{getInvoiceTotal(editingInvoice).toFixed(2)}
+                                    </span>
+                                </p>
+                                <p>
+                                    Invoice number sequence: <span className="font-medium text-foreground">
+                                        {sequenceRollback.canRollback ? 'Will be restored' : 'Will stay as-is'}
+                                    </span>
+                                </p>
+                                {sequenceRollback.reason && (
+                                    <p>{sequenceRollback.reason}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="undo-edit-invoice-confirmation" className="block">
+                                    Type <strong>{editingInvoice.invoiceNumber}</strong> to confirm:
+                                </Label>
+                                <Input
+                                    id="undo-edit-invoice-confirmation"
+                                    type="text"
+                                    value={undoInvoiceConfirmationText}
+                                    onChange={(event) => setUndoInvoiceConfirmationText(event.target.value)}
+                                    placeholder={editingInvoice.invoiceNumber}
+                                    disabled={isUndoingInvoice}
+                                />
+                            </div>
+                        </div>
+                    );
+                })()}
+            </Modal>
         </div>
     );
 };

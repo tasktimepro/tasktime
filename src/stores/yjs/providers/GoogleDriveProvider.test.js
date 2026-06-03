@@ -157,6 +157,31 @@ describe('YjsDriveProvider', () => {
         }
     })
 
+    it('blocks backup-mode push when Drive manifest changed remotely', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.connected = true
+        provider.setSyncMode('backup')
+        provider.pendingDeltas.set('core', [new Uint8Array([1, 2, 3])])
+        provider.manifest = {
+            getManifest: vi.fn(() => ({ documents: { core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] } } })),
+            canCheckRemoteManifestChanges: vi.fn(() => true),
+            hasManifestChanged: vi.fn(async () => true),
+            load: vi.fn(async () => {}),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async () => {})
+
+        await provider.sync(false, { allowPull: false })
+
+        expect(provider.manifest.hasManifestChanged).toHaveBeenCalled()
+        expect(provider.syncDoc).not.toHaveBeenCalled()
+        expect(provider.pendingDeltas.get('core')).toHaveLength(1)
+        expect(provider.getState()).toBe('error')
+    })
+
     it('preserves updates queued while a delta upload is in flight', async () => {
         const liveDoc = new Y.Doc()
         const provider = createProviderWithCoreDoc(liveDoc)
@@ -255,6 +280,152 @@ describe('YjsDriveProvider', () => {
 
         expect(provider.pendingDeltas.get('core')).toHaveLength(1)
         expect(provider.manifest.updateFile).toHaveBeenCalledTimes(1)
+    })
+
+    it('saves manifest before deleting deltas during reconnect full-state upload', async () => {
+        const liveDoc = new Y.Doc()
+        liveDoc.getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Reconnect state',
+        }))
+
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const order = []
+        const manifestDoc = {
+            stateFile: 'tasktime-yjs-core.bin',
+            stateVersion: 3,
+            lastCompaction: '2026-06-03T00:00:00.000Z',
+            deltas: [
+                { id: 'old-1', timestamp: '2026-06-03T00:00:00.000Z' },
+                { id: 'old-2', timestamp: '2026-06-03T00:00:00.000Z' },
+            ],
+        }
+
+        provider.manifest = {
+            ensureDocManifest: vi.fn(() => manifestDoc),
+            getFileId: vi.fn(() => 'core-state-id'),
+            updateFile: vi.fn(async () => {
+                order.push('state-uploaded')
+            }),
+            createFile: vi.fn(async () => 'core-state-id'),
+            setFileId: vi.fn(),
+            updateDocManifest: vi.fn((_, update) => {
+                order.push('manifest-updated')
+                Object.assign(manifestDoc, update)
+            }),
+            save: vi.fn(async () => {
+                order.push('manifest-saved')
+            }),
+            deleteFileByName: vi.fn(async (name) => {
+                order.push(`deleted:${name}`)
+            }),
+        }
+
+        await provider.pushFullState('core', liveDoc, true)
+
+        expect(order).toEqual([
+            'state-uploaded',
+            'manifest-updated',
+            'manifest-saved',
+            'deleted:tasktime-yjs-core-delta-old-1.bin',
+            'deleted:tasktime-yjs-core-delta-old-2.bin',
+        ])
+        expect(manifestDoc.deltas).toEqual([])
+    })
+
+    it('saves compacted manifest before deleting old compacted delta files', async () => {
+        const liveDoc = new Y.Doc()
+        liveDoc.getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Compacted state',
+        }))
+
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const order = []
+        const manifestDoc = {
+            stateFile: 'tasktime-yjs-core.bin',
+            stateVersion: 7,
+            lastCompaction: '2026-06-03T00:00:00.000Z',
+            deltas: [
+                { id: 'compact-1', timestamp: '2026-06-03T00:00:00.000Z' },
+            ],
+        }
+
+        provider.manifest = {
+            getDocManifest: vi.fn(() => manifestDoc),
+            getFileId: vi.fn(() => 'core-state-id'),
+            updateFile: vi.fn(async () => {
+                order.push('state-uploaded')
+            }),
+            createFile: vi.fn(async () => 'core-state-id'),
+            setFileId: vi.fn(),
+            clearDeltas: vi.fn(() => {
+                order.push('manifest-updated')
+                manifestDoc.deltas = []
+                manifestDoc.stateVersion += 1
+            }),
+            save: vi.fn(async () => {
+                order.push('manifest-saved')
+            }),
+            deleteFileByName: vi.fn(async (name) => {
+                order.push(`deleted:${name}`)
+            }),
+        }
+
+        await provider.compactDoc('core', liveDoc)
+
+        expect(order).toEqual([
+            'state-uploaded',
+            'manifest-updated',
+            'manifest-saved',
+            'deleted:tasktime-yjs-core-delta-compact-1.bin',
+        ])
+        expect(manifestDoc.stateVersion).toBe(8)
+    })
+
+    it('recovers from stale cached delta file IDs after a 404', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        const remoteDoc = new Y.Doc()
+        remoteDoc.getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Recovered From Fresh File ID',
+        }))
+
+        const deltaBuffer = Y.encodeStateAsUpdate(remoteDoc).buffer
+
+        provider.manifest = {
+            getDocManifest: vi.fn(() => ({
+                stateVersion: 0,
+                stateFile: 'tasktime-yjs-core.bin',
+                deltas: [{ id: 'delta-1', timestamp: '2026-06-03T00:00:00.000Z' }],
+            })),
+            getFileIdWithFallback: vi.fn()
+                .mockResolvedValueOnce('stale-file-id')
+                .mockResolvedValueOnce('fresh-file-id'),
+            refreshFileCache: vi.fn(async () => {}),
+            deleteFileId: vi.fn(),
+            downloadFileAsArrayBuffer: vi.fn(async (fileId) => {
+                if (fileId === 'stale-file-id') {
+                    throw new Error('Drive API error 404: {"error":{"code":404,"message":"File not found"}}')
+                }
+
+                if (fileId === 'fresh-file-id') {
+                    return deltaBuffer
+                }
+
+                throw new Error(`Unexpected file id ${fileId}`)
+            }),
+            removeDelta: vi.fn(),
+        }
+
+        await provider.pullDoc('core', liveDoc)
+
+        expect(provider.manifest.deleteFileId).toHaveBeenCalledWith('tasktime-yjs-core-delta-delta-1.bin')
+        expect(provider.manifest.refreshFileCache).toHaveBeenCalledTimes(1)
+        expect(provider.manifest.removeDelta).not.toHaveBeenCalled()
+        expect(liveDoc.getMap('projects').get('project-1').get('title')).toBe('Recovered From Fresh File ID')
     })
 
     it('applies remote updates with broken references but logs a warning', () => {

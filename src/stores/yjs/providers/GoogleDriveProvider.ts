@@ -37,6 +37,14 @@ const PULL_THROTTLE_MS = 30_000; // Skip pull if no local changes and last pull 
 const CROSS_TAB_SYNC_RECENCY_MS = 60_000; // Skip periodic sync if another tab synced in last 60s
 const SYNC_LOCK_NAME = 'tasktime-drive-sync';
 
+class BackupModeRemoteChangedError extends Error {
+
+    constructor() {
+        super('Remote Drive data changed. Run Sync Now before backup mode can upload local changes.');
+        this.name = 'BackupModeRemoteChangedError';
+    }
+}
+
 /**
  * Acquire a Web Lock to coordinate sync across browser tabs.
  * - ifAvailable=true: return immediately if lock not available (for periodic/debounced syncs)
@@ -199,6 +207,40 @@ export class YjsDriveProvider {
 
         if (uploadedBatch.every((update, index) => latestPending[index] === update)) {
             this.pendingDeltas.set(docName, latestPending.slice(uploadedBatch.length));
+        }
+    }
+
+    private isDriveFileNotFoundError(error: unknown): boolean {
+        const message = error instanceof Error ? error.message : String(error);
+        return message.includes('Drive API error 404');
+    }
+
+    private async downloadFileWithRecovery(fileName: string, fileId: string): Promise<ArrayBuffer | null> {
+        try {
+            return await this.manifest.downloadFileAsArrayBuffer(fileId);
+        } catch (error) {
+            if (!this.isDriveFileNotFoundError(error)) {
+                throw error;
+            }
+
+            this.log('pull: cached file id missing, refreshing file cache', { fileName, fileId });
+            this.manifest.deleteFileId(fileName);
+            await this.manifest.refreshFileCache();
+
+            const recoveredFileId = await this.manifest.getFileIdWithFallback(fileName);
+            if (!recoveredFileId) {
+                return null;
+            }
+
+            try {
+                return await this.manifest.downloadFileAsArrayBuffer(recoveredFileId);
+            } catch (retryError) {
+                if (this.isDriveFileNotFoundError(retryError)) {
+                    return null;
+                }
+
+                throw retryError;
+            }
         }
     }
 
@@ -686,6 +728,15 @@ export class YjsDriveProvider {
                 this.log('sync: manifest loaded (push-only)');
             }
 
+            if (!allowPull && this.syncMode === 'backup' && hasPendingLocal && this.manifest.canCheckRemoteManifestChanges()) {
+                this.setPhase('checking');
+                const remoteManifestChanged = await this.manifest.hasManifestChanged();
+
+                if (remoteManifestChanged) {
+                    throw new BackupModeRemoteChangedError();
+                }
+            }
+
             const shouldPull = allowPull && (manifestChanged || force);
 
             // Sync each loaded document (pull if manifest changed, always push pending)
@@ -737,7 +788,7 @@ export class YjsDriveProvider {
             this.updatePendingState();
 
             // If changes arrived during sync, run another pass immediately
-            if (this.hasPendingDeltas()) {
+            if (this.syncState !== 'error' && this.hasPendingDeltas()) {
                 const followUpAllowPull = this.syncMode === 'sync';
                 this.sync(false, { allowPull: followUpAllowPull }).catch(console.error);
             }
@@ -847,23 +898,27 @@ export class YjsDriveProvider {
 
             if (stateFileId) {
                 try {
-                    const stateBuffer = await this.manifest.downloadFileAsArrayBuffer(stateFileId);
-                    const stateArray = new Uint8Array(stateBuffer);
-                    let applied = true;
+                    const stateBuffer = await this.downloadFileWithRecovery(docManifest.stateFile, stateFileId);
+                    if (!stateBuffer) {
+                        console.warn(`[YjsDriveProvider] State file not found for ${docName}: ${docManifest.stateFile}`);
+                    } else {
+                        const stateArray = new Uint8Array(stateBuffer);
+                        let applied = true;
 
-                    if (stateArray.length > 0) {
-                        applied = this.applyValidatedRemoteUpdate(docName, doc, stateArray, `base state v${docManifest.stateVersion}`);
+                        if (stateArray.length > 0) {
+                            applied = this.applyValidatedRemoteUpdate(docName, doc, stateArray, `base state v${docManifest.stateVersion}`);
+
+                            if (applied) {
+                                this.log(`pull: applied base state v${docManifest.stateVersion} for ${docName}`, { bytes: stateArray.length });
+                            }
+                        }
 
                         if (applied) {
-                            this.log(`pull: applied base state v${docManifest.stateVersion} for ${docName}`, { bytes: stateArray.length });
+                            // Mark as applied and clear old deltas (they're included in the new state)
+                            this.appliedStateVersions.set(docName, docManifest.stateVersion);
+                            appliedDeltas.clear();
+                            this.appliedDeltaIds.set(docName, appliedDeltas);
                         }
-                    }
-
-                    if (applied) {
-                        // Mark as applied and clear old deltas (they're included in the new state)
-                        this.appliedStateVersions.set(docName, docManifest.stateVersion);
-                        appliedDeltas.clear();
-                        this.appliedDeltaIds.set(docName, appliedDeltas);
                     }
                 } catch (error) {
                     console.warn(`[YjsDriveProvider] Could not pull base state for ${docName}:`, error);
@@ -892,7 +947,13 @@ export class YjsDriveProvider {
 
             if (deltaFileId) {
                 try {
-                    const deltaBuffer = await this.manifest.downloadFileAsArrayBuffer(deltaFileId);
+                    const deltaBuffer = await this.downloadFileWithRecovery(deltaFileName, deltaFileId);
+                    if (!deltaBuffer) {
+                        console.warn(`[YjsDriveProvider] Delta file orphaned after recovery, pruning: ${deltaFileName}`);
+                        orphanedDeltaIds.push(delta.id);
+                        continue;
+                    }
+
                     const deltaArray = new Uint8Array(deltaBuffer);
 
                     if (deltaArray.length > 0) {
@@ -1007,13 +1068,11 @@ export class YjsDriveProvider {
             }
 
             const nextStateVersion = docManifest.stateVersion + 1;
+            const deltaFileNamesToDelete = clearDeltas
+                ? docManifest.deltas.map((delta) => `tasktime-yjs-${docName}-delta-${delta.id}.bin`)
+                : [];
 
             if (clearDeltas && docManifest.deltas.length > 0) {
-                for (const delta of docManifest.deltas) {
-                    const deltaFileName = `tasktime-yjs-${docName}-delta-${delta.id}.bin`;
-                    await this.manifest.deleteFileByName(deltaFileName);
-                }
-
                 this.manifest.updateDocManifest(docName, {
                     stateVersion: nextStateVersion,
                     lastCompaction: new Date().toISOString(),
@@ -1029,6 +1088,14 @@ export class YjsDriveProvider {
 
             // CRITICAL: Always save manifest after state upload succeeds
             await this.manifest.save();
+
+            for (const deltaFileName of deltaFileNamesToDelete) {
+                try {
+                    await this.manifest.deleteFileByName(deltaFileName);
+                } catch (deleteError) {
+                    console.warn(`[YjsDriveProvider] Could not delete compacted delta ${deltaFileName}:`, deleteError);
+                }
+            }
 
             this.appliedStateVersions.set(docName, nextStateVersion);
             this.appliedDeltaIds.set(docName, new Set());
@@ -1057,6 +1124,7 @@ export class YjsDriveProvider {
         if (!docManifest) return;
 
         const deltasToRemove = docManifest.deltas.length;
+        const deltaFileNamesToDelete = docManifest.deltas.map((delta) => `tasktime-yjs-${docName}-delta-${delta.id}.bin`);
 
         // Get full current state
         const fullState = encodeStateAsUpdate(doc);
@@ -1074,18 +1142,20 @@ export class YjsDriveProvider {
             this.manifest.setFileId(stateFileName, fileId);
         }
 
-        // Delete old delta files
-        for (const delta of docManifest.deltas) {
-            const deltaFileName = `tasktime-yjs-${docName}-delta-${delta.id}.bin`;
-            await this.manifest.deleteFileByName(deltaFileName);
-        }
-
-        // Update manifest and save immediately to prevent orphaned delta references
+        // Save the manifest before deleting old files so remote readers never see references to deleted deltas.
         this.manifest.clearDeltas(docName);
         await this.manifest.save();
 
+        for (const deltaFileName of deltaFileNamesToDelete) {
+            try {
+                await this.manifest.deleteFileByName(deltaFileName);
+            } catch (deleteError) {
+                console.warn(`[YjsDriveProvider] Could not delete compacted delta ${deltaFileName}:`, deleteError);
+            }
+        }
+
         // Update local tracking - new state version, clear applied deltas
-        const newVersion = (this.appliedStateVersions.get(docName) ?? 0) + 1;
+        const newVersion = this.manifest.getDocManifest(docName)?.stateVersion ?? ((this.appliedStateVersions.get(docName) ?? 0) + 1);
         this.appliedStateVersions.set(docName, newVersion);
         this.appliedDeltaIds.set(docName, new Set());
         this.log(`compact: ${docName}`, { bytes: fullState.length, deltasRemoved: deltasToRemove, version: newVersion });

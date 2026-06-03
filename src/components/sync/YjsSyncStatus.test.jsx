@@ -22,6 +22,7 @@ const yjsState = vi.hoisted(() => ({
     pendingSyncChanges: false,
     forceSyncDrive: forceSyncDriveMock,
     autoSyncEnabled: true,
+    autoSyncMode: 'sync',
     lastSyncedAt: null,
 }))
 let consoleErrorSpy
@@ -64,6 +65,7 @@ describe('YjsSyncStatus', () => {
         yjsState.manualSyncInProgress = false
         yjsState.pendingSyncChanges = false
         yjsState.autoSyncEnabled = true
+        yjsState.autoSyncMode = 'sync'
         yjsState.lastSyncedAt = null
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     })

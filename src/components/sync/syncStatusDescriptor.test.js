@@ -14,6 +14,7 @@ const baseArgs = {
     manualSyncInProgress: false,
     pendingSyncChanges: false,
     autoSyncEnabled: true,
+    autoSyncMode: 'sync',
     isSyncing: true,
     hasSynced: true,
     onConnect: vi.fn(),
@@ -120,6 +121,23 @@ describe('getYjsSyncStatusDescriptor', () => {
 
         expect(result.kind).toBe(SYNC_STATUS_KIND.ERROR)
         expect(result.text).toMatch(/25m ago/)
+    })
+
+    it('returns Sync Now needed when backup mode is blocked by pending remote changes', () => {
+        const onManualSync = vi.fn()
+        const result = getYjsSyncStatusDescriptor({
+            ...baseArgs,
+            syncState: 'error',
+            autoSyncEnabled: true,
+            autoSyncMode: 'backup',
+            pendingSyncChanges: true,
+            isSyncing: false,
+            onManualSync,
+        })
+
+        expect(result.kind).toBe(SYNC_STATUS_KIND.ERROR)
+        expect(result.text).toBe('Sync Now needed')
+        expect(result.onClick).toBe(onManualSync)
     })
 
     it('returns OFFLINE when offline', () => {

@@ -239,6 +239,47 @@ describe('ClientDashboard', () => {
         expect(screen.getByText('Quote Test Project')).toBeInTheDocument();
     });
 
+    it('wraps long project titles on project cards instead of truncating them', () => {
+        const longTitle = 'New AI with a very very long title here that will not fit on one line';
+
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }}
+                projects={[{
+                    id: 'project-1',
+                    title: longTitle,
+                    preferredClientId: 'client-1',
+                    defaultCurrency: 'USD',
+                    hourlyRate: 50,
+                }]}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        const title = screen.getByRole('heading', { name: longTitle });
+
+        expect(title.className).toContain('whitespace-normal');
+        expect(title.className).toContain('break-words');
+        expect(title.className).toContain('[overflow-wrap:anywhere]');
+        expect(title.className).not.toContain('truncate');
+    });
+
     it('hides the hourly subtitle for flat-rate project cards', () => {
         render(
             <ClientDashboard

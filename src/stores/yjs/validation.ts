@@ -327,6 +327,12 @@ const invoiceProjectBreakdownSchema = z.object({
     allocatedTotal: finiteNumberSchema.optional(),
 }).passthrough();
 
+const invoiceBillingStateSnapshotSchema = z.object({
+    version: z.literal(1),
+    capturedAt: finiteNumberSchema,
+    taskLastBilledAt: z.record(z.string(), finiteNumberSchema.nullable()),
+}).passthrough();
+
 const invoiceSchema = z.object({
     id: nonEmptyStringSchema,
     projectId: optionalNullableIdSchema,
@@ -355,6 +361,7 @@ const invoiceSchema = z.object({
     paymentCurrencySnapshot: paymentCurrencySnapshotSchema.nullable().optional(),
     sentAt: finiteNumberSchema.nullable().optional(),
     sentToEmail: z.string().nullable().optional(),
+    billingStateSnapshot: invoiceBillingStateSnapshotSchema.nullable().optional(),
     brandingSnapshot: z.object({
         businessInfoId: optionalNullableIdSchema,
         templateId: optionalNullableIdSchema,
@@ -807,7 +814,11 @@ function assertReference(condition: boolean, message: string): void {
     }
 }
 
-function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string): void {
+function validateSnapshotIntegrity(
+    snapshot: ValidationSnapshot,
+    context: string,
+    options: { validateTimeEntryTaskReferences?: boolean } = {}
+): void {
     const projectIds = new Set(snapshot.projects.map((item) => item.id));
     const clientIds = new Set(snapshot.clients.map((item) => item.id));
     const businessInfoIds = new Set(snapshot.businessInfos.map((item) => item.id));
@@ -978,11 +989,13 @@ function validateSnapshotIntegrity(snapshot: ValidationSnapshot, context: string
         }
     }
 
-    if (taskIds.size > 0) {
+    if (taskIds.size > 0 && options.validateTimeEntryTaskReferences) {
         for (const entry of snapshot.timeEntries) {
             assertReference(taskIds.has(entry.taskId), `${context}: time entry ${entry.id} references missing task ${entry.taskId}`);
         }
+    }
 
+    if (taskIds.size > 0) {
         for (const timer of snapshot.timers) {
             assertReference(taskIds.has(timer.taskId), `${context}: timer ${timer.projectId} references missing task ${timer.taskId}`);
         }
@@ -1004,10 +1017,11 @@ export function validateDocManagerState(docManager: YjsDocManager, docName: DocN
         return docManager.getDocSync(name);
     };
 
+    const archivedTasksDoc = resolveDoc('tasks-archived');
     const snapshot = buildSnapshotFromDocs({
         coreDoc: resolveDoc('core'),
         activeEntriesDoc: resolveDoc('entries-active'),
-        archivedTasksDoc: resolveDoc('tasks-archived'),
+        archivedTasksDoc,
         archivedInvoicesDoc: resolveDoc('invoices-archived'),
         archivedExpensesDoc: resolveDoc('expenses-archived'),
         yearEntryDocs: Array.from(loadedDocNames)
@@ -1016,5 +1030,7 @@ export function validateDocManagerState(docManager: YjsDocManager, docName: DocN
             .filter((doc): doc is Y.Doc => doc !== null),
     });
 
-    validateSnapshotIntegrity(snapshot, `remote ${docName}`);
+    validateSnapshotIntegrity(snapshot, `remote ${docName}`, {
+        validateTimeEntryTaskReferences: Boolean(archivedTasksDoc),
+    });
 }

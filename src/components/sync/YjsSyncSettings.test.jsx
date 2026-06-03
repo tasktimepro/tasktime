@@ -7,6 +7,8 @@ import YjsSyncSettings from './YjsSyncSettings'
 const signInMock = vi.hoisted(() => vi.fn())
 const showSuccessMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
+const updatePreferencesMock = vi.hoisted(() => vi.fn())
+const setDriveSyncPreferencesMock = vi.hoisted(() => vi.fn())
 const yjsSyncSettingsMocks = vi.hoisted(() => ({
     isDriveConnected: false,
     isConnecting: false,
@@ -15,6 +17,10 @@ const yjsSyncSettingsMocks = vi.hoisted(() => ({
     user: null,
     pendingSyncChanges: false,
     lastSyncedAt: null,
+    syncState: 'idle',
+    syncPhase: 'idle',
+    autoSyncEnabled: false,
+    autoSyncMode: 'sync',
     forceSyncDrive: vi.fn(),
     disconnectDrive: vi.fn(),
     signOut: vi.fn(),
@@ -23,11 +29,11 @@ let consoleErrorSpy
 
 vi.mock('@/contexts/YjsContext', () => ({
     useYjs: () => ({
-        store: { setDriveSyncPreferences: vi.fn() },
+        store: { setDriveSyncPreferences: setDriveSyncPreferencesMock },
         isReady: true,
         isSyncing: false,
-        syncState: 'idle',
-        syncPhase: 'idle',
+        syncState: yjsSyncSettingsMocks.syncState,
+        syncPhase: yjsSyncSettingsMocks.syncPhase,
         isDriveConnected: yjsSyncSettingsMocks.isDriveConnected,
         isConnecting: yjsSyncSettingsMocks.isConnecting,
         hasSynced: false,
@@ -53,10 +59,10 @@ vi.mock('@/hooks/useGoogleAuth', () => ({
 vi.mock('@/hooks/usePreferences', () => ({
     usePreferences: () => ({
         preferences: {
-            autoSyncEnabled: false,
-            autoSyncMode: 'backup',
+            autoSyncEnabled: yjsSyncSettingsMocks.autoSyncEnabled,
+            autoSyncMode: yjsSyncSettingsMocks.autoSyncMode,
         },
-        updatePreferences: vi.fn(),
+        updatePreferences: updatePreferencesMock,
     }),
 }))
 
@@ -75,6 +81,18 @@ describe('YjsSyncSettings', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        if (!HTMLElement.prototype.hasPointerCapture) {
+            HTMLElement.prototype.hasPointerCapture = vi.fn(() => false)
+        }
+        if (!HTMLElement.prototype.setPointerCapture) {
+            HTMLElement.prototype.setPointerCapture = vi.fn()
+        }
+        if (!HTMLElement.prototype.releasePointerCapture) {
+            HTMLElement.prototype.releasePointerCapture = vi.fn()
+        }
+        if (!HTMLElement.prototype.scrollIntoView) {
+            HTMLElement.prototype.scrollIntoView = vi.fn()
+        }
         yjsSyncSettingsMocks.isDriveConnected = false
         yjsSyncSettingsMocks.isConnecting = false
         yjsSyncSettingsMocks.isSignedIn = false
@@ -82,6 +100,10 @@ describe('YjsSyncSettings', () => {
         yjsSyncSettingsMocks.user = null
         yjsSyncSettingsMocks.pendingSyncChanges = false
         yjsSyncSettingsMocks.lastSyncedAt = null
+        yjsSyncSettingsMocks.syncState = 'idle'
+        yjsSyncSettingsMocks.syncPhase = 'idle'
+        yjsSyncSettingsMocks.autoSyncEnabled = false
+        yjsSyncSettingsMocks.autoSyncMode = 'sync'
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     })
 
@@ -154,5 +176,57 @@ describe('YjsSyncSettings', () => {
 
         expect(screen.queryByRole('button', { name: /connect google drive/i })).toBeNull()
         expect(screen.getByText('Not connected')).toBeInTheDocument()
+    })
+
+    it('labels sync as recommended and backup as device-only', () => {
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+        yjsSyncSettingsMocks.autoSyncEnabled = true
+        yjsSyncSettingsMocks.autoSyncMode = 'sync'
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.getByText('Sync between devices (recommended)')).toBeInTheDocument()
+        expect(screen.getByText(/Device backup uploads this device/i)).toBeInTheDocument()
+    })
+
+    it('requires confirmation before switching to device backup mode', async () => {
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+        yjsSyncSettingsMocks.autoSyncEnabled = true
+        yjsSyncSettingsMocks.autoSyncMode = 'sync'
+
+        render(<YjsSyncSettings />)
+
+        await userEvent.click(screen.getAllByRole('combobox')[0])
+        await userEvent.click(screen.getByRole('option', { name: 'Back up this device only' }))
+
+        expect(screen.getByText('Use device backup mode?')).toBeInTheDocument()
+        expect(updatePreferencesMock).not.toHaveBeenCalledWith(expect.objectContaining({ autoSyncMode: 'backup' }))
+
+        await userEvent.click(screen.getByRole('button', { name: 'Use Backup Mode' }))
+
+        expect(updatePreferencesMock).toHaveBeenCalledWith({
+            autoSyncEnabled: true,
+            autoSyncMode: 'backup',
+        })
+        expect(setDriveSyncPreferencesMock).toHaveBeenCalledWith(true, 'backup')
+        expect(yjsSyncSettingsMocks.forceSyncDrive).toHaveBeenCalled()
+    })
+
+    it('shows Sync Now needed when backup mode is blocked with pending changes', () => {
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+        yjsSyncSettingsMocks.autoSyncEnabled = true
+        yjsSyncSettingsMocks.autoSyncMode = 'backup'
+        yjsSyncSettingsMocks.pendingSyncChanges = true
+        yjsSyncSettingsMocks.syncState = 'error'
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.getByText('Sync Now needed')).toBeInTheDocument()
     })
 })

@@ -13,8 +13,11 @@ const toastMocks = vi.hoisted(() => ({
 
 const invoiceHookMocks = vi.hoisted(() => ({
 
+    invoices: [],
     createInvoice: vi.fn(),
-    updateInvoice: vi.fn()
+    updateInvoice: vi.fn(),
+    undoLatestInvoice: vi.fn(),
+    canUndoInvoice: vi.fn(() => false),
 }))
 
 const expenseHookMocks = vi.hoisted(() => ({
@@ -60,9 +63,11 @@ vi.mock('../../hooks/useToast.ts', () => ({
 vi.mock('../../hooks/useInvoices.ts', () => ({
 
     useInvoices: () => ({
-        invoices: [],
+        invoices: invoiceHookMocks.invoices,
         createInvoice: invoiceHookMocks.createInvoice,
-        updateInvoice: invoiceHookMocks.updateInvoice
+        updateInvoice: invoiceHookMocks.updateInvoice,
+        undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
+        canUndoInvoice: invoiceHookMocks.canUndoInvoice,
     })
 }))
 

@@ -77,7 +77,7 @@ vi.mock('./InvoiceActions', () => ({
 const baseProps = {
     showInvoiceForm: true,
     editingInvoice: null,
-    handleCancel: vi.fn(),
+    handleClose: vi.fn(),
     handleSaveInvoice: vi.fn(),
     handlePreviewInvoice: vi.fn(),
     isProjectContextFixed: false,
@@ -191,24 +191,16 @@ describe('InvoiceModal', () => {
         capturedModalProps = null
     })
 
-    it('prevents default open autofocus for new invoices', () => {
+    it('lets the shared dialog autofocus behavior run', () => {
         render(<InvoiceModal {...baseProps} />)
 
         expect(screen.getByRole('dialog')).toBeInTheDocument()
-        expect(typeof capturedModalProps?.onOpenAutoFocus).toBe('function')
-
-        const preventDefault = vi.fn()
-        capturedModalProps.onOpenAutoFocus({ preventDefault })
-
-        expect(preventDefault).toHaveBeenCalledTimes(1)
+        expect(capturedModalProps?.onOpenAutoFocus).toBeUndefined()
     })
 
-    it('leaves shared autofocus behavior intact for invoice edits', () => {
-        render(<InvoiceModal {...baseProps} editingInvoice={{ id: 'invoice-1' }} />)
+    it('marks the first section toggle as the explicit autofocus target', () => {
+        render(<InvoiceModal {...baseProps} />)
 
-        const preventDefault = vi.fn()
-        capturedModalProps.onOpenAutoFocus({ preventDefault })
-
-        expect(preventDefault).not.toHaveBeenCalled()
+        expect(screen.getByRole('button', { name: /client & project details/i })).toHaveAttribute('data-autofocus')
     })
 })

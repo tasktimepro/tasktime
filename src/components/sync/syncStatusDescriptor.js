@@ -35,6 +35,7 @@ export function getYjsSyncStatusDescriptor({
     manualSyncInProgress,
     pendingSyncChanges,
     autoSyncEnabled,
+    autoSyncMode,
     isSyncing,
     hasSynced,
     onConnect,
@@ -90,6 +91,16 @@ export function getYjsSyncStatusDescriptor({
     }
 
     if (syncState === 'error') {
+        if (autoSyncEnabled && autoSyncMode === 'backup' && pendingSyncChanges) {
+            return {
+                kind: SYNC_STATUS_KIND.ERROR,
+                text: 'Sync Now needed',
+                icon: ExclamationTriangleIcon,
+                tone: 'status-warning-text-strong',
+                onClick: onManualSync,
+            };
+        }
+
         let errorText = 'Sync Error';
 
         if (lastSyncedAt) {

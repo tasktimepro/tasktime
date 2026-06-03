@@ -5,16 +5,18 @@ import { EyeIcon, PaperAirplaneIcon } from '@/components/ui/icons';
  * InvoiceActions component - Footer action buttons for the invoice modal.
  * @param {Object} props
  * @param {Object|null} props.editingInvoice
- * @param {Function} props.handleCancel
+ * @param {Function} props.handleClose
  * @param {Function} props.onPreview
  */
 const InvoiceActions = ({
     editingInvoice,
-    handleCancel,
+    handleClose,
     onPreview,
     mode = 'invoice',
     onSend,
     onDownload,
+    canUndoInvoice = false,
+    onUndoInvoice,
 }) => {
     const isQuoteMode = mode === 'quote';
 
@@ -35,12 +37,22 @@ const InvoiceActions = ({
                 <div />
             )}
             <div className="flex items-center gap-2 sm:gap-3">
+                {editingInvoice && canUndoInvoice && onUndoInvoice && (
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={onUndoInvoice}
+                    >
+                        Undo Invoice
+                    </Button>
+                )}
+
                 <Button
                     type="button"
                     variant="secondary"
-                    onClick={handleCancel}
+                    onClick={handleClose}
                 >
-                    Cancel
+                    Close
                 </Button>
 
                 {isQuoteMode ? (
@@ -63,12 +75,14 @@ const InvoiceActions = ({
                         </Button>
                     </>
                 ) : (
-                    <Button
-                        type="submit"
-                        form="invoice-form"
-                    >
-                        {editingInvoice ? 'Update Invoice' : 'Generate Invoice'}
-                    </Button>
+                    <>
+                        <Button
+                            type="submit"
+                            form="invoice-form"
+                        >
+                            {editingInvoice ? 'Update Invoice' : 'Generate Invoice'}
+                        </Button>
+                    </>
                 )}
             </div>
         </div>

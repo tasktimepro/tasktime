@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
+import * as Y from 'yjs'
 import { useInvoices } from './useInvoices'
 import { useYjs } from '@/contexts/YjsContext'
 import { useYjsCollection } from './useYjsCollection'
@@ -504,5 +505,461 @@ describe('useInvoices', () => {
         const { result } = renderHook(() => useInvoices())
 
         await expect(result.current.markAsPaid('usd-invoice')).rejects.toThrow('offline')
+    })
+
+    it('undoes the latest invoice and restores linked billing state across collections', async () => {
+        const coreDoc = new Y.Doc()
+        const activeEntries = createTestYMap({
+            'entry-current': {
+                id: 'entry-current',
+                taskId: 'task-1',
+                start: new Date('2026-01-05T09:00:00Z').getTime(),
+                end: new Date('2026-01-05T11:00:00Z').getTime(),
+                billedInvoiceId: 'inv-2',
+                billedAt: 200,
+                billedHourlyRate: 100,
+            },
+            'entry-adjustment': {
+                id: 'entry-adjustment',
+                taskId: 'task-1',
+                start: new Date('2026-01-05T11:00:00Z').getTime(),
+                end: new Date('2026-01-05T12:00:00Z').getTime(),
+                source: 'invoice-adjustment',
+                billedInvoiceId: 'inv-2',
+                billedAt: 200,
+                billedHourlyRate: 100,
+            },
+        }, undefined, 'timeEntries')
+        const year2025Entries = createTestYMap({
+            'entry-previous': {
+                id: 'entry-previous',
+                taskId: 'task-1',
+                start: new Date('2025-12-15T09:00:00Z').getTime(),
+                end: new Date('2025-12-15T10:00:00Z').getTime(),
+                billedInvoiceId: 'inv-1',
+                billedAt: 100,
+                billedHourlyRate: 90,
+            },
+            'entry-historical-current': {
+                id: 'entry-historical-current',
+                taskId: 'task-1',
+                start: new Date('2025-12-20T09:00:00Z').getTime(),
+                end: new Date('2025-12-20T10:00:00Z').getTime(),
+                billedInvoiceId: 'inv-2',
+                billedAt: 200,
+                billedHourlyRate: 100,
+            },
+        }, undefined, 'timeEntries')
+        const tasksMap = createTestYMap({
+            'task-1': {
+                id: 'task-1',
+                title: 'Implementation',
+                lastBilledAt: new Date('2026-01-05T12:00:00Z').getTime(),
+            },
+        }, coreDoc, 'tasks')
+        const archivedTasksMap = createTestYMap({
+            'task-quoted': {
+                id: 'task-quoted',
+                title: 'Quoted Task',
+                estimatedFlatAmount: null,
+                quotedAmountBilling: {
+                    invoiceId: 'inv-2',
+                    billedAt: 200,
+                    total: 500,
+                },
+            },
+        })
+        const expensesMap = createTestYMap({
+            'expense-active': {
+                id: 'expense-active',
+                title: 'Hosting',
+                date: '2026-01-05',
+                amount: 25,
+                currency: 'EUR',
+                paymentStatus: 'paid',
+                billingStatus: 'billed',
+                billable: true,
+                isPersonal: false,
+                clientId: 'client-1',
+                projectId: 'project-1',
+                invoiceId: 'inv-2',
+                billedAt: 200,
+            },
+        }, coreDoc, 'expenses')
+        const archivedExpensesMap = createTestYMap({
+            'expense-archived': {
+                id: 'expense-archived',
+                title: 'Travel',
+                date: '2025-12-15',
+                amount: 10,
+                currency: 'EUR',
+                paymentStatus: 'paid',
+                billingStatus: 'billed',
+                billable: true,
+                isPersonal: false,
+                clientId: 'client-1',
+                projectId: 'project-1',
+                invoiceId: 'inv-2',
+                billedAt: 200,
+            },
+        })
+        const projectsMap = createTestYMap({
+            'project-1': {
+                id: 'project-1',
+                title: 'Project',
+                invoiceIds: ['inv-1', 'inv-2'],
+            },
+        }, coreDoc, 'projects')
+        const templatesMap = createTestYMap({
+            'tpl-1': {
+                id: 'tpl-1',
+                name: 'Default Template',
+                useSequentialNumbers: true,
+                currentSequentialNumber: 3,
+                invoiceNumberFormat: 'INV-{sequential}',
+            },
+        }, coreDoc, 'invoiceTemplates')
+        const invoicesMap = createTestYMap({
+            'inv-1': {
+                id: 'inv-1',
+                invoiceNumber: 'INV-1',
+                templateId: 'tpl-1',
+                clientId: 'client-1',
+                projectId: 'project-1',
+                date: '2026-01-01',
+                status: 'sent',
+                subtotal: 100,
+                total: 100,
+                items: [],
+                createdAt: 1,
+            },
+            'inv-2': {
+                id: 'inv-2',
+                invoiceNumber: 'INV-2',
+                templateId: 'tpl-1',
+                billingStateSnapshot: {
+                    version: 1,
+                    capturedAt: 200,
+                    taskLastBilledAt: {
+                        'task-1': new Date('2025-12-15T10:00:00Z').getTime(),
+                    },
+                },
+                clientId: 'client-1',
+                projectId: 'project-1',
+                date: '2026-01-05',
+                status: 'sent',
+                subtotal: 135,
+                total: 135,
+                items: [],
+                createdAt: 2,
+            },
+        }, coreDoc, 'invoices')
+        const loadedYearMaps = new Map()
+        const loadArchivedTasks = vi.fn(async () => {
+            store.archivedTasks = archivedTasksMap
+            return archivedTasksMap
+        })
+        const loadArchivedExpenses = vi.fn(async () => {
+            store.archivedExpenses = archivedExpensesMap
+            return archivedExpensesMap
+        })
+        const loadEntriesForYear = vi.fn(async (year) => {
+            if (year === 2025) {
+                loadedYearMaps.set(2025, year2025Entries)
+                return year2025Entries
+            }
+
+            return createTestYMap({}, undefined, 'timeEntries')
+        })
+        const store = {
+            archivedInvoicesSync: createTestYMap(),
+            archivedTasks: null,
+            archivedExpenses: null,
+            preferences: mockPreferences,
+            tasks: tasksMap,
+            expenses: expensesMap,
+            projects: projectsMap,
+            invoiceTemplates: templatesMap,
+            invoices: invoicesMap,
+            activeTimeEntries: activeEntries,
+            coreDoc,
+            getAllTimeEntries: () => {
+                const active = Array.from(activeEntries.values())
+                const archived = Array.from(loadedYearMaps.values()).flatMap((map) => Array.from(map.values()))
+                return [...active, ...archived]
+            },
+        }
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+            loadArchivedTasks,
+            loadArchivedExpenses,
+            loadEntriesForYear,
+            getAvailableYears: vi.fn(async () => [2025]),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [
+                readStored(invoicesMap, 'inv-1'),
+                readStored(invoicesMap, 'inv-2'),
+            ],
+            isLoading: false,
+            get: vi.fn((id) => readStored(invoicesMap, id)),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn((id) => invoicesMap.delete(id)),
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        await act(async () => {
+            await expect(result.current.undoLatestInvoice('inv-2')).resolves.toEqual({
+                invoiceNumber: 'INV-2',
+                clearedTimeEntryCount: 2,
+                deletedAdjustmentCount: 1,
+                unbilledExpenseCount: 2,
+                rewoundSequence: true,
+            })
+        })
+
+        expect(invoicesMap.has('inv-2')).toBe(false)
+        expect(readStored(projectsMap, 'project-1')).toEqual(expect.objectContaining({
+            invoiceIds: ['inv-1'],
+        }))
+        expect(readStored(templatesMap, 'tpl-1')).toEqual(expect.objectContaining({
+            currentSequentialNumber: 2,
+        }))
+        expect(readStored(activeEntries, 'entry-current')).toEqual(expect.objectContaining({
+            billedInvoiceId: null,
+            billedAt: null,
+            billedHourlyRate: null,
+        }))
+        expect(activeEntries.has('entry-adjustment')).toBe(false)
+        expect(readStored(year2025Entries, 'entry-previous')).toEqual(expect.objectContaining({
+            billedInvoiceId: 'inv-1',
+        }))
+        expect(readStored(year2025Entries, 'entry-historical-current')).toEqual(expect.objectContaining({
+            billedInvoiceId: null,
+            billedAt: null,
+            billedHourlyRate: null,
+        }))
+        expect(readStored(tasksMap, 'task-1')).toEqual(expect.objectContaining({
+            lastBilledAt: new Date('2025-12-15T10:00:00Z').getTime(),
+        }))
+        expect(readStored(archivedTasksMap, 'task-quoted')).toEqual(expect.objectContaining({
+            estimatedFlatAmount: 500,
+            quotedAmountBilling: null,
+        }))
+        expect(readStored(expensesMap, 'expense-active')).toEqual(expect.objectContaining({
+            billingStatus: 'unbilled',
+            invoiceId: null,
+            billedAt: null,
+        }))
+        expect(readStored(archivedExpensesMap, 'expense-archived')).toEqual(expect.objectContaining({
+            billingStatus: 'unbilled',
+            invoiceId: null,
+            billedAt: null,
+        }))
+    })
+
+    it('fails closed when archived billing state cannot be loaded', async () => {
+        const coreDoc = new Y.Doc()
+        const activeEntries = createTestYMap({
+            'entry-current': {
+                id: 'entry-current',
+                taskId: 'task-1',
+                start: new Date('2026-01-05T09:00:00Z').getTime(),
+                end: new Date('2026-01-05T11:00:00Z').getTime(),
+                billedInvoiceId: 'inv-2',
+                billedAt: 200,
+                billedHourlyRate: 100,
+            },
+        }, undefined, 'timeEntries')
+        const invoicesMap = createTestYMap({
+            'inv-2': {
+                id: 'inv-2',
+                invoiceNumber: 'INV-2',
+                clientId: 'client-1',
+                projectId: 'project-1',
+                date: '2026-01-05',
+                status: 'sent',
+                subtotal: 100,
+                total: 100,
+                items: [],
+                createdAt: 2,
+            },
+        }, coreDoc, 'invoices')
+        const remove = vi.fn((id) => invoicesMap.delete(id))
+
+        mockUseYjs.mockReturnValue({
+            store: {
+                archivedInvoicesSync: createTestYMap(),
+                archivedTasks: null,
+                archivedExpenses: null,
+                preferences: mockPreferences,
+                tasks: createTestYMap({}, coreDoc, 'tasks'),
+                expenses: createTestYMap({}, coreDoc, 'expenses'),
+                projects: createTestYMap({}, coreDoc, 'projects'),
+                invoiceTemplates: createTestYMap({}, coreDoc, 'invoiceTemplates'),
+                invoices: invoicesMap,
+                activeTimeEntries: activeEntries,
+                coreDoc,
+                getAllTimeEntries: () => Array.from(activeEntries.values()),
+            },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+            loadArchivedTasks: vi.fn(async () => {
+                throw new Error('archived tasks unavailable')
+            }),
+            loadArchivedExpenses: vi.fn(async () => createTestYMap()),
+            loadEntriesForYear: vi.fn(async () => createTestYMap({}, undefined, 'timeEntries')),
+            getAvailableYears: vi.fn(async () => []),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [readStored(invoicesMap, 'inv-2')],
+            isLoading: false,
+            get: vi.fn((id) => readStored(invoicesMap, id)),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove,
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        await expect(result.current.undoLatestInvoice('inv-2')).rejects.toThrow('archived tasks unavailable')
+        expect(remove).not.toHaveBeenCalled()
+        expect(invoicesMap.has('inv-2')).toBe(true)
+        expect(readStored(activeEntries, 'entry-current')).toEqual(expect.objectContaining({
+            billedInvoiceId: 'inv-2',
+            billedAt: 200,
+            billedHourlyRate: 100,
+        }))
+    })
+
+    it('uses a legacy cutoff fallback when undoing invoices without a billing snapshot', async () => {
+        const coreDoc = new Y.Doc()
+        const previousLegacyCutoff = new Date('2026-01-01T10:00:00Z').getTime()
+        const invoiceEntryStart = new Date('2026-01-05T09:00:00Z').getTime()
+        const activeEntries = createTestYMap({
+            'entry-current': {
+                id: 'entry-current',
+                taskId: 'task-1',
+                start: invoiceEntryStart,
+                end: new Date('2026-01-05T11:00:00Z').getTime(),
+                billedInvoiceId: 'inv-2',
+                billedAt: 200,
+                billedHourlyRate: 100,
+            },
+            'entry-old-unmarked': {
+                id: 'entry-old-unmarked',
+                taskId: 'task-1',
+                start: new Date('2025-12-30T09:00:00Z').getTime(),
+                end: previousLegacyCutoff,
+            },
+        }, undefined, 'timeEntries')
+        const tasksMap = createTestYMap({
+            'task-1': {
+                id: 'task-1',
+                title: 'Implementation',
+                lastBilledAt: new Date('2026-01-05T11:00:00Z').getTime(),
+            },
+        }, coreDoc, 'tasks')
+        const invoicesMap = createTestYMap({
+            'inv-2': {
+                id: 'inv-2',
+                invoiceNumber: 'INV-2',
+                clientId: 'client-1',
+                projectId: 'project-1',
+                date: '2026-01-05',
+                status: 'sent',
+                subtotal: 100,
+                total: 100,
+                items: [],
+                tasks: [{ id: 'task-1' }],
+                createdAt: 2,
+            },
+        }, coreDoc, 'invoices')
+
+        mockUseYjs.mockReturnValue({
+            store: {
+                archivedInvoicesSync: createTestYMap(),
+                archivedTasks: createTestYMap(),
+                archivedExpenses: createTestYMap(),
+                preferences: mockPreferences,
+                tasks: tasksMap,
+                expenses: createTestYMap({}, coreDoc, 'expenses'),
+                projects: createTestYMap({}, coreDoc, 'projects'),
+                invoiceTemplates: createTestYMap({}, coreDoc, 'invoiceTemplates'),
+                invoices: invoicesMap,
+                activeTimeEntries: activeEntries,
+                coreDoc,
+                getAllTimeEntries: () => Array.from(activeEntries.values()),
+            },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+            loadArchivedTasks: vi.fn(async () => createTestYMap()),
+            loadArchivedExpenses: vi.fn(async () => createTestYMap()),
+            loadEntriesForYear: vi.fn(async () => createTestYMap({}, undefined, 'timeEntries')),
+            getAvailableYears: vi.fn(async () => []),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [readStored(invoicesMap, 'inv-2')],
+            isLoading: false,
+            get: vi.fn((id) => readStored(invoicesMap, id)),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn((id) => invoicesMap.delete(id)),
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        await act(async () => {
+            await result.current.undoLatestInvoice('inv-2')
+        })
+
+        expect(readStored(activeEntries, 'entry-current')).toEqual(expect.objectContaining({
+            billedInvoiceId: null,
+            billedAt: null,
+            billedHourlyRate: null,
+        }))
+        expect(readStored(tasksMap, 'task-1')).toEqual(expect.objectContaining({
+            lastBilledAt: invoiceEntryStart - 1,
+        }))
+    })
+
+    it('blocks undo for invoices that are not the latest unpaid invoice', async () => {
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: createTestYMap(), preferences: mockPreferences },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+            loadArchivedTasks: vi.fn(async () => createTestYMap()),
+            loadArchivedExpenses: vi.fn(async () => createTestYMap()),
+            loadEntriesForYear: vi.fn(async () => createTestYMap()),
+            getAvailableYears: vi.fn(async () => []),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [
+                { id: 'inv-1', invoiceNumber: 'INV-1', status: 'sent', date: '2026-01-01', total: 100, clientId: 'c1', projectId: 'p1', createdAt: 1 },
+                { id: 'inv-2', invoiceNumber: 'INV-2', status: 'sent', date: '2026-01-02', total: 100, clientId: 'c1', projectId: 'p1', createdAt: 2 },
+            ],
+            isLoading: false,
+            get: vi.fn((id) => (id === 'inv-1'
+                ? { id: 'inv-1', invoiceNumber: 'INV-1', status: 'sent', date: '2026-01-01', total: 100, clientId: 'c1', projectId: 'p1', createdAt: 1 }
+                : { id: 'inv-2', invoiceNumber: 'INV-2', status: 'sent', date: '2026-01-02', total: 100, clientId: 'c1', projectId: 'p1', createdAt: 2 }
+            )),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        expect(result.current.canUndoInvoice('inv-1')).toBe(false)
+        expect(result.current.getInvoiceUndoBlockReason('inv-1')).toBe('Only the latest unpaid invoice can be undone.')
+        await expect(result.current.undoLatestInvoice('inv-1')).rejects.toThrow('Only the latest unpaid invoice can be undone.')
     })
 })

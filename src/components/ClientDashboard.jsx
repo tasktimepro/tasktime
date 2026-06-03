@@ -497,8 +497,8 @@ const ClientDashboard = ({
             >
                 <CardContent className={cn('flex min-h-full flex-1 flex-col', isMobileLayout ? 'p-4' : 'p-4 pt-5')}>
                     <div className="space-y-2">
-                        <div className="flex min-w-0 items-center gap-2">
-                            <h3 className="truncate font-medium text-foreground">{project.title}</h3>
+                        <div className="flex min-w-0 flex-wrap items-start gap-2">
+                            <h3 className="min-w-0 flex-1 whitespace-normal break-words [overflow-wrap:anywhere] font-medium leading-tight text-foreground">{project.title}</h3>
                             {isProjectInQuoteMode(project) && (
                                 <span className="inline-flex items-center whitespace-nowrap rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                                     Quote stage

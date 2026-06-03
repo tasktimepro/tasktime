@@ -267,6 +267,13 @@ export class ManifestManager {
     }
 
     /**
+     * Whether this instance has loaded a Drive-backed manifest with metadata.
+     */
+    canCheckRemoteManifestChanges(): boolean {
+        return Boolean(this.manifestFileId && this.lastManifestModifiedTime);
+    }
+
+    /**
      * Get last sync timestamp (ISO string) if manifest is loaded
      */
     getLastSync(): string | null {

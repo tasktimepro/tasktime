@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
+    canUndoInvoice,
     createInvoicePaymentCurrencySnapshot,
     extractSequentialNumber,
+    getInvoiceSequenceRollback,
+    getInvoiceUndoBlockReason,
     getInvoiceProjectFinancials,
     getInvoiceProjectIds,
     getInvoiceProjectRevenueBreakdown,
     getInvoiceProjectTitle,
+    getLatestUndoableInvoice,
     getInvoicePaidAtTimestamp,
     getInvoicePaymentCurrencySnapshot,
     getInvoiceStatusAfterMarkingUnpaid,
@@ -463,5 +467,65 @@ describe('invoiceUtils', () => {
         expect(getInvoiceStatusAfterMarkingUnpaid({ status: 'draft' })).toBe('draft')
         expect(getInvoiceStatusAfterMarkingUnpaid({ status: 'sent', dueDate: '2026-01-01' }, new Date('2026-02-01'))).toBe('overdue')
         expect(getInvoiceStatusAfterMarkingUnpaid({ status: 'sent', dueDate: '2026-03-01' }, new Date('2026-02-01'))).toBe('sent')
+    })
+
+    it('only allows undo for the latest unpaid invoice', () => {
+
+        const invoices = [
+            { id: 'inv-1', status: 'sent', createdAt: 1, invoiceNumber: 'INV-1' },
+            { id: 'inv-2', status: 'paid', createdAt: 2, invoiceNumber: 'INV-2', paidAt: 2 },
+            { id: 'inv-3', status: 'sent', createdAt: 3, invoiceNumber: 'INV-3' },
+        ]
+
+        expect(getLatestUndoableInvoice(invoices)).toEqual(invoices[2])
+        expect(canUndoInvoice(invoices[2], invoices)).toBe(true)
+        expect(getInvoiceUndoBlockReason(invoices[0], invoices)).toBe('Only the latest unpaid invoice can be undone.')
+        expect(getInvoiceUndoBlockReason(invoices[1], invoices)).toBe('Paid invoices cannot be undone.')
+    })
+
+    it('rolls back template sequence only when the deleted invoice owns the latest number', () => {
+
+        const template = {
+            id: 'tpl-1',
+            currentSequentialNumber: 8,
+            useSequentialNumbers: true,
+            invoiceNumberFormat: 'INV-{sequential}'
+        }
+        const invoices = [
+            { id: 'inv-6', templateId: 'tpl-1', invoiceNumber: 'INV-6', createdAt: 1 },
+            { id: 'inv-7', templateId: 'tpl-1', invoiceNumber: 'INV-7', createdAt: 2 },
+        ]
+
+        expect(getInvoiceSequenceRollback(invoices[1], template, invoices)).toEqual({
+            canRollback: true,
+            nextSequentialNumber: 7,
+            reason: null,
+        })
+
+        expect(getInvoiceSequenceRollback(invoices[0], template, invoices)).toEqual({
+            canRollback: false,
+            nextSequentialNumber: null,
+            reason: 'Template sequence has advanced since this invoice was created.',
+        })
+    })
+
+    it('blocks sequence rollback when remaining invoices already use later numbers', () => {
+
+        const template = {
+            id: 'tpl-1',
+            currentSequentialNumber: 8,
+            useSequentialNumbers: true,
+            invoiceNumberFormat: 'INV-{sequential}'
+        }
+        const invoices = [
+            { id: 'inv-7a', templateId: 'tpl-1', invoiceNumber: 'INV-7', createdAt: 1 },
+            { id: 'inv-7b', templateId: 'tpl-1', invoiceNumber: 'INV-7', createdAt: 2 },
+        ]
+
+        expect(getInvoiceSequenceRollback(invoices[1], template, invoices)).toEqual({
+            canRollback: false,
+            nextSequentialNumber: null,
+            reason: 'Existing invoice numbers prevent rewinding the template sequence.',
+        })
     })
 })

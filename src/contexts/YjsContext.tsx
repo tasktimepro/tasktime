@@ -11,6 +11,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { YjsStore, getYjsStore, YjsDocManager, SyncState, SyncPhase, AutoSyncMode, AuthorizationError } from '@/stores/yjs';
 /* eslint-disable react-refresh/only-export-components */
 import type { BackupInfo } from '@/stores/yjs';
+import type { TimeEntry } from '@/stores/yjs/types';
+import type * as Y from 'yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useToast } from '@/hooks/useToast';
 import { shouldSyncOnLoad, wasSyncInterrupted, hasPersistedPendingChanges } from '@/utils/syncPersistence';
@@ -62,7 +64,7 @@ export interface YjsContextValue {
     /** Wipe all TaskTime files from Drive */
     wipeDriveData: () => Promise<void>;
     /** Load time entries for a specific year */
-    loadEntriesForYear: (year: number) => Promise<void>;
+    loadEntriesForYear: (year: number) => Promise<Y.Map<string, TimeEntry>>;
     /** Load archived tasks */
     loadArchivedTasks: () => Promise<void>;
     /** Load archived invoices */
@@ -217,7 +219,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         const syncPreferences = () => {
             const enabled = store.preferences.get('autoSyncEnabled') === true;
             const modeValue = store.preferences.get('autoSyncMode');
-            const mode: AutoSyncMode = modeValue === 'sync' ? 'sync' : 'backup';
+            const mode: AutoSyncMode = modeValue === 'backup' ? 'backup' : 'sync';
 
             setAutoSyncEnabled(enabled);
             setAutoSyncMode(mode);
@@ -491,7 +493,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
     }, [store]);
 
     const loadEntriesForYear = useCallback<YjsContextValue['loadEntriesForYear']>(async (year) => {
-        await store.loadEntriesForYear(year);
+        return store.loadEntriesForYear(year);
     }, [store]);
 
     const loadArchivedTasks = useCallback(async () => {

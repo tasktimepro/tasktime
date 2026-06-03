@@ -26,7 +26,9 @@ const invoiceHookMocks = vi.hoisted(() => ({
 
     invoices: [],
     createInvoice: vi.fn((data) => ({ ...data, id: 'new-invoice-id' })),
-    updateInvoice: vi.fn()
+    updateInvoice: vi.fn(),
+    undoLatestInvoice: vi.fn(),
+    canUndoInvoice: vi.fn(() => false),
 }))
 
 const projectHookMocks = vi.hoisted(() => ({
@@ -84,7 +86,9 @@ vi.mock('../hooks/useInvoices.ts', () => ({
     useInvoices: () => ({
         invoices: invoiceHookMocks.invoices,
         createInvoice: invoiceHookMocks.createInvoice,
-        updateInvoice: invoiceHookMocks.updateInvoice
+        updateInvoice: invoiceHookMocks.updateInvoice,
+        undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
+        canUndoInvoice: invoiceHookMocks.canUndoInvoice,
     })
 }))
 
@@ -158,6 +162,7 @@ vi.mock('./invoice/InvoiceModal', () => {
 
     function MockInvoiceModal({
         showInvoiceForm,
+        handleClose,
         handleHoursChange,
         handleSaveInvoice,
         handleTemplateSelection,
@@ -319,6 +324,7 @@ vi.mock('./invoice/InvoiceModal', () => {
                 >
                     Save Invoice
                 </button>
+                <button type="button" onClick={handleClose}>Close Invoice</button>
             </div>
         )
     }
@@ -488,6 +494,193 @@ describe('InvoiceGenerator', () => {
         ])
         expect(invoiceData.subtotal).toBe(250)
         expect(invoiceData.total).toBe(250)
+    })
+
+    it('restores an in-memory draft after close and reopen in the same context', async () => {
+
+        modalConfig.additionalTask = {
+            title: 'Draft-only item',
+            hours: 2,
+            hourlyRate: 140,
+        }
+
+        const user = userEvent.setup()
+        const draftProject = { id: 'project-draft-restore', title: 'Project', hourlyRate: 100, invoiceIds: [] }
+        const draftTask = { id: 'task-draft-restore', projectId: 'project-draft-restore', title: 'Task', billable: true, hourlyRate: 100 }
+        taskHookMocks.tasks = [draftTask]
+
+        const { unmount } = render(
+            <InvoiceGenerator
+                project={draftProject}
+                client={baseClient}
+                timeEntries={[{ ...baseEntry, id: 'entry-draft-restore', taskId: draftTask.id }]}
+                editingInvoice={null}
+                onInvoiceSaved={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[baseClient]}
+                showButton={true}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Close Invoice' }))
+
+        modalConfig.additionalTask = null
+        unmount()
+
+        render(
+            <InvoiceGenerator
+                project={draftProject}
+                client={baseClient}
+                timeEntries={[{ ...baseEntry, id: 'entry-draft-restore', taskId: draftTask.id }]}
+                editingInvoice={null}
+                onInvoiceSaved={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[baseClient]}
+                showButton={true}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.additionalTasks).toEqual([
+            expect.objectContaining({
+                title: 'Draft-only item',
+                hours: 2,
+                hourlyRate: 140,
+            })
+        ])
+    })
+
+    it('does not restore expired in-memory drafts', async () => {
+
+        const fixedNow = Date.parse('2026-02-01T10:00:00Z')
+        const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow)
+
+        modalConfig.additionalTask = {
+            title: 'Expired draft item',
+            hours: 2,
+            hourlyRate: 140,
+        }
+
+        const user = userEvent.setup()
+        const draftProject = { id: 'project-draft-expiry', title: 'Project', hourlyRate: 100, invoiceIds: [] }
+        const draftTask = { id: 'task-draft-expiry', projectId: 'project-draft-expiry', title: 'Task', billable: true, hourlyRate: 100 }
+        taskHookMocks.tasks = [draftTask]
+
+        try {
+            const { unmount } = render(
+                <InvoiceGenerator
+                    project={draftProject}
+                    client={baseClient}
+                    timeEntries={[{ ...baseEntry, id: 'entry-draft-expiry', taskId: draftTask.id }]}
+                    editingInvoice={null}
+                    onInvoiceSaved={vi.fn()}
+                    paymentMethods={[]}
+                    businessInfos={[]}
+                    clients={[baseClient]}
+                    showButton={true}
+                />
+            )
+
+            await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            await user.click(await screen.findByRole('button', { name: 'Close Invoice' }))
+
+            modalConfig.additionalTask = null
+            unmount()
+            dateNowSpy.mockReturnValue(fixedNow + (13 * 60 * 60 * 1000))
+
+            render(
+                <InvoiceGenerator
+                    project={draftProject}
+                    client={baseClient}
+                    timeEntries={[{ ...baseEntry, id: 'entry-draft-expiry', taskId: draftTask.id }]}
+                    editingInvoice={null}
+                    onInvoiceSaved={vi.fn()}
+                    paymentMethods={[]}
+                    businessInfos={[]}
+                    clients={[baseClient]}
+                    showButton={true}
+                />
+            )
+
+            await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+            expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+            const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+            expect(invoiceData.additionalTasks).toEqual([])
+        } finally {
+            dateNowSpy.mockRestore()
+        }
+    })
+
+    it('keeps in-memory edit drafts scoped to the invoice being edited', async () => {
+
+        modalConfig.additionalTask = {
+            title: 'Invoice one draft item',
+            hours: 1,
+            hourlyRate: 125,
+        }
+
+        const user = userEvent.setup()
+        const firstInvoice = {
+            id: 'inv-draft-one',
+            invoiceNumber: 'INV-DRAFT-ONE',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
+            date: '2026-02-01',
+            createdAt: 111,
+            status: 'sent',
+            template: { id: 'tpl-1', name: 'Template One' }
+        }
+        const secondInvoice = {
+            id: 'inv-draft-two',
+            invoiceNumber: 'INV-DRAFT-TWO',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
+            date: '2026-02-02',
+            createdAt: 222,
+            status: 'sent',
+            template: { id: 'tpl-1', name: 'Template One' }
+        }
+
+        const { rerender } = renderGenerator({
+            editingInvoice: firstInvoice,
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Close Invoice' }))
+
+        modalConfig.additionalTask = null
+
+        rerender(
+            <InvoiceGenerator
+                project={baseProject}
+                client={baseClient}
+                timeEntries={[baseEntry]}
+                editingInvoice={secondInvoice}
+                onInvoiceSaved={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[baseClient]}
+                showButton={true}
+            />
+        )
+
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
+        const [invoiceId, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
+        expect(invoiceId).toBe('inv-draft-two')
+        expect(invoiceData.additionalTasks).toEqual([])
     })
 
     it('preloads flat-rate quote task amounts for flat-rate projects', async () => {
@@ -1067,6 +1260,42 @@ describe('InvoiceGenerator', () => {
             })
             expect(taskHookMocks.updateTask).not.toHaveBeenCalledWith('task-1', {
                 lastBilledAt: fixedNow
+            })
+        } finally {
+            dateNowSpy.mockRestore()
+        }
+    })
+
+    it('stores previous task billing cutoffs for exact invoice undo', async () => {
+
+        const fixedDate = new Date('2026-01-11T10:00:00Z')
+        const fixedNow = fixedDate.getTime()
+        const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow)
+        try {
+            modalConfig.billingPeriodPreset = 'all-time'
+            const user = userEvent.setup()
+
+            taskHookMocks.tasks = [
+                { id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100, lastBilledAt: 500 }
+            ]
+
+            renderGenerator({
+                timeEntries: [
+                    { id: 'entry-1', taskId: 'task-1', start: 1000, end: 3601000 }
+                ]
+            })
+
+            await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+            expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+            const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+            expect(invoiceData.billingStateSnapshot).toEqual({
+                version: 1,
+                capturedAt: fixedNow,
+                taskLastBilledAt: {
+                    'task-1': 500
+                }
             })
         } finally {
             dateNowSpy.mockRestore()

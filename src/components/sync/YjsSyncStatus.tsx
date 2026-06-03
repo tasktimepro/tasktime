@@ -27,7 +27,7 @@ const TooltipContentComponent = TooltipContent as unknown as ComponentType<{
 
 export default function YjsSyncStatus({ className = '', isCompact = false, onActionComplete }: YjsSyncStatusProps) {
 
-    const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled, lastSyncedAt } = useYjs();
+    const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled, autoSyncMode, lastSyncedAt } = useYjs();
     const { signIn, isLoading: authLoading, hadPreviousSession } = useGoogleAuth();
     const { showError } = useToast();
     const { navigateToAccount } = useUrlState();
@@ -89,6 +89,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
             manualSyncInProgress,
             pendingSyncChanges,
             autoSyncEnabled,
+            autoSyncMode,
             isSyncing,
             hasSynced,
             onConnect: handleConnect,
@@ -98,6 +99,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
     }, [
         authLoading,
         autoSyncEnabled,
+        autoSyncMode,
         hadPreviousSession,
         handleCloudOptions,
         handleConnect,

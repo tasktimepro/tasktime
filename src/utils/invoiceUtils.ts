@@ -761,6 +761,112 @@ export const getNextSequentialNumberForTemplate = (
     return Math.max(baseSequentialNumber, Math.max(...usedSequentialNumbers) + 1);
 };
 
+const getLatestInvoice = (invoices: any[] | null | undefined) => {
+
+    const sortedInvoices = (Array.isArray(invoices) ? invoices : [])
+        .filter((invoice) => invoice && typeof invoice === 'object')
+        .slice()
+        .sort((a, b) => getInvoiceSortValue(a) - getInvoiceSortValue(b));
+
+    return sortedInvoices.length > 0
+        ? sortedInvoices[sortedInvoices.length - 1]
+        : null;
+};
+
+export const getLatestUndoableInvoice = (invoices: any[] | null | undefined) => {
+
+    const latestInvoice = getLatestInvoice(invoices);
+    if (!latestInvoice) {
+        return null;
+    }
+
+    return isInvoicePaid(latestInvoice)
+        ? null
+        : latestInvoice;
+};
+
+export const getInvoiceUndoBlockReason = (invoice: any, invoices: any[] | null | undefined) => {
+
+    if (!invoice || typeof invoice !== 'object' || !invoice.id) {
+        return 'Invoice not found.';
+    }
+
+    if (isInvoicePaid(invoice)) {
+        return 'Paid invoices cannot be undone.';
+    }
+
+    const latestUndoableInvoice = getLatestUndoableInvoice(invoices);
+    if (!latestUndoableInvoice) {
+        return 'Only the latest unpaid invoice can be undone.';
+    }
+
+    if (latestUndoableInvoice.id !== invoice.id) {
+        return 'Only the latest unpaid invoice can be undone.';
+    }
+
+    return null;
+};
+
+export const canUndoInvoice = (invoice: any, invoices: any[] | null | undefined) => {
+    return getInvoiceUndoBlockReason(invoice, invoices) === null;
+};
+
+export const getInvoiceSequenceRollback = (
+    invoice: any,
+    template: any,
+    invoices: any[] | null | undefined,
+) => {
+
+    if (!invoice?.id || !template?.id || !template?.useSequentialNumbers) {
+        return {
+            canRollback: false,
+            nextSequentialNumber: null,
+            reason: null,
+        };
+    }
+
+    const currentSequentialNumber = typeof template.currentSequentialNumber === 'number'
+        ? template.currentSequentialNumber
+        : null;
+    const invoiceSequentialNumber = extractSequentialNumber(invoice.invoiceNumber, template);
+
+    if (!currentSequentialNumber || !invoiceSequentialNumber) {
+        return {
+            canRollback: false,
+            nextSequentialNumber: null,
+            reason: null,
+        };
+    }
+
+    const expectedCurrentSequentialNumber = invoiceSequentialNumber + 1;
+
+    if (currentSequentialNumber !== expectedCurrentSequentialNumber) {
+        return {
+            canRollback: false,
+            nextSequentialNumber: null,
+            reason: 'Template sequence has advanced since this invoice was created.',
+        };
+    }
+
+    const remainingSequentialNumbers = getTemplateInvoices(invoices, template.id, invoice.id)
+        .map((existingInvoice) => extractSequentialNumber(existingInvoice?.invoiceNumber, template))
+        .filter((value): value is number => Number.isInteger(value));
+
+    if (remainingSequentialNumbers.some((value) => value >= invoiceSequentialNumber)) {
+        return {
+            canRollback: false,
+            nextSequentialNumber: null,
+            reason: 'Existing invoice numbers prevent rewinding the template sequence.',
+        };
+    }
+
+    return {
+        canRollback: true,
+        nextSequentialNumber: invoiceSequentialNumber,
+        reason: null,
+    };
+};
+
 /**
  * Get invoices for a specific project.
  * @param {Array} invoices

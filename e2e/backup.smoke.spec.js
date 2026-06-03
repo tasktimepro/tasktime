@@ -211,7 +211,8 @@ test.describe('Backup smoke', () => {
 
         await expect(invoiceCard).toBeVisible();
         await expect(invoiceCard).toContainText('RET-2026-004');
-        await invoiceCard.getByTitle('Edit Invoice').click();
+        await invoiceCard.getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
 
         const editDialog = page.getByRole('dialog', { name: 'Edit Invoice' });
         await expect(editDialog).toBeVisible();

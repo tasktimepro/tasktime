@@ -30,6 +30,10 @@ async function updateExchangeRateCache(page, rates) {
     }, rates);
 }
 
+async function openInvoiceActionMenu(invoiceCard) {
+    await invoiceCard.getByRole('button', { name: 'More actions' }).click();
+}
+
 test.describe('Invoices smoke', () => {
 
     test('creates an invoice from tracked time and keeps it after reload', async ({ page }) => {
@@ -179,12 +183,95 @@ test.describe('Invoices smoke', () => {
 
         const invoiceNumber = (await invoiceCard.getByRole('heading').innerText()).trim();
 
+        await openInvoiceActionMenu(invoiceCard);
         const [download] = await Promise.all([
             page.waitForEvent('download'),
-            invoiceCard.getByTitle('Download as PDF').click(),
+            page.getByRole('menuitem', { name: 'Download' }).click(),
         ]);
 
         await expect(download.suggestedFilename()).toBe(`invoice-${invoiceNumber}.pdf`);
+    });
+
+    test('undoes the latest invoice and restores the billed time entry', async ({ page }) => {
+        const now = Date.now();
+        const projectTitle = `Playwright Undo Invoice Project ${now}`;
+        const clientTitle = `Playwright Undo Invoice Client ${now}`;
+        const clientName = `Undo Invoice Client ${now}`;
+        const taskTitle = `Playwright Undo Invoice Task ${now}`;
+        const templateName = `Playwright Undo Template ${now}`;
+
+        await createTrackedInvoice(page, {
+            projectTitle,
+            clientTitle,
+            clientName,
+            taskTitle,
+            templateName,
+        });
+
+        const invoiceCard = getInvoiceCardByProject(page, projectTitle);
+        await expect(invoiceCard).toBeVisible();
+        const invoiceNumber = (await invoiceCard.getByRole('heading').innerText()).trim();
+
+        await openInvoiceActionMenu(invoiceCard);
+        await page.getByRole('menuitem', { name: 'Undo' }).click();
+
+        const undoDialog = page.getByRole('dialog', { name: 'Undo Invoice?' });
+        await expect(undoDialog).toBeVisible();
+        const undoButton = undoDialog.getByRole('button', { name: 'Undo Invoice', exact: true });
+        await expect(undoButton).toBeDisabled();
+
+        await undoDialog.locator('input').fill(invoiceNumber);
+        await expect(undoButton).toBeEnabled();
+        await undoButton.click();
+
+        await expect(undoDialog).not.toBeVisible();
+        await expect(getInvoiceCardByProject(page, projectTitle)).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: /^Invoices$/ })).toBeVisible();
+        await expect(page.getByText('No invoices yet')).toBeVisible();
+
+        await page.reload();
+        await expect(page.getByRole('heading', { name: /^Invoices$/ })).toBeVisible();
+        await expect(page.getByText(`Project: ${projectTitle}`)).toHaveCount(0);
+
+        await page.goto('/projects');
+        await openProjectDashboard(page, projectTitle);
+        await page.getByTitle('View Time Entries').click();
+
+        const timeEntriesDialog = page.getByRole('dialog', { name: `Time Entries - ${taskTitle}` });
+        await expect(timeEntriesDialog.getByRole('heading', { name: 'Current Time Entries (1)' })).toBeVisible();
+        await expect(timeEntriesDialog.getByText('Billed Time Entries')).toHaveCount(0);
+    });
+
+    test('does not expose undo for paid invoices', async ({ page }) => {
+        const now = Date.now();
+        const projectTitle = `Playwright Paid Guard Invoice Project ${now}`;
+        const clientTitle = `Playwright Paid Guard Invoice Client ${now}`;
+        const clientName = `Paid Guard Invoice Client ${now}`;
+        const taskTitle = `Playwright Paid Guard Invoice Task ${now}`;
+        const templateName = `Playwright Paid Guard Template ${now}`;
+
+        await createTrackedInvoice(page, {
+            projectTitle,
+            clientTitle,
+            clientName,
+            taskTitle,
+            templateName,
+        });
+
+        const invoiceCard = getInvoiceCardByProject(page, projectTitle);
+        await expect(invoiceCard).toBeVisible();
+        await invoiceCard.getByRole('button', { name: 'Mark as Paid' }).click();
+
+        await page.getByRole('tab', { name: /^Paid \(1\)$/ }).click();
+
+        const paidInvoiceCard = getInvoiceCardByProject(page, projectTitle);
+        await expect(paidInvoiceCard).toBeVisible();
+        await expect(paidInvoiceCard).toContainText('Paid');
+
+        await openInvoiceActionMenu(paidInvoiceCard);
+        await expect(page.getByRole('menuitem', { name: 'Download' })).toBeVisible();
+        await expect(page.getByRole('menuitem', { name: 'Edit' })).toBeVisible();
+        await expect(page.getByRole('menuitem', { name: 'Undo' })).toHaveCount(0);
     });
 
     test('uses a project billed minimum for invoice totals while keeping actual worked time visible', async ({ page }) => {

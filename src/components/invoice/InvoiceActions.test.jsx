@@ -13,7 +13,7 @@ describe('InvoiceActions', () => {
         render(
             <InvoiceActions
                 editingInvoice={null}
-                handleCancel={vi.fn()}
+                handleClose={vi.fn()}
                 onPreview={onPreview}
             />
         )
@@ -33,12 +33,14 @@ describe('InvoiceActions', () => {
         render(
             <InvoiceActions
                 editingInvoice={null}
-                handleCancel={vi.fn()}
+                handleClose={vi.fn()}
                 onPreview={vi.fn()}
             />
         )
 
         expect(screen.getByRole('button', { name: 'Generate Invoice' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Generate New Invoice' })).not.toBeInTheDocument()
     })
 
@@ -49,7 +51,7 @@ describe('InvoiceActions', () => {
         render(
             <InvoiceActions
                 editingInvoice={null}
-                handleCancel={vi.fn()}
+                handleClose={vi.fn()}
                 onPreview={vi.fn()}
                 mode="quote"
                 onSend={onSend}
@@ -66,6 +68,24 @@ describe('InvoiceActions', () => {
 
         await user.click(sendButton)
         expect(onSend).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows an undo action for undoable invoice edits', async () => {
+        const user = userEvent.setup()
+        const onUndoInvoice = vi.fn()
+
+        render(
+            <InvoiceActions
+                editingInvoice={{ id: 'inv-1' }}
+                handleClose={vi.fn()}
+                onPreview={vi.fn()}
+                canUndoInvoice
+                onUndoInvoice={onUndoInvoice}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Undo Invoice' }))
+        expect(onUndoInvoice).toHaveBeenCalledTimes(1)
     })
 
 })

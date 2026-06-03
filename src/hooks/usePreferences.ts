@@ -23,7 +23,7 @@ const DEFAULT_PREFERENCES: Preferences = {
     projectSort: 'createdAt',
     clientSort: 'createdAt',
     autoSyncEnabled: false,
-    autoSyncMode: 'backup',
+    autoSyncMode: 'sync',
     weeklyGoalTargetHours: null,
     weeklyGoalTargetEarnings: null,
     systemNotificationsEnabled: false,

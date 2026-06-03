@@ -392,8 +392,8 @@ const ProjectList = ({
                 <CardContent className="flex min-h-full flex-1 flex-col p-4 sm:pt-5">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="truncate text-base font-medium text-foreground sm:text-lg">
+                            <div className="flex flex-wrap items-start gap-2">
+                                <h3 className="min-w-0 flex-1 whitespace-normal break-words [overflow-wrap:anywhere] text-base font-medium leading-tight text-foreground sm:text-lg">
                                     {project.title}
                                 </h3>
                                 {archived && (
@@ -442,7 +442,7 @@ const ProjectList = ({
                                     onClick={(e) => e.stopPropagation()}
                                     variant="ghost"
                                     size="icon"
-                                    className="rounded-full text-muted-foreground hover:bg-muted"
+                                    className="shrink-0 rounded-full text-muted-foreground hover:bg-muted"
                                     title="More actions"
                                     aria-label="More actions"
                                 >

@@ -2,18 +2,11 @@
 
 ## Priority
 
-[ ] I have some customers that have created an invoice by mistake, or made some mistakes, and they don't want to leave it there. I was thinking that the best option for now is that we pass a query in the URL like ?deleteMode=1 and that would enable the current session to allow deleting of invoices?
-    [ ] Or should we just add the delete option and then it's up to them?
-    [ ] Warning message about deleting
-    [ ] Check about sequential numbering and if future invoices were already sent
-    [ ] Undo all billed time entries for tasks under that invoice
-    [ ] Basically undo invoice state as if it was never generated before
-    [ ] I think this should be only available for the last invoice generated - so if another one is generated, then you can only delete the latest one - this way we can easily revert mistakes, but not allowing accidental deletion of other submitted invoices
+[ ] Manually test undo invoice and more invoices generations
 
-[ ] Cancel invoice implementation that should place invoice in a canceled tab and handled properyly in all the reporting areas necessary!
-    [ ] Also think about about whether currently billed items will become active again/undo billed state?
-    [ ] If you cancel an invoice and there is no other future invoice, should the next one take the same sequential number or not?
+[ ] When I generated the invoice with the date filter to last month, it should have reverted that back to all time - this only applies to if we close the invoice modal, not when we submit, it should revert that
 
+[ ] Would be nice to add month property in the email template subject, and to also have the option to forward the email to the sender too - but it should also count as the sum of total emails left, so that would be two emails.
 
 ---
 
@@ -31,6 +24,15 @@
 
 [ ] Task Templates - Create “global” tasks which are assigned a category/tag and these can be assigned to all projects for that category by default (or at a click of a button → import default tasks for this project category)
     [ ] This would be a button under projects page “Create task templates”, then when creating a new project, we can choose a task template to be added
+
+---
+
+## Invoice updates
+
+[ ] Cancel invoice implementation that should place invoice in a canceled tab and handled properyly in all the reporting areas necessary!
+    [ ] Also think about about whether currently billed items will become active again/undo billed state?
+    [ ] If you cancel an invoice and there is no other future invoice, should the next one take the same sequential number or not?
+    [ ] Really think about how an invoice cancellation is typically handled in a system like ours and make sure we do the minimal necessities but not overcomplicate things
 
 ---
 

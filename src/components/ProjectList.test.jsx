@@ -185,6 +185,32 @@ describe('ProjectList', () => {
         expect(onSelectProject).toHaveBeenCalledWith(expect.objectContaining({ id: 'project-1' }))
     })
 
+    it('wraps long project titles instead of truncating them', () => {
+        const longTitle = 'New AI with a very very long title here that will not fit on one line'
+
+        projectsHookMocks.projects = [
+            { id: 'project-1', title: longTitle, createdAt: Date.now(), archived: false }
+        ]
+
+        render(
+            <ProjectList
+                onSelectProject={vi.fn()}
+                clients={[]}
+                openProjectModal={vi.fn()}
+                editProjectModal={vi.fn()}
+            />
+        )
+
+        const title = screen.getByRole('heading', { name: longTitle })
+        const menuButton = screen.getByRole('button', { name: 'More actions' })
+
+        expect(title.className).toContain('whitespace-normal')
+        expect(title.className).toContain('break-words')
+        expect(title.className).toContain('[overflow-wrap:anywhere]')
+        expect(title.className).not.toContain('truncate')
+        expect(menuButton.className).toContain('shrink-0')
+    })
+
     it('keeps the header actions inline with flexible wrapping instead of forcing a mobile stack', () => {
         render(
             <ProjectList

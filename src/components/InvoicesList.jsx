@@ -3,10 +3,13 @@ import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon, Pl
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
-import { Send, Bell } from 'lucide-react';
+import { Send, Bell, MoreHorizontal, RotateCcw } from 'lucide-react';
 import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
@@ -14,7 +17,15 @@ import { useUrlState } from '../hooks/useUrlState.ts';
 import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { getInvoiceProjectTitle, getInvoiceStatus, getInvoiceTotal, isInvoiceOverdue, isInvoicePaid } from '../utils/invoiceUtils.ts';
+import {
+    getInvoiceProjectTitle,
+    getInvoiceSequenceRollback,
+    getInvoiceStatus,
+    getInvoiceTotal,
+    isInvoiceOverdue,
+    isInvoicePaid,
+    resolveCurrentInvoiceTemplate,
+} from '../utils/invoiceUtils.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
@@ -44,10 +55,19 @@ const InvoicesList = ({
     const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
     const [emailInvoice, setEmailInvoice] = useState(null);
     const [emailSendType, setEmailSendType] = useState('invoice');
+    const [pendingUndoInvoice, setPendingUndoInvoice] = useState(null);
+    const [undoConfirmationText, setUndoConfirmationText] = useState('');
+    const [isUndoingInvoice, setIsUndoingInvoice] = useState(false);
     const { updateUrl } = useUrlState();
     
     // Yjs hook for invoice updates
-    const { markAsPaid, markAsUnpaid } = useInvoices();
+    const {
+        invoices: allActiveInvoices,
+        markAsPaid,
+        markAsUnpaid,
+        undoLatestInvoice,
+        canUndoInvoice,
+    } = useInvoices();
 
     // Filter out soft-deleted invoices (projectInvoices already filtered by parent)
     const activeInvoices = useMemo(() => projectInvoices, [projectInvoices]);
@@ -193,6 +213,63 @@ const InvoicesList = ({
         setEmailInvoice(null);
     }, []);
 
+    const handleOpenUndoModal = useCallback((invoice) => {
+        setPendingUndoInvoice(invoice);
+        setUndoConfirmationText('');
+    }, []);
+
+    const handleCloseUndoModal = useCallback(() => {
+        if (isUndoingInvoice) {
+            return;
+        }
+
+        setPendingUndoInvoice(null);
+        setUndoConfirmationText('');
+    }, [isUndoingInvoice]);
+
+    const handleConfirmUndoInvoice = useCallback(async () => {
+        if (!pendingUndoInvoice) {
+            return;
+        }
+
+        const invoiceToUndo = pendingUndoInvoice;
+        const expectedConfirmation = invoiceToUndo.invoiceNumber || '';
+        if (undoConfirmationText.trim() !== expectedConfirmation) {
+            showToast(`Type ${expectedConfirmation} to confirm.`, 'error');
+            return;
+        }
+
+        setIsUndoingInvoice(true);
+        setPendingUndoInvoice(null);
+        setUndoConfirmationText('');
+
+        try {
+            const result = await undoLatestInvoice(invoiceToUndo.id);
+
+            if (selectedInvoice?.id === invoiceToUndo.id) {
+                setShowPreview(false);
+                setSelectedInvoice(null);
+            }
+
+            if (emailInvoice?.id === invoiceToUndo.id) {
+                setEmailInvoice(null);
+            }
+
+            const sequenceMessage = result?.rewoundSequence
+                ? ' Next invoice number was restored.'
+                : '';
+
+            showToast(
+                `Invoice ${result?.invoiceNumber || invoiceToUndo.invoiceNumber} undone. ${result?.clearedTimeEntryCount || 0} billed entr${result?.clearedTimeEntryCount === 1 ? 'y' : 'ies'} restored, ${result?.deletedAdjustmentCount || 0} invoice adjustment${result?.deletedAdjustmentCount === 1 ? '' : 's'} removed, and ${result?.unbilledExpenseCount || 0} expense${result?.unbilledExpenseCount === 1 ? '' : 's'} unbilled.${sequenceMessage}`,
+                'success'
+            );
+        } catch (error) {
+            showToast(error.message || 'Unable to undo this invoice.', 'error');
+        } finally {
+            setIsUndoingInvoice(false);
+        }
+    }, [emailInvoice, pendingUndoInvoice, selectedInvoice, showToast, undoConfirmationText, undoLatestInvoice]);
+
     /**
      * Handle invoice edit
      */
@@ -332,6 +409,7 @@ const InvoicesList = ({
                         const invoiceStatus = getInvoiceStatus(invoice);
                         const invoiceIsPaid = isInvoicePaid(invoice);
                         const invoiceIsOverdue = isInvoiceOverdue(invoice);
+                        const invoiceCanBeUndone = canUndoInvoice(invoice);
 
                         return (
                             <Card
@@ -516,15 +594,6 @@ const InvoicesList = ({
                                             </Button>
                                         )}
                                         <Button
-                                            onClick={() => handleEdit(invoice)}
-                                            variant="ghost"
-                                            size="icon"
-                                            title="Edit Invoice"
-                                        >
-                                            <PencilIcon className="h-5 w-5" />
-                                        </Button>
-                                        
-                                        <Button
                                             onClick={() => handlePreview(invoice)}
                                             variant="ghost"
                                             size="icon"
@@ -532,15 +601,45 @@ const InvoicesList = ({
                                         >
                                             <EyeIcon className="h-5 w-5" />
                                         </Button>
-                                        
-                                        <Button
-                                            onClick={() => handleDownload(invoice)}
-                                            variant="ghost"
-                                            size="icon"
-                                            title="Download as PDF"
-                                        >
-                                            <ArrowDownTrayIcon className="h-5 w-5" />
-                                        </Button>
+
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-md text-muted-foreground transition-colors hover:bg-accent"
+                                                    title="More actions"
+                                                    aria-label="More actions"
+                                                >
+                                                    <MoreHorizontal className="h-5 w-5" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                    onClick={() => handleDownload(invoice)}
+                                                    className="cursor-pointer hover:bg-accent focus:bg-accent"
+                                                >
+                                                    <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+                                                    <span>Download</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => handleEdit(invoice)}
+                                                    className="cursor-pointer hover:bg-accent focus:bg-accent"
+                                                >
+                                                    <PencilIcon className="h-4 w-4 mr-2" />
+                                                    <span>Edit</span>
+                                                </DropdownMenuItem>
+                                                {invoiceCanBeUndone && (
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleOpenUndoModal(invoice)}
+                                                        className="status-danger-action cursor-pointer"
+                                                    >
+                                                        <RotateCcw className="h-4 w-4 mr-2" />
+                                                        <span>Undo</span>
+                                                    </DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
                                 </div>
                                 </div>
@@ -704,6 +803,99 @@ const InvoicesList = ({
                     title="This invoice is marked as paid. Continue anyway?"
                     variant="warning"
                 />
+            </Modal>
+
+            <Modal
+                isOpen={Boolean(pendingUndoInvoice)}
+                onClose={handleCloseUndoModal}
+                title="Undo Invoice?"
+                footer={(
+                    <div className="flex justify-end space-x-3">
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmUndoInvoice}
+                            loading={isUndoingInvoice}
+                            loadingText="Undoing Invoice"
+                            disabled={undoConfirmationText.trim() !== (pendingUndoInvoice?.invoiceNumber || '')}
+                        >
+                            Undo Invoice
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={handleCloseUndoModal}
+                            disabled={isUndoingInvoice}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                )}
+            >
+                {pendingUndoInvoice && (() => {
+                    const template = resolveCurrentInvoiceTemplate(pendingUndoInvoice, invoiceTemplates);
+                    const sequenceRollback = getInvoiceSequenceRollback(pendingUndoInvoice, template, allActiveInvoices);
+
+                    return (
+                        <div className="space-y-4">
+                            <Notice
+                                title="This will restore billing state as if the invoice was never generated."
+                                variant="warning"
+                            >
+                                <p>
+                                    The invoice record will be removed, billed time entries will be restored, invoice adjustments deleted, quoted flat amounts released, and linked expenses marked unbilled again.
+                                </p>
+                            </Notice>
+
+                            <div className="space-y-1 text-sm text-muted-foreground">
+                                <p>
+                                    Invoice: <span className="font-medium text-foreground">{pendingUndoInvoice.invoiceNumber}</span>
+                                </p>
+                                <p>
+                                    Client: <span className="font-medium text-foreground">
+                                        {(() => {
+                                            if (pendingUndoInvoice.clientId) {
+                                                const client = clients.find((candidate) => candidate.id === pendingUndoInvoice.clientId);
+                                                if (client) {
+                                                    return client.clientName;
+                                                }
+                                            }
+
+                                            return pendingUndoInvoice.client?.name || 'Unknown';
+                                        })()}
+                                    </span>
+                                </p>
+                                <p>
+                                    Total: <span className="font-medium text-foreground sensitive-data">
+                                        {getCurrencySymbol(pendingUndoInvoice.currency || getPreferredCurrency())}{getInvoiceTotal(pendingUndoInvoice).toFixed(2)}
+                                    </span>
+                                </p>
+                                <p>
+                                    Invoice number sequence: <span className="font-medium text-foreground">
+                                        {sequenceRollback.canRollback
+                                            ? 'Will be restored'
+                                            : 'Will stay as-is'}
+                                    </span>
+                                </p>
+                                {sequenceRollback.reason && (
+                                    <p>{sequenceRollback.reason}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="undo-invoice-confirmation" className="block">
+                                    Type <strong>{pendingUndoInvoice.invoiceNumber}</strong> to confirm:
+                                </Label>
+                                <Input
+                                    id="undo-invoice-confirmation"
+                                    type="text"
+                                    value={undoConfirmationText}
+                                    onChange={(event) => setUndoConfirmationText(event.target.value)}
+                                    placeholder={pendingUndoInvoice.invoiceNumber}
+                                    disabled={isUndoingInvoice}
+                                />
+                            </div>
+                        </div>
+                    );
+                })()}
             </Modal>
         </div>
     );

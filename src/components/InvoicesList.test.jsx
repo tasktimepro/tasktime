@@ -8,8 +8,11 @@ const updateUrlMock = vi.fn()
 
 const invoiceHookMocks = vi.hoisted(() => ({
 
+    invoices: [],
     markAsPaid: vi.fn(),
     markAsUnpaid: vi.fn(),
+    undoLatestInvoice: vi.fn(),
+    canUndoInvoice: vi.fn(() => false),
 }))
 
 const businessBrandAssetHookMocks = vi.hoisted(() => ({
@@ -43,8 +46,11 @@ vi.mock('../hooks/useUrlState.ts', () => ({
 vi.mock('../hooks/useInvoices.ts', () => ({
 
     useInvoices: () => ({
+        invoices: invoiceHookMocks.invoices,
         markAsPaid: invoiceHookMocks.markAsPaid,
         markAsUnpaid: invoiceHookMocks.markAsUnpaid,
+        undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
+        canUndoInvoice: invoiceHookMocks.canUndoInvoice,
     })
 }))
 
@@ -85,6 +91,17 @@ describe('InvoicesList', () => {
         invoiceHookMocks.markAsPaid.mockResolvedValue(undefined)
         invoiceHookMocks.markAsUnpaid.mockReset()
         invoiceHookMocks.markAsUnpaid.mockReturnValue(undefined)
+        invoiceHookMocks.invoices = []
+        invoiceHookMocks.undoLatestInvoice.mockReset()
+        invoiceHookMocks.undoLatestInvoice.mockResolvedValue({
+            invoiceNumber: 'INV-001',
+            clearedTimeEntryCount: 1,
+            deletedAdjustmentCount: 0,
+            unbilledExpenseCount: 1,
+            rewoundSequence: true,
+        })
+        invoiceHookMocks.canUndoInvoice.mockReset()
+        invoiceHookMocks.canUndoInvoice.mockReturnValue(false)
         pdfMocks.generatePDF.mockClear()
         pdfMocks.createInvoiceHTML.mockClear()
         pdfMocks.getCurrentInvoiceHtmlContent.mockClear()
@@ -264,6 +281,104 @@ describe('InvoicesList', () => {
         expect(matches.length).toBeGreaterThan(0)
     })
 
+    it('shows the undo latest invoice action only for eligible invoices', () => {
+
+        invoiceHookMocks.canUndoInvoice.mockImplementation((invoice) => invoice.id === 'inv-latest')
+
+        render(
+            <InvoicesList
+                projectInvoices={[
+                    {
+                        ...baseInvoice,
+                        id: 'inv-old',
+                        invoiceNumber: 'INV-OLD',
+                        dueDate: '2099-01-01'
+                    },
+                    {
+                        ...baseInvoice,
+                        id: 'inv-latest',
+                        invoiceNumber: 'INV-LATEST',
+                        dueDate: '2099-01-02'
+                    }
+                ]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        expect(screen.getAllByRole('button', { name: 'More actions' })).toHaveLength(2)
+    })
+
+    it('requires typing the invoice number before undoing the latest invoice', async () => {
+
+        invoiceHookMocks.canUndoInvoice.mockReturnValue(true)
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', clientName: 'Client Co' }]}
+                invoiceTemplates={[{ id: 'tpl-1', name: 'Default Template', useSequentialNumbers: true, currentSequentialNumber: 2, invoiceNumberFormat: 'INV-{sequential}' }]}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Undo' }))
+
+        expect(screen.getByLabelText(/Type INV-001 to confirm/i)).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Undo Invoice' })).toBeDisabled()
+
+        await user.type(screen.getByLabelText(/Type INV-001 to confirm/i), 'INV-001')
+        expect(screen.getByRole('button', { name: 'Undo Invoice' })).toBeEnabled()
+
+        await user.click(screen.getByRole('button', { name: 'Undo Invoice' }))
+
+        await waitFor(() => {
+            expect(invoiceHookMocks.undoLatestInvoice).toHaveBeenCalledWith('inv-1')
+        })
+    })
+
+    it('uses all active invoices when showing sequence rollback safety', async () => {
+
+        invoiceHookMocks.canUndoInvoice.mockReturnValue(true)
+        const sequenceInvoice = {
+            ...baseInvoice,
+            templateId: 'tpl-1',
+        }
+        invoiceHookMocks.invoices = [
+            sequenceInvoice,
+            {
+                ...sequenceInvoice,
+                id: 'inv-other-project',
+                invoiceNumber: 'INV-002',
+                projectId: 'project-2',
+                createdAt: 2,
+            }
+        ]
+
+        render(
+            <InvoicesList
+                projectInvoices={[sequenceInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', clientName: 'Client Co' }]}
+                invoiceTemplates={[{ id: 'tpl-1', name: 'Default Template', useSequentialNumbers: true, currentSequentialNumber: 2, invoiceNumberFormat: 'INV-{sequential}' }]}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Undo' }))
+
+        expect(screen.getByText('Will stay as-is')).toBeInTheDocument()
+        expect(screen.getByText('Existing invoice numbers prevent rewinding the template sequence.')).toBeInTheDocument()
+    })
+
     it('shows a sent badge for emailed invoices', () => {
 
         const sentInvoice = {
@@ -327,7 +442,8 @@ describe('InvoicesList', () => {
             />
         )
 
-        await user.click(screen.getByTitle('Edit Invoice'))
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Edit' }))
 
         expect(screen.getByText('Edit paid invoice?')).toBeInTheDocument()
 
