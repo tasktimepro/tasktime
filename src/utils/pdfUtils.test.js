@@ -59,6 +59,7 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Shipping: <strong>$10.00</strong>')
         expect(html).toContain('Tax (10.0%): <strong>$19.00</strong>')
         expect(html).toContain('Total: $209.00')
+        expect(html).toContain('margin: 6px 0 0 0; font-size: 24px; color: #111827;')
     })
 
     it('renders total hours beside subtotal when hourly columns exist', () => {
@@ -228,6 +229,8 @@ describe('createInvoiceHTML', () => {
 
         expect(html).not.toContain('Project total hours:')
         expect(html).not.toContain('Project subtotal:')
+        expect(html).toMatch(/<div class="invoice-project-section" style="margin-bottom: 36px;">\s*<h3[^>]*>Hourly Project<\/h3>/)
+        expect(html).toMatch(/<div class="invoice-project-section" style="margin-bottom: 24px;">\s*<h3[^>]*>Flat Project<\/h3>/)
         expect(html).toContain('Additional expenses subtotal: <strong>$75.00</strong>')
         expect(html).not.toContain('Total hours: <strong>4.00</strong>')
         expect(html).toContain('Subtotal: <strong>$775.00</strong>')
@@ -436,7 +439,7 @@ describe('createInvoiceHTML', () => {
         })
 
         expect(html).toContain('<div style="width: 100%; height: 3px; background-color: #1f2937; margin-bottom: 28px;"></div>')
-        expect(html).toContain('font-size: 24px; color: #374151;')
+        expect(html).toContain('margin: 6px 0 0 0; font-size: 24px; color: #111827;')
         expect(html).not.toContain('font-size: 24px; color: #1f2937;')
     })
 

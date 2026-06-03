@@ -92,6 +92,14 @@ const ExpenseRow = ({
             </Badge>
         );
     })();
+    const billedBadge = expense.billable && expense.billingStatus === 'billed'
+        ? (
+            <Badge variant="secondary">
+                <CheckIcon className="mr-1 h-3 w-3" />
+                Billed
+            </Badge>
+        )
+        : null;
 
     return (
         <Card
@@ -123,7 +131,8 @@ const ExpenseRow = ({
                             )}
                         </div>
                     </div>
-                    <div>
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                        {billedBadge}
                         {statusBadge}
                     </div>
                 </div>
@@ -179,13 +188,6 @@ const ExpenseRow = ({
                                             {category.name}
                                         </span>
                                     </p>
-                                )}
-                                {expense.billable && expense.billingStatus === 'billed' && (
-                                    <div>
-                                        <Badge variant="success">
-                                            Billed
-                                        </Badge>
-                                    </div>
                                 )}
                             </div>
                         )}

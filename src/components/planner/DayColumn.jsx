@@ -72,7 +72,6 @@ const DayColumn = ({
 
     const popoverAlign = isLastColumn ? 'end' : 'start';
     const columnBackgroundClass = isToday ? 'bg-muted/80 dark:bg-muted/10' : 'bg-card';
-
     // Format total time as Xh Ym
     const formatTotalTime = (ms) => {
         if (!ms || ms <= 0) return null;
@@ -192,7 +191,6 @@ const DayColumn = ({
                         <div
                             className={cn(
                                 "px-2 pb-2 transition-opacity absolute bottom-0 left-0 w-full z-10 rounded-b-lg",
-                                columnBackgroundClass,
                                 isToday ? "opacity-100" : "opacity-0 group-hover:opacity-100",
                                 !isToday && "pointer-events-none group-hover:pointer-events-auto"
                             )}
@@ -210,8 +208,18 @@ const DayColumn = ({
 
                     {/* Footer - Daily total time */}
                     {!shouldShowProgress && formattedTime && (
-                        <div className="px-2 py-1.5 border-t border-border absolute bottom-0 left-0 w-full z-10 bg-card/80 backdrop-blur-sm rounded-b-lg">
-                            <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                        <div
+                            className={cn(
+                                "px-2 py-1.5 absolute bottom-0 left-0 w-full z-10 rounded-b-lg"
+                            )}
+                        >
+                            <div
+                                className={cn(
+                                    "flex items-center justify-center gap-1.5 rounded-md border border-border",
+                                    "px-2 py-2 text-xs text-muted-foreground backdrop-blur-sm transition-colors",
+                                    "hover:bg-card/95"
+                                )}
+                            >
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
                                     viewBox="0 0 20 20"

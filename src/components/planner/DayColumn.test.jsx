@@ -30,21 +30,24 @@ describe('DayColumn', () => {
         onSetDailyGoal: vi.fn(),
     };
 
-    it('uses the column background on the desktop hover footer for regular days', () => {
+    it('keeps the desktop hover footer wrapper transparent for regular days', () => {
         render(<DayColumn {...baseProps} />);
 
         const footer = screen.getByText('Daily goal progress').parentElement;
 
         expect(footer).not.toBeNull();
-        expect(footer.className).toContain('bg-card');
+        expect(footer.className).not.toContain('bg-card/95');
+        expect(footer.className).not.toContain('backdrop-blur-sm');
     });
 
-    it('uses the today column background on the desktop hover footer for today', () => {
+    it('keeps the desktop hover footer wrapper transparent for today', () => {
         render(<DayColumn {...baseProps} isToday={true} />);
 
         const footer = screen.getByText('Daily goal progress').parentElement;
 
         expect(footer).not.toBeNull();
-        expect(footer.className).toContain('bg-muted/80');
+        expect(footer.className).not.toContain('bg-card/95');
+        expect(footer.className).not.toContain('backdrop-blur-sm');
     });
+
 });

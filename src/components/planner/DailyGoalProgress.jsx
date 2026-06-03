@@ -53,7 +53,8 @@ const DailyGoalProgress = ({
             onClick={onEditGoal}
             className={cn(
                 "w-full text-left space-y-2 rounded-md border border-dashed border-border",
-                "px-2 py-2 hover:bg-muted/40 transition-colors"
+                "px-2 py-2 backdrop-blur-sm transition-colors",
+                "hover:bg-card/95"
             )}
         >
             {shouldShowEarnings && (

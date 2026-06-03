@@ -77,4 +77,50 @@ describe('ExpenseRow', () => {
         expect(screen.getByText('Project:')).toBeInTheDocument();
         expect(screen.getByText('Health AI')).toBeInTheDocument();
     });
+
+    it('renders billed expenses in the top-right badge row for both full and compact cards', () => {
+        const expense = {
+            id: 'expense-1',
+            title: 'Client software',
+            date: '2026-04-12',
+            amount: 40,
+            currency: 'EUR',
+            paymentStatus: 'paid',
+            billingStatus: 'billed',
+            billable: true,
+            isPersonal: false,
+        };
+
+        const { rerender } = render(
+            <ExpenseRow
+                expense={expense}
+                onEdit={vi.fn()}
+                onTogglePaid={vi.fn()}
+            />
+        );
+
+        const billedBadge = screen.getByText('Billed').closest('div');
+
+        expect(billedBadge).not.toBeNull();
+        expect(billedBadge.className.includes('bg-secondary')).toBe(true);
+        expect(billedBadge.querySelector('svg')).not.toBeNull();
+        expect(screen.getByText('Paid')).toBeInTheDocument();
+        expect(screen.queryByText('Unbilled')).not.toBeInTheDocument();
+
+        rerender(
+            <ExpenseRow
+                compact
+                expense={expense}
+                onEdit={vi.fn()}
+                onTogglePaid={vi.fn()}
+            />
+        );
+
+        const compactBilledBadge = screen.getByText('Billed').closest('div');
+
+        expect(compactBilledBadge).not.toBeNull();
+        expect(compactBilledBadge.className.includes('bg-secondary')).toBe(true);
+        expect(compactBilledBadge.querySelector('svg')).not.toBeNull();
+        expect(screen.getByText('Paid')).toBeInTheDocument();
+    });
 });

@@ -8,6 +8,7 @@
     [ ] Check about sequential numbering and if future invoices were already sent
     [ ] Undo all billed time entries for tasks under that invoice
     [ ] Basically undo invoice state as if it was never generated before
+    [ ] I think this should be only available for the last invoice generated - so if another one is generated, then you can only delete the latest one - this way we can easily revert mistakes, but not allowing accidental deletion of other submitted invoices
 
 [ ] Cancel invoice implementation that should place invoice in a canceled tab and handled properyly in all the reporting areas necessary!
     [ ] Also think about about whether currently billed items will become active again/undo billed state?

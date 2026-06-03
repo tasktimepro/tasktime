@@ -334,7 +334,7 @@ export const generatePDFBase64 = (htmlContent: string): Promise<string> => {
     });
 };
 
-const DEFAULT_INVOICE_ACCENT_COLOR = '#374151';
+const DEFAULT_INVOICE_ACCENT_COLOR = '#111827';
 
 const resolveInvoiceBranding = (invoiceData: InvoiceData) => {
     const templateBranding = invoiceData.template?.brandingOptions;
@@ -594,6 +594,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         : 'color: #333; margin-bottom: 15px;';
     const minimalPaymentLabelStyle = 'color: inherit; font-weight: 400;';
     const totalTextColor = DEFAULT_INVOICE_ACCENT_COLOR;
+    const totalMarginTop = '6px';
     const invoiceDocumentFontFamily = 'Arial, sans-serif';
     const invoiceDocumentPadding = '0 0 12px 0';
     const renderPaymentDetailLine = (label: string, value?: string) => {
@@ -717,9 +718,9 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                             <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(currency)}${tax.toFixed(2)}</strong></p>
                         ` : ''}
 
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: ${totalTextColor}; ${totalDividerStyle}"><strong>Total: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
+                        <p style="margin: ${totalMarginTop} 0 0 0; font-size: 24px; color: ${totalTextColor}; ${totalDividerStyle}"><strong>Total: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
                     ` : `
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: ${totalTextColor};"><strong>Total${totalHours && parseFloat(String(totalHours)) > 0 ? ` (${parseFloat(String(totalHours)).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
+                        <p style="margin: ${totalMarginTop} 0 0 0; font-size: 24px; color: ${totalTextColor};"><strong>Total${totalHours && parseFloat(String(totalHours)) > 0 ? ` (${parseFloat(String(totalHours)).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
                     `}
                 </div>
             </div>
@@ -908,12 +909,14 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             && originalAdditionalTasks.every((task) => !usesFlatRateForTask(task))
             && clientExpenseItems.length === 0
             && invoiceOnlyExpenseItems.length === 0;
-        const projectSectionsMarkup = projectBreakdowns.map((breakdown) => {
+        const projectSectionsMarkup = projectBreakdowns.map((breakdown, index) => {
             const projectLineItemCount = (breakdown.tasks?.length || 0) + (breakdown.expenseItems?.length || 0);
             const shouldRenderProjectSummary = projectBreakdowns.length === 1 || projectLineItemCount > 1;
+            const hasProjectBelow = index < projectBreakdowns.length - 1;
+            const projectSectionMarginBottom = !shouldRenderProjectSummary && hasProjectBelow ? 36 : 24;
 
             return `
-                <div class="invoice-project-section" style="margin-bottom: 24px;">
+                <div class="invoice-project-section" style="margin-bottom: ${projectSectionMarginBottom}px;">
                     <h3 style="${groupedSectionHeadingStyle}">${breakdown.projectTitle}</h3>
                     ${renderLineItemsTable(breakdown.tasks || [], breakdown.expenseItems || [], 'Project subtotal', breakdown.subtotal, { showSubtotalRow: false })}
                     ${shouldRenderProjectSummary ? renderGroupedSectionSummary({
@@ -1299,9 +1302,9 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                             <p style="margin: 5px 0; font-size: 16px;">${taxLabel || 'Tax'} (${(taxRate || 0).toFixed(1)}%): <strong>${getCurrencySymbol(currency)}${tax.toFixed(2)}</strong></p>
                         ` : ''}
 
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: ${totalTextColor}; ${totalDividerStyle}"><strong>Total: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
+                        <p style="margin: ${totalMarginTop} 0 0 0; font-size: 24px; color: ${totalTextColor}; ${totalDividerStyle}"><strong>Total: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
                     ` : `
-                        <p style="margin: 10px 0 0 0; font-size: 24px; color: ${totalTextColor};"><strong>Total${totalHours && parseFloat(String(totalHours)) > 0 ? ` (${parseFloat(String(totalHours)).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
+                        <p style="margin: ${totalMarginTop} 0 0 0; font-size: 24px; color: ${totalTextColor};"><strong>Total${totalHours && parseFloat(String(totalHours)) > 0 ? ` (${parseFloat(String(totalHours)).toFixed(2)} hours)` : ''}: ${getCurrencySymbol(currency)}${resolvedTotal.toFixed(2)}</strong></p>
                     `}
                 </div>
             </div>
