@@ -908,18 +908,23 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
             && originalAdditionalTasks.every((task) => !usesFlatRateForTask(task))
             && clientExpenseItems.length === 0
             && invoiceOnlyExpenseItems.length === 0;
-        const projectSectionsMarkup = projectBreakdowns.map((breakdown) => `
-            <div class="invoice-project-section" style="margin-bottom: 24px;">
-                <h3 style="${groupedSectionHeadingStyle}">${breakdown.projectTitle}</h3>
-                ${renderLineItemsTable(breakdown.tasks || [], breakdown.expenseItems || [], 'Project subtotal', breakdown.subtotal, { showSubtotalRow: false })}
-                ${renderGroupedSectionSummary({
-                    label: 'Project subtotal',
-                    amount: breakdown.subtotal,
-                    hoursLabel: 'Project total hours',
-                    hoursValue: typeof breakdown.totalHours === 'number' ? breakdown.totalHours : undefined,
-                })}
-            </div>
-        `).join('');
+        const projectSectionsMarkup = projectBreakdowns.map((breakdown) => {
+            const projectLineItemCount = (breakdown.tasks?.length || 0) + (breakdown.expenseItems?.length || 0);
+            const shouldRenderProjectSummary = projectBreakdowns.length === 1 || projectLineItemCount > 1;
+
+            return `
+                <div class="invoice-project-section" style="margin-bottom: 24px;">
+                    <h3 style="${groupedSectionHeadingStyle}">${breakdown.projectTitle}</h3>
+                    ${renderLineItemsTable(breakdown.tasks || [], breakdown.expenseItems || [], 'Project subtotal', breakdown.subtotal, { showSubtotalRow: false })}
+                    ${shouldRenderProjectSummary ? renderGroupedSectionSummary({
+                        label: 'Project subtotal',
+                        amount: breakdown.subtotal,
+                        hoursLabel: 'Project total hours',
+                        hoursValue: typeof breakdown.totalHours === 'number' ? breakdown.totalHours : undefined,
+                    }) : ''}
+                </div>
+            `;
+        }).join('');
         const clientExpenseSectionMarkup = clientExpenseItems.length > 0 ? `
             <div class="invoice-project-section" style="margin-bottom: 24px;">
                 <h3 style="${groupedSectionHeadingStyle}">Additional Expenses</h3>

@@ -161,7 +161,7 @@ describe('createInvoiceHTML', () => {
                     clientId: 'client-1',
                     pricingMode: 'hourly',
                     totalHours: 4,
-                    subtotal: 400,
+                    subtotal: 450,
                     tasks: [{ id: 'task-1', title: 'UX audit', hours: 4, hourlyRate: 100 }],
                     expenseItems: [{ id: 'expense-1', title: 'Stock assets', amount: 50, supplierName: 'Envato' }],
                 },
@@ -185,7 +185,9 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Website Redesign')
         expect(html).toContain('Maintenance')
         expect(html).toContain('Additional Expenses')
-        expect(html).toContain('Project subtotal: <strong>€400.00</strong>')
+        expect((html.match(/Project subtotal:/g) || []).length).toBe(1)
+        expect(html).toContain('Project subtotal: <strong>€450.00</strong>')
+        expect(html).not.toContain('Project subtotal: <strong>€300.00</strong>')
         expect(html).toContain('Additional expenses subtotal: <strong>€75.00</strong>')
         expect(html).toContain('Travel')
         expect(html).toContain('Stock assets')
@@ -224,9 +226,8 @@ describe('createInvoiceHTML', () => {
             currency: 'USD'
         })
 
-        expect(html).toContain('Project total hours: <strong>4.00</strong>')
-        expect(html).toContain('Project subtotal: <strong>$400.00</strong>')
-        expect(html).toContain('Project subtotal: <strong>$300.00</strong>')
+        expect(html).not.toContain('Project total hours:')
+        expect(html).not.toContain('Project subtotal:')
         expect(html).toContain('Additional expenses subtotal: <strong>$75.00</strong>')
         expect(html).not.toContain('Total hours: <strong>4.00</strong>')
         expect(html).toContain('Subtotal: <strong>$775.00</strong>')
@@ -1005,14 +1006,10 @@ describe('createInvoiceHTML', () => {
                     pricingMode: 'hourly',
                     totalHours: 3,
                     subtotal: 300,
-                    tasks: [{
-                        id: 'task-1',
-                        title: 'Workshop',
-                        hours: 1,
-                        hourlyRate: 100,
-                        isMerged: true,
-                        mergedSubtasks: [{ id: 'subtask-1', title: 'Follow-up', hours: 2, hourlyRate: 100 }]
-                    }],
+                    tasks: [
+                        { id: 'task-1', title: 'Workshop', hours: 1, hourlyRate: 100 },
+                        { id: 'task-2', title: 'Follow-up', hours: 2, hourlyRate: 100 }
+                    ],
                     expenseItems: [],
                 },
                 {
@@ -1071,6 +1068,8 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Extra hourly')
         expect(html).toContain('Extra flat')
         expect(html).toContain('Permit')
+        expect(html).toContain('Project total hours: <strong>2.00</strong>')
+        expect(html).toContain('Project subtotal: <strong>$200.00</strong>')
         expect(html).toContain('Additional items subtotal: <strong>$360.00</strong>')
         expect(html).toContain('Invoice-only expenses subtotal: <strong>$30.00</strong>')
         expect(html).toContain('Qty</th>')
