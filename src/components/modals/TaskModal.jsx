@@ -254,6 +254,13 @@ const TaskModal = ({
             return;
         }
 
+        const estimatedFlatAmountChanged = editingTask
+            && showEstimateFields
+            && isFlatRateProject
+            && estimatedFlatAmountValue !== (typeof editingTask.estimatedFlatAmount === 'number' && Number.isFinite(editingTask.estimatedFlatAmount)
+                ? editingTask.estimatedFlatAmount
+                : null);
+
         const payload = {
             title: formData.title.trim(),
             projectId: formData.projectId === NO_PROJECT_VALUE ? null : formData.projectId,
@@ -265,6 +272,10 @@ const TaskModal = ({
             estimatedFlatAmount: showEstimateFields && isFlatRateProject ? estimatedFlatAmountValue : null,
             lastActive: Date.now()
         };
+
+        if (editingTask?.quotedAmountBilling?.invoiceId && estimatedFlatAmountChanged) {
+            payload.quotedAmountBilling = null;
+        }
 
         if (editingTask) {
             updateTask(editingTask.id, {

@@ -5,7 +5,7 @@ import { useInvoices } from './useInvoices'
 import { useYjs } from '@/contexts/YjsContext'
 import { useYjsCollection } from './useYjsCollection'
 import { fetchExchangeRates } from '@/utils/currencyUtils'
-import { createTestYMap } from '@/test/yjs-test-helpers'
+import { createTestYMap, readStored } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 vi.mock('./useYjsCollection', () => ({ useYjsCollection: vi.fn() }))
@@ -199,6 +199,121 @@ describe('useInvoices', () => {
         expect(result.current.paidInvoices.map((i) => i.id)).toEqual(['a'])
         expect(result.current.sentInvoices.map((i) => i.id)).toEqual(['b'])
         expect(result.current.totals).toEqual({ outstanding: 50, paid: 100, total: 150 })
+    })
+
+    it('releases task quoted amounts when deleting an invoice', () => {
+        const tasksMap = createTestYMap({
+            'task-1': {
+                id: 'task-1',
+                title: 'Quoted task',
+                estimatedFlatAmount: null,
+                quotedAmountBilling: {
+                    invoiceId: 'inv-1',
+                    billedAt: 100,
+                    total: 500,
+                },
+            },
+            'task-2': {
+                id: 'task-2',
+                title: 'Other quoted task',
+                estimatedFlatAmount: null,
+                quotedAmountBilling: {
+                    invoiceId: 'inv-2',
+                    billedAt: 100,
+                    total: 300,
+                },
+            },
+        })
+        const remove = vi.fn(() => true)
+
+        mockUseYjs.mockReturnValue({
+            store: {
+                archivedInvoicesSync: createTestYMap(),
+                archivedTasks: null,
+                preferences: mockPreferences,
+                tasks: tasksMap,
+            },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove,
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        expect(result.current.deleteInvoice('inv-1')).toBe(true)
+        expect(remove).toHaveBeenCalledWith('inv-1')
+        expect(readStored(tasksMap, 'task-1')).toEqual(expect.objectContaining({
+            estimatedFlatAmount: 500,
+            quotedAmountBilling: null,
+        }))
+        expect(readStored(tasksMap, 'task-2')).toEqual(expect.objectContaining({
+            estimatedFlatAmount: null,
+            quotedAmountBilling: expect.objectContaining({ invoiceId: 'inv-2' }),
+        }))
+    })
+
+    it('loads archived tasks to release quoted amounts when deleting an invoice', async () => {
+        const tasksMap = createTestYMap()
+        let archivedTasksMap = null
+        const loadArchivedTasks = vi.fn(async () => {
+            archivedTasksMap = createTestYMap({
+                'archived-task-1': {
+                    id: 'archived-task-1',
+                    title: 'Archived quoted task',
+                    estimatedFlatAmount: null,
+                    quotedAmountBilling: {
+                        invoiceId: 'inv-1',
+                        billedAt: 100,
+                        total: 800,
+                    },
+                },
+            })
+        })
+        const remove = vi.fn(() => true)
+
+        mockUseYjs.mockReturnValue({
+            store: {
+                archivedInvoicesSync: createTestYMap(),
+                get archivedTasks() {
+                    return archivedTasksMap
+                },
+                preferences: mockPreferences,
+                tasks: tasksMap,
+            },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+            loadArchivedTasks,
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove,
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        expect(result.current.deleteInvoice('inv-1')).toBe(true)
+
+        await waitFor(() => expect(loadArchivedTasks).toHaveBeenCalledTimes(1))
+        await waitFor(() => {
+            expect(readStored(archivedTasksMap, 'archived-task-1')).toEqual(expect.objectContaining({
+                estimatedFlatAmount: 800,
+                quotedAmountBilling: null,
+            }))
+        })
     })
 
     it('includes shared invoices when filtering by project id', () => {

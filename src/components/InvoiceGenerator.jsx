@@ -80,14 +80,89 @@ const areInvoiceTaskListsEqual = (left, right) => {
 
         return otherTask
             && task.id === otherTask.id
+            && task.projectId === otherTask.projectId
+            && task.projectTitle === otherTask.projectTitle
+            && task.projectHourlyRate === otherTask.projectHourlyRate
+            && task.projectFlatRate === otherTask.projectFlatRate
             && task.title === otherTask.title
             && task.parentTaskId === otherTask.parentTaskId
             && task.originalHours === otherTask.originalHours
             && task.originalTimeMs === otherTask.originalTimeMs
             && task.hours === otherTask.hours
+            && task.flatRate === otherTask.flatRate
+            && task.hourlyRate === otherTask.hourlyRate
+            && task.useFlatRate === otherTask.useFlatRate
+            && task.quantity === otherTask.quantity
             && task.isEdited === otherTask.isEdited
             && task.billable === otherTask.billable;
     });
+};
+
+const mergeEditingInvoiceTasks = (liveInvoiceTasks, editingInvoice) => {
+    const savedInvoiceTasks = (editingInvoice?.tasks || []).filter((task) => task?.id);
+
+    if (savedInvoiceTasks.length === 0) {
+        return liveInvoiceTasks;
+    }
+
+    const liveTaskMap = new Map(liveInvoiceTasks.map((task) => [task.id, task]));
+    const savedTaskIds = new Set(savedInvoiceTasks.map((task) => task.id));
+
+    const mergedSavedTasks = savedInvoiceTasks.map((savedTask) => {
+        const liveTask = liveTaskMap.get(savedTask.id) || {};
+
+        return {
+            ...liveTask,
+            ...savedTask,
+            projectId: savedTask.projectId || liveTask.projectId || null,
+            projectTitle: savedTask.projectTitle || liveTask.projectTitle || '',
+            projectHourlyRate: savedTask.projectHourlyRate ?? liveTask.projectHourlyRate ?? 0,
+            projectFlatRate: savedTask.projectFlatRate === true || liveTask.projectFlatRate === true,
+            parentTaskId: savedTask.parentTaskId ?? liveTask.parentTaskId ?? null,
+            originalHours: savedTask.originalHours ?? savedTask.hours ?? liveTask.originalHours ?? 0,
+            originalTimeMs: savedTask.originalTimeMs ?? liveTask.originalTimeMs ?? 0,
+            hours: savedTask.hours ?? liveTask.hours ?? savedTask.originalHours ?? 0,
+            isEdited: savedTask.isEdited ?? false,
+            billable: savedTask.billable ?? liveTask.billable ?? true,
+        };
+    });
+
+    return [
+        ...mergedSavedTasks,
+        ...liveInvoiceTasks.filter((task) => !savedTaskIds.has(task.id)),
+    ];
+};
+
+const getFinitePositiveNumber = (value) => {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+};
+
+const isSameCurrencyAmount = (left, right) => {
+    return Math.abs(left - right) < 0.005;
+};
+
+const getCurrentQuotedFlatAmount = (task) => {
+    const currentQuotedAmount = getFinitePositiveNumber(task?.estimatedFlatAmount);
+
+    if (currentQuotedAmount === null) {
+        return null;
+    }
+
+    const billedQuotedAmount = getFinitePositiveNumber(task?.quotedAmountBilling?.total);
+
+    if (
+        task?.quotedAmountBilling?.invoiceId
+        && billedQuotedAmount !== null
+        && isSameCurrencyAmount(currentQuotedAmount, billedQuotedAmount)
+    ) {
+        return null;
+    }
+
+    return currentQuotedAmount;
+};
+
+const isQuotedFlatInvoiceTask = (task) => {
+    return task?.useFlatRate === true || task?.projectFlatRate === true;
 };
 
 const areProjectsEquivalent = (left, right) => {
@@ -1114,13 +1189,18 @@ const InvoiceGenerator = ({
                 || null
             ].filter(Boolean);
 
-        if (projectsForInvoice.length === 0) {
+        if (projectsForInvoice.length === 0 && !editingInvoice?.tasks?.length) {
             setInvoiceTasks((prev) => (prev.length === 0 ? prev : []));
             setSelectedTasksForBilling((prev) => (Object.keys(prev).length === 0 ? prev : {}));
             return;
         }
 
-        const nextTasks = prepareInvoiceDataForProjects(projectsForInvoice);
+        const nextLiveTasks = projectsForInvoice.length === 0
+            ? []
+            : prepareInvoiceDataForProjects(projectsForInvoice);
+        const nextTasks = editingInvoice
+            ? mergeEditingInvoiceTasks(nextLiveTasks, editingInvoice)
+            : nextLiveTasks;
         const editingTaskMap = new Map((editingInvoice?.tasks || []).map((task) => [task.id, task]));
         const previousInvoiceTaskMap = new Map(invoiceTasks.map((task) => [task.id, task]));
 
@@ -1223,7 +1303,7 @@ const InvoiceGenerator = ({
         const taskEstimateMap = new Map(
             tasks
                 .filter((task) => task.projectId && flatRateProjectIds.has(task.projectId))
-                .map((task) => [task.id, task.estimatedFlatAmount])
+                .map((task) => [task.id, getCurrentQuotedFlatAmount(task)])
         );
 
         setUseFlatRate((prev) => {
@@ -2085,6 +2165,47 @@ const InvoiceGenerator = ({
             }
         });
 
+        const invoiceTaskMap = new Map((invoiceData.tasks || []).map((task) => [task.id, task]));
+
+        tasks.forEach((task) => {
+            if (!task?.id) {
+                return;
+            }
+
+            const invoiceTask = invoiceTaskMap.get(task.id);
+            const existingQuoteAmount = getCurrentQuotedFlatAmount(task);
+
+            if (
+                invoiceTask
+                && isQuotedFlatInvoiceTask(invoiceTask)
+                && existingQuoteAmount !== null
+                && (!editingInvoice || !task.quotedAmountBilling?.invoiceId)
+            ) {
+                updateTask(task.id, {
+                    estimatedFlatAmount: null,
+                    quotedAmountBilling: {
+                        invoiceId,
+                        billedAt: adjustmentTimestamp,
+                        total: existingQuoteAmount
+                    }
+                });
+                return;
+            }
+
+            if (
+                editingInvoice
+                && task.quotedAmountBilling?.invoiceId === invoiceId
+                && !invoiceTask
+            ) {
+                const restoredQuoteAmount = existingQuoteAmount ?? task.quotedAmountBilling.total;
+
+                updateTask(task.id, {
+                    estimatedFlatAmount: restoredQuoteAmount,
+                    quotedAmountBilling: null
+                });
+            }
+        });
+
         // Update tasks to set lastBilledAt for billed tasks
         if (!editingInvoice) {
             const currentTime = adjustmentTimestamp;
@@ -2380,10 +2501,10 @@ const InvoiceGenerator = ({
                     // For flat rate projects, pre-toggle all tasks to flat rate
                     if (task.projectFlatRate === true) {
                         const sourceTask = tasks.find((candidate) => candidate.id === task.id);
-                        const estimatedFlatAmount = sourceTask?.estimatedFlatAmount;
+                        const estimatedFlatAmount = getCurrentQuotedFlatAmount(sourceTask);
                         const flatRateAmount = typeof task.flatRate === 'number' && Number.isFinite(task.flatRate)
                             ? task.flatRate
-                            : (typeof estimatedFlatAmount === 'number' && Number.isFinite(estimatedFlatAmount) ? estimatedFlatAmount : 0);
+                            : (estimatedFlatAmount !== null ? estimatedFlatAmount : 0);
 
                         initialFlatRateToggles[task.id] = true;
                         initialTaskFlatRates[task.id] = flatRateAmount;

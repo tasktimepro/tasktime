@@ -64,6 +64,54 @@ describe('invoicePreviewUtils', () => {
         }));
     });
 
+    it('excludes flat task quote amounts already claimed by an invoice', () => {
+        const preview = getProjectInvoicePreview(
+            { id: 'project-1', title: 'Build', preferredClientId: 'client-1', hourlyRate: 50, flatRate: true },
+            {
+                clients: [{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }],
+                tasks: [{
+                    id: 'task-1',
+                    projectId: 'project-1',
+                    title: 'Task',
+                    billable: true,
+                    estimatedFlatAmount: 3000,
+                    quotedAmountBilling: {
+                        invoiceId: 'invoice-1',
+                        billedAt: 1000,
+                        total: 3000,
+                    },
+                }],
+            }
+        );
+
+        expect(preview.taskAmount).toBe(0);
+        expect(preview.total).toBe(0);
+    });
+
+    it('includes a new flat quote amount on a task with previous quoted billing metadata', () => {
+        const preview = getProjectInvoicePreview(
+            { id: 'project-1', title: 'Build', preferredClientId: 'client-1', hourlyRate: 50, flatRate: true },
+            {
+                clients: [{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }],
+                tasks: [{
+                    id: 'task-1',
+                    projectId: 'project-1',
+                    title: 'Task',
+                    billable: true,
+                    estimatedFlatAmount: 3500,
+                    quotedAmountBilling: {
+                        invoiceId: 'invoice-1',
+                        billedAt: 1000,
+                        total: 3000,
+                    },
+                }],
+            }
+        );
+
+        expect(preview.taskAmount).toBe(3500);
+        expect(preview.total).toBe(3500);
+    });
+
     it('reports unpriced hours only for hourly projects without an effective rate', () => {
         const preview = getProjectInvoicePreview(
             { id: 'project-1', title: 'Build', preferredClientId: 'client-1', hourlyRate: null, flatRate: false },

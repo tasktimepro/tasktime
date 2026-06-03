@@ -539,6 +539,44 @@ describe('InvoiceGenerator', () => {
         })
     })
 
+    it('clears a one-time quoted flat amount after creating an invoice', async () => {
+
+        taskHookMocks.tasks = [
+            {
+                id: 'task-1',
+                projectId: 'project-1',
+                title: 'Task',
+                billable: true,
+                estimatedFlatAmount: 500
+            }
+        ]
+        const fixedNow = Date.parse('2026-01-12T10:00:00Z')
+        const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow)
+        const user = userEvent.setup()
+
+        try {
+            renderGenerator({
+                project: { ...baseProject, flatRate: true },
+                timeEntries: []
+            })
+
+            await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+            expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+            expect(taskHookMocks.updateTask).toHaveBeenCalledWith('task-1', {
+                estimatedFlatAmount: null,
+                quotedAmountBilling: {
+                    invoiceId: expect.stringMatching(/^INV-/),
+                    billedAt: fixedNow,
+                    total: 500
+                }
+            })
+        } finally {
+            dateNowSpy.mockRestore()
+        }
+    })
+
     it('refreshes the selected project when the source project switches to flat rate', async () => {
 
         taskHookMocks.tasks = [
@@ -1085,6 +1123,84 @@ describe('InvoiceGenerator', () => {
         const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
         expect(invoiceData.tasks.map(task => task.id)).toEqual(['task-1'])
         expect(invoiceData.htmlContent).toBeNull()
+    })
+
+    it('keeps saved invoice task snapshots editable when the live task is now unbillable', async () => {
+
+        taskHookMocks.tasks = [
+            {
+                id: 'task-1',
+                projectId: 'project-1',
+                title: 'Task',
+                billable: false,
+                estimatedFlatAmount: null,
+                quotedAmountBilling: {
+                    invoiceId: 'invoice-1',
+                    billedAt: 1000,
+                    total: 500
+                }
+            }
+        ]
+
+        const user = userEvent.setup()
+        const editingInvoice = {
+            id: 'invoice-1',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-001',
+            date: '2026-01-10',
+            status: 'sent',
+            items: [],
+            subtotal: 500,
+            total: 500,
+            createdAt: 1000,
+            tasks: [{
+                id: 'task-1',
+                projectId: 'project-1',
+                projectTitle: 'Project',
+                projectHourlyRate: 100,
+                projectFlatRate: true,
+                title: 'Task',
+                parentTaskId: null,
+                originalHours: 0,
+                originalTimeMs: 0,
+                hours: 0,
+                flatRate: 500,
+                useFlatRate: true,
+                quantity: 1,
+                billable: true
+            }],
+            useFlatRate: { 'task-1': true },
+            taskFlatRates: { 'task-1': 500 },
+            taskQuantities: { 'task-1': 1 },
+            billingPeriodPreset: 'all-time',
+            billingPeriodStart: null,
+            billingPeriodEnd: null,
+            currency: 'EUR',
+            template: { id: 'tpl-1', name: 'Template One' }
+        }
+
+        renderGenerator({
+            project: { ...baseProject, flatRate: true },
+            editingInvoice,
+            timeEntries: []
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
+        const invoiceData = invoiceHookMocks.updateInvoice.mock.calls[0][1]
+        expect(invoiceData.tasks).toEqual([
+            expect.objectContaining({
+                id: 'task-1',
+                flatRate: 500,
+                useFlatRate: true
+            })
+        ])
+        expect(invoiceData.total).toBe(500)
     })
 
     it('shows a warning and skips invoice generation when total is zero', async () => {

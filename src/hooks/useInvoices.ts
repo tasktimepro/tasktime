@@ -7,8 +7,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
-import type { Invoice } from '@/stores/yjs/types';
-import { collectEntities } from '@/stores/yjs/entityUtils';
+import type { Invoice, Task } from '@/stores/yjs/types';
+import { collectEntities, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import {
     createInvoicePaymentCurrencySnapshot,
@@ -23,6 +23,10 @@ const shouldStoreInvoicePaymentSnapshot = (invoice: Partial<Invoice>, preferredC
     return normalizeCurrencyCode(invoice.currency || preferredCurrency) !== preferredCurrency;
 };
 
+const isPositiveFiniteNumber = (value: unknown): value is number => (
+    typeof value === 'number' && Number.isFinite(value) && value > 0
+);
+
 export interface UseInvoicesOptions {
     /** Filter to a specific project */
     projectId?: string;
@@ -33,7 +37,7 @@ export interface UseInvoicesOptions {
 }
 
 export function useInvoices(options: UseInvoicesOptions = {}) {
-    const { store, isReady, loadArchivedInvoices: loadArchived } = useYjs();
+    const { store, isReady, loadArchivedInvoices: loadArchived, loadArchivedTasks } = useYjs();
     
     // Active invoices from core doc
     const { items: activeInvoices, isLoading: activeLoading, get, create, update, remove } = 
@@ -191,6 +195,53 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         });
     }, [get, update]);
 
+    const releaseQuotedAmountsForInvoice = useCallback((invoiceId: string) => {
+        const releaseFromTaskMap = (taskMap: unknown) => {
+            if (!taskMap || typeof (taskMap as { forEach?: unknown }).forEach !== 'function') {
+                return;
+            }
+
+            (taskMap as { forEach: (fn: (value: unknown, key: string) => void) => void }).forEach((value, taskId) => {
+                const task = readEntity<Task>(value);
+
+                if (!task || task.quotedAmountBilling?.invoiceId !== invoiceId) {
+                    return;
+                }
+
+                const restoredQuoteAmount = isPositiveFiniteNumber(task.estimatedFlatAmount)
+                    ? task.estimatedFlatAmount
+                    : task.quotedAmountBilling.total;
+
+                updateEntityFields(taskMap as any, taskId, {
+                    estimatedFlatAmount: restoredQuoteAmount,
+                    quotedAmountBilling: null,
+                    updatedAt: Date.now(),
+                });
+            });
+        };
+
+        releaseFromTaskMap(store.tasks);
+        releaseFromTaskMap(store.archivedTasks);
+
+        if (!store.archivedTasks) {
+            void loadArchivedTasks()
+                .then(() => {
+                    releaseFromTaskMap(store.archivedTasks);
+                })
+                .catch(() => {});
+        }
+    }, [loadArchivedTasks, store]);
+
+    const deleteInvoice = useCallback((id: string) => {
+        const removed = remove(id);
+
+        if (removed) {
+            releaseQuotedAmountsForInvoice(id);
+        }
+
+        return removed;
+    }, [releaseQuotedAmountsForInvoice, remove]);
+
     // Get total amounts
     const totals = useMemo(() => {
         const outstanding = filteredInvoices
@@ -219,7 +270,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         getInvoice: get,
         createInvoice: create,
         updateInvoice: update,
-        deleteInvoice: remove,
+        deleteInvoice,
         
         // Status helpers
         markAsSent,

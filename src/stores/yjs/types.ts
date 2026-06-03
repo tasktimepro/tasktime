@@ -95,6 +95,12 @@ export interface Task {
     estimatedHours?: number | null;
     /** Optional flat estimate amount for flat-rate client projects */
     estimatedFlatAmount?: number | null;
+    /** Snapshot of a one-time quoted flat amount that has been claimed by an invoice */
+    quotedAmountBilling?: {
+        invoiceId: string;
+        billedAt: number;
+        total: number;
+    } | null;
 }
 
 export interface RecurringConfig {

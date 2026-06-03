@@ -55,6 +55,11 @@ describe('Yjs validation', () => {
             sortOrderUpdatedAt: 123456,
             estimatedHours: 4.5,
             estimatedFlatAmount: 300,
+            quotedAmountBilling: {
+                invoiceId: 'invoice-1',
+                billedAt: 123456,
+                total: 300,
+            },
         }, 'test ordered task')).toEqual({
             id: 'task-ordered-1',
             title: 'Ordered Task',
@@ -62,6 +67,11 @@ describe('Yjs validation', () => {
             sortOrderUpdatedAt: 123456,
             estimatedHours: 4.5,
             estimatedFlatAmount: 300,
+            quotedAmountBilling: {
+                invoiceId: 'invoice-1',
+                billedAt: 123456,
+                total: 300,
+            },
         })
 
         expect(validateCollectionEntity('projects', {

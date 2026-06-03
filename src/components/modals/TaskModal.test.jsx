@@ -292,6 +292,32 @@ describe('TaskModal', () => {
         }))
     })
 
+    it('clears quoted billing metadata when a billed flat task gets a new quote amount', async () => {
+
+        const user = userEvent.setup()
+        const editingTask = {
+            id: 't1',
+            title: 'Quoted task',
+            projectId: 'p3',
+            estimatedFlatAmount: null,
+            quotedAmountBilling: {
+                invoiceId: 'inv-1',
+                billedAt: 1000,
+                total: 500,
+            },
+        }
+
+        render(<TaskModal isOpen onClose={vi.fn()} editingTask={editingTask} />)
+
+        await user.type(screen.getByLabelText('Quote Amount'), '750')
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+
+        expect(taskMocks.updateTask).toHaveBeenCalledWith('t1', expect.objectContaining({
+            estimatedFlatAmount: 750,
+            quotedAmountBilling: null,
+        }))
+    })
+
     it('hides estimate fields for standalone tasks', () => {
 
         render(<TaskModal isOpen onClose={vi.fn()} />)

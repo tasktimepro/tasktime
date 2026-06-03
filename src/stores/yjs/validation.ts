@@ -164,6 +164,11 @@ const taskSchema = z.object({
     completedOnDate: storageDateSchema.nullable().optional(),
     estimatedHours: nonNegativeNumberSchema.nullable().optional(),
     estimatedFlatAmount: nonNegativeNumberSchema.nullable().optional(),
+    quotedAmountBilling: z.object({
+        invoiceId: nonEmptyStringSchema,
+        billedAt: finiteNumberSchema,
+        total: nonNegativeNumberSchema,
+    }).nullable().optional(),
 }).passthrough() satisfies z.ZodType<Task>;
 
 const timeEntrySchema = z.object({

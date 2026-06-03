@@ -37,6 +37,18 @@ const normalizeFiniteNumber = (value: unknown): number | null => {
     return value;
 };
 
+const isSameCurrencyAmount = (left: number, right: number): boolean => {
+    return Math.abs(left - right) < 0.005;
+};
+
+const isClaimedCurrentQuotedAmount = (task: Task, currentQuotedAmount: number): boolean => {
+    const billedQuotedAmount = normalizeFiniteNumber(task.quotedAmountBilling?.total);
+
+    return Boolean(task.quotedAmountBilling?.invoiceId)
+        && billedQuotedAmount !== null
+        && isSameCurrencyAmount(currentQuotedAmount, billedQuotedAmount);
+};
+
 const getProjectClient = (project: Project, clients: Client[] = []): Client | null => {
     if (!project.preferredClientId) {
         return null;
@@ -118,7 +130,13 @@ export const getProjectInvoicePreview = (
             unbilledHours += taskHours;
 
             if (project.flatRate) {
-                taskAmount += normalizeFiniteNumber(task.estimatedFlatAmount) ?? 0;
+                const quotedAmount = normalizeFiniteNumber(task.estimatedFlatAmount) ?? 0;
+
+                if (quotedAmount > 0 && isClaimedCurrentQuotedAmount(task, quotedAmount)) {
+                    return;
+                }
+
+                taskAmount += quotedAmount;
                 return;
             }
 

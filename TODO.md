@@ -14,8 +14,6 @@
     [ ] Also think about about whether currently billed items will become active again/undo billed state?
     [ ] If you cancel an invoice and there is no other future invoice, should the next one take the same sequential number or not?
 
-[ ] Billed task with quoted amount still kept showing the total in the invoice generation button and project card - EVEN AFTER THE INVOICE WAS GENERATED - I think this is one of those use-cases where we should automatically switch from billable to not-billable after it was invoiced
-    [ ] I also noticed that if an invoice was generated from a flat rate task, and the invoice is still outstanding, if I mark the same task that is still in the project as unbillable, and I edit the invoice, there are no more tasks visible there... wtf? How is this possible? Aren't we keeping a snapshot of these or not until the invoice is generated? And what can we do to solve this?
 
 ---
 
