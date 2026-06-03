@@ -55,7 +55,13 @@ vi.mock('@/components/ui/period-range-picker', () => ({
 }))
 
 vi.mock('../CustomCheckbox', () => ({
-    default: ({ labelClassName, ...props }) => <input type="checkbox" {...props} />
+    default: (props) => {
+        const inputProps = { ...props }
+
+        delete inputProps.labelClassName
+
+        return <input type="checkbox" {...inputProps} />
+    }
 }))
 
 vi.mock('./InvoiceTaskSelector', () => ({

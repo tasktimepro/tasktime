@@ -5,9 +5,11 @@ import userEvent from '@testing-library/user-event'
 import InvoicesList from '../../components/InvoicesList'
 
 const invoiceHookMocks = vi.hoisted(() => ({
-
+    invoices: [],
     markAsPaid: vi.fn(),
     markAsUnpaid: vi.fn(),
+    undoLatestInvoice: vi.fn(),
+    canUndoInvoice: vi.fn(() => false),
 }))
 
 const businessBrandAssetHookMocks = vi.hoisted(() => ({
@@ -23,8 +25,11 @@ const urlStateMocks = vi.hoisted(() => ({
 vi.mock('../../hooks/useInvoices.ts', () => ({
 
     useInvoices: () => ({
+        invoices: invoiceHookMocks.invoices,
         markAsPaid: invoiceHookMocks.markAsPaid,
         markAsUnpaid: invoiceHookMocks.markAsUnpaid,
+        undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
+        canUndoInvoice: invoiceHookMocks.canUndoInvoice,
     })
 }))
 
@@ -73,6 +78,8 @@ describe('Invoice payment workflow integration', () => {
             clientId: 'client-1',
             project: { id: 'project-1', title: 'Project Alpha' }
         }
+
+        invoiceHookMocks.invoices = [invoice]
 
         render(
             <InvoicesList
