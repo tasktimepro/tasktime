@@ -52,7 +52,7 @@ export default defineConfig({
       includeAssets: ['favicon.svg', 'favicon.ico', 'favicon-96x96.png', 'icons/*.png'],
       manifest: false, // Use our custom manifest.json in public/
       injectManifest: {
-        injectionPoint: undefined,
+        injectionPoint: 'self.__WB_MANIFEST',
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
       workbox: {

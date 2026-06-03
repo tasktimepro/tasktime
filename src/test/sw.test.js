@@ -24,6 +24,7 @@ describe('service worker caching', () => {
         handlers.notificationclick = null
 
         globalThis.self = {
+            __WB_MANIFEST: [],
             addEventListener: (type, handler) => {
                 handlers[type] = handler
             },

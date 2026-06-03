@@ -2,8 +2,6 @@
 
 ## Priority
 
-[ ] Update latest DebugBundle packages
-
 [ ] Screenshot mobile UI adjustments
 
 ---

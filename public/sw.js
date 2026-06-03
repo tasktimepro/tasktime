@@ -10,12 +10,43 @@ const APP_SHELL = [
     '/icons/web-app-manifest-192x192.png',
     '/icons/web-app-manifest-512x512.png'
 ];
+const BUILD_ASSETS = self.__WB_MANIFEST || [];
 const STATIC_PUBLIC_PATHS = [
     '/blog',
     '/contact',
     '/privacy',
     '/terms',
 ];
+
+function getPrecacheUrls() {
+    const precacheUrls = BUILD_ASSETS.map((entry) => {
+        if (typeof entry === 'string') {
+            return entry;
+        }
+
+        return entry?.url;
+    }).filter(Boolean);
+
+    const normalizeUrl = (value) => {
+        if (typeof value !== 'string' || value.length === 0) {
+            return null;
+        }
+
+        if (value.startsWith('http://') || value.startsWith('https://')) {
+            return value;
+        }
+
+        return value.startsWith('/') ? value : `/${value}`;
+    };
+
+    return Array.from(
+        new Set(
+            [...APP_SHELL, ...precacheUrls]
+                .map(normalizeUrl)
+                .filter(Boolean)
+        )
+    );
+}
 
 function getRequestUrl(request) {
     if (typeof request?.url !== 'string' || request.url.length === 0) {
@@ -54,7 +85,7 @@ function getNavigationFallbackResponse() {
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then((cache) => cache.addAll(APP_SHELL))
+            .then((cache) => cache.addAll(getPrecacheUrls()))
             .then(() => self.skipWaiting())
     );
 });
