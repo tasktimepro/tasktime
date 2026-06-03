@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Notice } from '@/components/ui/notice';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InlineFieldHeader } from '@/components/ui/inline-field-header';
+import CustomCheckbox from '@/components/CustomCheckbox';
 import { Send } from 'lucide-react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useBusinessBrandAssets } from '@/hooks/useBusinessBrandAssets.ts';
@@ -26,6 +27,7 @@ import {
     DEFAULT_QUOTE_BODY,
     DEFAULT_ATTACHMENT_TITLE,
     DEFAULT_QUOTE_ATTACHMENT_TITLE,
+    getLastMonthPlaceholderValue,
 } from '@/utils/emailTemplateUtils';
 import { sendInvoiceEmail, isEmailSendError } from '@/utils/emailService';
 import { getCurrentInvoiceHtmlContent, generatePDFBase64 } from '@/utils/pdfUtils.ts';
@@ -70,6 +72,7 @@ const EmailPreviewModal = ({
     const [preferredTemplateId, setPreferredTemplateId] = useState('');
     const [pendingTemplate, setPendingTemplate] = useState(null);
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+    const [forwardToSelf, setForwardToSelf] = useState(false);
 
     const businessName = businessInfo?.businessName || businessInfo?.name || businessInfo?.title || '';
     const defaultReplyToEmail = businessInfo?.email || '';
@@ -87,8 +90,11 @@ const EmailPreviewModal = ({
         amount: invoiceTotal.toFixed(2),
         currency: currencySymbol,
         dueDate: invoice?.dueDate ? toDisplayDate(invoice.dueDate) : 'N/A',
+        lastMonth: getLastMonthPlaceholderValue(invoice?.date || invoice?.dueDate),
         businessName,
     }), [invoice, client, invoiceTotal, currencySymbol, businessName]);
+
+    const senderForwardAddress = (replyTo || defaultReplyToEmail).trim();
 
     const defaultSubjectTemplate = isQuoteSend ? DEFAULT_QUOTE_SUBJECT : DEFAULT_SUBJECT;
     const defaultBodyTemplate = isQuoteSend
@@ -162,6 +168,7 @@ const EmailPreviewModal = ({
         setPreferredTemplateId('');
         setPendingTemplate(null);
         setIsTemplateModalOpen(false);
+        setForwardToSelf(false);
     }, [isOpen]);
 
     // When the user switches template, re-apply
@@ -203,6 +210,11 @@ const EmailPreviewModal = ({
             return;
         }
 
+        if (forwardToSelf && !senderForwardAddress) {
+            setError('Add a Reply-To or business email before forwarding a copy.');
+            return;
+        }
+
         setSending(true);
         setError(null);
 
@@ -216,6 +228,7 @@ const EmailPreviewModal = ({
                 invoiceId: documentId,
                 invoiceNumber: invoice.invoiceNumber,
                 to,
+                forwardTo: forwardToSelf ? senderForwardAddress : undefined,
                 fromName: fromName || undefined,
                 subject,
                 bodyText: body,
@@ -240,12 +253,20 @@ const EmailPreviewModal = ({
                 }
 
                 const remaining = result.remaining != null ? ` (${result.remaining} emails remaining this month)` : '';
+                const forwardedCopyMessage = !forwardToSelf
+                    ? ''
+                    : result.forwarded === true
+                        ? ` and forwarded to ${senderForwardAddress}`
+                        : result.forwarded === false
+                            ? `. The copy to ${senderForwardAddress} could not be sent`
+                            : '';
+
                 showSuccess(
                     isQuoteSend
-                        ? `Quote emailed to ${to}${remaining}`
+                        ? `Quote emailed to ${to}${forwardedCopyMessage}${remaining}`
                         : sendType === 'reminder'
-                        ? `Reminder sent to ${to}${remaining}`
-                        : `Invoice emailed to ${to}${remaining}`
+                        ? `Reminder sent to ${to}${forwardedCopyMessage}${remaining}`
+                        : `Invoice emailed to ${to}${forwardedCopyMessage}${remaining}`
                 );
                 onClose();
             }
@@ -257,7 +278,7 @@ const EmailPreviewModal = ({
                         setError('Session expired. Please reconnect cloud sync and try again.');
                         break;
                     case 'quota_exceeded':
-                        setError(`Monthly email limit reached (${err.remaining} remaining). Try again next month.`);
+                        setError(`${err.message} (${err.remaining} remaining).`);
                         break;
                     case 'already_sent':
                         setError('This invoice has already been emailed. Use "Send Reminder" for overdue invoices.');
@@ -279,7 +300,7 @@ const EmailPreviewModal = ({
         } finally {
             setSending(false);
         }
-    }, [attachmentTitle, body, businessBrandAssets, clients, documentLabel, driveSessionId, fromName, invoice, isQuoteSend, onClose, replyTo, sendType, showSuccess, subject, to, updateInvoice]);
+    }, [attachmentTitle, body, businessBrandAssets, clients, documentLabel, driveSessionId, forwardToSelf, fromName, invoice, isQuoteSend, onClose, replyTo, sendType, senderForwardAddress, showSuccess, subject, to, updateInvoice]);
 
     const handleClose = useCallback(() => {
         setError(null);
@@ -299,17 +320,29 @@ const EmailPreviewModal = ({
     const hasTemplates = availableTemplates.length > 0;
 
     const footer = (
-        <div className="flex justify-end space-x-3">
-            <Button variant="outline" onClick={handleClose} disabled={sending}>
-                Cancel
-            </Button>
-            <Button
-                onClick={handleSend}
-                disabled={sending || !to}
-                leadingIcon={Send}
-            >
-                {sending ? 'Sending...' : (isQuoteSend ? 'Send Quote' : (sendType === 'reminder' ? 'Send Reminder' : 'Send Invoice'))}
-            </Button>
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+            <div className="flex items-center">
+                <CustomCheckbox
+                    checked={forwardToSelf}
+                    onChange={setForwardToSelf}
+                    disabled={sending}
+                    label="Forward this email to me"
+                    labelClassName="block text-sm text-foreground"
+                />
+            </div>
+
+            <div className="flex flex-row flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={handleClose} disabled={sending}>
+                    Cancel
+                </Button>
+                <Button
+                    onClick={handleSend}
+                    disabled={sending || !to}
+                    leadingIcon={Send}
+                >
+                    {sending ? 'Sending...' : (isQuoteSend ? 'Send Quote' : (sendType === 'reminder' ? 'Send Reminder' : 'Send Invoice'))}
+                </Button>
+            </div>
         </div>
     );
 

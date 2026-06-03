@@ -122,6 +122,17 @@ describe('sendInvoiceEmail', () => {
         expect(body.attachmentTitle).toBe('custom-invoice.pdf');
     });
 
+    it('includes forwardTo when provided', async () => {
+
+        fetchMock.mockResolvedValue(createJsonResponse({ success: true, remaining: 8, forwarded: true }));
+
+        const result = await sendInvoiceEmail({ ...validParams, forwardTo: 'me@business.com' });
+
+        const body = JSON.parse(String(getFetchCall().options.body));
+        expect(body.forwardTo).toBe('me@business.com');
+        expect(result).toEqual({ success: true, remaining: 8, forwarded: true });
+    });
+
     it('passes quote sendType through unchanged', async () => {
 
         fetchMock.mockResolvedValue(createJsonResponse({ success: true, remaining: 9 }));
@@ -189,6 +200,33 @@ describe('sendInvoiceEmail', () => {
 
             expect(error.remaining).toBe(0);
             expect(error.message).toContain('Monthly email limit');
+        }
+    });
+
+    it('preserves quota details from the worker response', async () => {
+
+        fetchMock.mockResolvedValue(createJsonResponse(
+            {
+                error: 'quota_exceeded',
+                remaining: 1,
+                details: 'Forwarding a copy requires 2 emails, but only 1 email remains this month.',
+            },
+            { status: 429 }
+        ));
+
+        try {
+            await sendInvoiceEmail(validParams);
+            expect.unreachable('should have thrown');
+        } catch (err) {
+            const error = expectEmailSendError(err);
+            expect(error.type).toBe('quota_exceeded');
+
+            if (error.type !== 'quota_exceeded') {
+                expect.unreachable('expected quota_exceeded error');
+            }
+
+            expect(error.remaining).toBe(1);
+            expect(error.message).toBe('Forwarding a copy requires 2 emails, but only 1 email remains this month.');
         }
     });
 

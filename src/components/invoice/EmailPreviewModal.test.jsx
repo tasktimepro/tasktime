@@ -244,6 +244,15 @@ describe('EmailPreviewModal', () => {
         expect(screen.getByLabelText('Message').value).toBe('');
     });
 
+    it('shows the forward copy checkbox in the footer', () => {
+
+        mockEmailTemplates = [mockDefaultTemplate];
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(screen.getByRole('checkbox', { name: 'Forward this email to me' })).toBeTruthy();
+    });
+
     it('shows warning when no drive session', () => {
 
         mockDriveSessionId = null;
@@ -361,6 +370,125 @@ describe('EmailPreviewModal', () => {
         expect(mockOnClose).toHaveBeenCalledOnce();
     });
 
+    it('forwards a copy to the sender address when selected', async () => {
+
+        const user = userEvent.setup();
+
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockSendInvoiceEmail.mockResolvedValue({ success: true, remaining: 8, forwarded: true });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await user.click(screen.getByRole('checkbox', { name: 'Forward this email to me' }));
+        await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
+
+        await waitFor(() => {
+            expect(mockSendInvoiceEmail).toHaveBeenCalledOnce();
+        });
+
+        expect(mockSendInvoiceEmail).toHaveBeenCalledWith(expect.objectContaining({
+            forwardTo: 'billing@acme.com',
+        }));
+        expect(mockShowSuccess).toHaveBeenCalledWith(
+            expect.stringContaining('forwarded to billing@acme.com')
+        );
+    });
+
+    it('uses the business email for the forwarded copy when reply-to is blank', async () => {
+
+        const user = userEvent.setup();
+
+        mockEmailTemplates = [{
+            ...mockDefaultTemplate,
+            replyTo: '',
+        }];
+        mockSendInvoiceEmail.mockResolvedValue({ success: true, remaining: 8, forwarded: true });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await user.click(screen.getByRole('checkbox', { name: 'Forward this email to me' }));
+        await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
+
+        await waitFor(() => {
+            expect(mockSendInvoiceEmail).toHaveBeenCalledOnce();
+        });
+
+        expect(mockSendInvoiceEmail).toHaveBeenCalledWith(expect.objectContaining({
+            forwardTo: 'me@mybiz.com',
+        }));
+    });
+
+    it('shows a clear error when forwarding is selected without a sender address', async () => {
+
+        const user = userEvent.setup();
+
+        mockEmailTemplates = [{
+            ...mockDefaultTemplate,
+            replyTo: '',
+        }];
+
+        render(
+            <EmailPreviewModal
+                {...defaultProps}
+                businessInfo={{ id: 'biz-1', businessName: 'NoBiz' }}
+            />
+        );
+
+        await user.click(screen.getByRole('checkbox', { name: 'Forward this email to me' }));
+        await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
+
+        await waitFor(() => {
+            expect(screen.getByText((content) => content.includes('Add a Reply-To or business email'))).toBeTruthy();
+        });
+
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it('keeps the invoice send successful when the forwarded copy fails', async () => {
+
+        const user = userEvent.setup();
+
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockSendInvoiceEmail.mockResolvedValue({ success: true, remaining: 9, forwarded: false });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await user.click(screen.getByRole('checkbox', { name: 'Forward this email to me' }));
+        await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
+
+        await waitFor(() => {
+            expect(mockSendInvoiceEmail).toHaveBeenCalledOnce();
+        });
+
+        expect(mockShowSuccess).toHaveBeenCalledWith(
+            expect.stringContaining('The copy to billing@acme.com could not be sent')
+        );
+        expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', expect.objectContaining({
+            sentToEmail: 'billing@acme.com',
+            status: 'sent',
+        }));
+        expect(mockOnClose).toHaveBeenCalledOnce();
+    });
+
+    it('does not claim the email was forwarded when the worker does not confirm it', async () => {
+
+        const user = userEvent.setup();
+
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockSendInvoiceEmail.mockResolvedValue({ success: true, remaining: 9 });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await user.click(screen.getByRole('checkbox', { name: 'Forward this email to me' }));
+        await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
+
+        await waitFor(() => {
+            expect(mockShowSuccess).toHaveBeenCalled();
+        });
+
+        expect(mockShowSuccess).toHaveBeenCalledWith('Invoice emailed to billing@acme.com (9 emails remaining this month)');
+    });
+
     it('uses reminder template and sendType for reminders', () => {
 
         mockEmailTemplates = [mockDefaultTemplate];
@@ -467,17 +595,19 @@ describe('EmailPreviewModal', () => {
         mockEmailTemplates = [mockDefaultTemplate];
         mockSendInvoiceEmail.mockRejectedValue({
             type: 'quota_exceeded',
-            message: 'Monthly email limit reached',
-            remaining: 0,
+            message: 'Forwarding a copy requires 2 emails, but only 1 email remains this month.',
+            remaining: 1,
         });
 
         render(<EmailPreviewModal {...defaultProps} />);
+
+        await user.click(screen.getByRole('checkbox', { name: 'Forward this email to me' }));
 
         const sendButton = screen.getByRole('button', { name: /Send Invoice/i });
         await user.click(sendButton);
 
         await waitFor(() => {
-            expect(screen.getByText((content) => content.includes('Monthly email limit reached'))).toBeTruthy();
+            expect(screen.getByText((content) => content.includes('Forwarding a copy requires 2 emails'))).toBeTruthy();
         });
 
         // Modal should still be open (onClose not called)

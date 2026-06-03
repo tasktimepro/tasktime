@@ -5,6 +5,8 @@
  * invoice/client/business data before sending.
  */
 
+import { format, subMonths } from 'date-fns';
+
 // ── Default field values for new invoice email templates ─────────────────────
 
 export type EmailSendType = 'invoice' | 'reminder' | 'quote';
@@ -52,6 +54,7 @@ export const EMAIL_PLACEHOLDER_VARIABLES = [
     { key: '{amount}', description: 'Invoice total' },
     { key: '{currency}', description: 'Currency symbol' },
     { key: '{dueDate}', description: 'Due date' },
+    { key: '{lastMonth}', description: 'Previous month (e.g. May 2026)' },
     { key: '{businessName}', description: 'Your business name' },
 ] as const;
 
@@ -63,6 +66,7 @@ export interface EmailTemplatePlaceholders {
     amount: string;
     currency: string;
     dueDate: string;
+    lastMonth: string;
     businessName: string;
 }
 
@@ -72,8 +76,20 @@ const PLACEHOLDER_KEYS: (keyof EmailTemplatePlaceholders)[] = [
     'amount',
     'currency',
     'dueDate',
+    'lastMonth',
     'businessName',
 ];
+
+/**
+ * Resolve the {lastMonth} placeholder using the document date when available.
+ */
+export function getLastMonthPlaceholderValue(referenceDate?: Date | number | string | null): string {
+
+    const parsedReferenceDate = referenceDate ? new Date(referenceDate) : new Date();
+    const safeReferenceDate = Number.isNaN(parsedReferenceDate.getTime()) ? new Date() : parsedReferenceDate;
+
+    return format(subMonths(safeReferenceDate, 1), 'MMMM yyyy');
+}
 
 /**
  * Replace all {placeholder} tokens in a template string with actual values.

@@ -3,6 +3,7 @@ import {
     resolveTemplate,
     resolveSubject,
     resolveAttachmentTitle,
+    getLastMonthPlaceholderValue,
     DEFAULT_SEND_BODY,
     DEFAULT_REMINDER_BODY,
     DEFAULT_QUOTE_BODY,
@@ -19,6 +20,7 @@ const SAMPLE_VALUES = {
     amount: '1,250.00',
     currency: '€',
     dueDate: '2026-05-01',
+    lastMonth: 'April 2026',
     businessName: 'Owen Far Studio',
 };
 
@@ -68,6 +70,26 @@ describe('resolveTemplate', () => {
         const result = resolveTemplate('From: {businessName}', values);
 
         expect(result).toBe('From: ');
+    });
+
+    it('replaces the lastMonth placeholder', () => {
+
+        const result = resolveTemplate('Work completed during {lastMonth}', SAMPLE_VALUES);
+
+        expect(result).toBe('Work completed during April 2026');
+    });
+});
+
+describe('getLastMonthPlaceholderValue', () => {
+
+    it('uses the provided reference date', () => {
+
+        expect(getLastMonthPlaceholderValue('2026-06-03')).toBe('May 2026');
+    });
+
+    it('falls back to the current date for invalid input', () => {
+
+        expect(getLastMonthPlaceholderValue('not-a-date')).toMatch(/^[A-Z][a-z]+ \d{4}$/);
     });
 });
 
@@ -178,7 +200,7 @@ describe('default templates', () => {
         expect(DEFAULT_QUOTE_ATTACHMENT_TITLE).toContain('{invoiceNumber}');
     });
 
-    it('EMAIL_PLACEHOLDER_VARIABLES covers all six placeholders', () => {
+    it('EMAIL_PLACEHOLDER_VARIABLES covers all seven placeholders', () => {
 
         const keys = EMAIL_PLACEHOLDER_VARIABLES.map(v => v.key);
         expect(keys).toContain('{invoiceNumber}');
@@ -186,7 +208,8 @@ describe('default templates', () => {
         expect(keys).toContain('{amount}');
         expect(keys).toContain('{currency}');
         expect(keys).toContain('{dueDate}');
+        expect(keys).toContain('{lastMonth}');
         expect(keys).toContain('{businessName}');
-        expect(keys).toHaveLength(6);
+        expect(keys).toHaveLength(7);
     });
 });

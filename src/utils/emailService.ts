@@ -10,6 +10,7 @@ export interface SendInvoiceEmailParams {
     invoiceId: string;
     invoiceNumber: string;
     to: string;
+    forwardTo?: string;
     fromName?: string;
     subject: string;
     bodyText: string;
@@ -22,6 +23,7 @@ export interface SendInvoiceEmailParams {
 export interface SendInvoiceEmailResult {
     success: boolean;
     remaining?: number;
+    forwarded?: boolean;
 }
 
 export type EmailSendError =
@@ -49,6 +51,7 @@ export async function sendInvoiceEmail(
         invoiceId: params.invoiceId,
         invoiceNumber: params.invoiceNumber,
         to: params.to,
+        forwardTo: params.forwardTo,
         fromName: params.fromName,
         subject: params.subject,
         bodyText: params.bodyText,
@@ -75,7 +78,16 @@ export async function sendInvoiceEmail(
 
     if (response.ok) {
         const data = await response.json();
-        return { success: true, remaining: data.remaining };
+        const result: SendInvoiceEmailResult = {
+            success: true,
+            remaining: data.remaining,
+        };
+
+        if (typeof data.forwarded === 'boolean') {
+            result.forwarded = data.forwarded;
+        }
+
+        return result;
     }
 
     // Parse structured error from Worker
@@ -95,7 +107,13 @@ export async function sendInvoiceEmail(
     }
 
     if (errorCode === 'quota_exceeded') {
-        throw createEmailError('quota_exceeded', 'Monthly email limit reached', errorData?.remaining ?? 0);
+        const quotaMessage = errorData?.details || errorData?.message || 'Monthly email limit reached';
+
+        throw createEmailError(
+            'quota_exceeded',
+            quotaMessage,
+            errorData?.remaining ?? 0
+        );
     }
 
     if (errorCode === 'already_sent') {
