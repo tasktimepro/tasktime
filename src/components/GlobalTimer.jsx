@@ -188,6 +188,7 @@ const GlobalTimer = ({
                         task={currentTask}
                         isGlobalTimer={true}
                         showTimeDisplay={false}
+                        timer={timerData}
                     />
                     
                     {/* Options toggle button */}

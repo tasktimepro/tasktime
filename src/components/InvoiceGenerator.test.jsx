@@ -72,6 +72,8 @@ let modalConfig = {
     billingPeriodEnd: null
 }
 
+let capturedInvoiceModalProps = null
+
 vi.mock('../hooks/useToast.ts', () => ({
 
     useToast: () => ({
@@ -167,6 +169,7 @@ vi.mock('./invoice/InvoiceModal', () => {
         handleSaveInvoice,
         handleTemplateSelection,
         calculatePricing,
+        billingPeriodPreset,
         availableExpenses = [],
         selectedExpensesForBilling = {},
         selectedBusinessInfo,
@@ -185,7 +188,12 @@ vi.mock('./invoice/InvoiceModal', () => {
         setBillingPeriodPreset,
         setBillingPeriodStart,
         setBillingPeriodEnd,
+        ...props
     }) {
+        capturedInvoiceModalProps = {
+            showInvoiceForm,
+            ...props
+        }
         const didApplyAdjustments = React.useRef(false)
         const didAddAdditionalTask = React.useRef(false)
         const didApplyBillingPeriod = React.useRef(false)
@@ -292,6 +300,7 @@ vi.mock('./invoice/InvoiceModal', () => {
                         : 'no tax configured'}
                 </div>
                 <div data-testid="pricing-subtotal">{calculatePricing?.subtotal ?? 0}</div>
+                <div data-testid="billing-period-preset">{billingPeriodPreset}</div>
                 <div data-testid="available-expense-ids">
                     {availableExpenses.map((expense) => expense.id).sort().join(',')}
                 </div>
@@ -409,6 +418,7 @@ describe('InvoiceGenerator', () => {
             billingPeriodStart: null,
             billingPeriodEnd: null
         }
+        capturedInvoiceModalProps = null
         templateHookMocks.invoiceTemplates = [
             {
                 id: 'tpl-1',
@@ -456,6 +466,34 @@ describe('InvoiceGenerator', () => {
         expect(screen.queryByRole('button', { name: 'Open Invoice' })).not.toBeInTheDocument()
         expect(await screen.findByRole('button', { name: 'Save Invoice' })).toBeInTheDocument()
         expect(screen.getByTestId('tax-status')).toBeInTheDocument()
+    })
+
+    it('allows additional project selection only in client dashboard context', async () => {
+        const user = userEvent.setup()
+
+        renderGenerator({
+            project: null,
+            client: baseClient,
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        expect(capturedInvoiceModalProps?.allowAdditionalProjectsSelection).toBe(true)
+        expect(capturedInvoiceModalProps?.openedFromProjectContext).toBe(false)
+    })
+
+    it('opens project dashboard invoices focused on tasks and without additional project selection', async () => {
+        const user = userEvent.setup()
+
+        renderGenerator({
+            project: baseProject,
+            client: null,
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        expect(capturedInvoiceModalProps?.openedFromProjectContext).toBe(true)
+        expect(capturedInvoiceModalProps?.allowAdditionalProjectsSelection).toBe(false)
     })
 
     it('creates invoice-only tasks from the client default hourly rate when no project is selected', async () => {
@@ -1535,5 +1573,37 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.billingPeriodStart).toBe('2026-03-10')
         expect(invoiceData.billingPeriodEnd).toBe('2026-03-31')
         expect(invoiceData.htmlContent).toBeNull()
+    })
+
+    it('resets the billing period to all time after saving a new invoice', async () => {
+
+        modalConfig.billingPeriodPreset = 'last-month'
+        const user = userEvent.setup()
+        const now = new Date()
+        const lastMonthEntryStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 15, 9, 0, 0))
+
+        renderGenerator({
+            timeEntries: [
+                {
+                    id: 'entry-last-month',
+                    taskId: 'task-1',
+                    start: lastMonthEntryStart.getTime(),
+                    end: lastMonthEntryStart.getTime() + 3600000,
+                }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        expect(await screen.findByTestId('billing-period-preset')).toHaveTextContent('last-month')
+
+        await user.click(screen.getByRole('button', { name: 'Save Invoice' }))
+        await waitFor(() => {
+            expect(screen.queryByTestId('billing-period-preset')).not.toBeInTheDocument()
+        })
+
+        modalConfig.billingPeriodPreset = null
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        expect(await screen.findByTestId('billing-period-preset')).toHaveTextContent('all-time')
     })
 })

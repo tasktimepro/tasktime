@@ -48,7 +48,7 @@ const InvoicesList = ({
     selectedTab = null // New prop to preselect a tab
 }) => {
     const isMobileLayout = useIsMobileLayout();
-    const { showToast } = useToast();
+    const { showSuccess, showError } = useToast();
     const { businessBrandAssets } = useBusinessBrandAssets();
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
@@ -189,7 +189,7 @@ const InvoicesList = ({
             await generatePDF(htmlContent, filename);
         } catch (error) {
             console.error('Error downloading invoice:', error);
-            showToast('Failed to generate PDF: ' + error.message, 'error');
+            showError('Failed to generate PDF: ' + error.message);
         }
     };
 
@@ -235,7 +235,7 @@ const InvoicesList = ({
         const invoiceToUndo = pendingUndoInvoice;
         const expectedConfirmation = invoiceToUndo.invoiceNumber || '';
         if (undoConfirmationText.trim() !== expectedConfirmation) {
-            showToast(`Type ${expectedConfirmation} to confirm.`, 'error');
+            showError(`Type ${expectedConfirmation} to confirm.`);
             return;
         }
 
@@ -259,16 +259,15 @@ const InvoicesList = ({
                 ? ' Next invoice number was restored.'
                 : '';
 
-            showToast(
-                `Invoice ${result?.invoiceNumber || invoiceToUndo.invoiceNumber} undone. ${result?.clearedTimeEntryCount || 0} billed entr${result?.clearedTimeEntryCount === 1 ? 'y' : 'ies'} restored, ${result?.deletedAdjustmentCount || 0} invoice adjustment${result?.deletedAdjustmentCount === 1 ? '' : 's'} removed, and ${result?.unbilledExpenseCount || 0} expense${result?.unbilledExpenseCount === 1 ? '' : 's'} unbilled.${sequenceMessage}`,
-                'success'
+            showSuccess(
+                `Invoice ${result?.invoiceNumber || invoiceToUndo.invoiceNumber} undone. ${result?.clearedTimeEntryCount || 0} billed entr${result?.clearedTimeEntryCount === 1 ? 'y' : 'ies'} restored, ${result?.deletedAdjustmentCount || 0} invoice adjustment${result?.deletedAdjustmentCount === 1 ? '' : 's'} removed, and ${result?.unbilledExpenseCount || 0} expense${result?.unbilledExpenseCount === 1 ? '' : 's'} unbilled.${sequenceMessage}`
             );
         } catch (error) {
-            showToast(error.message || 'Unable to undo this invoice.', 'error');
+            showError(error.message || 'Unable to undo this invoice.');
         } finally {
             setIsUndoingInvoice(false);
         }
-    }, [emailInvoice, pendingUndoInvoice, selectedInvoice, showToast, undoConfirmationText, undoLatestInvoice]);
+    }, [emailInvoice, pendingUndoInvoice, selectedInvoice, showError, showSuccess, undoConfirmationText, undoLatestInvoice]);
 
     /**
      * Handle invoice edit
@@ -317,7 +316,7 @@ const InvoicesList = ({
                 markAsUnpaid(invoice.id);
             }
         } catch (error) {
-            showToast(error.message || 'Unable to update invoice payment status.', 'error');
+            showError(error.message || 'Unable to update invoice payment status.');
             return;
         }
 

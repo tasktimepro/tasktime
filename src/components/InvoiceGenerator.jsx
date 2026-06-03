@@ -261,6 +261,8 @@ const InvoiceGenerator = ({
     mode = 'invoice'
 }) => {
     const isQuoteMode = mode === 'quote';
+    const openedFromProjectContext = Boolean(project && !client);
+    const allowAdditionalProjectsSelection = Boolean(client && !project);
     // Yjs hooks for data access
     const { invoices, createInvoice, updateInvoice, undoLatestInvoice, canUndoInvoice } = useInvoices();
     const { projects } = useProjects();
@@ -289,6 +291,7 @@ const InvoiceGenerator = ({
     const { showSuccess, showError, showWarning } = useToast();
     const didAutoOpenModalRef = useRef(false); // Added a ref to track auto-open state
     const taskInputRef = useRef(null); // Ref for task description input field
+    const skipNextDraftRestoreRef = useRef(false);
     const [isHiddenForNestedModal, setIsHiddenForNestedModal] = useState(false);
     const [exchangeRates, setExchangeRates] = useState(null);
     const [exchangeRatesError, setExchangeRatesError] = useState(null);
@@ -1234,7 +1237,9 @@ const InvoiceGenerator = ({
         setSelectedClient(resolveClientFromDraft(draftState.selectedClientId, draftState.selectedClientSnapshot));
         setSelectedProject(resolveProjectFromDraft(draftState.selectedProjectId, draftState.selectedProjectSnapshot));
         setSelectedAdditionalProjectIds(
-            (draftState.selectedAdditionalProjectIds || []).filter((projectId) => resolveProjectFromDraft(projectId))
+            !editingInvoice && !allowAdditionalProjectsSelection
+                ? []
+                : (draftState.selectedAdditionalProjectIds || []).filter((projectId) => resolveProjectFromDraft(projectId))
         );
         setSelectedPaymentMethod(resolvePaymentMethodFromDraft(draftState.selectedPaymentMethodId, draftState.selectedPaymentMethodSnapshot));
         setSelectedBusinessInfo(resolveBusinessInfoFromDraft(draftState.selectedBusinessInfoId, draftState.selectedBusinessInfoSnapshot));
@@ -1279,10 +1284,12 @@ const InvoiceGenerator = ({
         setNewExpenseCurrency(draftState.newExpenseCurrency || normalizedInvoiceCurrency);
         setNewExpenseSupplierName(draftState.newExpenseSupplierName || '');
     }, [
+        allowAdditionalProjectsSelection,
         client,
         defaultBillingPeriodState.endDate,
         defaultBillingPeriodState.preset,
         defaultBillingPeriodState.startDate,
+        editingInvoice,
         normalizedInvoiceCurrency,
         project,
         resolveBusinessInfoFromDraft,
@@ -1859,6 +1866,12 @@ const InvoiceGenerator = ({
         setSelectedAdditionalProjectIds([]);
         baseHandleCancel();
     }, [baseHandleCancel, clearInvoiceFormState]);
+
+    const resetBillingPeriodState = useCallback(() => {
+        setBillingPeriodPreset(defaultBillingPeriodState.preset);
+        setBillingPeriodStart(defaultBillingPeriodState.startDate);
+        setBillingPeriodEnd(defaultBillingPeriodState.endDate);
+    }, [defaultBillingPeriodState]);
 
     const canUndoEditingInvoice = useMemo(() => {
         if (isQuoteMode || !editingInvoice) {
@@ -2667,6 +2680,8 @@ const InvoiceGenerator = ({
         setSelectedAdditionalProjectIds([]);
         clearInvoiceFormState();
         setPendingDraftRestore(null);
+        skipNextDraftRestoreRef.current = true;
+        resetBillingPeriodState();
         
         // Use the centralized reset function
         handleResetInvoiceForm();
@@ -2843,6 +2858,10 @@ const InvoiceGenerator = ({
                 setQuoteNumberTimestamp(getQuoteNumberTimestamp());
             }
 
+            if (!allowAdditionalProjectsSelection) {
+                setSelectedAdditionalProjectIds([]);
+            }
+
             // Open form with new invoice data
             const quoteLineItems = isQuoteMode && selectedProject
                 ? buildProjectQuoteLineItems({ project: selectedProject, tasks, clients })
@@ -2953,9 +2972,11 @@ const InvoiceGenerator = ({
                 setIsClientContextFixed(true);
             }
         }
-        setPendingDraftRestore(getInvoiceFormState());
+        const nextDraftRestore = skipNextDraftRestoreRef.current ? null : getInvoiceFormState();
+        skipNextDraftRestoreRef.current = false;
+        setPendingDraftRestore(nextDraftRestore);
         setShowInvoiceForm(true);
-    }, [availableExpensesWithConversion, client, clients, editingInvoice, expenses, getInvoiceFormState, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceDataForProjects, projects, quoteNumberTimestamp, selectedClient, selectedProject, selectedProjectsForInvoice, setIsProjectContextFixed, shouldSelectExpenseByDefault, showError, showInvoiceForm, tasks]);
+    }, [allowAdditionalProjectsSelection, availableExpensesWithConversion, client, clients, editingInvoice, expenses, getInvoiceFormState, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceDataForProjects, projects, quoteNumberTimestamp, selectedClient, selectedProject, selectedProjectsForInvoice, setIsProjectContextFixed, shouldSelectExpenseByDefault, showError, showInvoiceForm, tasks]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {
@@ -3008,6 +3029,8 @@ const InvoiceGenerator = ({
                     canUndoInvoice={canUndoEditingInvoice}
                     handleUndoInvoice={openUndoInvoiceConfirm}
                     mode={mode}
+                    openedFromProjectContext={openedFromProjectContext}
+                    allowAdditionalProjectsSelection={allowAdditionalProjectsSelection}
                     isProjectContextFixed={isProjectContextFixed}
                     isClientContextFixed={isClientContextFixed}
                     projects={projects}

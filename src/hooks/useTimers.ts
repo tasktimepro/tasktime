@@ -32,7 +32,7 @@ export interface UseTimersResult {
     /** Start timer for a task */
     startTimer: (taskId: string, note?: string) => void;
     /** Pause a project's timer */
-    pauseTimer: (projectId: string) => void;
+    pauseTimer: (projectId: string, pausedAt?: number) => void;
     /** Resume a project's timer */
     resumeTimer: (projectId: string) => void;
     /** Stop timer and create time entry */
@@ -56,6 +56,7 @@ export function useTimers(): UseTimersResult {
     // Use master clock for synchronized timing across all timer displays
     const hasRunningTimers = timerStates.some(timer => !timer.paused);
     const now = useMasterClock(hasRunningTimers);
+    const elapsedNow = hasRunningTimers ? Math.max(now, Date.now()) : now;
 
     const syncTimerStates = useCallback(() => {
         if (!isReady) return;
@@ -82,7 +83,7 @@ export function useTimers(): UseTimersResult {
             .map((timer) => {
                 const elapsedTime = timer.paused
                     ? (timer.pausedElapsedTime || 0)
-                    : Math.max(0, now - timer.startTime);
+                    : Math.max(0, elapsedNow - timer.startTime);
 
                 return {
                     ...timer,
@@ -95,7 +96,7 @@ export function useTimers(): UseTimersResult {
                 const bTime = b.lastActive || b.startTime;
                 return bTime - aTime;
             });
-    }, [timerStates, now]);
+    }, [timerStates, elapsedNow]);
 
     const getTimerForProject = useCallback((projectId: string) => {
         return timers.find(timer => timer.projectId === projectId) || null;
@@ -147,19 +148,22 @@ export function useTimers(): UseTimersResult {
         markMeaningfulActivity('timer_start');
     }, [isReady, store]);
 
-    const pauseTimer = useCallback((projectId: string) => {
+    const pauseTimer = useCallback((projectId: string, pausedAt?: number) => {
         if (!isReady) return;
 
         const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `pause timer ${projectId}`);
         if (!timer || timer.paused) return;
 
-        const elapsed = Date.now() - timer.startTime;
+        const pauseTimestamp = typeof pausedAt === 'number' && Number.isFinite(pausedAt)
+            ? pausedAt
+            : Date.now();
+        const elapsed = pauseTimestamp - timer.startTime;
 
         store.coreDoc.transact(() => {
             updateEntityFields(store.timers as any, projectId, {
                 paused: true,
                 pausedElapsedTime: elapsed,
-                lastActive: Date.now(),
+                lastActive: pauseTimestamp,
             });
         });
 
@@ -174,17 +178,11 @@ export function useTimers(): UseTimersResult {
 
         const pausedTime = timer.pausedElapsedTime || 0;
         const now = Date.now();
-        
-        // Align resume to next second boundary for consistent ticking
-        // Calculate the fractional part of the paused time
-        const pausedSeconds = Math.floor(pausedTime / 1000);
-        const alignedNow = Math.ceil(now / 1000) * 1000;
-        // Set startTime so that at alignedNow, elapsed = pausedSeconds * 1000
-        const alignedStartTime = alignedNow - (pausedSeconds * 1000);
 
         store.coreDoc.transact(() => {
             updateEntityFields(store.timers as any, projectId, {
-                startTime: alignedStartTime,
+                // Preserve the exact paused elapsed time so resume never jumps backward.
+                startTime: now - pausedTime,
                 paused: false,
                 pausedElapsedTime: 0,
                 lastActive: now,

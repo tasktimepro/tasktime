@@ -2,11 +2,7 @@
 
 ## Priority
 
-[ ] Manually test undo invoice and more invoices generations
-
-[ ] When I generated the invoice with the date filter to last month, it should have reverted that back to all time - this only applies to if we close the invoice modal, not when we submit, it should revert that
-
-[ ] Would be nice to add month property in the email template subject, and to also have the option to forward the email to the sender too - but it should also count as the sum of total emails left, so that would be two emails.
+[ ] Would be nice to add a {lastMonth} variable in the email template options, and to also have the option to forward the email to the sender too - that should also count as the sum of total emails left, so a forwarded email would be counted as 2 emails.
 
 ---
 

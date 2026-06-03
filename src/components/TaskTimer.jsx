@@ -19,12 +19,13 @@ const TaskTimer = ({
     size = 'normal',
     showTimeDisplay = true,
     isGlobalTimer = false,
-    onComplete = null
+    onComplete = null,
+    timer = null,
 }) => {
     // Use Yjs timer hook directly - elapsedTime is synchronized via master clock
     const { timers } = useTimers();
     
-    const activeTimer = timers.find(timer => timer.taskId === task.id) || null;
+    const activeTimer = timer || timers.find(timerItem => timerItem.taskId === task.id) || null;
     const isTimerActive = !!activeTimer;
     const isTimerPaused = isTimerActive && activeTimer.isPaused;
     const elapsedTime = activeTimer?.elapsedTime || 0;
@@ -52,6 +53,7 @@ const TaskTimer = ({
                 size={size}
                 isGlobalTimer={isGlobalTimer}
                 onComplete={onComplete}
+                timer={activeTimer}
             />
         </div>
     );

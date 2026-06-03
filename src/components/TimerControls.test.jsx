@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TimerControls from './TimerControls'
 import { ToastContext } from '../contexts/ToastContext'
@@ -143,6 +143,32 @@ describe('TimerControls', () => {
 
         expect(screen.getByTitle('Pause Timer')).toBeInTheDocument()
         expect(screen.getByTitle('Save & Stop Timer')).toBeInTheDocument()
+    })
+
+    it('pauses using the displayed elapsed time instead of the later click timestamp', () => {
+
+        mockProjectTimer = {
+            projectId: 'project-1',
+            taskId: 'task-1',
+            startTime: 0,
+            elapsedTime: 13000,
+            isPaused: false,
+            note: ''
+        }
+
+        renderWithToast(
+            <TimerControls task={baseTask} />
+        )
+
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(14000)
+
+        const pauseButton = screen.getByTitle('Pause Timer')
+        fireEvent.pointerDown(pauseButton)
+        fireEvent.click(pauseButton)
+
+        expect(timerHookMocks.pauseTimer).toHaveBeenCalledWith('project-1', 13000)
+
+        nowSpy.mockRestore()
     })
 
     it('stops timer and creates entry', async () => {

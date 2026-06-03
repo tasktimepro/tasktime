@@ -174,4 +174,27 @@ describe('GlobalTimer', () => {
         expect(timerDisplay.className).toContain('shrink-0')
         expect(pauseButton.className).toContain('shrink-0')
     })
+
+    it('keeps pause and stop controls when a timer prop is present before hook state catches up', () => {
+
+        mockTimers = []
+
+        renderWithToast(
+            <GlobalTimer
+                timer={{
+                    projectId: 'project-1',
+                    taskId: 'task-1',
+                    startTime: Date.now() - 10000,
+                    elapsedTime: 10000,
+                    isPaused: false,
+                    note: ''
+                }}
+                navigateToProject={vi.fn()}
+                onClose={vi.fn()}
+            />
+        )
+
+        expect(screen.getByRole('button', { name: 'Pause Timer' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Save & Stop Timer' })).toBeInTheDocument()
+    })
 })

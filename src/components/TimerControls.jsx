@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { PlayIcon, PauseIcon, StopIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
@@ -22,9 +22,11 @@ function TimerControls({
     task,
     size = 'normal',
     onComplete = null,
-    onStart = null
+    onStart = null,
+    timer = null,
 }) {
     const { showError } = useToast();
+    const pausePointerDownAtRef = useRef(null);
     
     // Use Yjs hooks directly
     const {
@@ -41,7 +43,7 @@ function TimerControls({
     
     const projectId = task.projectId;
     const timerKey = projectId || task.id;
-    const projectTimer = getTimerForTask(task.id, projectId);
+    const projectTimer = timer || getTimerForTask(task.id, projectId);
     const isTimerActive = !!projectTimer && projectTimer.taskId === task.id;
     const isTimerPaused = isTimerActive && projectTimer.isPaused;
 
@@ -139,8 +141,10 @@ function TimerControls({
      */
     const handlePause = useCallback(() => {
         if (!isTimerActive) return;
-        
-        timerPause(timerKey);
+
+        const pauseTimestamp = pausePointerDownAtRef.current;
+        pausePointerDownAtRef.current = null;
+        timerPause(timerKey, pauseTimestamp ?? undefined);
         
         // Update task's lastActive
         updateTask(task.id, { lastActive: Date.now() });
@@ -232,6 +236,15 @@ function TimerControls({
                         variant="ghost"
                         size="icon"
                         onClick={handlePause}
+                        onPointerDown={() => {
+                            const displayedPauseTime = projectTimer
+                                && typeof projectTimer.startTime === 'number'
+                                && typeof projectTimer.elapsedTime === 'number'
+                                ? projectTimer.startTime + projectTimer.elapsedTime
+                                : Date.now();
+
+                            pausePointerDownAtRef.current = displayedPauseTime;
+                        }}
                         className="status-warning-action h-8 w-8 shrink-0 status-warning-text-strong"
                         title="Pause Timer"
                     >

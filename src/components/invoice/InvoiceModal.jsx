@@ -27,6 +27,8 @@ const InvoiceModal = ({
     canUndoInvoice = false,
     handleUndoInvoice = null,
     mode = 'invoice',
+    openedFromProjectContext = false,
+    allowAdditionalProjectsSelection = false,
     isProjectContextFixed,
     isClientContextFixed,
     projects,
@@ -141,7 +143,7 @@ const InvoiceModal = ({
     // - 'projectClient' when opened from Invoices view (standalone mode)
     // - 'tasksTime' when opened from Project Dashboard view
     const getDefaultSection = () => {
-        if (isProjectContextFixed) {
+        if (openedFromProjectContext) {
             // From Project Dashboard - default to Tasks & Time
             return 'tasksTime';
         } else {
@@ -276,7 +278,7 @@ const InvoiceModal = ({
                 <div className="border border-border rounded-lg">
                     <button
                         type="button"
-                        data-autofocus
+                        {...(!openedFromProjectContext ? { 'data-autofocus': true } : {})}
                         onClick={() => toggleSection('projectClient')}
                         className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'projectClient' ? 'rounded-t-lg' : 'rounded-lg'}`}
                     >
@@ -441,7 +443,7 @@ const InvoiceModal = ({
                                                 />
                                             )}
 
-                                            {!isQuoteMode && selectedClient && availableProjects.length > 1 && selectedProject && (
+                                            {!isQuoteMode && allowAdditionalProjectsSelection && selectedClient && availableProjects.length > 1 && selectedProject && (
                                                 <div className="rounded-md border border-border bg-card p-3">
                                                     <div className="mb-2 text-xs font-medium text-muted-foreground">
                                                         Additional Projects
@@ -481,6 +483,7 @@ const InvoiceModal = ({
                 <InvoiceTaskSelector
                     activeSection={activeSection}
                     toggleSection={toggleSection}
+                    autoFocusToggle={openedFromProjectContext}
                     invoiceTasks={invoiceTasks}
                     selectedTasksForBilling={selectedTasksForBilling}
                     setSelectedTasksForBilling={setSelectedTasksForBilling}

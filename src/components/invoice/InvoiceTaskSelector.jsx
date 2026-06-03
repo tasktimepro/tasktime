@@ -15,6 +15,7 @@ import { getClientHourlyRate } from '../../utils/projectPlanningUtils.ts';
 const InvoiceTaskSelector = ({
     activeSection,
     toggleSection,
+    autoFocusToggle = false,
     invoiceTasks,
     selectedTasksForBilling,
     setSelectedTasksForBilling,
@@ -77,6 +78,7 @@ const InvoiceTaskSelector = ({
         <div className="border border-border rounded-lg">
             <button
                 type="button"
+                {...(autoFocusToggle ? { 'data-autofocus': true } : {})}
                 onClick={() => toggleSection('tasksTime')}
                 className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${activeSection === 'tasksTime' ? 'rounded-t-lg' : 'rounded-lg'}`}
             >

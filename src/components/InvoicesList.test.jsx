@@ -5,6 +5,11 @@ import userEvent from '@testing-library/user-event'
 import InvoicesList from './InvoicesList'
 
 const updateUrlMock = vi.fn()
+const toastMocks = vi.hoisted(() => ({
+
+    showSuccess: vi.fn(),
+    showError: vi.fn(),
+}))
 
 const invoiceHookMocks = vi.hoisted(() => ({
 
@@ -55,7 +60,10 @@ vi.mock('../hooks/useInvoices.ts', () => ({
 }))
 
 vi.mock('../hooks/useToast.ts', () => ({
-    useToast: () => ({ showToast: vi.fn() })
+    useToast: () => ({
+        showSuccess: toastMocks.showSuccess,
+        showError: toastMocks.showError,
+    })
 }))
 
 vi.mock('../hooks/useBusinessBrandAssets.ts', () => ({
@@ -105,6 +113,8 @@ describe('InvoicesList', () => {
         pdfMocks.generatePDF.mockClear()
         pdfMocks.createInvoiceHTML.mockClear()
         pdfMocks.getCurrentInvoiceHtmlContent.mockClear()
+        toastMocks.showSuccess.mockClear()
+        toastMocks.showError.mockClear()
         setMatchMedia(false)
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
         user = userEvent.setup()
@@ -340,6 +350,37 @@ describe('InvoicesList', () => {
 
         await waitFor(() => {
             expect(invoiceHookMocks.undoLatestInvoice).toHaveBeenCalledWith('inv-1')
+        })
+
+        expect(toastMocks.showSuccess).toHaveBeenCalledWith(
+            'Invoice INV-001 undone. 1 billed entry restored, 0 invoice adjustments removed, and 1 expense unbilled. Next invoice number was restored.'
+        )
+        expect(toastMocks.showError).not.toHaveBeenCalled()
+    })
+
+    it('shows an error toast when undoing the latest invoice fails', async () => {
+
+        invoiceHookMocks.canUndoInvoice.mockReturnValue(true)
+        invoiceHookMocks.undoLatestInvoice.mockRejectedValue(new Error('Undo blocked'))
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', clientName: 'Client Co' }]}
+                invoiceTemplates={[{ id: 'tpl-1', name: 'Default Template', useSequentialNumbers: true, currentSequentialNumber: 2, invoiceNumberFormat: 'INV-{sequential}' }]}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Undo' }))
+        await user.type(screen.getByLabelText(/Type INV-001 to confirm/i), 'INV-001')
+        await user.click(screen.getByRole('button', { name: 'Undo Invoice' }))
+
+        await waitFor(() => {
+            expect(toastMocks.showError).toHaveBeenCalledWith('Undo blocked')
         })
     })
 

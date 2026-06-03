@@ -55,11 +55,19 @@ vi.mock('@/components/ui/period-range-picker', () => ({
 }))
 
 vi.mock('../CustomCheckbox', () => ({
-    default: (props) => <input type="checkbox" {...props} />
+    default: ({ labelClassName, ...props }) => <input type="checkbox" {...props} />
 }))
 
 vi.mock('./InvoiceTaskSelector', () => ({
-    default: () => <div>Task selector</div>
+    default: ({ autoFocusToggle = false }) => (
+        <button
+            type="button"
+            data-testid="tasks-time-toggle"
+            {...(autoFocusToggle ? { 'data-autofocus': true } : {})}
+        >
+            Tasks & Time
+        </button>
+    )
 }))
 
 vi.mock('./InvoiceExpenseSelector', () => ({
@@ -84,6 +92,8 @@ const baseProps = {
     isClientContextFixed: false,
     projects: [],
     selectedProject: null,
+    selectedAdditionalProjectIds: [],
+    setSelectedAdditionalProjectIds: vi.fn(),
     handleProjectSelection: vi.fn(),
     clients: [],
     selectedClient: null,
@@ -202,5 +212,45 @@ describe('InvoiceModal', () => {
         render(<InvoiceModal {...baseProps} />)
 
         expect(screen.getByRole('button', { name: /client & project details/i })).toHaveAttribute('data-autofocus')
+    })
+
+    it('marks the tasks toggle as the explicit autofocus target when opened from a project dashboard', () => {
+        render(<InvoiceModal {...baseProps} openedFromProjectContext />)
+
+        expect(screen.getByTestId('tasks-time-toggle')).toHaveAttribute('data-autofocus')
+        expect(screen.getByRole('button', { name: /client & project details/i })).not.toHaveAttribute('data-autofocus')
+    })
+
+    it('shows additional projects only when the modal is opened from a client dashboard', () => {
+        render(
+            <InvoiceModal
+                {...baseProps}
+                allowAdditionalProjectsSelection
+                selectedClient={{ id: 'client-1', title: 'Acme' }}
+                selectedProject={{ id: 'project-1', title: 'Website' }}
+                projects={[
+                    { id: 'project-1', title: 'Website', preferredClientId: 'client-1' },
+                    { id: 'project-2', title: 'Retainer', preferredClientId: 'client-1' },
+                ]}
+            />
+        )
+
+        expect(screen.getByText('Additional Projects')).toBeInTheDocument()
+    })
+
+    it('hides additional projects outside the client dashboard flow', () => {
+        render(
+            <InvoiceModal
+                {...baseProps}
+                selectedClient={{ id: 'client-1', title: 'Acme' }}
+                selectedProject={{ id: 'project-1', title: 'Website' }}
+                projects={[
+                    { id: 'project-1', title: 'Website', preferredClientId: 'client-1' },
+                    { id: 'project-2', title: 'Retainer', preferredClientId: 'client-1' },
+                ]}
+            />
+        )
+
+        expect(screen.queryByText('Additional Projects')).not.toBeInTheDocument()
     })
 })
