@@ -129,7 +129,7 @@ describe('registerAppServiceWorker', () => {
         expect(postReloadToastMocks.queuePostReloadToast).not.toHaveBeenCalled();
     });
 
-    it('reloads once when an existing production service worker is replaced', async () => {
+    it('does not force reload when an existing production service worker is replaced', async () => {
         postReloadToastMocks.queuePostReloadToast.mockClear();
 
         const windowObject = {
@@ -154,12 +154,8 @@ describe('registerAppServiceWorker', () => {
         serviceWorker.dispatch('controllerchange');
         serviceWorker.dispatch('controllerchange');
 
-        expect(windowObject.location.reload).toHaveBeenCalledTimes(1);
-        expect(postReloadToastMocks.queuePostReloadToast).toHaveBeenCalledTimes(1);
-        expect(postReloadToastMocks.queuePostReloadToast).toHaveBeenCalledWith({
-            level: 'success',
-            message: 'TaskTime was updated',
-        });
+        expect(windowObject.location.reload).not.toHaveBeenCalled();
+        expect(postReloadToastMocks.queuePostReloadToast).not.toHaveBeenCalled();
     });
 
     it('asks a newly installed worker to skip waiting when an active controller already exists', async () => {

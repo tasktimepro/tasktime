@@ -47,14 +47,25 @@ export function consumePostReloadToast(): PostReloadToast | null {
     }
 }
 
-export function rememberAppVersion(currentVersion: string): void {
+export function consumeAppVersionUpdateToast(currentVersion: string): PostReloadToast | null {
     if (typeof window === 'undefined' || !currentVersion) {
-        return;
+        return null;
     }
 
     try {
+        const lastSeenVersion = localStorage.getItem(LAST_SEEN_APP_VERSION_KEY);
+
         localStorage.setItem(LAST_SEEN_APP_VERSION_KEY, currentVersion);
+
+        if (!lastSeenVersion || lastSeenVersion === currentVersion) {
+            return null;
+        }
+
+        return {
+            level: 'success',
+            message: 'TaskTime was updated',
+        };
     } catch {
-        // Ignore storage failures so startup behavior still proceeds.
+        return null;
     }
 }

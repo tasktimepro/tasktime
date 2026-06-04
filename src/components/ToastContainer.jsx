@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { ToastContext } from '../contexts/ToastContext.ts';
 import { APP_VERSION, TOAST_DURATION_DEFAULT_MS, TOAST_DURATION_WARNING_MS } from '../constants/app.ts';
-import { consumePostReloadToast, rememberAppVersion } from '../utils/postReloadToast.ts';
+import { consumeAppVersionUpdateToast, consumePostReloadToast } from '../utils/postReloadToast.ts';
 
 /**
  * Toast provider component that manages toasts across the application
@@ -12,53 +12,32 @@ import { consumePostReloadToast, rememberAppVersion } from '../utils/postReloadT
 export const ToastProvider = ({ children }) => {
 
     useEffect(() => {
-        rememberAppVersion(APP_VERSION);
+        const pendingToast = consumePostReloadToast();
+        const versionUpdateToast = consumeAppVersionUpdateToast(APP_VERSION);
+        const startupToast = pendingToast ?? versionUpdateToast;
 
-        const showPendingPostReloadToast = () => {
-            const pendingToast = consumePostReloadToast();
-
-            if (!pendingToast) {
-                return;
-            }
-
-            const options = pendingToast.duration ? { duration: pendingToast.duration } : undefined;
-
-            switch (pendingToast.level) {
-                case 'success':
-                    toast.success(pendingToast.message, options);
-                    break;
-                case 'error':
-                    toast.error(pendingToast.message, options);
-                    break;
-                case 'info':
-                    toast.info(pendingToast.message, options);
-                    break;
-                case 'warning':
-                    toast.warning(pendingToast.message, options);
-                    break;
-                default:
-                    break;
-            }
-        };
-
-        if (typeof document !== 'undefined' && document.hidden) {
-            const handleVisibilityChange = () => {
-                if (document.hidden) {
-                    return;
-                }
-
-                document.removeEventListener('visibilitychange', handleVisibilityChange);
-                showPendingPostReloadToast();
-            };
-
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-
-            return () => {
-                document.removeEventListener('visibilitychange', handleVisibilityChange);
-            };
+        if (!startupToast) {
+            return;
         }
 
-        showPendingPostReloadToast();
+        const options = startupToast.duration ? { duration: startupToast.duration } : undefined;
+
+        switch (startupToast.level) {
+            case 'success':
+                toast.success(startupToast.message, options);
+                break;
+            case 'error':
+                toast.error(startupToast.message, options);
+                break;
+            case 'info':
+                toast.info(startupToast.message, options);
+                break;
+            case 'warning':
+                toast.warning(startupToast.message, options);
+                break;
+            default:
+                break;
+        }
     }, []);
 
     // Helper methods for different toast types - wraps sonner's toast API

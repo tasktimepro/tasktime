@@ -1,12 +1,12 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ToastProvider } from './ToastContainer'
 import { useToast } from '../hooks/useToast'
 
 const consumePostReloadToastMock = vi.hoisted(() => vi.fn())
-const rememberAppVersionMock = vi.hoisted(() => vi.fn())
+const consumeAppVersionUpdateToastMock = vi.hoisted(() => vi.fn())
 
 const toasterRenderSpy = vi.hoisted(() => vi.fn())
 
@@ -29,8 +29,8 @@ vi.mock('@/components/ui/sonner', () => ({
 }))
 
 vi.mock('../utils/postReloadToast.ts', () => ({
+    consumeAppVersionUpdateToast: consumeAppVersionUpdateToastMock,
     consumePostReloadToast: consumePostReloadToastMock,
-    rememberAppVersion: rememberAppVersionMock
 }))
 
 const TriggerToast = () => {
@@ -49,10 +49,7 @@ describe('ToastProvider', () => {
 
         vi.clearAllMocks()
         consumePostReloadToastMock.mockReturnValue(null)
-        Object.defineProperty(document, 'hidden', {
-            configurable: true,
-            value: false
-        })
+        consumeAppVersionUpdateToastMock.mockReturnValue(null)
     })
 
     it('renders children and toaster', () => {
@@ -117,13 +114,9 @@ describe('ToastProvider', () => {
         expect(toastMocks.success).toHaveBeenCalledWith('TaskTime was updated', undefined)
     })
 
-    it('waits until a hidden tab becomes visible before consuming the queued update toast', () => {
+    it('dispatches an app update success toast when a new build is detected on startup', () => {
 
-        Object.defineProperty(document, 'hidden', {
-            configurable: true,
-            value: true
-        })
-        consumePostReloadToastMock.mockReturnValue({
+        consumeAppVersionUpdateToastMock.mockReturnValue({
             level: 'success',
             message: 'TaskTime was updated'
         })
@@ -134,20 +127,19 @@ describe('ToastProvider', () => {
             </ToastProvider>
         )
 
-        expect(consumePostReloadToastMock).not.toHaveBeenCalled()
-        expect(toastMocks.success).not.toHaveBeenCalled()
-
-        Object.defineProperty(document, 'hidden', {
-            configurable: true,
-            value: false
-        })
-        fireEvent(document, new Event('visibilitychange'))
-
-        expect(consumePostReloadToastMock).toHaveBeenCalledTimes(1)
         expect(toastMocks.success).toHaveBeenCalledWith('TaskTime was updated', undefined)
     })
 
-    it('records the current app version on mount without showing a startup update toast', () => {
+    it('prefers the queued post-reload toast over the startup version toast', () => {
+
+        consumePostReloadToastMock.mockReturnValue({
+            level: 'success',
+            message: 'Reloaded successfully'
+        })
+        consumeAppVersionUpdateToastMock.mockReturnValue({
+            level: 'success',
+            message: 'TaskTime was updated'
+        })
 
         render(
             <ToastProvider>
@@ -155,7 +147,7 @@ describe('ToastProvider', () => {
             </ToastProvider>
         )
 
-        expect(rememberAppVersionMock).toHaveBeenCalledTimes(1)
-        expect(toastMocks.success).not.toHaveBeenCalled()
+        expect(toastMocks.success).toHaveBeenCalledTimes(1)
+        expect(toastMocks.success).toHaveBeenCalledWith('Reloaded successfully', undefined)
     })
 })

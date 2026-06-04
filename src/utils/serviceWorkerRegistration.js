@@ -1,12 +1,3 @@
-import { queuePostReloadToast } from './postReloadToast.ts';
-
-function queueAppUpdatedToast() {
-    queuePostReloadToast({
-        level: 'success',
-        message: 'TaskTime was updated',
-    });
-}
-
 function requestWaitingWorkerActivation(worker) {
     if (!worker) {
         return;
@@ -16,7 +7,7 @@ function requestWaitingWorkerActivation(worker) {
 }
 
 /**
- * Register the production service worker and force-refresh only for actual updates.
+ * Register the production service worker and let updates take effect on the next app load.
  */
 export function registerAppServiceWorker({
     isProd,
@@ -31,8 +22,6 @@ export function registerAppServiceWorker({
 
     if (isProd) {
         windowObject.addEventListener('load', () => {
-            const hadControllerOnLoad = Boolean(serviceWorker.controller);
-
             serviceWorker.register('/sw.js').then((registration) => {
                 registration.update();
 
@@ -50,15 +39,6 @@ export function registerAppServiceWorker({
                         }
                     });
                 });
-            });
-
-            let refreshing = false;
-            serviceWorker.addEventListener('controllerchange', () => {
-                if (!hadControllerOnLoad || refreshing) return;
-
-                refreshing = true;
-                queueAppUpdatedToast();
-                windowObject.location.reload();
             });
         });
 
