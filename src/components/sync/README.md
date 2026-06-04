@@ -33,13 +33,13 @@ When adding a document, update export/import, Drive sync, validation, local clea
 | Tab focus | No auto-sync | Push pending local changes only | Pull+push, cooldown guarded |
 | Network online | No auto-sync | Push pending local changes only | Pull+push, cooldown guarded |
 | Periodic interval | None | None | Pull+push every 15 minutes |
-| Page reload connect | Connect only | Initial pull if remote data exists, otherwise push dirty docs | Pull+push |
+| Page reload connect | Connect only, except a pristine first device may do one bootstrap pull | Initial pull if remote data exists, otherwise push dirty docs | Pull+push |
 | Sync Now | Pull+push forced | Pull+push forced | Pull+push forced |
 | Reconnect after disconnect | Connect only | Push dirty docs on connect | Push dirty docs on connect |
 
 Mode rules:
 
-- Manual means user-controlled. Do not pull or push automatically after connect/reload unless the user clicks Sync Now.
+- Manual means user-controlled. Do not pull or push automatically after connect/reload unless the user clicks Sync Now, except for a one-time bootstrap pull on a pristine device so existing Drive data appears immediately after first connect.
 - Backup means push-only by default after connect. It must not overwrite changed remote Drive state without requiring Sync Now first.
 - Sync means bidirectional. It should merge remote changes and push local changes.
 - All modes must preserve pending local changes after failed uploads.

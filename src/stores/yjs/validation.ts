@@ -24,6 +24,8 @@ import type {
 } from './types';
 import type { YjsDocManager } from './YjsDocManager';
 
+z.config({ jitless: true });
+
 const STORAGE_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const HEX_COLOR_REGEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const IMAGE_DATA_URL_REGEX = /^data:image\/(svg\+xml|png|jpeg|webp)(;charset=[^;,]+)?(;base64)?,/i;
@@ -37,7 +39,12 @@ const finiteNumberSchema = z.number().finite();
 const integerNumberSchema = z.number().int();
 const nonNegativeNumberSchema = z.number().finite().min(0);
 const nonEmptyStringSchema = z.string().trim().min(1);
+const nullableIdSchema = z.string().trim().min(1).nullable();
 const optionalNullableIdSchema = z.string().trim().min(1).nullable().optional();
+const nullableIdWithLegacyUndefinedSchema = z.preprocess(
+    (value) => (value === undefined ? null : value),
+    nullableIdSchema
+);
 const hexColorSchema = z.string().regex(HEX_COLOR_REGEX);
 const imageDataUrlSchema = z.string().regex(IMAGE_DATA_URL_REGEX);
 const brandAssetMimeTypeSchema = z.enum(['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp']);
@@ -335,7 +342,7 @@ const invoiceBillingStateSnapshotSchema = z.object({
 
 const invoiceSchema = z.object({
     id: nonEmptyStringSchema,
-    projectId: optionalNullableIdSchema,
+    projectId: nullableIdWithLegacyUndefinedSchema,
     projectIds: z.array(nonEmptyStringSchema).optional(),
     projectBreakdowns: z.array(invoiceProjectBreakdownSchema).optional(),
     clientId: nonEmptyStringSchema,

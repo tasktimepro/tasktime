@@ -100,6 +100,10 @@ async function withSyncLock<T>(fn: () => Promise<T>, wait: boolean = false): Pro
 
 type DocUpdateHandler = (...args: unknown[]) => void;
 
+type ConnectOptions = {
+    bootstrapPullIfPristine?: boolean;
+};
+
 export class YjsDriveProvider {
 
     private docManager: YjsDocManager;
@@ -444,10 +448,11 @@ export class YjsDriveProvider {
      * @param syncMode - Optional sync mode to determine connect behavior.
      *   'sync' = pull + push (default), 'backup' = push only, 'manual' = subscribe only
      */
-    async connect(syncMode?: DriveSyncMode): Promise<void> {
+    async connect(syncMode?: DriveSyncMode, options: ConnectOptions = {}): Promise<void> {
         if (this.connected) return;
 
         const mode = syncMode ?? this.syncMode;
+        const bootstrapPullIfPristine = options.bootstrapPullIfPristine === true;
         this.syncMode = mode;
 
         try {
@@ -541,8 +546,28 @@ export class YjsDriveProvider {
 
                 this.promotePersistedLocalChangesToFullState(this.docManager.getLoadedDocs());
 
-                for (const docName of this.docManager.getLoadedDocs()) {
-                    this.subscribeToDoc(docName);
+                const remoteManifest = this.manifest.getManifest();
+                const hasRemoteData = remoteManifest && Object.keys(remoteManifest.documents).length > 0;
+                const shouldBootstrapPull = bootstrapPullIfPristine && hasRemoteData && !this.hasLocalChangesToPush();
+
+                if (shouldBootstrapPull) {
+                    this.log('connect: bootstrap pull for pristine manual-mode device');
+                    this.setPhase('downloading');
+
+                    for (const docName of this.docManager.getLoadedDocs()) {
+                        if (remoteManifest.documents[docName]) {
+                            await this.syncDoc(docName, true);
+                        }
+                        this.subscribeToDoc(docName);
+                    }
+
+                    if (this.manifest.isDirty()) {
+                        await this.manifest.save();
+                    }
+                } else {
+                    for (const docName of this.docManager.getLoadedDocs()) {
+                        this.subscribeToDoc(docName);
+                    }
                 }
             }
 

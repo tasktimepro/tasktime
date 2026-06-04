@@ -61,11 +61,63 @@ describe('YjsDriveProvider', () => {
 
         provider.markDocsForFullStateUpload(['core'])
 
-        await provider.connect('manual')
+        await provider.connect('manual', { bootstrapPullIfPristine: false })
 
         expect(provider.manifest.load).toHaveBeenCalled()
         expect(provider.syncDoc).not.toHaveBeenCalled()
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
+    })
+
+    it('pulls remote data on manual-mode connect when bootstrap is allowed for a pristine device', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: { core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] } } })),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async () => {})
+        provider.subscribeToDoc = vi.fn()
+
+        await provider.connect('manual', { bootstrapPullIfPristine: true })
+
+        expect(provider.manifest.load).toHaveBeenCalled()
+        expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
+        expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
+    })
+
+    it('does not create missing remote docs during manual-mode bootstrap pull', async () => {
+        const coreDoc = new Y.Doc()
+        const archivedExpensesDoc = new Y.Doc()
+        const docManager = {
+            getLoadedDocs: () => ['core', 'expenses-archived'],
+            getDocSync: (name) => {
+                if (name === 'core') return coreDoc
+                if (name === 'expenses-archived') return archivedExpensesDoc
+                return null
+            },
+        }
+        const provider = new YjsDriveProvider(docManager, 'playwright-access-token')
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: { core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] } } })),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async () => {})
+        provider.subscribeToDoc = vi.fn()
+
+        await provider.connect('manual', { bootstrapPullIfPristine: true })
+
+        expect(provider.syncDoc).toHaveBeenCalledTimes(1)
+        expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
+        expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
+        expect(provider.subscribeToDoc).toHaveBeenCalledWith('expenses-archived')
     })
 
     it('flushes pending local changes on pagehide in backup mode', async () => {

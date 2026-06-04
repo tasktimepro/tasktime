@@ -165,6 +165,37 @@ describe('YjsStore reconnect sync tracking', () => {
         store.destroy()
     })
 
+    it('bootstraps a pristine manual-mode device with a remote pull check on connect', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+
+        expect(provider.connect).toHaveBeenCalledWith('manual', { bootstrapPullIfPristine: true })
+
+        store.destroy()
+    })
+
+    it('skips manual-mode bootstrap pull when local entity data already exists', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        docs.get('core').getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Local only project',
+        }))
+
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+
+        expect(provider.connect).toHaveBeenCalledWith('manual', { bootstrapPullIfPristine: false })
+
+        store.destroy()
+    })
+
     it('keeps disconnected dirty docs queued when reconnect leaves provider work pending', async () => {
         const store = new YjsStore()
         await store.initialize()

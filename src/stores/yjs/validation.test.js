@@ -1,7 +1,7 @@
 // @ts-nocheck
 
 import * as Y from 'yjs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { validateCollectionEntity, validateDocManagerState } from './validation.ts'
 
 function objectToYMap(data) {
@@ -27,6 +27,26 @@ function createDocManager(coreDoc = null, loadedDocs = ['core'], extraDocs = {})
 }
 
 describe('Yjs validation', () => {
+    it('keeps Zod validation jitless for the production CSP', () => {
+        const OriginalFunction = globalThis.Function
+
+        try {
+            globalThis.Function = vi.fn(() => {
+                throw new Error('Zod JIT should not execute under TaskTime CSP')
+            })
+
+            expect(validateCollectionEntity('projects', {
+                id: 'project-csp-safe',
+                title: 'CSP safe project',
+            }, 'csp validation')).toEqual({
+                id: 'project-csp-safe',
+                title: 'CSP safe project',
+            })
+        } finally {
+            globalThis.Function = OriginalFunction
+        }
+    })
+
     it('accepts valid entities and rejects malformed collection records', () => {
         expect(validateCollectionEntity('projects', { id: 'project-1', title: 'Valid Project' }, 'test project')).toEqual({
             id: 'project-1',
@@ -202,6 +222,22 @@ describe('Yjs validation', () => {
             total: 125,
             paymentMethodId: null,
         }, 'test invoice')).not.toThrow()
+    })
+
+    it('normalizes legacy invoices missing projectId to null', () => {
+        expect(validateCollectionEntity('invoices', {
+            id: 'invoice-legacy-project-id',
+            clientId: 'client-1',
+            invoiceNumber: 'INV-LEGACY-PROJECT',
+            date: '2026-04-07',
+            status: 'draft',
+            items: [],
+            subtotal: 0,
+            total: 0,
+        }, 'legacy invoice without projectId')).toEqual(expect.objectContaining({
+            id: 'invoice-legacy-project-id',
+            projectId: null,
+        }))
     })
 
     it('normalizes legacy one-time paid expenses instead of dropping them', () => {

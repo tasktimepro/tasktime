@@ -6,7 +6,7 @@ import { ToastProvider } from './ToastContainer'
 import { useToast } from '../hooks/useToast'
 
 const consumePostReloadToastMock = vi.hoisted(() => vi.fn())
-const consumeAppVersionUpdateToastMock = vi.hoisted(() => vi.fn())
+const rememberAppVersionMock = vi.hoisted(() => vi.fn())
 
 const toasterRenderSpy = vi.hoisted(() => vi.fn())
 
@@ -29,8 +29,8 @@ vi.mock('@/components/ui/sonner', () => ({
 }))
 
 vi.mock('../utils/postReloadToast.ts', () => ({
-    consumeAppVersionUpdateToast: consumeAppVersionUpdateToastMock,
-    consumePostReloadToast: consumePostReloadToastMock
+    consumePostReloadToast: consumePostReloadToastMock,
+    rememberAppVersion: rememberAppVersionMock
 }))
 
 const TriggerToast = () => {
@@ -49,7 +49,6 @@ describe('ToastProvider', () => {
 
         vi.clearAllMocks()
         consumePostReloadToastMock.mockReturnValue(null)
-        consumeAppVersionUpdateToastMock.mockReturnValue(null)
     })
 
     it('renders children and toaster', () => {
@@ -98,25 +97,9 @@ describe('ToastProvider', () => {
         })
     })
 
-    it('dispatches a queued post-reload success toast on mount', () => {
+    it('dispatches the queued app update toast after reload', () => {
 
         consumePostReloadToastMock.mockReturnValue({
-            level: 'success',
-            message: 'Reloaded successfully'
-        })
-
-        render(
-            <ToastProvider>
-                <div>Child</div>
-            </ToastProvider>
-        )
-
-        expect(toastMocks.success).toHaveBeenCalledWith('Reloaded successfully', undefined)
-    })
-
-    it('dispatches an app update success toast when a new build is detected on startup', () => {
-
-        consumeAppVersionUpdateToastMock.mockReturnValue({
             level: 'success',
             message: 'TaskTime was updated'
         })
@@ -130,16 +113,7 @@ describe('ToastProvider', () => {
         expect(toastMocks.success).toHaveBeenCalledWith('TaskTime was updated', undefined)
     })
 
-    it('prefers the queued post-reload toast over the startup version toast', () => {
-
-        consumePostReloadToastMock.mockReturnValue({
-            level: 'success',
-            message: 'Reloaded successfully'
-        })
-        consumeAppVersionUpdateToastMock.mockReturnValue({
-            level: 'success',
-            message: 'TaskTime was updated'
-        })
+    it('records the current app version on mount without showing a startup update toast', () => {
 
         render(
             <ToastProvider>
@@ -147,7 +121,7 @@ describe('ToastProvider', () => {
             </ToastProvider>
         )
 
-        expect(toastMocks.success).toHaveBeenCalledTimes(1)
-        expect(toastMocks.success).toHaveBeenCalledWith('Reloaded successfully', undefined)
+        expect(rememberAppVersionMock).toHaveBeenCalledTimes(1)
+        expect(toastMocks.success).not.toHaveBeenCalled()
     })
 })

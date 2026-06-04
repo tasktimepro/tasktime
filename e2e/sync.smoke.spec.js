@@ -14,7 +14,7 @@ import {
 } from './helpers/tasktime.js';
 
 test.describe('Cloud sync smoke', () => {
-    test('keeps remote data untouched on first manual restore until Sync Now runs', async ({ page }) => {
+    test('pulls remote data on first manual restore when local state is pristine', async ({ page }) => {
         const projectTitle = `Playwright Remote Project ${Date.now()}`;
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({
             projects: [
@@ -41,18 +41,11 @@ test.describe('Cloud sync smoke', () => {
 
         await page.reload();
 
-        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-        await expect(page.getByText('No projects')).toBeVisible();
-        await expect(page.getByRole('heading', { name: projectTitle })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
-        expect(driveFixture.uploads).toHaveLength(0);
-
-        await syncNowFromAccount(page);
-        await page.goto('/projects');
-
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible({ timeout: 20_000 });
         await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible({ timeout: 20_000 });
-        await expect(page.getByText('No projects')).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'In sync' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Sync changes' })).toHaveCount(0);
+        expect(driveFixture.uploads).toHaveLength(0);
 
         await page.reload();
 

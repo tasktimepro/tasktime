@@ -809,7 +809,11 @@ export class YjsStore {
             this.backupManager.maybeCreateBackup(frequencyHours).catch(console.error);
         });
 
-        await this.driveProvider.connect(this.driveSyncMode);
+        const bootstrapPullIfPristine = this.driveSyncMode === 'manual' && this.shouldBootstrapRemotePullOnManualConnect();
+
+        await this.driveProvider.connect(this.driveSyncMode, {
+            bootstrapPullIfPristine,
+        });
 
         // Clear disconnected dirty docs after a successful online reconnect
         // only when connect() actually reconciled them. Manual mode keeps
@@ -1431,6 +1435,60 @@ export class YjsStore {
 
     private isDisconnectedDirtyDoc(docName: DocName): boolean {
         return this.disconnectedDirtyDocs.has(docName);
+    }
+
+    private shouldBootstrapRemotePullOnManualConnect(): boolean {
+        if (this.disconnectedDirtyDocs.size > 0) {
+            return false;
+        }
+
+        return !this.docManager.getLoadedDocs().some((docName) => this.docHasMeaningfulLocalData(docName));
+    }
+
+    private docHasMeaningfulLocalData(docName: DocName): boolean {
+        const doc = this.docManager.getDocSync(docName);
+        if (!doc) {
+            return false;
+        }
+
+        if (docName === 'core') {
+            return [
+                'projects',
+                'tasks',
+                'clients',
+                'businessInfos',
+                'businessBrandAssets',
+                'invoiceTemplates',
+                'emailTemplates',
+                'paymentMethods',
+                'expenseCategories',
+                'taxReturnPeriods',
+                'expenses',
+                'expenseRecurrences',
+                'timers',
+                'plannerAttachments',
+                'dailyGoals',
+                'invoices',
+            ].some((mapName) => doc.getMap(mapName).size > 0);
+        }
+
+        if (docName === 'entries-active' || /^entries-\d{4}$/.test(docName)) {
+            return doc.getMap('timeEntries').size > 0;
+        }
+
+        if (docName === 'tasks-archived') {
+            return doc.getMap('tasks').size > 0;
+        }
+
+        if (docName === 'expenses-archived') {
+            return doc.getMap('expenses').size > 0;
+        }
+
+        if (docName === 'invoices-archived') {
+            return doc.getMap('invoices').size > 0;
+        }
+
+        return false;
     }
 
     private canClearDisconnectedDirtyDocsAfterSync(): boolean {

@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { ToastContext } from '../contexts/ToastContext.ts';
 import { APP_VERSION, TOAST_DURATION_DEFAULT_MS, TOAST_DURATION_WARNING_MS } from '../constants/app.ts';
-import { consumeAppVersionUpdateToast, consumePostReloadToast } from '../utils/postReloadToast.ts';
+import { consumePostReloadToast, rememberAppVersion } from '../utils/postReloadToast.ts';
 
 /**
  * Toast provider component that manages toasts across the application
@@ -13,27 +13,26 @@ export const ToastProvider = ({ children }) => {
 
     useEffect(() => {
         const pendingToast = consumePostReloadToast();
-        const versionUpdateToast = consumeAppVersionUpdateToast(APP_VERSION);
-        const startupToast = pendingToast ?? versionUpdateToast;
+        rememberAppVersion(APP_VERSION);
 
-        if (!startupToast) {
+        if (!pendingToast) {
             return;
         }
 
-        const options = startupToast.duration ? { duration: startupToast.duration } : undefined;
+        const options = pendingToast.duration ? { duration: pendingToast.duration } : undefined;
 
-        switch (startupToast.level) {
+        switch (pendingToast.level) {
             case 'success':
-                toast.success(startupToast.message, options);
+                toast.success(pendingToast.message, options);
                 break;
             case 'error':
-                toast.error(startupToast.message, options);
+                toast.error(pendingToast.message, options);
                 break;
             case 'info':
-                toast.info(startupToast.message, options);
+                toast.info(pendingToast.message, options);
                 break;
             case 'warning':
-                toast.warning(startupToast.message, options);
+                toast.warning(pendingToast.message, options);
                 break;
             default:
                 break;

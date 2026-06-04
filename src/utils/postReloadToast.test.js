@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { consumeAppVersionUpdateToast, consumePostReloadToast, queuePostReloadToast } from './postReloadToast.ts'
+import { consumePostReloadToast, queuePostReloadToast, rememberAppVersion } from './postReloadToast.ts'
 
 describe('postReloadToast', () => {
     const originalWindow = global.window
@@ -56,43 +56,24 @@ describe('postReloadToast', () => {
 
         expect(() => queuePostReloadToast({ level: 'info', message: 'Queued' })).not.toThrow()
         expect(consumePostReloadToast()).toBeNull()
-        expect(consumeAppVersionUpdateToast('1.2.3')).toBeNull()
+        expect(() => rememberAppVersion('1.2.3')).not.toThrow()
 
         vi.stubGlobal('window', originalWindow)
         vi.stubGlobal('localStorage', originalLocalStorage)
         vi.stubGlobal('sessionStorage', originalSessionStorage)
     })
 
-    it('returns null and stores the version on the first seen build', () => {
-        localStorageMock.getItem.mockReturnValue(null)
-
-        expect(consumeAppVersionUpdateToast('1.2.3')).toBeNull()
+    it('stores the current build version', () => {
+        rememberAppVersion('1.2.3')
         expect(localStorageMock.setItem).toHaveBeenCalledWith('tasktime-last-seen-app-version', '1.2.3')
     })
 
-    it('returns null when the build version is unchanged', () => {
-        localStorageMock.getItem.mockReturnValue('1.2.3')
-
-        expect(consumeAppVersionUpdateToast('1.2.3')).toBeNull()
-        expect(localStorageMock.setItem).toHaveBeenCalledWith('tasktime-last-seen-app-version', '1.2.3')
-    })
-
-    it('returns a success toast when the build version changed', () => {
-        localStorageMock.getItem.mockReturnValue('1.2.2')
-
-        expect(consumeAppVersionUpdateToast('1.2.3')).toEqual({
-            level: 'success',
-            message: 'TaskTime was updated',
-        })
-        expect(localStorageMock.setItem).toHaveBeenCalledWith('tasktime-last-seen-app-version', '1.2.3')
-    })
-
-    it('returns null when version storage access fails', () => {
-        localStorageMock.getItem.mockImplementation(() => {
+    it('ignores app version storage failures', () => {
+        localStorageMock.setItem.mockImplementation(() => {
             throw new Error('storage blocked')
         })
 
-        expect(consumeAppVersionUpdateToast('1.2.3')).toBeNull()
+        expect(() => rememberAppVersion('1.2.3')).not.toThrow()
     })
 
     it('returns null when no queued toast exists', () => {
