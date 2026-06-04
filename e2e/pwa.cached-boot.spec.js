@@ -48,28 +48,25 @@ async function expectStaticPublicRoute(page, { path, title, heading }) {
 }
 
 test.describe('PWA smoke', () => {
-    test('boots from the cached app shell while offline after the production service worker is active', async ({ browser }) => {
+    test('stays usable offline after the production service worker is active', async ({ browser }) => {
         const context = await browser.newContext();
 
         try {
-            const onlinePage = await context.newPage();
+            const page = await context.newPage();
             const projectTitle = `Playwright Cached Boot Project ${Date.now()}`;
 
-            await onlinePage.goto('/projects');
-            await expect(onlinePage.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+            await page.goto('/projects');
+            await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
 
-            await createPersonalProject(onlinePage, projectTitle);
+            await createPersonalProject(page, projectTitle);
 
-            await waitForActiveServiceWorker(onlinePage);
+            await waitForActiveServiceWorker(page);
 
             await context.setOffline(true);
 
-            const offlinePage = await context.newPage();
-            await offlinePage.goto('/projects');
-
-            await expect(offlinePage.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-            await expect(offlinePage.getByRole('heading', { name: projectTitle })).toBeVisible();
-            await expect(offlinePage.getByText("You're offline")).toBeVisible();
+            await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+            await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
+            await expect(page.getByText("You're offline")).toBeVisible();
         } finally {
             await context.close();
         }

@@ -2,7 +2,6 @@
 
 ## Priority
 
-[ ] Screenshot mobile UI adjustments
 
 ---
 
