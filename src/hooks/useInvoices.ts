@@ -64,6 +64,13 @@ export interface UseInvoicesOptions {
     includeArchived?: boolean;
 }
 
+export interface UpdateInvoicePaymentDetailsOptions {
+    paidAt?: number;
+    paymentCurrencySnapshot?: Invoice['paymentCurrencySnapshot'];
+}
+
+export interface MarkInvoicePaidOptions extends UpdateInvoicePaymentDetailsOptions {}
+
 export function useInvoices(options: UseInvoicesOptions = {}) {
     const {
         store,
@@ -177,6 +184,34 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         return normalizeCurrencyCode(typeof storedPreference === 'string' ? storedPreference : undefined);
     }, [store]);
 
+    const resolveInvoicePaymentSnapshot = useCallback(async (
+        invoice: Invoice,
+        preferredCurrency: string,
+        paidAt: number,
+        options: UpdateInvoicePaymentDetailsOptions = {}
+    ) => {
+        if (Object.prototype.hasOwnProperty.call(options, 'paymentCurrencySnapshot')) {
+            return options.paymentCurrencySnapshot ?? undefined;
+        }
+
+        const requiresSnapshot = shouldStoreInvoicePaymentSnapshot(invoice, preferredCurrency);
+        if (!requiresSnapshot) {
+            return undefined;
+        }
+
+        const { rates, error } = await fetchExchangeRates();
+        if (!rates) {
+            throw new Error(error || 'Unable to load exchange rates for payment snapshot.');
+        }
+
+        return createInvoicePaymentCurrencySnapshot({
+            invoice,
+            preferredCurrency,
+            exchangeRates: rates,
+            capturedAt: paidAt,
+        }) ?? undefined;
+    }, []);
+
     // Status update helpers
     const markAsSent = useCallback((id: string) => {
         return update(id, {
@@ -186,37 +221,45 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         });
     }, [update]);
 
-    const markAsPaid = useCallback(async (id: string) => {
+    const markAsPaid = useCallback(async (id: string, options: MarkInvoicePaidOptions = {}) => {
         const invoice = get(id);
         if (!invoice) {
             return undefined;
         }
 
-        const paidAt = Date.now();
+        const paidAt = typeof options.paidAt === 'number' && Number.isFinite(options.paidAt)
+            ? options.paidAt
+            : Date.now();
         const preferredCurrency = getPreferredCurrency();
-        const requiresSnapshot = shouldStoreInvoicePaymentSnapshot(invoice, preferredCurrency);
-        let rates: Record<string, number> | null = null;
-        let error: string | null = null;
-
-        if (requiresSnapshot) {
-            ({ rates, error } = await fetchExchangeRates());
-
-            if (!rates) {
-                throw new Error(error || 'Unable to load exchange rates for payment snapshot.');
-            }
-        }
+        const paymentCurrencySnapshot = await resolveInvoicePaymentSnapshot(invoice, preferredCurrency, paidAt, options);
 
         return update(id, {
             status: 'paid',
             paidAt,
-            paymentCurrencySnapshot: createInvoicePaymentCurrencySnapshot({
-                invoice,
-                preferredCurrency,
-                exchangeRates: rates,
-                capturedAt: paidAt,
-            }) ?? undefined,
+            paymentCurrencySnapshot,
         });
-    }, [get, getPreferredCurrency, update]);
+    }, [get, getPreferredCurrency, resolveInvoicePaymentSnapshot, update]);
+
+    const updatePaymentDetails = useCallback(async (id: string, options: UpdateInvoicePaymentDetailsOptions = {}) => {
+        const invoice = get(id);
+        if (!invoice) {
+            return undefined;
+        }
+
+        const paidAt = typeof options.paidAt === 'number' && Number.isFinite(options.paidAt)
+            ? options.paidAt
+            : (typeof invoice.paidAt === 'number' && Number.isFinite(invoice.paidAt)
+                ? invoice.paidAt
+                : Date.now());
+        const preferredCurrency = getPreferredCurrency();
+        const paymentCurrencySnapshot = await resolveInvoicePaymentSnapshot(invoice, preferredCurrency, paidAt, options);
+
+        return update(id, {
+            status: 'paid',
+            paidAt,
+            paymentCurrencySnapshot,
+        });
+    }, [get, getPreferredCurrency, resolveInvoicePaymentSnapshot, update]);
 
     const markAsUnpaid = useCallback((id: string) => {
         const invoice = get(id);
@@ -597,6 +640,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         // Status helpers
         markAsSent,
         markAsPaid,
+        updatePaymentDetails,
         markAsUnpaid,
         canUndoInvoice,
         getInvoiceUndoBlockReason,

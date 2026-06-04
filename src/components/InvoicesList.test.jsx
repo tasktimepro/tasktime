@@ -15,9 +15,15 @@ const invoiceHookMocks = vi.hoisted(() => ({
 
     invoices: [],
     markAsPaid: vi.fn(),
+    updatePaymentDetails: vi.fn(),
     markAsUnpaid: vi.fn(),
     undoLatestInvoice: vi.fn(),
     canUndoInvoice: vi.fn(() => false),
+}))
+
+const currencyUtilsMocks = vi.hoisted(() => ({
+
+    fetchExchangeRates: vi.fn(),
 }))
 
 const businessBrandAssetHookMocks = vi.hoisted(() => ({
@@ -53,11 +59,20 @@ vi.mock('../hooks/useInvoices.ts', () => ({
     useInvoices: () => ({
         invoices: invoiceHookMocks.invoices,
         markAsPaid: invoiceHookMocks.markAsPaid,
+        updatePaymentDetails: invoiceHookMocks.updatePaymentDetails,
         markAsUnpaid: invoiceHookMocks.markAsUnpaid,
         undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
         canUndoInvoice: invoiceHookMocks.canUndoInvoice,
     })
 }))
+
+vi.mock('../utils/currencyUtils.ts', async () => {
+    const actual = await vi.importActual('../utils/currencyUtils.ts')
+    return {
+        ...actual,
+        fetchExchangeRates: currencyUtilsMocks.fetchExchangeRates,
+    }
+})
 
 vi.mock('../hooks/useToast.ts', () => ({
     useToast: () => ({
@@ -97,6 +112,8 @@ describe('InvoicesList', () => {
         updateUrlMock.mockClear()
         invoiceHookMocks.markAsPaid.mockReset()
         invoiceHookMocks.markAsPaid.mockResolvedValue(undefined)
+        invoiceHookMocks.updatePaymentDetails.mockReset()
+        invoiceHookMocks.updatePaymentDetails.mockResolvedValue(undefined)
         invoiceHookMocks.markAsUnpaid.mockReset()
         invoiceHookMocks.markAsUnpaid.mockReturnValue(undefined)
         invoiceHookMocks.invoices = []
@@ -115,6 +132,11 @@ describe('InvoicesList', () => {
         pdfMocks.getCurrentInvoiceHtmlContent.mockClear()
         toastMocks.showSuccess.mockClear()
         toastMocks.showError.mockClear()
+        currencyUtilsMocks.fetchExchangeRates.mockReset()
+        currencyUtilsMocks.fetchExchangeRates.mockResolvedValue({
+            rates: { USD: 1, EUR: 0.8 },
+            error: null,
+        })
         setMatchMedia(false)
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
         user = userEvent.setup()
@@ -445,10 +467,14 @@ describe('InvoicesList', () => {
     })
 
     it('toggles paid status without corrupting list', async () => {
+        const sameCurrencyInvoice = {
+            ...baseInvoice,
+            currency: 'EUR',
+        }
 
         render(
             <InvoicesList
-                projectInvoices={[baseInvoice]}
+                projectInvoices={[sameCurrencyInvoice]}
                 onEditInvoice={vi.fn()}
                 paymentMethods={[]}
                 businessInfos={[]}
@@ -463,6 +489,122 @@ describe('InvoicesList', () => {
             expect(invoiceHookMocks.markAsPaid).toHaveBeenCalledTimes(1)
         })
         expect(invoiceHookMocks.markAsPaid).toHaveBeenCalledWith('inv-1')
+    })
+
+    it('confirms payment conversion before marking a cross-currency invoice as paid', async () => {
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Mark as Paid' }))
+
+        expect(screen.getByText('Confirm Payment Conversion')).toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Exchange rate')).toHaveValue(0.8)
+        })
+        expect(screen.getByDisplayValue('80.00')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Mark as Paid' }))
+
+        await waitFor(() => {
+            expect(invoiceHookMocks.markAsPaid).toHaveBeenCalledWith('inv-1', expect.objectContaining({
+                paymentCurrencySnapshot: expect.objectContaining({
+                    sourceCurrency: 'USD',
+                    sourceAmount: 100,
+                    preferredCurrencyAtPayment: 'EUR',
+                    preferredCurrencyAmount: 80,
+                }),
+            }))
+        })
+    })
+
+    it('marks zero-total cross-currency invoices paid without requiring conversion details', async () => {
+
+        const zeroTotalInvoice = {
+            ...baseInvoice,
+            id: 'inv-zero',
+            total: 0,
+            currency: 'USD',
+        }
+
+        render(
+            <InvoicesList
+                projectInvoices={[zeroTotalInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Mark as Paid' }))
+
+        expect(screen.queryByText('Confirm Payment Conversion')).not.toBeInTheDocument()
+        expect(invoiceHookMocks.markAsPaid).toHaveBeenCalledWith('inv-zero')
+    })
+
+    it('edits saved payment details without reopening the invoice editor', async () => {
+
+        const paidInvoice = {
+            ...baseInvoice,
+            id: 'inv-paid-fx',
+            status: 'paid',
+            paidAt: 1700000000000,
+            paymentCurrencySnapshot: {
+                capturedAt: 1700000000000,
+                sourceCurrency: 'USD',
+                sourceAmount: 100,
+                preferredCurrencyAtPayment: 'EUR',
+                preferredCurrencyAmount: 80,
+            },
+        }
+
+        render(
+            <InvoicesList
+                projectInvoices={[paidInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="paid"
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Edit payment details' }))
+
+        expect(screen.getByText('Stored payment conversion')).toBeInTheDocument()
+        expect(screen.queryByText('Live conversion preview')).not.toBeInTheDocument()
+        expect(currencyUtilsMocks.fetchExchangeRates).not.toHaveBeenCalled()
+
+        const exchangeRateInput = screen.getByLabelText('Exchange rate')
+        await user.clear(exchangeRateInput)
+        await user.type(exchangeRateInput, '0.9')
+
+        expect(screen.getByDisplayValue('90.00')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Save Payment Details' }))
+
+        await waitFor(() => {
+            expect(invoiceHookMocks.updatePaymentDetails).toHaveBeenCalledWith('inv-paid-fx', expect.objectContaining({
+                paymentCurrencySnapshot: expect.objectContaining({
+                    sourceCurrency: 'USD',
+                    sourceAmount: 100,
+                    preferredCurrencyAtPayment: 'EUR',
+                    preferredCurrencyAmount: 90,
+                }),
+            }))
+        })
     })
 
     it('warns before editing paid invoices', async () => {
@@ -484,7 +626,7 @@ describe('InvoicesList', () => {
         )
 
         await user.click(screen.getByRole('button', { name: 'More actions' }))
-        await user.click(screen.getByRole('menuitem', { name: 'Edit' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Edit invoice' }))
 
         expect(screen.getByText('Edit paid invoice?')).toBeInTheDocument()
 

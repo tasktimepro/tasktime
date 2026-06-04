@@ -507,6 +507,88 @@ describe('useInvoices', () => {
         await expect(result.current.markAsPaid('usd-invoice')).rejects.toThrow('offline')
     })
 
+    it('marks cross-currency invoices paid with a provided payment snapshot without fetching rates', async () => {
+        const update = vi.fn()
+        const providedSnapshot = {
+            capturedAt: 1700000000000,
+            sourceCurrency: 'USD',
+            sourceAmount: 100,
+            preferredCurrencyAtPayment: 'EUR',
+            preferredCurrencyAmount: 82.13,
+        }
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: createTestYMap(), preferences: mockPreferences },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: false,
+            get: vi.fn((id) => id === 'usd-invoice'
+                ? { id, status: 'sent', total: 100, currency: 'USD', clientId: 'c1', projectId: 'p1' }
+                : undefined),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        await act(async () => {
+            await result.current.markAsPaid('usd-invoice', { paymentCurrencySnapshot: providedSnapshot })
+        })
+
+        expect(mockFetchExchangeRates).not.toHaveBeenCalled()
+        expect(update).toHaveBeenCalledWith('usd-invoice', {
+            status: 'paid',
+            paidAt: expect.any(Number),
+            paymentCurrencySnapshot: providedSnapshot,
+        })
+    })
+
+    it('updates saved payment details without changing the paid timestamp', async () => {
+        const update = vi.fn()
+        const paidAt = 1700000000000
+        const providedSnapshot = {
+            capturedAt: paidAt,
+            sourceCurrency: 'USD',
+            sourceAmount: 100,
+            preferredCurrencyAtPayment: 'EUR',
+            preferredCurrencyAmount: 81.5,
+        }
+
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: createTestYMap(), preferences: mockPreferences },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+        })
+
+        mockUseYjsCollection.mockReturnValue({
+            items: [],
+            isLoading: false,
+            get: vi.fn((id) => id === 'usd-invoice'
+                ? { id, status: 'paid', paidAt, total: 100, currency: 'USD', clientId: 'c1', projectId: 'p1' }
+                : undefined),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        await act(async () => {
+            await result.current.updatePaymentDetails('usd-invoice', { paymentCurrencySnapshot: providedSnapshot })
+        })
+
+        expect(update).toHaveBeenCalledWith('usd-invoice', {
+            status: 'paid',
+            paidAt,
+            paymentCurrencySnapshot: providedSnapshot,
+        })
+    })
+
     it('undoes the latest invoice and restores linked billing state across collections', async () => {
         const coreDoc = new Y.Doc()
         const activeEntries = createTestYMap({

@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
     canUndoInvoice,
     createInvoicePaymentCurrencySnapshot,
+    createInvoicePaymentCurrencySnapshotFromAmounts,
     extractSequentialNumber,
     getInvoiceSequenceRollback,
     getInvoiceUndoBlockReason,
+    getInvoicePaymentExchangeRate,
     getInvoiceProjectFinancials,
     getInvoiceProjectIds,
     getInvoiceProjectRevenueBreakdown,
@@ -405,6 +407,24 @@ describe('invoiceUtils', () => {
             currency: 'USD',
             success: false,
             usedSnapshot: true,
+        })
+        expect(getInvoicePaymentExchangeRate({ paymentCurrencySnapshot: snapshot })).toBe(0.8)
+    })
+
+    it('creates payment snapshots from explicit received amounts', () => {
+
+        expect(createInvoicePaymentCurrencySnapshotFromAmounts({
+            sourceCurrency: 'USD',
+            sourceAmount: 100,
+            preferredCurrency: 'EUR',
+            preferredCurrencyAmount: 83.456,
+            capturedAt: 123,
+        })).toEqual({
+            capturedAt: 123,
+            sourceCurrency: 'USD',
+            sourceAmount: 100,
+            preferredCurrencyAtPayment: 'EUR',
+            preferredCurrencyAmount: 83.46,
         })
     })
 

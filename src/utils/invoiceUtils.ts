@@ -203,6 +203,7 @@ export const getInvoiceProjectTitle = (invoice: any, projects?: any[] | Map<stri
 };
 
 const roundCurrencyAmount = (value: number) => Math.round(value * 100) / 100;
+const roundExchangeRate = (value: number) => Math.round(value * 1000000) / 1000000;
 
 export const getInvoiceProjectRevenueBreakdown = (invoice: any) => {
     const projectIds = getInvoiceProjectIds(invoice);
@@ -490,21 +491,58 @@ export const createInvoicePaymentCurrencySnapshot = ({
 
     const normalizedRates = getFiniteRecord(exchangeRates);
 
-    let preferredCurrencyAmount = sourceAmount;
     const result = convertCurrency(sourceAmount, sourceCurrency, targetCurrency, normalizedRates);
-    preferredCurrencyAmount = result.amount;
+
+    return createInvoicePaymentCurrencySnapshotFromAmounts({
+        sourceCurrency,
+        sourceAmount,
+        preferredCurrency: targetCurrency,
+        preferredCurrencyAmount: result.amount,
+        capturedAt,
+    });
+};
+
+export function createInvoicePaymentCurrencySnapshotFromAmounts({
+    sourceCurrency,
+    sourceAmount,
+    preferredCurrency,
+    preferredCurrencyAmount,
+    capturedAt,
+}: {
+    sourceCurrency: string;
+    sourceAmount: number;
+    preferredCurrency: string;
+    preferredCurrencyAmount: number;
+    capturedAt: number;
+}): InvoicePaymentCurrencySnapshot | null {
+    const normalizedSourceCurrency = normalizeCurrencyCode(sourceCurrency);
+    const normalizedPreferredCurrency = normalizeCurrencyCode(preferredCurrency);
+
+    if (normalizedSourceCurrency === normalizedPreferredCurrency) {
+        return null;
+    }
 
     return {
         capturedAt,
-        sourceCurrency,
-        sourceAmount,
-        preferredCurrencyAtPayment: targetCurrency,
-        preferredCurrencyAmount,
+        sourceCurrency: normalizedSourceCurrency,
+        sourceAmount: roundCurrencyAmount(sourceAmount),
+        preferredCurrencyAtPayment: normalizedPreferredCurrency,
+        preferredCurrencyAmount: roundCurrencyAmount(preferredCurrencyAmount),
     };
-};
+}
 
 export const getInvoicePaymentCurrencySnapshot = (invoice: any): InvoicePaymentCurrencySnapshot | null => {
     return normalizePaymentCurrencySnapshot(invoice);
+};
+
+export const getInvoicePaymentExchangeRate = (invoice: any): number | null => {
+    const snapshot = getInvoicePaymentCurrencySnapshot(invoice);
+
+    if (!snapshot || !snapshot.sourceAmount) {
+        return null;
+    }
+
+    return roundExchangeRate(snapshot.preferredCurrencyAmount / snapshot.sourceAmount);
 };
 
 export const getPaidInvoiceConvertedAmount = (

@@ -7,9 +7,15 @@ import InvoicesList from '../../components/InvoicesList'
 const invoiceHookMocks = vi.hoisted(() => ({
     invoices: [],
     markAsPaid: vi.fn(),
+    updatePaymentDetails: vi.fn(),
     markAsUnpaid: vi.fn(),
     undoLatestInvoice: vi.fn(),
     canUndoInvoice: vi.fn(() => false),
+}))
+
+const currencyUtilsMocks = vi.hoisted(() => ({
+
+    fetchExchangeRates: vi.fn(),
 }))
 
 const businessBrandAssetHookMocks = vi.hoisted(() => ({
@@ -27,11 +33,20 @@ vi.mock('../../hooks/useInvoices.ts', () => ({
     useInvoices: () => ({
         invoices: invoiceHookMocks.invoices,
         markAsPaid: invoiceHookMocks.markAsPaid,
+        updatePaymentDetails: invoiceHookMocks.updatePaymentDetails,
         markAsUnpaid: invoiceHookMocks.markAsUnpaid,
         undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
         canUndoInvoice: invoiceHookMocks.canUndoInvoice,
     })
 }))
+
+vi.mock('../../utils/currencyUtils.ts', async () => {
+    const actual = await vi.importActual('../../utils/currencyUtils.ts')
+    return {
+        ...actual,
+        fetchExchangeRates: currencyUtilsMocks.fetchExchangeRates,
+    }
+})
 
 vi.mock('../../hooks/useUrlState.ts', () => ({
 
@@ -55,6 +70,11 @@ describe('Invoice payment workflow integration', () => {
     beforeEach(() => {
 
         vi.clearAllMocks()
+        invoiceHookMocks.updatePaymentDetails.mockResolvedValue(undefined)
+        currencyUtilsMocks.fetchExchangeRates.mockResolvedValue({
+            rates: { USD: 1, EUR: 0.8 },
+            error: null,
+        })
     })
 
     afterEach(() => {
@@ -94,6 +114,16 @@ describe('Invoice payment workflow integration', () => {
 
         await user.click(screen.getByRole('button', { name: 'Mark as Paid' }))
 
-        expect(invoiceHookMocks.markAsPaid).toHaveBeenCalledWith('inv-1')
+        expect(screen.getByText('Confirm Payment Conversion')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Mark as Paid' }))
+
+        expect(invoiceHookMocks.markAsPaid).toHaveBeenCalledWith('inv-1', expect.objectContaining({
+            paymentCurrencySnapshot: expect.objectContaining({
+                sourceCurrency: 'USD',
+                preferredCurrencyAtPayment: 'EUR',
+                preferredCurrencyAmount: 160,
+            }),
+        }))
     })
 })

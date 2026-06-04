@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
 import { Send, Bell, MoreHorizontal, RotateCcw } from 'lucide-react';
 import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
-import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { getCurrencySymbol, getPreferredCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
@@ -19,6 +19,7 @@ import { useInvoices } from '../hooks/useInvoices.ts';
 import { useToast } from '../hooks/useToast.ts';
 import {
     getInvoiceProjectTitle,
+    getInvoicePaymentCurrencySnapshot,
     getInvoiceSequenceRollback,
     getInvoiceStatus,
     getInvoiceTotal,
@@ -29,6 +30,7 @@ import {
 import Pagination from './Pagination';
 import Modal from './Modal';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
+import InvoicePaymentDetailsModal from './invoice/InvoicePaymentDetailsModal';
 import EmailPreviewModal from './invoice/EmailPreviewModal';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
@@ -53,6 +55,9 @@ const InvoicesList = ({
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
     const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
+    const [pendingPaymentInvoice, setPendingPaymentInvoice] = useState(null);
+    const [paymentDetailsMode, setPaymentDetailsMode] = useState('mark-paid');
+    const [isSavingPaymentDetails, setIsSavingPaymentDetails] = useState(false);
     const [emailInvoice, setEmailInvoice] = useState(null);
     const [emailSendType, setEmailSendType] = useState('invoice');
     const [pendingUndoInvoice, setPendingUndoInvoice] = useState(null);
@@ -64,10 +69,12 @@ const InvoicesList = ({
     const {
         invoices: allActiveInvoices,
         markAsPaid,
+        updatePaymentDetails,
         markAsUnpaid,
         undoLatestInvoice,
         canUndoInvoice,
     } = useInvoices();
+    const preferredCurrency = normalizeCurrencyCode(getPreferredCurrency());
 
     // Filter out soft-deleted invoices (projectInvoices already filtered by parent)
     const activeInvoices = useMemo(() => projectInvoices, [projectInvoices]);
@@ -303,32 +310,41 @@ const InvoicesList = ({
         setPendingPaidEditInvoice(null);
     };
 
-    /**
-     * Handle payment processed toggle
-     */
-    const handleInvoiceStatusToggle = async (invoice) => {
-        const nextPaidState = !isInvoicePaid(invoice);
+    const invoiceNeedsPaymentDetails = useCallback((invoice) => {
+        const snapshot = getInvoicePaymentCurrencySnapshot(invoice);
+        if (snapshot) {
+            return true;
+        }
 
-        try {
-            if (nextPaidState) {
-                await markAsPaid(invoice.id);
-            } else {
-                markAsUnpaid(invoice.id);
-            }
-        } catch (error) {
-            showError(error.message || 'Unable to update invoice payment status.');
+        if (getInvoiceTotal(invoice) <= 0) {
+            return false;
+        }
+
+        const invoiceCurrency = normalizeCurrencyCode(invoice?.currency || preferredCurrency);
+        return invoiceCurrency !== preferredCurrency;
+    }, [preferredCurrency]);
+
+    const openPaymentDetailsModal = useCallback((invoice, mode) => {
+        setPendingPaymentInvoice(invoice);
+        setPaymentDetailsMode(mode);
+    }, []);
+
+    const closePaymentDetailsModal = useCallback(() => {
+        if (isSavingPaymentDetails) {
             return;
         }
 
-        // If marking as paid and we're on outstanding or overdue tab, and it's the last item on the page,
-        // go to previous page if available
+        setPendingPaymentInvoice(null);
+    }, [isSavingPaymentDetails]);
+
+    const handleAfterMarkPaid = useCallback((invoice) => {
         if (!isInvoicePaid(invoice) && (activeTab === 'outstanding' || activeTab === 'overdue')) {
-            let remainingInvoices, setPage;
-            
+            let remainingInvoices;
+            let setPage;
+
             if (activeTab === 'overdue') {
                 remainingInvoices = overdueInvoices.filter(inv => inv.id !== invoice.id);
                 setPage = setOverduePage;
-                // If no more overdue invoices, fall back to the next available unpaid tab.
                 if (remainingInvoices.length === 0) {
                     setActiveTab(outstandingInvoices.length > 0 ? 'outstanding' : 'paid');
                     return;
@@ -337,13 +353,64 @@ const InvoicesList = ({
                 remainingInvoices = outstandingInvoices.filter(inv => inv.id !== invoice.id);
                 setPage = setOutstandingPage;
             }
-            
+
             const newTotalPages = Math.ceil(remainingInvoices.length / ITEMS_PER_PAGE) || 1;
             const currentPageForTab = activeTab === 'overdue' ? overduePage : outstandingPage;
-            
+
             if (currentPageForTab > newTotalPages) {
                 setPage(Math.max(1, newTotalPages));
             }
+        }
+    }, [activeTab, outstandingInvoices, overdueInvoices, overduePage, outstandingPage]);
+
+    const handleSubmitPaymentDetails = useCallback(async ({ paymentCurrencySnapshot }) => {
+        if (!pendingPaymentInvoice) {
+            return;
+        }
+
+        setIsSavingPaymentDetails(true);
+
+        try {
+            if (paymentDetailsMode === 'mark-paid') {
+                await markAsPaid(pendingPaymentInvoice.id, {
+                    paidAt: paymentCurrencySnapshot?.capturedAt,
+                    paymentCurrencySnapshot,
+                });
+                handleAfterMarkPaid(pendingPaymentInvoice);
+            } else {
+                await updatePaymentDetails?.(pendingPaymentInvoice.id, { paymentCurrencySnapshot });
+                showSuccess('Payment details updated');
+            }
+
+            setPendingPaymentInvoice(null);
+        } catch (error) {
+            showError(error.message || 'Unable to save invoice payment details.');
+        } finally {
+            setIsSavingPaymentDetails(false);
+        }
+    }, [handleAfterMarkPaid, markAsPaid, paymentDetailsMode, pendingPaymentInvoice, showError, showSuccess, updatePaymentDetails]);
+
+    /**
+     * Handle payment processed toggle
+     */
+    const handleInvoiceStatusToggle = async (invoice) => {
+        const nextPaidState = !isInvoicePaid(invoice);
+
+        try {
+            if (nextPaidState) {
+                if (invoiceNeedsPaymentDetails(invoice)) {
+                    openPaymentDetailsModal(invoice, 'mark-paid');
+                    return;
+                }
+
+                await markAsPaid(invoice.id);
+                handleAfterMarkPaid(invoice);
+            } else {
+                markAsUnpaid(invoice.id);
+            }
+        } catch (error) {
+            showError(error.message || 'Unable to update invoice payment status.');
+            return;
         }
     };
 
@@ -409,6 +476,7 @@ const InvoicesList = ({
                         const invoiceIsPaid = isInvoicePaid(invoice);
                         const invoiceIsOverdue = isInvoiceOverdue(invoice);
                         const invoiceCanBeUndone = canUndoInvoice(invoice);
+                        const invoiceHasEditablePaymentDetails = invoiceNeedsPaymentDetails(invoice);
 
                         return (
                             <Card
@@ -621,12 +689,21 @@ const InvoicesList = ({
                                                     <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
                                                     <span>Download</span>
                                                 </DropdownMenuItem>
+                                                {invoiceIsPaid && invoiceHasEditablePaymentDetails && (
+                                                    <DropdownMenuItem
+                                                        onClick={() => openPaymentDetailsModal(invoice, 'edit-payment')}
+                                                        className="cursor-pointer hover:bg-accent focus:bg-accent"
+                                                    >
+                                                        <CheckIcon className="h-4 w-4 mr-2" />
+                                                        <span>Edit payment details</span>
+                                                    </DropdownMenuItem>
+                                                )}
                                                 <DropdownMenuItem
                                                     onClick={() => handleEdit(invoice)}
                                                     className="cursor-pointer hover:bg-accent focus:bg-accent"
                                                 >
                                                     <PencilIcon className="h-4 w-4 mr-2" />
-                                                    <span>Edit</span>
+                                                    <span>Edit invoice</span>
                                                 </DropdownMenuItem>
                                                 {invoiceCanBeUndone && (
                                                     <DropdownMenuItem
@@ -759,6 +836,16 @@ const InvoicesList = ({
             {/* Invoice Preview Modal */}
             {renderInvoicePreview()}
 
+            <InvoicePaymentDetailsModal
+                isOpen={Boolean(pendingPaymentInvoice)}
+                onClose={closePaymentDetailsModal}
+                invoice={pendingPaymentInvoice}
+                mode={paymentDetailsMode}
+                preferredCurrency={preferredCurrency}
+                isSaving={isSavingPaymentDetails}
+                onSubmit={handleSubmitPaymentDetails}
+            />
+
             {/* Email Preview Modal */}
             {emailInvoice && (
                 <EmailPreviewModal
@@ -800,6 +887,7 @@ const InvoicesList = ({
                 </p>
                 <Notice
                     title="This invoice is marked as paid. Continue anyway?"
+                    description="Use Edit payment details instead when you only need to reconcile the received conversion."
                     variant="warning"
                 />
             </Modal>
