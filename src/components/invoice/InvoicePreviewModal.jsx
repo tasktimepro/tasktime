@@ -40,11 +40,13 @@ const InvoicePreviewModal = ({
     const modalContentRef = useRef(null);
     const previewPageRef = useRef(null);
     const [previewScale, setPreviewScale] = useState(1);
+    const [previewFrameWidth, setPreviewFrameWidth] = useState(A4_PREVIEW_WIDTH_PX);
     const [previewFrameHeight, setPreviewFrameHeight] = useState(A4_PREVIEW_HEIGHT_PX + PREVIEW_HEIGHT_BUFFER_PX);
 
     useEffect(() => {
         if (!isOpen || !previewHtml) {
             setPreviewScale(1);
+            setPreviewFrameWidth(A4_PREVIEW_WIDTH_PX);
             setPreviewFrameHeight(A4_PREVIEW_HEIGHT_PX + PREVIEW_HEIGHT_BUFFER_PX);
             return undefined;
         }
@@ -53,14 +55,21 @@ const InvoicePreviewModal = ({
             const measuredWidth = modalContentRef.current?.clientWidth || window.innerWidth || A4_PREVIEW_WIDTH_PX;
             const nextScale = Math.min(1, measuredWidth / A4_PREVIEW_WIDTH_PX);
             const invoiceDocumentElement = previewPageRef.current?.querySelector('.invoice-document');
+            const previewContentWidth = invoiceDocumentElement?.scrollWidth
+                || invoiceDocumentElement?.offsetWidth
+                || previewPageRef.current?.scrollWidth
+                || A4_PREVIEW_WIDTH_PX;
             const previewContentHeight = invoiceDocumentElement?.scrollHeight
                 || invoiceDocumentElement?.offsetHeight
                 || previewPageRef.current?.scrollHeight
                 || A4_PREVIEW_HEIGHT_PX;
+            const nextUnscaledWidth = Math.max(previewContentWidth, A4_PREVIEW_WIDTH_PX);
             const nextUnscaledHeight = Math.max(previewContentHeight, A4_PREVIEW_HEIGHT_PX);
+            const nextFrameWidth = Math.ceil(nextUnscaledWidth * nextScale);
             const nextFrameHeight = Math.ceil(nextUnscaledHeight * nextScale) + PREVIEW_HEIGHT_BUFFER_PX;
 
             setPreviewScale(nextScale > 0 ? nextScale : 1);
+            setPreviewFrameWidth(nextFrameWidth);
             setPreviewFrameHeight(nextFrameHeight);
         };
 
@@ -137,13 +146,13 @@ const InvoicePreviewModal = ({
                         title="Preview note"
                         description="The final generated PDF can vary slightly from the preview below."
                     />
-                    <div className="rounded-lg border border-slate-200 bg-white p-2 text-black sm:p-3" data-testid="invoice-preview-shell">
+                    <div className="overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200 bg-white p-2 text-black sm:p-3" data-testid="invoice-preview-shell">
                         <div
                             className="mx-auto"
                             data-testid="invoice-preview-frame"
                             style={{
-                                width: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
-                                minWidth: `${A4_PREVIEW_WIDTH_PX * previewScale}px`,
+                                width: `${previewFrameWidth}px`,
+                                minWidth: `${previewFrameWidth}px`,
                                 height: `${previewFrameHeight}px`,
                             }}
                         >

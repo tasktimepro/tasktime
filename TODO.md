@@ -4,8 +4,6 @@
 
 [ ] Screenshot mobile UI adjustments
 
-[ ] The "completing authentication" state int he /auth/callback loading is showing the sidebar and FAB - it would be ideal if that state is just the loading in the center of the full screen and that's it please - make sure to adapt just that loading state to be clean and don't touch/affect the rest
-
 ---
 
 ## Blog Posts

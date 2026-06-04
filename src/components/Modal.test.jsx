@@ -45,7 +45,7 @@ describe('Modal', () => {
         expect(onClose).toHaveBeenCalled()
     })
 
-    it('uses a mobile-safe shell without horizontal overflow', () => {
+    it('uses a constrained mobile shell without horizontal overflow', () => {
 
         render(
             <Modal isOpen onClose={vi.fn()} title="Edit Task">
@@ -59,7 +59,7 @@ describe('Modal', () => {
         expect(dialog.className.includes('max-w-[calc(100vw-1rem)]')).toBe(true)
         expect(dialog.className.includes('top-[50%]')).toBe(true)
         expect(dialog.className.includes('translate-y-[-50%]')).toBe(true)
-        expect(dialog.className.includes('max-h-[calc(100svh-var(--safe-area-top)-var(--safe-area-bottom)-1rem)]')).toBe(true)
+        expect(dialog.className.includes('max-h-[calc(100svh-1rem)]')).toBe(true)
         expect(dialog.className.includes('sm:max-w-md')).toBe(true)
         expect(dialog.className.includes('overflow-hidden')).toBe(true)
         expect(dialog.className.includes('rounded-lg')).toBe(true)
@@ -132,13 +132,13 @@ describe('Modal', () => {
 
         expect(header?.className.includes('items-center')).toBe(true)
         expect(header?.className.includes('gap-3')).toBe(true)
-        expect(header?.className.includes('pt-[max(0.75rem,var(--safe-area-top))]')).toBe(true)
+        expect(header?.className.includes('py-3')).toBe(true)
         expect(title.parentElement?.className.includes('text-left')).toBe(true)
         expect(closeButton.className.includes('rounded-full')).toBe(true)
         expect(closeButton.className.includes('shadow-sm')).toBe(true)
         expect(footer?.className.includes('flex-row')).toBe(true)
         expect(footer?.className.includes('gap-2')).toBe(true)
-        expect(footer?.className.includes('pb-[max(0.75rem,var(--safe-area-bottom))]')).toBe(true)
+        expect(footer?.className.includes('py-3')).toBe(true)
     })
 
     it('keeps header actions center-aligned with the title until wrapping is needed', () => {

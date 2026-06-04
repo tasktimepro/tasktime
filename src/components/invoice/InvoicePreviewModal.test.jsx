@@ -41,12 +41,43 @@ describe('InvoicePreviewModal', () => {
         expect(screen.getByText('Preview note')).toBeInTheDocument();
         expect(screen.getByText('The final generated PDF can vary slightly from the preview below.')).toBeInTheDocument();
         expect(previewShell).toHaveClass('bg-white');
-        expect(previewShell).not.toHaveClass('overflow-auto');
+        expect(previewShell).toHaveClass('overflow-x-auto');
+        expect(previewShell).toHaveClass('overflow-y-hidden');
         expect(previewPage.style.width).toBe('794px');
         expect(previewPage.style.minHeight).toBe('1123px');
         expect(previewFrame.style.width).toBe('375px');
         expect(previewPage).toHaveClass('overflow-visible');
         expect(previewPage).toHaveTextContent('Invoice: #INV-0160');
+    });
+
+    it('allows horizontal scrolling when preview content is wider than the modal body', async () => {
+        render(
+            <InvoicePreviewModal
+                isOpen
+                onClose={vi.fn()}
+                title="Invoice Preview"
+                htmlContent={'<div class="invoice-document"><div>Wide preview</div></div>'}
+            />
+        );
+
+        const previewFrame = screen.getByTestId('invoice-preview-frame');
+        const invoiceDocument = document.querySelector('.invoice-document');
+
+        Object.defineProperty(invoiceDocument, 'scrollWidth', {
+            configurable: true,
+            get: () => 1000,
+        });
+
+        Object.defineProperty(invoiceDocument, 'scrollHeight', {
+            configurable: true,
+            get: () => 1123,
+        });
+
+        fireEvent(window, new Event('resize'));
+
+        await waitFor(() => {
+            expect(previewFrame.style.width).toBe('473px');
+        });
     });
 
     it('omits client contact person and email from the fallback invoice to section', () => {

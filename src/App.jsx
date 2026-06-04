@@ -1268,6 +1268,10 @@ function AppContent() {
         );
     }
 
+    if (activeView === 'auth-callback') {
+        return <AuthCallback />;
+    }
+
     const handleSidebarCollapsedAction = (action) => (event) => {
         event.currentTarget.blur();
         action();

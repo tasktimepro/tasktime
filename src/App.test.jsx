@@ -317,6 +317,7 @@ vi.mock('./components/ProjectList', () => ({ default: () => <div data-testid="pr
 vi.mock('./components/ProjectDashboard', () => ({ default: () => <div data-testid="project-dashboard" /> }))
 vi.mock('./components/ClientList', () => ({ default: () => <div data-testid="client-list" /> }))
 vi.mock('./components/ClientDashboard', () => ({ default: () => <div data-testid="client-dashboard" /> }))
+vi.mock('./components/AuthCallback', () => ({ default: () => <div data-testid="auth-callback">Completing authentication...</div> }))
 vi.mock('./components/Dashboard', () => ({
     default: ({ openExpenseView }) => (
         <div data-testid="dashboard">
@@ -542,6 +543,17 @@ describe('App component', () => {
         expect(screen.getByText('Projects')).toBeInTheDocument()
         expect(screen.getByText('Invoices')).toBeInTheDocument()
         expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument()
+    })
+
+    it('renders only the auth callback view on the auth callback route', () => {
+        urlHookState.urlParams = { view: 'auth-callback', projectId: null, clientId: null }
+
+        render(<App />)
+
+        expect(screen.getByTestId('auth-callback')).toBeInTheDocument()
+        expect(screen.queryByText('TaskTime')).not.toBeInTheDocument()
+        expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument()
+        expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
     })
 
     it('shows theme toggle button', () => {

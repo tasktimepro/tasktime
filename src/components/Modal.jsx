@@ -82,7 +82,7 @@ const Modal = ({
             <DialogContent
                 className={cn(
                     sizeClasses[size],
-                    'flex w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden gap-0 p-0 max-h-[calc(100svh-var(--safe-area-top)-var(--safe-area-bottom)-1rem)] sm:w-full sm:max-h-[calc(100svh-2rem)]',
+                    'flex w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden gap-0 p-0 max-h-[calc(100svh-1rem)] sm:w-full sm:max-h-[calc(100svh-2rem)]',
                     className
                 )}
                 // Hide default close button if showCloseButton is false
@@ -100,7 +100,7 @@ const Modal = ({
                     ) : null
                 ) : (
                     (title || description || headerActions || showCloseButton) && (
-                        <div className={cn('flex flex-shrink-0 flex-wrap items-center gap-3 px-4 pb-2 pt-[max(0.75rem,var(--safe-area-top))] md:px-6 md:py-4', !(title || description || headerActions) && 'justify-end')}>
+                        <div className={cn('flex flex-shrink-0 flex-wrap items-center gap-3 px-4 py-3 md:px-6 md:py-4', !(title || description || headerActions) && 'justify-end')}>
                             {(title || description) && (
                                 <DialogHeader className="min-w-0 flex-1 py-0">
                                     {title && <DialogTitle>{title}</DialogTitle>}
@@ -138,7 +138,7 @@ const Modal = ({
 
                 {/* Footer */}
                 {footer && (
-                    <DialogFooter className="flex-shrink-0 border-t border-border px-4 pb-[max(0.75rem,var(--safe-area-bottom))] pt-3 sm:px-6 sm:py-4">
+                    <DialogFooter className="flex-shrink-0 border-t border-border px-4 py-3 sm:px-6 sm:py-4">
                         {footer}
                     </DialogFooter>
                 )}

@@ -34,6 +34,16 @@ async function openInvoiceActionMenu(invoiceCard) {
     await invoiceCard.getByRole('button', { name: 'More actions' }).click();
 }
 
+async function markInvoicePaid(page, invoiceCard) {
+    await invoiceCard.getByRole('button', { name: 'Mark as Paid' }).click();
+
+    const paymentConversionDialog = page.getByRole('dialog', { name: 'Confirm Payment Conversion' });
+    if (await paymentConversionDialog.isVisible()) {
+        await paymentConversionDialog.getByRole('button', { name: 'Mark as Paid' }).click();
+        await expect(paymentConversionDialog).not.toBeVisible();
+    }
+}
+
 test.describe('Invoices smoke', () => {
 
     test('creates an invoice from tracked time and keeps it after reload', async ({ page }) => {
@@ -89,7 +99,7 @@ test.describe('Invoices smoke', () => {
         const invoiceCard = getInvoiceCardByProject(page, projectTitle);
         await expect(invoiceCard).toBeVisible();
         await expect(invoiceCard).toContainText(expectedTotal);
-        await invoiceCard.getByRole('button', { name: 'Mark as Paid' }).click();
+        await markInvoicePaid(page, invoiceCard);
 
         const paidTab = page.getByRole('tab', { name: /^Paid \(1\)$/ });
         await expect(paidTab).toBeVisible();
@@ -142,7 +152,7 @@ test.describe('Invoices smoke', () => {
         const invoiceCard = getInvoiceCardByProject(page, projectTitle);
         await expect(invoiceCard).toBeVisible();
         await expect(invoiceCard).toContainText(expectedTotal);
-        await invoiceCard.getByRole('button', { name: 'Mark as Paid' }).click();
+        await markInvoicePaid(page, invoiceCard);
 
         await page.goto('/');
         await expect(page.getByText('Reports Overview')).toBeVisible();
