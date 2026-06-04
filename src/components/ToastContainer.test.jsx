@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ToastProvider } from './ToastContainer'
 import { useToast } from '../hooks/useToast'
@@ -49,6 +49,10 @@ describe('ToastProvider', () => {
 
         vi.clearAllMocks()
         consumePostReloadToastMock.mockReturnValue(null)
+        Object.defineProperty(document, 'hidden', {
+            configurable: true,
+            value: false
+        })
     })
 
     it('renders children and toaster', () => {
@@ -110,6 +114,36 @@ describe('ToastProvider', () => {
             </ToastProvider>
         )
 
+        expect(toastMocks.success).toHaveBeenCalledWith('TaskTime was updated', undefined)
+    })
+
+    it('waits until a hidden tab becomes visible before consuming the queued update toast', () => {
+
+        Object.defineProperty(document, 'hidden', {
+            configurable: true,
+            value: true
+        })
+        consumePostReloadToastMock.mockReturnValue({
+            level: 'success',
+            message: 'TaskTime was updated'
+        })
+
+        render(
+            <ToastProvider>
+                <div>Child</div>
+            </ToastProvider>
+        )
+
+        expect(consumePostReloadToastMock).not.toHaveBeenCalled()
+        expect(toastMocks.success).not.toHaveBeenCalled()
+
+        Object.defineProperty(document, 'hidden', {
+            configurable: true,
+            value: false
+        })
+        fireEvent(document, new Event('visibilitychange'))
+
+        expect(consumePostReloadToastMock).toHaveBeenCalledTimes(1)
         expect(toastMocks.success).toHaveBeenCalledWith('TaskTime was updated', undefined)
     })
 

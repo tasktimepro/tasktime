@@ -12,7 +12,6 @@ function requestWaitingWorkerActivation(worker) {
         return;
     }
 
-    queueAppUpdatedToast();
     worker.postMessage({ type: 'SKIP_WAITING' });
 }
 

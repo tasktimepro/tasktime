@@ -12,31 +12,53 @@ import { consumePostReloadToast, rememberAppVersion } from '../utils/postReloadT
 export const ToastProvider = ({ children }) => {
 
     useEffect(() => {
-        const pendingToast = consumePostReloadToast();
         rememberAppVersion(APP_VERSION);
 
-        if (!pendingToast) {
-            return;
+        const showPendingPostReloadToast = () => {
+            const pendingToast = consumePostReloadToast();
+
+            if (!pendingToast) {
+                return;
+            }
+
+            const options = pendingToast.duration ? { duration: pendingToast.duration } : undefined;
+
+            switch (pendingToast.level) {
+                case 'success':
+                    toast.success(pendingToast.message, options);
+                    break;
+                case 'error':
+                    toast.error(pendingToast.message, options);
+                    break;
+                case 'info':
+                    toast.info(pendingToast.message, options);
+                    break;
+                case 'warning':
+                    toast.warning(pendingToast.message, options);
+                    break;
+                default:
+                    break;
+            }
+        };
+
+        if (typeof document !== 'undefined' && document.hidden) {
+            const handleVisibilityChange = () => {
+                if (document.hidden) {
+                    return;
+                }
+
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+                showPendingPostReloadToast();
+            };
+
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+
+            return () => {
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            };
         }
 
-        const options = pendingToast.duration ? { duration: pendingToast.duration } : undefined;
-
-        switch (pendingToast.level) {
-            case 'success':
-                toast.success(pendingToast.message, options);
-                break;
-            case 'error':
-                toast.error(pendingToast.message, options);
-                break;
-            case 'info':
-                toast.info(pendingToast.message, options);
-                break;
-            case 'warning':
-                toast.warning(pendingToast.message, options);
-                break;
-            default:
-                break;
-        }
+        showPendingPostReloadToast();
     }, []);
 
     // Helper methods for different toast types - wraps sonner's toast API
