@@ -3,6 +3,7 @@
  */
 
 import { SYNC_WORKER_CONFIG } from '@/config/google';
+import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import type { EmailSendType } from './emailTemplateUtils';
 
 export interface SendInvoiceEmailParams {
@@ -34,6 +35,30 @@ export type EmailSendError =
     | { type: 'provider'; message: string }
     | { type: 'network'; message: string };
 
+const EMAIL_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
+
+function captureInvoiceEmailIncident({
+    incidentKey,
+    message,
+    error,
+    context,
+}: {
+    incidentKey: string;
+    message: string;
+    error: unknown;
+    context: Record<string, boolean | number | string | null>;
+}) {
+
+    captureDebugBundleIncident({
+        incidentKey,
+        name: 'TaskTimeInvoiceEmailFailure',
+        message,
+        error,
+        context,
+        throttleMs: EMAIL_INCIDENT_THROTTLE_MS,
+    });
+}
+
 /**
  * Send an invoice email via the Worker endpoint
  */
@@ -42,9 +67,21 @@ export async function sendInvoiceEmail(
 ): Promise<SendInvoiceEmailResult> {
 
     const workerUrl = SYNC_WORKER_CONFIG.workerUrl;
+    const incidentContext = {
+        sendType: params.sendType,
+        hasForwardToCopy: Boolean(params.forwardTo),
+        workerConfigured: Boolean(workerUrl),
+    };
 
     if (!workerUrl) {
-        throw createEmailError('network', 'Sync worker URL is not configured');
+        const error = createEmailError('network', 'Sync worker URL is not configured');
+        captureInvoiceEmailIncident({
+            incidentKey: 'invoice.email_send_network_failed',
+            message: 'TaskTime invoice email send failed to reach the worker',
+            error,
+            context: incidentContext,
+        });
+        throw error;
     }
 
     const body = JSON.stringify({
@@ -72,8 +109,15 @@ export async function sendInvoiceEmail(
             },
             body,
         });
-    } catch {
-        throw createEmailError('network', 'Unable to reach the email service. Check your connection and try again.');
+    } catch (error) {
+        const networkError = createEmailError('network', 'Unable to reach the email service. Check your connection and try again.');
+        captureInvoiceEmailIncident({
+            incidentKey: 'invoice.email_send_network_failed',
+            message: 'TaskTime invoice email send failed to reach the worker',
+            error,
+            context: incidentContext,
+        });
+        throw networkError;
     }
 
     if (response.ok) {
@@ -125,10 +169,30 @@ export async function sendInvoiceEmail(
     }
 
     if (response.status >= 500) {
-        throw createEmailError('provider', details || 'Email service error. Please try again later.');
+        const error = createEmailError('provider', details || 'Email service error. Please try again later.');
+        captureInvoiceEmailIncident({
+            incidentKey: 'invoice.email_send_provider_failed',
+            message: 'TaskTime invoice email provider request failed',
+            error,
+            context: {
+                ...incidentContext,
+                status: response.status,
+            },
+        });
+        throw error;
     }
 
-    throw createEmailError('network', details || `Unexpected error (${response.status})`);
+    const error = createEmailError('network', details || `Unexpected error (${response.status})`);
+    captureInvoiceEmailIncident({
+        incidentKey: 'invoice.email_send_network_failed',
+        message: 'TaskTime invoice email send returned an unexpected worker response',
+        error,
+        context: {
+            ...incidentContext,
+            status: response.status,
+        },
+    });
+    throw error;
 }
 
 function createEmailError(type: 'quota_exceeded', message: string, remaining: number): EmailSendError;

@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { isTokenExpired, getStoredToken, storeToken, clearStoredToken, getTokenTimeRemaining } from './googleAuthStorage';
 import { getStoredSession, storeSession, clearStoredSession } from './googleAuthStorage';
 
+const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
+    captureDebugBundleIncidentSpy: vi.fn(),
+}));
+
 // Mock IndexedDB
 const mockDb = {
     get: vi.fn(),
@@ -11,6 +15,10 @@ const mockDb = {
 
 vi.mock('idb', () => ({
     openDB: vi.fn(() => Promise.resolve(mockDb)),
+}));
+
+vi.mock('@/utils/debugbundle', () => ({
+    captureDebugBundleIncident: captureDebugBundleIncidentSpy,
 }));
 
 describe('googleAuthStorage', () => {
@@ -101,6 +109,9 @@ describe('googleAuthStorage', () => {
             const result = await getStoredToken();
 
             expect(result).toBeNull();
+            expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+                incidentKey: 'auth.token_storage_read_failed',
+            }));
         });
     });
 
@@ -133,6 +144,9 @@ describe('googleAuthStorage', () => {
             expect(consoleErrorSpy).toHaveBeenCalledWith(
                 'IndexedDB storage quota exceeded while saving auth token. Clear browser data to free space.'
             );
+            expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+                incidentKey: 'auth.token_storage_quota_exceeded',
+            }));
         });
 
         it('logs a quota warning for storage quota error messages', async () => {
@@ -159,6 +173,9 @@ describe('googleAuthStorage', () => {
 
             // Should not throw
             await expect(clearStoredToken()).resolves.toBeUndefined();
+            expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+                incidentKey: 'auth.token_storage_clear_failed',
+            }));
         });
     });
 
@@ -226,6 +243,9 @@ describe('googleAuthStorage', () => {
             const result = await getStoredSession();
 
             expect(result).toBeNull();
+            expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+                incidentKey: 'auth.session_storage_read_failed',
+            }));
         });
 
         it('stores session in IndexedDB', async () => {
@@ -255,6 +275,9 @@ describe('googleAuthStorage', () => {
                 'Error saving session to IndexedDB:',
                 expect.any(Error)
             );
+            expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+                incidentKey: 'auth.session_storage_write_failed',
+            }));
         });
 
         it('clears session in IndexedDB', async () => {
@@ -272,6 +295,9 @@ describe('googleAuthStorage', () => {
                 'Error clearing session from IndexedDB:',
                 expect.any(Error)
             );
+            expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+                incidentKey: 'auth.session_storage_clear_failed',
+            }));
         });
     });
 });

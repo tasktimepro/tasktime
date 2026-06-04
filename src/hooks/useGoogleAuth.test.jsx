@@ -3,6 +3,10 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 import { useGoogleAuth, _resetValidationCache } from './useGoogleAuth'
 import { getStoredSession, clearStoredSession } from '@/utils/googleAuthStorage'
 
+const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
+    captureDebugBundleIncidentSpy: vi.fn(),
+}))
+
 vi.mock('@/config/google', () => ({
     SYNC_WORKER_CONFIG: {
         isEnabled: true,
@@ -20,6 +24,10 @@ vi.mock('@/utils/googleAuthStorage', () => ({
     getStoredSession: vi.fn(),
     storeSession: vi.fn(),
     clearStoredSession: vi.fn(),
+}))
+
+vi.mock('@/utils/debugbundle', () => ({
+    captureDebugBundleIncident: captureDebugBundleIncidentSpy,
 }))
 
 function createPopupStub() {
@@ -153,6 +161,13 @@ describe('useGoogleAuth', () => {
         expect(thrownError).toBeInstanceOf(Error)
         expect(thrownError.message).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
         expect(result.current.error).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'auth.sign_in_failed',
+            context: expect.objectContaining({
+                step: 'auth-init',
+                workerOrigin: 'https://worker.example',
+            }),
+        }))
     })
 
     it('surfaces worker callback details when the auth exchange fails', async () => {
@@ -380,6 +395,127 @@ describe('useGoogleAuth', () => {
 
         expect(result.current.isSignedIn).toBe(true)
         expect(popup.focus).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not read popup.closed after navigating to Google OAuth', async () => {
+        getStoredSession.mockResolvedValue(null)
+
+        let closedReadCount = 0
+        const popupDocument = document.implementation.createHTMLDocument('Connecting Google Drive...')
+        const popup = {
+            close: vi.fn(),
+            focus: vi.fn(),
+            location: { href: '' },
+            document: popupDocument,
+        }
+
+        Object.defineProperty(popup, 'closed', {
+            configurable: true,
+            get() {
+                closedReadCount += 1
+
+                if (closedReadCount > 1) {
+                    throw new Error('popup.closed should not be read after navigation')
+                }
+
+                return false
+            },
+        })
+
+        window.open.mockImplementation(() => popup)
+
+        fetch.mockImplementation(async (input) => {
+            if (input === 'https://worker.example/auth/init') {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                        state: 'oauth-state',
+                    }),
+                }
+            }
+
+            if (input === 'https://worker.example/auth/callback') {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        sessionId: 'session-coop-safe',
+                        user: {
+                            id: 'user-coop-safe',
+                            email: 'coop-safe@example.com',
+                        },
+                    }),
+                }
+            }
+
+            if (input === 'https://worker.example/auth/status') {
+                return {
+                    ok: true,
+                    json: async () => ({ authenticated: true }),
+                }
+            }
+
+            throw new Error(`Unexpected fetch: ${String(input)}`)
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let signInPromise
+
+        act(() => {
+            signInPromise = result.current.signIn()
+        })
+
+        await waitFor(() => {
+            expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+        })
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: {
+                    type: 'google-auth-callback',
+                    code: 'coop-safe-code',
+                    state: 'oauth-state',
+                },
+            }))
+        })
+
+        await act(async () => {
+            await signInPromise
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(closedReadCount).toBe(1)
+    })
+
+    it('does not capture a DebugBundle incident when the auth popup is blocked', async () => {
+        getStoredSession.mockResolvedValue(null)
+        window.open.mockImplementation(() => null)
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let thrownError
+
+        await act(async () => {
+            try {
+                await result.current.signIn()
+            } catch (error) {
+                thrownError = error
+            }
+        })
+
+        expect(thrownError).toBeInstanceOf(Error)
+        expect(thrownError.message).toBe('Failed to open auth popup. Check popup blocker settings.')
+        expect(captureDebugBundleIncidentSpy).not.toHaveBeenCalled()
     })
 
     it('invalidates the local session into reconnect state without revoking access', async () => {

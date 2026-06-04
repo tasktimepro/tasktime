@@ -1,9 +1,18 @@
 // @ts-nocheck
 
 import * as Y from 'yjs'
-import { describe, expect, it, vi } from 'vitest'
-import { YjsDriveProvider } from './GoogleDriveProvider.ts'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PROJECT_NOTES_LOCAL_SAVE_ORIGIN } from '@/constants/syncOrigins'
+
+const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
+    captureDebugBundleIncidentSpy: vi.fn(),
+}))
+
+vi.mock('@/utils/debugbundle', () => ({
+    captureDebugBundleIncident: captureDebugBundleIncidentSpy,
+}))
+
+import { YjsDriveProvider } from './GoogleDriveProvider.ts'
 
 function objectToYMap(data) {
     const map = new Y.Map()
@@ -27,6 +36,10 @@ function createProviderWithCoreDoc(coreDoc) {
 }
 
 describe('YjsDriveProvider', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
     it('only establishes the connection without syncing on manual-mode connect', async () => {
         const liveDoc = new Y.Doc()
         liveDoc.getMap('projects').set('project-1', objectToYMap({
@@ -119,6 +132,39 @@ describe('YjsDriveProvider', () => {
         provider.disconnect()
     })
 
+    it('captures page-exit flush failures as incidents', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.isOnline = () => true
+        provider.setSyncMode('backup')
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: {} })),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+
+        vi.spyOn(provider, 'sync').mockRejectedValue(new Error('page-exit flush failed'))
+
+        await provider.connect('backup')
+
+        provider.pendingDeltas.set('core', [new Uint8Array([1, 2, 3])])
+
+        window.dispatchEvent(new Event('pagehide'))
+        await Promise.resolve()
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'drive.page_exit_sync_failed',
+            context: expect.objectContaining({
+                mode: 'backup',
+                trigger: 'pagehide',
+            }),
+        }))
+
+        provider.disconnect()
+    })
+
     it('queues local-only project note updates without scheduling an immediate sync', async () => {
         vi.useFakeTimers()
 
@@ -180,6 +226,138 @@ describe('YjsDriveProvider', () => {
         expect(provider.syncDoc).not.toHaveBeenCalled()
         expect(provider.pendingDeltas.get('core')).toHaveLength(1)
         expect(provider.getState()).toBe('error')
+    })
+
+    it('captures top-level sync failures as incidents', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.manifest = {
+            hasManifestChanged: vi.fn(async () => {
+                throw new Error('manifest read failed')
+            }),
+        }
+
+        await provider.sync(false, { allowPull: true })
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'drive.sync_failed',
+            context: expect.objectContaining({
+                allowPull: true,
+                force: false,
+                mode: 'sync',
+            }),
+        }))
+        expect(provider.getState()).toBe('error')
+    })
+
+    it('captures delta upload failures as incidents', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const capturedUpdates = []
+
+        liveDoc.on('update', (update) => {
+            capturedUpdates.push(update)
+        })
+
+        liveDoc.transact(() => {
+            liveDoc.getMap('projects').set('project-1', objectToYMap({
+                id: 'project-1',
+                title: 'Upload me',
+            }))
+        })
+
+        provider.pendingDeltas.set('core', [capturedUpdates[0]])
+        provider.manifest = {
+            createFile: vi.fn(async () => {
+                throw new Error('delta upload failed')
+            }),
+        }
+
+        await provider.pushDeltas('core', liveDoc)
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'drive.delta_upload_failed',
+            context: expect.objectContaining({
+                docName: 'core',
+                queuedUpdates: 1,
+            }),
+        }))
+    })
+
+    it('captures unrecoverable missing Drive files as incidents', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.manifest = {
+            deleteFileId: vi.fn(),
+            downloadFileAsArrayBuffer: vi.fn(async () => {
+                throw new Error('Drive API error 404: File not found')
+            }),
+            refreshFileCache: vi.fn(async () => {}),
+            getFileIdWithFallback: vi.fn(async () => null),
+        }
+
+        const result = await provider.downloadFileWithRecovery('tasktime-yjs-core.bin', 'stale-id')
+
+        expect(result).toBeNull()
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'drive.remote_file_missing_after_recovery',
+            context: expect.objectContaining({
+                fileId: 'stale-id',
+                fileName: 'tasktime-yjs-core.bin',
+            }),
+        }))
+    })
+
+    it('wipes all non-backup Drive files and preserves backup files', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.manifest = {
+            listAppDataFiles: vi.fn()
+                .mockResolvedValueOnce([
+                    { id: 'manifest-id', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-06-04T00:00:00.000Z' },
+                    { id: 'core-id', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-06-04T00:00:01.000Z' },
+                    { id: 'backup-id', name: 'tasktime-backup-2026-06-04-0700.json', modifiedTime: '2026-06-04T00:00:02.000Z' },
+                ])
+                .mockResolvedValueOnce([
+                    { id: 'backup-id', name: 'tasktime-backup-2026-06-04-0700.json', modifiedTime: '2026-06-04T00:00:02.000Z' },
+                ]),
+            deleteFileById: vi.fn(async () => {}),
+            reset: vi.fn(),
+        }
+
+        await provider.wipeDriveData()
+
+        expect(provider.manifest.deleteFileById).toHaveBeenCalledWith('manifest-id')
+        expect(provider.manifest.deleteFileById).toHaveBeenCalledWith('core-id')
+        expect(provider.manifest.deleteFileById).not.toHaveBeenCalledWith('backup-id')
+        expect(provider.manifest.reset).toHaveBeenCalledTimes(1)
+    })
+
+    it('fails Drive wipe when sync files remain after verification attempts', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.manifest = {
+            listAppDataFiles: vi.fn(async () => [
+                { id: 'manifest-id', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-06-04T00:00:00.000Z' },
+            ]),
+            deleteFileById: vi.fn(async () => {}),
+            reset: vi.fn(),
+        }
+
+        await expect(provider.wipeDriveData()).rejects.toThrow('Drive wipe incomplete')
+
+        expect(provider.manifest.deleteFileById).toHaveBeenCalled()
+        expect(provider.manifest.reset).not.toHaveBeenCalled()
     })
 
     it('preserves updates queued while a delta upload is in flight', async () => {
@@ -331,6 +509,91 @@ describe('YjsDriveProvider', () => {
             'deleted:tasktime-yjs-core-delta-old-2.bin',
         ])
         expect(manifestDoc.deltas).toEqual([])
+    })
+
+    it('creates a replacement base-state file when cached Drive file id is missing during full-state upload', async () => {
+        const liveDoc = new Y.Doc()
+        liveDoc.getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Imported replacement state',
+        }))
+
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const manifestDoc = {
+            stateFile: 'tasktime-yjs-core.bin',
+            stateVersion: 17,
+            lastCompaction: '2026-06-04T00:00:00.000Z',
+            deltas: [],
+        }
+
+        provider.manifest = {
+            ensureDocManifest: vi.fn(() => manifestDoc),
+            getFileId: vi.fn(() => 'stale-state-file-id'),
+            updateFile: vi.fn(async () => {
+                throw new Error('Drive update error 404: {"error":{"code":404,"message":"File not found: stale-state-file-id."}}')
+            }),
+            deleteFileId: vi.fn(),
+            refreshFileCache: vi.fn(async () => {}),
+            getFileIdWithFallback: vi.fn(async () => null),
+            createFile: vi.fn(async () => 'replacement-state-file-id'),
+            setFileId: vi.fn(),
+            updateDocManifest: vi.fn((_, update) => {
+                Object.assign(manifestDoc, update)
+            }),
+            save: vi.fn(async () => {}),
+        }
+
+        await provider.pushFullState('core', liveDoc, true)
+
+        expect(provider.manifest.deleteFileId).toHaveBeenCalledWith('tasktime-yjs-core.bin')
+        expect(provider.manifest.refreshFileCache).toHaveBeenCalledTimes(1)
+        expect(provider.manifest.createFile).toHaveBeenCalledWith('tasktime-yjs-core.bin', expect.any(Blob))
+        expect(provider.manifest.setFileId).toHaveBeenCalledWith('tasktime-yjs-core.bin', 'replacement-state-file-id')
+        expect(provider.manifest.save).toHaveBeenCalled()
+        expect(provider.forceFullStateDocs.has('core')).toBe(false)
+    })
+
+    it('retries a recovered base-state file id before creating a replacement', async () => {
+        const liveDoc = new Y.Doc()
+        liveDoc.getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Recovered upload state',
+        }))
+
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const manifestDoc = {
+            stateFile: 'tasktime-yjs-core.bin',
+            stateVersion: 4,
+            lastCompaction: '2026-06-04T00:00:00.000Z',
+            deltas: [],
+        }
+
+        provider.manifest = {
+            ensureDocManifest: vi.fn(() => manifestDoc),
+            getFileId: vi.fn(() => 'stale-state-file-id'),
+            updateFile: vi.fn(async (fileId) => {
+                if (fileId === 'stale-state-file-id') {
+                    throw new Error('Drive update error 404: {"error":{"code":404,"message":"File not found: stale-state-file-id."}}')
+                }
+            }),
+            deleteFileId: vi.fn(),
+            refreshFileCache: vi.fn(async () => {}),
+            getFileIdWithFallback: vi.fn(async () => 'fresh-state-file-id'),
+            createFile: vi.fn(async () => 'replacement-state-file-id'),
+            setFileId: vi.fn(),
+            updateDocManifest: vi.fn((_, update) => {
+                Object.assign(manifestDoc, update)
+            }),
+            save: vi.fn(async () => {}),
+        }
+
+        await provider.pushFullState('core', liveDoc, true)
+
+        expect(provider.manifest.updateFile).toHaveBeenCalledWith('stale-state-file-id', 'tasktime-yjs-core.bin', expect.any(Blob))
+        expect(provider.manifest.updateFile).toHaveBeenCalledWith('fresh-state-file-id', 'tasktime-yjs-core.bin', expect.any(Blob))
+        expect(provider.manifest.createFile).not.toHaveBeenCalled()
+        expect(provider.manifest.setFileId).toHaveBeenCalledWith('tasktime-yjs-core.bin', 'fresh-state-file-id')
+        expect(provider.forceFullStateDocs.has('core')).toBe(false)
     })
 
     it('saves compacted manifest before deleting old compacted delta files', async () => {

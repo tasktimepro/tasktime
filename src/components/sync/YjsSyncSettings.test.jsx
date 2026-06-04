@@ -9,6 +9,8 @@ const showSuccessMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
 const updatePreferencesMock = vi.hoisted(() => vi.fn())
 const setDriveSyncPreferencesMock = vi.hoisted(() => vi.fn())
+const wipeDriveDataMock = vi.hoisted(() => vi.fn())
+const deleteAllBackupsMock = vi.hoisted(() => vi.fn())
 const yjsSyncSettingsMocks = vi.hoisted(() => ({
     isDriveConnected: false,
     isConnecting: false,
@@ -42,7 +44,8 @@ vi.mock('@/contexts/YjsContext', () => ({
         pendingSyncChanges: yjsSyncSettingsMocks.pendingSyncChanges,
         forceSyncDrive: yjsSyncSettingsMocks.forceSyncDrive,
         disconnectDrive: yjsSyncSettingsMocks.disconnectDrive,
-        wipeDriveData: vi.fn(),
+        wipeDriveData: wipeDriveDataMock,
+        deleteAllBackups: deleteAllBackupsMock,
     }),
 }))
 
@@ -104,6 +107,9 @@ describe('YjsSyncSettings', () => {
         yjsSyncSettingsMocks.syncPhase = 'idle'
         yjsSyncSettingsMocks.autoSyncEnabled = false
         yjsSyncSettingsMocks.autoSyncMode = 'sync'
+        wipeDriveDataMock.mockResolvedValue(undefined)
+        deleteAllBackupsMock.mockResolvedValue(undefined)
+        yjsSyncSettingsMocks.signOut.mockResolvedValue(undefined)
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     })
 
@@ -228,5 +234,47 @@ describe('YjsSyncSettings', () => {
         render(<YjsSyncSettings />)
 
         expect(screen.getByText('Sync Now needed')).toBeInTheDocument()
+    })
+
+    it('preserves backup snapshots by default when wiping Drive sync data', async () => {
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+
+        render(<YjsSyncSettings />)
+
+        await userEvent.click(screen.getByRole('button', { name: /more actions/i }))
+        await userEvent.click(screen.getByText('Wipe & Disconnect'))
+
+        expect(screen.getByText('Also delete backup snapshots')).toBeInTheDocument()
+
+        await userEvent.type(screen.getByLabelText(/wipe drive/i), 'wipe drive')
+        await userEvent.click(screen.getByRole('button', { name: 'Wipe & Disconnect' }))
+
+        expect(wipeDriveDataMock).toHaveBeenCalledTimes(1)
+        expect(deleteAllBackupsMock).not.toHaveBeenCalled()
+        expect(yjsSyncSettingsMocks.disconnectDrive).toHaveBeenCalledTimes(1)
+        expect(yjsSyncSettingsMocks.signOut).toHaveBeenCalledTimes(1)
+        expect(showSuccessMock).toHaveBeenCalledWith('Google Drive sync data wiped and disconnected')
+    })
+
+    it('deletes backup snapshots when the wipe backup option is selected', async () => {
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+
+        render(<YjsSyncSettings />)
+
+        await userEvent.click(screen.getByRole('button', { name: /more actions/i }))
+        await userEvent.click(screen.getByText('Wipe & Disconnect'))
+        await userEvent.click(screen.getByText('Also delete backup snapshots'))
+        await userEvent.type(screen.getByLabelText(/wipe drive/i), 'wipe drive')
+        await userEvent.click(screen.getByRole('button', { name: 'Wipe & Disconnect' }))
+
+        expect(wipeDriveDataMock).toHaveBeenCalledTimes(1)
+        expect(deleteAllBackupsMock).toHaveBeenCalledTimes(1)
+        expect(wipeDriveDataMock.mock.invocationCallOrder[0]).toBeLessThan(deleteAllBackupsMock.mock.invocationCallOrder[0])
+        expect(deleteAllBackupsMock.mock.invocationCallOrder[0]).toBeLessThan(yjsSyncSettingsMocks.disconnectDrive.mock.invocationCallOrder[0])
+        expect(showSuccessMock).toHaveBeenCalledWith('Google Drive data and backups wiped and disconnected')
     })
 })

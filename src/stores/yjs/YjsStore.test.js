@@ -3,10 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const STORAGE_KEY = 'tasktime-disconnected-dirty-docs'
 
-const { docs, providerInstances, storage } = vi.hoisted(() => ({
+const { docs, providerInstances, storage, providerMockState, deletedDatabaseCalls } = vi.hoisted(() => ({
     docs: new Map(),
     providerInstances: [],
     storage: new Map(),
+    deletedDatabaseCalls: [],
+    providerMockState: {
+        hasLocalChangesToPush: false,
+    },
 }))
 
 vi.mock('./YjsDocManager', async () => {
@@ -43,7 +47,9 @@ vi.mock('./YjsDocManager', async () => {
                 docs.clear()
             }
 
-            async deleteDatabases() {}
+            async deleteDatabases(docNames) {
+                deletedDatabaseCalls.push(docNames)
+            }
         }
     }
 })
@@ -59,6 +65,7 @@ vi.mock('./providers/GoogleDriveProvider', () => ({
             this.disconnect = vi.fn()
             this.isConnected = vi.fn(() => true)
             this.getState = vi.fn(() => 'idle')
+            this.hasLocalChangesToPush = vi.fn(() => providerMockState.hasLocalChangesToPush)
             this.sync = vi.fn(async () => {})
             this.syncAndSubscribeDoc = vi.fn(async () => {})
             this.getEntryYears = vi.fn(() => [])
@@ -104,6 +111,8 @@ describe('YjsStore reconnect sync tracking', () => {
         docs.forEach((doc) => doc.destroy())
         docs.clear()
         providerInstances.length = 0
+        deletedDatabaseCalls.length = 0
+        providerMockState.hasLocalChangesToPush = false
     })
 
     it('hands disconnected local edits to Drive on reconnect', async () => {
@@ -156,6 +165,121 @@ describe('YjsStore reconnect sync tracking', () => {
         store.destroy()
     })
 
+    it('keeps disconnected dirty docs queued when reconnect leaves provider work pending', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        store.setDriveSyncPreferences(true, 'sync')
+
+        docs.get('core').getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Imported while disconnected',
+        }))
+
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['core'])
+
+        providerMockState.hasLocalChangesToPush = true
+
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+
+        expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(['core'])
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['core'])
+
+        store.destroy()
+    })
+
+    it('keeps disconnected dirty docs queued when manual sync fails', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        docs.get('core').getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Manual dirty project',
+        }))
+
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+        provider.getState.mockReturnValue('error')
+        provider.hasLocalChangesToPush.mockReturnValue(true)
+
+        await expect(store.forceDriveSync({ allowPull: true })).rejects.toThrow('Drive sync failed')
+
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['core'])
+
+        store.destroy()
+    })
+
+    it('clears disconnected dirty docs after manual sync succeeds with no provider work pending', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        docs.get('core').getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Manual dirty project',
+        }))
+
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+        provider.getState.mockReturnValue('idle')
+        provider.hasLocalChangesToPush.mockReturnValue(false)
+
+        await store.forceDriveSync({ allowPull: true })
+
+        expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
+
+        store.destroy()
+    })
+
+    it('keeps lazy disconnected dirty docs queued when their on-demand sync leaves provider work pending', async () => {
+        storage.set(STORAGE_KEY, JSON.stringify(['tasks-archived']))
+
+        const store = new YjsStore()
+        await store.initialize()
+
+        store.setDriveSyncPreferences(true, 'sync')
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['tasks-archived'])
+
+        providerMockState.hasLocalChangesToPush = true
+
+        await store.loadArchivedTasks()
+
+        const provider = providerInstances[0]
+
+        expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(['tasks-archived'])
+        expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('tasks-archived', undefined)
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['tasks-archived'])
+
+        store.destroy()
+    })
+
+    it('clears lazy disconnected dirty docs after their on-demand sync succeeds', async () => {
+        storage.set(STORAGE_KEY, JSON.stringify(['tasks-archived']))
+
+        const store = new YjsStore()
+        await store.initialize()
+
+        store.setDriveSyncPreferences(true, 'sync')
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['tasks-archived'])
+
+        await store.loadArchivedTasks()
+
+        const provider = providerInstances[0]
+
+        expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(['tasks-archived'])
+        expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('tasks-archived', undefined)
+        expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
+
+        store.destroy()
+    })
+
     it('does not force-upload clean docs on reconnect', async () => {
         const store = new YjsStore()
         await store.initialize()
@@ -188,6 +312,24 @@ describe('YjsStore reconnect sync tracking', () => {
 
         store.destroy()
     })
+
+    it('clears discovered persisted docs outside the default year range', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        docs.set('entries-2019', new Y.Doc())
+        docs.set('entries-2035', new Y.Doc())
+
+        await store.clearAllData()
+
+        expect(deletedDatabaseCalls).toHaveLength(1)
+        expect(deletedDatabaseCalls[0]).toEqual(expect.arrayContaining([
+            'core',
+            'entries-active',
+            'entries-2019',
+            'entries-2035',
+        ]))
+    })
 })
 
 describe('YjsStore timer reconciliation', () => {
@@ -209,6 +351,8 @@ describe('YjsStore timer reconciliation', () => {
         docs.forEach((doc) => doc.destroy())
         docs.clear()
         providerInstances.length = 0
+        deletedDatabaseCalls.length = 0
+        providerMockState.hasLocalChangesToPush = false
     })
 
     it('deletes orphaned timers that have a matching stopped timer instance', async () => {
@@ -638,6 +782,7 @@ describe('YjsStore task hierarchy archiving', () => {
         docs.forEach((doc) => doc.destroy())
         docs.clear()
         providerInstances.length = 0
+        providerMockState.hasLocalChangesToPush = false
     })
 
     it('archives a parent task together with descendant subtasks', async () => {

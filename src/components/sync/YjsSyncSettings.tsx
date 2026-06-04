@@ -1,5 +1,7 @@
 /**
  * YjsSyncSettings - Sync settings component for Yjs-based sync
+ *
+ * Sync contract source of truth: ./README.md
  * 
  * Shows connection status and allows managing Google Drive sync
  */
@@ -58,6 +60,7 @@ export default function YjsSyncSettings() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [wipeConfirmText, setWipeConfirmText] = useState('');
+    const [wipeIncludesBackups, setWipeIncludesBackups] = useState(false);
     const [backups, setBackups] = useState<BackupInfo[]>([]);
     const [backupsLoading, setBackupsLoading] = useState(false);
     const [backupCreating, setBackupCreating] = useState(false);
@@ -65,7 +68,7 @@ export default function YjsSyncSettings() {
     const [isRestoring, setIsRestoring] = useState(false);
     const [pendingBackupModeChange, setPendingBackupModeChange] = useState<PendingBackupModeChange>(null);
 
-    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, pendingSyncChanges, forceSyncDrive, disconnectDrive, wipeDriveData, listBackups, createBackup, downloadBackup } = useYjs();
+    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, pendingSyncChanges, forceSyncDrive, disconnectDrive, wipeDriveData, deleteAllBackups, listBackups, createBackup, downloadBackup } = useYjs();
     const { isSignedIn, isLoading: authLoading, user, signIn, signOut, hadPreviousSession } = useGoogleAuth();
     const { preferences, updatePreferences } = usePreferences();
     const { showSuccess, showError } = useToast();
@@ -242,6 +245,7 @@ export default function YjsSyncSettings() {
 
     const handleWipeAndDisconnect = () => {
         setWipeConfirmText('');
+        setWipeIncludesBackups(false);
         setConfirmDialog('wipe');
     };
 
@@ -276,9 +280,16 @@ export default function YjsSyncSettings() {
         setIsProcessing(true);
         try {
             await wipeDriveData();
+
+            if (wipeIncludesBackups) {
+                await deleteAllBackups();
+            }
+
             disconnectDrive();
             await signOut();
-            showSuccess('Google Drive wiped and disconnected');
+            showSuccess(wipeIncludesBackups
+                ? 'Google Drive data and backups wiped and disconnected'
+                : 'Google Drive sync data wiped and disconnected');
         } catch (error) {
             console.error('[YjsSyncSettings] Wipe & disconnect failed:', error);
             showError('Wipe failed. Please try again.');
@@ -759,7 +770,7 @@ export default function YjsSyncSettings() {
             <Modal
                 isOpen={confirmDialog === 'wipe'}
                 onClose={() => !isProcessing && setConfirmDialog(null)}
-                title="Wipe Google Drive and disconnect?"
+                title="Wipe synced Drive data and disconnect?"
                 size="md"
                 footer={
                     <div className="flex justify-end gap-3">
@@ -782,9 +793,21 @@ export default function YjsSyncSettings() {
             >
                 <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                        This will permanently delete all TaskTime files from Google Drive and disconnect this device.
+                        This will permanently delete TaskTime sync files from Google Drive and disconnect this device.
                         Your local data will remain on this device, but we recommend that you <strong>export your data before this action</strong>.
                     </p>
+                    <label className="flex items-start gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm">
+                        <Checkbox
+                            checked={wipeIncludesBackups}
+                            onCheckedChange={(checked: boolean | 'indeterminate') => setWipeIncludesBackups(checked === true)}
+                        />
+                        <span className="space-y-1">
+                            <span className="block font-medium text-foreground">Also delete backup snapshots</span>
+                            <span className="block text-muted-foreground">
+                                Leave this unchecked if you want to keep Drive backups available for recovery.
+                            </span>
+                        </span>
+                    </label>
                     <div>
                         <Label htmlFor="wipe-drive-confirm" className="text-sm font-medium">
                             Type <span className="font-semibold">wipe drive</span> to confirm

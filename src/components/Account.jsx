@@ -1,3 +1,8 @@
+/**
+ * Account deletion and cloud disconnect flows must follow the sync contract source of truth:
+ * ./sync/README.md
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 import { CogIcon, TrashIcon, CloudIcon, SignOutIcon } from '@/components/ui/icons';
 import { Database, Mail } from 'lucide-react';
@@ -42,7 +47,7 @@ const Account = ({
     const isMobileLayout = useIsMobileLayout();
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
-    const { clearAllData, isDriveConnected, forceSyncDrive, disconnectDrive, wipeDriveData } = useYjs();
+    const { clearAllData, isDriveConnected, forceSyncDrive, disconnectDrive, wipeDriveData, deleteAllBackups } = useYjs();
     const { signOut, revokeAccess } = useGoogleAuth();
     const { preferences, updatePreferences } = usePreferences();
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
@@ -111,6 +116,7 @@ const Account = ({
         try {
             if (isDriveConnected) {
                 await wipeDriveData();
+                await deleteAllBackups();
                 await revokeAccess();
             }
 

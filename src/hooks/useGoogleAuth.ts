@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SYNC_WORKER_CONFIG } from '@/config/google';
+import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { 
     getStoredSession, storeSession, clearStoredSession, type StoredSession
 } from '@/utils/googleAuthStorage';
@@ -33,6 +34,8 @@ interface AuthState {
 type ValidateWorkerSession = (session: StoredSession) => Promise<boolean>;
 type SignOutFromWorker = (options?: { revoke?: boolean }) => Promise<void>;
 const SIGN_IN_CAPACITY_EXCEEDED_ERROR = 'Google Drive sign-in is temporarily unavailable because the sync service reached its daily sign-in limit. Please try again tomorrow.';
+const AUTH_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
+const AUTH_CONFIG_INCIDENT_THROTTLE_MS = 60 * 60 * 1000;
 
 const HAD_PREVIOUS_SESSION_KEY = 'google-auth-had-previous-session';
 
@@ -90,6 +93,13 @@ const notifyAuthSubscribers = () => {
             subscriber();
         } catch (error) {
             console.error('Auth subscriber error:', error);
+            captureGoogleAuthIncident(
+                'auth.subscriber_callback_failed',
+                'TaskTime Google auth subscriber callback failed',
+                error,
+                {},
+                30 * 60 * 1000,
+            );
         }
     });
 };
@@ -126,6 +136,19 @@ function toAuthError(error: unknown, endpoint?: string): Error {
     return new Error('Sign in failed');
 }
 
+function closeAuthPopup(popup: Window | null): void {
+
+    if (!popup) {
+        return;
+    }
+
+    try {
+        popup.close();
+    } catch {
+        // Ignore cross-origin or already-closed popup failures.
+    }
+}
+
 function normalizeAuthErrorMessage(message: string): string {
 
     if (/kv put\(\) limit exceeded for the day/i.test(message)) {
@@ -133,6 +156,36 @@ function normalizeAuthErrorMessage(message: string): string {
     }
 
     return message;
+}
+
+function shouldCaptureSignInIncident(error: Error): boolean {
+
+    const message = error.message || '';
+
+    return !(
+        message === 'Failed to open auth popup. Check popup blocker settings.' ||
+        message === 'Authentication popup was closed before Google sign-in could start.' ||
+        message === 'Authentication popup was closed before sign-in completed.' ||
+        message === 'Authentication timed out. Please try again.'
+    );
+}
+
+function captureGoogleAuthIncident(
+    incidentKey: string,
+    message: string,
+    error: unknown,
+    context: Record<string, unknown>,
+    throttleMs: number = AUTH_INCIDENT_THROTTLE_MS,
+): void {
+
+    captureDebugBundleIncident({
+        incidentKey,
+        name: 'TaskTimeGoogleAuthError',
+        message,
+        error,
+        context,
+        throttleMs,
+    });
 }
 
 async function readResponseError(response: Response, fallbackMessage: string): Promise<string> {
@@ -254,9 +307,11 @@ export const useGoogleAuth = () => {
         setState(prev => ({ ...prev, isLoading: true, error: null }));
 
         let popup: Window | null = null;
+        let failedStep = 'open-popup';
 
         try {
             popup = openPendingAuthPopup();
+            failedStep = 'auth-init';
 
             // 1. Get auth URL from Worker
             const initResponse = await fetch(SYNC_WORKER_CONFIG.endpoints.authInit, {
@@ -271,12 +326,15 @@ export const useGoogleAuth = () => {
 
             const { authUrl, state: authState } = await initResponse.json();
             sessionStorage.setItem('google_auth_state', authState);
+            failedStep = 'popup-navigation';
 
             // 2. Navigate the already-open popup to preserve the user gesture on mobile browsers
             navigateAuthPopup(popup, authUrl);
+            failedStep = 'oauth-callback';
 
             // 3. Wait for callback
             const code = await waitForAuthCallback(popup, authState);
+            failedStep = 'auth-exchange';
 
             // 4. Exchange code for session via Worker
             const callbackResponse = await fetch(SYNC_WORKER_CONFIG.endpoints.authCallback, {
@@ -294,6 +352,7 @@ export const useGoogleAuth = () => {
             }
 
             const { sessionId, user } = await callbackResponse.json();
+            failedStep = 'session-validation';
 
             const isValid = await validateWorkerSession({
                 sessionId,
@@ -307,6 +366,7 @@ export const useGoogleAuth = () => {
             }
 
             // 5. Store session
+            failedStep = 'session-store';
             await storeSession({
                 sessionId,
                 userId: user.id,
@@ -330,13 +390,7 @@ export const useGoogleAuth = () => {
             notifyAuthSubscribers();
 
         } catch (error) {
-            if (popup && !popup.closed) {
-                try {
-                    popup.close();
-                } catch {
-                    // Ignore popup close failures
-                }
-            }
+            closeAuthPopup(popup);
 
             const authError = toAuthError(error, SYNC_WORKER_CONFIG.endpoints.authInit);
 
@@ -345,6 +399,18 @@ export const useGoogleAuth = () => {
                 isLoading: false,
                 error: authError.message,
             }));
+
+            if (shouldCaptureSignInIncident(authError)) {
+                captureGoogleAuthIncident(
+                    'auth.sign_in_failed',
+                    'TaskTime Google Drive sign-in failed',
+                    authError,
+                    {
+                        step: failedStep,
+                        workerOrigin: getEndpointOrigin(SYNC_WORKER_CONFIG.endpoints.authInit),
+                    },
+                );
+            }
 
             throw authError;
         }
@@ -416,6 +482,13 @@ export const useGoogleAuth = () => {
 
         if (!SYNC_WORKER_CONFIG.isEnabled) {
             console.error('[useGoogleAuth] Worker URL not configured');
+            captureGoogleAuthIncident(
+                'auth.worker_config_missing',
+                'TaskTime Google Drive sync worker URL is missing',
+                new Error('Sync Worker not configured'),
+                {},
+                AUTH_CONFIG_INCIDENT_THROTTLE_MS,
+            );
             setState(prev => ({
                 ...prev,
                 isLoading: false,
@@ -666,34 +739,13 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
         let settled = false;
         let broadcastChannel: BroadcastChannel | null = null;
 
-        let popupClosedAt = 0;
-
-        const closedCheckId = window.setInterval(() => {
-
-            if (settled || !popup.closed) {
-                if (!popup.closed) popupClosedAt = 0;
-                return;
-            }
-
-            // On mobile Safari, BroadcastChannel messages can arrive after
-            // the sending tab closes. Give a 1.5s grace period before
-            // treating popup closure as a user cancellation.
-            if (popupClosedAt === 0) {
-                popupClosedAt = Date.now();
-                return;
-            }
-
-            if (Date.now() - popupClosedAt < 1500) return;
-
-            cleanup();
-            settled = true;
-            reject(new Error('Authentication popup was closed before sign-in completed.'));
-        }, 500);
+        // Do not poll popup.closed once the window has navigated to Google.
+        // COOP can sever or warn on that reference, and the callback page
+        // already communicates completion via postMessage/BroadcastChannel.
 
         const cleanup = () => {
             window.removeEventListener('message', handleMessage);
             clearTimeout(timeoutId);
-            window.clearInterval(closedCheckId);
             if (broadcastChannel) {
                 try { broadcastChannel.close(); } catch { /* ignore */ }
                 broadcastChannel = null;

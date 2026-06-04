@@ -1,6 +1,8 @@
 // @ts-nocheck
 /**
  * BackupManager - Automated daily backups to Google Drive
+ *
+ * Sync contract source of truth: ../../../components/sync/README.md
  * 
  * Creates full JSON snapshots of all data in appDataFolder.
  * Independent from Yjs sync — sync operations cannot delete backups.

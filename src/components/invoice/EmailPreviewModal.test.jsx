@@ -6,9 +6,14 @@ import EmailPreviewModal from './EmailPreviewModal';
 
 // ---- Mocks ----
 
+const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
+    captureDebugBundleIncidentSpy: vi.fn(),
+}));
+
 const mockUpdateInvoice = vi.fn();
 const mockShowSuccess = vi.fn();
 const mockOnClose = vi.fn();
+const mockGeneratePDFBase64 = vi.fn(async () => 'bW9ja3BkZg==');
 let mockDriveSessionId = 'sess-abc';
 let mockEmailTemplates = [];
 const mockGetByType = vi.fn((type) => mockEmailTemplates.filter((template) => template.type === type));
@@ -88,6 +93,10 @@ vi.mock('@/hooks/useToast.ts', () => ({
     useToast: () => ({ showSuccess: mockShowSuccess }),
 }));
 
+vi.mock('@/utils/debugbundle', () => ({
+    captureDebugBundleIncident: captureDebugBundleIncidentSpy,
+}));
+
 const mockSendInvoiceEmail = vi.fn();
 
 vi.mock('@/utils/emailService', () => ({
@@ -97,7 +106,7 @@ vi.mock('@/utils/emailService', () => ({
 
 vi.mock('@/utils/pdfUtils.ts', () => ({
     getCurrentInvoiceHtmlContent: () => '<html>mock pdf html</html>',
-    generatePDFBase64: vi.fn(async () => 'bW9ja3BkZg=='),
+    generatePDFBase64: (...args) => mockGeneratePDFBase64(...args),
 }));
 
 vi.mock('@/utils/currencyUtils.ts', () => ({
@@ -174,6 +183,8 @@ describe('EmailPreviewModal', () => {
         mockDriveSessionId = 'sess-abc';
         mockEmailTemplates = [];
         mockSendInvoiceEmail.mockReset();
+        mockGeneratePDFBase64.mockReset();
+        mockGeneratePDFBase64.mockResolvedValue('bW9ja3BkZg==');
         mockGetByType.mockClear();
         mockGetDefaultForType.mockClear();
     });
@@ -631,6 +642,50 @@ describe('EmailPreviewModal', () => {
         await waitFor(() => {
             expect(screen.getByText((content) => content.includes('already been emailed'))).toBeTruthy();
         });
+    });
+
+    it('captures unexpected non-pdf send-flow failures as incidents', async () => {
+
+        const user = userEvent.setup();
+
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockSendInvoiceEmail.mockImplementation(() => {
+            throw new Error('Unexpected worker response shape');
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
+
+        await waitFor(() => {
+            expect(screen.getByText((content) => content.includes('Unexpected error: Unexpected worker response shape'))).toBeTruthy();
+        });
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.email_send_unexpected_failed',
+            context: expect.objectContaining({
+                stage: 'send',
+                sendType: 'invoice',
+            }),
+        }));
+    });
+
+    it('does not duplicate incidents for pdf generation failures already captured in pdfUtils', async () => {
+
+        const user = userEvent.setup();
+
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockGeneratePDFBase64.mockRejectedValueOnce(new Error('PDF generation failed'));
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
+
+        await waitFor(() => {
+            expect(screen.getByText((content) => content.includes('Unexpected error: PDF generation failed'))).toBeTruthy();
+        });
+
+        expect(captureDebugBundleIncidentSpy).not.toHaveBeenCalled();
     });
 
     it('does not call send when no session', async () => {

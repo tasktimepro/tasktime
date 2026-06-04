@@ -1,3 +1,8 @@
+/**
+ * Import/export must follow the sync contract source of truth:
+ * ./sync/README.md
+ */
+
 import React, { useRef, useState } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ExclamationTriangleIcon, FileBracesIcon } from '@/components/ui/icons';
 import { formatDuration, millisecondsToHours } from '../utils/dateUtils.ts';
@@ -40,7 +45,7 @@ function ExportImport({
     onImport 
 }) {
     const isMobileLayout = useIsMobileLayout();
-    const { store } = useYjs();
+    const { store, isDriveConnected } = useYjs();
     const { timers } = useTimers();
     const { expenses: allExpenses } = useExpenses({ includeArchived: true });
     const { showError } = useToast();
@@ -483,6 +488,15 @@ function ExportImport({
                         title="Warning"
                         description="Importing will replace all current data including projects, tasks, invoices, payment methods, business info, clients, templates, and preferences. Make sure to export your current data first if you want to keep it."
                     />
+
+                    {isDriveConnected && (
+                        <Notice
+                            variant="warning"
+                            icon={ExclamationTriangleIcon}
+                            title="Google Drive is connected"
+                            description="Import replaces this device's local data only. It does not replace existing Google Drive data. To make this import the cloud source of truth, first use Cloud Sync > Wipe Drive & disconnect, then import, then reconnect."
+                        />
+                    )}
                 </div>
             </Modal>
             </CardContent>

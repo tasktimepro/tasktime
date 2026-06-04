@@ -19,6 +19,7 @@ describe('debugbundle utility', () => {
         vi.resetModules()
         vi.clearAllMocks()
         vi.unstubAllEnvs()
+        vi.useRealTimers()
     })
 
     it('does not initialize when the project token is missing or blank', async () => {
@@ -101,5 +102,125 @@ describe('debugbundle utility', () => {
 
         expect(captureExceptionSpy).toHaveBeenCalledTimes(1)
         expect(captureExceptionSpy).toHaveBeenCalledWith(error)
+    })
+
+    it('captures handled incidents with stable metadata and throttling', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-06-04T10:00:00Z'))
+        vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
+
+        const { captureDebugBundleIncident, initializeDebugBundle } = await loadDebugBundleModule()
+
+        expect(initializeDebugBundle()).toBe(true)
+
+        const originalError = new Error('drive write failed')
+
+        expect(captureDebugBundleIncident({
+            incidentKey: 'drive.delta_upload_failed',
+            message: 'TaskTime could not upload a Drive delta update',
+            error: originalError,
+            context: { docName: 'core' },
+            throttleMs: 1_000,
+        })).toBe(true)
+
+        expect(captureDebugBundleIncident({
+            incidentKey: 'drive.delta_upload_failed',
+            message: 'TaskTime could not upload a Drive delta update',
+            error: originalError,
+            context: { docName: 'core' },
+            throttleMs: 1_000,
+        })).toBe(false)
+
+        vi.advanceTimersByTime(1_001)
+
+        expect(captureDebugBundleIncident({
+            incidentKey: 'drive.delta_upload_failed',
+            message: 'TaskTime could not upload a Drive delta update',
+            error: originalError,
+            context: { docName: 'core' },
+            throttleMs: 1_000,
+        })).toBe(true)
+
+        expect(captureExceptionSpy).toHaveBeenCalledTimes(2)
+
+        const capturedIncident = captureExceptionSpy.mock.calls[0][0]
+
+        expect(capturedIncident).toMatchObject({
+            name: 'TaskTimeHandledIncident',
+            message: 'TaskTime could not upload a Drive delta update',
+            debugbundleIncidentKey: 'drive.delta_upload_failed',
+            debugbundleHandled: true,
+            debugbundleContext: { docName: 'core' },
+            debugbundleOriginalName: 'Error',
+            debugbundleOriginalMessage: 'drive write failed',
+        })
+    })
+
+    it('captures global browser failures and CSP violations with incident keys', async () => {
+        vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
+
+        const {
+            captureDebugBundleGlobalError,
+            captureDebugBundleSecurityPolicyViolation,
+            captureDebugBundleUnhandledRejection,
+            initializeDebugBundle,
+        } = await loadDebugBundleModule()
+
+        expect(initializeDebugBundle()).toBe(true)
+
+        captureDebugBundleGlobalError(new Error('boom'), { filename: 'main.jsx' })
+        captureDebugBundleUnhandledRejection('nope', { type: 'unhandledrejection' })
+        captureDebugBundleSecurityPolicyViolation({
+            blockedURI: 'inline',
+            effectiveDirective: 'script-src',
+            violatedDirective: 'script-src',
+        })
+
+        expect(captureExceptionSpy).toHaveBeenCalledTimes(3)
+        expect(captureExceptionSpy.mock.calls[0][0].debugbundleIncidentKey).toBe('browser.global_error')
+        expect(captureExceptionSpy.mock.calls[1][0].debugbundleIncidentKey).toBe('browser.unhandled_rejection')
+        expect(captureExceptionSpy.mock.calls[2][0]).toMatchObject({
+            name: 'TaskTimeSecurityPolicyViolation',
+            debugbundleIncidentKey: 'browser.csp_violation',
+            debugbundleHandled: true,
+        })
+    })
+
+    it('swallows sdk capture failures so incident reporting cannot break the app', async () => {
+        vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
+        captureExceptionSpy.mockImplementation(() => {
+            throw new Error('sdk failure')
+        })
+
+        const {
+            captureDebugBundleException,
+            captureDebugBundleIncident,
+            initializeDebugBundle,
+        } = await loadDebugBundleModule()
+
+        expect(initializeDebugBundle()).toBe(true)
+        expect(captureDebugBundleException(new Error('boom'))).toBe(false)
+        expect(captureDebugBundleIncident({
+            incidentKey: 'drive.sync_failed',
+            message: 'TaskTime sync failed',
+        })).toBe(false)
+    })
+
+    it('does not throw when metadata cannot be attached to the original error', async () => {
+        vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
+
+        const {
+            captureDebugBundleGlobalError,
+            initializeDebugBundle,
+        } = await loadDebugBundleModule()
+
+        expect(initializeDebugBundle()).toBe(true)
+
+        const frozenError = Object.freeze(new Error('frozen'))
+
+        expect(() => {
+            captureDebugBundleGlobalError(frozenError, { filename: 'main.jsx' })
+        }).not.toThrow()
+        expect(captureExceptionSpy).toHaveBeenCalledWith(frozenError)
     })
 })

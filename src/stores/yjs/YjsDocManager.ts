@@ -1,5 +1,7 @@
 /**
  * YjsDocManager - Manages multiple Yjs documents with lazy loading
+ *
+ * Sync contract source of truth: ../../components/sync/README.md
  * 
  * This manager handles the multi-document architecture where:
  * - Core documents are always loaded at startup

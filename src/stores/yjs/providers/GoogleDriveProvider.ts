@@ -1,5 +1,7 @@
 /**
  * YjsDriveProvider - Google Drive sync provider for Yjs documents
+ *
+ * Sync contract source of truth: ../../../components/sync/README.md
  * 
  * Handles:
  * - Delta-based sync (only changes, not full state)
@@ -12,7 +14,7 @@
 import * as Y from 'yjs';
 import { encodeStateAsUpdate, applyUpdate, mergeUpdates } from 'yjs';
 import { YjsDocManager } from '../YjsDocManager';
-import { ManifestManager, AuthorizationError } from './ManifestManager';
+import { ManifestManager, AuthorizationError, isDriveFileNotFoundError } from './ManifestManager';
 import { BackupManager } from './BackupManager';
 import type { DocName, SyncState, DriveSyncMode, SyncPhase } from '../types';
 import { validateDocManagerState } from '../validation';
@@ -26,6 +28,7 @@ import {
     clearSyncPersistence,
     getSyncPersistenceState,
 } from '@/utils/syncPersistence';
+import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { PROJECT_NOTES_LOCAL_SAVE_ORIGIN } from '@/constants/syncOrigins';
 
 export { AuthorizationError };
@@ -36,6 +39,9 @@ const SYNC_DEBOUNCE_MS = 100; // Small debounce to batch rapid changes
 const PULL_THROTTLE_MS = 30_000; // Skip pull if no local changes and last pull was < 30s ago
 const CROSS_TAB_SYNC_RECENCY_MS = 60_000; // Skip periodic sync if another tab synced in last 60s
 const SYNC_LOCK_NAME = 'tasktime-drive-sync';
+const WIPE_VERIFY_ATTEMPTS = 3;
+const DRIVE_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
+const DRIVE_VALIDATION_INCIDENT_THROTTLE_MS = 30 * 60 * 1000;
 
 class BackupModeRemoteChangedError extends Error {
 
@@ -43,6 +49,29 @@ class BackupModeRemoteChangedError extends Error {
         super('Remote Drive data changed. Run Sync Now before backup mode can upload local changes.');
         this.name = 'BackupModeRemoteChangedError';
     }
+}
+
+function captureDriveIncident({
+    incidentKey,
+    message,
+    error,
+    context,
+    throttleMs = DRIVE_INCIDENT_THROTTLE_MS,
+}: {
+    incidentKey: string;
+    message: string;
+    error?: unknown;
+    context?: Record<string, unknown>;
+    throttleMs?: number;
+}): void {
+    captureDebugBundleIncident({
+        incidentKey,
+        name: 'TaskTimeDriveSyncError',
+        message,
+        error,
+        context,
+        throttleMs,
+    });
 }
 
 /**
@@ -195,6 +224,13 @@ export class YjsDriveProvider {
         this.log('page exit: flushing pending local changes', { trigger, mode: this.syncMode });
         this.sync(true, { allowPull: false }).catch((error) => {
             console.error('[YjsDriveProvider] Page-exit sync failed:', error);
+            captureDriveIncident({
+                incidentKey: 'drive.page_exit_sync_failed',
+                message: 'TaskTime could not flush pending Drive sync changes during page exit',
+                error,
+                context: { trigger, mode: this.syncMode },
+                throttleMs: 10 * 60 * 1000,
+            });
         });
     }
 
@@ -210,16 +246,11 @@ export class YjsDriveProvider {
         }
     }
 
-    private isDriveFileNotFoundError(error: unknown): boolean {
-        const message = error instanceof Error ? error.message : String(error);
-        return message.includes('Drive API error 404');
-    }
-
     private async downloadFileWithRecovery(fileName: string, fileId: string): Promise<ArrayBuffer | null> {
         try {
             return await this.manifest.downloadFileAsArrayBuffer(fileId);
         } catch (error) {
-            if (!this.isDriveFileNotFoundError(error)) {
+            if (!isDriveFileNotFoundError(error)) {
                 throw error;
             }
 
@@ -229,18 +260,74 @@ export class YjsDriveProvider {
 
             const recoveredFileId = await this.manifest.getFileIdWithFallback(fileName);
             if (!recoveredFileId) {
+                captureDriveIncident({
+                    incidentKey: 'drive.remote_file_missing_after_recovery',
+                    message: 'TaskTime could not recover a Drive sync file after refreshing the file cache',
+                    error,
+                    context: { fileName, fileId },
+                    throttleMs: 30 * 60 * 1000,
+                });
                 return null;
             }
 
             try {
                 return await this.manifest.downloadFileAsArrayBuffer(recoveredFileId);
             } catch (retryError) {
-                if (this.isDriveFileNotFoundError(retryError)) {
+                if (isDriveFileNotFoundError(retryError)) {
+                    captureDriveIncident({
+                        incidentKey: 'drive.remote_file_missing_after_recovery',
+                        message: 'TaskTime could not recover a Drive sync file after refreshing the file cache',
+                        error: retryError,
+                        context: { fileName, fileId: recoveredFileId, originalFileId: fileId },
+                        throttleMs: 30 * 60 * 1000,
+                    });
                     return null;
                 }
 
                 throw retryError;
             }
+        }
+    }
+
+    private async uploadFileWithRecovery(fileName: string, blob: Blob): Promise<void> {
+        const existingFileId = this.manifest.getFileId(fileName);
+
+        if (!existingFileId) {
+            const fileId = await this.manifest.createFile(fileName, blob);
+            this.manifest.setFileId(fileName, fileId);
+            return;
+        }
+
+        try {
+            await this.manifest.updateFile(existingFileId, fileName, blob);
+            return;
+        } catch (error) {
+            if (!isDriveFileNotFoundError(error)) {
+                throw error;
+            }
+
+            this.log('push: cached file id missing, refreshing file cache', { fileName, fileId: existingFileId });
+            this.manifest.deleteFileId(fileName);
+            await this.manifest.refreshFileCache();
+
+            const recoveredFileId = await this.manifest.getFileIdWithFallback(fileName);
+            if (recoveredFileId) {
+                try {
+                    await this.manifest.updateFile(recoveredFileId, fileName, blob);
+                    this.manifest.setFileId(fileName, recoveredFileId);
+                    return;
+                } catch (retryError) {
+                    if (!isDriveFileNotFoundError(retryError)) {
+                        throw retryError;
+                    }
+
+                    this.log('push: recovered file id also missing, creating replacement file', { fileName, fileId: recoveredFileId });
+                    this.manifest.deleteFileId(fileName);
+                }
+            }
+
+            const replacementFileId = await this.manifest.createFile(fileName, blob);
+            this.manifest.setFileId(fileName, replacementFileId);
         }
     }
 
@@ -311,6 +398,13 @@ export class YjsDriveProvider {
             // temporarily broken during concurrent multi-device edits;
             // blocking the update would prevent CRDT convergence.
             console.warn(`[YjsDriveProvider] Validation warning after ${source} for ${docName} (update applied anyway):`, error);
+            captureDriveIncident({
+                incidentKey: 'drive.remote_validation_warning',
+                message: 'TaskTime applied a remote Drive update that failed validation',
+                error,
+                context: { docName, source },
+                throttleMs: DRIVE_VALIDATION_INCIDENT_THROTTLE_MS,
+            });
         }
 
         projectedDoc.destroy();
@@ -467,6 +561,14 @@ export class YjsDriveProvider {
             }
 
             console.error('[YjsDriveProvider] Connection failed:', error);
+            if (!(error instanceof AuthorizationError)) {
+                captureDriveIncident({
+                    incidentKey: 'drive.connect_failed',
+                    message: 'TaskTime could not connect to Google Drive sync',
+                    error,
+                    context: { mode },
+                });
+            }
             this.setState('error');
             this.setPhase('error');
             throw error;
@@ -530,11 +632,26 @@ export class YjsDriveProvider {
         this.setPhase('uploading');
         this.log('wipe: started');
 
-        const files = await this.manifest.listAppDataFiles();
-        for (const file of files) {
-            // Backup files are preserved — only deletable via "delete all account data"
-            if (BackupManager.isBackupFile(file.name)) continue;
-            await this.manifest.deleteFileById(file.id);
+        for (let attempt = 1; attempt <= WIPE_VERIFY_ATTEMPTS; attempt++) {
+            const files = await this.manifest.listAppDataFiles();
+            const syncFiles = files.filter((file) => !BackupManager.isBackupFile(file.name));
+
+            if (syncFiles.length === 0) {
+                break;
+            }
+
+            for (const file of syncFiles) {
+                await this.manifest.deleteFileById(file.id);
+            }
+
+            if (attempt === WIPE_VERIFY_ATTEMPTS) {
+                const remainingFiles = await this.manifest.listAppDataFiles();
+                const remainingSyncFiles = remainingFiles.filter((file) => !BackupManager.isBackupFile(file.name));
+
+                if (remainingSyncFiles.length > 0) {
+                    throw new Error(`Drive wipe incomplete. ${remainingSyncFiles.length} sync file(s) remain.`);
+                }
+            }
         }
 
         // Reset local manifest caches
@@ -765,6 +882,18 @@ export class YjsDriveProvider {
         } catch (error) {
             console.error('[YjsDriveProvider] Sync failed:', error);
             markSyncFailed(); // Persist that sync failed (pending changes remain)
+            if (!(error instanceof AuthorizationError) && !(error instanceof BackupModeRemoteChangedError)) {
+                captureDriveIncident({
+                    incidentKey: 'drive.sync_failed',
+                    message: 'TaskTime Drive sync failed',
+                    error,
+                    context: {
+                        allowPull,
+                        force,
+                        mode: this.syncMode,
+                    },
+                });
+            }
             if (error instanceof AuthorizationError) {
                 this.setState('error');
                 this.setPhase('error');
@@ -1041,6 +1170,15 @@ export class YjsDriveProvider {
         } catch (error) {
             // Preserve pending deltas so they retry on next sync
             console.error(`[DriveSync] Failed to push delta for ${docName}, will retry on next sync`, error);
+            captureDriveIncident({
+                incidentKey: 'drive.delta_upload_failed',
+                message: 'TaskTime could not upload a Drive delta update',
+                error,
+                context: {
+                    docName,
+                    queuedUpdates: uploadedBatch.length,
+                },
+            });
             // Don't rethrow - let sync continue with other docs and retry later
         }
     }
@@ -1058,14 +1196,7 @@ export class YjsDriveProvider {
         const blob = new Blob([fullState.buffer as ArrayBuffer], { type: 'application/octet-stream' });
 
         try {
-            // Check if file already exists
-            const existingFileId = this.manifest.getFileId(stateFileName);
-            if (existingFileId) {
-                await this.manifest.updateFile(existingFileId, stateFileName, blob);
-            } else {
-                const fileId = await this.manifest.createFile(stateFileName, blob);
-                this.manifest.setFileId(stateFileName, fileId);
-            }
+            await this.uploadFileWithRecovery(stateFileName, blob);
 
             const nextStateVersion = docManifest.stateVersion + 1;
             const deltaFileNamesToDelete = clearDeltas
@@ -1106,6 +1237,16 @@ export class YjsDriveProvider {
             // Keep doc in forceFullStateDocs so it retries on next sync
             this.forceFullStateDocs.add(docName);
             console.error(`[DriveSync] Failed to push full state for ${docName}, will retry`, error);
+            captureDriveIncident({
+                incidentKey: 'drive.full_state_upload_failed',
+                message: 'TaskTime could not upload a full Drive document state',
+                error,
+                context: {
+                    clearDeltas,
+                    docName,
+                    bytes: fullState.length,
+                },
+            });
             // Don't rethrow - let sync continue with other docs
         }
     }
@@ -1131,16 +1272,9 @@ export class YjsDriveProvider {
 
         // Upload new base state
         const stateFileName = docManifest.stateFile;
-        const existingFileId = this.manifest.getFileId(stateFileName);
-
         const blob = new Blob([fullState.buffer as ArrayBuffer], { type: 'application/octet-stream' });
 
-        if (existingFileId) {
-            await this.manifest.updateFile(existingFileId, stateFileName, blob);
-        } else {
-            const fileId = await this.manifest.createFile(stateFileName, blob);
-            this.manifest.setFileId(stateFileName, fileId);
-        }
+        await this.uploadFileWithRecovery(stateFileName, blob);
 
         // Save the manifest before deleting old files so remote readers never see references to deleted deltas.
         this.manifest.clearDeltas(docName);

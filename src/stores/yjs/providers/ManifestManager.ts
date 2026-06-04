@@ -1,5 +1,7 @@
 /**
  * ManifestManager - Manages the manifest file for Yjs sync
+ *
+ * Sync contract source of truth: ../../../components/sync/README.md
  * 
  * The manifest tracks:
  * - All document files and their versions
@@ -34,6 +36,13 @@ export interface Manifest {
     deviceId: string;
     lastSync: string;
     documents: Record<string, DocManifest>;
+}
+
+export function isDriveFileNotFoundError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    const lowerMessage = message.toLowerCase();
+
+    return message.includes('404') && lowerMessage.includes('file not found');
 }
 
 /**
@@ -414,7 +423,7 @@ export class ManifestManager {
         // Fallback: search Drive for the file
         console.log(`[ManifestManager] File not in cache, searching Drive: ${fileName}`);
         try {
-            const query = encodeURIComponent(`name='${fileName}'`);
+            const query = encodeURIComponent(`name='${fileName}' and trashed=false`);
             const response = await this.request(
                 `/files?spaces=appDataFolder&q=${query}&fields=files(id,name)`
             );
@@ -580,11 +589,24 @@ export class ManifestManager {
      * List all files in appDataFolder
      */
     async listAppDataFiles(): Promise<Array<{ id: string; name: string; modifiedTime: string }>> {
-        const response = await this.request(
-            '/files?spaces=appDataFolder&fields=files(id,name,modifiedTime)'
-        );
-        const { files } = await response.json();
-        return files || [];
+        const allFiles: Array<{ id: string; name: string; modifiedTime: string }> = [];
+        const query = encodeURIComponent('trashed=false');
+        let pageToken: string | null = null;
+
+        do {
+            const pageTokenParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
+            const response = await this.request(
+                `/files?spaces=appDataFolder&q=${query}&pageSize=1000&fields=nextPageToken,files(id,name,modifiedTime)${pageTokenParam}`
+            );
+            const { files, nextPageToken } = await response.json();
+
+            allFiles.push(...(files || []));
+            pageToken = typeof nextPageToken === 'string' && nextPageToken.length > 0
+                ? nextPageToken
+                : null;
+        } while (pageToken);
+
+        return allFiles;
     }
 
     /**

@@ -1,5 +1,7 @@
 /**
  * YjsSyncStatus - Sync status indicator for Yjs-based sync
+ *
+ * Sync contract source of truth: ./README.md
  * 
  * Shows connection status to Google Drive and sync state
  */

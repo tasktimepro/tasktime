@@ -10,20 +10,27 @@ import {
     getCurrentInvoiceHtmlContent,
 } from './pdfUtils'
 
-const html2pdfMocks = vi.hoisted(() => {
+const { captureDebugBundleIncidentSpy, html2pdfMocks } = vi.hoisted(() => {
 
     return {
-        html2pdf: vi.fn(),
-        set: vi.fn(),
-        from: vi.fn(),
-        save: vi.fn(),
-        outputPdf: vi.fn(),
+        captureDebugBundleIncidentSpy: vi.fn(),
+        html2pdfMocks: {
+            html2pdf: vi.fn(),
+            set: vi.fn(),
+            from: vi.fn(),
+            save: vi.fn(),
+            outputPdf: vi.fn(),
+        },
     }
 })
 
 vi.mock('html2pdf.js', () => ({
 
     default: html2pdfMocks.html2pdf
+}))
+
+vi.mock('@/utils/debugbundle', () => ({
+    captureDebugBundleIncident: captureDebugBundleIncidentSpy,
 }))
 
 beforeEach(() => {
@@ -1180,6 +1187,12 @@ describe('generatePDF', () => {
         await expect(generatePDF('<p>Invoice</p>')).rejects.toThrow('Save failed')
 
         expect(errorSpy).toHaveBeenCalled()
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.pdf_generation_failed',
+            context: expect.objectContaining({
+                operation: 'download',
+            }),
+        }))
 
         errorSpy.mockRestore()
     })
@@ -1196,6 +1209,9 @@ describe('generatePDF', () => {
         await expect(generatePDF('<p>Invoice</p>')).rejects.toThrow('Boom')
 
         expect(errorSpy).toHaveBeenCalled()
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.pdf_generation_failed',
+        }))
 
         errorSpy.mockRestore()
     })
@@ -1225,6 +1241,44 @@ describe('generatePDFBase64', () => {
         html2pdfMocks.outputPdf.mockRejectedValueOnce(new Error('PDF generation failed'))
 
         await expect(generatePDFBase64('<p>Invoice</p>')).rejects.toThrow('PDF generation failed')
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.pdf_blob_generation_failed',
+            context: expect.objectContaining({
+                operation: 'blob',
+            }),
+        }))
+    })
+
+    it('captures base64 conversion failures separately', async () => {
+
+        const originalFileReader = global.FileReader
+
+        class BrokenFileReader {
+            constructor() {
+                this.result = null
+                this.onload = null
+                this.onerror = null
+            }
+
+            readAsDataURL() {
+                this.onerror?.(new Event('error'))
+            }
+        }
+
+        global.FileReader = BrokenFileReader
+
+        try {
+            await expect(generatePDFBase64('<p>Invoice</p>')).rejects.toThrow('Failed to convert PDF to base64')
+        } finally {
+            global.FileReader = originalFileReader
+        }
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.pdf_base64_generation_failed',
+            context: expect.objectContaining({
+                operation: 'base64',
+            }),
+        }))
     })
 
     it('passes sanitized HTML to html2pdf', async () => {
@@ -1251,5 +1305,8 @@ describe('generatePDFBlob', () => {
     it('rejects when no HTML content is provided', async () => {
 
         await expect(generatePDFBlob('')).rejects.toThrow('No HTML content provided')
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.pdf_blob_generation_failed',
+        }))
     })
 })

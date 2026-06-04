@@ -2,7 +2,12 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
-import { initializeDebugBundle } from './utils/debugbundle'
+import {
+  captureDebugBundleGlobalError,
+  captureDebugBundleSecurityPolicyViolation,
+  captureDebugBundleUnhandledRejection,
+  initializeDebugBundle,
+} from './utils/debugbundle'
 import { registerAppServiceWorker } from './utils/serviceWorkerRegistration'
 
 const VIEWPORT_HEIGHT_PROPERTY = '--viewport-height'
@@ -90,15 +95,41 @@ function registerViewportHeightSync() {
 
 registerViewportHeightSync()
 
+function shouldIgnoreSecurityPolicyViolation(event) {
+  return !import.meta.env.PROD &&
+    event?.blockedURI === 'eval' &&
+    (event?.effectiveDirective === 'script-src' || event?.violatedDirective === 'script-src')
+}
+
 // Global error handlers - catch uncaught exceptions and unhandled promise rejections
 // so they don't silently disappear in production.
 window.addEventListener('error', (event) => {
-    console.error('[TaskTime] Uncaught error:', event.error ?? event.message);
-});
+  const error = event.error ?? event.message
+
+  console.error('[TaskTime] Uncaught error:', error)
+  captureDebugBundleGlobalError(error, {
+    colno: event.colno ?? null,
+    filename: event.filename ?? null,
+    lineno: event.lineno ?? null,
+    message: event.message ?? null,
+  })
+})
 
 window.addEventListener('unhandledrejection', (event) => {
-    console.error('[TaskTime] Unhandled promise rejection:', event.reason);
-});
+  console.error('[TaskTime] Unhandled promise rejection:', event.reason)
+  captureDebugBundleUnhandledRejection(event.reason, {
+    type: event.type,
+  })
+})
+
+window.addEventListener('securitypolicyviolation', (event) => {
+  if (shouldIgnoreSecurityPolicyViolation(event)) {
+    return
+  }
+
+  console.error('[TaskTime] Content Security Policy violation:', event)
+  captureDebugBundleSecurityPolicyViolation(event)
+})
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

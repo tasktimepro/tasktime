@@ -1,3 +1,9 @@
+/**
+ * Sync status display rules.
+ *
+ * Sync contract source of truth: ./README.md
+ */
+
 import {
     CloudCheckIcon,
     CloudCogIcon,

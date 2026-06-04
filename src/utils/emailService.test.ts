@@ -6,10 +6,18 @@ import {
     type SendInvoiceEmailParams,
 } from './emailService';
 
+const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
+    captureDebugBundleIncidentSpy: vi.fn(),
+}));
+
 vi.mock('@/config/google', () => ({
     SYNC_WORKER_CONFIG: {
         workerUrl: 'https://sync.test.worker',
     },
+}));
+
+vi.mock('@/utils/debugbundle', () => ({
+    captureDebugBundleIncident: captureDebugBundleIncidentSpy,
 }));
 
 const validParams: SendInvoiceEmailParams = {
@@ -291,6 +299,14 @@ describe('sendInvoiceEmail', () => {
         } catch (err) {
             expect(expectEmailSendError(err).type).toBe('provider');
         }
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.email_send_provider_failed',
+            context: expect.objectContaining({
+                sendType: 'invoice',
+                status: 500,
+            }),
+        }));
     });
 
     it('throws network error when fetch fails', async () => {
@@ -305,6 +321,14 @@ describe('sendInvoiceEmail', () => {
             expect(error.type).toBe('network');
             expect(error.message).toContain('Unable to reach');
         }
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.email_send_network_failed',
+            context: expect.objectContaining({
+                sendType: 'invoice',
+                workerConfigured: true,
+            }),
+        }));
     });
 
     it('handles non-JSON error response gracefully', async () => {
@@ -319,6 +343,32 @@ describe('sendInvoiceEmail', () => {
             expect(error.type).toBe('provider');
             expect(error.message).toContain('Email service error');
         }
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.email_send_provider_failed',
+            context: expect.objectContaining({
+                status: 502,
+            }),
+        }));
+    });
+
+    it('does not capture incidents for validation or already-sent business responses', async () => {
+
+        fetchMock
+            .mockResolvedValueOnce(createJsonResponse(
+                { error: 'validation', details: 'Invalid email address' },
+                { status: 400 }
+            ))
+            .mockResolvedValueOnce(createJsonResponse({ error: 'already_sent' }, { status: 409 }));
+
+        await expect(sendInvoiceEmail(validParams)).rejects.toMatchObject({
+            type: 'validation',
+        });
+        await expect(sendInvoiceEmail(validParams)).rejects.toMatchObject({
+            type: 'already_sent',
+        });
+
+        expect(captureDebugBundleIncidentSpy).not.toHaveBeenCalled();
     });
 });
 

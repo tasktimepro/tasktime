@@ -1,5 +1,7 @@
 /**
  * YjsStore - Main store class for Yjs-based state management
+ *
+ * Sync contract source of truth: ../../components/sync/README.md
  * 
  * This is the central store that manages all Yjs documents and provides
  * access to collections. It handles:
@@ -259,7 +261,7 @@ export class YjsStore {
                     options.allowPullFromDrive ? { allowPull: true } : undefined,
                 );
                 // Only clear dirty flag if the doc was actually synced (not manual mode)
-                if (this.driveSyncMode !== 'manual') {
+                if (this.driveSyncMode !== 'manual' && this.canClearDisconnectedDirtyDocsAfterSync()) {
                     this.clearDisconnectedDirtyDocs(['tasks-archived']);
                 }
             }
@@ -347,7 +349,7 @@ export class YjsStore {
                     'expenses-archived',
                     options.allowPullFromDrive ? { allowPull: true } : undefined,
                 );
-                if (this.driveSyncMode !== 'manual') {
+                if (this.driveSyncMode !== 'manual' && this.canClearDisconnectedDirtyDocsAfterSync()) {
                     this.clearDisconnectedDirtyDocs(['expenses-archived']);
                 }
             }
@@ -474,7 +476,7 @@ export class YjsStore {
                 docName,
                 options.allowPullFromDrive ? { allowPull: true } : undefined,
             );
-            if (this.driveSyncMode !== 'manual') {
+            if (this.driveSyncMode !== 'manual' && this.canClearDisconnectedDirtyDocsAfterSync()) {
                 this.clearDisconnectedDirtyDocs([docName]);
             }
         }
@@ -553,7 +555,7 @@ export class YjsStore {
                     'invoices-archived',
                     options.allowPullFromDrive ? { allowPull: true } : undefined,
                 );
-                if (this.driveSyncMode !== 'manual') {
+                if (this.driveSyncMode !== 'manual' && this.canClearDisconnectedDirtyDocsAfterSync()) {
                     this.clearDisconnectedDirtyDocs(['invoices-archived']);
                 }
             }
@@ -812,7 +814,7 @@ export class YjsStore {
         // Clear disconnected dirty docs after a successful online reconnect
         // only when connect() actually reconciled them. Manual mode keeps
         // those docs queued until the user explicitly clicks Sync Now.
-        if (this.driveSyncMode !== 'manual' && (this.driveProvider.getState?.() ?? 'idle') !== 'offline') {
+        if (this.driveSyncMode !== 'manual' && this.canClearDisconnectedDirtyDocsAfterSync()) {
             this.clearDisconnectedDirtyDocs(
                 disconnectedDirtyDocs.filter((docName) => this.docManager.isLoaded(docName)),
             );
@@ -839,13 +841,26 @@ export class YjsStore {
      * Trigger Drive sync with optional force control.
      */
     async syncDrive(options?: { allowPull?: boolean; force?: boolean }): Promise<void> {
-        await this.driveProvider?.sync(options?.force ?? false, {
+        if (!this.driveProvider) {
+            return;
+        }
+
+        await this.driveProvider.sync(options?.force ?? false, {
             allowPull: options?.allowPull,
         });
 
+        const syncState = this.driveProvider.getState();
+        if (syncState === 'offline') {
+            throw new Error('Unable to sync while offline. Your local changes are still saved on this device.');
+        }
+
+        if (syncState === 'error') {
+            throw new Error('Drive sync failed. Your local changes are still saved and will retry.');
+        }
+
         // After a successful sync, clear any leftover disconnected dirty docs
         // (matters for manual mode where they aren't cleared on connect)
-        if (this.disconnectedDirtyDocs.size > 0) {
+        if (this.disconnectedDirtyDocs.size > 0 && this.canClearDisconnectedDirtyDocsAfterSync()) {
             this.clearDisconnectedDirtyDocs();
         }
     }
@@ -990,7 +1005,11 @@ export class YjsStore {
         const loadOptions = shouldRefreshFromCloud ? { allowPullFromDrive: true } : undefined;
 
         if (shouldRefreshFromCloud) {
-            await this.forceDriveSync({ allowPull: true });
+            try {
+                await this.forceDriveSync({ allowPull: true });
+            } catch {
+                throw new Error('Unable to refresh cloud data before export. Please check your connection and try again.');
+            }
 
             const syncState = this.getSyncState();
             if (syncState === 'offline' || syncState === 'error') {
@@ -1264,7 +1283,9 @@ export class YjsStore {
      */
     async clearAllData(): Promise<void> {
         console.log('[YjsStore] Clearing all data...');
-        
+
+        const persistedDocs = await this.docManager.listPersistedDocs();
+
         // Disconnect from Drive sync first
         this.driveProvider?.disconnect();
         this.driveProvider = null;
@@ -1274,23 +1295,29 @@ export class YjsStore {
 
         // Collect all potential database names to delete
         // 1. Standard docs
-        const docsToDelete: DocName[] = [
+        const docsToDelete = new Set<DocName>([
             'core',
             'entries-active',
             'tasks-archived',
             'expenses-archived',
             'invoices-archived'
-        ];
+        ]);
+
+        for (const docName of persistedDocs) {
+            docsToDelete.add(docName);
+        }
         
-        // 2. Add loaded docs if any (though destroy() clears them, we kept the names in docNames set earlier if we wanted to use it, but let's just be explicit)
-        // 3. Year-based entry databases
+        // 2. Add discovered persisted/loaded docs, including historical years outside the default range
+        // 3. Keep the default year range as a fallback for browsers without indexedDB.databases()
         const currentYear = new Date().getFullYear();
-        for (let year = 2020; year <= currentYear; year++) {
-            docsToDelete.push(`entries-${year}` as DocName);
+        const fallbackEndYear = Math.max(currentYear + 10, 2035);
+
+        for (let year = 2000; year <= fallbackEndYear; year++) {
+            docsToDelete.add(`entries-${year}` as DocName);
         }
 
         // Delete all databases using the correct prefix via DocManager
-        await this.docManager.deleteDatabases(docsToDelete);
+        await this.docManager.deleteDatabases(Array.from(docsToDelete));
 
         this._coreDoc = null;
         this._activeEntriesDoc = null;
@@ -1404,6 +1431,15 @@ export class YjsStore {
 
     private isDisconnectedDirtyDoc(docName: DocName): boolean {
         return this.disconnectedDirtyDocs.has(docName);
+    }
+
+    private canClearDisconnectedDirtyDocsAfterSync(): boolean {
+        if (!this.driveProvider) {
+            return false;
+        }
+
+        const state = this.driveProvider.getState();
+        return state !== 'offline' && state !== 'error' && !this.driveProvider.hasLocalChangesToPush();
     }
 
     private clearDisconnectedDirtyDocs(docNames?: DocName[]): void {

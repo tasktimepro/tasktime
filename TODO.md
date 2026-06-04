@@ -4,6 +4,8 @@
 
 [ ] Screenshot mobile UI adjustments
 
+[ ] I should be able to edit invoice exchange rate if it has one and when the invoice is marked as paid - this way I can actually keep track of the real income that came through after the payment was recieved and converted from my bank app. What's the best path to achieve this cleanly in terms of UX/UI?
+
 ---
 
 ## Blog Posts

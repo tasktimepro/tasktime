@@ -8,6 +8,7 @@ import { PUBLIC_STATIC_ROUTE_DENYLIST } from './src/config/publicRoutes.js'
 const packageJson = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url))
 )
+const appBuildVersion = `${packageJson.version}-${Date.now()}`
 
 const isPreviewCommand = process.argv.includes('preview')
 const publicRouteProxy = isPreviewCommand
@@ -79,7 +80,7 @@ export default defineConfig({
     },
   },
   define: {
-    __APP_VERSION__: JSON.stringify(packageJson.version),
+    __APP_VERSION__: JSON.stringify(appBuildVersion),
   },
   server: {
     port: 5173,

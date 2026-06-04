@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AuthorizationError, ManifestManager } from './ManifestManager.ts'
+import { AuthorizationError, ManifestManager, isDriveFileNotFoundError } from './ManifestManager.ts'
 
 function jsonResponse(body, init = {}) {
     return new Response(JSON.stringify(body), {
@@ -41,6 +41,53 @@ describe('ManifestManager', () => {
 
         await expect(promise).resolves.toEqual([])
         expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('excludes trashed appData files from file listing and fallback lookup', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(jsonResponse({ files: [] }, { status: 200 }))
+            .mockResolvedValueOnce(jsonResponse({ files: [] }, { status: 200 }))
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        const manager = new ManifestManager('token-123')
+
+        await manager.listAppDataFiles()
+        await manager.getFileIdWithFallback('tasktime-yjs-core.bin')
+
+        expect(fetchMock.mock.calls[0][0]).toContain('q=trashed%3Dfalse')
+        expect(fetchMock.mock.calls[0][0]).toContain('pageSize=1000')
+        expect(fetchMock.mock.calls[1][0]).toContain("name%3D'tasktime-yjs-core.bin'%20and%20trashed%3Dfalse")
+    })
+
+    it('lists every appData page before returning files', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(jsonResponse({
+                files: [{ id: 'file-1', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-06-04T00:00:00.000Z' }],
+                nextPageToken: 'next-page',
+            }, { status: 200 }))
+            .mockResolvedValueOnce(jsonResponse({
+                files: [{ id: 'file-2', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-06-04T00:00:01.000Z' }],
+            }, { status: 200 }))
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        const manager = new ManifestManager('token-123')
+
+        await expect(manager.listAppDataFiles()).resolves.toEqual([
+            { id: 'file-1', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-06-04T00:00:00.000Z' },
+            { id: 'file-2', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-06-04T00:00:01.000Z' },
+        ])
+
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+        expect(fetchMock.mock.calls[1][0]).toContain('pageToken=next-page')
+    })
+
+    it('identifies Drive file-not-found errors from download and upload paths', () => {
+        expect(isDriveFileNotFoundError(new Error('Drive API error 404: {"error":{"message":"File not found: abc."}}'))).toBe(true)
+        expect(isDriveFileNotFoundError(new Error('Drive update error 404: {"error":{"message":"File not found: abc."}}'))).toBe(true)
+        expect(isDriveFileNotFoundError(new Error('Drive API error 404: {"error":{"message":"Folder not found"}}'))).toBe(false)
+        expect(isDriveFileNotFoundError(new Error('Drive API error 500: {"error":{"message":"File not found"}}'))).toBe(false)
     })
 
     it('retries transient network failures with exponential backoff', async () => {

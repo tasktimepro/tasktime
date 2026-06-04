@@ -1,5 +1,7 @@
 /**
  * YjsContext - React context provider for Yjs store
+ *
+ * Sync contract source of truth: ../components/sync/README.md
  * 
  * Provides the YjsStore to all components and handles:
  * - Store initialization on mount
@@ -15,6 +17,7 @@ import type { TimeEntry } from '@/stores/yjs/types';
 import type * as Y from 'yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useToast } from '@/hooks/useToast';
+import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { shouldSyncOnLoad, wasSyncInterrupted, hasPersistedPendingChanges } from '@/utils/syncPersistence';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/ui/button';
@@ -100,6 +103,7 @@ type RunSyncWithAuthHandling = (options?: DriveSyncOptions) => Promise<void>;
 
 const VISIBILITY_SYNC_COOLDOWN_MS = 60 * 1000;
 const ONLINE_SYNC_COOLDOWN_MS = 60 * 1000;
+const YJS_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
 
 export function YjsProvider({ children }: YjsProviderProps) {
 
@@ -187,6 +191,13 @@ export function YjsProvider({ children }: YjsProviderProps) {
             })
             .catch((error) => {
                 console.error('[YjsContext] Store initialization failed:', error);
+                captureDebugBundleIncident({
+                    incidentKey: 'yjs.store_initialize_failed',
+                    name: 'TaskTimeStoreInitializationError',
+                    message: 'TaskTime Yjs store initialization failed',
+                    error,
+                    throttleMs: YJS_INCIDENT_THROTTLE_MS,
+                });
             });
 
         return () => {
@@ -198,14 +209,30 @@ export function YjsProvider({ children }: YjsProviderProps) {
     useEffect(() => {
         const hasWarned = { current: false };
 
-        const unsub = store.onPersistenceError((error) => {
+        const unsub = store.onPersistenceError((error, docName) => {
             if (hasWarned.current) return;
 
             if (YjsDocManager.isQuotaError(error)) {
                 hasWarned.current = true;
                 showError('Storage is full. Clear browser data to free space or your changes may not be saved.');
+                captureDebugBundleIncident({
+                    incidentKey: 'yjs.persistence_quota_exceeded',
+                    name: 'TaskTimePersistenceQuotaExceeded',
+                    message: 'TaskTime Yjs persistence quota was exceeded',
+                    error,
+                    context: { docName },
+                    throttleMs: YJS_INCIDENT_THROTTLE_MS,
+                });
             } else {
                 showWarning('A storage error occurred. Your data may not persist across page reloads.');
+                captureDebugBundleIncident({
+                    incidentKey: 'yjs.persistence_error',
+                    name: 'TaskTimePersistenceError',
+                    message: 'TaskTime Yjs persistence failed',
+                    error,
+                    context: { docName },
+                    throttleMs: YJS_INCIDENT_THROTTLE_MS,
+                });
             }
         });
 
@@ -320,8 +347,19 @@ export function YjsProvider({ children }: YjsProviderProps) {
             showWarning('Cloud sync is having trouble. Your data is safe locally.');
         } else if (consecutiveSyncErrors.current >= 5) {
             showError('Cloud sync has failed multiple times. Check your connection or reconnect Google Drive.');
+            captureDebugBundleIncident({
+                incidentKey: 'drive.sync_failed_repeatedly',
+                name: 'TaskTimeDriveSyncError',
+                message: 'TaskTime Drive sync failed repeatedly',
+                context: {
+                    autoSyncEnabled,
+                    autoSyncMode,
+                    consecutiveErrors: consecutiveSyncErrors.current,
+                },
+                throttleMs: 30 * 60 * 1000,
+            });
         }
-    }, [syncState, isDriveConnected, showWarning, showError]);
+    }, [syncState, isDriveConnected, showWarning, showError, autoSyncEnabled, autoSyncMode]);
 
     // Subscribe to sync state/phase/pending changes
     // Re-subscribe when isDriveConnected changes because that's when provider is created

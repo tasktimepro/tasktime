@@ -2,6 +2,7 @@ import html2pdf from 'html2pdf.js';
 import DOMPurify from 'dompurify';
 import { getCurrencySymbol, getPreferredCurrency } from './currencyUtils';
 import { formatBillingPeriodLabel } from './billingPeriodUtils';
+import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import type {
     InvoiceBrandingSnapshot,
     InvoiceTemplateBrandingOptions,
@@ -200,6 +201,29 @@ type PdfOptions = {
     };
 };
 
+const PDF_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
+
+const captureInvoicePdfIncident = ({
+    incidentKey,
+    message,
+    error,
+    context,
+}: {
+    incidentKey: string;
+    message: string;
+    error: unknown;
+    context: Record<string, boolean | number | string | null>;
+}) => {
+    captureDebugBundleIncident({
+        incidentKey,
+        name: 'TaskTimeInvoicePdfFailure',
+        message,
+        error,
+        context,
+        throttleMs: PDF_INCIDENT_THROTTLE_MS,
+    });
+};
+
 /** Force the cloned html2canvas document into light mode so PDFs are never
  *  rendered with the app's dark-mode colours. */
 const forceLightModeOnClone = (doc: Document): void => {
@@ -273,10 +297,30 @@ export const generatePDF = (
                 })
                 .catch((error: unknown) => {
                     console.error('PDF generation failed:', error);
+                    captureInvoicePdfIncident({
+                        incidentKey: 'invoice.pdf_generation_failed',
+                        message: 'TaskTime invoice PDF generation failed',
+                        error,
+                        context: {
+                            operation: 'download',
+                            hasCustomOptions: Object.keys(options).length > 0,
+                            hasFilename: Boolean(filename),
+                        },
+                    });
                     reject(error);
                 });
         } catch (error) {
             console.error('PDF generation error:', error);
+            captureInvoicePdfIncident({
+                incidentKey: 'invoice.pdf_generation_failed',
+                message: 'TaskTime invoice PDF generation failed',
+                error,
+                context: {
+                    operation: 'download',
+                    hasCustomOptions: Object.keys(options).length > 0,
+                    hasFilename: Boolean(filename),
+                },
+            });
             reject(error);
         }
     });
@@ -301,9 +345,27 @@ export const generatePDFBlob = (
                     resolve(blob);
                 })
                 .catch((error: unknown) => {
+                    captureInvoicePdfIncident({
+                        incidentKey: 'invoice.pdf_blob_generation_failed',
+                        message: 'TaskTime invoice PDF blob generation failed',
+                        error,
+                        context: {
+                            operation: 'blob',
+                            hasCustomOptions: Object.keys(options).length > 0,
+                        },
+                    });
                     reject(error);
                 });
         } catch (error) {
+            captureInvoicePdfIncident({
+                incidentKey: 'invoice.pdf_blob_generation_failed',
+                message: 'TaskTime invoice PDF blob generation failed',
+                error,
+                context: {
+                    operation: 'blob',
+                    hasCustomOptions: Object.keys(options).length > 0,
+                },
+            });
             reject(error);
         }
     });
@@ -325,7 +387,18 @@ export const generatePDFBase64 = (htmlContent: string): Promise<string> => {
                     resolve(base64);
                 };
 
-                reader.onerror = () => reject(new Error('Failed to convert PDF to base64'));
+                reader.onerror = () => {
+                    const error = new Error('Failed to convert PDF to base64');
+                    captureInvoicePdfIncident({
+                        incidentKey: 'invoice.pdf_base64_generation_failed',
+                        message: 'TaskTime invoice PDF base64 conversion failed',
+                        error,
+                        context: {
+                            operation: 'base64',
+                        },
+                    });
+                    reject(error);
+                };
                 reader.readAsDataURL(blob);
             })
             .catch((error: unknown) => {

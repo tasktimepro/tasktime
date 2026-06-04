@@ -30,6 +30,7 @@ import {
     getLastMonthPlaceholderValue,
 } from '@/utils/emailTemplateUtils';
 import { sendInvoiceEmail, isEmailSendError } from '@/utils/emailService';
+import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { getCurrentInvoiceHtmlContent, generatePDFBase64 } from '@/utils/pdfUtils.ts';
 import { getCurrencySymbol, getPreferredCurrency } from '@/utils/currencyUtils.ts';
 import { getInvoiceTotal } from '@/utils/invoiceUtils.ts';
@@ -218,11 +219,15 @@ const EmailPreviewModal = ({
         setSending(true);
         setError(null);
 
+        let failureStage = 'prepare';
+
         try {
             const htmlContent = getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets);
+            failureStage = 'pdf';
             const pdfBase64 = await generatePDFBase64(htmlContent);
             const documentId = invoice.id || invoice.projectId || invoice.invoiceNumber;
 
+            failureStage = 'send';
             const result = await sendInvoiceEmail({
                 sessionId: driveSessionId,
                 invoiceId: documentId,
@@ -239,6 +244,7 @@ const EmailPreviewModal = ({
             });
 
             if (result.success) {
+                failureStage = 'post-send';
                 if (!isQuoteSend) {
                     const updates = {
                         sentAt: Date.now(),
@@ -293,6 +299,21 @@ const EmailPreviewModal = ({
                         setError(err.message || 'Failed to send email');
                 }
             } else {
+                if (failureStage !== 'pdf') {
+                    captureDebugBundleIncident({
+                        incidentKey: 'invoice.email_send_unexpected_failed',
+                        name: 'TaskTimeInvoiceEmailUnexpectedFailure',
+                        message: 'TaskTime invoice email flow failed unexpectedly',
+                        error: err,
+                        context: {
+                            stage: failureStage,
+                            sendType,
+                            hasForwardToCopy: forwardToSelf,
+                            isQuoteSend,
+                        },
+                        throttleMs: 15 * 60 * 1000,
+                    });
+                }
                 console.error('[EmailPreviewModal] Unexpected error:', err);
                 const msg = err instanceof Error ? err.message : String(err);
                 setError(`Unexpected error: ${msg}`);

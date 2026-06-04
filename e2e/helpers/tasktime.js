@@ -342,9 +342,10 @@ export function createStatefulDriveFixture(initialFixture) {
                 return;
             }
 
-            const query = url.searchParams.get('q');
-            const files = query
-                ? state.files.filter((file) => query.includes(`name='${file.name}'`))
+            const query = url.searchParams.get('q') || '';
+            const nameMatch = query.match(/name='([^']+)'/);
+            const files = nameMatch
+                ? state.files.filter((file) => file.name === nameMatch[1])
                 : state.files;
 
             await route.fulfill({

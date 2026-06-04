@@ -11,6 +11,7 @@ const accountLayoutMocks = vi.hoisted(() => ({
     forceSyncDrive: vi.fn(),
     disconnectDrive: vi.fn(),
     wipeDriveData: vi.fn(),
+    deleteAllBackups: vi.fn(),
     signOut: vi.fn(),
     revokeAccess: vi.fn(),
     showSuccess: vi.fn(),
@@ -45,6 +46,7 @@ vi.mock('../contexts/YjsContext', () => ({
         forceSyncDrive: accountLayoutMocks.forceSyncDrive,
         disconnectDrive: accountLayoutMocks.disconnectDrive,
         wipeDriveData: accountLayoutMocks.wipeDriveData,
+        deleteAllBackups: accountLayoutMocks.deleteAllBackups,
     }),
 }));
 
@@ -109,6 +111,7 @@ beforeEach(() => {
     accountLayoutMocks.forceSyncDrive.mockReset();
     accountLayoutMocks.disconnectDrive.mockReset();
     accountLayoutMocks.wipeDriveData.mockReset();
+    accountLayoutMocks.deleteAllBackups.mockReset();
     accountLayoutMocks.signOut.mockReset();
     accountLayoutMocks.revokeAccess.mockReset();
     accountLayoutMocks.showSuccess.mockReset();
@@ -184,6 +187,7 @@ describe('Account', () => {
         accountLayoutMocks.activeSection = 'data';
 
         accountLayoutMocks.wipeDriveData.mockResolvedValue(undefined);
+        accountLayoutMocks.deleteAllBackups.mockResolvedValue(undefined);
         accountLayoutMocks.revokeAccess.mockResolvedValue(undefined);
         accountLayoutMocks.clearAllData.mockResolvedValue(undefined);
 
@@ -197,11 +201,13 @@ describe('Account', () => {
 
         await waitFor(() => {
             expect(accountLayoutMocks.wipeDriveData).toHaveBeenCalledTimes(1);
+            expect(accountLayoutMocks.deleteAllBackups).toHaveBeenCalledTimes(1);
             expect(accountLayoutMocks.revokeAccess).toHaveBeenCalledTimes(1);
             expect(accountLayoutMocks.clearAllData).toHaveBeenCalledTimes(1);
         });
 
-        expect(accountLayoutMocks.wipeDriveData.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.revokeAccess.mock.invocationCallOrder[0]);
+        expect(accountLayoutMocks.wipeDriveData.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.deleteAllBackups.mock.invocationCallOrder[0]);
+        expect(accountLayoutMocks.deleteAllBackups.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.revokeAccess.mock.invocationCallOrder[0]);
         expect(accountLayoutMocks.revokeAccess.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.clearAllData.mock.invocationCallOrder[0]);
         expect(accountLayoutMocks.resetOnboardingCompleted).toHaveBeenCalledTimes(1);
         expect(accountLayoutMocks.queuePostReloadToast).toHaveBeenCalledWith({
