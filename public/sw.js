@@ -1,9 +1,11 @@
-const CACHE_NAME = 'tasktime-cache-v2';
+const CACHE_NAME = 'tasktime-cache-v4';
 const APP_SHELL = [
     '/',
     '/index.html',
     '/manifest.json',
     '/favicon.svg',
+    '/favicon-32x32.png',
+    '/favicon-16x16.png',
     '/favicon-96x96.png',
     '/favicon.ico',
     '/icons/apple-touch-icon.png',
