@@ -82,6 +82,19 @@ describe('currencyUtils', () => {
             expect(formatCurrency(100.5555, 'EUR', 3)).toBe('€100.555')
         })
 
+        it('adds grouping separators for amounts at or above ten thousand', () => {
+
+            expect(formatCurrency(10000, 'EUR')).toBe('€10,000.00')
+            expect(formatCurrency(12345.67, 'USD')).toBe('$12,345.67')
+            expect(formatCurrency(-10000, 'CHF')).toBe('CHF-10,000.00')
+        })
+
+        it('keeps smaller amounts ungrouped', () => {
+
+            expect(formatCurrency(9999, 'EUR')).toBe('€9999.00')
+            expect(formatCurrency(1220, 'USD')).toBe('$1220.00')
+        })
+
         it('handles zero', () => {
 
             expect(formatCurrency(0, 'EUR')).toBe('€0.00')

@@ -595,7 +595,7 @@ const ProjectDashboard = ({
                                         <div className="flex items-center text-sm text-muted-foreground">
                                             <CurrencyDollarIcon className="h-4 w-4 mr-2" />
                                             <span className="sensitive-data text-foreground font-semibold">
-                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.potentialRevenue.toFixed(2)}
+                                                {formatCurrency(projectMetrics.potentialRevenue, getProjectCurrency(project, clients))}
                                             </span>
                                         </div>
                                         {projectExpenses.length > 0 && (
@@ -623,7 +623,7 @@ const ProjectDashboard = ({
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Pending</dt>
                                         <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                             <span className="sensitive-data">
-                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.pendingAmount.toFixed(2)}
+                                                {formatCurrency(projectMetrics.pendingAmount, getProjectCurrency(project, clients))}
                                             </span>
                                         </dd>
                                     </dl>
@@ -665,7 +665,7 @@ const ProjectDashboard = ({
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
                                         <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                             <span className="sensitive-data">
-                                                {getCurrencySymbol(getProjectCurrency(project, clients))}{projectMetrics.totalRevenue.toFixed(2)}
+                                                {formatCurrency(projectMetrics.totalRevenue, getProjectCurrency(project, clients))}
                                             </span>
                                         </dd>
                                     </dl>

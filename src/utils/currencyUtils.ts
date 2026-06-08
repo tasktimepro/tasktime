@@ -39,6 +39,7 @@ export const CURRENCY_NAMES: Record<string, string> = {
  * Default currency 
  */
 export const DEFAULT_CURRENCY = 'EUR';
+const CURRENCY_GROUPING_THRESHOLD = 10000;
 
 type ExchangeRateCache = {
     rates: Record<string, number>;
@@ -78,7 +79,16 @@ export const getCurrencySymbol = (currencyCode: string | null | undefined): stri
  */
 export const formatCurrency = (amount: number, currencyCode: string | null | undefined, decimals = 2): string => {
     const symbol = getCurrencySymbol(currencyCode);
-    return `${symbol}${amount.toFixed(decimals)}`;
+    const roundedAmount = Number(amount.toFixed(decimals));
+    const shouldUseGrouping = Math.abs(roundedAmount) >= CURRENCY_GROUPING_THRESHOLD;
+    const formattedAmount = shouldUseGrouping
+        ? roundedAmount.toLocaleString('en-US', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+        })
+        : amount.toFixed(decimals);
+
+    return `${symbol}${formattedAmount}`;
 };
 
 /**

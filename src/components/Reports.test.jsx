@@ -384,6 +384,16 @@ describe('Reports', () => {
         });
     });
 
+    it('marks overview monetary totals as sensitive data for blur hiding', () => {
+        render(<Reports />);
+
+        const issuedCard = screen.getByRole('heading', { name: 'Issued' }).closest('div.rounded-lg');
+        const receivedCard = screen.getByRole('heading', { name: 'Received' }).closest('div.rounded-lg');
+
+        expect(within(issuedCard).getByText('€1830.00')).toHaveClass('sensitive-data');
+        expect(within(receivedCard).getByText('€1220.00')).toHaveClass('sensitive-data');
+    });
+
     it('counts paid invoices without paidAt in the overview received totals', () => {
         mockInvoices.splice(0, mockInvoices.length,
             {
@@ -410,6 +420,49 @@ describe('Reports', () => {
         expect(within(receivedCard).getByText('€1220.00')).toBeInTheDocument();
         expect(within(receivedCard).getByText('1 invoice paid')).toBeInTheDocument();
         expect(within(estimatedProfitCard).getByText('€1100.00')).toBeInTheDocument();
+    });
+
+    it('uses paid invoice currency snapshots for overview issued, received, and profit totals', () => {
+        mockInvoices.splice(0, mockInvoices.length,
+            {
+                id: 'invoice-paid-usd',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                businessInfoId: 'business-1',
+                invoiceNumber: 'INV-USD',
+                date: '2026-04-12',
+                dueDate: '2026-04-26',
+                status: 'paid',
+                subtotal: 100,
+                tax: 0,
+                total: 100,
+                currency: 'USD',
+                paidAt: new Date('2026-04-20T10:00:00Z').getTime(),
+                paymentCurrencySnapshot: {
+                    capturedAt: new Date('2026-04-20T10:00:00Z').getTime(),
+                    sourceCurrency: 'USD',
+                    sourceAmount: 100,
+                    preferredCurrencyAtPayment: 'EUR',
+                    preferredCurrencyAmount: 85,
+                },
+            },
+        );
+        mockExpenses.splice(0, mockExpenses.length);
+        mockConvertToCurrency.mockImplementation((amountsByCurrency) => ({
+            amounts: { EUR: (amountsByCurrency.EUR || 0) + ((amountsByCurrency.USD || 0) * 0.5) },
+            hadConversionError: false,
+        }));
+
+        render(<Reports />);
+
+        const issuedCard = screen.getByRole('heading', { name: 'Issued' }).closest('div.rounded-lg');
+        const receivedCard = screen.getByRole('heading', { name: 'Received' }).closest('div.rounded-lg');
+        const estimatedProfitCard = screen.getByRole('heading', { name: 'Estimated Profit' }).closest('div.rounded-lg');
+
+        expect(within(issuedCard).getByText('€85.00')).toBeInTheDocument();
+        expect(within(receivedCard).getByText('€85.00')).toBeInTheDocument();
+        expect(within(estimatedProfitCard).getByText('€85.00')).toBeInTheDocument();
+        expect(screen.queryByText('€50.00')).not.toBeInTheDocument();
     });
 
     it('shows review issues as a header tag and opens details on click', () => {
@@ -704,7 +757,7 @@ describe('Reports', () => {
 
         expect(screen.getByRole('heading', { name: 'To invoice' })).toBeInTheDocument();
         expect(screen.getByText('€205.00')).toBeInTheDocument();
-        expect(screen.getByText('Time €200.00')).toBeInTheDocument();
+        expect(screen.getByText((content, element) => element?.textContent === 'Time €200.00')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
 
@@ -729,6 +782,17 @@ describe('Reports', () => {
         expect(screen.getByText('By client')).toBeInTheDocument();
         expect(screen.getByText('By business')).toBeInTheDocument();
         expect(screen.getByText('By currency')).toBeInTheDocument();
+    });
+
+    it('marks invoice tab monetary values as sensitive data for blur hiding', () => {
+        mockSection = 'invoices';
+
+        render(<Reports />);
+
+        const invoiceRow = screen.getAllByText('INV-001')[0].closest('div.rounded-lg');
+
+        expect(within(invoiceRow).getByText('€1220.00')).toHaveClass('sensitive-data');
+        expect(within(invoiceRow).getByText('€220.00')).toHaveClass('sensitive-data');
     });
 
     it('renders the client statement tab when the current slice resolves to one client', () => {

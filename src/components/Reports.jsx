@@ -30,7 +30,7 @@ import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import useCurrencyConversion from '@/components/dashboard/hooks/useCurrencyConversion';
 import ReportFilters from '@/components/reports/ReportFilters';
 import ReportSummaryCards from '@/components/reports/ReportSummaryCards';
-import { buildClientStatementSummary, buildExpenseTotalsSummary, buildInvoiceRegisterSummary, buildOutstandingInvoiceSummary, buildProjectWorkSummary, buildVatReportSummary, getExpenseNetAmount, getExpenseTaxAmount, getExpenseTaxClaimStatus, getExpenseTaxClaimStatusLabel, getInvoiceDaysOverdue } from '@/utils/reportCalculations';
+import { buildClientStatementSummary, buildExpenseTotalsSummary, buildInvoiceRegisterSummary, buildOutstandingInvoiceSummary, buildProjectWorkSummary, buildVatReportSummary, getExpenseNetAmount, getExpenseTaxAmount, getExpenseTaxClaimStatus, getExpenseTaxClaimStatusLabel, getInvoiceDaysOverdue, getInvoiceReportAmount, sumInvoiceReportAmountsByCurrency } from '@/utils/reportCalculations';
 import { buildCsvContent, downloadCsvFile } from '@/utils/reportCsvUtils';
 import { REPORT_PERIOD_OPTIONS, getDateRangeLabel, getDefaultCustomRange, getDefaultReportPeriod, resolveReportDateRange } from '@/utils/reportDateUtils';
 import { ACCOUNTANT_PACK_MANIFEST_COLUMNS, buildAccountantPackManifestRows } from '@/utils/reportPackUtils';
@@ -222,6 +222,16 @@ const getCurrencyBreakdownSortTotal = ({ amountsByCurrency, convertToCurrency })
     const amounts = converted.hadConversionError ? amountsByCurrency : converted.amounts;
 
     return Object.values(amounts).reduce((sum, amount) => sum + (Number.isFinite(amount) ? amount : 0), 0);
+};
+
+const formatInvoiceReportAmount = (invoice, preferredCurrency, sourceAmount) => {
+    const invoiceAmount = getInvoiceReportAmount(invoice, preferredCurrency, sourceAmount);
+
+    return formatCurrency(invoiceAmount.amount, invoiceAmount.currency);
+};
+
+const renderSensitiveValue = (value, className = '') => {
+    return <span className={cn('sensitive-data', className)}>{value}</span>;
 };
 
 const downloadReport = ({ filename, columns, rows }) => {
@@ -1075,15 +1085,11 @@ function Reports({ onReadyChange = null }) {
     }, [clientsById, filteredExpenses, filteredInvoices]);
 
     const revenueIssuedByCurrency = useMemo(() => {
-        return sumAmountsByCurrency(issuedInvoicesInRange, (invoice) => invoice.currency || preferredCurrency, (invoice) => getInvoiceTotal(invoice));
+        return sumInvoiceReportAmountsByCurrency(issuedInvoicesInRange, preferredCurrency);
     }, [issuedInvoicesInRange, preferredCurrency]);
 
     const revenuePaidByCurrency = useMemo(() => {
-        return sumAmountsByCurrency(
-            paidInvoicesInRange,
-            (invoice) => invoice.currency || preferredCurrency,
-            (invoice) => getInvoiceTotal(invoice)
-        );
+        return sumInvoiceReportAmountsByCurrency(paidInvoicesInRange, preferredCurrency);
     }, [paidInvoicesInRange, preferredCurrency]);
 
     const outstandingByCurrency = useMemo(() => {
@@ -1133,8 +1139,12 @@ function Reports({ onReadyChange = null }) {
         return buildBreakdownRows({
             items: filteredInvoices,
             getLabel: (invoice) => clientsById.get(invoice.clientId)?.title || EMPTY_CLIENT,
-            getAmount: (invoice) => getInvoiceTotal(invoice),
-            getCurrency: (invoice) => invoice.currency || preferredCurrency,
+            getAmount: (invoice) => {
+                return getInvoiceReportAmount(invoice, preferredCurrency).amount;
+            },
+            getCurrency: (invoice) => {
+                return getInvoiceReportAmount(invoice, preferredCurrency).currency;
+            },
             convertToCurrency,
             currencyDisplayMode,
             preferredCurrency,
@@ -1147,24 +1157,29 @@ function Reports({ onReadyChange = null }) {
                 const breakdowns = getInvoiceProjectRevenueBreakdown(invoice);
 
                 if (breakdowns.length === 0) {
+                    const invoiceAmount = getInvoiceReportAmount(invoice, preferredCurrency);
+
                     return [{
                         projectTitle: getInvoiceProjectTitle(invoice, projectsById) || EMPTY_PROJECT,
-                        amount: getInvoiceTotal(invoice),
-                        currency: invoice.currency || preferredCurrency,
+                        amount: invoiceAmount.amount,
+                        currency: invoiceAmount.currency,
                     }];
                 }
 
                 return breakdowns.map((breakdown) => ({
                     projectTitle: breakdown.projectTitle || projectsById.get(breakdown.projectId)?.title || EMPTY_PROJECT,
-                    amount: breakdown.allocatedTotal || 0,
-                    currency: invoice.currency || preferredCurrency,
+                    ...getInvoiceReportAmount(invoice, preferredCurrency, breakdown.allocatedTotal || 0),
                 }));
             })
-            : filteredInvoices.map((invoice) => ({
-                projectTitle: getInvoiceProjectTitle(invoice, projectsById) || EMPTY_PROJECT,
-                amount: getInvoiceTotal(invoice),
-                currency: invoice.currency || preferredCurrency,
-            }));
+            : filteredInvoices.map((invoice) => {
+                const invoiceAmount = getInvoiceReportAmount(invoice, preferredCurrency);
+
+                return {
+                    projectTitle: getInvoiceProjectTitle(invoice, projectsById) || EMPTY_PROJECT,
+                    amount: invoiceAmount.amount,
+                    currency: invoiceAmount.currency,
+                };
+            });
 
         return buildBreakdownRows({
             items: projectRevenueRows,
@@ -1192,13 +1207,13 @@ function Reports({ onReadyChange = null }) {
     const monthlySummaryRows = useMemo(() => {
         return [
             { metric: 'Period', value: getDateRangeLabel(resolvedRange) },
-            { metric: 'Revenue Issued', value: formatCurrencyBreakdown({ amountsByCurrency: revenueIssuedByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
-            { metric: 'Payments Received', value: formatCurrencyBreakdown({ amountsByCurrency: revenuePaidByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
-            { metric: 'Expenses', value: formatCurrencyBreakdown({ amountsByCurrency: expensesByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
-            { metric: 'Output Tax', value: formatCurrencyBreakdown({ amountsByCurrency: outputTaxByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
-            { metric: 'Input Tax', value: formatCurrencyBreakdown({ amountsByCurrency: inputTaxByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
-            { metric: 'Estimated VAT Position', value: formatCurrencyBreakdown({ amountsByCurrency: monthlyEstimatedVatPositionByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
-            { metric: 'Estimated Profit', value: formatCurrencyBreakdown({ amountsByCurrency: monthlyEstimatedProfitByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }) },
+            { metric: 'Revenue Issued', value: formatCurrencyBreakdown({ amountsByCurrency: revenueIssuedByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }), sensitive: true },
+            { metric: 'Payments Received', value: formatCurrencyBreakdown({ amountsByCurrency: revenuePaidByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }), sensitive: true },
+            { metric: 'Expenses', value: formatCurrencyBreakdown({ amountsByCurrency: expensesByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }), sensitive: true },
+            { metric: 'Output Tax', value: formatCurrencyBreakdown({ amountsByCurrency: outputTaxByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }), sensitive: true },
+            { metric: 'Input Tax', value: formatCurrencyBreakdown({ amountsByCurrency: inputTaxByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }), sensitive: true },
+            { metric: 'Estimated VAT Position', value: formatCurrencyBreakdown({ amountsByCurrency: monthlyEstimatedVatPositionByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }), sensitive: true },
+            { metric: 'Estimated Profit', value: formatCurrencyBreakdown({ amountsByCurrency: monthlyEstimatedProfitByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }), sensitive: true },
             { metric: 'Hours Worked', value: formatDuration(totalHoursMs) },
             { metric: 'Billable Utilization', value: formatPercent(totalHoursMs > 0 ? (billableHoursMs / totalHoursMs) * 100 : 0) },
             { metric: 'Outstanding Invoices', value: `${outstandingInvoices.length}` },
@@ -1263,34 +1278,40 @@ function Reports({ onReadyChange = null }) {
 
     const summaryCards = useMemo(() => {
         const utilization = totalHoursMs > 0 ? (billableHoursMs / totalHoursMs) * 100 : 0;
+        const uninvoicedExpenseDisplay = formatCurrencyBreakdown({
+            amountsByCurrency: totalUninvoicedExpenseByCurrency,
+            convertToCurrency,
+            currencyDisplayMode,
+            preferredCurrency,
+        });
 
         return {
             revenueIssued: {
-                value: formatCurrencyBreakdown({ amountsByCurrency: revenueIssuedByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
+                value: renderSensitiveValue(formatCurrencyBreakdown({ amountsByCurrency: revenueIssuedByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency })),
                 subtitle: `${issuedInvoicesInRange.length} invoice${issuedInvoicesInRange.length === 1 ? '' : 's'} issued`,
             },
             revenuePaid: {
-                value: formatCurrencyBreakdown({ amountsByCurrency: revenuePaidByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
+                value: renderSensitiveValue(formatCurrencyBreakdown({ amountsByCurrency: revenuePaidByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency })),
                 subtitle: `${paidInvoicesInRange.length} invoice${paidInvoicesInRange.length === 1 ? '' : 's'} paid`,
             },
             outstanding: {
-                value: formatCurrencyBreakdown({ amountsByCurrency: outstandingByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
+                value: renderSensitiveValue(formatCurrencyBreakdown({ amountsByCurrency: outstandingByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency })),
                 subtitle: `${outstandingInvoices.length} invoices still open`,
             },
             overdue: {
-                value: formatCurrencyBreakdown({ amountsByCurrency: overdueByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
+                value: renderSensitiveValue(formatCurrencyBreakdown({ amountsByCurrency: overdueByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency })),
                 subtitle: `${overdueInvoices.length} invoices past due`,
             },
             outputTax: {
-                value: formatCurrencyBreakdown({ amountsByCurrency: outputTaxByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
+                value: renderSensitiveValue(formatCurrencyBreakdown({ amountsByCurrency: outputTaxByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency })),
                 subtitle: `${issuedInvoicesInRange.length} invoices with tax totals`,
             },
             expenses: {
-                value: formatCurrencyBreakdown({ amountsByCurrency: expensesByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
+                value: renderSensitiveValue(formatCurrencyBreakdown({ amountsByCurrency: expensesByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency })),
                 subtitle: `${filteredExpenses.length} expenses in range`,
             },
             estimatedProfit: {
-                value: formatCurrencyBreakdown({ amountsByCurrency: monthlyEstimatedProfitByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency }),
+                value: renderSensitiveValue(formatCurrencyBreakdown({ amountsByCurrency: monthlyEstimatedProfitByCurrency, convertToCurrency, currencyDisplayMode, preferredCurrency })),
                 subtitle: 'Paid revenue minus filtered expenses',
             },
             hoursWorked: {
@@ -1299,12 +1320,13 @@ function Reports({ onReadyChange = null }) {
             },
             uninvoicedWork: {
                 value: formatDuration(totalUninvoicedHoursMs),
-                subtitle: `${toInvoiceRows.length} groups • ${formatCurrencyBreakdown({
-                    amountsByCurrency: totalUninvoicedExpenseByCurrency,
-                    convertToCurrency,
-                    currencyDisplayMode,
-                    preferredCurrency,
-                })}`,
+                subtitle: (
+                    <>
+                        {toInvoiceRows.length} groups
+                        {' • '}
+                        {renderSensitiveValue(uninvoicedExpenseDisplay)}
+                    </>
+                ),
             },
             billableUtilization: {
                 value: formatPercent(utilization),
@@ -1358,8 +1380,9 @@ function Reports({ onReadyChange = null }) {
             invoices: filteredInvoices,
             clientsById,
             businessInfosById,
+            preferredCurrency,
         });
-    }, [businessInfosById, clientsById, filteredInvoices]);
+    }, [businessInfosById, clientsById, filteredInvoices, preferredCurrency]);
 
     const invoiceRegisterSummarySections = useMemo(() => {
         const buildAmountLabel = (row) => {
@@ -1598,6 +1621,7 @@ function Reports({ onReadyChange = null }) {
                     currencyDisplayMode,
                     preferredCurrency,
                 }),
+                sensitive: true,
             },
             {
                 label: 'VAT amount',
@@ -1607,6 +1631,7 @@ function Reports({ onReadyChange = null }) {
                     currencyDisplayMode,
                     preferredCurrency,
                 }),
+                sensitive: true,
             },
             {
                 label: 'Inc VAT',
@@ -1616,6 +1641,7 @@ function Reports({ onReadyChange = null }) {
                     currencyDisplayMode,
                     preferredCurrency,
                 }),
+                sensitive: true,
             },
             {
                 label: 'Needs review',
@@ -1646,11 +1672,12 @@ function Reports({ onReadyChange = null }) {
 
         return buildClientStatementSummary({
             invoices: statementInvoices,
+            preferredCurrency,
             startDate: resolvedRange.startDate,
             endDate: resolvedRange.endDate,
             referenceDate: reportReferenceDate,
         });
-    }, [reportReferenceDate, resolvedRange.endDate, resolvedRange.startDate, selectedStatementClientId, statementInvoices]);
+    }, [preferredCurrency, reportReferenceDate, resolvedRange.endDate, resolvedRange.startDate, selectedStatementClientId, statementInvoices]);
 
     const projectWorkSummary = useMemo(() => {
         if (!selectedWorkSummaryProjectId) {
@@ -1696,6 +1723,7 @@ function Reports({ onReadyChange = null }) {
                     currencyDisplayMode,
                     preferredCurrency,
                 }),
+                sensitive: true,
             },
             {
                 label: 'Overdue total',
@@ -1705,6 +1733,7 @@ function Reports({ onReadyChange = null }) {
                     currencyDisplayMode,
                     preferredCurrency,
                 }),
+                sensitive: true,
             },
             {
                 label: 'Oldest overdue',
@@ -1729,6 +1758,7 @@ function Reports({ onReadyChange = null }) {
         return outstandingSummary.map((row) => ({
             label: `${row.bucketLabel} (${row.currency})`,
             value: `${row.count} invoices • ${formatCurrency(row.total, row.currency)}`,
+            sensitive: true,
         }));
     }, [outstandingSummary]);
 
@@ -1746,6 +1776,7 @@ function Reports({ onReadyChange = null }) {
                     currencyDisplayMode,
                     preferredCurrency,
                 }),
+                sensitive: true,
             },
             {
                 label: 'Invoices issued',
@@ -1755,6 +1786,7 @@ function Reports({ onReadyChange = null }) {
                     currencyDisplayMode,
                     preferredCurrency,
                 }),
+                sensitive: true,
             },
             {
                 label: 'Payments recorded',
@@ -1764,6 +1796,7 @@ function Reports({ onReadyChange = null }) {
                     currencyDisplayMode,
                     preferredCurrency,
                 }),
+                sensitive: true,
             },
             {
                 label: 'Closing balance',
@@ -1773,6 +1806,7 @@ function Reports({ onReadyChange = null }) {
                     currencyDisplayMode,
                     preferredCurrency,
                 }),
+                sensitive: true,
             },
         ];
     }, [clientStatementSummary, convertToCurrency, currencyDisplayMode, preferredCurrency]);
@@ -1782,38 +1816,50 @@ function Reports({ onReadyChange = null }) {
             return [];
         }
 
-        const openingRows = clientStatementSummary.openingBalanceInvoices.map((invoice) => ({
-            section: 'Opening balance',
-            invoiceNumber: invoice.invoiceNumber,
-            date: invoice.date,
-            dueDate: invoice.dueDate || '',
-            paidDate: '',
-            status: getInvoiceStatus(invoice, reportReferenceDate),
-            currency: invoice.currency || preferredCurrency,
-            total: getInvoiceTotal(invoice),
-        }));
+        const openingRows = clientStatementSummary.openingBalanceInvoices.map((invoice) => {
+            const invoiceAmount = getInvoiceReportAmount(invoice, preferredCurrency);
 
-        const issuedRows = clientStatementSummary.invoicesIssuedInRange.map((invoice) => ({
-            section: 'Issued in period',
-            invoiceNumber: invoice.invoiceNumber,
-            date: invoice.date,
-            dueDate: invoice.dueDate || '',
-            paidDate: getInvoicePaymentDateString(invoice) || '',
-            status: getInvoiceStatus(invoice, reportReferenceDate),
-            currency: invoice.currency || preferredCurrency,
-            total: getInvoiceTotal(invoice),
-        }));
+            return {
+                section: 'Opening balance',
+                invoiceNumber: invoice.invoiceNumber,
+                date: invoice.date,
+                dueDate: invoice.dueDate || '',
+                paidDate: '',
+                status: getInvoiceStatus(invoice, reportReferenceDate),
+                currency: invoiceAmount.currency,
+                total: invoiceAmount.amount,
+            };
+        });
 
-        const paymentRows = clientStatementSummary.paymentsRecordedInRange.map((invoice) => ({
-            section: 'Payments in period',
-            invoiceNumber: invoice.invoiceNumber,
-            date: invoice.date,
-            dueDate: invoice.dueDate || '',
-            paidDate: getInvoicePaymentDateString(invoice) || '',
-            status: 'paid',
-            currency: invoice.currency || preferredCurrency,
-            total: getInvoiceTotal(invoice),
-        }));
+        const issuedRows = clientStatementSummary.invoicesIssuedInRange.map((invoice) => {
+            const invoiceAmount = getInvoiceReportAmount(invoice, preferredCurrency);
+
+            return {
+                section: 'Issued in period',
+                invoiceNumber: invoice.invoiceNumber,
+                date: invoice.date,
+                dueDate: invoice.dueDate || '',
+                paidDate: getInvoicePaymentDateString(invoice) || '',
+                status: getInvoiceStatus(invoice, reportReferenceDate),
+                currency: invoiceAmount.currency,
+                total: invoiceAmount.amount,
+            };
+        });
+
+        const paymentRows = clientStatementSummary.paymentsRecordedInRange.map((invoice) => {
+            const paymentAmount = getInvoiceReportAmount(invoice, preferredCurrency);
+
+            return {
+                section: 'Payments in period',
+                invoiceNumber: invoice.invoiceNumber,
+                date: invoice.date,
+                dueDate: invoice.dueDate || '',
+                paidDate: getInvoicePaymentDateString(invoice) || '',
+                status: 'paid',
+                currency: paymentAmount.currency,
+                total: paymentAmount.amount,
+            };
+        });
 
         const outstandingRows = clientStatementSummary.outstandingInvoices.map((invoice) => ({
             section: 'Outstanding at statement date',
@@ -1876,7 +1922,7 @@ function Reports({ onReadyChange = null }) {
             { label: 'Tasks covered', value: `${projectWorkSummary.totals.tasksCount}` },
             { label: 'Entries logged', value: `${projectWorkSummary.totals.entriesCount}` },
             { label: 'Noted entries', value: `${projectWorkSummary.totals.notesCount}` },
-            { label: 'Estimated billable amount', value: formatCurrency(estimatedAmount, projectCurrency) },
+            { label: 'Estimated billable amount', value: formatCurrency(estimatedAmount, projectCurrency), sensitive: true },
         ];
     }, [clients, preferredCurrency, projectWorkSummary, workSummaryProject]);
 
@@ -2253,24 +2299,24 @@ function Reports({ onReadyChange = null }) {
                                 <div className="rounded-lg border border-border p-3">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estimated profit</p>
                                     <p className="mt-2 text-lg font-semibold text-foreground">
-                                        {formatCurrencyBreakdown({
+                                        {renderSensitiveValue(formatCurrencyBreakdown({
                                             amountsByCurrency: monthlyEstimatedProfitByCurrency,
                                             convertToCurrency,
                                             currencyDisplayMode,
                                             preferredCurrency,
-                                        })}
+                                        }))}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">Paid revenue minus filtered expenses</p>
                                 </div>
                                 <div className="rounded-lg border border-border p-3">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estimated VAT position</p>
                                     <p className="mt-2 text-lg font-semibold text-foreground">
-                                        {formatCurrencyBreakdown({
+                                        {renderSensitiveValue(formatCurrencyBreakdown({
                                             amountsByCurrency: monthlyEstimatedVatPositionByCurrency,
                                             convertToCurrency,
                                             currencyDisplayMode,
                                             preferredCurrency,
-                                        })}
+                                        }))}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">Output tax minus input tax</p>
                                 </div>
@@ -2282,12 +2328,12 @@ function Reports({ onReadyChange = null }) {
                                 <div className="rounded-lg border border-border p-3">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Uninvoiced value</p>
                                     <p className="mt-2 text-lg font-semibold text-foreground">
-                                        {formatCurrencyBreakdown({
+                                        {renderSensitiveValue(formatCurrencyBreakdown({
                                             amountsByCurrency: totalUninvoicedValueByCurrency,
                                             convertToCurrency,
                                             currencyDisplayMode,
                                             preferredCurrency,
-                                        })}
+                                        }))}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">{toInvoiceRows.length} open billing groups</p>
                                 </div>
@@ -2306,7 +2352,9 @@ function Reports({ onReadyChange = null }) {
                                         {monthlySummaryRows.map((row) => (
                                             <div key={row.metric} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
                                                 <p className="text-sm text-muted-foreground">{row.metric}</p>
-                                                <p className="text-sm font-semibold text-foreground">{row.value}</p>
+                                                <p className="text-sm font-semibold text-foreground">
+                                                    {row.sensitive ? renderSensitiveValue(row.value) : row.value}
+                                                </p>
                                             </div>
                                         ))}
                                     </div>
@@ -2322,7 +2370,7 @@ function Reports({ onReadyChange = null }) {
                                             topClientBreakdown.map((row) => (
                                                 <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
                                                     <p className="text-sm text-muted-foreground">{row.label}</p>
-                                                    <p className="text-sm font-semibold text-foreground">{row.value}</p>
+                                                    <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(row.value)}</p>
                                                 </div>
                                             ))
                                         )}
@@ -2338,7 +2386,7 @@ function Reports({ onReadyChange = null }) {
                                                 topProjectBreakdown.map((row) => (
                                                     <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
                                                         <p className="text-sm text-muted-foreground">{row.label}</p>
-                                                        <p className="text-sm font-semibold text-foreground">{row.value}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(row.value)}</p>
                                                     </div>
                                                 ))
                                             )}
@@ -2354,7 +2402,7 @@ function Reports({ onReadyChange = null }) {
                                                 topExpenseCategoryBreakdown.map((row) => (
                                                     <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
                                                         <p className="text-sm text-muted-foreground">{row.label}</p>
-                                                        <p className="text-sm font-semibold text-foreground">{row.value}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(row.value)}</p>
                                                     </div>
                                                 ))
                                             )}
@@ -2439,12 +2487,12 @@ function Reports({ onReadyChange = null }) {
                                                     date: toDisplayDate(invoice.date),
                                                     dueDate: invoice.dueDate ? toDisplayDate(invoice.dueDate) : '',
                                                     status: getInvoiceStatus(invoice, reportReferenceDate),
-                                                    amount: formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency),
+                                                    amount: formatInvoiceReportAmount(invoice, preferredCurrency),
                                                 })),
                                                 paymentRows: (clientStatementSummary?.paymentsRecordedInRange || []).map((invoice) => ({
                                                     invoiceNumber: invoice.invoiceNumber,
                                                     paidDate: getInvoicePaymentDisplayDate(invoice),
-                                                    amount: formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency),
+                                                    amount: formatInvoiceReportAmount(invoice, preferredCurrency),
                                                 })),
                                                 outstandingRows: (clientStatementSummary?.outstandingInvoices || []).map((invoice) => ({
                                                     invoiceNumber: invoice.invoiceNumber,
@@ -2464,7 +2512,9 @@ function Reports({ onReadyChange = null }) {
                                     {clientStatementSummaryRows.map((row) => (
                                         <div key={row.label} className="rounded-lg border border-border p-3">
                                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{row.label}</p>
-                                            <p className="mt-2 text-lg font-semibold text-foreground">{row.value}</p>
+                                            <p className="mt-2 text-lg font-semibold text-foreground">
+                                                {row.sensitive ? renderSensitiveValue(row.value) : row.value}
+                                            </p>
                                             <p className="mt-1 text-xs text-muted-foreground">{statementClient?.title || EMPTY_CLIENT}</p>
                                         </div>
                                     ))}
@@ -2486,7 +2536,7 @@ function Reports({ onReadyChange = null }) {
                                                                 {invoice.dueDate ? ` • Due ${toDisplayDate(invoice.dueDate)}` : ''}
                                                             </p>
                                                         </div>
-                                                        <p className="text-sm font-semibold text-foreground">{formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency)}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatInvoiceReportAmount(invoice, preferredCurrency))}</p>
                                                     </div>
                                                 ))
                                             )}
@@ -2513,7 +2563,7 @@ function Reports({ onReadyChange = null }) {
                                                                 {invoice.dueDate ? ` • Due ${toDisplayDate(invoice.dueDate)}` : ''}
                                                             </p>
                                                         </div>
-                                                        <p className="text-sm font-semibold text-foreground">{formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency)}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatInvoiceReportAmount(invoice, preferredCurrency))}</p>
                                                     </div>
                                                 ))
                                             )}
@@ -2534,7 +2584,7 @@ function Reports({ onReadyChange = null }) {
                                                                 Paid {getInvoicePaymentDisplayDate(invoice)}
                                                             </p>
                                                         </div>
-                                                        <p className="text-sm font-semibold text-foreground">{formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency)}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatInvoiceReportAmount(invoice, preferredCurrency))}</p>
                                                     </div>
                                                 ))
                                             )}
@@ -2561,7 +2611,7 @@ function Reports({ onReadyChange = null }) {
                                                                 {invoice.dueDate ? ` • Due ${toDisplayDate(invoice.dueDate)}` : ''}
                                                             </p>
                                                         </div>
-                                                        <p className="text-sm font-semibold text-foreground">{formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency)}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency))}</p>
                                                     </div>
                                                 ))
                                             )}
@@ -2630,7 +2680,9 @@ function Reports({ onReadyChange = null }) {
                                     {projectWorkSummaryMetrics.map((row) => (
                                         <div key={row.label} className="rounded-lg border border-border p-3">
                                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{row.label}</p>
-                                            <p className="mt-2 text-lg font-semibold text-foreground">{row.value}</p>
+                                            <p className="mt-2 text-lg font-semibold text-foreground">
+                                                {row.sensitive ? renderSensitiveValue(row.value) : row.value}
+                                            </p>
                                             <p className="mt-1 text-xs text-muted-foreground">{workSummaryProject?.title || EMPTY_PROJECT}</p>
                                         </div>
                                     ))}
@@ -2711,48 +2763,48 @@ function Reports({ onReadyChange = null }) {
                                         <div className="rounded-lg border border-border p-3">
                                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sales net</p>
                                             <p className="mt-2 text-lg font-semibold text-foreground">
-                                                {formatCurrencyBreakdown({
+                                                {renderSensitiveValue(formatCurrencyBreakdown({
                                                     amountsByCurrency: vatSummary.totalsByCurrency.salesNet,
                                                     convertToCurrency,
                                                     currencyDisplayMode,
                                                     preferredCurrency,
-                                                })}
+                                                }))}
                                             </p>
                                             <p className="mt-1 text-xs text-muted-foreground">{filteredInvoices.length} invoices in scope</p>
                                         </div>
                                         <div className="rounded-lg border border-border p-3">
                                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Output tax</p>
                                             <p className="mt-2 text-lg font-semibold text-foreground">
-                                                {formatCurrencyBreakdown({
+                                                {renderSensitiveValue(formatCurrencyBreakdown({
                                                     amountsByCurrency: vatSummary.totalsByCurrency.outputTax,
                                                     convertToCurrency,
                                                     currencyDisplayMode,
                                                     preferredCurrency,
-                                                })}
+                                                }))}
                                             </p>
                                             <p className="mt-1 text-xs text-muted-foreground">Invoice tax collected in this slice</p>
                                         </div>
                                         <div className="rounded-lg border border-border p-3">
                                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Input tax</p>
                                             <p className="mt-2 text-lg font-semibold text-foreground">
-                                                {formatCurrencyBreakdown({
+                                                {renderSensitiveValue(formatCurrencyBreakdown({
                                                     amountsByCurrency: vatSummary.totalsByCurrency.inputTax,
                                                     convertToCurrency,
                                                     currencyDisplayMode,
                                                     preferredCurrency,
-                                                })}
+                                                }))}
                                             </p>
                                             <p className="mt-1 text-xs text-muted-foreground">{filteredExpenses.length} expenses in scope</p>
                                         </div>
                                         <div className="rounded-lg border border-border p-3">
                                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estimated VAT position</p>
                                             <p className="mt-2 text-lg font-semibold text-foreground">
-                                                {formatCurrencyBreakdown({
+                                                {renderSensitiveValue(formatCurrencyBreakdown({
                                                     amountsByCurrency: vatSummary.totalsByCurrency.netVat,
                                                     convertToCurrency,
                                                     currencyDisplayMode,
                                                     preferredCurrency,
-                                                })}
+                                                }))}
                                             </p>
                                             <p className="mt-1 text-xs text-muted-foreground">Output tax minus input tax</p>
                                         </div>
@@ -2769,12 +2821,12 @@ function Reports({ onReadyChange = null }) {
                                                         <div key={`${row.bucketLabel}-${row.currency}`} className="rounded-lg border border-border p-3">
                                                             <div className="flex items-center justify-between gap-3">
                                                                 <p className="text-sm font-semibold text-foreground">{row.bucketLabel}</p>
-                                                                <p className="text-sm font-semibold text-foreground">{formatCurrency(row.grossAmount, row.currency)}</p>
+                                                                <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(row.grossAmount, row.currency))}</p>
                                                             </div>
                                                             <p className="mt-1 text-xs text-muted-foreground">
-                                                                Net {formatCurrency(row.netAmount, row.currency)}
+                                                                Net {renderSensitiveValue(formatCurrency(row.netAmount, row.currency))}
                                                                 {' • '}
-                                                                Tax {formatCurrency(row.taxAmount, row.currency)}
+                                                                Tax {renderSensitiveValue(formatCurrency(row.taxAmount, row.currency))}
                                                                 {' • '}
                                                                 {row.count} invoices
                                                             </p>
@@ -2794,12 +2846,12 @@ function Reports({ onReadyChange = null }) {
                                                         <div key={`${row.bucketLabel}-${row.currency}`} className="rounded-lg border border-border p-3">
                                                             <div className="flex items-center justify-between gap-3">
                                                                 <p className="text-sm font-semibold text-foreground">{row.bucketLabel}</p>
-                                                                <p className="text-sm font-semibold text-foreground">{formatCurrency(row.grossAmount, row.currency)}</p>
+                                                                <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(row.grossAmount, row.currency))}</p>
                                                             </div>
                                                             <p className="mt-1 text-xs text-muted-foreground">
-                                                                Net {formatCurrency(row.netAmount, row.currency)}
+                                                                Net {renderSensitiveValue(formatCurrency(row.netAmount, row.currency))}
                                                                 {' • '}
-                                                                Tax {formatCurrency(row.taxAmount, row.currency)}
+                                                                Tax {renderSensitiveValue(formatCurrency(row.taxAmount, row.currency))}
                                                                 {' • '}
                                                                 {row.count} expenses
                                                             </p>
@@ -2819,12 +2871,12 @@ function Reports({ onReadyChange = null }) {
                                                         <div key={`${row.bucketLabel}-${row.currency}`} className="rounded-lg border border-border p-3">
                                                             <div className="flex items-center justify-between gap-3">
                                                                 <p className="text-sm font-semibold text-foreground">{row.bucketLabel}</p>
-                                                                <p className="text-sm font-semibold text-foreground">{formatCurrency(row.taxAmount, row.currency)}</p>
+                                                                <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(row.taxAmount, row.currency))}</p>
                                                             </div>
                                                             <p className="mt-1 text-xs text-muted-foreground">
-                                                                Net {formatCurrency(row.netAmount, row.currency)}
+                                                                Net {renderSensitiveValue(formatCurrency(row.netAmount, row.currency))}
                                                                 {' • '}
-                                                                Gross {formatCurrency(row.grossAmount, row.currency)}
+                                                                Gross {renderSensitiveValue(formatCurrency(row.grossAmount, row.currency))}
                                                                 {' • '}
                                                                 {row.count} expenses
                                                             </p>
@@ -2844,7 +2896,7 @@ function Reports({ onReadyChange = null }) {
                                                         <div key={`${row.geography}-${row.currency}`} className="rounded-lg border border-border p-3">
                                                             <div className="flex items-center justify-between gap-3">
                                                                 <p className="text-sm font-semibold text-foreground">{row.geography}</p>
-                                                                <p className="text-sm font-semibold text-foreground">{formatCurrency(row.total, row.currency)}</p>
+                                                                <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(row.total, row.currency))}</p>
                                                             </div>
                                                             <p className="mt-1 text-xs text-muted-foreground">{row.count} invoices</p>
                                                         </div>
@@ -2924,12 +2976,12 @@ function Reports({ onReadyChange = null }) {
                                                     <div className="flex items-center justify-between gap-3">
                                                         <p className="text-sm font-semibold text-foreground capitalize">{row.label}</p>
                                                         <p className="text-sm font-semibold text-foreground">
-                                                            {formatCurrencyBreakdown({
+                                                            {renderSensitiveValue(formatCurrencyBreakdown({
                                                                 amountsByCurrency: row.totalByCurrency,
                                                                 convertToCurrency,
                                                                 currencyDisplayMode,
                                                                 preferredCurrency,
-                                                            })}
+                                                            }))}
                                                         </p>
                                                     </div>
                                                     <p className="mt-1 text-xs text-muted-foreground">{row.count} invoices</p>
@@ -2946,12 +2998,12 @@ function Reports({ onReadyChange = null }) {
                                                     <div className="flex items-center justify-between gap-3">
                                                         <p className="text-sm font-semibold text-foreground">{row.label}</p>
                                                         <p className="text-sm font-semibold text-foreground">
-                                                            {formatCurrencyBreakdown({
+                                                            {renderSensitiveValue(formatCurrencyBreakdown({
                                                                 amountsByCurrency: row.totalByCurrency,
                                                                 convertToCurrency,
                                                                 currencyDisplayMode,
                                                                 preferredCurrency,
-                                                            })}
+                                                            }))}
                                                         </p>
                                                     </div>
                                                     <p className="mt-1 text-xs text-muted-foreground">{row.count} invoices</p>
@@ -2968,12 +3020,12 @@ function Reports({ onReadyChange = null }) {
                                                     <div className="flex items-center justify-between gap-3">
                                                         <p className="text-sm font-semibold text-foreground">{row.label}</p>
                                                         <p className="text-sm font-semibold text-foreground">
-                                                            {formatCurrencyBreakdown({
+                                                            {renderSensitiveValue(formatCurrencyBreakdown({
                                                                 amountsByCurrency: row.totalByCurrency,
                                                                 convertToCurrency,
                                                                 currencyDisplayMode,
                                                                 preferredCurrency,
-                                                            })}
+                                                            }))}
                                                         </p>
                                                     </div>
                                                     <p className="mt-1 text-xs text-muted-foreground">{row.count} invoices</p>
@@ -2989,12 +3041,12 @@ function Reports({ onReadyChange = null }) {
                                                 <div key={row.currency} className="rounded-lg border border-border p-3">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <p className="text-sm font-semibold text-foreground">{row.currency}</p>
-                                                        <p className="text-sm font-semibold text-foreground">{formatCurrency(row.total, row.currency)}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(row.total, row.currency))}</p>
                                                     </div>
                                                     <p className="mt-1 text-xs text-muted-foreground">
-                                                        Subtotal {formatCurrency(row.subtotal, row.currency)}
+                                                        Subtotal {renderSensitiveValue(formatCurrency(row.subtotal, row.currency))}
                                                         {' • '}
-                                                        Tax {formatCurrency(row.tax, row.currency)}
+                                                        Tax {renderSensitiveValue(formatCurrency(row.tax, row.currency))}
                                                         {' • '}
                                                         {row.count} invoices
                                                     </p>
@@ -3030,8 +3082,8 @@ function Reports({ onReadyChange = null }) {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-sm font-semibold text-foreground">{formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency)}</p>
-                                                    <p className="text-xs text-muted-foreground">Tax {formatCurrency(invoice.tax || 0, invoice.currency || preferredCurrency)}</p>
+                                                    <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency))}</p>
+                                                    <p className="text-xs text-muted-foreground">Tax {renderSensitiveValue(formatCurrency(invoice.tax || 0, invoice.currency || preferredCurrency))}</p>
                                                 </div>
                                             </div>
                                         );
@@ -3103,24 +3155,24 @@ function Reports({ onReadyChange = null }) {
                                     <div className="rounded-lg border border-border p-3">
                                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Outstanding total</p>
                                         <p className="mt-2 text-lg font-semibold text-foreground">
-                                            {formatCurrencyBreakdown({
+                                            {renderSensitiveValue(formatCurrencyBreakdown({
                                                 amountsByCurrency: outstandingByCurrency,
                                                 convertToCurrency,
                                                 currencyDisplayMode,
                                                 preferredCurrency,
-                                            })}
+                                            }))}
                                         </p>
                                         <p className="mt-1 text-xs text-muted-foreground">{outstandingInvoices.length} invoices still open</p>
                                     </div>
                                     <div className="rounded-lg border border-border p-3">
                                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Overdue total</p>
                                         <p className="mt-2 text-lg font-semibold text-foreground">
-                                            {formatCurrencyBreakdown({
+                                            {renderSensitiveValue(formatCurrencyBreakdown({
                                                 amountsByCurrency: overdueByCurrency,
                                                 convertToCurrency,
                                                 currencyDisplayMode,
                                                 preferredCurrency,
-                                            })}
+                                            }))}
                                         </p>
                                         <p className="mt-1 text-xs text-muted-foreground">{overdueInvoices.length} invoices past due</p>
                                     </div>
@@ -3148,7 +3200,7 @@ function Reports({ onReadyChange = null }) {
                                                 <div key={`${row.bucketLabel}-${row.currency}`} className="rounded-lg border border-border p-3">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <p className="text-sm font-semibold text-foreground">{row.bucketLabel}</p>
-                                                        <p className="text-sm font-semibold text-foreground">{formatCurrency(row.total, row.currency)}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(row.total, row.currency))}</p>
                                                     </div>
                                                     <p className="mt-1 text-xs text-muted-foreground">{row.count} invoices</p>
                                                 </div>
@@ -3180,7 +3232,7 @@ function Reports({ onReadyChange = null }) {
                                                         </p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className="text-sm font-semibold text-foreground">{formatCurrency(row.total, row.currency)}</p>
+                                                        <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(row.total, row.currency))}</p>
                                                         <p className="text-xs text-muted-foreground">
                                                             {row.daysOverdue > 0 ? `${row.daysOverdue} days overdue` : 'Not due yet'}
                                                         </p>
@@ -3256,36 +3308,36 @@ function Reports({ onReadyChange = null }) {
                                     <div className="rounded-lg border border-border p-3">
                                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ex VAT</p>
                                         <p className="mt-2 text-lg font-semibold text-foreground">
-                                            {formatCurrencyBreakdown({
+                                            {renderSensitiveValue(formatCurrencyBreakdown({
                                                 amountsByCurrency: expenseTotalsSummary.netByCurrency,
                                                 convertToCurrency,
                                                 currencyDisplayMode,
                                                 preferredCurrency,
-                                            })}
+                                            }))}
                                         </p>
                                         <p className="mt-1 text-xs text-muted-foreground">Net expense amount before tax</p>
                                     </div>
                                     <div className="rounded-lg border border-border p-3">
                                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">VAT amount</p>
                                         <p className="mt-2 text-lg font-semibold text-foreground">
-                                            {formatCurrencyBreakdown({
+                                            {renderSensitiveValue(formatCurrencyBreakdown({
                                                 amountsByCurrency: expenseTotalsSummary.taxByCurrency,
                                                 convertToCurrency,
                                                 currencyDisplayMode,
                                                 preferredCurrency,
-                                            })}
+                                            }))}
                                         </p>
                                         <p className="mt-1 text-xs text-muted-foreground">Derived from current expense tax fields</p>
                                     </div>
                                     <div className="rounded-lg border border-border p-3">
                                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Inc VAT</p>
                                         <p className="mt-2 text-lg font-semibold text-foreground">
-                                            {formatCurrencyBreakdown({
+                                            {renderSensitiveValue(formatCurrencyBreakdown({
                                                 amountsByCurrency: expenseTotalsSummary.grossByCurrency,
                                                 convertToCurrency,
                                                 currencyDisplayMode,
                                                 preferredCurrency,
-                                            })}
+                                            }))}
                                         </p>
                                         <p className="mt-1 text-xs text-muted-foreground">{expenseTotalsSummary.count} expenses in scope</p>
                                     </div>
@@ -3385,8 +3437,8 @@ function Reports({ onReadyChange = null }) {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-sm font-semibold text-foreground">{formatCurrency(expense.amount || 0, expense.currency || preferredCurrency)}</p>
-                                                    <p className="text-xs text-muted-foreground">Tax {formatCurrency(getExpenseTaxAmount(expense), expense.currency || preferredCurrency)}</p>
+                                                    <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(expense.amount || 0, expense.currency || preferredCurrency))}</p>
+                                                    <p className="text-xs text-muted-foreground">Tax {renderSensitiveValue(formatCurrency(getExpenseTaxAmount(expense), expense.currency || preferredCurrency))}</p>
                                                 </div>
                                             </div>
                                         );
@@ -3477,20 +3529,20 @@ function Reports({ onReadyChange = null }) {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-sm font-semibold text-foreground">
-                                                {formatCurrencyBreakdown({
+                                                {renderSensitiveValue(formatCurrencyBreakdown({
                                                     amountsByCurrency: row.totalAmountsByCurrency,
                                                     convertToCurrency,
                                                     currencyDisplayMode,
                                                     preferredCurrency,
-                                                })}
+                                                }))}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                Time {formatCurrencyBreakdown({
+                                                Time {renderSensitiveValue(formatCurrencyBreakdown({
                                                     amountsByCurrency: row.estimatedAmountsByCurrency,
                                                     convertToCurrency,
                                                     currencyDisplayMode,
                                                     preferredCurrency,
-                                                })}
+                                                }))}
                                             </p>
                                         </div>
                                     </div>

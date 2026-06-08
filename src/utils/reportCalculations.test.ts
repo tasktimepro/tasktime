@@ -460,6 +460,37 @@ describe('reportCalculations', () => {
         expect(summary.totalsByCurrency.closingBalance).toEqual({ EUR: 220 });
     });
 
+    it('uses paid invoice currency snapshots for client statement paid invoice totals', () => {
+        const paidAt = new Date('2026-04-10T10:00:00Z').getTime();
+        const summary = buildClientStatementSummary({
+            startDate: '2026-04-01',
+            endDate: '2026-04-30',
+            preferredCurrency: 'EUR',
+            referenceDate: new Date('2026-04-30T23:59:59Z'),
+            invoices: [
+                {
+                    id: 'invoice-paid-usd',
+                    invoiceNumber: 'INV-USD',
+                    date: '2026-04-05',
+                    status: 'paid',
+                    total: 100,
+                    currency: 'USD',
+                    paidAt,
+                    paymentCurrencySnapshot: {
+                        capturedAt: paidAt,
+                        sourceCurrency: 'USD',
+                        sourceAmount: 100,
+                        preferredCurrencyAtPayment: 'EUR',
+                        preferredCurrencyAmount: 85,
+                    },
+                },
+            ],
+        });
+
+        expect(summary.totalsByCurrency.issued).toEqual({ EUR: 85 });
+        expect(summary.totalsByCurrency.payments).toEqual({ EUR: 85 });
+    });
+
     it('builds a project work summary grouped by task', () => {
         const summary = buildProjectWorkSummary([
             {
@@ -584,6 +615,50 @@ describe('reportCalculations', () => {
         expect(summary.totalsByCurrency).toEqual([
             { currency: 'EUR', count: 3, subtotal: 310, tax: 60, total: 370 },
             { currency: 'USD', count: 1, subtotal: 50, tax: 0, total: 50 },
+        ]);
+    });
+
+    it('uses paid invoice currency snapshots for invoice register grouped totals', () => {
+        const paidAt = new Date('2026-04-20T10:00:00Z').getTime();
+        const summary = buildInvoiceRegisterSummary({
+            preferredCurrency: 'EUR',
+            invoices: [
+                {
+                    id: 'invoice-paid-usd',
+                    clientId: 'client-1',
+                    businessInfoId: 'business-1',
+                    status: 'paid',
+                    paidAt,
+                    total: 100,
+                    currency: 'USD',
+                    paymentCurrencySnapshot: {
+                        capturedAt: paidAt,
+                        sourceCurrency: 'USD',
+                        sourceAmount: 100,
+                        preferredCurrencyAtPayment: 'EUR',
+                        preferredCurrencyAmount: 85,
+                    },
+                },
+            ],
+            clientsById: new Map([
+                ['client-1', { id: 'client-1', title: 'Acme' }],
+            ]),
+            businessInfosById: new Map([
+                ['business-1', { id: 'business-1', businessName: 'TaskTime Studio' }],
+            ]),
+        });
+
+        expect(summary.totalsByStatus).toEqual([
+            {
+                label: 'paid',
+                count: 1,
+                totalByCurrency: { EUR: 85 },
+            },
+        ]);
+        expect(summary.totalsByClient[0].totalByCurrency).toEqual({ EUR: 85 });
+        expect(summary.totalsByBusiness[0].totalByCurrency).toEqual({ EUR: 85 });
+        expect(summary.totalsByCurrency).toEqual([
+            { currency: 'USD', count: 1, subtotal: 0, tax: 0, total: 100 },
         ]);
     });
 });

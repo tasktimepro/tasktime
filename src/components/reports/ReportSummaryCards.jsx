@@ -107,8 +107,8 @@ function ReportSummaryCards({ cards }) {
 }
 
 const cardShape = PropTypes.shape({
-    value: PropTypes.string.isRequired,
-    subtitle: PropTypes.string.isRequired,
+    value: PropTypes.node.isRequired,
+    subtitle: PropTypes.node.isRequired,
 });
 
 ReportSummaryCards.propTypes = {

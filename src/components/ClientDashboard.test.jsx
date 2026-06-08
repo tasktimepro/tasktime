@@ -373,6 +373,47 @@ describe('ClientDashboard', () => {
         });
     });
 
+    it('formats large paid revenue totals with grouping separators', () => {
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }}
+                projects={[{
+                    id: 'project-1',
+                    title: 'Health AI',
+                    preferredClientId: 'client-1',
+                }]}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }]}
+                invoices={[{
+                    id: 'invoice-1',
+                    clientId: 'client-1',
+                    projectId: 'project-1',
+                    invoiceNumber: 'INV-1',
+                    status: 'paid',
+                    total: 12345.67,
+                    currency: 'CHF',
+                    paidAt: Date.now(),
+                }]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('CHF12,345.67')).toBeInTheDocument();
+    });
+
     it('shows an overdue badge on overdue project cards', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-03-24T12:00:00Z'));

@@ -1,7 +1,7 @@
 import { endOfDay, startOfDay } from 'date-fns';
 import { differenceInCalendarDays } from 'date-fns/differenceInCalendarDays';
 import { parseStoredDate } from './dateUtils';
-import { getInvoicePaidAtTimestamp, getInvoiceStatus, getInvoiceTotal, isInvoicePaid } from './invoiceUtils';
+import { getInvoicePaidAtTimestamp, getInvoiceStatus, getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoicePaid } from './invoiceUtils';
 import { getBillableDurationMs } from './timeEntryDurationUtils';
 
 const EU_COUNTRY_CODES = new Set([
@@ -131,6 +131,55 @@ type TaxSummaryParams = {
     invoices: any[];
 };
 
+export const getInvoiceReportAmount = (
+    invoice: any,
+    preferredCurrency: string,
+    sourceAmount = getInvoiceTotal(invoice)
+) => {
+    const sourceCurrency = invoice?.currency || preferredCurrency || 'EUR';
+
+    if (!isInvoicePaid(invoice)) {
+        return {
+            amount: sourceAmount,
+            currency: sourceCurrency,
+        };
+    }
+
+    const paidAmount = getPaidInvoiceConvertedAmount(invoice, preferredCurrency || sourceCurrency);
+
+    if (!paidAmount.usedSnapshot) {
+        return {
+            amount: sourceAmount,
+            currency: sourceCurrency,
+        };
+    }
+
+    const sourceTotal = getInvoiceTotal(invoice);
+    const ratio = sourceTotal !== 0 ? sourceAmount / sourceTotal : 1;
+
+    return {
+        amount: Math.round(paidAmount.amount * ratio * 100) / 100,
+        currency: paidAmount.currency,
+    };
+};
+
+export const sumInvoiceReportAmountsByCurrency = (
+    invoices: any[],
+    preferredCurrency: string,
+    getAmount: (invoice: any) => number = (invoice) => getInvoiceTotal(invoice)
+) => {
+    return invoices.reduce((totals, invoice) => {
+        const { amount, currency } = getInvoiceReportAmount(invoice, preferredCurrency, getAmount(invoice));
+
+        if (!currency || !Number.isFinite(amount) || amount === 0) {
+            return totals;
+        }
+
+        totals[currency] = (totals[currency] || 0) + amount;
+        return totals;
+    }, {} as Record<string, number>);
+};
+
 export const buildExpenseTotalsSummary = (expenses: any[]) => {
     const grossByCurrency: Record<string, number> = {};
     const netByCurrency: Record<string, number> = {};
@@ -164,7 +213,8 @@ export const buildExpenseTotalsSummary = (expenses: any[]) => {
 
 const buildInvoiceRegisterGroupRows = (
     invoices: any[],
-    getLabel: (invoice: any) => string
+    getLabel: (invoice: any) => string,
+    preferredCurrency = 'EUR'
 ) => {
     const grouped = new Map();
 
@@ -176,9 +226,9 @@ const buildInvoiceRegisterGroupRows = (
             totalByCurrency: {},
         };
 
-        const currency = invoice?.currency || 'EUR';
+        const { amount, currency } = getInvoiceReportAmount(invoice, preferredCurrency);
         current.count += 1;
-        current.totalByCurrency[currency] = (current.totalByCurrency[currency] || 0) + getInvoiceTotal(invoice);
+        current.totalByCurrency[currency] = (current.totalByCurrency[currency] || 0) + amount;
 
         grouped.set(label, current);
     });
@@ -196,10 +246,12 @@ export const buildInvoiceRegisterSummary = ({
     businessInfosById,
     clientsById,
     invoices,
+    preferredCurrency = 'EUR',
 }: InvoiceRegisterSummaryParams) => {
     const totalsByStatus = buildInvoiceRegisterGroupRows(
         invoices,
-        (invoice) => getInvoiceStatus(invoice)
+        (invoice) => getInvoiceStatus(invoice),
+        preferredCurrency
     ).sort((rowA, rowB) => {
         const orderA = STATUS_ORDER.get(rowA.label) ?? Number.MAX_SAFE_INTEGER;
         const orderB = STATUS_ORDER.get(rowB.label) ?? Number.MAX_SAFE_INTEGER;
@@ -213,7 +265,8 @@ export const buildInvoiceRegisterSummary = ({
 
     const totalsByClient = buildInvoiceRegisterGroupRows(
         invoices,
-        (invoice) => clientsById.get(invoice?.clientId)?.title || 'No client'
+        (invoice) => clientsById.get(invoice?.clientId)?.title || 'No client',
+        preferredCurrency
     );
 
     const totalsByBusiness = buildInvoiceRegisterGroupRows(
@@ -221,7 +274,8 @@ export const buildInvoiceRegisterSummary = ({
         (invoice) => {
             const business = invoice?.businessInfoId ? businessInfosById.get(invoice.businessInfoId) : null;
             return business?.businessName || business?.name || business?.title || 'Unassigned';
-        }
+        },
+        preferredCurrency
     );
 
     const currencyMap = new Map();
@@ -287,6 +341,7 @@ type InvoiceRegisterSummaryParams = {
     businessInfosById: Map<string, any>;
     clientsById: Map<string, any>;
     invoices: any[];
+    preferredCurrency?: string;
 };
 
 export const OUTSTANDING_AGING_BUCKETS = [
@@ -599,6 +654,7 @@ export const buildOutstandingInvoiceSummary = (invoices: any[], referenceDate?: 
 
 type ClientStatementSummaryParams = {
     invoices: any[];
+    preferredCurrency?: string;
     startDate: string;
     endDate: string;
     referenceDate?: Date;
@@ -606,6 +662,7 @@ type ClientStatementSummaryParams = {
 
 export const buildClientStatementSummary = ({
     invoices,
+    preferredCurrency = 'EUR',
     startDate,
     endDate,
     referenceDate,
@@ -642,21 +699,9 @@ export const buildClientStatementSummary = ({
             return dueDateA.localeCompare(dueDateB);
         });
 
-    const openingBalanceByCurrency = sumRecordsByCurrency(
-        openingBalanceInvoices,
-        (invoice) => invoice?.currency || 'EUR',
-        (invoice) => getInvoiceTotal(invoice)
-    );
-    const issuedByCurrency = sumRecordsByCurrency(
-        invoicesIssuedInRange,
-        (invoice) => invoice?.currency || 'EUR',
-        (invoice) => getInvoiceTotal(invoice)
-    );
-    const paymentsByCurrency = sumRecordsByCurrency(
-        paymentsRecordedInRange,
-        (invoice) => invoice?.currency || 'EUR',
-        (invoice) => getInvoiceTotal(invoice)
-    );
+    const openingBalanceByCurrency = sumInvoiceReportAmountsByCurrency(openingBalanceInvoices, preferredCurrency);
+    const issuedByCurrency = sumInvoiceReportAmountsByCurrency(invoicesIssuedInRange, preferredCurrency);
+    const paymentsByCurrency = sumInvoiceReportAmountsByCurrency(paymentsRecordedInRange, preferredCurrency);
     const closingBalanceByCurrency = sumRecordsByCurrency(
         outstandingInvoices,
         (invoice) => invoice?.currency || 'EUR',

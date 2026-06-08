@@ -62,9 +62,14 @@ vi.mock('../hooks/useBusinessBrandAssets.ts', () => ({
     useBusinessBrandAssets: () => ({ businessBrandAssets: [] })
 }));
 
-vi.mock('../utils/invoiceUtils.ts', () => ({
-    getInvoicesForProject: (invoices) => invoices,
-}));
+vi.mock('../utils/invoiceUtils.ts', async () => {
+    const actual = await vi.importActual('../utils/invoiceUtils.ts');
+
+    return {
+        ...actual,
+        getInvoicesForProject: (invoices) => invoices,
+    };
+});
 
 vi.mock('./TaskTree', () => ({ default: () => <div>Task tree</div> }));
 vi.mock('./InvoiceGenerator', () => ({
@@ -372,6 +377,50 @@ describe('ProjectDashboard', () => {
         expect(screen.queryByText('Target amount')).not.toBeInTheDocument();
         expect(screen.queryByText('On target')).not.toBeInTheDocument();
         expect(screen.queryByText(/Projected earnings:/i)).not.toBeInTheDocument();
+    });
+
+    it('formats large paid revenue totals with grouping separators', () => {
+        render(
+            <ProjectDashboard
+                project={{
+                    id: 'project-1',
+                    title: 'Fixed Scope',
+                    hourlyRate: 125,
+                    isPersonal: false,
+                    preferredClientId: 'client-1',
+                }}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToProjects={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }]}
+                invoices={[{
+                    id: 'invoice-1',
+                    projectId: 'project-1',
+                    clientId: 'client-1',
+                    invoiceNumber: 'INV-1',
+                    status: 'paid',
+                    total: 12345.67,
+                    currency: 'CHF',
+                    paidAt: Date.now(),
+                }]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openTaskModal={vi.fn()}
+                onViewTask={vi.fn()}
+                navigateToClient={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('CHF12,345.67')).toBeInTheDocument();
     });
 
     it('shows an activate action in the more-actions menu for quote-stage projects', async () => {

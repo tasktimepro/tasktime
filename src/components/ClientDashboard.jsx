@@ -731,7 +731,7 @@ const ClientDashboard = ({
                                     <div className="flex items-center text-sm text-muted-foreground">
                                         <CurrencyDollarIcon className="h-4 w-4 mr-2" />
                                         <span className="sensitive-data text-foreground font-semibold">
-                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.potentialRevenue.toFixed(2)}
+                                            {formatCurrency(clientMetrics.potentialRevenue, clientCurrency)}
                                         </span>
                                     </div>
                                     {clientExpenses.length > 0 && (
@@ -759,7 +759,7 @@ const ClientDashboard = ({
                                     <dt className="text-sm font-medium text-muted-foreground truncate">Pending</dt>
                                     <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                         <span className="sensitive-data">
-                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.pendingAmount.toFixed(2)}
+                                            {formatCurrency(clientMetrics.pendingAmount, clientCurrency)}
                                         </span>
                                     </dd>
                                 </dl>
@@ -801,7 +801,7 @@ const ClientDashboard = ({
                                     <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
                                     <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                         <span className="sensitive-data">
-                                            {getCurrencySymbol(clientCurrency)}{clientMetrics.totalRevenue.toFixed(2)}
+                                            {formatCurrency(clientMetrics.totalRevenue, clientCurrency)}
                                         </span>
                                     </dd>
                                 </dl>

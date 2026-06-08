@@ -108,6 +108,10 @@ const TimeFieldInput = ({ label, value, min, max, onCommit }) => {
                 type="number"
                 min={min}
                 max={max}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                enterKeyHint="done"
+                autoComplete="off"
                 value={displayValue}
                 onChange={handleChange}
                 onBlur={handleBlur}

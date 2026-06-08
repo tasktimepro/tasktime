@@ -1,5 +1,6 @@
 import CustomCheckbox from '../CustomCheckbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatCurrency } from '../../utils/currencyUtils.ts';
 
 /**
  * InvoicePreview component - Pricing and totals section for invoice review.
@@ -37,6 +38,9 @@ const InvoicePreview = ({
     getInvoiceCurrency,
     getCurrencySymbol
 }) => {
+    const invoiceCurrency = getInvoiceCurrency();
+    const formatInvoiceAmount = (amount) => formatCurrency(amount || 0, invoiceCurrency);
+
     return (
         <div className="border border-border rounded-lg">
             <button
@@ -48,7 +52,7 @@ const InvoicePreview = ({
                     <h4 className="text-sm font-medium text-foreground">Pricing & Totals</h4>
                     <div className="flex items-center space-x-3">
                         <span className="status-info-text-strong text-sm font-medium sensitive-data">
-                            {getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.total.toFixed(2)}
+                            {formatInvoiceAmount(calculatePricing.total)}
                         </span>
                         <svg
                             className={`w-5 h-5 text-muted-foreground transform transition-transform ${activeSection === 'pricingTotals' ? 'rotate-180' : ''}`}
@@ -71,14 +75,14 @@ const InvoicePreview = ({
                                 value={discountType}
                                 onValueChange={setDiscountType}
                             >
-                                <SelectTrigger className="w-24">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="percentage">%</SelectItem>
-                                    <SelectItem value="fixed">{getCurrencySymbol(getInvoiceCurrency())}</SelectItem>
-                                </SelectContent>
-                            </Select>
+                                    <SelectTrigger className="w-24">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="percentage">%</SelectItem>
+                                        <SelectItem value="fixed">{getCurrencySymbol(invoiceCurrency)}</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             <input
                                 type="number"
                                 step="0.01"
@@ -186,33 +190,33 @@ const InvoicePreview = ({
                     <div className="border-t pt-3 space-y-2">
                         <div className="flex justify-between text-sm">
                             <span>Subtotal:</span>
-                            <span className="sensitive-data">{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.subtotal.toFixed(2)}</span>
+                            <span className="sensitive-data">{formatInvoiceAmount(calculatePricing.subtotal)}</span>
                         </div>
 
                         {calculatePricing.discount > 0 && (
                             <div className="status-danger-text-strong flex justify-between text-sm">
-                                <span>Discount ({discountType === 'percentage' ? `${discountValue}%` : getCurrencySymbol(getInvoiceCurrency()) + discountValue}):</span>
-                                <span className="sensitive-data">-{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.discount.toFixed(2)}</span>
+                                <span>Discount ({discountType === 'percentage' ? `${discountValue}%` : formatInvoiceAmount(Number(discountValue) || 0)}):</span>
+                                <span className="sensitive-data">-{formatInvoiceAmount(calculatePricing.discount)}</span>
                             </div>
                         )}
 
                         {calculatePricing.shipping > 0 && (
                             <div className="flex justify-between text-sm">
                                 <span>Shipping:</span>
-                                <span className="sensitive-data">{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.shipping.toFixed(2)}</span>
+                                <span className="sensitive-data">{formatInvoiceAmount(calculatePricing.shipping)}</span>
                             </div>
                         )}
 
                         {calculatePricing.tax > 0 && (
                             <div className="flex justify-between text-sm">
                                 <span>{calculatePricing.taxLabel} ({calculatePricing.taxRate}%):</span>
-                                <span className="sensitive-data">{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.tax.toFixed(2)}</span>
+                                <span className="sensitive-data">{formatInvoiceAmount(calculatePricing.tax)}</span>
                             </div>
                         )}
 
                         <div className="flex justify-between text-base font-medium border-t pt-2">
                             <span>Total:</span>
-                            <span className="sensitive-data">{getCurrencySymbol(getInvoiceCurrency())}{calculatePricing.total.toFixed(2)}</span>
+                            <span className="sensitive-data">{formatInvoiceAmount(calculatePricing.total)}</span>
                         </div>
                     </div>
                 </div>
