@@ -14,6 +14,7 @@ import {
     hoursToMinutes,
     getTodayRange,
     getThisWeekRange,
+    getLastWeekRange,
     getThisMonthRange,
     getLastMonthRange,
     getThisYearRange
@@ -27,7 +28,8 @@ import {
     endOfMonth,
     startOfYear,
     endOfYear,
-    subMonths
+    subMonths,
+    subWeeks
 } from 'date-fns'
 
 describe('dateUtils', () => {
@@ -161,6 +163,14 @@ describe('dateUtils', () => {
             const now = new Date()
             expect(range.start).toBe(startOfWeek(now, { weekStartsOn: 0 }).getTime())
             expect(range.end).toBe(endOfWeek(now, { weekStartsOn: 0 }).getTime())
+        })
+
+        it('returns last week range', () => {
+
+            const range = getLastWeekRange(1)
+            const lastWeek = subWeeks(new Date(), 1)
+            expect(range.start).toBe(startOfWeek(lastWeek, { weekStartsOn: 1 }).getTime())
+            expect(range.end).toBe(endOfWeek(lastWeek, { weekStartsOn: 1 }).getTime())
         })
 
         it('returns this month range', () => {

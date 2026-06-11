@@ -1,6 +1,7 @@
 import { 
     getTodayRange, 
     getThisWeekRange, 
+    getLastWeekRange,
     getThisMonthRange, 
     getLastMonthRange,
     formatDuration,
@@ -101,6 +102,10 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
 
     const weekMetrics = calculateMetrics(weekRange.start, weekRange.end);
 
+    const lastWeekRange = getLastWeekRange(weekStartsOn);
+
+    const lastWeekMetrics = calculateMetrics(lastWeekRange.start, lastWeekRange.end);
+
     const monthRange = getThisMonthRange();
 
     const monthMetrics = calculateMetrics(monthRange.start, monthRange.end);
@@ -108,23 +113,6 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
     const lastMonthRange = getLastMonthRange();
 
     const lastMonthMetrics = calculateMetrics(lastMonthRange.start, lastMonthRange.end);
-
-    // Calculate last 90 days range (matching dashboard reports)
-    const getLast90DaysRange = () => {
-        const now = new Date();
-        const end = now.getTime();
-        // Create new date for start calculation to avoid mutating the 'now' used for other things if any
-        // (though in this function scope it's local)
-        const start = new Date(now);
-        start.setDate(start.getDate() - 90);
-        start.setHours(0, 0, 0, 0);
-        
-        return { start: start.getTime(), end };
-    };
-
-    const last90DaysRange = getLast90DaysRange();
-
-    const last90DaysMetrics = calculateMetrics(last90DaysRange.start, last90DaysRange.end);
 
     const metrics = [
         { 
@@ -135,6 +123,10 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
             label: 'This Week',
             ...weekMetrics 
         },
+        {
+            label: 'Last Week',
+            ...lastWeekMetrics
+        },
         { 
             label: 'This Month',
             ...monthMetrics 
@@ -142,10 +134,6 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
         { 
             label: 'Last Month',
             ...lastMonthMetrics 
-        },
-        { 
-            label: 'Last 90 Days',
-            ...last90DaysMetrics 
         }
     ];
 
