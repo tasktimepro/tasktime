@@ -120,6 +120,50 @@ describe('main entrypoint', () => {
         consoleErrorSpy.mockRestore()
     })
 
+    it('ignores browser extension CSP noise in production', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+        vi.stubEnv('PROD', true)
+
+        await import('./main.jsx')
+
+        const cspViolationEvent = new Event('securitypolicyviolation')
+        Object.defineProperties(cspViolationEvent, {
+            blockedURI: { configurable: true, value: 'inline' },
+            effectiveDirective: { configurable: true, value: 'script-src' },
+            sourceFile: { configurable: true, value: 'chrome-extension://test-extension/content.js' },
+            violatedDirective: { configurable: true, value: 'script-src' },
+        })
+
+        window.dispatchEvent(cspViolationEvent)
+
+        expect(consoleErrorSpy).not.toHaveBeenCalledWith('[TaskTime] Content Security Policy violation:', cspViolationEvent)
+        expect(captureDebugBundleSecurityPolicyViolationSpy).not.toHaveBeenCalled()
+
+        consoleErrorSpy.mockRestore()
+    })
+
+    it('ignores report-only CSP violations', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+        vi.stubEnv('PROD', true)
+
+        await import('./main.jsx')
+
+        const cspViolationEvent = new Event('securitypolicyviolation')
+        Object.defineProperties(cspViolationEvent, {
+            blockedURI: { configurable: true, value: 'https://example.com/script.js' },
+            disposition: { configurable: true, value: 'report' },
+            effectiveDirective: { configurable: true, value: 'script-src' },
+            violatedDirective: { configurable: true, value: 'script-src' },
+        })
+
+        window.dispatchEvent(cspViolationEvent)
+
+        expect(consoleErrorSpy).not.toHaveBeenCalledWith('[TaskTime] Content Security Policy violation:', cspViolationEvent)
+        expect(captureDebugBundleSecurityPolicyViolationSpy).not.toHaveBeenCalled()
+
+        consoleErrorSpy.mockRestore()
+    })
+
     it('uses innerHeight for non-touch desktop viewports even when visualViewport exists', async () => {
         await import('./main.jsx')
 

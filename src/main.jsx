@@ -11,6 +11,12 @@ import {
 import { registerAppServiceWorker } from './utils/serviceWorkerRegistration'
 
 const VIEWPORT_HEIGHT_PROPERTY = '--viewport-height'
+const SECURITY_POLICY_EXTENSION_PROTOCOLS = [
+  'chrome-extension://',
+  'moz-extension://',
+  'safari-web-extension://',
+  'edge-extension://',
+]
 
 initializeDebugBundle()
 
@@ -95,10 +101,29 @@ function registerViewportHeightSync() {
 
 registerViewportHeightSync()
 
+function isBrowserExtensionResource(value) {
+  if (typeof value !== 'string') {
+    return false
+  }
+
+  const normalizedValue = value.trim().toLowerCase()
+
+  return SECURITY_POLICY_EXTENSION_PROTOCOLS.some((protocol) => normalizedValue.startsWith(protocol))
+}
+
 function shouldIgnoreSecurityPolicyViolation(event) {
-  return !import.meta.env.PROD &&
+  if (!import.meta.env.PROD &&
     event?.blockedURI === 'eval' &&
     (event?.effectiveDirective === 'script-src' || event?.violatedDirective === 'script-src')
+  ) {
+    return true
+  }
+
+  if (event?.disposition === 'report') {
+    return true
+  }
+
+  return isBrowserExtensionResource(event?.blockedURI) || isBrowserExtensionResource(event?.sourceFile)
 }
 
 // Global error handlers - catch uncaught exceptions and unhandled promise rejections
