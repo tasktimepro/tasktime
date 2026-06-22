@@ -145,12 +145,26 @@ export function captureDebugBundleException(error) {
     return safeCaptureException(normalizedError)
 }
 
+/**
+ * @typedef {Object} HandledIncidentOptions
+ * @property {string} incidentKey
+ * @property {string} message
+ * @property {string} [name]
+ * @property {unknown} [error]
+ * @property {Record<string, unknown>} [context]
+ * @property {number} [throttleMs]
+ */
+
+/**
+ * @param {HandledIncidentOptions} options
+ * @returns {boolean}
+ */
 export function captureDebugBundleIncident({
     incidentKey,
     name = 'TaskTimeHandledIncident',
     message,
-    error,
-    context,
+    error = undefined,
+    context = undefined,
     throttleMs = 5 * 60 * 1000,
 }) {
     if (!isInitialized || !incidentKey || !message) {

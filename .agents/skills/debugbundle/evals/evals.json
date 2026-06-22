@@ -27,6 +27,25 @@
       ]
     },
     {
+      "name": "noise_management_guidance",
+      "prompt": "The same low-value frontend incident keeps reopening. Confirm the skill tells the agent how to evaluate operational noise without hiding real bugs.",
+      "expected_behavior": [
+        "Inspect incident evidence before creating a rule.",
+        "Use capture-rule suggestions for repeated operational noise.",
+        "Keep generic frontend suppression narrow with structured browser or bot signals.",
+        "Use capture-policy path rules for known route-scoped 4xx incidents."
+      ]
+    },
+    {
+      "name": "operational_controls_guidance",
+      "prompt": "The user reports missing webhook deliveries and asks whether probes or alerts are available. Confirm the skill points the agent to the relevant operational controls and docs.",
+      "expected_behavior": [
+        "Inspect alert and webhook configuration plus webhook delivery history before changing application code.",
+        "Use probes for targeted evidence gathering with narrow scope and TTL.",
+        "Point to the full CLI, MCP, alerts, webhooks, probes, capture policy, availability checks, and ingestion documentation URLs."
+      ]
+    },
+    {
       "name": "artifact_path_discovery",
       "prompt": "The user reports an unknown local runtime error. Confirm the skill tells the agent which DebugBundle paths and commands to inspect first.",
       "expected_behavior": [
@@ -38,7 +57,8 @@
       "name": "connected_incident_fetch",
       "prompt": "The user says a production incident fired in the hosted DebugBundle project. Confirm the skill points the agent to the cloud retrieval path.",
       "expected_behavior": [
-        "List cloud open incidents or use MCP list_incidents with source cloud.",
+        "Check both local and cloud incident sources when the project is connected and the environment is cloud-enabled.",
+        "Explicitly report whether the local source, the cloud source, or both had matches.",
         "Fetch inspect, context, bundle, and reproduction artifacts before editing code."
       ]
     }

@@ -206,6 +206,32 @@ describe('debugbundle utility', () => {
         })).toBe(false)
     })
 
+    it('allows handled incidents without an original error or context payload', async () => {
+        vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
+        captureExceptionSpy.mockImplementation(() => undefined)
+
+        const {
+            captureDebugBundleIncident,
+            initializeDebugBundle,
+        } = await loadDebugBundleModule()
+
+        expect(initializeDebugBundle()).toBe(true)
+        expect(captureDebugBundleIncident({
+            incidentKey: 'drive.sync_failed_repeatedly',
+            name: 'TaskTimeDriveSyncError',
+            message: 'TaskTime Drive sync failed repeatedly',
+        })).toBe(true)
+
+        expect(captureExceptionSpy).toHaveBeenCalledTimes(1)
+        expect(captureExceptionSpy.mock.calls[0][0]).toMatchObject({
+            name: 'TaskTimeDriveSyncError',
+            message: 'TaskTime Drive sync failed repeatedly',
+            debugbundleIncidentKey: 'drive.sync_failed_repeatedly',
+            debugbundleHandled: true,
+        })
+        expect(captureExceptionSpy.mock.calls[0][0].debugbundleContext).toBeUndefined()
+    })
+
     it('does not throw when metadata cannot be attached to the original error', async () => {
         vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
 
