@@ -218,20 +218,3 @@ export function captureDebugBundleUnhandledRejection(reason, context) {
     })
     return safeCaptureException(normalizedError)
 }
-
-export function captureDebugBundleSecurityPolicyViolation(event) {
-    return captureDebugBundleIncident({
-        incidentKey: 'browser.csp_violation',
-        name: 'TaskTimeSecurityPolicyViolation',
-        message: 'TaskTime Content Security Policy violation',
-        context: {
-            blockedURI: event?.blockedURI ?? null,
-            disposition: event?.disposition ?? null,
-            effectiveDirective: event?.effectiveDirective ?? null,
-            originalPolicy: event?.originalPolicy ?? null,
-            sourceFile: event?.sourceFile ?? null,
-            violatedDirective: event?.violatedDirective ?? null,
-        },
-        throttleMs: 5 * 60 * 1000,
-    })
-}

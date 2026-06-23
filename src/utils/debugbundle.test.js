@@ -156,12 +156,11 @@ describe('debugbundle utility', () => {
         })
     })
 
-    it('captures global browser failures and CSP violations with incident keys', async () => {
+    it('captures global browser failures and unhandled rejections with incident keys', async () => {
         vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
 
         const {
             captureDebugBundleGlobalError,
-            captureDebugBundleSecurityPolicyViolation,
             captureDebugBundleUnhandledRejection,
             initializeDebugBundle,
         } = await loadDebugBundleModule()
@@ -170,20 +169,10 @@ describe('debugbundle utility', () => {
 
         captureDebugBundleGlobalError(new Error('boom'), { filename: 'main.jsx' })
         captureDebugBundleUnhandledRejection('nope', { type: 'unhandledrejection' })
-        captureDebugBundleSecurityPolicyViolation({
-            blockedURI: 'inline',
-            effectiveDirective: 'script-src',
-            violatedDirective: 'script-src',
-        })
 
-        expect(captureExceptionSpy).toHaveBeenCalledTimes(3)
+        expect(captureExceptionSpy).toHaveBeenCalledTimes(2)
         expect(captureExceptionSpy.mock.calls[0][0].debugbundleIncidentKey).toBe('browser.global_error')
         expect(captureExceptionSpy.mock.calls[1][0].debugbundleIncidentKey).toBe('browser.unhandled_rejection')
-        expect(captureExceptionSpy.mock.calls[2][0]).toMatchObject({
-            name: 'TaskTimeSecurityPolicyViolation',
-            debugbundleIncidentKey: 'browser.csp_violation',
-            debugbundleHandled: true,
-        })
     })
 
     it('swallows sdk capture failures so incident reporting cannot break the app', async () => {

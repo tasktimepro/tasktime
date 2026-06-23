@@ -5,7 +5,6 @@ const createRootSpy = vi.fn(() => ({ render: renderSpy }))
 const initializeDebugBundleSpy = vi.fn()
 const captureDebugBundleGlobalErrorSpy = vi.fn()
 const captureDebugBundleUnhandledRejectionSpy = vi.fn()
-const captureDebugBundleSecurityPolicyViolationSpy = vi.fn()
 
 vi.mock('./App', () => ({
     default: () => null,
@@ -15,7 +14,6 @@ vi.mock('./utils/debugbundle', () => ({
     initializeDebugBundle: initializeDebugBundleSpy,
     captureDebugBundleGlobalError: captureDebugBundleGlobalErrorSpy,
     captureDebugBundleUnhandledRejection: captureDebugBundleUnhandledRejectionSpy,
-    captureDebugBundleSecurityPolicyViolation: captureDebugBundleSecurityPolicyViolationSpy,
 }))
 
 vi.mock('react-dom/client', () => ({
@@ -78,71 +76,18 @@ describe('main entrypoint', () => {
         })
         window.dispatchEvent(rejectionEvent)
 
-        const cspViolationEvent = new Event('securitypolicyviolation')
-        Object.defineProperties(cspViolationEvent, {
-            blockedURI: { configurable: true, value: 'inline' },
-            effectiveDirective: { configurable: true, value: 'script-src' },
-            violatedDirective: { configurable: true, value: 'script-src' },
-        })
-        window.dispatchEvent(cspViolationEvent)
-
         expect(consoleErrorSpy).toHaveBeenNthCalledWith(1, '[TaskTime] Uncaught error:', uncaughtError)
         expect(consoleErrorSpy).toHaveBeenNthCalledWith(2, '[TaskTime] Unhandled promise rejection:', 'nope')
-        expect(consoleErrorSpy).toHaveBeenNthCalledWith(3, '[TaskTime] Content Security Policy violation:', cspViolationEvent)
         expect(initializeDebugBundleSpy).toHaveBeenCalledTimes(1)
         expect(captureDebugBundleGlobalErrorSpy).toHaveBeenCalledWith(uncaughtError, expect.objectContaining({
             message: 'boom',
         }))
         expect(captureDebugBundleUnhandledRejectionSpy).toHaveBeenCalledWith('nope', { type: 'unhandledrejection' })
-        expect(captureDebugBundleSecurityPolicyViolationSpy).toHaveBeenCalledWith(cspViolationEvent)
 
         consoleErrorSpy.mockRestore()
     })
 
-    it('ignores the known local dev eval CSP violation noise', async () => {
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-        vi.stubEnv('PROD', false)
-
-        await import('./main.jsx')
-
-        const cspViolationEvent = new Event('securitypolicyviolation')
-        Object.defineProperties(cspViolationEvent, {
-            blockedURI: { configurable: true, value: 'eval' },
-            effectiveDirective: { configurable: true, value: 'script-src' },
-            violatedDirective: { configurable: true, value: 'script-src' },
-        })
-
-        window.dispatchEvent(cspViolationEvent)
-
-        expect(consoleErrorSpy).not.toHaveBeenCalledWith('[TaskTime] Content Security Policy violation:', cspViolationEvent)
-        expect(captureDebugBundleSecurityPolicyViolationSpy).not.toHaveBeenCalled()
-
-        consoleErrorSpy.mockRestore()
-    })
-
-    it('ignores browser extension CSP noise in production', async () => {
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-        vi.stubEnv('PROD', true)
-
-        await import('./main.jsx')
-
-        const cspViolationEvent = new Event('securitypolicyviolation')
-        Object.defineProperties(cspViolationEvent, {
-            blockedURI: { configurable: true, value: 'inline' },
-            effectiveDirective: { configurable: true, value: 'script-src' },
-            sourceFile: { configurable: true, value: 'chrome-extension://test-extension/content.js' },
-            violatedDirective: { configurable: true, value: 'script-src' },
-        })
-
-        window.dispatchEvent(cspViolationEvent)
-
-        expect(consoleErrorSpy).not.toHaveBeenCalledWith('[TaskTime] Content Security Policy violation:', cspViolationEvent)
-        expect(captureDebugBundleSecurityPolicyViolationSpy).not.toHaveBeenCalled()
-
-        consoleErrorSpy.mockRestore()
-    })
-
-    it('ignores report-only CSP violations', async () => {
+    it('ignores all CSP violations', async () => {
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
         vi.stubEnv('PROD', true)
 
@@ -151,15 +96,15 @@ describe('main entrypoint', () => {
         const cspViolationEvent = new Event('securitypolicyviolation')
         Object.defineProperties(cspViolationEvent, {
             blockedURI: { configurable: true, value: 'https://example.com/script.js' },
-            disposition: { configurable: true, value: 'report' },
+            disposition: { configurable: true, value: 'enforce' },
             effectiveDirective: { configurable: true, value: 'script-src' },
+            sourceFile: { configurable: true, value: 'https://challenge.cloudflare.com/turnstile.js' },
             violatedDirective: { configurable: true, value: 'script-src' },
         })
 
         window.dispatchEvent(cspViolationEvent)
 
         expect(consoleErrorSpy).not.toHaveBeenCalledWith('[TaskTime] Content Security Policy violation:', cspViolationEvent)
-        expect(captureDebugBundleSecurityPolicyViolationSpy).not.toHaveBeenCalled()
 
         consoleErrorSpy.mockRestore()
     })
