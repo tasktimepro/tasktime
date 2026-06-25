@@ -9,10 +9,7 @@
 ## Blog Posts
 
 - Always keep in mind trending words and most likely searched for words for better SEO reachability
-[ ] Create a blog about invoice templates, multiple businesses and payment methods and the advantages that come by having these
-    [ ] Create a blog about setting up an invoice template, with layout options, branding from business settings and so on
-[ ] Create another blog post about auto-converting multiple currences from different clients into your own prefered currency in reports overviews & totals/goals
-[ ] Create a few more blog ideas based on reporting as that has a lot of functionality
+[ ] ...
 
 ---
 

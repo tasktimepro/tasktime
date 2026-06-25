@@ -351,9 +351,13 @@ worker-metrics-action-weekly:
 		echo "Usage: make worker-metrics-action-weekly ACTION=<action-name>"; \
 		exit 1; \
 	fi
+	@if ! printf '%s\n' "$(ACTION)" | grep -Eq '^[A-Za-z0-9_]+$$'; then \
+		echo "Error: ACTION must contain only letters, numbers, and underscores"; \
+		exit 1; \
+	fi
 	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
-		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER), 0) > 0 THEN device_hash END) AS weekly_devices, COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER), 0) > 0 THEN dedupe_hash END) AS weekly_people_approx, COALESCE(SUM(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER)), 0) AS weekly_occurrences FROM daily_device_usage WHERE day >= date('now', '-6 day')"
+		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER), 0) > 0 THEN device_hash END) AS weekly_devices, COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER), 0) > 0 THEN dedupe_hash END) AS weekly_people_approx, COALESCE(SUM(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER)), 0) AS weekly_occurrences FROM daily_device_usage WHERE day >= date('now', '-6 day')"
 
 # Monthly totals for a specific action type (usage: make worker-metrics-action-monthly ACTION=timer_start)
 worker-metrics-action-monthly:
@@ -365,6 +369,10 @@ worker-metrics-action-monthly:
 		echo "Usage: make worker-metrics-action-monthly ACTION=<action-name>"; \
 		exit 1; \
 	fi
+	@if ! printf '%s\n' "$(ACTION)" | grep -Eq '^[A-Za-z0-9_]+$$'; then \
+		echo "Error: ACTION must contain only letters, numbers, and underscores"; \
+		exit 1; \
+	fi
 	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
-		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER), 0) > 0 THEN device_hash END) AS monthly_devices, COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER), 0) > 0 THEN dedupe_hash END) AS monthly_people_approx, COALESCE(SUM(CAST(json_extract(action_counts_json, '$.$(ACTION)') AS INTEGER)), 0) AS monthly_occurrences FROM daily_device_usage WHERE day >= date('now', '-29 day')"
+		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER), 0) > 0 THEN device_hash END) AS monthly_devices, COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER), 0) > 0 THEN dedupe_hash END) AS monthly_people_approx, COALESCE(SUM(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER)), 0) AS monthly_occurrences FROM daily_device_usage WHERE day >= date('now', '-29 day')"
