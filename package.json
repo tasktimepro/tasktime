@@ -3,11 +3,16 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "bin": {
+    "tasktime-agent-bridge": "./agent-bridge/dist/tasktime-agent-bridge.mjs"
+  },
   "scripts": {
     "dev": "vite",
     "start": "vite",
     "build": "node ./scripts/build-pages.mjs",
     "build:app": "vite build",
+    "build:agent-bridge": "vite build --config vite.agent-bridge.config.js && node ./scripts/fix-agent-bridge-bin.mjs",
+    "smoke:agent-bridge": "node ./scripts/smoke-agent-bridge.mjs",
     "build:blog": "npm --prefix blog run build",
     "lint": "sh ./scripts/run-eslint.sh",
     "preview": "vite preview",

@@ -2,7 +2,8 @@
 
 ## Priority
 
-
+[ ] docs/todo/local-agent-bridge-proposal.md
+    - Make sure this is full-parity with UI
 
 ---
 

@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { CogIcon, TrashIcon, CloudIcon, SignOutIcon } from '@/components/ui/icons';
+import { BotIcon, CogIcon, TrashIcon, CloudIcon, SignOutIcon } from '@/components/ui/icons';
 import { Database, Mail } from 'lucide-react';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import ExportImport from './ExportImport';
@@ -27,6 +27,7 @@ import { resetOnboardingCompleted } from '../utils/onboardingUtils.ts';
 import { queuePostReloadToast } from '../utils/postReloadToast.ts';
 import YjsSyncSettings from './sync/YjsSyncSettings';
 import AccountFooter from './account/AccountFooter';
+import AgentBridgeSettings from './agent/AgentBridgeSettings';
 
 /**
  * Account component - Main account management page with side navigation
@@ -75,6 +76,12 @@ const Account = ({
             name: 'Cloud Sync',
             icon: CloudIcon,
             description: 'Connect Google Drive sync'
+        },
+        {
+            id: 'agent',
+            name: 'Agent Access',
+            icon: BotIcon,
+            description: 'Manage local agent bridge access'
         },
         {
             id: 'data',
@@ -179,6 +186,8 @@ const Account = ({
                 return <EmailTemplates />;
             case 'sync':
                 return <YjsSyncSettings />;
+            case 'agent':
+                return <AgentBridgeSettings />;
             case 'data':
                 return (
                     <div>

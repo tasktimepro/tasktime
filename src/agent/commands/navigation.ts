@@ -1,0 +1,76 @@
+import type { AgentCommandContext } from '@/agent/types';
+import { AgentCommandError } from '@/agent/types';
+import type { Client, Invoice, Project, MultiTimerState } from '@/stores/yjs/types';
+import { readRequiredEntity, requireString, assertPermission, assertReady } from './shared';
+
+function openRoute(context: AgentCommandContext, path: string): { route: string } {
+    if (!context.navigation) {
+        throw new AgentCommandError('UNAVAILABLE', 'Navigation adapter is not available.');
+    }
+
+    context.navigation.openRoute(path);
+    return { route: path };
+}
+
+export function openProjectViewCommand(context: AgentCommandContext, input: { projectId: string }): { route: string } {
+    assertReady(context);
+    assertPermission(context, 'navigation');
+
+    const projectId = requireString(input.projectId, 'projectId');
+    readRequiredEntity<Project>(context.store.projects as any, projectId, 'Project');
+    return openRoute(context, `/projects/${encodeURIComponent(projectId)}`);
+}
+
+export function openClientViewCommand(context: AgentCommandContext, input: { clientId: string }): { route: string } {
+    assertReady(context);
+    assertPermission(context, 'navigation');
+
+    const clientId = requireString(input.clientId, 'clientId');
+    readRequiredEntity<Client>(context.store.clients as any, clientId, 'Client');
+    return openRoute(context, `/clients/${encodeURIComponent(clientId)}`);
+}
+
+export function openInvoiceViewCommand(context: AgentCommandContext, input: { invoiceId?: string }): { route: string } {
+    assertReady(context);
+    assertPermission(context, 'navigation');
+
+    if (input.invoiceId) {
+        readRequiredEntity<Invoice>(context.store.invoices as any, input.invoiceId, 'Invoice');
+    }
+
+    return openRoute(context, '/invoices');
+}
+
+export function openExpensesViewCommand(context: AgentCommandContext, input: { clientId?: string; projectId?: string } = {}): { route: string } {
+    assertReady(context);
+    assertPermission(context, 'navigation');
+
+    const params = new URLSearchParams();
+
+    if (input.clientId) {
+        readRequiredEntity<Client>(context.store.clients as any, input.clientId, 'Client');
+        params.set('clientId', input.clientId);
+    }
+
+    if (input.projectId) {
+        readRequiredEntity<Project>(context.store.projects as any, input.projectId, 'Project');
+        params.set('projectId', input.projectId);
+    }
+
+    const query = params.toString();
+    return openRoute(context, query ? `/expenses?${query}` : '/expenses');
+}
+
+export function focusRunningTimerCommand(context: AgentCommandContext, input: { timerKey: string }): { route: string; timerKey: string } {
+    assertReady(context);
+    assertPermission(context, 'navigation');
+
+    const timerKey = requireString(input.timerKey, 'timerKey');
+    readRequiredEntity<MultiTimerState>(context.store.timers as any, timerKey, 'Timer');
+    const result = openRoute(context, '/');
+
+    return {
+        ...result,
+        timerKey,
+    };
+}

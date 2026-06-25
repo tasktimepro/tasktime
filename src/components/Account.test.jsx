@@ -172,6 +172,16 @@ describe('Account', () => {
         expect(backupHeading.compareDocumentPosition(deleteButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
+    it('shows agent access as an account section', () => {
+        accountLayoutMocks.activeSection = 'agent';
+
+        renderAccount();
+
+        expect(screen.getByRole('tab', { name: 'Agent Access' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Agent Access' })).toBeInTheDocument();
+        expect(screen.getByText('Local Agent Bridge')).toBeInTheDocument();
+    });
+
     it('redirects the removed backup tab to your data', () => {
         accountLayoutMocks.activeSection = 'backup';
 
