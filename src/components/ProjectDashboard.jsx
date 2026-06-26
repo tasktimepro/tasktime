@@ -19,7 +19,7 @@ import { useInvoices } from '../hooks/useInvoices.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
-import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import { buildProjectDeleteImpactPlan } from '@/domain/deletions/projectDeletion';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import {
     DropdownMenu,
@@ -154,17 +154,25 @@ const ProjectDashboard = ({
     };
 
     const performProjectDeletion = useCallback((projectId, shouldDeleteInvoices = false) => {
-        const projectTasks = tasks.filter(task => task.projectId === projectId && !task.deletedAt);
-        const allTaskIdsToDelete = new Set();
-
-        projectTasks.forEach(task => {
-            const taskIds = getTaskIdsToDelete(task.id, tasks);
-            taskIds.forEach(id => allTaskIdsToDelete.add(id));
+        const timerForProject = getTimerForProject(projectId);
+        const deletePlan = buildProjectDeleteImpactPlan({
+            projectId,
+            includeInvoiceDeletion: shouldDeleteInvoices,
+            projects: [project],
+            activeTasks: tasks.filter(task => !task.deletedAt),
+            archivedTasks: [],
+            timeEntries,
+            timers: timerForProject ? [timerForProject] : [],
+            invoices,
+            expenses,
+            expenseRecurrences: recurrences,
+            plannerAttachments: [],
         });
 
-        const taskIdsArray = Array.from(allTaskIdsToDelete);
+        if (!deletePlan) {
+            return;
+        }
 
-        const timerForProject = getTimerForProject(projectId);
         if (timerForProject) {
             clearTimer(projectId);
         }
@@ -182,28 +190,22 @@ const ProjectDashboard = ({
             projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
         }
 
-        expenses
-            .filter(expense => expense.projectId === projectId)
-            .forEach(expense => deleteExpense(expense.id));
+        deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-        recurrences
-            .filter(recurrence => recurrence.projectId === projectId)
-            .forEach(recurrence => deleteRecurrence(recurrence.id));
+        deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
 
         deleteProject(projectId);
-        taskIdsArray.forEach(taskId => deleteTask(taskId));
+        deletePlan.taskIdsToDelete.forEach(taskId => deleteTask(taskId));
 
-        const timeEntryIdsToDelete = timeEntries
-            .filter(entry => allTaskIdsToDelete.has(entry.taskId))
-            .map(entry => entry.id);
+        const timeEntryIdsToDelete = deletePlan.timeEntryIdsToDelete;
         timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
 
-        const deletedTaskCount = allTaskIdsToDelete.size;
+        const deletedTaskCount = deletePlan.taskIdsToDelete.length;
         const deletedTimeEntriesCount = timeEntryIdsToDelete.length;
         const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
         const invoiceMessage = shouldDeleteInvoices ? ' Associated invoices were also deleted.' : '';
         showSuccess(baseMessage + invoiceMessage);
-    }, [tasks, timeEntries, expenses, recurrences, getTimerForProject, clearTimer, invoices, deleteInvoice, deleteProject, deleteTask, deleteEntry, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showError, showSuccess]);
+    }, [project, tasks, timeEntries, expenses, recurrences, getTimerForProject, clearTimer, invoices, deleteInvoice, deleteProject, deleteTask, deleteEntry, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showError, showSuccess]);
 
     const handleEditProject = () => {
         openProjectModal?.(project);

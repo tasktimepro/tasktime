@@ -7,6 +7,7 @@
 import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
 import type { BusinessInfo } from '@/stores/yjs/types';
+import { planDefaultSelection } from '@/domain/settings/defaultSelection';
 
 export function useBusinessInfos() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<BusinessInfo>(
@@ -22,14 +23,13 @@ export function useBusinessInfos() {
 
     // Set a business info as default
     const setDefault = useCallback((id: string) => {
-        // First, unset any existing default
-        items.forEach(b => {
-            if (b.isDefault && b.id !== id) {
-                update(b.id, { isDefault: false });
-            }
+        let result: BusinessInfo | undefined;
+
+        planDefaultSelection({ items, targetId: id }).forEach((change) => {
+            result = update(change.id, change.updates);
         });
-        // Then set the new default
-        return update(id, { isDefault: true });
+
+        return result;
     }, [items, update]);
 
     return {

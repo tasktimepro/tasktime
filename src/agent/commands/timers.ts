@@ -2,6 +2,7 @@ import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { checkTimeOverlap } from '@/utils/timeValidationUtils';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 import { objectToYMap, updateEntityFields } from '@/stores/yjs/entityUtils';
+import { buildBillableDurationFields } from '@/utils/timeEntryDurationUtils';
 import type { MultiTimerState, Task, TimeEntry } from '@/stores/yjs/types';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
@@ -29,7 +30,32 @@ export interface AddManualTimeEntryCommandInput {
     start: number;
     end: number;
     note?: string;
+    billingIncrementMinutes?: number | null;
     idempotencyKey?: string;
+}
+
+export interface UpdateTimeEntryCommandInput {
+    entryId: string;
+    taskId?: string;
+    start?: number;
+    end?: number;
+    note?: string | null;
+    billingIncrementMinutes?: number | null;
+}
+
+export interface DeleteTimeEntryCommandInput {
+    entryId: string;
+    confirmDelete?: boolean;
+    confirmationText?: string;
+}
+
+export interface DeleteTimeEntryResult {
+    entryId: string;
+    taskId: string;
+    start: number;
+    end: number;
+    durationMs: number;
+    deleted: true;
 }
 
 export interface ActiveTimerResult extends MultiTimerState {
@@ -53,6 +79,54 @@ function resolveTimerKey(context: AgentCommandContext, input: { timerKey?: strin
     }
 
     throw new AgentCommandError('INVALID_INPUT', 'timerKey or taskId is required.');
+}
+
+function isEntryBilled(entry: TimeEntry): boolean {
+    return Boolean(entry.billedAt || entry.billedInvoiceId);
+}
+
+function getTaskOverlapContext(context: AgentCommandContext) {
+    return collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent time entry task overlap')
+        .map((item) => ({
+            id: item.id,
+            projectId: item.projectId || item.id,
+            title: item.title,
+        }));
+}
+
+function assertValidEntryTiming(start: number, end: number, label: string): void {
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+        throw new AgentCommandError('INVALID_INPUT', `${label} start/end are invalid.`);
+    }
+}
+
+function assertEntryAfterBillingCutoff(task: Task, start: number): void {
+    const billingCutoff = task.lastBilledAt || 0;
+
+    if (start < billingCutoff) {
+        throw new AgentCommandError('CONFLICT', 'Cannot place time entries before the latest billed time entry.', { billingCutoff });
+    }
+}
+
+function assertNoTimeOverlap(
+    context: AgentCommandContext,
+    task: Task,
+    start: number,
+    end: number,
+    excludeEntryId?: string | null
+): void {
+    const overlap = checkTimeOverlap(
+        start,
+        end,
+        task.projectId || task.id,
+        context.store.getAllTimeEntries(),
+        getTaskOverlapContext(context),
+        excludeEntryId || null
+    );
+
+    if (!overlap.isValid) {
+        throw new AgentCommandError('CONFLICT', overlap.error || 'Time entry overlaps an existing entry.');
+    }
 }
 
 export function getActiveTimersCommand(context: AgentCommandContext): ActiveTimerResult[] {
@@ -202,27 +276,9 @@ export function addManualTimeEntryCommand(context: AgentCommandContext, input: A
         const taskId = requireString(input.taskId, 'taskId');
         const task = readRequiredEntity<Task>(context.store.tasks as any, taskId, 'Task');
 
-        if (!Number.isFinite(input.start) || !Number.isFinite(input.end) || input.end < input.start) {
-            throw new AgentCommandError('INVALID_INPUT', 'Manual time entry start/end are invalid.');
-        }
-
-        const billingCutoff = task.lastBilledAt || 0;
-        if (input.start < billingCutoff) {
-            throw new AgentCommandError('CONFLICT', 'Cannot add time entries before the latest billed time entry.', { billingCutoff });
-        }
-
-        const allEntries = context.store.getAllTimeEntries();
-        const allTasks = collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent manual entry task overlap')
-            .map((item) => ({
-                id: item.id,
-                projectId: item.projectId || item.id,
-                title: item.title,
-            }));
-        const overlap = checkTimeOverlap(input.start, input.end, task.projectId || task.id, allEntries, allTasks);
-
-        if (!overlap.isValid) {
-            throw new AgentCommandError('CONFLICT', overlap.error || 'Time entry overlaps an existing entry.');
-        }
+        assertValidEntryTiming(input.start, input.end, 'Manual time entry');
+        assertEntryAfterBillingCutoff(task, input.start);
+        assertNoTimeOverlap(context, task, input.start, input.end);
 
         const now = getNow(context);
         const entry = validateCollectionEntity<TimeEntry>('timeEntries', {
@@ -231,6 +287,11 @@ export function addManualTimeEntryCommand(context: AgentCommandContext, input: A
             start: input.start,
             end: input.end,
             note: input.note?.trim() || undefined,
+            ...buildBillableDurationFields({
+                start: input.start,
+                end: input.end,
+                billingIncrementMinutes: input.billingIncrementMinutes,
+            }),
             createdAt: now,
             updatedAt: now,
         }, `agent create manual entry ${taskId}`);
@@ -242,4 +303,103 @@ export function addManualTimeEntryCommand(context: AgentCommandContext, input: A
         markMeaningfulActivity('time_entry_create');
         return entry;
     });
+}
+
+export function updateTimeEntryCommand(context: AgentCommandContext, input: UpdateTimeEntryCommandInput): TimeEntry {
+    assertReady(context);
+    assertPermission(context, 'write');
+
+    const entryId = requireString(input.entryId, 'entryId');
+    const existing = readValidatedEntity<TimeEntry>('timeEntries', context.store.activeTimeEntries.get(entryId), `agent update time entry ${entryId}`);
+
+    if (!existing) {
+        throw new AgentCommandError('NOT_FOUND', 'Active time entry not found. Historical entries cannot be edited by an agent in v1.', { entryId });
+    }
+
+    if (isEntryBilled(existing)) {
+        throw new AgentCommandError('CONFLICT', 'Billed time entries cannot be edited by an agent.', { entryId });
+    }
+
+    const nextTaskId = input.taskId ? requireString(input.taskId, 'taskId') : existing.taskId;
+    const task = readRequiredEntity<Task>(context.store.tasks as any, nextTaskId, 'Task');
+    const start = input.start ?? existing.start;
+    const end = input.end ?? existing.end;
+
+    assertValidEntryTiming(start, end, 'Time entry');
+    assertEntryAfterBillingCutoff(task, start);
+    assertNoTimeOverlap(context, task, start, end, entryId);
+
+    const hasBillingIncrement = Object.prototype.hasOwnProperty.call(input, 'billingIncrementMinutes');
+    const billingIncrementMinutes = hasBillingIncrement
+        ? input.billingIncrementMinutes
+        : existing.billingIncrementMinutes;
+    const durationFields = buildBillableDurationFields({
+        start,
+        end,
+        billingIncrementMinutes,
+    });
+    const updates: Partial<TimeEntry> = {
+        taskId: nextTaskId,
+        start,
+        end,
+        note: typeof input.note === 'string' ? input.note.trim() || undefined : (input.note === null ? undefined : existing.note),
+        billedDurationMs: durationFields.billedDurationMs ?? null,
+        billingIncrementMinutes: durationFields.billingIncrementMinutes ?? null,
+        updatedAt: getNow(context),
+    };
+    const merged = validateCollectionEntity<TimeEntry>('timeEntries', {
+        ...existing,
+        ...updates,
+    }, `agent update time entry ${entryId}`);
+
+    context.store.activeEntriesDoc.transact(() => {
+        const updated = updateEntityFields(context.store.activeTimeEntries as any, entryId, updates as Record<string, unknown>);
+
+        if (!updated) {
+            (context.store.activeTimeEntries as any).set(entryId, objectToYMap(merged as unknown as Record<string, unknown>));
+        }
+    });
+
+    markMeaningfulActivity('time_entry_update');
+    return merged;
+}
+
+export function deleteTimeEntryCommand(context: AgentCommandContext, input: DeleteTimeEntryCommandInput): DeleteTimeEntryResult {
+    assertReady(context);
+    assertPermission(context, 'write');
+
+    const entryId = requireString(input.entryId, 'entryId');
+
+    if (input.confirmDelete !== true) {
+        throw new AgentCommandError('INVALID_INPUT', 'confirmDelete must be true to delete a time entry.', { entryId });
+    }
+
+    if (input.confirmationText !== entryId) {
+        throw new AgentCommandError('INVALID_INPUT', 'confirmationText must match entryId to delete a time entry.', { entryId });
+    }
+
+    const existing = readValidatedEntity<TimeEntry>('timeEntries', context.store.activeTimeEntries.get(entryId), `agent delete time entry ${entryId}`);
+
+    if (!existing) {
+        throw new AgentCommandError('NOT_FOUND', 'Active time entry not found. Historical entries cannot be deleted by an agent in v1.', { entryId });
+    }
+
+    if (isEntryBilled(existing)) {
+        throw new AgentCommandError('CONFLICT', 'Billed time entries cannot be deleted by an agent.', { entryId });
+    }
+
+    context.store.activeEntriesDoc.transact(() => {
+        context.store.activeTimeEntries.delete(entryId);
+    });
+
+    markMeaningfulActivity('time_entry_delete');
+
+    return {
+        entryId,
+        taskId: existing.taskId,
+        start: existing.start,
+        end: existing.end,
+        durationMs: Math.max(0, existing.end - existing.start),
+        deleted: true,
+    };
 }

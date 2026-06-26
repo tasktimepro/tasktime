@@ -21,6 +21,13 @@ export function openProjectViewCommand(context: AgentCommandContext, input: { pr
     return openRoute(context, `/projects/${encodeURIComponent(projectId)}`);
 }
 
+export function openDashboardViewCommand(context: AgentCommandContext): { route: string } {
+    assertReady(context);
+    assertPermission(context, 'navigation');
+
+    return openRoute(context, '/');
+}
+
 export function openClientViewCommand(context: AgentCommandContext, input: { clientId: string }): { route: string } {
     assertReady(context);
     assertPermission(context, 'navigation');
@@ -59,6 +66,13 @@ export function openExpensesViewCommand(context: AgentCommandContext, input: { c
 
     const query = params.toString();
     return openRoute(context, query ? `/expenses?${query}` : '/expenses');
+}
+
+export function openReportsViewCommand(context: AgentCommandContext): { route: string } {
+    assertReady(context);
+    assertPermission(context, 'navigation');
+
+    return openRoute(context, '/reports');
 }
 
 export function focusRunningTimerCommand(context: AgentCommandContext, input: { timerKey: string }): { route: string; timerKey: string } {

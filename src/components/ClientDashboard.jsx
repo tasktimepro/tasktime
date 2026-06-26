@@ -22,6 +22,7 @@ import { usePreferences } from '../hooks/usePreferences.ts';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import { getProjectDeadlineStatus, isProjectInQuoteMode } from '../utils/projectPlanningUtils.ts';
 import { getProjectInvoicePreview } from '../utils/invoicePreviewUtils.ts';
+import { buildClientDeleteImpactPlan } from '@/domain/deletions/clientDeletion';
 import ExpensesSection from './expenses/ExpensesSection';
 import {
     DropdownMenu,
@@ -306,55 +307,59 @@ const ClientDashboard = ({
 
     const performClientDeletion = useCallback((clientId, alsoDeleteProjects) => {
         const related = projects.filter(project => project.preferredClientId === clientId);
+        const deletePlan = buildClientDeleteImpactPlan({
+            clientId,
+            alsoDeleteProjects,
+            includeInvoiceDeletion: alsoDeleteProjects,
+            clients: [client],
+            projects,
+            activeTasks: tasks,
+            archivedTasks: [],
+            timeEntries,
+            timers: [],
+            invoices,
+            expenses,
+            expenseRecurrences: recurrences,
+            plannerAttachments: [],
+        });
+
+        if (!deletePlan) {
+            return;
+        }
 
         if (alsoDeleteProjects) {
-            const relatedProjectIds = related.map(p => p.id);
+            const relatedProjectIds = deletePlan.projectIdsToDelete;
 
             relatedProjectIds.forEach(id => deleteProject(id));
 
-            const relatedTaskIds = tasks
-                .filter(task => relatedProjectIds.includes(task.projectId))
-                .map(t => t.id);
+            const relatedTaskIds = [
+                ...deletePlan.activeTaskIdsToDelete,
+                ...deletePlan.archivedTaskIdsToDelete,
+            ];
             relatedTaskIds.forEach(id => deleteTask(id));
 
-            const relatedTimeEntryIds = timeEntries
-                .filter(entry => relatedTaskIds.includes(entry.taskId))
-                .map(e => e.id);
+            const relatedTimeEntryIds = deletePlan.timeEntryIdsToDelete;
             relatedTimeEntryIds.forEach(id => deleteEntry(id));
 
-            const relatedInvoiceIds = invoices
-                .filter((invoice) => (
-                    invoice.clientId === clientId
-                    || relatedProjectIds.some((projectId) => invoiceBelongsToProject(invoice, projectId))
-                ))
-                .map(i => i.id);
+            const relatedInvoiceIds = deletePlan.invoiceIds;
             relatedInvoiceIds.forEach(id => unbillExpensesForInvoice(id));
             relatedInvoiceIds.forEach(id => deleteInvoice(id));
 
-            expenses
-                .filter(expense => expense.clientId === clientId || relatedProjectIds.includes(expense.projectId))
-                .forEach(expense => deleteExpense(expense.id));
+            deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-            recurrences
-                .filter(recurrence => recurrence.clientId === clientId || relatedProjectIds.includes(recurrence.projectId))
-                .forEach(recurrence => deleteRecurrence(recurrence.id));
+            deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
         } else {
-            projects
-                .filter(project => project.preferredClientId === clientId)
-                .forEach(project => updateProject(project.id, {
+            deletePlan.projectIdsToConvertToPersonal
+                .forEach(projectId => updateProject(projectId, {
                     preferredClientId: null,
                     hourlyRate: null,
                     flatRate: false,
                     isPersonal: true
                 }));
 
-            expenses
-                .filter(expense => expense.clientId === clientId)
-                .forEach(expense => deleteExpense(expense.id));
+            deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-            recurrences
-                .filter(recurrence => recurrence.clientId === clientId)
-                .forEach(recurrence => deleteRecurrence(recurrence.id));
+            deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
         }
 
         deleteClient(clientId);
@@ -363,7 +368,7 @@ const ClientDashboard = ({
             ? `Client and ${related.length} related project(s) deleted successfully.`
             : 'Client deleted successfully.';
         showSuccess(message);
-    }, [projects, tasks, timeEntries, invoices, expenses, recurrences, deleteProject, deleteTask, deleteEntry, deleteInvoice, updateProject, deleteClient, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showSuccess]);
+    }, [client, projects, tasks, timeEntries, invoices, expenses, recurrences, deleteProject, deleteTask, deleteEntry, deleteInvoice, updateProject, deleteClient, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showSuccess]);
 
     const handleEditClient = () => {
         openClientModal?.(client);

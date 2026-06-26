@@ -14,6 +14,7 @@ export type BridgeAuditCommandCategory =
     | 'write'
     | 'billing'
     | 'export'
+    | 'email'
     | 'navigation'
     | 'unknown';
 
@@ -50,13 +51,21 @@ export interface BridgeAuditLogOptions {
 const DEFAULT_MAX_AUDIT_EVENTS = 500;
 
 export function getBridgeAuditCommandCategory(command: string): BridgeAuditCommandCategory {
+    if (
+        command.startsWith('export_')
+        || command === 'create_drive_backup'
+        || command === 'download_drive_backup_json'
+    ) {
+        return 'export';
+    }
+
     if (command.startsWith('open_') || command.startsWith('focus_')) {
         return 'navigation';
     }
 
     if (command.includes('invoice') || command.includes('billed') || command.includes('billing')) {
-        if (command.startsWith('export_')) {
-            return 'export';
+        if (command.includes('email')) {
+            return 'email';
         }
 
         return 'billing';
@@ -71,12 +80,15 @@ export function getBridgeAuditCommandCategory(command: string): BridgeAuditComma
         || command.startsWith('update_')
         || command.startsWith('complete_')
         || command.startsWith('archive_')
+        || command.startsWith('unarchive_')
         || command.startsWith('start_')
         || command.startsWith('pause_')
         || command.startsWith('stop_')
         || command.startsWith('add_')
         || command.startsWith('mark_')
         || command.startsWith('finalize_')
+        || command.startsWith('restore_')
+        || command.startsWith('delete_')
     ) {
         return 'write';
     }

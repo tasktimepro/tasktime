@@ -48,6 +48,15 @@ function flushPromises(): Promise<void> {
     return new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
+function createDeferred<T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    const promise = new Promise<T>((innerResolve) => {
+        resolve = innerResolve;
+    });
+
+    return { promise, resolve };
+}
+
 function createContext(): AgentCommandContext & { tasks: Y.Map<string, unknown> } {
     const coreDoc = new Y.Doc();
     const activeEntriesDoc = new Y.Doc();
@@ -230,6 +239,165 @@ describe('AgentAppSessionWebSocketClient', () => {
             }),
         }));
         expect(readEntity<{ status: string }>(context.store.invoices.get('invoice-approval'))?.status).toBe('paid');
+    });
+
+    it('serializes app-session command execution in the browser client', async () => {
+        const context = createContext();
+        context.store.invoices.set('invoice-serialized', {
+            id: 'invoice-serialized',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-SERIAL',
+            date: '2026-06-25',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+            currency: 'USD',
+        });
+        const approval = createDeferred<boolean>();
+        const starts: unknown[] = [];
+        const client = new AgentAppSessionWebSocketClient({
+            url: 'ws://127.0.0.1:39876/tasktime-agent',
+            context,
+            session: createSession({ scopes: new Set(['read', 'write', 'billing']) }),
+            WebSocketCtor: FakeWebSocket,
+            onCommandStart: (activity) => starts.push(activity),
+            onCommandApprovalRequest: () => approval.promise,
+        });
+
+        client.connect();
+        const socket = FakeWebSocket.instances[0];
+        socket.open();
+        socket.message(JSON.stringify({
+            protocolVersion: 1,
+            requestId: 'request-first',
+            sessionToken: 'session-token',
+            command: 'mark_invoice_paid',
+            input: {
+                invoiceId: 'invoice-serialized',
+                confirmPaid: true,
+            },
+        }));
+        socket.message(JSON.stringify({
+            protocolVersion: 1,
+            requestId: 'request-second',
+            sessionToken: 'session-token',
+            command: 'create_task',
+            input: {
+                title: 'Queued task',
+                projectId: 'project-1',
+            },
+        }));
+        await flushPromises();
+
+        expect(starts).toEqual([{
+            requestId: 'request-first',
+            command: 'mark_invoice_paid',
+        }]);
+        expect(socket.sent).toHaveLength(0);
+
+        approval.resolve(true);
+        await flushPromises();
+        await flushPromises();
+
+        expect(starts).toEqual([
+            {
+                requestId: 'request-first',
+                command: 'mark_invoice_paid',
+            },
+            {
+                requestId: 'request-second',
+                command: 'create_task',
+            },
+        ]);
+        expect(socket.sent).toHaveLength(2);
+        expect(JSON.parse(socket.sent[0])).toEqual(expect.objectContaining({
+            requestId: 'request-first',
+            response: expect.objectContaining({
+                ok: true,
+                command: 'mark_invoice_paid',
+            }),
+        }));
+        expect(JSON.parse(socket.sent[1])).toEqual(expect.objectContaining({
+            requestId: 'request-second',
+            response: expect.objectContaining({
+                ok: true,
+                command: 'create_task',
+            }),
+        }));
+        expect(readEntity<{ title: string }>(context.tasks.get('ws-id-0'))?.title).toBe('Queued task');
+    });
+
+    it('does not run queued writes after the app-session socket closes during approval', async () => {
+        const context = createContext();
+        context.store.invoices.set('invoice-interrupted', {
+            id: 'invoice-interrupted',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-INTERRUPTED',
+            date: '2026-06-25',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+            currency: 'USD',
+        });
+        const approval = createDeferred<boolean>();
+        const starts: unknown[] = [];
+        const client = new AgentAppSessionWebSocketClient({
+            url: 'ws://127.0.0.1:39876/tasktime-agent',
+            context,
+            session: createSession({ scopes: new Set(['read', 'write', 'billing']) }),
+            WebSocketCtor: FakeWebSocket,
+            onCommandStart: (activity) => starts.push(activity),
+            onCommandApprovalRequest: () => approval.promise,
+        });
+
+        client.connect();
+        const socket = FakeWebSocket.instances[0];
+        socket.open();
+        socket.message(JSON.stringify({
+            protocolVersion: 1,
+            requestId: 'request-first',
+            sessionToken: 'session-token',
+            command: 'mark_invoice_paid',
+            input: {
+                invoiceId: 'invoice-interrupted',
+                confirmPaid: true,
+            },
+        }));
+        socket.message(JSON.stringify({
+            protocolVersion: 1,
+            requestId: 'request-second',
+            sessionToken: 'session-token',
+            command: 'create_task',
+            input: {
+                title: 'Should not run',
+                projectId: 'project-1',
+            },
+        }));
+        await flushPromises();
+
+        expect(starts).toEqual([{
+            requestId: 'request-first',
+            command: 'mark_invoice_paid',
+        }]);
+
+        socket.close();
+        approval.resolve(false);
+        await flushPromises();
+        await flushPromises();
+
+        expect(starts).toEqual([{
+            requestId: 'request-first',
+            command: 'mark_invoice_paid',
+        }]);
+        expect(socket.sent).toEqual([]);
+        expect(readEntity<{ title: string }>(context.tasks.get('ws-id-0'))).toBeUndefined();
+        expect(readEntity<{ status: string }>(context.store.invoices.get('invoice-interrupted'))?.status).toBe('sent');
     });
 
     it('accepts an in-band pairing session message before dispatching commands', async () => {

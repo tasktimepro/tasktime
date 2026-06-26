@@ -188,15 +188,72 @@ describe('MCP bridge tool definitions', () => {
         const readTools = listMcpToolDefinitions(new Set(['read']));
         const fullTools = listMcpToolDefinitions(new Set(['read', 'write', 'navigation']));
         const billingTools = listMcpToolDefinitions(new Set(['read', 'write', 'billing', 'navigation']));
+        const exportTools = listMcpToolDefinitions(new Set(['read', 'export']));
+        const accountTools = listMcpToolDefinitions(new Set(['read', 'write', 'export']));
+        const emailTools = listMcpToolDefinitions(new Set(['read', 'write', 'email']));
 
         expect(readTools.map((tool) => tool.name)).toEqual([...readTools.map((tool) => tool.name)].sort());
         expect(readTools.map((tool) => tool.name)).toContain('get_dashboard_summary');
         expect(readTools.map((tool) => tool.name)).toContain('list_invoices');
+        expect(readTools.map((tool) => tool.name)).toContain('list_business_brand_assets');
+        expect(readTools.map((tool) => tool.name)).toContain('list_expense_categories');
+        expect(readTools.map((tool) => tool.name)).toContain('list_expense_recurrences');
+        expect(readTools.map((tool) => tool.name)).toContain('preview_backup_import_json');
+        expect(readTools.map((tool) => tool.name)).toContain('get_sync_status');
+        expect(readTools.map((tool) => tool.name)).toContain('preview_delete_task');
+        expect(readTools.map((tool) => tool.name)).toContain('preview_delete_project');
+        expect(readTools.map((tool) => tool.name)).toContain('preview_delete_client');
         expect(readTools.map((tool) => tool.name)).not.toContain('create_task');
         expect(fullTools.map((tool) => tool.name)).toContain('create_task');
+        expect(fullTools.map((tool) => tool.name)).toContain('cascade_delete_task');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_task');
+        expect(fullTools.map((tool) => tool.name)).toContain('cascade_delete_project');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_project');
+        expect(fullTools.map((tool) => tool.name)).toContain('cascade_delete_client');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_client');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_business_info');
+        expect(fullTools.map((tool) => tool.name)).toContain('create_business_brand_asset');
+        expect(fullTools.map((tool) => tool.name)).toContain('archive_business_brand_asset');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_business_brand_asset');
+        expect(fullTools.map((tool) => tool.name)).toContain('create_expense_category');
+        expect(fullTools.map((tool) => tool.name)).toContain('archive_expense_category');
+        expect(fullTools.map((tool) => tool.name)).toContain('unarchive_expense_category');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_expense_category');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_expense');
+        expect(fullTools.map((tool) => tool.name)).toContain('create_expense_recurrence');
+        expect(fullTools.map((tool) => tool.name)).toContain('pause_expense_recurrence');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_expense_recurrence');
+        expect(fullTools.map((tool) => tool.name)).toContain('open_dashboard_view');
         expect(fullTools.map((tool) => tool.name)).toContain('open_project_view');
+        expect(fullTools.map((tool) => tool.name)).toContain('open_reports_view');
+        expect(fullTools.map((tool) => tool.name)).toContain('unarchive_task');
+        expect(fullTools.map((tool) => tool.name)).toContain('update_time_entry');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_time_entry');
+        expect(fullTools.map((tool) => tool.name)).toContain('mark_tax_return_period_filed');
+        expect(fullTools.map((tool) => tool.name)).toContain('mark_tax_return_period_paid');
+        expect(fullTools.map((tool) => tool.name)).toContain('update_invoice_draft');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_payment_method');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_invoice_template');
+        expect(fullTools.map((tool) => tool.name)).toContain('delete_email_template');
         expect(fullTools.map((tool) => tool.name)).not.toContain('finalize_invoice');
+        expect(fullTools.map((tool) => tool.name)).not.toContain('export_invoice_pdf');
+        expect(fullTools.map((tool) => tool.name)).not.toContain('send_invoice_email');
         expect(billingTools.map((tool) => tool.name)).toContain('finalize_invoice');
+        expect(exportTools.map((tool) => tool.name)).toContain('create_drive_backup');
+        expect(exportTools.map((tool) => tool.name)).toContain('download_drive_backup_json');
+        expect(exportTools.map((tool) => tool.name)).toContain('export_accountant_pack');
+        expect(exportTools.map((tool) => tool.name)).toContain('export_backup_json');
+        expect(exportTools.map((tool) => tool.name)).toContain('export_invoice_pdf');
+        expect(exportTools.map((tool) => tool.name)).toContain('export_report_csv');
+        expect(exportTools.map((tool) => tool.name)).toContain('export_report_pdf');
+        expect(exportTools.map((tool) => tool.name)).toContain('list_drive_backups');
+        expect(exportTools.map((tool) => tool.name)).not.toContain('restore_backup_json');
+        expect(exportTools.map((tool) => tool.name)).not.toContain('restore_drive_backup');
+        expect(accountTools.map((tool) => tool.name)).toContain('restore_backup_json');
+        expect(accountTools.map((tool) => tool.name)).toContain('restore_drive_backup');
+        expect(accountTools.map((tool) => tool.name)).toContain('update_sync_settings');
+        expect(accountTools.map((tool) => tool.name)).toContain('delete_all_account_data');
+        expect(emailTools.map((tool) => tool.name)).toContain('send_invoice_email');
     });
 });
 
@@ -308,6 +365,98 @@ describe('McpBridgeJsonRpcServer', () => {
                 isError: false,
             },
         });
+    });
+
+    it('rate-limits MCP tool calls before they reach the app session', async () => {
+        const { bridge, calls } = createBridge();
+        let now = 1000;
+        let nextRequestNumber = 0;
+        const server = new McpBridgeJsonRpcServer({
+            bridge,
+            scopes: ['read'],
+            requestIdFactory: () => `mcp-rate-${nextRequestNumber++}`,
+            toolCallRateLimit: 2,
+            toolCallRateWindowMs: 1000,
+            now: () => now,
+        });
+
+        const callDashboardSummary = (id: string) => server.handleMessage({
+            jsonrpc: '2.0',
+            id,
+            method: 'tools/call',
+            params: {
+                name: 'get_dashboard_summary',
+                arguments: {},
+            },
+        });
+
+        await expect(callDashboardSummary('call-1')).resolves.toEqual(expect.objectContaining({
+            result: expect.objectContaining({
+                isError: false,
+            }),
+        }));
+        await expect(callDashboardSummary('call-2')).resolves.toEqual(expect.objectContaining({
+            result: expect.objectContaining({
+                isError: false,
+            }),
+        }));
+
+        const limited = await callDashboardSummary('call-3');
+
+        expect(calls).toHaveLength(2);
+        expect(limited?.result).toEqual(expect.objectContaining({
+            isError: true,
+            structuredContent: expect.objectContaining({
+                ok: false,
+                error: expect.objectContaining({
+                    code: 'RATE_LIMITED',
+                    details: {
+                        tool: 'get_dashboard_summary',
+                        limit: 2,
+                        windowMs: 1000,
+                        retryAfterMs: 1000,
+                    },
+                }),
+            }),
+        }));
+
+        now = 2000;
+
+        await expect(callDashboardSummary('call-4')).resolves.toEqual(expect.objectContaining({
+            result: expect.objectContaining({
+                isError: false,
+            }),
+        }));
+        expect(calls).toHaveLength(3);
+    });
+
+    it('allows MCP tool-call rate limiting to be disabled explicitly', async () => {
+        const { bridge, calls } = createBridge();
+        const server = new McpBridgeJsonRpcServer({
+            bridge,
+            scopes: ['read'],
+            toolCallRateLimit: 0,
+            toolCallRateWindowMs: 1,
+            now: () => 1000,
+        });
+
+        for (let index = 0; index < 3; index += 1) {
+            await expect(server.handleMessage({
+                jsonrpc: '2.0',
+                id: `disabled-${index}`,
+                method: 'tools/call',
+                params: {
+                    name: 'get_dashboard_summary',
+                    arguments: {},
+                },
+            })).resolves.toEqual(expect.objectContaining({
+                result: expect.objectContaining({
+                    isError: false,
+                }),
+            }));
+        }
+
+        expect(calls).toHaveLength(3);
     });
 
     it('returns structured tool errors for denied scopes and unsupported tools', async () => {

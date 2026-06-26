@@ -7,6 +7,7 @@
 import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
 import type { PaymentMethod } from '@/stores/yjs/types';
+import { planDefaultSelection } from '@/domain/settings/defaultSelection';
 
 export function usePaymentMethods() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<PaymentMethod>(
@@ -22,14 +23,13 @@ export function usePaymentMethods() {
 
     // Set a payment method as default
     const setDefault = useCallback((id: string) => {
-        // First, unset any existing default
-        items.forEach(p => {
-            if (p.isDefault && p.id !== id) {
-                update(p.id, { isDefault: false });
-            }
+        let result: PaymentMethod | undefined;
+
+        planDefaultSelection({ items, targetId: id }).forEach((change) => {
+            result = update(change.id, change.updates);
         });
-        // Then set the new default
-        return update(id, { isDefault: true });
+
+        return result;
     }, [items, update]);
 
     return {

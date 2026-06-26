@@ -110,6 +110,7 @@ export class AgentAppSessionWebSocketClient {
     private reconnectTimer: number | null = null;
     private reconnectAttempts = 0;
     private manualClose = false;
+    private commandQueue: Promise<void> = Promise.resolve();
 
     constructor(options: AgentAppSessionWebSocketClientOptions) {
         this.options = options;
@@ -251,24 +252,55 @@ export class AgentAppSessionWebSocketClient {
         }
 
         const requestMetadata = getAgentAppSessionRequestMetadata(parsed);
-        if (requestMetadata) {
-            this.options.onCommandStart?.(requestMetadata);
+        if (!requestMetadata) {
+            const response = await Promise.race([
+                handleAgentAppSessionRequest(this.options.context, this.session, parsed, {
+                    requestApproval: this.options.onCommandApprovalRequest,
+                }),
+                timeoutAfter(this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
+            ]);
+
+            this.options.onCommandActivity?.({
+                requestId: response.requestId,
+                command: response.response.command,
+                ok: response.response.ok,
+                errorCode: response.response.ok ? undefined : response.response.error.code,
+            });
+
+            socket.send(JSON.stringify(response));
+            return;
         }
 
-        const response = await Promise.race([
-            handleAgentAppSessionRequest(this.options.context, this.session, parsed, {
-                requestApproval: this.options.onCommandApprovalRequest,
-            }),
-            timeoutAfter(this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
-        ]);
+        this.enqueueCommand(socket, parsed, requestMetadata);
+    }
 
-        this.options.onCommandActivity?.({
-            requestId: response.requestId,
-            command: response.response.command,
-            ok: response.response.ok,
-            errorCode: response.response.ok ? undefined : response.response.error.code,
-        });
+    private enqueueCommand(socket: AgentWebSocketLike, parsed: unknown, requestMetadata: AgentAppSessionCommandStart): void {
+        this.commandQueue = this.commandQueue
+            .catch(() => undefined)
+            .then(async () => {
+                if (socket !== this.socket || socket.readyState !== 1 || !this.session) {
+                    return;
+                }
 
-        socket.send(JSON.stringify(response));
+                this.options.onCommandStart?.(requestMetadata);
+
+                const response = await Promise.race([
+                    handleAgentAppSessionRequest(this.options.context, this.session, parsed, {
+                        requestApproval: this.options.onCommandApprovalRequest,
+                    }),
+                    timeoutAfter(this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
+                ]);
+
+                this.options.onCommandActivity?.({
+                    requestId: response.requestId,
+                    command: response.response.command,
+                    ok: response.response.ok,
+                    errorCode: response.response.ok ? undefined : response.response.error.code,
+                });
+
+                if (socket === this.socket && socket.readyState === 1) {
+                    socket.send(JSON.stringify(response));
+                }
+            });
     }
 }

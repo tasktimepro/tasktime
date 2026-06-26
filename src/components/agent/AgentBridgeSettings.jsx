@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Notice } from '@/components/ui/notice';
+import CustomCheckbox from '@/components/CustomCheckbox';
 import { useYjs } from '@/contexts/YjsContext';
+import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { cn } from '@/lib/utils';
 
 const STATUS_LABELS = {
@@ -20,7 +22,7 @@ const STATUS_LABELS = {
 };
 
 const ACTIVITY_HISTORY_LIMIT = 8;
-const APPROVAL_TIMEOUT_MS = 120_000;
+const APPROVAL_TIMEOUT_MS = 110_000;
 
 function formatTime(timestamp) {
     if (!timestamp) {
@@ -87,7 +89,8 @@ function getNoticeVariant(severity) {
 }
 
 export default function AgentBridgeSettings() {
-    const { store, isReady } = useYjs();
+    const { store, isReady, driveSessionId, clearAllData } = useYjs();
+    const { revokeAccess } = useGoogleAuth();
     const idempotencyRef = useRef(new Map());
     const clientRef = useRef(null);
     const pendingApprovalRef = useRef(null);
@@ -102,15 +105,19 @@ export default function AgentBridgeSettings() {
     const [currentActivity, setCurrentActivity] = useState(null);
     const [activityHistory, setActivityHistory] = useState([]);
     const [pendingApproval, setPendingApproval] = useState(null);
+    const [agentAccessEnabled, setAgentAccessEnabled] = useState(true);
 
     const context = useMemo(() => ({
         store,
         isReady,
+        clearAllData,
+        revokeDriveAccess: revokeAccess,
         idempotency: idempotencyRef.current,
         navigation: {
             openRoute: openAppRoute,
         },
-    }), [store, isReady]);
+        driveSessionId,
+    }), [store, isReady, clearAllData, revokeAccess, driveSessionId]);
     const endpointDiagnostics = useMemo(
         () => getAgentBridgeConnectionDiagnostics(endpoint),
         [endpoint]
@@ -130,6 +137,11 @@ export default function AgentBridgeSettings() {
     }, []);
 
     const connect = useCallback(() => {
+        if (!agentAccessEnabled) {
+            setError('Agent access is disabled for this page session.');
+            return;
+        }
+
         let url;
 
         try {
@@ -163,7 +175,12 @@ export default function AgentBridgeSettings() {
                 }
 
                 if (nextStatus === 'error') {
+                    resolvePendingApproval(false);
                     setError('Unable to connect to the local agent bridge. Check that tasktime-agent-bridge is still running, the endpoint and path match the bridge output, the pairing code has not expired or already been used, and your browser/CSP/local-network settings allow this localhost WebSocket.');
+                }
+
+                if (nextStatus === 'closed') {
+                    resolvePendingApproval(false);
                 }
             },
             onSessionChange: (nextSession) => {
@@ -253,7 +270,7 @@ export default function AgentBridgeSettings() {
             setStatus('error');
             setError(connectError instanceof Error ? connectError.message : 'Unable to connect to the bridge.');
         }
-    }, [context, endpoint, pairingCode, pairingId, resolvePendingApproval]);
+    }, [agentAccessEnabled, context, endpoint, pairingCode, pairingId, resolvePendingApproval]);
 
     const disconnect = useCallback(() => {
         resolvePendingApproval(false);
@@ -273,14 +290,29 @@ export default function AgentBridgeSettings() {
         setStatus('closed');
     }, [resolvePendingApproval]);
 
+    const setAgentAccessState = useCallback((enabled) => {
+        setAgentAccessEnabled(enabled);
+
+        if (!enabled) {
+            resolvePendingApproval(false);
+            clientRef.current?.revoke();
+            clientRef.current = null;
+            setSession(null);
+            setCurrentActivity(null);
+            setLastActivity(null);
+            setStatus('closed');
+            setError('');
+        }
+    }, [resolvePendingApproval]);
+
     useEffect(() => () => {
         resolvePendingApproval(false);
         clientRef.current?.close();
         clientRef.current = null;
     }, [resolvePendingApproval]);
 
-    const statusLabel = currentActivity ? 'Acting' : session ? 'Paired' : STATUS_LABELS[status] || status;
-    const canConnect = Boolean(endpoint.trim() && pairingId.trim() && pairingCode.trim() && status !== 'connecting' && status !== 'open');
+    const statusLabel = !agentAccessEnabled ? 'Disabled' : currentActivity ? 'Acting' : session ? 'Paired' : STATUS_LABELS[status] || status;
+    const canConnect = Boolean(agentAccessEnabled && endpoint.trim() && pairingId.trim() && pairingCode.trim() && status !== 'connecting' && status !== 'open');
     const scopes = session ? Array.from(session.scopes) : [];
     const expiresAt = session ? new Date(session.expiresAt).toLocaleString() : 'None';
 
@@ -309,6 +341,25 @@ export default function AgentBridgeSettings() {
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-5">
+                        <div className="rounded-md border border-border bg-muted/30 p-3">
+                            <CustomCheckbox
+                                id="agent-access-enabled"
+                                checked={agentAccessEnabled}
+                                onChange={setAgentAccessState}
+                                label="Enable local agent access"
+                                labelClassName="text-sm font-medium text-foreground"
+                            />
+                        </div>
+
+                        {!agentAccessEnabled && (
+                            <Notice
+                                title="Agent access disabled"
+                                description="Pairing is blocked and any connected local bridge session has been revoked for this page session. Standard TaskTime features are unchanged."
+                                variant="default"
+                                compact
+                            />
+                        )}
+
                         <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                             <div className="space-y-2">
                                 <Label htmlFor="agent-bridge-endpoint">Bridge endpoint</Label>
@@ -319,7 +370,7 @@ export default function AgentBridgeSettings() {
                                     placeholder="ws://127.0.0.1:12345/tasktime-agent"
                                     autoComplete="off"
                                     spellCheck={false}
-                                    disabled={status === 'connecting' || status === 'open'}
+                                    disabled={!agentAccessEnabled || status === 'connecting' || status === 'open'}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -330,7 +381,7 @@ export default function AgentBridgeSettings() {
                                     onChange={(event) => setPairingId(event.target.value)}
                                     autoComplete="off"
                                     spellCheck={false}
-                                    disabled={status === 'connecting' || status === 'open'}
+                                    disabled={!agentAccessEnabled || status === 'connecting' || status === 'open'}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -340,7 +391,7 @@ export default function AgentBridgeSettings() {
                                     value={pairingCode}
                                     onChange={(event) => setPairingCode(event.target.value)}
                                     autoComplete="one-time-code"
-                                    disabled={status === 'connecting' || status === 'open'}
+                                    disabled={!agentAccessEnabled || status === 'connecting' || status === 'open'}
                                 />
                             </div>
                         </div>
@@ -426,9 +477,9 @@ export default function AgentBridgeSettings() {
                         <CardHeader>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <CardTitle>Billing Approval</CardTitle>
+                                    <CardTitle>Agent Approval</CardTitle>
                                     <p className="mt-1 text-sm text-muted-foreground">
-                                        A paired agent is requesting a billing action.
+                                        A paired agent is requesting a sensitive action.
                                     </p>
                                 </div>
                                 <Badge variant="warning">Waiting</Badge>

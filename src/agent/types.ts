@@ -5,6 +5,8 @@ export type AgentPermissionScope =
     | 'read'
     | 'write'
     | 'billing'
+    | 'export'
+    | 'email'
     | 'navigation';
 
 export type AgentCommandErrorCode =
@@ -13,6 +15,7 @@ export type AgentCommandErrorCode =
     | 'INVALID_INPUT'
     | 'CONFLICT'
     | 'PERMISSION_DENIED'
+    | 'RATE_LIMITED'
     | 'UNAVAILABLE';
 
 export class AgentCommandError extends Error {
@@ -35,11 +38,14 @@ export interface AgentNavigationAdapter {
 export interface AgentCommandContext {
     store: YjsStore;
     isReady?: boolean;
+    clearAllData?: () => Promise<void>;
+    revokeDriveAccess?: () => Promise<void>;
     now?: () => number;
     generateId?: () => string;
     navigation?: AgentNavigationAdapter;
     permissions?: Set<AgentPermissionScope>;
     idempotency?: Map<string, unknown>;
+    driveSessionId?: string | null;
 }
 
 export interface AgentCommandResult<T> {

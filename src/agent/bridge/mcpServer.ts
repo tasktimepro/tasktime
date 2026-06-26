@@ -5,6 +5,8 @@ import { getMcpToolDefinition, listMcpToolDefinitions } from './mcpTools';
 
 const MCP_PROTOCOL_VERSION = '2025-11-25';
 const JSON_RPC_VERSION = '2.0';
+const DEFAULT_TOOL_CALL_RATE_LIMIT = 120;
+const DEFAULT_TOOL_CALL_RATE_WINDOW_MS = 60_000;
 
 export interface McpBridgeCommandSender {
     sendCommand: (
@@ -20,6 +22,9 @@ export interface McpBridgeServerOptions {
     scopes: Iterable<AgentPermissionScope>;
     requestIdFactory?: () => string;
     commandTimeoutMs?: number;
+    toolCallRateLimit?: number;
+    toolCallRateWindowMs?: number;
+    now?: () => number;
 }
 
 export interface JsonRpcRequest {
@@ -58,6 +63,11 @@ export class McpBridgeJsonRpcServer {
     private readonly scopes: Set<AgentPermissionScope>;
     private readonly commandTimeoutMs?: number;
     private readonly requestIdFactory: () => string;
+    private readonly toolCallRateLimit: number;
+    private readonly toolCallRateWindowMs: number;
+    private readonly now: () => number;
+    private toolCallWindowStartedAt: number;
+    private toolCallCount = 0;
     private nextRequestId = 0;
 
     constructor(options: McpBridgeServerOptions) {
@@ -65,6 +75,19 @@ export class McpBridgeJsonRpcServer {
         this.scopes = new Set(options.scopes);
         this.commandTimeoutMs = options.commandTimeoutMs;
         this.requestIdFactory = options.requestIdFactory ?? (() => `mcp-request-${this.nextRequestId++}`);
+        this.toolCallRateLimit = options.toolCallRateLimit ?? DEFAULT_TOOL_CALL_RATE_LIMIT;
+        this.toolCallRateWindowMs = options.toolCallRateWindowMs ?? DEFAULT_TOOL_CALL_RATE_WINDOW_MS;
+        this.now = options.now ?? (() => Date.now());
+
+        if (!Number.isInteger(this.toolCallRateLimit) || this.toolCallRateLimit < 0) {
+            throw new Error('toolCallRateLimit must be a non-negative integer.');
+        }
+
+        if (!Number.isInteger(this.toolCallRateWindowMs) || this.toolCallRateWindowMs <= 0) {
+            throw new Error('toolCallRateWindowMs must be a positive integer.');
+        }
+
+        this.toolCallWindowStartedAt = this.now();
     }
 
     async handleMessage(message: unknown): Promise<JsonRpcResponse | null> {
@@ -130,6 +153,12 @@ export class McpBridgeJsonRpcServer {
             });
         }
 
+        const rateLimitError = this.consumeToolCallBudget(tool.name);
+
+        if (rateLimitError) {
+            return rateLimitError;
+        }
+
         let response: AgentAppSessionResponse;
 
         try {
@@ -157,6 +186,33 @@ export class McpBridgeJsonRpcServer {
             structuredContent: response.response,
             isError: !response.response.ok,
         };
+    }
+
+    private consumeToolCallBudget(toolName: string): unknown | null {
+        if (this.toolCallRateLimit <= 0) {
+            return null;
+        }
+
+        const currentTime = this.now();
+
+        if (currentTime - this.toolCallWindowStartedAt >= this.toolCallRateWindowMs) {
+            this.toolCallWindowStartedAt = currentTime;
+            this.toolCallCount = 0;
+        }
+
+        if (this.toolCallCount >= this.toolCallRateLimit) {
+            const retryAfterMs = Math.max(0, this.toolCallRateWindowMs - (currentTime - this.toolCallWindowStartedAt));
+
+            return createToolError('RATE_LIMITED', 'TaskTime MCP tool call rate limit exceeded.', {
+                tool: toolName,
+                limit: this.toolCallRateLimit,
+                windowMs: this.toolCallRateWindowMs,
+                retryAfterMs,
+            });
+        }
+
+        this.toolCallCount += 1;
+        return null;
     }
 
     private result(id: string | number | null, result: unknown): JsonRpcResponse {

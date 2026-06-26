@@ -24,6 +24,8 @@ describe('TaskTime agent bridge CLI', () => {
             pairingTtlMs: 300000,
             sessionTtlMs: undefined,
             commandTimeoutMs: 120000,
+            toolCallRateLimit: 120,
+            toolCallRateWindowMs: 60000,
             help: false,
         });
 
@@ -42,23 +44,39 @@ describe('TaskTime agent bridge CLI', () => {
             'http://localhost:3101',
             '--origin',
             'https://app.tasktime.pro',
+            '--tool-rate-limit',
+            '30',
+            '--tool-rate-window-ms',
+            '10000',
         ], {})).toEqual(expect.objectContaining({
             host: '::1',
             port: 3799,
             path: '/agent',
             scopes: ['read', 'billing'],
             allowedOrigins: ['http://localhost:3101', 'https://app.tasktime.pro'],
+            toolCallRateLimit: 30,
+            toolCallRateWindowMs: 10000,
+        }));
+
+        expect(parseTaskTimeAgentBridgeCliOptions([], {
+            TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT: '0',
+            TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS: '1500',
+        })).toEqual(expect.objectContaining({
+            toolCallRateLimit: 0,
+            toolCallRateWindowMs: 1500,
         }));
     });
 
     it('fails fast for unsupported CLI options and scopes', () => {
         expect(() => parseTaskTimeAgentBridgeCliOptions(['--scope', 'admin'], {})).toThrow(/scope must be one of/);
         expect(() => parseTaskTimeAgentBridgeCliOptions(['--port', '-1'], {})).toThrow(/non-negative integer/);
+        expect(() => parseTaskTimeAgentBridgeCliOptions(['--tool-rate-window-ms', '0'], {})).toThrow(/positive integer/);
         expect(() => parseTaskTimeAgentBridgeCliOptions(['--missing'], {})).toThrow(/Unsupported option/);
     });
 
     it('formats help and pairing text without session tokens', () => {
         expect(getTaskTimeAgentBridgeCliUsage()).toContain('MCP JSON-RPC messages are read from stdin');
+        expect(getTaskTimeAgentBridgeCliUsage()).toContain('--tool-rate-limit <count>');
 
         const text = formatPairingInstructions({
             id: 'pairing-1',
@@ -90,6 +108,8 @@ describe('TaskTime agent bridge CLI', () => {
             allowedOrigins: ['http://localhost:3101'],
             pairingTtlMs: 300000,
             commandTimeoutMs: 1000,
+            toolCallRateLimit: 120,
+            toolCallRateWindowMs: 60000,
             help: false,
         }, {
             stdin,

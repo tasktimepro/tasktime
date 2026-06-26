@@ -7,6 +7,7 @@
 import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
 import type { InvoiceTemplate } from '@/stores/yjs/types';
+import { planDefaultSelection } from '@/domain/settings/defaultSelection';
 
 export function useInvoiceTemplates() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<InvoiceTemplate>(
@@ -42,14 +43,13 @@ export function useInvoiceTemplates() {
 
     // Set a template as default
     const setDefault = useCallback((id: string) => {
-        // First, unset any existing default
-        items.forEach(t => {
-            if (t.isDefault && t.id !== id) {
-                update(t.id, { isDefault: false });
-            }
+        let result: InvoiceTemplate | undefined;
+
+        planDefaultSelection({ items, targetId: id }).forEach((change) => {
+            result = update(change.id, change.updates);
         });
-        // Then set the new default
-        return update(id, { isDefault: true });
+
+        return result;
     }, [items, update]);
 
     return {

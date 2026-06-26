@@ -51,7 +51,7 @@ import {
     setOnboardingCompleted,
     setOnboardingPending,
 } from './utils/onboardingUtils.ts';
-import { getTaskIdsToDelete } from './utils/taskUtils.ts';
+import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import { setUsageMetricsSessionId, startUsageMetrics } from './utils/usageMetrics.ts';
 import { buildTodoNotificationSchedules, getTodoNotificationReplaceHorizonUntil } from './utils/todoNotificationSchedule.ts';
 import { getCurrentPushSubscription, getPushSupportState, uploadPushSchedules } from './utils/pushNotificationClient.ts';
@@ -63,6 +63,20 @@ import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { APP_VERSION, TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
+
+const getActiveTaskDeletePlanIds = (taskId, activeTasks) => {
+    const plan = buildTaskDeleteImpactPlan({
+        taskId,
+        activeTasks,
+        archivedTasks: [],
+        timeEntries: [],
+        timers: [],
+        invoices: [],
+        plannerAttachments: [],
+    });
+
+    return plan?.taskIdsToDelete || [taskId];
+};
 
 const Reports = lazy(() => import('./components/Reports'));
 
@@ -736,7 +750,7 @@ function AppContent() {
 
         const taskIdsToDelete = task.parentTaskId
             ? [task.id]
-            : getTaskIdsToDelete(task.id, activeTasks);
+            : getActiveTaskDeletePlanIds(task.id, activeTasks);
 
         const entriesToDelete = timeEntries.filter(entry => taskIdsToDelete.includes(entry.taskId));
         entriesToDelete.forEach(entry => deleteEntry(entry.id));

@@ -14,6 +14,12 @@ import { objectToYMap, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import { createExpensePaymentCurrencySnapshot, getExpensePaymentCurrencySnapshot } from '@/utils/expenseUtils';
+import {
+    buildExpenseTaxClaimedUpdates,
+    buildExpenseTaxUnclaimedUpdates,
+    buildMarkExpensePaidUpdates,
+    buildMarkExpenseUnpaidUpdates,
+} from '@/domain/expenses/expenseUpdates';
 
 export interface UseExpensesOptions {
     clientId?: string;
@@ -384,21 +390,20 @@ export function useExpenses(options: UseExpensesOptions = {}) {
             paymentStatus: 'paid' as const,
         };
 
-        return updateExpense(id, {
+        return updateExpense(id, buildMarkExpensePaidUpdates({
             amount,
             paidOn,
             paidBy,
-            paymentStatus: 'paid',
             paymentCurrencySnapshot: createExpensePaymentCurrencySnapshot({
                 expense: paidExpense,
                 preferredCurrency,
                 exchangeRates: rates,
             }) ?? undefined,
-        });
+        }));
     }, [getExpense, getPreferredCurrency, updateExpense]);
 
     const markAsUnpaid = useCallback((id: string) => {
-        return updateExpense(id, { paidOn: null, paidBy: null, paymentStatus: 'unpaid', paymentCurrencySnapshot: undefined });
+        return updateExpense(id, buildMarkExpenseUnpaidUpdates());
     }, [updateExpense]);
 
     const markAsBilled = useCallback((id: string, invoiceId: string) => {
@@ -414,19 +419,14 @@ export function useExpenses(options: UseExpensesOptions = {}) {
     }, [updateExpense]);
 
     const markAsClaimed = useCallback((id: string, taxClaimPeriodId: string) => {
-        return updateExpense(id, {
-            taxClaimStatus: 'claimed',
+        return updateExpense(id, buildExpenseTaxClaimedUpdates({
             taxClaimPeriodId,
-            taxClaimedAt: Date.now(),
-        });
+            claimedAt: Date.now(),
+        }));
     }, [updateExpense]);
 
     const markAsUnclaimed = useCallback((id: string) => {
-        return updateExpense(id, {
-            taxClaimStatus: 'unclaimed',
-            taxClaimPeriodId: null,
-            taxClaimedAt: null,
-        });
+        return updateExpense(id, buildExpenseTaxUnclaimedUpdates());
     }, [updateExpense]);
 
     const markManyAsClaimed = useCallback((ids: string[], taxClaimPeriodId: string) => {

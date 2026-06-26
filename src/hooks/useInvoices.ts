@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
-import type { Invoice, Task, TimeEntry } from '@/stores/yjs/types';
+import type { Expense, Invoice, InvoiceTemplate, Task, TimeEntry } from '@/stores/yjs/types';
 import { collectEntities, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import {
@@ -17,42 +17,23 @@ import {
     invoiceBelongsToProject,
     getInvoiceUndoBlockReason as getInvoiceUndoBlockReasonForCollection,
     getInvoiceStatus,
-    getInvoiceStatusAfterMarkingUnpaid,
     getInvoiceTotal,
     isInvoicePaid,
     resolveCurrentInvoiceTemplate,
 } from '@/utils/invoiceUtils';
+import { buildMarkInvoicePaidUpdates, buildMarkInvoiceUnpaidUpdates } from '@/domain/invoices/invoicePayment';
+import { planInvoiceUndo } from '@/domain/invoices/invoiceUndo';
+import {
+    buildClearedBilledTimeEntryUpdates,
+    buildInvoiceTemplateSequenceRollbackUpdates,
+    buildProjectInvoiceUnlinkUpdates,
+    buildReleasedQuotedTaskUpdates,
+    buildRestoredTaskBillingCutoffUpdates,
+    buildUnbilledExpenseUpdates,
+} from '@/domain/invoices/invoiceUndoApplication';
 
 const shouldStoreInvoicePaymentSnapshot = (invoice: Partial<Invoice>, preferredCurrency: string) => {
     return normalizeCurrencyCode(invoice.currency || preferredCurrency) !== preferredCurrency;
-};
-
-const isPositiveFiniteNumber = (value: unknown): value is number => (
-    typeof value === 'number' && Number.isFinite(value) && value > 0
-);
-
-const getInvoiceBillingSnapshotCutoffs = (invoice: Invoice | null | undefined): Record<string, unknown> => {
-    const snapshot = (invoice as any)?.billingStateSnapshot?.taskLastBilledAt;
-
-    return snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)
-        ? snapshot
-        : {};
-};
-
-const getSnapshotCutoff = (snapshotCutoffs: Record<string, unknown>, taskId: string): number | null | undefined => {
-    if (!Object.prototype.hasOwnProperty.call(snapshotCutoffs, taskId)) {
-        return undefined;
-    }
-
-    const value = snapshotCutoffs[taskId];
-
-    if (value === null || value === undefined) {
-        return null;
-    }
-
-    return isPositiveFiniteNumber(value)
-        ? value
-        : null;
 };
 
 export interface UseInvoicesOptions {
@@ -233,11 +214,10 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         const preferredCurrency = getPreferredCurrency();
         const paymentCurrencySnapshot = await resolveInvoicePaymentSnapshot(invoice, preferredCurrency, paidAt, options);
 
-        return update(id, {
-            status: 'paid',
+        return update(id, buildMarkInvoicePaidUpdates({
             paidAt,
             paymentCurrencySnapshot,
-        });
+        }));
     }, [get, getPreferredCurrency, resolveInvoicePaymentSnapshot, update]);
 
     const updatePaymentDetails = useCallback(async (id: string, options: UpdateInvoicePaymentDetailsOptions = {}) => {
@@ -254,11 +234,10 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         const preferredCurrency = getPreferredCurrency();
         const paymentCurrencySnapshot = await resolveInvoicePaymentSnapshot(invoice, preferredCurrency, paidAt, options);
 
-        return update(id, {
-            status: 'paid',
+        return update(id, buildMarkInvoicePaidUpdates({
             paidAt,
             paymentCurrencySnapshot,
-        });
+        }));
     }, [get, getPreferredCurrency, resolveInvoicePaymentSnapshot, update]);
 
     const markAsUnpaid = useCallback((id: string) => {
@@ -267,11 +246,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             return undefined;
         }
 
-        return update(id, {
-            status: getInvoiceStatusAfterMarkingUnpaid(invoice),
-            paidAt: null,
-            paymentCurrencySnapshot: undefined,
-        });
+        return update(id, buildMarkInvoiceUnpaidUpdates({ invoice }));
     }, [get, update]);
 
     const releaseQuotedAmountsForInvoice = useCallback((invoiceId: string) => {
@@ -287,15 +262,14 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
                     return;
                 }
 
-                const restoredQuoteAmount = isPositiveFiniteNumber(task.estimatedFlatAmount)
-                    ? task.estimatedFlatAmount
-                    : task.quotedAmountBilling.total;
-
-                updateEntityFields(taskMap as any, taskId, {
-                    estimatedFlatAmount: restoredQuoteAmount,
-                    quotedAmountBilling: null,
+                const updates = buildReleasedQuotedTaskUpdates({
+                    task,
                     updatedAt: Date.now(),
                 });
+
+                if (updates) {
+                    updateEntityFields(taskMap as any, taskId, updates);
+                }
             });
         };
 
@@ -360,15 +334,15 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
 
         const undoTimestamp = Date.now();
         const loadedEntries = store.getAllTimeEntries();
-        const billedEntries = loadedEntries.filter((entry) => entry?.billedInvoiceId === id);
-        const touchedTaskIds = new Set<string>();
-        const invoiceBilledEntryStartByTaskId = new Map<string, number>();
-        const snapshotCutoffs = getInvoiceBillingSnapshotCutoffs(invoice);
-
-        Object.keys(snapshotCutoffs).forEach((taskId) => {
-            touchedTaskIds.add(taskId);
+        const taskMaps = [store.tasks, store.archivedTasks].filter(Boolean);
+        const allExpenseMaps = [store.expenses, store.archivedExpenses].filter(Boolean);
+        const undoPlan = planInvoiceUndo({
+            invoice: invoice as Invoice,
+            invoiceId: id,
+            entries: loadedEntries,
+            tasks: taskMaps.flatMap((taskMap) => collectEntities<Task>(taskMap as any)),
+            expenses: allExpenseMaps.flatMap((expenseMap) => collectEntities<Expense>(expenseMap as any)),
         });
-
         const entriesByMap = new Map<any, { toDelete: TimeEntry[]; toClear: TimeEntry[] }>();
         const queueEntryMutation = (entryMap: any, action: 'delete' | 'clear', entry: TimeEntry) => {
             if (!entryMap) {
@@ -386,52 +360,20 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             entriesByMap.set(entryMap, existing);
         };
 
-        billedEntries.forEach((entry) => {
-            if (entry?.taskId) {
-                touchedTaskIds.add(entry.taskId);
-            }
-
-            if (
-                entry?.taskId
-                && entry.source !== 'invoice-adjustment'
-                && typeof entry.start === 'number'
-            ) {
-                const existingStart = invoiceBilledEntryStartByTaskId.get(entry.taskId);
-
-                if (existingStart === undefined || entry.start < existingStart) {
-                    invoiceBilledEntryStartByTaskId.set(entry.taskId, entry.start);
-                }
-            }
-
+        undoPlan.entriesToDelete.forEach((entry) => {
             const entryMap = store.activeTimeEntries.has(entry.id)
                 ? store.activeTimeEntries
                 : yearEntryMaps.get(new Date(entry.start).getFullYear());
 
-            if (entry.source === 'invoice-adjustment') {
-                queueEntryMutation(entryMap, 'delete', entry);
-                return;
-            }
+            queueEntryMutation(entryMap, 'delete', entry);
+        });
+
+        undoPlan.entriesToClear.forEach((entry) => {
+            const entryMap = store.activeTimeEntries.has(entry.id)
+                ? store.activeTimeEntries
+                : yearEntryMaps.get(new Date(entry.start).getFullYear());
 
             queueEntryMutation(entryMap, 'clear', entry);
-        });
-
-        const quotedTaskMaps = [store.tasks, store.archivedTasks].filter(Boolean);
-        quotedTaskMaps.forEach((taskMap) => {
-            (taskMap as any).forEach((value: unknown, taskId: string) => {
-                const task = readEntity<Task>(value);
-
-                if (!task || task.quotedAmountBilling?.invoiceId !== id) {
-                    return;
-                }
-
-                touchedTaskIds.add(taskId);
-            });
-        });
-
-        (Array.isArray((invoice as any)?.tasks) ? (invoice as any).tasks : []).forEach((task: any) => {
-            if (task?.id) {
-                touchedTaskIds.add(task.id);
-            }
         });
 
         entriesByMap.forEach((mutation, entryMap) => {
@@ -443,12 +385,9 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
                 });
 
                 mutation.toClear.forEach((entry) => {
-                    updateEntityFields(entryMap as any, entry.id, {
-                        billedAt: null,
-                        billedHourlyRate: null,
-                        billedInvoiceId: null,
+                    updateEntityFields(entryMap as any, entry.id, buildClearedBilledTimeEntryUpdates({
                         updatedAt: undoTimestamp,
-                    });
+                    }));
                 });
             };
 
@@ -460,7 +399,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             applyChanges();
         });
 
-        const allExpenseMaps = [store.expenses, store.archivedExpenses].filter(Boolean);
+        const expenseIdsToUnbill = new Set(undoPlan.expenseIdsToUnbill);
         let unbilledExpenseCount = 0;
 
         allExpenseMaps.forEach((expenseMap) => {
@@ -470,16 +409,13 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
                 (expenseMap as any).forEach((value: unknown, expenseId: string) => {
                     const expense = readEntity<any>(value);
 
-                    if (!expense || expense.invoiceId !== id) {
+                    if (!expense || !expenseIdsToUnbill.has(expenseId)) {
                         return;
                     }
 
-                    updateEntityFields(expenseMap as any, expenseId, {
-                        billingStatus: 'unbilled',
-                        invoiceId: null,
-                        billedAt: null,
+                    updateEntityFields(expenseMap as any, expenseId, buildUnbilledExpenseUpdates({
                         updatedAt: undoTimestamp,
-                    });
+                    }));
                     unbilledExpenseCount += 1;
                 });
             };
@@ -494,52 +430,19 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
 
         releaseQuotedAmountsForInvoice(id);
 
-        const allEntriesAfterUndo = store.getAllTimeEntries();
-        const taskMaps = [store.tasks, store.archivedTasks].filter(Boolean);
-
         taskMaps.forEach((taskMap) => {
             const parentDoc = (taskMap as any)?.doc;
 
             const applyChanges = () => {
-                touchedTaskIds.forEach((taskId) => {
+                undoPlan.taskLastBilledAtRestorations.forEach((restoredCutoff, taskId) => {
                     if (!(taskMap as any).has(taskId)) {
                         return;
                     }
 
-                    const nextBillingCutoff = allEntriesAfterUndo.reduce((latestEnd, entry) => {
-                        if (entry.taskId !== taskId) {
-                            return latestEnd;
-                        }
-
-                        const hasBillingMarker = Boolean(entry.billedInvoiceId)
-                            || typeof entry.billedAt === 'number'
-                            || typeof entry.billedHourlyRate === 'number';
-
-                        if (!hasBillingMarker || typeof entry.end !== 'number' || entry.end <= latestEnd) {
-                            return latestEnd;
-                        }
-
-                        return entry.end;
-                    }, 0);
-
-                    const snapshotCutoff = getSnapshotCutoff(snapshotCutoffs, taskId);
-                    let restoredCutoff: number | null | undefined;
-
-                    if (snapshotCutoff !== undefined) {
-                        restoredCutoff = Math.max(snapshotCutoff || 0, nextBillingCutoff) || null;
-                    } else if (invoiceBilledEntryStartByTaskId.has(taskId)) {
-                        const inferredPreviousCutoff = Math.max(0, (invoiceBilledEntryStartByTaskId.get(taskId) || 0) - 1);
-                        restoredCutoff = Math.max(nextBillingCutoff, inferredPreviousCutoff) || null;
-                    }
-
-                    if (restoredCutoff === undefined) {
-                        return;
-                    }
-
-                    updateEntityFields(taskMap as any, taskId, {
-                        lastBilledAt: restoredCutoff,
+                    updateEntityFields(taskMap as any, taskId, buildRestoredTaskBillingCutoffUpdates({
+                        restoredCutoff,
                         updatedAt: undoTimestamp,
-                    });
+                    }));
                 });
             };
 
@@ -557,24 +460,26 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         store.coreDoc.transact(() => {
             store.projects.forEach((value: unknown, projectId: string) => {
                 const project = readEntity<any>(value);
-                const invoiceIds = Array.isArray(project?.invoiceIds) ? project.invoiceIds : null;
+                const updates = project
+                    ? buildProjectInvoiceUnlinkUpdates({
+                        project,
+                        invoiceId: id,
+                        updatedAt: undoTimestamp,
+                    })
+                    : null;
 
-                if (!invoiceIds || !invoiceIds.includes(id)) {
+                if (!updates) {
                     return;
                 }
 
-                const nextInvoiceIds = invoiceIds.filter((invoiceId: string) => invoiceId !== id);
-                updateEntityFields(store.projects as any, projectId, {
-                    invoiceIds: nextInvoiceIds,
-                    updatedAt: undoTimestamp,
-                });
+                updateEntityFields(store.projects as any, projectId, updates);
             });
 
             if (sequenceRollback.canRollback && template?.id) {
-                updateEntityFields(store.invoiceTemplates as any, template.id, {
+                updateEntityFields(store.invoiceTemplates as any, template.id, buildInvoiceTemplateSequenceRollbackUpdates({
                     currentSequentialNumber: sequenceRollback.nextSequentialNumber,
                     updatedAt: undoTimestamp,
-                });
+                }) as Partial<InvoiceTemplate>);
             }
         });
 
@@ -590,8 +495,8 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
 
         return {
             invoiceNumber: invoice?.invoiceNumber || id,
-            clearedTimeEntryCount: billedEntries.filter((entry) => entry.source !== 'invoice-adjustment').length,
-            deletedAdjustmentCount: billedEntries.filter((entry) => entry.source === 'invoice-adjustment').length,
+            clearedTimeEntryCount: undoPlan.clearedTimeEntryCount,
+            deletedAdjustmentCount: undoPlan.deletedAdjustmentCount,
             unbilledExpenseCount,
             rewoundSequence: sequenceRollback.canRollback,
         };

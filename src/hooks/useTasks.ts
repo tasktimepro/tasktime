@@ -9,13 +9,13 @@ import { addDays } from 'date-fns';
 import { useYjs } from '@/contexts/YjsContext';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { useYjsCollection } from './useYjsCollection';
-import type { Task } from '@/stores/yjs/types';
+import type { PlannerAttachment, Task } from '@/stores/yjs/types';
 import { getTodayString, toStorageDate } from '@/utils/dateUtils.ts';
 import { findNextRecurringDueDate, findPreviousRecurringDueDate, isRecurringTaskDueOnDate } from '@/utils/recurringUtils.ts';
 import { isRecurringCompletedOnDate, toggleRecurringCompletionDate } from '@/utils/recurringCompletionUtils.ts';
 import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import { collectEntities, updateEntityFields } from '@/stores/yjs/entityUtils';
-import { getTaskIdsWithDescendants } from '@/utils/taskUtils.ts';
+import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 
 export interface UseTasksOptions {
     /** Filter to a specific project */
@@ -173,7 +173,23 @@ export function useTasks(options: UseTasksOptions = {}) {
         const archivedTasksSnapshot = archivedMap
             ? collectEntities<Task>(archivedMap as any)
             : [];
-        const taskIdsToDelete = getTaskIdsWithDescendants(id, [...activeTasks, ...archivedTasksSnapshot]);
+        const plan = buildTaskDeleteImpactPlan({
+            taskId: id,
+            activeTasks,
+            archivedTasks: archivedTasksSnapshot,
+            timeEntries: [],
+            timers: [],
+            invoices: [],
+            plannerAttachments: store.plannerAttachments
+                ? collectEntities<PlannerAttachment>(store.plannerAttachments as any)
+                : [],
+        });
+
+        if (!plan) {
+            return false;
+        }
+
+        const taskIdsToDelete = plan.taskIdsToDelete;
         let removedAny = false;
 
         taskIdsToDelete.forEach((taskId) => {

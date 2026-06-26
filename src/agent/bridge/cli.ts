@@ -11,7 +11,9 @@ const DEFAULT_PATH = '/tasktime-agent';
 const DEFAULT_SCOPES: AgentPermissionScope[] = ['read', 'write', 'navigation'];
 const DEFAULT_PAIRING_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_COMMAND_TIMEOUT_MS = 120_000;
-const VALID_SCOPES: AgentPermissionScope[] = ['read', 'write', 'billing', 'navigation'];
+const DEFAULT_TOOL_CALL_RATE_LIMIT = 120;
+const DEFAULT_TOOL_CALL_RATE_WINDOW_MS = 60_000;
+const VALID_SCOPES: AgentPermissionScope[] = ['read', 'write', 'billing', 'export', 'email', 'navigation'];
 
 export interface TaskTimeAgentBridgeCliOptions {
     host: string;
@@ -22,6 +24,8 @@ export interface TaskTimeAgentBridgeCliOptions {
     pairingTtlMs: number;
     sessionTtlMs?: number;
     commandTimeoutMs: number;
+    toolCallRateLimit: number;
+    toolCallRateWindowMs: number;
     help: boolean;
 }
 
@@ -52,6 +56,8 @@ export function parseTaskTimeAgentBridgeCliOptions(
         pairingTtlMs: parseIntegerOption(env.TASKTIME_AGENT_BRIDGE_PAIRING_TTL_MS, DEFAULT_PAIRING_TTL_MS, 'TASKTIME_AGENT_BRIDGE_PAIRING_TTL_MS'),
         sessionTtlMs: parseOptionalIntegerOption(env.TASKTIME_AGENT_BRIDGE_SESSION_TTL_MS, 'TASKTIME_AGENT_BRIDGE_SESSION_TTL_MS'),
         commandTimeoutMs: parseIntegerOption(env.TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS, DEFAULT_COMMAND_TIMEOUT_MS, 'TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS'),
+        toolCallRateLimit: parseIntegerOption(env.TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT, DEFAULT_TOOL_CALL_RATE_LIMIT, 'TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT'),
+        toolCallRateWindowMs: parsePositiveIntegerOption(env.TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS, DEFAULT_TOOL_CALL_RATE_WINDOW_MS, 'TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS'),
         help: false,
     };
 
@@ -103,6 +109,14 @@ export function parseTaskTimeAgentBridgeCliOptions(
                 options.commandTimeoutMs = parseIntegerOption(readOptionValue(args, ++index, arg), DEFAULT_COMMAND_TIMEOUT_MS, arg);
                 break;
 
+            case '--tool-rate-limit':
+                options.toolCallRateLimit = parseIntegerOption(readOptionValue(args, ++index, arg), DEFAULT_TOOL_CALL_RATE_LIMIT, arg);
+                break;
+
+            case '--tool-rate-window-ms':
+                options.toolCallRateWindowMs = parsePositiveIntegerOption(readOptionValue(args, ++index, arg), DEFAULT_TOOL_CALL_RATE_WINDOW_MS, arg);
+                break;
+
             default:
                 throw new Error(`Unsupported option: ${arg}`);
         }
@@ -139,6 +153,8 @@ export function getTaskTimeAgentBridgeCliUsage(): string {
         '  --pairing-ttl-ms <ms>         Pairing code lifetime. Default: 300000',
         '  --session-ttl-ms <ms>         App-session token lifetime.',
         '  --command-timeout-ms <ms>     App command timeout. Default: 120000',
+        '  --tool-rate-limit <count>     Max MCP tools/call requests per window. Default: 120. Use 0 to disable.',
+        '  --tool-rate-window-ms <ms>    MCP tools/call rate-limit window. Default: 60000',
         '  --help                        Show this help.',
         '',
         'MCP JSON-RPC messages are read from stdin and written to stdout.',
@@ -181,6 +197,8 @@ export async function startTaskTimeAgentBridgeCli(
         bridge,
         scopes: options.scopes,
         commandTimeoutMs: options.commandTimeoutMs,
+        toolCallRateLimit: options.toolCallRateLimit,
+        toolCallRateWindowMs: options.toolCallRateWindowMs,
     });
     const stopTransport = startMcpLineDelimitedStdioTransport({
         input: io.stdin,
@@ -315,6 +333,16 @@ function parseOptionalIntegerOption(value: string | undefined, label: string): n
     }
 
     return parseIntegerOption(value, 0, label);
+}
+
+function parsePositiveIntegerOption(value: string | undefined, fallback: number, label: string): number {
+    const parsed = parseIntegerOption(value, fallback, label);
+
+    if (parsed <= 0) {
+        throw new Error(`${label} must be a positive integer.`);
+    }
+
+    return parsed;
 }
 
 function isCliEntrypoint(): boolean {

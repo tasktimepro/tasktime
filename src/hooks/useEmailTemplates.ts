@@ -8,6 +8,7 @@
 import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
 import type { EmailTemplate } from '@/stores/yjs/types';
+import { planDefaultSelection } from '@/domain/settings/defaultSelection';
 
 export function useEmailTemplates() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<EmailTemplate>(
@@ -41,17 +42,19 @@ export function useEmailTemplates() {
 
     /** Set a template as the default (unsets previous default of the same type) */
     const setDefault = useCallback((id: string) => {
-        const target = get(id);
-        if (!target) return;
+        let result: EmailTemplate | undefined;
 
-        items.forEach(t => {
-            if (t.isDefault && t.id !== id && t.type === target.type) {
-                update(t.id, { isDefault: false });
-            }
+        planDefaultSelection({
+            items,
+            targetId: id,
+            requireExistingTarget: true,
+            isInScope: (template, target) => template.type === target?.type,
+        }).forEach((change) => {
+            result = update(change.id, change.updates);
         });
 
-        return update(id, { isDefault: true });
-    }, [items, get, update]);
+        return result;
+    }, [items, update]);
 
     return {
         emailTemplates: items,

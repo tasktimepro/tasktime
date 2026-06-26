@@ -34,7 +34,8 @@ import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import DeleteTaskWarnings from './task/DeleteTaskWarnings';
-import { getTaskDeletionBillingSummary, getTaskIdsToDelete, getTaskIdsWithDescendants } from '../utils/taskUtils.ts';
+import { getTaskDeletionBillingSummary, getTaskIdsWithDescendants } from '../utils/taskUtils.ts';
+import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { buildTaskAppendOrderPlan, buildTaskContainerMoveOrderUpdates, buildTaskMoveOrderUpdates, reorderTaskItems, sortTasksByManualOrder } from '../utils/taskOrderingUtils.ts';
 import { isRecurringTaskDueOnDate } from '../utils/recurringUtils.ts';
@@ -49,6 +50,20 @@ const TASK_SORT_OPTIONS = [
     { value: 'manual', label: 'Manual' },
 ];
 const TASK_SORT_VALUES = new Set(TASK_SORT_OPTIONS.map((option) => option.value));
+
+const getTaskDeletePlanIds = (taskId, tasks) => {
+    const plan = buildTaskDeleteImpactPlan({
+        taskId,
+        activeTasks: tasks.filter(task => !task.archived),
+        archivedTasks: tasks.filter(task => task.archived),
+        timeEntries: [],
+        timers: [],
+        invoices: [],
+        plannerAttachments: [],
+    });
+
+    return plan?.taskIdsToDelete || [taskId];
+};
 
 const getProjectTaskSort = (taskSort) => {
     return TASK_SORT_VALUES.has(taskSort) ? taskSort : 'lastActive';
@@ -500,7 +515,7 @@ const TaskTree = ({
 
         return pendingDeleteTask.parentTaskId
             ? [pendingDeleteTaskId]
-            : getTaskIdsToDelete(pendingDeleteTaskId, tasks);
+            : getTaskDeletePlanIds(pendingDeleteTaskId, tasks);
     }, [pendingDeleteTaskId, pendingDeleteTask, tasks]);
 
     const deleteBillingSummary = useMemo(() => {
@@ -676,7 +691,7 @@ const TaskTree = ({
 
         // Get all task IDs to delete (including subtasks for main tasks)
         const taskIdsToDelete = isMainTask 
-            ? getTaskIdsToDelete(pendingDeleteTaskId, tasks)
+            ? getTaskDeletePlanIds(pendingDeleteTaskId, tasks)
             : [pendingDeleteTaskId];
 
         // Delete time entries for these tasks

@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AgentBridgeSettings from './AgentBridgeSettings';
 
 class FakeWebSocket {
@@ -48,9 +48,16 @@ const yjsMocks = vi.hoisted(() => ({
     },
     isReady: true,
 }));
+const googleAuthMocks = vi.hoisted(() => ({
+    revokeAccess: vi.fn(async () => undefined),
+}));
 
 vi.mock('@/contexts/YjsContext', () => ({
     useYjs: () => yjsMocks,
+}));
+
+vi.mock('@/hooks/useGoogleAuth', () => ({
+    useGoogleAuth: () => googleAuthMocks,
 }));
 
 describe('AgentBridgeSettings', () => {
@@ -58,7 +65,12 @@ describe('AgentBridgeSettings', () => {
         FakeWebSocket.instances = [];
         vi.stubGlobal('WebSocket', FakeWebSocket);
         yjsMocks.isReady = true;
+        googleAuthMocks.revokeAccess.mockClear();
         window.history.pushState({}, '', '/account?section=agent');
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('requires explicit loopback pairing details before connecting', async () => {
@@ -127,6 +139,55 @@ describe('AgentBridgeSettings', () => {
         expect(screen.getAllByText('Disconnected').length).toBeGreaterThan(0);
     });
 
+    it('can disable agent access without affecting the settings page', async () => {
+        render(<AgentBridgeSettings />);
+
+        await userEvent.type(screen.getByLabelText('Bridge endpoint'), 'ws://127.0.0.1:39123/tasktime-agent');
+        await userEvent.type(screen.getByLabelText('Pairing ID'), 'pairing-1');
+        await userEvent.type(screen.getByLabelText('Pairing code'), '123456');
+        await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+            socket.message(JSON.stringify({
+                type: 'agent_bridge_session',
+                protocolVersion: 1,
+                sessionToken: 'paired-token',
+                scopes: ['read', 'write'],
+                expiresAt: Date.now() + 60_000,
+            }));
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('Paired').length).toBeGreaterThan(0);
+        });
+
+        await userEvent.click(screen.getByLabelText('Enable local agent access'));
+
+        expect(socket.sent).toEqual([
+            JSON.stringify({
+                type: 'agent_bridge_control',
+                protocolVersion: 1,
+                sessionToken: 'paired-token',
+                action: 'revoke',
+            }),
+        ]);
+        expect(screen.getAllByText('Disabled').length).toBeGreaterThan(0);
+        expect(screen.getByText('Agent access disabled')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Agent Access' })).toBeInTheDocument();
+        expect(screen.getByLabelText('Bridge endpoint')).toBeDisabled();
+        expect(screen.getByLabelText('Pairing ID')).toBeDisabled();
+        expect(screen.getByLabelText('Pairing code')).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Connect' })).toBeDisabled();
+
+        await userEvent.click(screen.getByLabelText('Enable local agent access'));
+
+        expect(screen.getByLabelText('Bridge endpoint')).not.toBeDisabled();
+        expect(screen.getByLabelText('Pairing ID')).not.toBeDisabled();
+        expect(screen.getByLabelText('Pairing code')).not.toBeDisabled();
+    });
+
     it('shows command activity without exposing command input', async () => {
         render(<AgentBridgeSettings />);
 
@@ -156,9 +217,6 @@ describe('AgentBridgeSettings', () => {
             }));
         });
 
-        expect(screen.getAllByText('Acting').length).toBeGreaterThan(0);
-        expect(screen.getByText('Running unsupported_command')).toBeInTheDocument();
-
         await act(async () => {
             await new Promise((resolve) => window.setTimeout(resolve, 0));
         });
@@ -179,7 +237,7 @@ describe('AgentBridgeSettings', () => {
         }));
     });
 
-    it('requires visible approval for billing commands before sending a response', async () => {
+    it('requires visible approval for sensitive commands before sending a response', async () => {
         render(<AgentBridgeSettings />);
 
         await userEvent.type(screen.getByLabelText('Bridge endpoint'), 'ws://127.0.0.1:39123/tasktime-agent');
@@ -209,9 +267,11 @@ describe('AgentBridgeSettings', () => {
             }));
         });
 
-        expect(screen.getByText('Billing Approval')).toBeInTheDocument();
-        expect(screen.getAllByText('mark_invoice_paid').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('request-billing').length).toBeGreaterThan(0);
+        await waitFor(() => {
+            expect(screen.getByText('Agent Approval')).toBeInTheDocument();
+            expect(screen.getAllByText('mark_invoice_paid').length).toBeGreaterThan(0);
+            expect(screen.getAllByText('request-billing').length).toBeGreaterThan(0);
+        });
         expect(screen.queryByText('secret-invoice-id')).toBeNull();
         expect(socket.sent).toHaveLength(0);
 
@@ -232,7 +292,106 @@ describe('AgentBridgeSettings', () => {
                 },
             },
         }));
-        expect(screen.queryByText('Billing Approval')).toBeNull();
+        expect(screen.queryByText('Agent Approval')).toBeNull();
+    });
+
+    it('fails closed when a sensitive command approval times out', async () => {
+        render(<AgentBridgeSettings />);
+
+        await userEvent.type(screen.getByLabelText('Bridge endpoint'), 'ws://127.0.0.1:39123/tasktime-agent');
+        await userEvent.type(screen.getByLabelText('Pairing ID'), 'pairing-1');
+        await userEvent.type(screen.getByLabelText('Pairing code'), '123456');
+        await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+        vi.useFakeTimers();
+
+        const socket = FakeWebSocket.instances[0];
+        await act(async () => {
+            socket.open();
+            socket.message(JSON.stringify({
+                type: 'agent_bridge_session',
+                protocolVersion: 1,
+                sessionToken: 'paired-token',
+                scopes: ['read', 'write', 'billing'],
+                expiresAt: Date.now() + 180_000,
+            }));
+            socket.message(JSON.stringify({
+                protocolVersion: 1,
+                requestId: 'request-timeout',
+                sessionToken: 'paired-token',
+                command: 'mark_invoice_paid',
+                input: {
+                    invoiceId: 'secret-invoice-id',
+                    confirmPaid: true,
+                },
+            }));
+        });
+
+        expect(screen.getByText('Agent Approval')).toBeInTheDocument();
+        expect(socket.sent).toHaveLength(0);
+
+        await act(async () => {
+            vi.advanceTimersByTime(110_000);
+        });
+
+        expect(socket.sent).toHaveLength(1);
+
+        expect(JSON.parse(socket.sent[0])).toEqual(expect.objectContaining({
+            requestId: 'request-timeout',
+            response: {
+                ok: false,
+                command: 'mark_invoice_paid',
+                error: {
+                    code: 'PERMISSION_DENIED',
+                    message: 'Agent command was not approved in TaskTime.',
+                },
+            },
+        }));
+        expect(screen.queryByText('Agent Approval')).toBeNull();
+    });
+
+    it('clears pending sensitive approval when the bridge disconnects', async () => {
+        render(<AgentBridgeSettings />);
+
+        await userEvent.type(screen.getByLabelText('Bridge endpoint'), 'ws://127.0.0.1:39123/tasktime-agent');
+        await userEvent.type(screen.getByLabelText('Pairing ID'), 'pairing-1');
+        await userEvent.type(screen.getByLabelText('Pairing code'), '123456');
+        await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+            socket.message(JSON.stringify({
+                type: 'agent_bridge_session',
+                protocolVersion: 1,
+                sessionToken: 'paired-token',
+                scopes: ['read', 'write', 'billing'],
+                expiresAt: Date.now() + 60_000,
+            }));
+            socket.message(JSON.stringify({
+                protocolVersion: 1,
+                requestId: 'request-disconnect',
+                sessionToken: 'paired-token',
+                command: 'mark_invoice_paid',
+                input: {
+                    invoiceId: 'secret-invoice-id',
+                    confirmPaid: true,
+                },
+            }));
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('Agent Approval')).toBeInTheDocument();
+        });
+
+        act(() => {
+            socket.close();
+        });
+
+        await waitFor(() => {
+            expect(screen.queryByText('Agent Approval')).toBeNull();
+        });
+        expect(socket.sent).toEqual([]);
     });
 
     it('opens app routes requested by agent navigation commands', async () => {

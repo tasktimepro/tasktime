@@ -19,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
-import { BACKUP_VERSION } from '../utils/backupData.ts';
+import { parseBackupImportJson } from '../utils/backupData.ts';
 
 /**
  * ExportImport component for backing up and restoring application data
@@ -30,8 +30,6 @@ import { BACKUP_VERSION } from '../utils/backupData.ts';
  * 
  * Note: Timer state is intentionally excluded from export/import
  */
-const SUPPORTED_VERSIONS = Array.from(new Set(['1.0', '1.1', '1.3', BACKUP_VERSION]));
-
 function ExportImport({ 
     projects, 
     tasks = [], 
@@ -127,191 +125,9 @@ function ExportImport({
         setImportError('');
         
         try {
-            const parsedData = JSON.parse(importData);
-            
-            // Version check
-            if (parsedData.version && !SUPPORTED_VERSIONS.includes(parsedData.version)) {
-                throw new Error(`Unsupported export version "${parsedData.version}". Supported: ${SUPPORTED_VERSIONS.join(', ')}. You may need to update TaskTime.`);
-            }
+            const { version: _version, exportDate: _exportDate, backupType: _backupType, ...backupImportData } = parseBackupImportJson(importData);
 
-            // Validate data structure
-            if (!parsedData.projects || !Array.isArray(parsedData.projects)) {
-                throw new Error('Invalid data format: projects array not found');
-            }
-
-            // Deep validation of projects
-            const projectIds = new Set();
-            for (const project of parsedData.projects) {
-                if (!project.id || typeof project.id !== 'string') {
-                    throw new Error('Invalid project: missing or non-string id');
-                }
-                if (!project.title || typeof project.title !== 'string') {
-                    throw new Error(`Invalid project "${project.id}": missing or non-string title`);
-                }
-                if (projectIds.has(project.id)) {
-                    throw new Error(`Duplicate project id: ${project.id}`);
-                }
-                projectIds.add(project.id);
-            }
-
-            // Validate tasks if present
-            if (parsedData.tasks && !Array.isArray(parsedData.tasks)) {
-                throw new Error('Invalid data format: tasks must be an array');
-            }
-            if (parsedData.tasks) {
-                const taskIds = new Set();
-                for (const task of parsedData.tasks) {
-                    if (!task.id || typeof task.id !== 'string') {
-                        throw new Error('Invalid task: missing or non-string id');
-                    }
-                    if (!task.title || typeof task.title !== 'string') {
-                        throw new Error(`Invalid task "${task.id}": missing or non-string title`);
-                    }
-                    if (taskIds.has(task.id)) {
-                        throw new Error(`Duplicate task id: ${task.id}`);
-                    }
-                    taskIds.add(task.id);
-                }
-
-                // Validate task hierarchy: parentTaskId must reference an existing task
-                for (const task of parsedData.tasks) {
-                    if (task.parentTaskId && !taskIds.has(task.parentTaskId)) {
-                        throw new Error(`Task "${task.id}" references non-existent parent task "${task.parentTaskId}"`);
-                    }
-                }
-
-                // Validate task→project linkage
-                for (const task of parsedData.tasks) {
-                    if (task.projectId && !projectIds.has(task.projectId)) {
-                        throw new Error(`Task "${task.id}" references non-existent project "${task.projectId}"`);
-                    }
-                }
-            }
-
-            // Validate timeEntries if present
-            if (parsedData.timeEntries && !Array.isArray(parsedData.timeEntries)) {
-                throw new Error('Invalid data format: timeEntries must be an array');
-            }
-            const taskIds = parsedData.tasks ? new Set(parsedData.tasks.map(t => t.id)) : new Set();
-            if (parsedData.timeEntries) {
-                for (const entry of parsedData.timeEntries) {
-                    if (!entry.id || typeof entry.id !== 'string') {
-                        throw new Error('Invalid time entry: missing or non-string id');
-                    }
-                    if (typeof entry.start !== 'number' || typeof entry.end !== 'number') {
-                        throw new Error(`Invalid time entry "${entry.id}": start and end must be numbers`);
-                    }
-                    if (entry.start > entry.end) {
-                        throw new Error(`Invalid time entry "${entry.id}": start time is after end time`);
-                    }
-                    if (entry.taskId && !taskIds.has(entry.taskId)) {
-                        throw new Error(`Time entry "${entry.id}" references non-existent task "${entry.taskId}"`);
-                    }
-                }
-            }
-
-            // Validate invoices if present
-            if (parsedData.invoices && !Array.isArray(parsedData.invoices)) {
-                throw new Error('Invalid data format: invoices must be an array');
-            }
-            const invoiceIds = new Set((parsedData.invoices || []).map(i => i.id).filter(Boolean));
-
-            // Validate project invoiceIds references
-            for (const project of parsedData.projects) {
-                if (project.invoiceIds && Array.isArray(project.invoiceIds)) {
-                    for (const invId of project.invoiceIds) {
-                        if (!invoiceIds.has(invId)) {
-                            throw new Error(`Project "${project.id}" references non-existent invoice "${invId}"`);
-                        }
-                    }
-                }
-            }
-
-            // Validate paymentMethods if present
-            if (parsedData.paymentMethods && !Array.isArray(parsedData.paymentMethods)) {
-                throw new Error('Invalid data format: paymentMethods must be an array');
-            }
-
-            // Validate businessInfos if present
-            if (parsedData.businessInfos && !Array.isArray(parsedData.businessInfos)) {
-                throw new Error('Invalid data format: businessInfos must be an array');
-            }
-
-            // Validate businessBrandAssets if present
-            if (parsedData.businessBrandAssets && !Array.isArray(parsedData.businessBrandAssets)) {
-                throw new Error('Invalid data format: businessBrandAssets must be an array');
-            }
-
-            // Validate clients if present
-            if (parsedData.clients && !Array.isArray(parsedData.clients)) {
-                throw new Error('Invalid data format: clients must be an array');
-            }
-
-            // Validate invoiceTemplates if present
-            if (parsedData.invoiceTemplates && !Array.isArray(parsedData.invoiceTemplates)) {
-                throw new Error('Invalid data format: invoiceTemplates must be an array');
-            }
-
-            // Validate emailTemplates if present
-            if (parsedData.emailTemplates && !Array.isArray(parsedData.emailTemplates)) {
-                throw new Error('Invalid data format: emailTemplates must be an array');
-            }
-
-            // Validate expenses if present
-            if (parsedData.expenses && !Array.isArray(parsedData.expenses)) {
-                throw new Error('Invalid data format: expenses must be an array');
-            }
-
-            // Validate expenseCategories if present
-            if (parsedData.expenseCategories && !Array.isArray(parsedData.expenseCategories)) {
-                throw new Error('Invalid data format: expenseCategories must be an array');
-            }
-
-            // Validate taxReturnPeriods if present
-            if (parsedData.taxReturnPeriods && !Array.isArray(parsedData.taxReturnPeriods)) {
-                throw new Error('Invalid data format: taxReturnPeriods must be an array');
-            }
-
-            // Validate expenseRecurrences if present
-            if (parsedData.expenseRecurrences && !Array.isArray(parsedData.expenseRecurrences)) {
-                throw new Error('Invalid data format: expenseRecurrences must be an array');
-            }
-
-            // Validate dailyGoals if present
-            if (parsedData.dailyGoals && !Array.isArray(parsedData.dailyGoals)) {
-                throw new Error('Invalid data format: dailyGoals must be an array');
-            }
-
-            // Validate plannerAttachments if present
-            if (parsedData.plannerAttachments && !Array.isArray(parsedData.plannerAttachments)) {
-                throw new Error('Invalid data format: plannerAttachments must be an array');
-            }
-
-            // Validate preferences if present
-            if (parsedData.preferences && typeof parsedData.preferences !== 'object') {
-                throw new Error('Invalid data format: preferences must be an object');
-            }
-
-            // Call the import handler with all data
-            onImport({
-                projects: parsedData.projects,
-                tasks: parsedData.tasks || [],
-                timeEntries: parsedData.timeEntries || [],
-                invoices: parsedData.invoices || [],
-                paymentMethods: parsedData.paymentMethods || [],
-                expenseCategories: parsedData.expenseCategories || [],
-                taxReturnPeriods: parsedData.taxReturnPeriods || [],
-                businessInfos: parsedData.businessInfos || [],
-                businessBrandAssets: parsedData.businessBrandAssets || [],
-                clients: parsedData.clients || [],
-                invoiceTemplates: parsedData.invoiceTemplates || [],
-                emailTemplates: parsedData.emailTemplates || [],
-                expenses: parsedData.expenses || [],
-                expenseRecurrences: parsedData.expenseRecurrences || [],
-                dailyGoals: parsedData.dailyGoals || [],
-                plannerAttachments: parsedData.plannerAttachments || [],
-                preferences: parsedData.preferences || {}
-            });
+            onImport(backupImportData);
             setShowImportModal(false);
             setImportData('');
             

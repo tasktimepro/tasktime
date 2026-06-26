@@ -30,7 +30,7 @@ import ClientArchiveDialog from './modals/ClientArchiveDialog';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { buildClientRecentUpdateMap, buildProjectRecentUpdateMap } from '../utils/activityUtils.ts';
-import { invoiceBelongsToProject } from '../utils/invoiceUtils.ts';
+import { buildClientDeleteImpactPlan } from '@/domain/deletions/clientDeletion';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -169,22 +169,40 @@ const ClientList = ({
      */
     const performClientDeletion = (clientId, alsoDeleteProjects) => {
         const clientRelatedProjects = getRelatedProjects(clientId);
+        const deletePlan = buildClientDeleteImpactPlan({
+            clientId,
+            alsoDeleteProjects,
+            includeInvoiceDeletion: alsoDeleteProjects,
+            clients,
+            projects,
+            activeTasks: tasks,
+            archivedTasks: [],
+            timeEntries,
+            timers: [],
+            invoices,
+            expenses,
+            expenseRecurrences: recurrences,
+            plannerAttachments: [],
+        });
+
+        if (!deletePlan) {
+            return;
+        }
         
         if (alsoDeleteProjects) {
             // Get related projects and their task/time entry IDs
-            const relatedProjectIds = clientRelatedProjects.map(p => p.id);
+            const relatedProjectIds = deletePlan.projectIdsToDelete;
             
             // Delete tasks for related projects
-            const relatedTaskIds = tasks
-                .filter(task => relatedProjectIds.includes(task.projectId))
-                .map(t => t.id);
+            const relatedTaskIds = [
+                ...deletePlan.activeTaskIdsToDelete,
+                ...deletePlan.archivedTaskIdsToDelete,
+            ];
             
             // Delete time entries for related tasks
             // Note: Time entries are in a separate Yjs document (active-entries), so they cannot be included
             // in the core document transaction below. We delete them first, but grouped in their own transaction.
-            const relatedTimeEntryIds = timeEntries
-                .filter(entry => relatedTaskIds.includes(entry.taskId))
-                .map(e => e.id);
+            const relatedTimeEntryIds = deletePlan.timeEntryIdsToDelete;
             
             if (relatedTimeEntryIds.length > 0) {
                 store.activeEntriesDoc.transact(() => {
@@ -193,20 +211,9 @@ const ClientList = ({
             }
             
             // Delete invoices for related projects (Invoices are in core doc)
-            const relatedInvoiceIds = invoices
-                .filter((invoice) => (
-                    invoice.clientId === clientId
-                    || relatedProjectIds.some((projectId) => invoiceBelongsToProject(invoice, projectId))
-                ))
-                .map(i => i.id);
-
-            const relatedExpenseIds = expenses
-                .filter(expense => expense.clientId === clientId || relatedProjectIds.includes(expense.projectId))
-                .map(expense => expense.id);
-
-            const relatedRecurrenceIds = recurrences
-                .filter(recurrence => recurrence.clientId === clientId || relatedProjectIds.includes(recurrence.projectId))
-                .map(recurrence => recurrence.id);
+            const relatedInvoiceIds = deletePlan.invoiceIds;
+            const relatedExpenseIds = deletePlan.expenseIdsToDelete;
+            const relatedRecurrenceIds = deletePlan.recurrenceIdsToDelete;
             
             // Execute all core document deletions in a single transaction
             // This ensures they are synced as a single atomic update
@@ -222,21 +229,16 @@ const ClientList = ({
         } else {
             // Remove client reference from projects and delete client in one transaction
             store.projects.doc.transact(() => {
-                projects
-                    .filter(project => project.preferredClientId === clientId)
-                    .forEach(project => updateProject(project.id, {
+                deletePlan.projectIdsToConvertToPersonal
+                    .forEach(projectId => updateProject(projectId, {
                         preferredClientId: null,
                         hourlyRate: null,
                         flatRate: false,
                         isPersonal: true
                     }));
-                expenses
-                    .filter(expense => expense.clientId === clientId)
-                    .forEach(expense => deleteExpense(expense.id));
+                deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-                recurrences
-                    .filter(recurrence => recurrence.clientId === clientId)
-                    .forEach(recurrence => deleteRecurrence(recurrence.id));
+                deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
 
                 deleteClient(clientId);
             });

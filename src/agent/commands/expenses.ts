@@ -1,9 +1,10 @@
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { toStorageDate } from '@/utils/dateUtils';
 import { normalizeCurrencyCode, fetchExchangeRates } from '@/utils/currencyUtils';
-import { createExpensePaymentCurrencySnapshot } from '@/utils/expenseUtils';
+import { buildExpenseFromRecurrence, createExpensePaymentCurrencySnapshot } from '@/utils/expenseUtils';
+import { buildMarkExpensePaidUpdates, buildMarkExpenseUnpaidUpdates } from '@/domain/expenses/expenseUpdates';
 import { collectValidatedEntities } from '@/stores/yjs/validation';
-import type { Client, Expense, Project } from '@/stores/yjs/types';
+import type { BusinessInfo, Client, Expense, ExpenseCategory, ExpenseRecurrence, Project } from '@/stores/yjs/types';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
 import {
@@ -37,11 +38,67 @@ export interface CreateExpenseCommandInput extends Partial<Omit<Expense, 'id' | 
     idempotencyKey?: string;
 }
 
+export interface ListExpenseRecurrencesCommandInput {
+    activeOnly?: boolean;
+    clientId?: string | null;
+    projectId?: string | null;
+}
+
+export interface CreateExpenseRecurrenceCommandInput extends Partial<Omit<ExpenseRecurrence, 'id' | 'createdAt' | 'updatedAt'>> {
+    id?: string;
+    title: string;
+    currency: string;
+    amount: number;
+    amountType: ExpenseRecurrence['amountType'];
+    repeat: ExpenseRecurrence['repeat'];
+    startDate: string;
+    isPersonal: boolean;
+    billable: boolean;
+    isTaxExempt: boolean;
+    generateInitial?: boolean;
+    createdAt?: number;
+    updatedAt?: number;
+    idempotencyKey?: string;
+}
+
+export interface UpdateExpenseRecurrenceCommandInput {
+    recurrenceId: string;
+    updates: Partial<ExpenseRecurrence>;
+}
+
+export interface DeleteExpenseRecurrenceCommandInput {
+    recurrenceId: string;
+    confirmDelete?: boolean;
+    confirmationText?: string;
+}
+
+export interface DeleteExpenseRecurrenceResult {
+    recurrenceId: string;
+    title: string;
+    generatedExpensesDeleted: 0;
+    deleted: true;
+}
+
 export interface MarkExpensePaidCommandInput {
     expenseId: string;
     amount?: number;
     paidOn?: string | null;
     paidBy?: string | null;
+}
+
+export interface DeleteExpenseCommandInput {
+    expenseId: string;
+    confirmDelete?: boolean;
+    confirmationText?: string;
+}
+
+export interface DeleteExpenseResult {
+    expenseId: string;
+    title: string;
+    date: string;
+    amount: number;
+    currency: string;
+    deleted: true;
 }
 
 function getPreferredCurrency(context: AgentCommandContext): string {
@@ -60,6 +117,30 @@ function validateExpenseReferences(context: AgentCommandContext, input: Partial<
 
     if (input.projectId) {
         readRequiredEntity<Project>(context.store.projects as any, input.projectId, 'Project');
+    }
+}
+
+function validateExpenseRecurrenceReferences(context: AgentCommandContext, input: Partial<ExpenseRecurrence>): void {
+    validateExpenseReferences(context, input as Partial<Expense>);
+
+    if (input.businessId) {
+        readRequiredEntity<BusinessInfo>(context.store.businessInfos as any, input.businessId, 'Business info');
+    }
+
+    if (input.categoryId) {
+        readRequiredEntity<ExpenseCategory>(context.store.expenseCategories as any, input.categoryId, 'Expense category');
+    }
+}
+
+function validateExpenseRecurrenceInput(input: Partial<ExpenseRecurrence>): void {
+    if (!Number.isFinite(input.amount)) {
+        throw new AgentCommandError('INVALID_INPUT', 'amount must be a finite number.');
+    }
+
+    if (input.repeat === 'monthly' && input.monthlyType === 'specific' && !Number.isFinite(input.monthlyDay)) {
+        throw new AgentCommandError('INVALID_INPUT', 'monthlyDay is required for specific monthly recurring expenses.', {
+            field: 'monthlyDay',
+        });
     }
 }
 
@@ -111,6 +192,154 @@ export function createExpenseCommand(context: AgentCommandContext, input: Create
     });
 }
 
+export function listExpenseRecurrencesCommand(context: AgentCommandContext, input: ListExpenseRecurrencesCommandInput = {}): ExpenseRecurrence[] {
+    assertReady(context);
+    assertPermission(context, 'read');
+
+    return collectValidatedEntities<ExpenseRecurrence>('expenseRecurrences', context.store.expenseRecurrences as any, 'agent list expense recurrences')
+        .filter((recurrence) => input.activeOnly ? recurrence.active : true)
+        .filter((recurrence) => !input.clientId || recurrence.clientId === input.clientId)
+        .filter((recurrence) => !input.projectId || recurrence.projectId === input.projectId)
+        .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+}
+
+export function createExpenseRecurrenceCommand(
+    context: AgentCommandContext,
+    input: CreateExpenseRecurrenceCommandInput
+): { recurrence: ExpenseRecurrence; generatedExpense: Expense | null } {
+    assertReady(context);
+    assertPermission(context, 'write');
+
+    return withIdempotency(context, input.idempotencyKey, () => {
+        const title = requireString(input.title, 'title');
+        validateExpenseRecurrenceInput(input);
+        validateExpenseRecurrenceReferences(context, input);
+
+        const now = getNow(context);
+        const id = input.id || getId(context);
+        const today = toStorageDate(new Date(now));
+        const shouldGenerateInitial = input.generateInitial !== false && Boolean(today && input.startDate <= today);
+        const recurrence = createValidatedEntity<ExpenseRecurrence>(context.store.expenseRecurrences as any, 'expenseRecurrences', {
+            ...input,
+            id,
+            title,
+            note: input.note ?? null,
+            supplierName: input.supplierName ?? null,
+            paidBy: input.paidBy ?? null,
+            paymentMode: input.paymentMode ?? 'manual',
+            currency: normalizeCurrencyCode(input.currency),
+            amount: input.amount,
+            amountType: input.amountType,
+            repeat: input.repeat,
+            monthlyType: input.repeat === 'monthly' ? input.monthlyType : undefined,
+            monthlyDay: input.repeat === 'monthly' ? input.monthlyDay : undefined,
+            endDate: input.endDate ?? null,
+            clientId: input.clientId ?? null,
+            projectId: input.projectId ?? null,
+            businessId: input.businessId ?? null,
+            categoryId: input.categoryId ?? null,
+            isPersonal: input.isPersonal,
+            billable: input.billable,
+            taxNumber: input.taxNumber ?? null,
+            isTaxExempt: input.isTaxExempt,
+            amountExcludingTax: input.amountExcludingTax ?? null,
+            taxLabel: input.taxLabel ?? null,
+            taxRate: input.taxRate ?? null,
+            lastGeneratedDate: shouldGenerateInitial ? input.startDate : input.lastGeneratedDate ?? null,
+            active: input.active ?? true,
+            createdAt: input.createdAt ?? now,
+            updatedAt: input.updatedAt ?? now,
+        }, `agent create expense recurrence ${id}`);
+
+        let generatedExpense: Expense | null = null;
+
+        if (shouldGenerateInitial) {
+            generatedExpense = buildExpenseFromRecurrence(recurrence, input.startDate);
+
+            if (!context.store.expenses.has(generatedExpense.id)) {
+                generatedExpense = createValidatedEntity<Expense>(context.store.expenses as any, 'expenses', {
+                    ...generatedExpense,
+                    createdAt: now,
+                    updatedAt: now,
+                }, `agent create initial recurring expense ${generatedExpense.id}`);
+            } else {
+                generatedExpense = readRequiredEntity<Expense>(context.store.expenses as any, generatedExpense.id, 'Generated expense');
+            }
+        }
+
+        markMeaningfulActivity('expense_create');
+        return { recurrence, generatedExpense };
+    });
+}
+
+export function updateExpenseRecurrenceCommand(context: AgentCommandContext, input: UpdateExpenseRecurrenceCommandInput): ExpenseRecurrence {
+    assertReady(context);
+    assertPermission(context, 'write');
+
+    const recurrenceId = requireString(input.recurrenceId, 'recurrenceId');
+    const existing = readRequiredEntity<ExpenseRecurrence>(context.store.expenseRecurrences as any, recurrenceId, 'Expense recurrence');
+    const updates = input.updates || {};
+    const next = { ...existing, ...updates };
+
+    validateExpenseRecurrenceInput(next);
+    validateExpenseRecurrenceReferences(context, next);
+
+    const updated = updateValidatedEntity<ExpenseRecurrence>(context.store.expenseRecurrences as any, 'expenseRecurrences', recurrenceId, {
+        ...updates,
+        updatedAt: getNow(context),
+    }, `agent update expense recurrence ${recurrenceId}`);
+
+    markMeaningfulActivity('expense_update');
+    return updated;
+}
+
+export function pauseExpenseRecurrenceCommand(context: AgentCommandContext, input: { recurrenceId: string }): ExpenseRecurrence {
+    return updateExpenseRecurrenceCommand(context, {
+        recurrenceId: input.recurrenceId,
+        updates: { active: false },
+    });
+}
+
+export function resumeExpenseRecurrenceCommand(context: AgentCommandContext, input: { recurrenceId: string }): ExpenseRecurrence {
+    return updateExpenseRecurrenceCommand(context, {
+        recurrenceId: input.recurrenceId,
+        updates: { active: true },
+    });
+}
+
+export function deleteExpenseRecurrenceCommand(
+    context: AgentCommandContext,
+    input: DeleteExpenseRecurrenceCommandInput
+): DeleteExpenseRecurrenceResult {
+    assertReady(context);
+    assertPermission(context, 'write');
+
+    const recurrenceId = requireString(input.recurrenceId, 'recurrenceId');
+
+    if (input.confirmDelete !== true) {
+        throw new AgentCommandError('INVALID_INPUT', 'confirmDelete must be true to delete a recurring expense template.', { recurrenceId });
+    }
+
+    if (input.confirmationText !== recurrenceId) {
+        throw new AgentCommandError('INVALID_INPUT', 'confirmationText must match recurrenceId to delete a recurring expense template.', { recurrenceId });
+    }
+
+    const recurrence = readRequiredEntity<ExpenseRecurrence>(context.store.expenseRecurrences as any, recurrenceId, 'Expense recurrence');
+
+    context.store.coreDoc.transact(() => {
+        context.store.expenseRecurrences.delete(recurrenceId);
+    });
+
+    markMeaningfulActivity('expense_update');
+
+    return {
+        recurrenceId,
+        title: recurrence.title,
+        generatedExpensesDeleted: 0,
+        deleted: true,
+    };
+}
+
 export async function markExpensePaidCommand(context: AgentCommandContext, input: MarkExpensePaidCommandInput): Promise<Expense> {
     assertReady(context);
     assertPermission(context, 'write');
@@ -152,14 +381,19 @@ export async function markExpensePaidCommand(context: AgentCommandContext, input
         exchangeRates: rates,
     }) ?? undefined;
 
-    const updated = updateValidatedEntity<Expense>(context.store.expenses as any, 'expenses', expenseId, {
-        amount,
-        paidOn,
-        paidBy,
-        paymentStatus: 'paid',
-        paymentCurrencySnapshot,
-        updatedAt: now,
-    }, `agent mark expense paid ${expenseId}`);
+    const updated = updateValidatedEntity<Expense>(
+        context.store.expenses as any,
+        'expenses',
+        expenseId,
+        buildMarkExpensePaidUpdates({
+            amount,
+            paidOn,
+            paidBy,
+            paymentCurrencySnapshot,
+            updatedAt: now,
+        }),
+        `agent mark expense paid ${expenseId}`
+    );
 
     markMeaningfulActivity('expense_update');
     return updated;
@@ -171,14 +405,60 @@ export function markExpenseUnpaidCommand(context: AgentCommandContext, input: { 
 
     const expenseId = requireString(input.expenseId, 'expenseId');
     readRequiredEntity<Expense>(context.store.expenses as any, expenseId, 'Expense');
-    const updated = updateValidatedEntity<Expense>(context.store.expenses as any, 'expenses', expenseId, {
-        paidOn: null,
-        paidBy: null,
-        paymentStatus: 'unpaid',
-        paymentCurrencySnapshot: undefined,
-        updatedAt: getNow(context),
-    }, `agent mark expense unpaid ${expenseId}`);
+    const updated = updateValidatedEntity<Expense>(
+        context.store.expenses as any,
+        'expenses',
+        expenseId,
+        buildMarkExpenseUnpaidUpdates({ updatedAt: getNow(context) }),
+        `agent mark expense unpaid ${expenseId}`
+    );
 
     markMeaningfulActivity('expense_update');
     return updated;
+}
+
+export function deleteExpenseCommand(context: AgentCommandContext, input: DeleteExpenseCommandInput): DeleteExpenseResult {
+    assertReady(context);
+    assertPermission(context, 'write');
+
+    const expenseId = requireString(input.expenseId, 'expenseId');
+
+    if (input.confirmDelete !== true) {
+        throw new AgentCommandError('INVALID_INPUT', 'confirmDelete must be true to delete an expense.', { expenseId });
+    }
+
+    if (input.confirmationText !== expenseId) {
+        throw new AgentCommandError('INVALID_INPUT', 'confirmationText must match expenseId to delete an expense.', { expenseId });
+    }
+
+    const expense = readRequiredEntity<Expense>(context.store.expenses as any, expenseId, 'Expense');
+
+    if (expense.billingStatus === 'billed' || expense.invoiceId || expense.billedAt) {
+        throw new AgentCommandError('CONFLICT', 'Billed expenses cannot be deleted by an agent.', {
+            expenseId,
+            invoiceId: expense.invoiceId || null,
+        });
+    }
+
+    if (expense.taxClaimStatus === 'claimed' || expense.taxClaimPeriodId || expense.taxClaimedAt) {
+        throw new AgentCommandError('CONFLICT', 'Tax-claimed expenses cannot be deleted by an agent.', {
+            expenseId,
+            taxClaimPeriodId: expense.taxClaimPeriodId || null,
+        });
+    }
+
+    context.store.coreDoc.transact(() => {
+        context.store.expenses.delete(expenseId);
+    });
+
+    markMeaningfulActivity('expense_delete');
+
+    return {
+        expenseId,
+        title: expense.title,
+        date: expense.date,
+        amount: expense.amount,
+        currency: expense.currency,
+        deleted: true,
+    };
 }

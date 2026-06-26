@@ -16,7 +16,7 @@ import { fetchExchangeRates, formatCurrency, getCurrencySymbol, getProjectCurren
 import { toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useYjs } from '../contexts/YjsContext';
-import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import { buildProjectDeleteImpactPlan } from '@/domain/deletions/projectDeletion';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
@@ -215,33 +215,22 @@ const ProjectList = ({
      * Perform the actual project deletion
      */
     const performProjectDeletion = (projectId, shouldDeleteInvoices = false) => {
-        // Get all task IDs that need to be deleted (including subtasks)
-        const projectTasks = tasks.filter(task => task.projectId === projectId && !task.deletedAt);
-        const allTaskIdsToDelete = new Set();
-        
-        // Add all project tasks and their subtasks
-        projectTasks.forEach(task => {
-            const taskIds = getTaskIdsToDelete(task.id, tasks);
-            taskIds.forEach(id => allTaskIdsToDelete.add(id));
+        const deletePlan = buildProjectDeleteImpactPlan({
+            projectId,
+            includeInvoiceDeletion: shouldDeleteInvoices,
+            projects,
+            activeTasks: tasks.filter(task => !task.deletedAt),
+            archivedTasks: [],
+            timeEntries,
+            timers,
+            invoices,
+            expenses,
+            expenseRecurrences: recurrences,
+            plannerAttachments: [],
         });
 
-        const taskIdsArray = Array.from(allTaskIdsToDelete);
-
-        const projectTimer = timers.find(timer => timer.projectId === projectId);
-        if (projectTimer) {
-            clearTimer(projectId);
-        }
-
-        // Delete all time entries for deleted tasks (Separate document: entries-active)
-        const timeEntryIdsToDelete = timeEntries
-            .filter(entry => allTaskIdsToDelete.has(entry.taskId))
-            .map(entry => entry.id);
-            
-        if (timeEntryIdsToDelete.length > 0) {
-            // Group time entry deletions in their own transaction on the active-entries document
-            store.activeEntriesDoc.transact(() => {
-                timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
-            });
+        if (!deletePlan) {
+            return;
         }
 
         const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
@@ -252,6 +241,23 @@ const ProjectList = ({
             return;
         }
 
+        const taskIdsArray = deletePlan.taskIdsToDelete;
+
+        const projectTimer = timers.find(timer => timer.projectId === projectId);
+        if (projectTimer) {
+            clearTimer(projectId);
+        }
+
+        // Delete all time entries for deleted tasks (Separate document: entries-active)
+        const timeEntryIdsToDelete = deletePlan.timeEntryIdsToDelete;
+            
+        if (timeEntryIdsToDelete.length > 0) {
+            // Group time entry deletions in their own transaction on the active-entries document
+            store.activeEntriesDoc.transact(() => {
+                timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
+            });
+        }
+
         // Perform core updates in a single atomic transaction (projects, tasks, invoices)
         store.projects.doc.transact(() => {
             // Delete associated invoices if requested
@@ -260,13 +266,9 @@ const ProjectList = ({
                 projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
             }
 
-            expenses
-                .filter(expense => expense.projectId === projectId)
-                .forEach(expense => deleteExpense(expense.id));
+            deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-            recurrences
-                .filter(recurrence => recurrence.projectId === projectId)
-                .forEach(recurrence => deleteRecurrence(recurrence.id));
+            deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
 
             // Delete the project
             deleteProject(projectId);
@@ -275,7 +277,7 @@ const ProjectList = ({
             taskIdsArray.forEach(taskId => deleteTask(taskId));
         });
         
-        const deletedTaskCount = allTaskIdsToDelete.size;
+        const deletedTaskCount = taskIdsArray.length;
         const deletedTimeEntriesCount = timeEntryIdsToDelete.length;
         
         // Close the edit form if the deleted project was being edited - Removed since using modal manager

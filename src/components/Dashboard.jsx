@@ -29,7 +29,7 @@ import {
     DEFAULT_PROJECT_FILTER,
     DEFAULT_TASK_FILTER,
 } from './dashboard/dashboardOverviewUtils.ts';
-import { getTaskIdsToDelete } from '../utils/taskUtils.ts';
+import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import { CornerDownRightIcon } from '@/components/ui/icons';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTodayString } from '@/hooks/useDayRollover';
@@ -96,6 +96,20 @@ const buildTodoNotificationBody = ({ taskCount, expenseCount, firstTitle }) => {
     }
 
     return `${itemSummary} are due today.`;
+};
+
+const getTaskDeletePlanIds = (taskId, tasks) => {
+    const plan = buildTaskDeleteImpactPlan({
+        taskId,
+        activeTasks: tasks.filter(task => !task.archived),
+        archivedTasks: tasks.filter(task => task.archived),
+        timeEntries: [],
+        timers: [],
+        invoices: [],
+        plannerAttachments: [],
+    });
+
+    return plan?.taskIdsToDelete || [taskId];
 };
 
 /**
@@ -1051,7 +1065,7 @@ const Dashboard = ({
 
         const taskIdsToDelete = task.parentTaskId
             ? [task.id]
-            : getTaskIdsToDelete(task.id, availableTasks);
+            : getTaskDeletePlanIds(task.id, availableTasks);
 
         const entriesToDelete = timeEntries.filter(entry => taskIdsToDelete.includes(entry.taskId));
         entriesToDelete.forEach(entry => deleteEntry(entry.id));
