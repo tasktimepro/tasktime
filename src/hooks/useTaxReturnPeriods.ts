@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useYjsCollection } from './useYjsCollection';
+import { buildTaxReturnPeriodFiledUpdates, buildTaxReturnPeriodPaidUpdates } from '@/domain/expenses/taxReturnUpdates';
 import type { TaxReturnPeriod } from '@/stores/yjs/types';
 
 const sortTaxReturnPeriods = (periods: TaxReturnPeriod[]) => {
@@ -23,6 +24,39 @@ export function useTaxReturnPeriods() {
     );
 
     const taxReturnPeriods = useMemo(() => sortTaxReturnPeriods(items), [items]);
+    const markAsFiled = useCallback((id: string, filedAt = Date.now()) => {
+        const existing = get(id);
+
+        if (!existing) {
+            return undefined;
+        }
+
+        if (existing.status === 'paid') {
+            throw new Error('Paid tax return periods cannot be moved back to filed.');
+        }
+
+        return update(id, buildTaxReturnPeriodFiledUpdates({
+            existing,
+            filedAt,
+            updatedAt: Date.now(),
+        }));
+    }, [get, update]);
+    const markAsPaid = useCallback((id: string, options: { filedAt?: number; paidAt?: number } = {}) => {
+        const existing = get(id);
+
+        if (!existing) {
+            return undefined;
+        }
+
+        const now = Date.now();
+
+        return update(id, buildTaxReturnPeriodPaidUpdates({
+            existing,
+            filedAt: options.filedAt ?? now,
+            paidAt: options.paidAt ?? now,
+            updatedAt: now,
+        }));
+    }, [get, update]);
 
     return {
         taxReturnPeriods,
@@ -31,5 +65,7 @@ export function useTaxReturnPeriods() {
         createTaxReturnPeriod: create,
         updateTaxReturnPeriod: update,
         deleteTaxReturnPeriod: remove,
+        markTaxReturnPeriodFiled: markAsFiled,
+        markTaxReturnPeriodPaid: markAsPaid,
     };
 }

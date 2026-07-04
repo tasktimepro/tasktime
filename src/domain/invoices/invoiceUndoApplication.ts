@@ -1,4 +1,178 @@
-import type { Expense, InvoiceTemplate, Project, Task, TimeEntry } from '@/stores/yjs/types';
+import type { Expense, Invoice, InvoiceTemplate, Project, Task, TimeEntry } from '@/stores/yjs/types';
+import { planInvoiceUndo, type InvoiceUndoPlan } from './invoiceUndo';
+
+export interface InvoiceUndoApplicationPlan {
+    entriesToDelete: TimeEntry[];
+    entriesToClear: Array<{
+        entry: TimeEntry;
+        updates: Partial<TimeEntry>;
+    }>;
+    expenseUpdatesToUnbill: Array<{
+        id: string;
+        updates: Partial<Expense>;
+    }>;
+    quotedTaskUpdates: Array<{
+        id: string;
+        updates: Partial<Task>;
+    }>;
+    taskCutoffUpdates: Array<{
+        id: string;
+        updates: Partial<Task>;
+    }>;
+    projectUnlinkUpdates: Array<{
+        id: string;
+        updates: Partial<Project>;
+    }>;
+    invoiceTemplateSequenceUpdate: {
+        id: string;
+        updates: Partial<InvoiceTemplate>;
+    } | null;
+    clearedTimeEntryCount: number;
+    deletedAdjustmentCount: number;
+    unbilledExpenseCount: number;
+    rewoundSequence: boolean;
+}
+
+export function buildInvoiceUndoApplication({
+    invoice,
+    invoiceId,
+    entries,
+    expenses,
+    tasks,
+    projects,
+    sequenceRollback,
+    templateId,
+    undoneAt,
+}: {
+    invoice: Invoice;
+    invoiceId: string;
+    entries: TimeEntry[];
+    expenses: Expense[];
+    tasks: Task[];
+    projects: Project[];
+    sequenceRollback: {
+        canRollback: boolean;
+        nextSequentialNumber: number;
+    };
+    templateId?: string | null;
+    undoneAt: number;
+}): {
+    plan: InvoiceUndoPlan;
+    application: InvoiceUndoApplicationPlan;
+} {
+    const plan = planInvoiceUndo({
+        invoice,
+        invoiceId,
+        entries,
+        expenses,
+        tasks,
+    });
+    const application = buildInvoiceUndoApplicationPlan({
+        invoiceId,
+        undoPlan: plan,
+        expenses,
+        tasks,
+        projects,
+        sequenceRollback,
+        templateId,
+        undoneAt,
+    });
+
+    return {
+        plan,
+        application,
+    };
+}
+
+export function buildInvoiceUndoApplicationPlan({
+    invoiceId,
+    undoPlan,
+    expenses,
+    tasks,
+    projects,
+    sequenceRollback,
+    templateId,
+    undoneAt,
+}: {
+    invoiceId: string;
+    undoPlan: InvoiceUndoPlan;
+    expenses: Expense[];
+    tasks: Task[];
+    projects: Project[];
+    sequenceRollback: {
+        canRollback: boolean;
+        nextSequentialNumber: number;
+    };
+    templateId?: string | null;
+    undoneAt: number;
+}): InvoiceUndoApplicationPlan {
+    const expenseIdsToUnbill = new Set(undoPlan.expenseIdsToUnbill);
+    const expenseUpdatesToUnbill = expenses
+        .filter((expense) => expenseIdsToUnbill.has(expense.id))
+        .map((expense) => ({
+            id: expense.id,
+            updates: buildUnbilledExpenseUpdates({ updatedAt: undoneAt }),
+        }));
+    const quotedTaskUpdates = tasks
+        .map((task) => {
+            if (task.quotedAmountBilling?.invoiceId !== invoiceId) {
+                return null;
+            }
+
+            const updates = buildReleasedQuotedTaskUpdates({
+                task,
+                updatedAt: undoneAt,
+            });
+
+            return updates ? { id: task.id, updates } : null;
+        })
+        .filter((update): update is { id: string; updates: Partial<Task> } => Boolean(update));
+    const taskCutoffUpdates = Array.from(undoPlan.taskLastBilledAtRestorations.entries())
+        .map(([taskId, restoredCutoff]) => ({
+            id: taskId,
+            updates: buildRestoredTaskBillingCutoffUpdates({
+                restoredCutoff,
+                updatedAt: undoneAt,
+            }),
+        }));
+    const projectUnlinkUpdates = projects
+        .map((project) => {
+            const updates = buildProjectInvoiceUnlinkUpdates({
+                project,
+                invoiceId,
+                updatedAt: undoneAt,
+            });
+
+            return updates ? { id: project.id, updates } : null;
+        })
+        .filter((update): update is { id: string; updates: Partial<Project> } => Boolean(update));
+    const invoiceTemplateSequenceUpdate = sequenceRollback.canRollback && templateId
+        ? {
+            id: templateId,
+            updates: buildInvoiceTemplateSequenceRollbackUpdates({
+                currentSequentialNumber: sequenceRollback.nextSequentialNumber,
+                updatedAt: undoneAt,
+            }),
+        }
+        : null;
+
+    return {
+        entriesToDelete: [...undoPlan.entriesToDelete],
+        entriesToClear: undoPlan.entriesToClear.map((entry) => ({
+            entry,
+            updates: buildClearedBilledTimeEntryUpdates({ updatedAt: undoneAt }),
+        })),
+        expenseUpdatesToUnbill,
+        quotedTaskUpdates,
+        taskCutoffUpdates,
+        projectUnlinkUpdates,
+        invoiceTemplateSequenceUpdate,
+        clearedTimeEntryCount: undoPlan.clearedTimeEntryCount,
+        deletedAdjustmentCount: undoPlan.deletedAdjustmentCount,
+        unbilledExpenseCount: expenseUpdatesToUnbill.length,
+        rewoundSequence: Boolean(invoiceTemplateSequenceUpdate),
+    };
+}
 
 export function buildClearedBilledTimeEntryUpdates({
     updatedAt,

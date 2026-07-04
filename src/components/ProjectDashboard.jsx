@@ -19,6 +19,7 @@ import { useInvoices } from '../hooks/useInvoices.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
+import { buildProjectDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import { buildProjectDeleteImpactPlan } from '@/domain/deletions/projectDeletion';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import {
@@ -173,6 +174,8 @@ const ProjectDashboard = ({
             return;
         }
 
+        const applicationPlan = buildProjectDeleteApplicationPlan(deletePlan);
+
         if (timerForProject) {
             clearTimer(projectId);
         }
@@ -190,14 +193,14 @@ const ProjectDashboard = ({
             projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
         }
 
-        deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
+        applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-        deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
+        applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
 
-        deleteProject(projectId);
-        deletePlan.taskIdsToDelete.forEach(taskId => deleteTask(taskId));
+        deleteProject(applicationPlan.projectIdToDelete);
+        applicationPlan.taskIdsToDelete.forEach(taskId => deleteTask(taskId));
 
-        const timeEntryIdsToDelete = deletePlan.timeEntryIdsToDelete;
+        const timeEntryIdsToDelete = applicationPlan.timeEntryIdsToDelete;
         timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
 
         const deletedTaskCount = deletePlan.taskIdsToDelete.length;

@@ -23,6 +23,7 @@ import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import { getProjectDeadlineStatus, isProjectInQuoteMode } from '../utils/projectPlanningUtils.ts';
 import { getProjectInvoicePreview } from '../utils/invoicePreviewUtils.ts';
 import { buildClientDeleteImpactPlan } from '@/domain/deletions/clientDeletion';
+import { buildClientDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import ExpensesSection from './expenses/ExpensesSection';
 import {
     DropdownMenu,
@@ -327,39 +328,33 @@ const ClientDashboard = ({
             return;
         }
 
+        const applicationPlan = buildClientDeleteApplicationPlan(deletePlan);
+
         if (alsoDeleteProjects) {
-            const relatedProjectIds = deletePlan.projectIdsToDelete;
+            const relatedProjectIds = applicationPlan.projectIdsToDelete;
 
             relatedProjectIds.forEach(id => deleteProject(id));
 
-            const relatedTaskIds = [
-                ...deletePlan.activeTaskIdsToDelete,
-                ...deletePlan.archivedTaskIdsToDelete,
-            ];
+            const relatedTaskIds = applicationPlan.taskIdsToDelete;
             relatedTaskIds.forEach(id => deleteTask(id));
 
-            const relatedTimeEntryIds = deletePlan.timeEntryIdsToDelete;
+            const relatedTimeEntryIds = applicationPlan.timeEntryIdsToDelete;
             relatedTimeEntryIds.forEach(id => deleteEntry(id));
 
-            const relatedInvoiceIds = deletePlan.invoiceIds;
+            const relatedInvoiceIds = applicationPlan.invoiceIdsToDelete;
             relatedInvoiceIds.forEach(id => unbillExpensesForInvoice(id));
             relatedInvoiceIds.forEach(id => deleteInvoice(id));
 
-            deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
+            applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-            deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
+            applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
         } else {
-            deletePlan.projectIdsToConvertToPersonal
-                .forEach(projectId => updateProject(projectId, {
-                    preferredClientId: null,
-                    hourlyRate: null,
-                    flatRate: false,
-                    isPersonal: true
-                }));
+            applicationPlan.projectConversionUpdates
+                .forEach(({ id, updates }) => updateProject(id, updates));
 
-            deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
+            applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-            deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
+            applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
         }
 
         deleteClient(clientId);

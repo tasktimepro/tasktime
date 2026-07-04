@@ -16,6 +16,7 @@ import { fetchExchangeRates, formatCurrency, getCurrencySymbol, getProjectCurren
 import { toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useYjs } from '../contexts/YjsContext';
+import { buildProjectDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import { buildProjectDeleteImpactPlan } from '@/domain/deletions/projectDeletion';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
@@ -233,6 +234,8 @@ const ProjectList = ({
             return;
         }
 
+        const applicationPlan = buildProjectDeleteApplicationPlan(deletePlan);
+
         const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
         const sharedInvoices = projectInvoicesForDelete.filter((invoice) => isMultiProjectInvoice(invoice));
 
@@ -241,7 +244,7 @@ const ProjectList = ({
             return;
         }
 
-        const taskIdsArray = deletePlan.taskIdsToDelete;
+        const taskIdsArray = applicationPlan.taskIdsToDelete;
 
         const projectTimer = timers.find(timer => timer.projectId === projectId);
         if (projectTimer) {
@@ -249,7 +252,7 @@ const ProjectList = ({
         }
 
         // Delete all time entries for deleted tasks (Separate document: entries-active)
-        const timeEntryIdsToDelete = deletePlan.timeEntryIdsToDelete;
+        const timeEntryIdsToDelete = applicationPlan.timeEntryIdsToDelete;
             
         if (timeEntryIdsToDelete.length > 0) {
             // Group time entry deletions in their own transaction on the active-entries document
@@ -266,12 +269,12 @@ const ProjectList = ({
                 projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
             }
 
-            deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
+            applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-            deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
+            applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
 
             // Delete the project
-            deleteProject(projectId);
+            deleteProject(applicationPlan.projectIdToDelete);
             
             // Delete all tasks for this project (including subtasks)
             taskIdsArray.forEach(taskId => deleteTask(taskId));

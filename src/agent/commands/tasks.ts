@@ -4,6 +4,7 @@ import { isRecurringCompletedOnDate, toggleRecurringCompletionDate } from '@/uti
 import { collectValidatedEntities } from '@/stores/yjs/validation';
 import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import { collectEntities } from '@/stores/yjs/entityUtils';
+import { buildProjectDeleteApplicationPlan, buildTaskDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import { buildProjectDeleteImpactPlan } from '@/domain/deletions/projectDeletion';
 import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import type { Client, Expense, ExpenseRecurrence, Invoice, MultiTimerState, PlannerAttachment, Project, Task, TimeEntry } from '@/stores/yjs/types';
@@ -348,36 +349,37 @@ export async function cascadeDeleteProjectCommand(context: AgentCommandContext, 
 
     const archivedMap = await context.store.loadArchivedTasks();
     let removedPlannerAttachmentCount = 0;
+    const applicationPlan = buildProjectDeleteApplicationPlan(preview);
 
     context.store.activeEntriesDoc.transact(() => {
-        preview.timeEntryIdsToDelete.forEach((entryId) => {
+        applicationPlan.timeEntryIdsToDelete.forEach((entryId) => {
             context.store.activeTimeEntries.delete(entryId);
         });
     });
 
     context.store.coreDoc.transact(() => {
-        preview.timerKeysToClear.forEach((timerKey) => {
+        applicationPlan.timerKeysToClear.forEach((timerKey) => {
             context.store.timers.delete(timerKey);
         });
 
-        preview.expenseIdsToDelete.forEach((expenseId) => {
+        applicationPlan.expenseIdsToDelete.forEach((expenseId) => {
             context.store.expenses.delete(expenseId);
         });
 
-        preview.recurrenceIdsToDelete.forEach((recurrenceId) => {
+        applicationPlan.recurrenceIdsToDelete.forEach((recurrenceId) => {
             context.store.expenseRecurrences.delete(recurrenceId);
         });
 
-        preview.taskIdsToDelete.forEach((deleteTaskId) => {
+        applicationPlan.taskIdsToDelete.forEach((deleteTaskId) => {
             context.store.tasks.delete(deleteTaskId);
             removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, deleteTaskId);
         });
 
-        context.store.projects.delete(projectId);
+        context.store.projects.delete(applicationPlan.projectIdToDelete);
         removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, projectId);
     });
 
-    preview.taskIdsToDelete.forEach((deleteTaskId) => {
+    applicationPlan.taskIdsToDelete.forEach((deleteTaskId) => {
         archivedMap.delete(deleteTaskId);
     });
 
@@ -657,25 +659,26 @@ export async function cascadeDeleteTaskCommand(context: AgentCommandContext, inp
     const archivedMap = await context.store.loadArchivedTasks();
     const taskIdSet = new Set(preview.taskIdsToDelete);
     let removedPlannerAttachmentCount = 0;
+    const applicationPlan = buildTaskDeleteApplicationPlan(preview);
 
     context.store.activeEntriesDoc.transact(() => {
-        preview.timeEntryIdsToDelete.forEach((entryId) => {
+        applicationPlan.timeEntryIdsToDelete.forEach((entryId) => {
             context.store.activeTimeEntries.delete(entryId);
         });
     });
 
     context.store.coreDoc.transact(() => {
-        preview.timerKeysToClear.forEach((timerKey) => {
+        applicationPlan.timerKeysToClear.forEach((timerKey) => {
             context.store.timers.delete(timerKey);
         });
 
-        preview.taskIdsToDelete.forEach((deleteTaskId) => {
+        applicationPlan.taskIdsToDelete.forEach((deleteTaskId) => {
             context.store.tasks.delete(deleteTaskId);
             removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, deleteTaskId);
         });
     });
 
-    preview.taskIdsToDelete.forEach((deleteTaskId) => {
+    applicationPlan.taskIdsToDelete.forEach((deleteTaskId) => {
         if (taskIdSet.has(deleteTaskId)) {
             archivedMap.delete(deleteTaskId);
         }

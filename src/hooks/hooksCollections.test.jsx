@@ -20,7 +20,7 @@ vi.mock('@/contexts/YjsContext', () => ({
 const mockUseYjsCollection = useYjsCollection
 
 function makeCollection(items) {
-    const update = vi.fn()
+    const update = vi.fn((id, updates) => ({ id, ...updates }))
     return {
         items,
         isLoading: false,
@@ -53,6 +53,18 @@ describe('collection-backed hooks', () => {
 
         expect(collection.update).toHaveBeenCalledWith('b', { isDefault: false })
         expect(collection.update).toHaveBeenCalledWith('a', { isDefault: true })
+    })
+
+    it('business infos fall back to the first record when no default is marked', () => {
+        const collection = makeCollection([
+            { id: 'a', isDefault: false, name: 'One' },
+            { id: 'b', isDefault: false, name: 'Two' },
+        ])
+        mockUseYjsCollection.mockReturnValue(collection)
+
+        const { result } = renderHook(() => useBusinessInfos())
+
+        expect(result.current.defaultBusinessInfo?.id).toBe('a')
     })
 
     it('clients are sorted and can be found case-insensitively', () => {
@@ -121,6 +133,18 @@ describe('collection-backed hooks', () => {
 
         expect(collection.update).toHaveBeenCalledWith('p2', { isDefault: false })
         expect(collection.update).toHaveBeenCalledWith('p1', { isDefault: true })
+    })
+
+    it('payment methods fall back to the first record when no default is marked', () => {
+        const collection = makeCollection([
+            { id: 'p1', isDefault: false, label: 'Cash' },
+            { id: 'p2', isDefault: false, label: 'Card' },
+        ])
+        mockUseYjsCollection.mockReturnValue(collection)
+
+        const { result } = renderHook(() => usePaymentMethods())
+
+        expect(result.current.defaultPaymentMethod?.id).toBe('p1')
     })
 
     it('projects expose active/archived splits and archive helpers', () => {

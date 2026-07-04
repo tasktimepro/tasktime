@@ -111,12 +111,16 @@ import {
 import {
     createInvoiceDraftFromUnbilledWorkCommand,
     exportInvoicePdfCommand,
+    exportProjectQuotePdfCommand,
     finalizeInvoiceCommand,
     listInvoicesCommand,
     markInvoicePaidCommand,
     markInvoiceUnpaidCommand,
+    previewProjectQuoteCommand,
+    previewProjectQuoteEmailCommand,
     previewInvoiceFromUnbilledWorkCommand,
     previewInvoiceEmailCommand,
+    sendProjectQuoteEmailCommand,
     sendInvoiceEmailCommand,
     undoLatestInvoiceCommand,
     updateInvoiceDraftCommand,
@@ -233,6 +237,10 @@ export type AgentCommandName =
     | 'mark_invoice_unpaid'
     | 'undo_latest_invoice'
     | 'export_invoice_pdf'
+    | 'preview_project_quote'
+    | 'export_project_quote_pdf'
+    | 'preview_project_quote_email'
+    | 'send_project_quote_email'
     | 'preview_invoice_email'
     | 'send_invoice_email'
     | 'get_dashboard_summary'
@@ -853,6 +861,31 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         description: 'Generate and download an invoice PDF in the paired browser app session without returning PDF bytes through the bridge.',
         scopes: ['read', 'export'],
         handler: exportInvoicePdfCommand,
+    },
+    preview_project_quote: {
+        name: 'preview_project_quote',
+        description: 'Build a non-persistent quote document from project estimates without creating invoices or billing side effects.',
+        scopes: ['read'],
+        handler: previewProjectQuoteCommand,
+    },
+    export_project_quote_pdf: {
+        name: 'export_project_quote_pdf',
+        description: 'Generate and download a non-persistent project quote PDF in the paired browser app session.',
+        scopes: ['read', 'export'],
+        handler: exportProjectQuotePdfCommand,
+    },
+    preview_project_quote_email: {
+        name: 'preview_project_quote_email',
+        description: 'Resolve quote email recipient, template fields, body, and attachment title for a non-persistent project quote without sending email.',
+        scopes: ['read'],
+        handler: previewProjectQuoteEmailCommand,
+    },
+    send_project_quote_email: {
+        name: 'send_project_quote_email',
+        description: 'Generate a non-persistent project quote PDF in the paired browser app session and send it by email after explicit confirmation.',
+        scopes: ['read', 'email'],
+        requiresApproval: true,
+        handler: sendProjectQuoteEmailCommand,
     },
     preview_invoice_email: {
         name: 'preview_invoice_email',

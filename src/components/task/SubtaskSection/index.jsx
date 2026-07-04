@@ -26,6 +26,8 @@ import { useTimers } from '../../../hooks/useTimers';
 import { useProjects } from '../../../hooks/useProjects';
 import DeleteTaskWarnings from '../DeleteTaskWarnings';
 import { getTaskDeletionBillingSummary } from '../../../utils/taskUtils.ts';
+import { buildTaskDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
+import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { toStorageDate } from '../../../utils/dateUtils.ts';
@@ -204,16 +206,33 @@ const SubtaskSection = ({
             || null;
 
         const subtaskTitle = subtaskToDelete?.title || 'Subtask';
+        const deleteImpactPlan = buildTaskDeleteImpactPlan({
+            taskId: pendingDeleteSubtaskId,
+            activeTasks: subtasks.filter((subtask) => !subtask.archived),
+            archivedTasks: subtasks.filter((subtask) => subtask.archived),
+            timeEntries,
+            timers,
+            invoices: [],
+            plannerAttachments: [],
+        });
+        const deleteApplication = deleteImpactPlan
+            ? buildTaskDeleteApplicationPlan(deleteImpactPlan)
+            : {
+                taskIdsToDelete: [pendingDeleteSubtaskId],
+                timeEntryIdsToDelete: timeEntries
+                    .filter((entry) => entry.taskId === pendingDeleteSubtaskId)
+                    .map((entry) => entry.id),
+                timerKeysToClear: timers
+                    .filter((timer) => timer.taskId === pendingDeleteSubtaskId)
+                    .map((timer) => timer.projectId),
+                plannerAttachmentIdsToDelete: [],
+            };
 
-        const entriesToDelete = timeEntries.filter((entry) => entry.taskId === pendingDeleteSubtaskId);
-        entriesToDelete.forEach((entry) => deleteEntry(entry.id));
+        deleteApplication.timeEntryIdsToDelete.forEach((entryId) => deleteEntry(entryId));
 
-        const activeTimer = timers.find((timer) => timer.taskId === pendingDeleteSubtaskId);
-        if (activeTimer) {
-            clearTimer(activeTimer.projectId);
-        }
+        deleteApplication.timerKeysToClear.forEach((timerKey) => clearTimer(timerKey));
 
-        deleteTask(pendingDeleteSubtaskId);
+        deleteApplication.taskIdsToDelete.forEach((taskId) => deleteTask(taskId));
         showSuccess(`Subtask "${subtaskTitle}" deleted successfully`);
         setPendingDeleteSubtaskId(null);
     }, [pendingDeleteSubtaskId, pendingDeleteSubtask, subtasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);

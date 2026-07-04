@@ -54,6 +54,11 @@ import {
     isStoredDateWithinBillingRange,
 } from '../utils/billingPeriodUtils.ts';
 import { getClientHourlyRate } from '../utils/projectPlanningUtils.ts';
+import { generateId } from '../utils/idUtils.ts';
+import {
+    buildInvoiceEditApplication,
+    buildInvoiceFinalizationApplication,
+} from '../domain/invoices/invoiceFinalizationApplication.ts';
 
 const INVOICE_DRAFT_CACHE = new Map();
 const INVOICE_DRAFT_TTL_MS = 12 * 60 * 60 * 1000;
@@ -171,10 +176,6 @@ const getCurrentQuotedFlatAmount = (task) => {
     return currentQuotedAmount;
 };
 
-const isQuotedFlatInvoiceTask = (task) => {
-    return task?.useFlatRate === true || task?.projectFlatRate === true;
-};
-
 const areProjectsEquivalent = (left, right) => {
     if (left === right) {
         return true;
@@ -265,10 +266,10 @@ const InvoiceGenerator = ({
     const allowAdditionalProjectsSelection = Boolean(client && !project);
     // Yjs hooks for data access
     const { invoices, createInvoice, updateInvoice, undoLatestInvoice, canUndoInvoice } = useInvoices();
-    const { projects } = useProjects();
+    const { projects, updateProject } = useProjects();
     const { tasks, updateTask } = useTasks();
     const { createEntry, updateEntry, deleteEntry } = useTimeEntries();
-    const { expenses, markAsBilled, markAsUnbilled } = useExpenses();
+    const { expenses, updateExpense } = useExpenses();
     const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
     const { businessBrandAssets, getBusinessBrandAsset } = useBusinessBrandAssets();
     const { getTimerForProject } = useTimers();
@@ -2423,125 +2424,62 @@ const InvoiceGenerator = ({
         };
     };
 
-    const syncInvoiceAdjustments = useCallback((invoiceData, adjustmentTimestamp) => {
-        if (!invoiceData || !Array.isArray(invoiceData.tasks)) return;
-
-        const invoiceId = invoiceData.id;
-        const existingAdjustments = timeEntries.filter(entry =>
-            entry.source === 'invoice-adjustment' && entry.billedInvoiceId === invoiceId
-        );
-        const existingByTaskId = new Map(existingAdjustments.map(entry => [entry.taskId, entry]));
-
-        const tasksToAdjust = invoiceData.tasks.filter(task => task && task.id);
-        const taskIdsToAdjust = new Set(tasksToAdjust.map(task => task.id));
-
-        tasksToAdjust.forEach(task => {
-            if (task.useFlatRate) return;
-
-            const originalMs = Number.isFinite(task.originalTimeMs)
-                ? task.originalTimeMs
-                : (Number(task.originalHours) || 0) * 3600000;
-            const desiredMs = (Number(task.hours) || 0) * 3600000;
-            const deltaMs = desiredMs - originalMs;
-
-            const existingEntry = existingByTaskId.get(task.id);
-
-            if (deltaMs <= 0) {
-                if (existingEntry) {
-                    deleteEntry(existingEntry.id);
-                }
-                return;
-            }
-
-            const startTime = existingEntry?.start || (adjustmentTimestamp - deltaMs);
-            const endTime = startTime + deltaMs;
-            const hourlyRate = Number.isFinite(task.hourlyRate) ? task.hourlyRate : null;
-
-            if (existingEntry) {
-                updateEntry(existingEntry.id, {
-                    start: startTime,
-                    end: endTime,
-                    note: 'Invoice adjustment',
-                    source: 'invoice-adjustment',
-                    billedAt: adjustmentTimestamp,
-                    billedInvoiceId: invoiceId,
-                    billedHourlyRate: hourlyRate
-                });
-                return;
-            }
-
-            createEntry({
-                taskId: task.id,
-                start: startTime,
-                end: endTime,
-                note: 'Invoice adjustment',
-                source: 'invoice-adjustment',
-                billedAt: adjustmentTimestamp,
-                billedInvoiceId: invoiceId,
-                billedHourlyRate: hourlyRate
-            });
-        });
-
-        existingAdjustments.forEach(entry => {
-            if (!taskIdsToAdjust.has(entry.taskId)) {
-                deleteEntry(entry.id);
-            }
-        });
-    }, [timeEntries, createEntry, updateEntry, deleteEntry]);
-
-    const getBilledTaskIdsForInvoiceCreation = () => {
-        const billedTaskIds = new Set();
-        const invoiceTaskIds = new Set(invoiceTasks.map((task) => task.id));
-
-        invoiceTasks.forEach(task => {
-            if (selectedTasksForBilling[task.id] && invoiceTaskIds.has(task.id)) {
-                billedTaskIds.add(task.id);
-
-                if (mergedSubtasks[task.id]) {
-                    const subtasks = invoiceTasks.filter(subtask =>
-                        subtask.parentTaskId === task.id && invoiceTaskIds.has(subtask.id)
-                    );
-                    subtasks.forEach(subtask => {
-                        billedTaskIds.add(subtask.id);
-                    });
-                }
-            }
-        });
-
-        return Array.from(billedTaskIds);
-    };
-
-    const buildBillingStateSnapshot = (snapshotTimestamp) => {
-        const taskLastBilledAt = {};
-        const billedTaskIds = getBilledTaskIdsForInvoiceCreation();
-
-        billedTaskIds.forEach(taskId => {
-            const task = tasks.find(t => t.id === taskId);
-            taskLastBilledAt[taskId] = task?.lastBilledAt || null;
-        });
-
-        return {
-            version: 1,
-            capturedAt: snapshotTimestamp,
-            taskLastBilledAt,
-        };
-    };
-
     /**
      * Save invoice (create new or update existing)
      */
     const handleSaveInvoice = (e) => {
         e.preventDefault();
-        const invoiceData = buildInvoiceData({ applyTemplateSequentialUpdate: true });
+
+        if (isQuoteMode) {
+            return;
+        }
+
+        let invoiceData = buildInvoiceData({ applyTemplateSequentialUpdate: Boolean(editingInvoice || isQuoteMode) });
         if (!invoiceData) {
             return;
         }
 
-        const invoiceId = invoiceData.id;
         const adjustmentTimestamp = Date.now();
+        const shouldUseSharedFinalizationPlan = !editingInvoice && !isQuoteMode;
+        const shouldUseSharedEditPlan = Boolean(editingInvoice && !isQuoteMode);
+        let finalizationApplication = null;
+        let editApplication = null;
 
-        if (!editingInvoice && !isQuoteMode) {
-            invoiceData.billingStateSnapshot = buildBillingStateSnapshot(adjustmentTimestamp);
+        if (shouldUseSharedFinalizationPlan) {
+            finalizationApplication = buildInvoiceFinalizationApplication({
+                invoice: invoiceData,
+                projects,
+                clients,
+                tasks,
+                entries: timeEntries,
+                expenses,
+                finalizedAt: adjustmentTimestamp,
+                createAdjustmentId: generateId,
+                invoiceTemplate: resolveCurrentInvoiceTemplate(invoiceData, invoiceTemplates),
+                invoices: [...invoices, invoiceData],
+            }).application;
+
+            invoiceData = {
+                ...invoiceData,
+                ...finalizationApplication.invoiceUpdates,
+            };
+        }
+
+        if (shouldUseSharedEditPlan) {
+            const selectedExpenseIds = Object.keys(selectedExpensesForBilling)
+                .filter((expenseId) => selectedExpensesForBilling[expenseId]);
+
+            editApplication = buildInvoiceEditApplication({
+                invoice: invoiceData,
+                projects,
+                clients,
+                tasks,
+                entries: timeEntries,
+                expenses,
+                editedAt: adjustmentTimestamp,
+                createAdjustmentId: generateId,
+                selectedExpenseIds,
+            }).application;
         }
 
         // Store invoice in the invoices collection
@@ -2553,126 +2491,71 @@ const InvoiceGenerator = ({
             createInvoice(invoiceData);
         }
 
-        syncInvoiceAdjustments(invoiceData, adjustmentTimestamp);
-
-        const selectedExpenseIds = new Set(
-            Object.keys(selectedExpensesForBilling).filter((expenseId) => selectedExpensesForBilling[expenseId])
-        );
-        const previouslyBilledExpenseIds = new Set(
-            expenses.filter((expense) => expense.invoiceId === invoiceId).map((expense) => expense.id)
-        );
-
-        selectedExpenseIds.forEach((expenseId) => {
-            markAsBilled(expenseId, invoiceId);
-        });
-
-        previouslyBilledExpenseIds.forEach((expenseId) => {
-            if (!selectedExpenseIds.has(expenseId)) {
-                markAsUnbilled(expenseId);
-            }
-        });
-
-        const invoiceTaskMap = new Map((invoiceData.tasks || []).map((task) => [task.id, task]));
-
-        tasks.forEach((task) => {
-            if (!task?.id) {
-                return;
-            }
-
-            const invoiceTask = invoiceTaskMap.get(task.id);
-            const existingQuoteAmount = getCurrentQuotedFlatAmount(task);
-
-            if (
-                invoiceTask
-                && isQuotedFlatInvoiceTask(invoiceTask)
-                && existingQuoteAmount !== null
-                && (!editingInvoice || !task.quotedAmountBilling?.invoiceId)
-            ) {
-                updateTask(task.id, {
-                    estimatedFlatAmount: null,
-                    quotedAmountBilling: {
-                        invoiceId,
-                        billedAt: adjustmentTimestamp,
-                        total: existingQuoteAmount
-                    }
-                });
-                return;
-            }
-
-            if (
-                editingInvoice
-                && task.quotedAmountBilling?.invoiceId === invoiceId
-                && !invoiceTask
-            ) {
-                const restoredQuoteAmount = existingQuoteAmount ?? task.quotedAmountBilling.total;
-
-                updateTask(task.id, {
-                    estimatedFlatAmount: restoredQuoteAmount,
-                    quotedAmountBilling: null
-                });
-            }
-        });
-
-        // Update tasks to set lastBilledAt for billed tasks
-        if (!editingInvoice) {
-            const currentTime = adjustmentTimestamp;
-            const billedTaskIds = getBilledTaskIdsForInvoiceCreation();
-
-            const billedRateByTaskId = new Map();
-            (invoiceData.tasks || []).forEach(task => {
-                const rate = Number.isFinite(task.hourlyRate) ? task.hourlyRate : 0;
-                billedRateByTaskId.set(task.id, rate);
-
-                if (task.isMerged && Array.isArray(task.mergedSubtasks)) {
-                    task.mergedSubtasks.forEach(subtask => {
-                        const subtaskRate = Number.isFinite(subtask.hourlyRate) ? subtask.hourlyRate : rate;
-                        billedRateByTaskId.set(subtask.id, subtaskRate);
-                    });
-                }
+        if (finalizationApplication) {
+            finalizationApplication.adjustmentEntryIdsToDelete.forEach((entryId) => {
+                deleteEntry(entryId);
             });
 
-            const previousBillingCutoffs = new Map();
-            billedTaskIds.forEach(taskId => {
-                const task = tasks.find(t => t.id === taskId);
-                previousBillingCutoffs.set(taskId, task?.lastBilledAt || 0);
+            finalizationApplication.adjustmentEntriesToUpdate.forEach(({ id, updates }) => {
+                updateEntry(id, updates);
             });
 
-            const nextBillingCutoffs = new Map(previousBillingCutoffs);
-
-            if (Array.isArray(timeEntries) && timeEntries.length > 0) {
-                timeEntries.forEach(entry => {
-                    if (!billedRateByTaskId.has(entry.taskId)) return;
-                    if (entry.source === 'invoice-adjustment') return;
-
-                    const cutoff = previousBillingCutoffs.get(entry.taskId) || 0;
-                    if (entry.start <= cutoff) return;
-                    if (!entry.end || entry.end <= entry.start) return;
-                    if (entry.start > currentTime) return;
-                    if (!isStoredDateWithinBillingRange(entry.start, activeBillingPeriodStart, activeBillingPeriodEnd)) return;
-
-                    updateEntry(entry.id, {
-                        billedHourlyRate: billedRateByTaskId.get(entry.taskId),
-                        billedAt: currentTime,
-                        billedInvoiceId: invoiceId
-                    });
-
-                    const nextCutoff = Math.max(nextBillingCutoffs.get(entry.taskId) || 0, entry.end);
-                    nextBillingCutoffs.set(entry.taskId, nextCutoff);
+            finalizationApplication.adjustmentEntriesToCreate.forEach(({ id, entry }) => {
+                createEntry({
+                    id,
+                    ...entry,
                 });
-            }
-            
-            // Update lastBilledAt using the latest billed entry end per task.
-            // Using invoice creation time can block valid backdated entries.
-            billedTaskIds.forEach(taskId => {
-                const task = tasks.find(t => t.id === taskId);
-                const previousCutoff = previousBillingCutoffs.get(taskId) || 0;
-                const nextCutoff = nextBillingCutoffs.get(taskId) || 0;
-
-                if (task && nextCutoff > previousCutoff) {
-                    updateTask(taskId, { lastBilledAt: nextCutoff });
-                }
             });
-            
+
+            finalizationApplication.timeEntryUpdates.forEach(({ id, updates }) => {
+                updateEntry(id, updates);
+            });
+
+            finalizationApplication.expenseUpdates.forEach(({ id, updates }) => {
+                updateExpense(id, updates);
+            });
+
+            finalizationApplication.taskCutoffUpdates.forEach(({ id, updates }) => {
+                updateTask(id, updates);
+            });
+
+            finalizationApplication.quotedTaskUpdates.forEach(({ id, updates }) => {
+                updateTask(id, updates);
+            });
+
+            finalizationApplication.projectLinkUpdates.forEach(({ id, updates }) => {
+                updateProject(id, updates);
+            });
+
+            if (finalizationApplication.invoiceTemplateSequenceUpdate) {
+                updateInvoiceTemplate(
+                    finalizationApplication.invoiceTemplateSequenceUpdate.id,
+                    finalizationApplication.invoiceTemplateSequenceUpdate.updates
+                );
+            }
+        } else if (editApplication) {
+            editApplication.adjustmentEntryIdsToDelete.forEach((entryId) => {
+                deleteEntry(entryId);
+            });
+
+            editApplication.adjustmentEntriesToUpdate.forEach(({ id, updates }) => {
+                updateEntry(id, updates);
+            });
+
+            editApplication.adjustmentEntriesToCreate.forEach(({ id, entry }) => {
+                createEntry({
+                    id,
+                    ...entry,
+                });
+            });
+
+            editApplication.expenseUpdates.forEach(({ id, updates }) => {
+                updateExpense(id, updates);
+            });
+
+            editApplication.quotedTaskUpdates.forEach(({ id, updates }) => {
+                updateTask(id, updates);
+            });
         }
 
         // Reset form

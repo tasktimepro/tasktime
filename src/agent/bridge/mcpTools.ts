@@ -19,6 +19,50 @@ const optionalString = { type: 'string' };
 const optionalNumber = { type: 'number' };
 const optionalBoolean = { type: 'boolean' };
 const nullableString = { type: ['string', 'null'] };
+const projectQuoteTaskSchema = {
+    type: 'object',
+    properties: {
+        id: optionalString,
+        title: optionalString,
+        hours: optionalNumber,
+        hourlyRate: optionalNumber,
+        flatRate: optionalNumber,
+        quantity: optionalNumber,
+        useFlatRate: optionalBoolean,
+        parentTaskId: nullableString,
+    },
+    required: ['title'],
+    additionalProperties: false,
+};
+const projectQuoteBaseProperties = {
+    projectId: optionalString,
+    clientId: nullableString,
+    businessInfoId: nullableString,
+    paymentMethodId: nullableString,
+    invoiceTemplateId: nullableString,
+    note: optionalString,
+    quoteDate: optionalString,
+    quoteTimestamp: optionalString,
+    quoteTasks: {
+        type: 'array',
+        items: projectQuoteTaskSchema,
+    },
+    additionalTasks: {
+        type: 'array',
+        items: projectQuoteTaskSchema,
+    },
+};
+const projectQuoteEmailProperties = {
+    ...projectQuoteBaseProperties,
+    emailTemplateId: nullableString,
+    to: nullableString,
+    fromName: nullableString,
+    replyTo: nullableString,
+    subject: nullableString,
+    body: nullableString,
+    attachmentTitle: nullableString,
+    forwardToSelf: optionalBoolean,
+};
 
 const emptySchema: JsonSchema = {
     type: 'object',
@@ -1554,6 +1598,57 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
                 filename: optionalString,
             },
             required: ['invoiceId'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'preview_project_quote',
+        description: 'Build a non-persistent quote document from project estimates without creating invoices or billing side effects.',
+        scopes: ['read'],
+        inputSchema: {
+            type: 'object',
+            properties: projectQuoteBaseProperties,
+            required: ['projectId'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'export_project_quote_pdf',
+        description: 'Generate and download a non-persistent project quote PDF in the paired browser app session. The bridge returns status metadata only, not PDF bytes.',
+        scopes: ['read', 'export'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                ...projectQuoteBaseProperties,
+                filename: optionalString,
+            },
+            required: ['projectId'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'preview_project_quote_email',
+        description: 'Resolve project quote email recipient, template fields, body, and attachment title without sending email or mutating data.',
+        scopes: ['read'],
+        inputSchema: {
+            type: 'object',
+            properties: projectQuoteEmailProperties,
+            required: ['projectId'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'send_project_quote_email',
+        description: 'Send a non-persistent project quote email through the paired browser app session after explicit confirmation and browser approval. Generates the quote PDF in-browser and does not update invoice records.',
+        scopes: ['read', 'email'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                ...projectQuoteEmailProperties,
+                confirmSend: optionalBoolean,
+                idempotencyKey: optionalString,
+            },
+            required: ['projectId', 'confirmSend'],
             additionalProperties: false,
         },
     },

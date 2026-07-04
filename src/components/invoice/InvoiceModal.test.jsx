@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 import InvoiceModal from './InvoiceModal'
 
@@ -225,6 +225,25 @@ describe('InvoiceModal', () => {
 
         expect(screen.getByTestId('tasks-time-toggle')).toHaveAttribute('data-autofocus')
         expect(screen.getByRole('button', { name: /client & project details/i })).not.toHaveAttribute('data-autofocus')
+    })
+
+    it('ignores accidental quote form submissions', () => {
+        const handleSaveInvoice = vi.fn()
+        const { container } = render(
+            <InvoiceModal
+                {...baseProps}
+                mode="quote"
+                selectedClient={{ id: 'client-1', title: 'Acme' }}
+                selectedProject={{ id: 'project-1', title: 'Website' }}
+                invoiceTasks={[{ id: 'task-1', title: 'Task' }]}
+                selectedTasksForBilling={{ 'task-1': true }}
+                handleSaveInvoice={handleSaveInvoice}
+            />
+        )
+
+        fireEvent.submit(container.querySelector('form'))
+
+        expect(handleSaveInvoice).not.toHaveBeenCalled()
     })
 
     it('shows additional projects only when the modal is opened from a client dashboard', () => {

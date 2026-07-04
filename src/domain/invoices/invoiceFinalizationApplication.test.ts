@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { InvoiceFinalizationPlan } from './invoiceFinalization';
 import {
+    buildInvoiceEditApplicationPlan,
     buildInvoiceFinalizationApplicationPlan,
     buildFinalizedExpenseUpdates,
     buildFinalizedInvoiceUpdates,
@@ -105,7 +106,6 @@ describe('invoice finalization application builders', () => {
             },
         })).toEqual({
             status: 'sent',
-            sentAt: 1000,
             billingStateSnapshot: {
                 version: 1,
                 capturedAt: 1000,
@@ -285,12 +285,138 @@ describe('invoice finalization application builders', () => {
         });
         expect(applicationPlan.invoiceUpdates).toEqual(expect.objectContaining({
             status: 'sent',
-            sentAt: 1000,
         }));
+        expect(applicationPlan.invoiceUpdates).not.toHaveProperty('sentAt');
         expect(applicationPlan.billedEntryCount).toBe(1);
         expect(applicationPlan.billedExpenseCount).toBe(1);
         expect(applicationPlan.updatedTaskCount).toBe(1);
         expect(applicationPlan.updatedProjectInvoiceReferences).toBe(true);
         expect(applicationPlan.advancedInvoiceSequence).toBe(true);
+    });
+
+    it('builds edit application updates for invoice adjustment, expense, and quoted task changes', () => {
+        const applicationPlan = buildInvoiceEditApplicationPlan({
+            invoice: {
+                id: 'invoice-1',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                invoiceNumber: 'INV-1',
+                date: '2026-06-27',
+                status: 'sent',
+                subtotal: 0,
+                total: 0,
+                items: [],
+                tasks: [
+                    { id: 'task-kept' },
+                    { id: 'task-new-quoted' },
+                ],
+            } as any,
+            plan: {
+                adjustmentEntryIdsToDelete: ['adjustment-delete'],
+                adjustmentEntriesToUpdate: [{
+                    id: 'adjustment-update',
+                    updates: {
+                        end: 200,
+                    },
+                }],
+                adjustmentEntriesToCreate: [{
+                    id: 'adjustment-create',
+                    entry: {
+                        taskId: 'task-kept',
+                        start: 100,
+                        end: 200,
+                    } as any,
+                }],
+                quotedTaskClaims: [{
+                    taskId: 'task-new-quoted',
+                    total: 400,
+                }],
+            },
+            expenses: [
+                { id: 'expense-selected', invoiceId: null } as any,
+                { id: 'expense-deselected', invoiceId: 'invoice-1' } as any,
+                { id: 'expense-other', invoiceId: 'invoice-2' } as any,
+            ],
+            tasks: [
+                {
+                    id: 'task-new-quoted',
+                    estimatedFlatAmount: 400,
+                } as any,
+                {
+                    id: 'task-removed-quoted',
+                    estimatedFlatAmount: null,
+                    quotedAmountBilling: {
+                        invoiceId: 'invoice-1',
+                        billedAt: 90,
+                        total: 300,
+                    },
+                } as any,
+                {
+                    id: 'task-other-quoted',
+                    quotedAmountBilling: {
+                        invoiceId: 'invoice-2',
+                        billedAt: 90,
+                        total: 500,
+                    },
+                } as any,
+            ],
+            selectedExpenseIds: ['expense-selected'],
+            editedAt: 1000,
+        });
+
+        expect(applicationPlan.adjustmentEntryIdsToDelete).toEqual(['adjustment-delete']);
+        expect(applicationPlan.adjustmentEntriesToUpdate).toEqual([{
+            id: 'adjustment-update',
+            updates: {
+                end: 200,
+            },
+        }]);
+        expect(applicationPlan.adjustmentEntriesToCreate).toHaveLength(1);
+        expect(applicationPlan.expenseUpdates).toEqual([
+            {
+                id: 'expense-selected',
+                updates: {
+                    billingStatus: 'billed',
+                    invoiceId: 'invoice-1',
+                    billedAt: 1000,
+                    updatedAt: 1000,
+                },
+            },
+            {
+                id: 'expense-deselected',
+                updates: {
+                    billingStatus: 'unbilled',
+                    invoiceId: null,
+                    billedAt: null,
+                    updatedAt: 1000,
+                },
+            },
+        ]);
+        expect(applicationPlan.quotedTaskUpdates).toEqual([
+            {
+                id: 'task-new-quoted',
+                updates: {
+                    estimatedFlatAmount: null,
+                    quotedAmountBilling: {
+                        invoiceId: 'invoice-1',
+                        billedAt: 1000,
+                        total: 400,
+                    },
+                    updatedAt: 1000,
+                },
+            },
+            {
+                id: 'task-removed-quoted',
+                updates: {
+                    estimatedFlatAmount: 300,
+                    quotedAmountBilling: null,
+                    updatedAt: 1000,
+                },
+            },
+        ]);
+        expect(applicationPlan.billedExpenseCount).toBe(1);
+        expect(applicationPlan.unbilledExpenseCount).toBe(1);
+        expect(applicationPlan.claimedQuotedTaskCount).toBe(1);
+        expect(applicationPlan.releasedQuotedTaskCount).toBe(1);
     });
 });

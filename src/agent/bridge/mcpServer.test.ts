@@ -203,6 +203,10 @@ describe('MCP bridge tool definitions', () => {
         expect(readTools.map((tool) => tool.name)).toContain('preview_delete_task');
         expect(readTools.map((tool) => tool.name)).toContain('preview_delete_project');
         expect(readTools.map((tool) => tool.name)).toContain('preview_delete_client');
+        expect(readTools.map((tool) => tool.name)).toContain('preview_project_quote');
+        expect(readTools.map((tool) => tool.name)).toContain('preview_project_quote_email');
+        expect(readTools.map((tool) => tool.name)).not.toContain('export_project_quote_pdf');
+        expect(readTools.map((tool) => tool.name)).not.toContain('send_project_quote_email');
         expect(readTools.map((tool) => tool.name)).not.toContain('create_task');
         expect(fullTools.map((tool) => tool.name)).toContain('create_task');
         expect(fullTools.map((tool) => tool.name)).toContain('cascade_delete_task');
@@ -253,7 +257,9 @@ describe('MCP bridge tool definitions', () => {
         expect(accountTools.map((tool) => tool.name)).toContain('restore_drive_backup');
         expect(accountTools.map((tool) => tool.name)).toContain('update_sync_settings');
         expect(accountTools.map((tool) => tool.name)).toContain('delete_all_account_data');
+        expect(exportTools.map((tool) => tool.name)).toContain('export_project_quote_pdf');
         expect(emailTools.map((tool) => tool.name)).toContain('send_invoice_email');
+        expect(emailTools.map((tool) => tool.name)).toContain('send_project_quote_email');
     });
 });
 

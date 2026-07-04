@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
-import type { Expense, Invoice, InvoiceTemplate, Task, TimeEntry } from '@/stores/yjs/types';
+import type { Expense, Invoice, Task, TimeEntry } from '@/stores/yjs/types';
 import { collectEntities, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import {
@@ -22,14 +22,9 @@ import {
     resolveCurrentInvoiceTemplate,
 } from '@/utils/invoiceUtils';
 import { buildMarkInvoicePaidUpdates, buildMarkInvoiceUnpaidUpdates } from '@/domain/invoices/invoicePayment';
-import { planInvoiceUndo } from '@/domain/invoices/invoiceUndo';
 import {
-    buildClearedBilledTimeEntryUpdates,
-    buildInvoiceTemplateSequenceRollbackUpdates,
-    buildProjectInvoiceUnlinkUpdates,
+    buildInvoiceUndoApplication,
     buildReleasedQuotedTaskUpdates,
-    buildRestoredTaskBillingCutoffUpdates,
-    buildUnbilledExpenseUpdates,
 } from '@/domain/invoices/invoiceUndoApplication';
 
 const shouldStoreInvoicePaymentSnapshot = (invoice: Partial<Invoice>, preferredCurrency: string) => {
@@ -336,15 +331,31 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         const loadedEntries = store.getAllTimeEntries();
         const taskMaps = [store.tasks, store.archivedTasks].filter(Boolean);
         const allExpenseMaps = [store.expenses, store.archivedExpenses].filter(Boolean);
-        const undoPlan = planInvoiceUndo({
+        const allTasks = taskMaps.flatMap((taskMap) => collectEntities<Task>(taskMap as any));
+        const allExpenses = allExpenseMaps.flatMap((expenseMap) => collectEntities<Expense>(expenseMap as any));
+        const template = resolveCurrentInvoiceTemplate(invoice, collectEntities(store.invoiceTemplates as any));
+        const sequenceRollback = getInvoiceSequenceRollback(invoice, template, allInvoices);
+        const undoApplication = buildInvoiceUndoApplication({
             invoice: invoice as Invoice,
             invoiceId: id,
             entries: loadedEntries,
-            tasks: taskMaps.flatMap((taskMap) => collectEntities<Task>(taskMap as any)),
-            expenses: allExpenseMaps.flatMap((expenseMap) => collectEntities<Expense>(expenseMap as any)),
-        });
-        const entriesByMap = new Map<any, { toDelete: TimeEntry[]; toClear: TimeEntry[] }>();
-        const queueEntryMutation = (entryMap: any, action: 'delete' | 'clear', entry: TimeEntry) => {
+            expenses: allExpenses,
+            tasks: allTasks,
+            projects: collectEntities(store.projects as any),
+            sequenceRollback,
+            templateId: template?.id,
+            undoneAt: undoTimestamp,
+        }).application;
+        const entriesByMap = new Map<any, {
+            toDelete: TimeEntry[];
+            toClear: Array<{ entry: TimeEntry; updates: Partial<TimeEntry> }>;
+        }>();
+        const queueEntryMutation = (
+            entryMap: any,
+            action: 'delete' | 'clear',
+            entry: TimeEntry,
+            updates?: Partial<TimeEntry>
+        ) => {
             if (!entryMap) {
                 return;
             }
@@ -354,13 +365,16 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             if (action === 'delete') {
                 existing.toDelete.push(entry);
             } else {
-                existing.toClear.push(entry);
+                existing.toClear.push({
+                    entry,
+                    updates: updates || {},
+                });
             }
 
             entriesByMap.set(entryMap, existing);
         };
 
-        undoPlan.entriesToDelete.forEach((entry) => {
+        undoApplication.entriesToDelete.forEach((entry) => {
             const entryMap = store.activeTimeEntries.has(entry.id)
                 ? store.activeTimeEntries
                 : yearEntryMaps.get(new Date(entry.start).getFullYear());
@@ -368,12 +382,12 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             queueEntryMutation(entryMap, 'delete', entry);
         });
 
-        undoPlan.entriesToClear.forEach((entry) => {
+        undoApplication.entriesToClear.forEach(({ entry, updates }) => {
             const entryMap = store.activeTimeEntries.has(entry.id)
                 ? store.activeTimeEntries
                 : yearEntryMaps.get(new Date(entry.start).getFullYear());
 
-            queueEntryMutation(entryMap, 'clear', entry);
+            queueEntryMutation(entryMap, 'clear', entry, updates);
         });
 
         entriesByMap.forEach((mutation, entryMap) => {
@@ -384,10 +398,8 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
                     entryMap.delete(entry.id);
                 });
 
-                mutation.toClear.forEach((entry) => {
-                    updateEntityFields(entryMap as any, entry.id, buildClearedBilledTimeEntryUpdates({
-                        updatedAt: undoTimestamp,
-                    }));
+                mutation.toClear.forEach(({ entry, updates }) => {
+                    updateEntityFields(entryMap as any, entry.id, updates);
                 });
             };
 
@@ -399,8 +411,9 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             applyChanges();
         });
 
-        const expenseIdsToUnbill = new Set(undoPlan.expenseIdsToUnbill);
-        let unbilledExpenseCount = 0;
+        const expenseUpdatesToUnbill = new Map(
+            undoApplication.expenseUpdatesToUnbill.map(({ id: expenseId, updates }) => [expenseId, updates])
+        );
 
         allExpenseMaps.forEach((expenseMap) => {
             const parentDoc = (expenseMap as any)?.doc;
@@ -409,14 +422,13 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
                 (expenseMap as any).forEach((value: unknown, expenseId: string) => {
                     const expense = readEntity<any>(value);
 
-                    if (!expense || !expenseIdsToUnbill.has(expenseId)) {
+                    const updates = expenseUpdatesToUnbill.get(expenseId);
+
+                    if (!expense || !updates) {
                         return;
                     }
 
-                    updateEntityFields(expenseMap as any, expenseId, buildUnbilledExpenseUpdates({
-                        updatedAt: undoTimestamp,
-                    }));
-                    unbilledExpenseCount += 1;
+                    updateEntityFields(expenseMap as any, expenseId, updates);
                 });
             };
 
@@ -428,21 +440,31 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             applyChanges();
         });
 
-        releaseQuotedAmountsForInvoice(id);
+        const quotedTaskUpdates = new Map(
+            undoApplication.quotedTaskUpdates.map(({ id: taskId, updates }) => [taskId, updates])
+        );
+        const taskCutoffUpdates = new Map(
+            undoApplication.taskCutoffUpdates.map(({ id: taskId, updates }) => [taskId, updates])
+        );
 
         taskMaps.forEach((taskMap) => {
             const parentDoc = (taskMap as any)?.doc;
 
             const applyChanges = () => {
-                undoPlan.taskLastBilledAtRestorations.forEach((restoredCutoff, taskId) => {
+                quotedTaskUpdates.forEach((updates, taskId) => {
                     if (!(taskMap as any).has(taskId)) {
                         return;
                     }
 
-                    updateEntityFields(taskMap as any, taskId, buildRestoredTaskBillingCutoffUpdates({
-                        restoredCutoff,
-                        updatedAt: undoTimestamp,
-                    }));
+                    updateEntityFields(taskMap as any, taskId, updates);
+                });
+
+                taskCutoffUpdates.forEach((updates, taskId) => {
+                    if (!(taskMap as any).has(taskId)) {
+                        return;
+                    }
+
+                    updateEntityFields(taskMap as any, taskId, updates);
                 });
             };
 
@@ -454,32 +476,21 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             applyChanges();
         });
 
-        const template = resolveCurrentInvoiceTemplate(invoice, collectEntities(store.invoiceTemplates as any));
-        const sequenceRollback = getInvoiceSequenceRollback(invoice, template, allInvoices);
-
         store.coreDoc.transact(() => {
-            store.projects.forEach((value: unknown, projectId: string) => {
-                const project = readEntity<any>(value);
-                const updates = project
-                    ? buildProjectInvoiceUnlinkUpdates({
-                        project,
-                        invoiceId: id,
-                        updatedAt: undoTimestamp,
-                    })
-                    : null;
-
-                if (!updates) {
+            undoApplication.projectUnlinkUpdates.forEach(({ id: projectId, updates }) => {
+                if (!store.projects.has(projectId)) {
                     return;
                 }
 
                 updateEntityFields(store.projects as any, projectId, updates);
             });
 
-            if (sequenceRollback.canRollback && template?.id) {
-                updateEntityFields(store.invoiceTemplates as any, template.id, buildInvoiceTemplateSequenceRollbackUpdates({
-                    currentSequentialNumber: sequenceRollback.nextSequentialNumber,
-                    updatedAt: undoTimestamp,
-                }) as Partial<InvoiceTemplate>);
+            if (undoApplication.invoiceTemplateSequenceUpdate) {
+                updateEntityFields(
+                    store.invoiceTemplates as any,
+                    undoApplication.invoiceTemplateSequenceUpdate.id,
+                    undoApplication.invoiceTemplateSequenceUpdate.updates
+                );
             }
         });
 
@@ -495,10 +506,10 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
 
         return {
             invoiceNumber: invoice?.invoiceNumber || id,
-            clearedTimeEntryCount: undoPlan.clearedTimeEntryCount,
-            deletedAdjustmentCount: undoPlan.deletedAdjustmentCount,
-            unbilledExpenseCount,
-            rewoundSequence: sequenceRollback.canRollback,
+            clearedTimeEntryCount: undoApplication.clearedTimeEntryCount,
+            deletedAdjustmentCount: undoApplication.deletedAdjustmentCount,
+            unbilledExpenseCount: undoApplication.unbilledExpenseCount,
+            rewoundSequence: undoApplication.rewoundSequence,
         };
     }, [
         allInvoices,
@@ -507,7 +518,6 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         loadArchivedExpenses,
         loadArchivedTasks,
         loadEntriesForYear,
-        releaseQuotedAmountsForInvoice,
         store,
     ]);
 

@@ -1,6 +1,11 @@
-import type { Expense, Invoice, InvoiceTemplate, Project, Task, TimeEntry } from '@/stores/yjs/types';
+import type { Client, Expense, Invoice, InvoiceTemplate, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { getNextSequentialNumberForTemplate } from '@/utils/invoiceUtils';
-import type { InvoiceFinalizationPlan, InvoiceQuotedTaskClaim } from './invoiceFinalization';
+import {
+    planInvoiceFinalization,
+    type InvoiceFinalizationPlan,
+    type InvoiceQuotedTaskClaim,
+} from './invoiceFinalization';
+import { buildReleasedQuotedTaskUpdates, buildUnbilledExpenseUpdates } from './invoiceUndoApplication';
 
 export type FinalizedInvoiceUpdates = Partial<Invoice> & {
     agentDraft?: Record<string, unknown>;
@@ -46,6 +51,130 @@ export interface InvoiceFinalizationApplicationPlan {
     updatedTaskCount: number;
     updatedProjectInvoiceReferences: boolean;
     advancedInvoiceSequence: boolean;
+}
+
+export interface InvoiceEditApplicationPlan {
+    adjustmentEntryIdsToDelete: string[];
+    adjustmentEntriesToUpdate: Array<{
+        id: string;
+        updates: Partial<TimeEntry>;
+    }>;
+    adjustmentEntriesToCreate: Array<{
+        id: string;
+        entry: Omit<TimeEntry, 'id'>;
+    }>;
+    expenseUpdates: Array<{
+        id: string;
+        updates: Partial<Expense>;
+    }>;
+    quotedTaskUpdates: Array<{
+        id: string;
+        updates: Partial<Task>;
+    }>;
+    billedExpenseCount: number;
+    unbilledExpenseCount: number;
+    claimedQuotedTaskCount: number;
+    releasedQuotedTaskCount: number;
+}
+
+export function buildInvoiceFinalizationApplication({
+    invoice,
+    projects,
+    clients,
+    tasks,
+    entries,
+    expenses,
+    invoiceTemplate,
+    invoices,
+    finalizedAt,
+    createAdjustmentId,
+}: {
+    invoice: Invoice;
+    projects: Project[];
+    clients: Client[];
+    tasks: Task[];
+    entries: TimeEntry[];
+    expenses: Expense[];
+    invoiceTemplate?: (InvoiceTemplate & Record<string, unknown>) | null;
+    invoices: Invoice[];
+    finalizedAt: number;
+    createAdjustmentId: () => string;
+}): {
+    plan: InvoiceFinalizationPlan;
+    application: InvoiceFinalizationApplicationPlan;
+} {
+    const plan = planInvoiceFinalization({
+        invoice,
+        projects,
+        clients,
+        tasks,
+        entries,
+        expenses,
+        finalizedAt,
+        createAdjustmentId,
+    });
+    const application = buildInvoiceFinalizationApplicationPlan({
+        invoice,
+        plan,
+        projects,
+        invoiceTemplate,
+        invoices,
+        finalizedAt,
+    });
+
+    return {
+        plan,
+        application,
+    };
+}
+
+export function buildInvoiceEditApplication({
+    invoice,
+    projects,
+    clients,
+    tasks,
+    entries,
+    expenses,
+    selectedExpenseIds,
+    editedAt,
+    createAdjustmentId,
+}: {
+    invoice: Invoice;
+    projects: Project[];
+    clients: Client[];
+    tasks: Task[];
+    entries: TimeEntry[];
+    expenses: Expense[];
+    selectedExpenseIds: Iterable<string>;
+    editedAt: number;
+    createAdjustmentId: () => string;
+}): {
+    plan: InvoiceFinalizationPlan;
+    application: InvoiceEditApplicationPlan;
+} {
+    const plan = planInvoiceFinalization({
+        invoice,
+        projects,
+        clients,
+        tasks,
+        entries,
+        expenses,
+        finalizedAt: editedAt,
+        createAdjustmentId,
+    });
+    const application = buildInvoiceEditApplicationPlan({
+        invoice,
+        plan,
+        expenses,
+        tasks,
+        selectedExpenseIds,
+        editedAt,
+    });
+
+    return {
+        plan,
+        application,
+    };
 }
 
 export function buildInvoiceFinalizationApplicationPlan({
@@ -138,6 +267,82 @@ export function buildInvoiceFinalizationApplicationPlan({
         updatedTaskCount: plan.updatedTaskIds.size,
         updatedProjectInvoiceReferences: projectLinkUpdates.length > 0,
         advancedInvoiceSequence: Boolean(invoiceTemplateSequenceUpdate),
+    };
+}
+
+export function buildInvoiceEditApplicationPlan({
+    invoice,
+    plan,
+    expenses,
+    tasks,
+    selectedExpenseIds,
+    editedAt,
+}: {
+    invoice: Invoice;
+    plan: Pick<InvoiceFinalizationPlan, 'adjustmentEntryIdsToDelete' | 'adjustmentEntriesToUpdate' | 'adjustmentEntriesToCreate' | 'quotedTaskClaims'>;
+    expenses: Expense[];
+    tasks: Task[];
+    selectedExpenseIds: Iterable<string>;
+    editedAt: number;
+}): InvoiceEditApplicationPlan {
+    const selectedExpenseIdSet = new Set(selectedExpenseIds);
+    const invoiceTaskIds = collectInvoiceTaskIds(invoice);
+    const expenseUpdatesToBill = expenses
+        .filter((expense) => selectedExpenseIdSet.has(expense.id))
+        .map((expense) => ({
+            id: expense.id,
+            updates: buildFinalizedExpenseUpdates({
+                invoiceId: invoice.id,
+                finalizedAt: editedAt,
+            }),
+        }));
+    const expenseUpdatesToUnbill = expenses
+        .filter((expense) => expense.invoiceId === invoice.id && !selectedExpenseIdSet.has(expense.id))
+        .map((expense) => ({
+            id: expense.id,
+            updates: buildUnbilledExpenseUpdates({
+                updatedAt: editedAt,
+            }),
+        }));
+    const quotedTaskClaims = plan.quotedTaskClaims.map((claim) => ({
+        id: claim.taskId,
+        updates: buildFinalizedQuotedTaskUpdates({
+            invoiceId: invoice.id,
+            finalizedAt: editedAt,
+            claim,
+        }),
+    }));
+    const quotedTaskReleases = tasks
+        .map((task) => {
+            if (task.quotedAmountBilling?.invoiceId !== invoice.id || invoiceTaskIds.has(task.id)) {
+                return null;
+            }
+
+            const updates = buildReleasedQuotedTaskUpdates({
+                task,
+                updatedAt: editedAt,
+            });
+
+            return updates ? { id: task.id, updates } : null;
+        })
+        .filter((update): update is { id: string; updates: Partial<Task> } => Boolean(update));
+
+    return {
+        adjustmentEntryIdsToDelete: [...plan.adjustmentEntryIdsToDelete],
+        adjustmentEntriesToUpdate: plan.adjustmentEntriesToUpdate.map((adjustment) => ({
+            id: adjustment.id,
+            updates: adjustment.updates,
+        })),
+        adjustmentEntriesToCreate: plan.adjustmentEntriesToCreate.map((adjustment) => ({
+            id: adjustment.id,
+            entry: adjustment.entry,
+        })),
+        expenseUpdates: [...expenseUpdatesToBill, ...expenseUpdatesToUnbill],
+        quotedTaskUpdates: [...quotedTaskClaims, ...quotedTaskReleases],
+        billedExpenseCount: expenseUpdatesToBill.length,
+        unbilledExpenseCount: expenseUpdatesToUnbill.length,
+        claimedQuotedTaskCount: quotedTaskClaims.length,
+        releasedQuotedTaskCount: quotedTaskReleases.length,
     };
 }
 
@@ -250,7 +455,6 @@ export function buildFinalizedInvoiceUpdates({
 }): FinalizedInvoiceUpdates {
     return {
         status: 'sent',
-        sentAt: finalizedAt,
         billingStateSnapshot: {
             version: 1,
             capturedAt: finalizedAt,
@@ -265,4 +469,36 @@ export function buildFinalizedInvoiceUpdates({
             : undefined,
         updatedAt,
     };
+}
+
+function collectInvoiceTaskIds(invoice: Invoice): Set<string> {
+    const ids = new Set<string>();
+    const collect = (tasks: unknown) => {
+        if (!Array.isArray(tasks)) return;
+
+        tasks.forEach((task) => {
+            if (!task || typeof task !== 'object') return;
+
+            const record = task as Record<string, unknown>;
+            const taskId = typeof record.id === 'string' ? record.id : null;
+
+            if (taskId) {
+                ids.add(taskId);
+            }
+
+            collect(record.mergedSubtasks);
+        });
+    };
+
+    collect((invoice as Invoice & { tasks?: unknown }).tasks);
+
+    const projectBreakdowns = (invoice as Invoice & { projectBreakdowns?: unknown }).projectBreakdowns;
+    if (Array.isArray(projectBreakdowns)) {
+        projectBreakdowns.forEach((breakdown) => {
+            if (!breakdown || typeof breakdown !== 'object') return;
+            collect((breakdown as Record<string, unknown>).tasks);
+        });
+    }
+
+    return ids;
 }

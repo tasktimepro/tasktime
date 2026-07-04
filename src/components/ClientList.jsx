@@ -31,6 +31,7 @@ import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { buildClientRecentUpdateMap, buildProjectRecentUpdateMap } from '../utils/activityUtils.ts';
 import { buildClientDeleteImpactPlan } from '@/domain/deletions/clientDeletion';
+import { buildClientDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -188,21 +189,20 @@ const ClientList = ({
         if (!deletePlan) {
             return;
         }
+
+        const applicationPlan = buildClientDeleteApplicationPlan(deletePlan);
         
         if (alsoDeleteProjects) {
             // Get related projects and their task/time entry IDs
-            const relatedProjectIds = deletePlan.projectIdsToDelete;
+            const relatedProjectIds = applicationPlan.projectIdsToDelete;
             
             // Delete tasks for related projects
-            const relatedTaskIds = [
-                ...deletePlan.activeTaskIdsToDelete,
-                ...deletePlan.archivedTaskIdsToDelete,
-            ];
+            const relatedTaskIds = applicationPlan.taskIdsToDelete;
             
             // Delete time entries for related tasks
             // Note: Time entries are in a separate Yjs document (active-entries), so they cannot be included
             // in the core document transaction below. We delete them first, but grouped in their own transaction.
-            const relatedTimeEntryIds = deletePlan.timeEntryIdsToDelete;
+            const relatedTimeEntryIds = applicationPlan.timeEntryIdsToDelete;
             
             if (relatedTimeEntryIds.length > 0) {
                 store.activeEntriesDoc.transact(() => {
@@ -211,9 +211,9 @@ const ClientList = ({
             }
             
             // Delete invoices for related projects (Invoices are in core doc)
-            const relatedInvoiceIds = deletePlan.invoiceIds;
-            const relatedExpenseIds = deletePlan.expenseIdsToDelete;
-            const relatedRecurrenceIds = deletePlan.recurrenceIdsToDelete;
+            const relatedInvoiceIds = applicationPlan.invoiceIdsToDelete;
+            const relatedExpenseIds = applicationPlan.expenseIdsToDelete;
+            const relatedRecurrenceIds = applicationPlan.recurrenceIdsToDelete;
             
             // Execute all core document deletions in a single transaction
             // This ensures they are synced as a single atomic update
@@ -229,16 +229,11 @@ const ClientList = ({
         } else {
             // Remove client reference from projects and delete client in one transaction
             store.projects.doc.transact(() => {
-                deletePlan.projectIdsToConvertToPersonal
-                    .forEach(projectId => updateProject(projectId, {
-                        preferredClientId: null,
-                        hourlyRate: null,
-                        flatRate: false,
-                        isPersonal: true
-                    }));
-                deletePlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
+                applicationPlan.projectConversionUpdates
+                    .forEach(({ id, updates }) => updateProject(id, updates));
+                applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
 
-                deletePlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
+                applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
 
                 deleteClient(clientId);
             });

@@ -58,6 +58,7 @@ const templateHookMocks = vi.hoisted(() => ({
 const expenseHookMocks = vi.hoisted(() => ({
 
     expenses: [],
+    updateExpense: vi.fn(),
     markAsBilled: vi.fn(),
     markAsUnbilled: vi.fn()
 }))
@@ -67,6 +68,7 @@ let modalConfig = {
     skipTemplateSelection: false,
     adjustTaskHours: null,
     additionalTask: null,
+    deselectExpenseIds: [],
     billingPeriodPreset: null,
     billingPeriodStart: null,
     billingPeriodEnd: null
@@ -131,6 +133,7 @@ vi.mock('../hooks/useExpenses.ts', () => ({
 
     useExpenses: () => ({
         expenses: expenseHookMocks.expenses,
+        updateExpense: expenseHookMocks.updateExpense,
         markAsBilled: expenseHookMocks.markAsBilled,
         markAsUnbilled: expenseHookMocks.markAsUnbilled
     })
@@ -172,6 +175,7 @@ vi.mock('./invoice/InvoiceModal', () => {
         billingPeriodPreset,
         availableExpenses = [],
         selectedExpensesForBilling = {},
+        setSelectedExpensesForBilling,
         selectedBusinessInfo,
         newTaskTitle,
         newTaskHours,
@@ -196,12 +200,14 @@ vi.mock('./invoice/InvoiceModal', () => {
         }
         const didApplyAdjustments = React.useRef(false)
         const didAddAdditionalTask = React.useRef(false)
+        const didApplyExpenseSelection = React.useRef(false)
         const didApplyBillingPeriod = React.useRef(false)
 
         React.useEffect(() => {
             if (!showInvoiceForm) {
                 didApplyAdjustments.current = false
                 didAddAdditionalTask.current = false
+                didApplyExpenseSelection.current = false
                 didApplyBillingPeriod.current = false
                 return
             }
@@ -270,6 +276,26 @@ vi.mock('./invoice/InvoiceModal', () => {
             handleAddAdditionalTask,
             handleToggleNewTaskFlatRate
         ])
+
+        React.useEffect(() => {
+            if (
+                !showInvoiceForm
+                || didApplyExpenseSelection.current
+                || modalConfig.deselectExpenseIds.length === 0
+                || typeof setSelectedExpensesForBilling !== 'function'
+            ) {
+                return
+            }
+
+            didApplyExpenseSelection.current = true
+            setSelectedExpensesForBilling((previous) => {
+                const next = { ...previous }
+                modalConfig.deselectExpenseIds.forEach((expenseId) => {
+                    next[expenseId] = false
+                })
+                return next
+            })
+        }, [showInvoiceForm, setSelectedExpensesForBilling])
 
         React.useEffect(() => {
             if (!showInvoiceForm || didApplyBillingPeriod.current || !modalConfig.billingPeriodPreset) {
@@ -398,12 +424,14 @@ describe('InvoiceGenerator', () => {
         invoiceHookMocks.invoices = []
         invoiceHookMocks.createInvoice.mockClear()
         invoiceHookMocks.updateInvoice.mockClear()
+        projectHookMocks.updateProject.mockClear()
         templateHookMocks.updateInvoiceTemplate.mockClear()
         timeEntryHookMocks.updateEntry.mockClear()
         timeEntryHookMocks.createEntry.mockClear()
         timeEntryHookMocks.deleteEntry.mockClear()
         taskHookMocks.updateTask.mockClear()
         expenseHookMocks.expenses = []
+        expenseHookMocks.updateExpense.mockClear()
         expenseHookMocks.markAsBilled.mockClear()
         expenseHookMocks.markAsUnbilled.mockClear()
         pdfMocks.getCurrentInvoiceHtmlContent.mockClear()
@@ -414,6 +442,7 @@ describe('InvoiceGenerator', () => {
             skipTemplateSelection: false,
             adjustTaskHours: null,
             additionalTask: null,
+            deselectExpenseIds: [],
             billingPeriodPreset: null,
             billingPeriodStart: null,
             billingPeriodEnd: null
@@ -745,6 +774,37 @@ describe('InvoiceGenerator', () => {
         expect(await screen.findByTestId('pricing-subtotal')).toHaveTextContent('500')
     })
 
+    it('does not persist or mutate billing state from the quote save path', async () => {
+
+        taskHookMocks.tasks = [
+            {
+                id: 'task-1',
+                projectId: 'project-1',
+                title: 'Task',
+                billable: true,
+                estimatedHours: 3,
+                estimatedFlatAmount: 500
+            }
+        ]
+        const user = userEvent.setup()
+
+        renderGenerator({
+            mode: 'quote',
+            project: { ...baseProject, flatRate: true, statusMode: 'quote' }
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.createInvoice).not.toHaveBeenCalled()
+        expect(invoiceHookMocks.updateInvoice).not.toHaveBeenCalled()
+        expect(templateHookMocks.updateInvoiceTemplate).not.toHaveBeenCalled()
+        expect(taskHookMocks.updateTask).not.toHaveBeenCalled()
+        expect(timeEntryHookMocks.updateEntry).not.toHaveBeenCalled()
+        expect(timeEntryHookMocks.createEntry).not.toHaveBeenCalled()
+        expect(expenseHookMocks.updateExpense).not.toHaveBeenCalled()
+    })
+
     it('preloads flat-rate quote task amounts when a flat-rate project becomes active', async () => {
 
         taskHookMocks.tasks = [
@@ -801,7 +861,8 @@ describe('InvoiceGenerator', () => {
                     invoiceId: expect.stringMatching(/^INV-/),
                     billedAt: fixedNow,
                     total: 500
-                }
+                },
+                updatedAt: fixedNow
             })
         } finally {
             dateNowSpy.mockRestore()
@@ -1018,6 +1079,105 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.invoiceNumber).toBe('INV-OLD')
     })
 
+    it('applies edited invoice expense and quoted-task side effects through shared edit planning', async () => {
+
+        const fixedNow = Date.parse('2026-01-20T10:00:00Z')
+        const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow)
+        const user = userEvent.setup()
+
+        modalConfig.deselectExpenseIds = ['expense-deselected']
+        expenseHookMocks.expenses = [
+            {
+                id: 'expense-selected',
+                title: 'Selected expense',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                billable: true,
+                billingStatus: 'unbilled',
+                amount: 50,
+                date: '2026-01-10',
+                currency: 'EUR'
+            },
+            {
+                id: 'expense-deselected',
+                title: 'Deselected expense',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                billable: true,
+                billingStatus: 'billed',
+                invoiceId: 'inv-edit',
+                billedAt: Date.parse('2026-01-10T10:00:00Z'),
+                amount: 40,
+                date: '2026-01-09',
+                currency: 'EUR'
+            }
+        ]
+        taskHookMocks.tasks = [
+            { id: 'task-1', projectId: 'project-1', title: 'Task', billable: true, hourlyRate: 100 },
+            {
+                id: 'task-removed-quoted',
+                projectId: 'project-1',
+                title: 'Removed quoted task',
+                billable: true,
+                estimatedFlatAmount: null,
+                quotedAmountBilling: {
+                    invoiceId: 'inv-edit',
+                    billedAt: Date.parse('2026-01-10T10:00:00Z'),
+                    total: 300
+                }
+            }
+        ]
+
+        try {
+            renderGenerator({
+                editingInvoice: {
+                    id: 'inv-edit',
+                    invoiceNumber: 'INV-EDIT',
+                    projectId: 'project-1',
+                    clientId: 'client-1',
+                    tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
+                    items: [{
+                        description: 'Selected expense',
+                        quantity: 1,
+                        rate: 50,
+                        amount: 50,
+                        expenseId: 'expense-selected'
+                    }],
+                    date: '2026-01-05',
+                    createdAt: 111,
+                    status: 'sent',
+                    template: { id: 'tpl-1', name: 'Template One' }
+                }
+            })
+
+            await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+            await new Promise((resolve) => setTimeout(resolve, 0))
+            await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+            expect(expenseHookMocks.updateExpense).toHaveBeenCalledWith('expense-selected', {
+                billingStatus: 'billed',
+                invoiceId: 'inv-edit',
+                billedAt: fixedNow,
+                updatedAt: fixedNow
+            })
+            expect(expenseHookMocks.updateExpense).toHaveBeenCalledWith('expense-deselected', {
+                billingStatus: 'unbilled',
+                invoiceId: null,
+                billedAt: null,
+                updatedAt: fixedNow
+            })
+            expect(taskHookMocks.updateTask).toHaveBeenCalledWith('task-removed-quoted', {
+                estimatedFlatAmount: 300,
+                quotedAmountBilling: null,
+                updatedAt: fixedNow
+            })
+            expect(expenseHookMocks.markAsBilled).not.toHaveBeenCalled()
+            expect(expenseHookMocks.markAsUnbilled).not.toHaveBeenCalled()
+        } finally {
+            dateNowSpy.mockRestore()
+        }
+    })
+
     it('uses the live template sequence when history carries a stale template snapshot', async () => {
 
         modalConfig.skipTemplateSelection = true
@@ -1062,6 +1222,9 @@ describe('InvoiceGenerator', () => {
         const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
         expect(invoiceData.invoiceNumber).toBe('INV-0160')
         expect(invoiceData.template?.currentSequentialNumber).toBe(160)
+        expect(projectHookMocks.updateProject).toHaveBeenCalledWith('project-1', expect.objectContaining({
+            invoiceIds: [invoiceData.id]
+        }))
         expect(templateHookMocks.updateInvoiceTemplate).toHaveBeenCalledWith('tpl-1', { currentSequentialNumber: 161 })
     })
 
@@ -1294,7 +1457,8 @@ describe('InvoiceGenerator', () => {
 
             expect(taskHookMocks.updateTask).toHaveBeenCalledTimes(1)
             expect(taskHookMocks.updateTask).toHaveBeenCalledWith('task-1', {
-                lastBilledAt: 3601000
+                lastBilledAt: 3601000,
+                updatedAt: fixedNow
             })
             expect(taskHookMocks.updateTask).not.toHaveBeenCalledWith('task-1', {
                 lastBilledAt: fixedNow

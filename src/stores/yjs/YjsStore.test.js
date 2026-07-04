@@ -690,6 +690,7 @@ describe('YjsStore timer reconciliation', () => {
     it('imports email templates plus archived and historical backup data into the correct docs', async () => {
         const store = new YjsStore()
         await store.initialize()
+        const activeExpenseDate = new Date().toISOString().slice(0, 10)
 
         await store.importBackupData({
             projects: [{
@@ -729,7 +730,7 @@ describe('YjsStore timer reconciliation', () => {
             invoiceTemplates: [],
             emailTemplates: [{ id: 'email-template-1', name: 'Email Template', type: 'quote', subject: 'Hello', sendBody: 'World', reminderBody: '', attachmentTitle: 'quote.pdf', isDefault: true }],
             expenses: [
-                { id: 'expense-active', title: 'Active Expense', date: '2026-04-01', amount: 10, currency: 'EUR', paymentStatus: 'paid', billingStatus: 'unbilled', isPersonal: true, billable: false, isRecurring: false, isTaxExempt: false },
+                { id: 'expense-active', title: 'Active Expense', date: activeExpenseDate, amount: 10, currency: 'EUR', paymentStatus: 'paid', billingStatus: 'unbilled', isPersonal: true, billable: false, isRecurring: false, isTaxExempt: false },
                 { id: 'expense-archived', title: 'Archived Expense', date: '2025-01-01', amount: 20, currency: 'EUR', paymentStatus: 'paid', billingStatus: 'unbilled', isPersonal: true, billable: false, isRecurring: false, isTaxExempt: false },
             ],
             expenseRecurrences: [],

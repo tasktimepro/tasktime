@@ -45,6 +45,7 @@ import {
     exportAccountantPackCommand,
     exportBackupJsonCommand,
     exportInvoicePdfCommand,
+    exportProjectQuotePdfCommand,
     exportReportCsvCommand,
     exportReportPdfCommand,
     finalizeInvoiceCommand,
@@ -81,11 +82,14 @@ import {
     previewDeleteClientCommand,
     previewDeleteProjectCommand,
     previewDeleteTaskCommand,
+    previewProjectQuoteCommand,
+    previewProjectQuoteEmailCommand,
     previewInvoiceEmailCommand,
     restoreBackupJsonCommand,
     restoreDriveBackupCommand,
     downloadDriveBackupJsonCommand,
     resumeExpenseRecurrenceCommand,
+    sendProjectQuoteEmailCommand,
     sendInvoiceEmailCommand,
     setDefaultBusinessInfoCommand,
     setDefaultEmailTemplateCommand,
@@ -5091,7 +5095,6 @@ describe('agent commands', () => {
             advancedInvoiceSequence: true,
             invoice: expect.objectContaining({
                 status: 'sent',
-                sentAt: Date.parse('2026-06-25T12:00:00Z'),
                 billingStateSnapshot: expect.objectContaining({
                     taskLastBilledAt: {
                         'task-ui-hourly': Date.parse('2025-05-01T00:00:00Z'),
@@ -5101,6 +5104,7 @@ describe('agent commands', () => {
                 }),
             }),
         }));
+        expect(finalized.invoice).not.toHaveProperty('sentAt');
         expect(readStored<Record<string, unknown>>(historicalEntries, 'entry-historical-ui')).toEqual(expect.objectContaining({
             billedInvoiceId: 'invoice-ui-draft',
             billedAt: Date.parse('2026-06-25T12:00:00Z'),
@@ -5702,6 +5706,211 @@ describe('agent commands', () => {
         })).resolves.toEqual(expect.objectContaining({
             ok: false,
             command: 'send_invoice_email',
+            error: expect.objectContaining({
+                code: 'PERMISSION_DENIED',
+                details: { scope: 'email' },
+            }),
+        }));
+    });
+
+    it('previews, exports, and sends non-persistent project quotes without invoice mutations', async () => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'export', 'email']);
+        context.driveSessionId = 'drive-session-quote';
+        context.now = () => Date.parse('2026-06-26T09:10:11Z');
+        context.maps.clients.set('client-1', objectToYMap({
+            id: 'client-1',
+            title: 'Client One',
+            clientName: 'Client One Ltd',
+            contactPerson: 'Alex Client',
+            email: 'quote@example.com',
+            defaultCurrency: 'USD',
+        }));
+        context.maps.projects.set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Quote Project',
+            preferredClientId: 'client-1',
+            hourlyRate: 150,
+            flatRate: false,
+            statusMode: 'quote',
+        }));
+        context.maps.tasks.set('quote-task-1', objectToYMap({
+            id: 'quote-task-1',
+            projectId: 'project-1',
+            title: 'Discovery',
+            billable: true,
+            estimatedHours: 2,
+        }));
+        context.maps.businessInfos.set('business-quote', objectToYMap({
+            id: 'business-quote',
+            title: 'TaskTime Studio',
+            businessName: 'TaskTime Studio',
+            email: 'hello@tasktime.test',
+            isDefault: true,
+        }));
+        context.maps.invoiceTemplates.set('template-quote', objectToYMap({
+            id: 'template-quote',
+            name: 'Quote template',
+            isDefault: true,
+            defaultNotes: 'Default quote note',
+        }));
+        context.maps.emailTemplates.set('email-template-quote-default', objectToYMap({
+            id: 'email-template-quote-default',
+            name: 'Default quote email',
+            type: 'quote',
+            fromName: 'Jane at TaskTime',
+            replyTo: 'quotes@tasktime.test',
+            subject: 'Quote {invoiceNumber} from {businessName}',
+            sendBody: 'Hi {clientName}, quote total is {currency}{amount}.',
+            reminderBody: 'Quote reminder',
+            attachmentTitle: 'quote-{invoiceNumber}',
+            isDefault: true,
+        }));
+
+        const preview = previewProjectQuoteCommand(context, {
+            projectId: 'project-1',
+            quoteDate: '2026-06-26',
+            quoteTimestamp: '26091011',
+        });
+
+        expect(preview).toEqual(expect.objectContaining({
+            projectId: 'project-1',
+            quote: expect.objectContaining({
+                id: 'QUOTE-project-1-26091011',
+                documentMode: 'quote',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                invoiceNumber: '26091011',
+                total: 300,
+                subtotal: 300,
+                status: 'sent',
+                items: [],
+            }),
+            sideEffects: {
+                createsInvoice: false,
+                marksEntriesBilled: false,
+                marksExpensesBilled: false,
+                updatesTaskBillingCutoffs: false,
+                updatesProjectInvoiceReferences: false,
+                advancesInvoiceSequence: false,
+            },
+        }));
+        expect(context.maps.invoices.size).toBe(0);
+
+        const pdf = await exportProjectQuotePdfCommand(context, {
+            projectId: 'project-1',
+            quoteDate: '2026-06-26',
+            quoteTimestamp: '26091011',
+        });
+
+        expect(pdf).toEqual({
+            projectId: 'project-1',
+            quoteId: 'QUOTE-project-1-26091011',
+            quoteNumber: '26091011',
+            filename: 'quote-project-quote-2026-06-26.pdf',
+            downloadStarted: true,
+        });
+        expect(pdfMocks.getCurrentInvoiceHtmlContent).toHaveBeenCalledWith(
+            expect.objectContaining({ documentMode: 'quote', invoiceNumber: '26091011' }),
+            [expect.objectContaining({ id: 'client-1' })],
+            [],
+        );
+        expect(pdfMocks.generatePDF).toHaveBeenCalledWith('<div>Invoice HTML</div>', 'quote-project-quote-2026-06-26.pdf');
+
+        const emailPreview = previewProjectQuoteEmailCommand(context, {
+            projectId: 'project-1',
+            quoteDate: '2026-06-26',
+            quoteTimestamp: '26091011',
+            forwardToSelf: true,
+        });
+
+        expect(emailPreview).toEqual(expect.objectContaining({
+            invoiceId: 'QUOTE-project-1-26091011',
+            invoiceNumber: '26091011',
+            sendType: 'quote',
+            templateId: 'email-template-quote-default',
+            to: 'quote@example.com',
+            fromName: 'Jane at TaskTime',
+            replyTo: 'quotes@tasktime.test',
+            subject: 'Quote 26091011 from TaskTime Studio',
+            body: expect.stringContaining('quote total is $300.00'),
+            attachmentTitle: 'quote-26091011',
+            forwardTo: 'quotes@tasktime.test',
+        }));
+
+        await expect(sendProjectQuoteEmailCommand(context, {
+            projectId: 'project-1',
+            quoteDate: '2026-06-26',
+            quoteTimestamp: '26091011',
+            confirmSend: false,
+        })).rejects.toThrow(/confirmSend/);
+
+        const sent = await sendProjectQuoteEmailCommand(context, {
+            projectId: 'project-1',
+            quoteDate: '2026-06-26',
+            quoteTimestamp: '26091011',
+            confirmSend: true,
+            forwardToSelf: true,
+            idempotencyKey: 'quote-send-1',
+        });
+        const repeated = await sendProjectQuoteEmailCommand(context, {
+            projectId: 'project-1',
+            quoteDate: '2026-06-26',
+            quoteTimestamp: '26091011',
+            confirmSend: true,
+            forwardToSelf: true,
+            idempotencyKey: 'quote-send-1',
+        });
+
+        expect(repeated).toBe(sent);
+        expect(emailMocks.sendInvoiceEmail).toHaveBeenCalledWith(expect.objectContaining({
+            sessionId: 'drive-session-quote',
+            invoiceId: 'QUOTE-project-1-26091011',
+            invoiceNumber: '26091011',
+            to: 'quote@example.com',
+            forwardTo: 'quotes@tasktime.test',
+            fromName: 'Jane at TaskTime',
+            replyTo: 'quotes@tasktime.test',
+            subject: 'Quote 26091011 from TaskTime Studio',
+            bodyText: expect.stringContaining('quote total is $300.00'),
+            pdfBase64: 'mock-pdf-base64',
+            sendType: 'quote',
+            attachmentTitle: 'quote-26091011',
+        }));
+        expect(sent).toEqual({
+            projectId: 'project-1',
+            quoteId: 'QUOTE-project-1-26091011',
+            quoteNumber: '26091011',
+            sendType: 'quote',
+            to: 'quote@example.com',
+            forwarded: true,
+            remaining: 9,
+            updatedInvoice: false,
+            sentAt: null,
+        });
+        expect(context.maps.invoices.size).toBe(0);
+
+        await expect(executeAgentCommand(context, 'preview_project_quote', {
+            projectId: 'project-1',
+            quoteTimestamp: '26091011',
+        })).resolves.toEqual(expect.objectContaining({
+            ok: true,
+            command: 'preview_project_quote',
+            data: expect.objectContaining({
+                quote: expect.objectContaining({
+                    documentMode: 'quote',
+                    invoiceNumber: '26091011',
+                }),
+            }),
+        }));
+
+        context.permissions = new Set(['read']);
+        await expect(executeAgentCommand(context, 'send_project_quote_email', {
+            projectId: 'project-1',
+            confirmSend: true,
+        })).resolves.toEqual(expect.objectContaining({
+            ok: false,
+            command: 'send_project_quote_email',
             error: expect.objectContaining({
                 code: 'PERMISSION_DENIED',
                 details: { scope: 'email' },

@@ -35,6 +35,7 @@ import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import DeleteTaskWarnings from './task/DeleteTaskWarnings';
 import { getTaskDeletionBillingSummary, getTaskIdsWithDescendants } from '../utils/taskUtils.ts';
+import { buildTaskDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { buildTaskAppendOrderPlan, buildTaskContainerMoveOrderUpdates, buildTaskMoveOrderUpdates, reorderTaskItems, sortTasksByManualOrder } from '../utils/taskOrderingUtils.ts';
@@ -51,18 +52,23 @@ const TASK_SORT_OPTIONS = [
 ];
 const TASK_SORT_VALUES = new Set(TASK_SORT_OPTIONS.map((option) => option.value));
 
-const getTaskDeletePlanIds = (taskId, tasks) => {
+const getTaskDeleteApplication = (taskId, tasks, timeEntries = [], timers = []) => {
     const plan = buildTaskDeleteImpactPlan({
         taskId,
         activeTasks: tasks.filter(task => !task.archived),
         archivedTasks: tasks.filter(task => task.archived),
-        timeEntries: [],
-        timers: [],
+        timeEntries,
+        timers,
         invoices: [],
         plannerAttachments: [],
     });
 
-    return plan?.taskIdsToDelete || [taskId];
+    return plan ? buildTaskDeleteApplicationPlan(plan) : {
+        taskIdsToDelete: [taskId],
+        timeEntryIdsToDelete: [],
+        timerKeysToClear: [],
+        plannerAttachmentIdsToDelete: [],
+    };
 };
 
 const getProjectTaskSort = (taskSort) => {
@@ -515,7 +521,7 @@ const TaskTree = ({
 
         return pendingDeleteTask.parentTaskId
             ? [pendingDeleteTaskId]
-            : getTaskDeletePlanIds(pendingDeleteTaskId, tasks);
+            : getTaskDeleteApplication(pendingDeleteTaskId, tasks).taskIdsToDelete;
     }, [pendingDeleteTaskId, pendingDeleteTask, tasks]);
 
     const deleteBillingSummary = useMemo(() => {
@@ -689,22 +695,26 @@ const TaskTree = ({
         const taskTitle = taskToDelete?.title || 'Task';
         const isMainTask = !!(taskToDelete && !taskToDelete.parentTaskId);
 
-        // Get all task IDs to delete (including subtasks for main tasks)
-        const taskIdsToDelete = isMainTask 
-            ? getTaskDeletePlanIds(pendingDeleteTaskId, tasks)
-            : [pendingDeleteTaskId];
+        const projectTimer = getTimerForProject(project.id);
+        const deleteApplication = isMainTask
+            ? getTaskDeleteApplication(pendingDeleteTaskId, tasks, timeEntries, [projectTimer].filter(Boolean))
+            : {
+                taskIdsToDelete: [pendingDeleteTaskId],
+                timeEntryIdsToDelete: timeEntries
+                    .filter(entry => entry.taskId === pendingDeleteTaskId)
+                    .map(entry => entry.id),
+                timerKeysToClear: projectTimer && projectTimer.taskId === pendingDeleteTaskId
+                    ? [project.id]
+                    : [],
+                plannerAttachmentIdsToDelete: [],
+            };
+        const taskIdsToDelete = deleteApplication.taskIdsToDelete;
 
         // Delete time entries for these tasks
-        const entriesToDelete = timeEntries.filter(entry => 
-            taskIdsToDelete.includes(entry.taskId)
-        );
-        entriesToDelete.forEach(entry => deleteEntry(entry.id));
+        deleteApplication.timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
 
         // Clear timer if it's for one of these tasks
-        const projectTimer = getTimerForProject(project.id);
-        if (projectTimer && taskIdsToDelete.includes(projectTimer.taskId)) {
-            clearTimer(project.id);
-        }
+        deleteApplication.timerKeysToClear.forEach(timerKey => clearTimer(timerKey));
 
         // Delete tasks
         taskIdsToDelete.forEach(id => deleteTask(id));

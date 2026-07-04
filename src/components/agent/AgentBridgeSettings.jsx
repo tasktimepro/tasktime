@@ -9,8 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Notice } from '@/components/ui/notice';
 import CustomCheckbox from '@/components/CustomCheckbox';
-import { useYjs } from '@/contexts/YjsContext';
-import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { useAgentCommandContext } from '@/hooks/useAgentCommandContext';
 import { cn } from '@/lib/utils';
 
 const STATUS_LABELS = {
@@ -55,11 +54,6 @@ function getStatusVariant(status, session, currentActivity) {
     return 'secondary';
 }
 
-function openAppRoute(path) {
-    const url = new URL(path, window.location.origin);
-    window.history.pushState({}, '', `${url.pathname}${url.search}`);
-}
-
 function describeActivity(activity) {
     if (!activity) {
         return 'None';
@@ -89,9 +83,7 @@ function getNoticeVariant(severity) {
 }
 
 export default function AgentBridgeSettings() {
-    const { store, isReady, driveSessionId, clearAllData } = useYjs();
-    const { revokeAccess } = useGoogleAuth();
-    const idempotencyRef = useRef(new Map());
+    const context = useAgentCommandContext();
     const clientRef = useRef(null);
     const pendingApprovalRef = useRef(null);
     const [endpoint, setEndpoint] = useState('');
@@ -107,17 +99,6 @@ export default function AgentBridgeSettings() {
     const [pendingApproval, setPendingApproval] = useState(null);
     const [agentAccessEnabled, setAgentAccessEnabled] = useState(true);
 
-    const context = useMemo(() => ({
-        store,
-        isReady,
-        clearAllData,
-        revokeDriveAccess: revokeAccess,
-        idempotency: idempotencyRef.current,
-        navigation: {
-            openRoute: openAppRoute,
-        },
-        driveSessionId,
-    }), [store, isReady, clearAllData, revokeAccess, driveSessionId]);
     const endpointDiagnostics = useMemo(
         () => getAgentBridgeConnectionDiagnostics(endpoint),
         [endpoint]

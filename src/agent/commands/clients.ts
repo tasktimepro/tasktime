@@ -4,6 +4,7 @@ import { collectValidatedEntities } from '@/stores/yjs/validation';
 import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import { collectEntities } from '@/stores/yjs/entityUtils';
 import { buildClientDeleteImpactPlan } from '@/domain/deletions/clientDeletion';
+import { buildClientDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import type { Client, Expense, ExpenseRecurrence, Invoice, MultiTimerState, PlannerAttachment, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
@@ -286,6 +287,7 @@ export async function cascadeDeleteClientCommand(context: AgentCommandContext, i
     const archivedMap = await context.store.loadArchivedTasks();
     let removedPlannerAttachmentCount = 0;
     const deletedTaskIds = [...preview.activeTaskIdsToDelete, ...preview.archivedTaskIdsToDelete].sort();
+    const applicationPlan = buildClientDeleteApplicationPlan(preview);
 
     context.store.activeEntriesDoc.transact(() => {
         preview.timeEntryIdsToDelete.forEach((entryId) => {
@@ -307,22 +309,19 @@ export async function cascadeDeleteClientCommand(context: AgentCommandContext, i
         });
 
         if (alsoDeleteProjects) {
-            deletedTaskIds.forEach((taskId) => {
+            applicationPlan.taskIdsToDelete.forEach((taskId) => {
                 context.store.tasks.delete(taskId);
                 removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, taskId);
             });
 
-            preview.projectIdsToDelete.forEach((projectId) => {
+            applicationPlan.projectIdsToDelete.forEach((projectId) => {
                 context.store.projects.delete(projectId);
                 removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, projectId);
             });
         } else {
-            preview.projectIdsToConvertToPersonal.forEach((projectId) => {
+            applicationPlan.projectConversionUpdates.forEach(({ id: projectId, updates }) => {
                 updateValidatedEntity<Project>(context.store.projects as any, 'projects', projectId, {
-                    preferredClientId: null,
-                    hourlyRate: null,
-                    flatRate: false,
-                    isPersonal: true,
+                    ...updates,
                     updatedAt: getNow(context),
                 }, `agent cascade delete client convert project ${projectId}`);
             });

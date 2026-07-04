@@ -213,6 +213,11 @@ const InvoiceModal = ({
 
     const handleSave = (e) => {
         e.preventDefault();
+
+        if (isQuoteMode) {
+            return;
+        }
+
         // Validation logic to open the relevant section if required inputs are missing
         if (!selectedClient) {
             setActiveSection('projectClient');

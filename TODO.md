@@ -5,6 +5,10 @@
 [ ] docs/todo/local-agent-bridge-proposal.md
     - Make sure this is full-parity with UI
 
+[ ] Check about the current incidents on debugbundle
+
+[ ] Check about create invoice from main invoice page should allow multiple projects - and for within projects we should leave a notice that for multiple projects should be from the client main page
+
 ---
 
 ## Blog Posts

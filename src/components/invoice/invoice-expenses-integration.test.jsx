@@ -20,9 +20,15 @@ const invoiceHookMocks = vi.hoisted(() => ({
     canUndoInvoice: vi.fn(() => false),
 }))
 
+const projectHookMocks = vi.hoisted(() => ({
+
+    updateProject: vi.fn()
+}))
+
 const expenseHookMocks = vi.hoisted(() => ({
 
     expenses: [],
+    updateExpense: vi.fn(),
     markAsBilled: vi.fn(),
     markAsUnbilled: vi.fn()
 }))
@@ -74,7 +80,8 @@ vi.mock('../../hooks/useInvoices.ts', () => ({
 vi.mock('../../hooks/useProjects.ts', () => ({
 
     useProjects: () => ({
-        projects: [{ id: 'project-1', title: 'Project', hourlyRate: 100, invoiceIds: [] }]
+        projects: [{ id: 'project-1', title: 'Project', hourlyRate: 100, invoiceIds: [] }],
+        updateProject: projectHookMocks.updateProject
     })
 }))
 
@@ -107,6 +114,7 @@ vi.mock('../../hooks/useExpenses.ts', () => ({
 
     useExpenses: () => ({
         expenses: expenseHookMocks.expenses,
+        updateExpense: expenseHookMocks.updateExpense,
         markAsBilled: expenseHookMocks.markAsBilled,
         markAsUnbilled: expenseHookMocks.markAsUnbilled
     })
@@ -240,6 +248,8 @@ describe('invoice expenses integration', () => {
 
     beforeEach(() => {
         invoiceHookMocks.createInvoice.mockClear()
+        projectHookMocks.updateProject.mockClear()
+        expenseHookMocks.updateExpense.mockClear()
         expenseHookMocks.markAsBilled.mockClear()
         expenseHookMocks.markAsUnbilled.mockClear()
         invoiceOnlyTestState.enabled = false
@@ -296,7 +306,13 @@ describe('invoice expenses integration', () => {
                 exchangeRate: 1
             }
         ])
-        expect(expenseHookMocks.markAsBilled).toHaveBeenCalledWith('exp-1', invoiceData.id)
+        expect(expenseHookMocks.updateExpense).toHaveBeenCalledWith('exp-1', {
+            billingStatus: 'billed',
+            invoiceId: invoiceData.id,
+            billedAt: expect.any(Number),
+            updatedAt: expect.any(Number)
+        })
+        expect(expenseHookMocks.markAsBilled).not.toHaveBeenCalled()
     })
 
     it('converts cross-currency expenses to invoice currency', async () => {
@@ -351,7 +367,13 @@ describe('invoice expenses integration', () => {
         expect(expenseItem.amount).toBeCloseTo(116.46, 1)
         expect(expenseItem.rate).toBeCloseTo(116.46, 1)
         expect(expenseItem.exchangeRate).toBeGreaterThan(1) // GBP is worth more than EUR
-        expect(expenseHookMocks.markAsBilled).toHaveBeenCalledWith('exp-gbp', invoiceData.id)
+        expect(expenseHookMocks.updateExpense).toHaveBeenCalledWith('exp-gbp', {
+            billingStatus: 'billed',
+            invoiceId: invoiceData.id,
+            billedAt: expect.any(Number),
+            updatedAt: expect.any(Number)
+        })
+        expect(expenseHookMocks.markAsBilled).not.toHaveBeenCalled()
     })
 
     it('does not include non-convertible expenses when rates are unavailable', async () => {
@@ -403,6 +425,7 @@ describe('invoice expenses integration', () => {
         // The non-convertible expense should NOT be included in invoice items
         const expenseItem = invoiceData.items.find(i => i.expenseId === 'exp-chf')
         expect(expenseItem).toBeUndefined()
+        expect(expenseHookMocks.updateExpense).not.toHaveBeenCalled()
         expect(expenseHookMocks.markAsBilled).not.toHaveBeenCalled()
     })
 
@@ -440,6 +463,7 @@ describe('invoice expenses integration', () => {
         expect(invoiceOnlyItem.rate).toBe(80)
         expect(invoiceOnlyItem.originalAmount).toBe(80)
         expect(invoiceOnlyItem.originalCurrency).toBe('EUR')
+        expect(expenseHookMocks.updateExpense).not.toHaveBeenCalled()
         expect(expenseHookMocks.markAsBilled).not.toHaveBeenCalled()
     })
 })

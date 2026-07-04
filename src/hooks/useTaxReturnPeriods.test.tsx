@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTaxReturnPeriods } from './useTaxReturnPeriods';
 
@@ -29,6 +29,7 @@ describe('useTaxReturnPeriods', () => {
         mockUpdate.mockReset();
         mockRemove.mockReset();
         mockGet.mockReset();
+        vi.useRealTimers();
     });
 
     it('sorts tax return periods by end date descending', () => {
@@ -101,5 +102,77 @@ describe('useTaxReturnPeriods', () => {
             'period-title-b',
         ]);
         expect(result.current.isLoading).toBe(true);
+    });
+
+    it('marks a tax return period filed through shared status updates', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-01T12:00:00Z'));
+        mockGet.mockReturnValue({
+            id: 'period-1',
+            title: 'Q2 VAT',
+            type: 'vat',
+            startDate: '2026-04-01',
+            endDate: '2026-06-30',
+            status: 'draft',
+        });
+
+        const { result } = renderHook(() => useTaxReturnPeriods());
+
+        act(() => {
+            result.current.markTaxReturnPeriodFiled('period-1', 100);
+        });
+
+        expect(mockUpdate).toHaveBeenCalledWith('period-1', {
+            status: 'filed',
+            filedAt: 100,
+            updatedAt: Date.parse('2026-07-01T12:00:00Z'),
+        });
+    });
+
+    it('marks a tax return period paid while preserving existing filed timestamps', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+        mockGet.mockReturnValue({
+            id: 'period-1',
+            title: 'Q2 VAT',
+            type: 'vat',
+            startDate: '2026-04-01',
+            endDate: '2026-06-30',
+            status: 'filed',
+            filedAt: 100,
+        });
+
+        const { result } = renderHook(() => useTaxReturnPeriods());
+
+        act(() => {
+            result.current.markTaxReturnPeriodPaid('period-1', { paidAt: 200 });
+        });
+
+        expect(mockUpdate).toHaveBeenCalledWith('period-1', {
+            status: 'paid',
+            filedAt: 100,
+            paidAt: 200,
+            updatedAt: Date.parse('2026-07-05T12:00:00Z'),
+        });
+    });
+
+    it('does not mark missing periods and rejects moving paid periods back to filed', () => {
+        mockGet.mockReturnValueOnce(undefined);
+
+        const { result } = renderHook(() => useTaxReturnPeriods());
+
+        expect(result.current.markTaxReturnPeriodFiled('missing')).toBeUndefined();
+        expect(mockUpdate).not.toHaveBeenCalled();
+
+        mockGet.mockReturnValueOnce({
+            id: 'period-paid',
+            title: 'Paid VAT',
+            type: 'vat',
+            startDate: '2026-04-01',
+            endDate: '2026-06-30',
+            status: 'paid',
+        });
+
+        expect(() => result.current.markTaxReturnPeriodFiled('period-paid')).toThrow(/cannot be moved back to filed/i);
     });
 });

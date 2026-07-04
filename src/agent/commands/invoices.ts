@@ -1,6 +1,6 @@
 import { collectValidatedEntities } from '@/stores/yjs/validation';
 import { collectEntities, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
-import type { BusinessBrandAsset, BusinessInfo, Client, EmailTemplate, Expense, Invoice, InvoiceItem, InvoiceTemplate, Project, Task, TimeEntry } from '@/stores/yjs/types';
+import type { BusinessBrandAsset, BusinessInfo, Client, EmailTemplate, Expense, Invoice, InvoiceTemplate, PaymentMethod, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { getProjectInvoicePreview, type ProjectInvoicePreview } from '@/utils/invoicePreviewUtils';
 import { toStorageDate } from '@/utils/dateUtils';
 import type { EmailSendType } from '@/utils/emailTemplateUtils';
@@ -13,20 +13,23 @@ import {
 } from '@/utils/invoiceUtils';
 import { normalizeCurrencyCode } from '@/utils/currencyUtils';
 import { calculateDueDate, generateInvoiceNumber } from '@/components/invoice/utils/invoiceDateUtils';
-import { planInvoiceFinalization } from '@/domain/invoices/invoiceFinalization';
 import {
-    buildInvoiceFinalizationApplicationPlan,
+    buildQuoteDocumentData,
+    getQuoteDownloadFilename,
+    getQuoteNumberTimestamp,
+} from '@/utils/quoteUtils';
+import {
+    buildInvoiceFinalizationApplication,
 } from '@/domain/invoices/invoiceFinalizationApplication';
+import {
+    buildDraftInvoiceItems,
+    buildDraftInvoiceUpdates,
+    InvoiceDraftValidationError,
+} from '@/domain/invoices/invoiceDraft';
 import { resolveInvoiceEmailDraft, type InvoiceEmailDraft, type InvoiceEmailDraftOverrides } from '@/domain/invoices/invoiceEmail';
 import { buildMarkInvoicePaidUpdates, buildMarkInvoiceUnpaidUpdates } from '@/domain/invoices/invoicePayment';
-import { planInvoiceUndo } from '@/domain/invoices/invoiceUndo';
 import {
-    buildClearedBilledTimeEntryUpdates,
-    buildInvoiceTemplateSequenceRollbackUpdates,
-    buildProjectInvoiceUnlinkUpdates,
-    buildReleasedQuotedTaskUpdates,
-    buildRestoredTaskBillingCutoffUpdates,
-    buildUnbilledExpenseUpdates,
+    buildInvoiceUndoApplication,
 } from '@/domain/invoices/invoiceUndoApplication';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
@@ -138,6 +141,43 @@ export interface SendInvoiceEmailInput extends PreviewInvoiceEmailInput {
     idempotencyKey?: string;
 }
 
+export interface ProjectQuoteTaskInput {
+    id?: string;
+    title: string;
+    hours?: number;
+    hourlyRate?: number;
+    flatRate?: number;
+    quantity?: number;
+    useFlatRate?: boolean;
+    parentTaskId?: string | null;
+}
+
+export interface ProjectQuoteInput {
+    projectId: string;
+    clientId?: string | null;
+    businessInfoId?: string | null;
+    paymentMethodId?: string | null;
+    invoiceTemplateId?: string | null;
+    note?: string;
+    quoteDate?: string;
+    quoteTimestamp?: string;
+    quoteTasks?: ProjectQuoteTaskInput[];
+    additionalTasks?: ProjectQuoteTaskInput[];
+}
+
+export interface ExportProjectQuotePdfInput extends ProjectQuoteInput {
+    filename?: string;
+}
+
+export interface PreviewProjectQuoteEmailInput extends ProjectQuoteInput, Omit<InvoiceEmailDraftOverrides, 'templateId'> {
+    emailTemplateId?: string | null;
+}
+
+export interface SendProjectQuoteEmailInput extends PreviewProjectQuoteEmailInput {
+    confirmSend: boolean;
+    idempotencyKey?: string;
+}
+
 export interface InvoiceUnbilledWorkPreview {
     projectId: string;
     projectTitle: string;
@@ -224,6 +264,39 @@ export interface SendInvoiceEmailResult {
     updatedInvoice: boolean;
     status: Invoice['status'];
     sentAt: number | null;
+}
+
+export interface ProjectQuotePreviewResult {
+    projectId: string;
+    quote: Record<string, unknown>;
+    sideEffects: {
+        createsInvoice: false;
+        marksEntriesBilled: false;
+        marksExpensesBilled: false;
+        updatesTaskBillingCutoffs: false;
+        updatesProjectInvoiceReferences: false;
+        advancesInvoiceSequence: false;
+    };
+}
+
+export interface ExportProjectQuotePdfResult {
+    projectId: string;
+    quoteId: string;
+    quoteNumber: string;
+    filename: string;
+    downloadStarted: true;
+}
+
+export interface SendProjectQuoteEmailResult {
+    projectId: string;
+    quoteId: string;
+    quoteNumber: string;
+    sendType: 'quote';
+    to: string;
+    forwarded: boolean | null;
+    remaining: number | null;
+    updatedInvoice: false;
+    sentAt: null;
 }
 
 function getLimit(limit?: number): number {
@@ -347,104 +420,6 @@ function assertOptionalReference<T>(
     }
 
     readRequiredEntity<T>(map as any, requireString(id, label), label);
-}
-
-function normalizeInvoiceItems(items: unknown): InvoiceItem[] {
-    if (!Array.isArray(items)) {
-        throw new AgentCommandError('INVALID_INPUT', 'items must be an array.', { field: 'items' });
-    }
-
-    return items.map((item, index) => {
-        if (!item || typeof item !== 'object') {
-            throw new AgentCommandError('INVALID_INPUT', 'Each invoice item must be an object.', { field: `items[${index}]` });
-        }
-
-        const candidate = item as Partial<InvoiceItem>;
-        const description = requireString(candidate.description, `items[${index}].description`);
-        const quantity = Number(candidate.quantity);
-        const rate = Number(candidate.rate);
-        const amount = Number(candidate.amount);
-
-        if (!Number.isFinite(quantity) || quantity < 0) {
-            throw new AgentCommandError('INVALID_INPUT', 'Invoice item quantity must be a non-negative number.', { field: `items[${index}].quantity` });
-        }
-
-        if (!Number.isFinite(rate)) {
-            throw new AgentCommandError('INVALID_INPUT', 'Invoice item rate must be a number.', { field: `items[${index}].rate` });
-        }
-
-        if (!Number.isFinite(amount)) {
-            throw new AgentCommandError('INVALID_INPUT', 'Invoice item amount must be a number.', { field: `items[${index}].amount` });
-        }
-
-        return {
-            ...candidate,
-            description,
-            quantity,
-            rate,
-            amount,
-        } as InvoiceItem;
-    });
-}
-
-function numberFromUpdate(updates: Record<string, unknown>, existing: Record<string, unknown>, key: string, fallback = 0) {
-    const value = Object.prototype.hasOwnProperty.call(updates, key) ? updates[key] : existing[key];
-
-    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-function buildDraftInvoiceUpdates(existing: Invoice & Record<string, unknown>, rawUpdates: Record<string, unknown>, now: number) {
-    const updates = { ...rawUpdates };
-
-    if (Object.prototype.hasOwnProperty.call(updates, 'items')) {
-        updates.items = normalizeInvoiceItems(updates.items);
-    }
-
-    if (Object.prototype.hasOwnProperty.call(updates, 'projectIds')) {
-        if (!Array.isArray(updates.projectIds)) {
-            throw new AgentCommandError('INVALID_INPUT', 'projectIds must be an array.', { field: 'projectIds' });
-        }
-
-        updates.projectIds = Array.from(new Set(updates.projectIds.map((id) => requireString(id, 'projectIds[]'))));
-    }
-
-    const items = (updates.items as InvoiceItem[] | undefined) || existing.items || [];
-    const shouldRecalculateSubtotal = Object.prototype.hasOwnProperty.call(updates, 'items') && !Object.prototype.hasOwnProperty.call(updates, 'subtotal');
-    const subtotal = shouldRecalculateSubtotal
-        ? items.reduce((sum, item) => sum + item.amount, 0)
-        : numberFromUpdate(updates, existing, 'subtotal', 0);
-
-    if (shouldRecalculateSubtotal) {
-        updates.subtotal = subtotal;
-    }
-
-    const taxRate = numberFromUpdate(updates, existing, 'taxRate', 0);
-    const tax = Object.prototype.hasOwnProperty.call(updates, 'tax')
-        ? numberFromUpdate(updates, existing, 'tax', 0)
-        : (Object.prototype.hasOwnProperty.call(updates, 'taxRate') ? subtotal * (taxRate / 100) : numberFromUpdate(updates, existing, 'tax', 0));
-    const discount = numberFromUpdate(updates, existing, 'discount', 0);
-    const shipping = numberFromUpdate(updates, existing, 'shipping', 0);
-
-    if (!Object.prototype.hasOwnProperty.call(updates, 'tax') && (Object.prototype.hasOwnProperty.call(updates, 'taxRate') || shouldRecalculateSubtotal)) {
-        updates.tax = tax;
-    }
-
-    if (
-        !Object.prototype.hasOwnProperty.call(updates, 'total')
-        && (
-            shouldRecalculateSubtotal
-            || Object.prototype.hasOwnProperty.call(updates, 'subtotal')
-            || Object.prototype.hasOwnProperty.call(updates, 'tax')
-            || Object.prototype.hasOwnProperty.call(updates, 'taxRate')
-            || Object.prototype.hasOwnProperty.call(updates, 'discount')
-            || Object.prototype.hasOwnProperty.call(updates, 'shipping')
-        )
-    ) {
-        updates.total = subtotal - discount + shipping + tax;
-    }
-
-    updates.updatedAt = now;
-    return updates;
 }
 
 export function listInvoicesCommand(context: AgentCommandContext, input: ListInvoicesCommandInput = {}): InvoiceSummary[] {
@@ -659,7 +634,18 @@ export function updateInvoiceDraftCommand(
         });
     }
 
-    const invoiceUpdates = buildDraftInvoiceUpdates(existing, updates, getNow(context));
+    let invoiceUpdates: Partial<Invoice> & Record<string, unknown>;
+
+    try {
+        invoiceUpdates = buildDraftInvoiceUpdates(existing, updates, getNow(context));
+    } catch (error) {
+        if (error instanceof InvoiceDraftValidationError) {
+            throw new AgentCommandError('INVALID_INPUT', error.message, error.details);
+        }
+
+        throw error;
+    }
+
     const invoice = updateValidatedEntity<Invoice>(
         context.store.invoices as any,
         'invoices',
@@ -721,26 +707,6 @@ export function finalizeInvoiceCommand(
         const taskMapById = mapEntitiesToSource(taskMaps);
         const entryMapById = mapEntitiesToSource(entryMaps);
         const expenseMapById = mapEntitiesToSource(expenseMaps);
-        let finalizationPlan: ReturnType<typeof planInvoiceFinalization>;
-
-        try {
-            finalizationPlan = planInvoiceFinalization({
-                invoice,
-                projects,
-                clients,
-                tasks,
-                entries,
-                expenses,
-                finalizedAt,
-                createAdjustmentId: () => getId(context),
-            });
-        } catch (error) {
-            throw new AgentCommandError('CONFLICT', 'Unable to prepare invoice finalization side effects.', {
-                invoiceId,
-                reason: error instanceof Error ? error.message : 'finalization planning failed',
-            });
-        }
-
         const invoiceTemplates = collectValidatedEntities<InvoiceTemplate & Record<string, unknown>>(
             'invoiceTemplates',
             context.store.invoiceTemplates as any,
@@ -751,14 +717,27 @@ export function finalizeInvoiceCommand(
             context.store.invoices as any,
             'agent invoice finalize sequence invoices'
         );
-        const finalizationApplication = buildInvoiceFinalizationApplicationPlan({
-            invoice,
-            plan: finalizationPlan,
-            projects,
-            invoiceTemplate: resolveCurrentInvoiceTemplate(invoice, invoiceTemplates),
-            invoices: invoicesForSequence,
-            finalizedAt,
-        });
+        let finalizationApplication: ReturnType<typeof buildInvoiceFinalizationApplication>['application'];
+
+        try {
+            finalizationApplication = buildInvoiceFinalizationApplication({
+                invoice,
+                projects,
+                clients,
+                tasks,
+                entries,
+                expenses,
+                invoiceTemplate: resolveCurrentInvoiceTemplate(invoice, invoiceTemplates),
+                invoices: invoicesForSequence,
+                finalizedAt,
+                createAdjustmentId: () => getId(context),
+            }).application;
+        } catch (error) {
+            throw new AgentCommandError('CONFLICT', 'Unable to prepare invoice finalization side effects.', {
+                invoiceId,
+                reason: error instanceof Error ? error.message : 'finalization planning failed',
+            });
+        }
 
         applyEntryMutations(entryMaps, () => {
             finalizationApplication.adjustmentEntryIdsToDelete.forEach((entryId) => {
@@ -997,16 +976,32 @@ export function undoLatestInvoiceCommand(
         const entryMapById = mapEntitiesToSource(entryMaps);
         const entries = entryMaps
             .flatMap((entryMap) => collectValidatedEntities<TimeEntry>('timeEntries', entryMap as any, 'agent invoice undo time entries'));
-        const undoPlan = planInvoiceUndo({
+        const tasks = taskMaps.flatMap((taskMap) => collectEntities<Task>(taskMap as any));
+        const expenses = expenseMaps.flatMap((expenseMap) => collectEntities<Expense>(expenseMap as any));
+        const template = resolveCurrentInvoiceTemplate(invoice, collectEntities(context.store.invoiceTemplates as any));
+        const sequenceRollback = getInvoiceSequenceRollback(invoice, template, activeInvoices);
+        const undoApplication = buildInvoiceUndoApplication({
             invoice,
             invoiceId,
             entries,
-            tasks: taskMaps.flatMap((taskMap) => collectEntities<Task>(taskMap as any)),
-            expenses: expenseMaps.flatMap((expenseMap) => collectEntities<Expense>(expenseMap as any)),
-        });
+            expenses,
+            tasks,
+            projects: collectEntities(context.store.projects as any),
+            sequenceRollback,
+            templateId: template?.id,
+            undoneAt,
+        }).application;
 
-        const entriesByMap = new Map<any, { toDelete: TimeEntry[]; toClear: TimeEntry[] }>();
-        const queueEntryMutation = (entryMap: any, action: 'delete' | 'clear', entry: TimeEntry) => {
+        const entriesByMap = new Map<any, {
+            toDelete: TimeEntry[];
+            toClear: Array<{ entry: TimeEntry; updates: Partial<TimeEntry> }>;
+        }>();
+        const queueEntryMutation = (
+            entryMap: any,
+            action: 'delete' | 'clear',
+            entry: TimeEntry,
+            updates?: Partial<TimeEntry>
+        ) => {
             if (!entryMap) return;
 
             const existing = entriesByMap.get(entryMap) || { toDelete: [], toClear: [] };
@@ -1014,20 +1009,23 @@ export function undoLatestInvoiceCommand(
             if (action === 'delete') {
                 existing.toDelete.push(entry);
             } else {
-                existing.toClear.push(entry);
+                existing.toClear.push({
+                    entry,
+                    updates: updates || {},
+                });
             }
 
             entriesByMap.set(entryMap, existing);
         };
 
-        undoPlan.entriesToDelete.forEach((entry) => {
+        undoApplication.entriesToDelete.forEach((entry) => {
             const entryMap = entryMapById.get(entry.id);
             queueEntryMutation(entryMap, 'delete', entry);
         });
 
-        undoPlan.entriesToClear.forEach((entry) => {
+        undoApplication.entriesToClear.forEach(({ entry, updates }) => {
             const entryMap = entryMapById.get(entry.id);
-            queueEntryMutation(entryMap, 'clear', entry);
+            queueEntryMutation(entryMap, 'clear', entry, updates);
         });
 
         entriesByMap.forEach((mutation, entryMap) => {
@@ -1036,10 +1034,8 @@ export function undoLatestInvoiceCommand(
                     entryMap.delete(entry.id);
                 });
 
-                mutation.toClear.forEach((entry) => {
-                    updateEntityFields(entryMap as any, entry.id, buildClearedBilledTimeEntryUpdates({
-                        updatedAt: undoneAt,
-                    }));
+                mutation.toClear.forEach(({ entry, updates }) => {
+                    updateEntityFields(entryMap as any, entry.id, updates);
                 });
             };
 
@@ -1051,22 +1047,21 @@ export function undoLatestInvoiceCommand(
             applyChanges();
         });
 
-        const expenseIdsToUnbill = new Set(undoPlan.expenseIdsToUnbill);
-        let unbilledExpenseCount = 0;
+        const expenseUpdatesToUnbill = new Map(
+            undoApplication.expenseUpdatesToUnbill.map(({ id: expenseId, updates }) => [expenseId, updates])
+        );
 
         expenseMaps.forEach((expenseMap) => {
             const applyChanges = () => {
                 expenseMap?.forEach?.((value: unknown, expenseId: string) => {
                     const expense = readEntity<Expense>(value);
+                    const updates = expenseUpdatesToUnbill.get(expenseId);
 
-                    if (!expense || !expenseIdsToUnbill.has(expenseId)) {
+                    if (!expense || !updates) {
                         return;
                     }
 
-                    updateEntityFields(expenseMap as any, expenseId, buildUnbilledExpenseUpdates({
-                        updatedAt: undoneAt,
-                    }));
-                    unbilledExpenseCount += 1;
+                    updateEntityFields(expenseMap as any, expenseId, updates);
                 });
             };
 
@@ -1078,19 +1073,29 @@ export function undoLatestInvoiceCommand(
             applyChanges();
         });
 
-        releaseQuotedAmountsForInvoice(taskMaps, invoiceId, undoneAt);
+        const quotedTaskUpdates = new Map(
+            undoApplication.quotedTaskUpdates.map(({ id: taskId, updates }) => [taskId, updates])
+        );
+        const taskCutoffUpdates = new Map(
+            undoApplication.taskCutoffUpdates.map(({ id: taskId, updates }) => [taskId, updates])
+        );
 
         taskMaps.forEach((taskMap) => {
             const applyChanges = () => {
-                undoPlan.taskLastBilledAtRestorations.forEach((restoredCutoff, taskId) => {
+                quotedTaskUpdates.forEach((updates, taskId) => {
                     if (!taskMap?.has?.(taskId)) {
                         return;
                     }
 
-                    updateEntityFields(taskMap as any, taskId, buildRestoredTaskBillingCutoffUpdates({
-                        restoredCutoff,
-                        updatedAt: undoneAt,
-                    }));
+                    updateEntityFields(taskMap as any, taskId, updates);
+                });
+
+                taskCutoffUpdates.forEach((updates, taskId) => {
+                    if (!taskMap?.has?.(taskId)) {
+                        return;
+                    }
+
+                    updateEntityFields(taskMap as any, taskId, updates);
                 });
             };
 
@@ -1102,32 +1107,21 @@ export function undoLatestInvoiceCommand(
             applyChanges();
         });
 
-        const template = resolveCurrentInvoiceTemplate(invoice, collectEntities(context.store.invoiceTemplates as any));
-        const sequenceRollback = getInvoiceSequenceRollback(invoice, template, activeInvoices);
-
         context.store.coreDoc.transact(() => {
-            context.store.projects.forEach((value: unknown, projectId: string) => {
-                const project = readEntity<Project>(value);
-                const updates = project
-                    ? buildProjectInvoiceUnlinkUpdates({
-                        project,
-                        invoiceId,
-                        updatedAt: undoneAt,
-                    })
-                    : null;
-
-                if (!updates) {
+            undoApplication.projectUnlinkUpdates.forEach(({ id: projectId, updates }) => {
+                if (!context.store.projects.has(projectId)) {
                     return;
                 }
 
                 updateEntityFields(context.store.projects as any, projectId, updates);
             });
 
-            if (sequenceRollback.canRollback && template?.id) {
-                updateEntityFields(context.store.invoiceTemplates as any, template.id, buildInvoiceTemplateSequenceRollbackUpdates({
-                    currentSequentialNumber: sequenceRollback.nextSequentialNumber,
-                    updatedAt: undoneAt,
-                }));
+            if (undoApplication.invoiceTemplateSequenceUpdate) {
+                updateEntityFields(
+                    context.store.invoiceTemplates as any,
+                    undoApplication.invoiceTemplateSequenceUpdate.id,
+                    undoApplication.invoiceTemplateSequenceUpdate.updates
+                );
             }
         });
 
@@ -1143,10 +1137,10 @@ export function undoLatestInvoiceCommand(
 
         return {
             invoiceNumber: invoice.invoiceNumber || invoiceId,
-            clearedTimeEntryCount: undoPlan.clearedTimeEntryCount,
-            deletedAdjustmentCount: undoPlan.deletedAdjustmentCount,
-            unbilledExpenseCount,
-            rewoundSequence: sequenceRollback.canRollback,
+            clearedTimeEntryCount: undoApplication.clearedTimeEntryCount,
+            deletedAdjustmentCount: undoApplication.deletedAdjustmentCount,
+            unbilledExpenseCount: undoApplication.unbilledExpenseCount,
+            rewoundSequence: undoApplication.rewoundSequence,
         };
     });
 }
@@ -1191,6 +1185,275 @@ function getInvoicePdfFilename(invoice: Invoice, filename?: string): string {
     }
 
     return `invoice-${invoice.invoiceNumber}.pdf`;
+}
+
+function buildProjectQuoteDocument(
+    context: AgentCommandContext,
+    input: ProjectQuoteInput
+): Invoice & Record<string, unknown> {
+    const projectId = requireString(input.projectId, 'projectId');
+    const project = readRequiredEntity<Project>(context.store.projects as any, projectId, 'Project');
+    const clients = collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent project quote clients');
+    const tasks = collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent project quote tasks');
+    const businessInfos = collectValidatedEntities<BusinessInfo>('businessInfos', context.store.businessInfos as any, 'agent project quote business infos');
+    const paymentMethods = collectValidatedEntities<PaymentMethod>('paymentMethods', context.store.paymentMethods as any, 'agent project quote payment methods');
+    const invoiceTemplates = collectValidatedEntities<InvoiceTemplate>('invoiceTemplates', context.store.invoiceTemplates as any, 'agent project quote templates');
+    const client = input.clientId
+        ? readRequiredEntity<Client>(context.store.clients as any, input.clientId, 'Client')
+        : null;
+    const businessInfo = input.businessInfoId
+        ? readRequiredEntity<BusinessInfo>(context.store.businessInfos as any, input.businessInfoId, 'Business info')
+        : null;
+    const paymentMethod = input.paymentMethodId
+        ? readRequiredEntity<PaymentMethod>(context.store.paymentMethods as any, input.paymentMethodId, 'Payment method')
+        : null;
+    const template = input.invoiceTemplateId
+        ? readRequiredEntity<InvoiceTemplate>(context.store.invoiceTemplates as any, input.invoiceTemplateId, 'Invoice template')
+        : null;
+    const now = getNow(context);
+    const quoteDate = input.quoteDate || toStorageDate(new Date(now));
+    const quoteTimestamp = input.quoteTimestamp || getQuoteNumberTimestamp(new Date(now));
+
+    try {
+        const quote = buildQuoteDocumentData({
+            project,
+            tasks,
+            clients,
+            businessInfos,
+            paymentMethods,
+            invoiceTemplates,
+            client,
+            businessInfo,
+            paymentMethod,
+            template,
+            note: input.note,
+            quoteTasks: input.quoteTasks ? normalizeProjectQuoteTasks(input.quoteTasks, 'quoteTasks') : undefined,
+            additionalTasks: input.additionalTasks ? normalizeProjectQuoteTasks(input.additionalTasks, 'additionalTasks') : undefined,
+            quoteDate,
+            quoteTimestamp,
+        }) as Record<string, unknown>;
+        const clientId = requireString(quote.clientId, 'quote.clientId');
+        const invoiceNumber = requireString(quote.invoiceNumber, 'quote.invoiceNumber');
+
+        return {
+            ...quote,
+            id: `QUOTE-${project.id}-${invoiceNumber}`,
+            projectId: project.id,
+            projectIds: [project.id],
+            clientId,
+            invoiceNumber,
+            date: requireString(quote.date, 'quote.date'),
+            dueDate: null,
+            status: 'sent',
+            items: [],
+            subtotal: typeof quote.subtotal === 'number' ? quote.subtotal : 0,
+            total: typeof quote.total === 'number' ? quote.total : 0,
+            notes: typeof quote.note === 'string' ? quote.note : undefined,
+            createdAt: now,
+            updatedAt: now,
+        } as Invoice & Record<string, unknown>;
+    } catch (error) {
+        if (error instanceof AgentCommandError) {
+            throw error;
+        }
+
+        throw new AgentCommandError('INVALID_INPUT', error instanceof Error ? error.message : 'Unable to prepare project quote.', {
+            projectId,
+        });
+    }
+}
+
+function normalizeProjectQuoteTasks(tasks: ProjectQuoteTaskInput[], field: string): ProjectQuoteTaskInput[] {
+    if (!Array.isArray(tasks)) {
+        throw new AgentCommandError('INVALID_INPUT', `${field} must be an array.`, { field });
+    }
+
+    return tasks.map((task, index) => {
+        if (!task || typeof task !== 'object') {
+            throw new AgentCommandError('INVALID_INPUT', `${field}[${index}] must be an object.`, { field: `${field}[${index}]` });
+        }
+
+        return {
+            id: typeof task.id === 'string' && task.id.trim() ? task.id : undefined,
+            title: requireString(task.title, `${field}[${index}].title`),
+            hours: finiteOptionalNumber(task.hours, `${field}[${index}].hours`),
+            hourlyRate: finiteOptionalNumber(task.hourlyRate, `${field}[${index}].hourlyRate`),
+            flatRate: finiteOptionalNumber(task.flatRate, `${field}[${index}].flatRate`),
+            quantity: finiteOptionalNumber(task.quantity, `${field}[${index}].quantity`),
+            useFlatRate: task.useFlatRate === true,
+            parentTaskId: typeof task.parentTaskId === 'string' ? task.parentTaskId : null,
+        };
+    });
+}
+
+function finiteOptionalNumber(value: unknown, field: string): number | undefined {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) {
+        throw new AgentCommandError('INVALID_INPUT', `${field} must be a number.`, { field });
+    }
+
+    return numberValue;
+}
+
+function getProjectQuotePdfFilename(quote: Record<string, unknown>, filename?: string): string {
+    const trimmed = typeof filename === 'string' ? filename.trim() : '';
+
+    if (trimmed) {
+        return trimmed.toLowerCase().endsWith('.pdf') ? trimmed : `${trimmed}.pdf`;
+    }
+
+    const project = quote.project && typeof quote.project === 'object' ? quote.project as { title?: unknown } : null;
+    const title = typeof project?.title === 'string' ? project.title : 'quote';
+    const date = typeof quote.date === 'string' ? quote.date : toStorageDate(new Date());
+
+    return getQuoteDownloadFilename(title, date);
+}
+
+export function previewProjectQuoteCommand(
+    context: AgentCommandContext,
+    input: ProjectQuoteInput
+): ProjectQuotePreviewResult {
+    assertReady(context);
+    assertPermission(context, 'read');
+
+    const quote = buildProjectQuoteDocument(context, input);
+
+    return {
+        projectId: quote.projectId,
+        quote,
+        sideEffects: {
+            createsInvoice: false,
+            marksEntriesBilled: false,
+            marksExpensesBilled: false,
+            updatesTaskBillingCutoffs: false,
+            updatesProjectInvoiceReferences: false,
+            advancesInvoiceSequence: false,
+        },
+    };
+}
+
+export async function exportProjectQuotePdfCommand(
+    context: AgentCommandContext,
+    input: ExportProjectQuotePdfInput
+): Promise<ExportProjectQuotePdfResult> {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'export');
+
+    const quote = buildProjectQuoteDocument(context, input);
+    const clients = collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent project quote pdf clients');
+    const businessBrandAssets = context.store.businessBrandAssets
+        ? collectValidatedEntities<BusinessBrandAsset>(
+            'businessBrandAssets',
+            context.store.businessBrandAssets as any,
+            'agent project quote pdf business brand assets'
+        )
+        : [];
+    const { generatePDF, getCurrentInvoiceHtmlContent } = await import('@/utils/pdfUtils');
+    const htmlContent = getCurrentInvoiceHtmlContent(quote as any, clients as any, businessBrandAssets as any);
+    const filename = getProjectQuotePdfFilename(quote, input.filename);
+
+    await generatePDF(htmlContent, filename);
+
+    return {
+        projectId: quote.projectId,
+        quoteId: quote.id,
+        quoteNumber: quote.invoiceNumber,
+        filename,
+        downloadStarted: true,
+    };
+}
+
+export function previewProjectQuoteEmailCommand(
+    context: AgentCommandContext,
+    input: PreviewProjectQuoteEmailInput
+): InvoiceEmailDraft {
+    assertReady(context);
+    assertPermission(context, 'read');
+
+    const quote = buildProjectQuoteDocument(context, input);
+
+    return buildProjectQuoteEmailDraft(context, quote, input);
+}
+
+export function sendProjectQuoteEmailCommand(
+    context: AgentCommandContext,
+    input: SendProjectQuoteEmailInput
+): Promise<SendProjectQuoteEmailResult> {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'email');
+
+    return withIdempotency(context, input.idempotencyKey, async () => {
+        if (input.confirmSend !== true) {
+            throw new AgentCommandError('INVALID_INPUT', 'Sending a project quote email requires confirmSend: true.');
+        }
+
+        const sessionId = typeof context.driveSessionId === 'string' ? context.driveSessionId.trim() : '';
+
+        if (!sessionId) {
+            throw new AgentCommandError('UNAVAILABLE', 'Cloud sync must be connected before sending quote email.');
+        }
+
+        const quote = buildProjectQuoteDocument(context, input);
+        const draft = buildProjectQuoteEmailDraft(context, quote, input);
+
+        if (!draft.to.trim()) {
+            throw new AgentCommandError('INVALID_INPUT', 'Recipient email is required.');
+        }
+
+        if (!draft.subject.trim()) {
+            throw new AgentCommandError('INVALID_INPUT', 'Subject is required.');
+        }
+
+        if (draft.forwardToSelf && !draft.forwardTo) {
+            throw new AgentCommandError('INVALID_INPUT', 'Reply-To or business email is required when forwarding a copy.');
+        }
+
+        const clients = collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent project quote email clients');
+        const businessBrandAssets = context.store.businessBrandAssets
+            ? collectValidatedEntities<BusinessBrandAsset>(
+                'businessBrandAssets',
+                context.store.businessBrandAssets as any,
+                'agent project quote email business brand assets'
+            )
+            : [];
+        const { getCurrentInvoiceHtmlContent, generatePDFBase64 } = await import('@/utils/pdfUtils');
+        const { sendInvoiceEmail } = await import('@/utils/emailService');
+        const htmlContent = getCurrentInvoiceHtmlContent(quote as any, clients as any, businessBrandAssets as any);
+        const pdfBase64 = await generatePDFBase64(htmlContent);
+        const result = await sendInvoiceEmail({
+            sessionId,
+            invoiceId: quote.id,
+            invoiceNumber: quote.invoiceNumber,
+            to: draft.to,
+            forwardTo: draft.forwardTo || undefined,
+            fromName: draft.fromName || undefined,
+            subject: draft.subject,
+            bodyText: draft.body,
+            replyTo: draft.replyTo || undefined,
+            pdfBase64,
+            sendType: 'quote',
+            attachmentTitle: draft.attachmentTitle,
+        });
+
+        return {
+            projectId: quote.projectId,
+            quoteId: quote.id,
+            quoteNumber: quote.invoiceNumber,
+            sendType: 'quote',
+            to: draft.to,
+            forwarded: typeof result.forwarded === 'boolean' ? result.forwarded : null,
+            remaining: typeof result.remaining === 'number' ? result.remaining : null,
+            updatedInvoice: false,
+            sentAt: null,
+        };
+    });
 }
 
 export function previewInvoiceEmailCommand(
@@ -1324,6 +1587,24 @@ function buildInvoiceEmailDraft(
     });
 }
 
+function buildProjectQuoteEmailDraft(
+    context: AgentCommandContext,
+    quote: Invoice & Record<string, unknown>,
+    input: PreviewProjectQuoteEmailInput
+): InvoiceEmailDraft {
+    return resolveInvoiceEmailDraft({
+        invoice: quote,
+        client: resolveInvoiceClient(context, quote),
+        businessInfo: resolveInvoiceBusinessInfo(context, quote),
+        emailTemplates: collectValidatedEntities<EmailTemplate>('emailTemplates', context.store.emailTemplates as any, 'agent project quote email templates'),
+        sendType: 'quote',
+        overrides: {
+            ...input,
+            templateId: input.emailTemplateId ?? null,
+        },
+    });
+}
+
 function normalizeEmailSendType(sendType: EmailSendType | undefined): EmailSendType {
     if (!sendType) {
         return 'invoice';
@@ -1355,27 +1636,6 @@ function resolveInvoiceBusinessInfo(context: AgentCommandContext, invoice: Invoi
     const businessInfos = collectValidatedEntities<BusinessInfo>('businessInfos', context.store.businessInfos as any, 'agent invoice email business infos');
 
     return businessInfos.find((businessInfo) => businessInfo.isDefault) || businessInfos[0] || null;
-}
-
-function releaseQuotedAmountsForInvoice(taskMaps: Array<any>, invoiceId: string, updatedAt: number): void {
-    taskMaps.forEach((taskMap) => {
-        taskMap?.forEach?.((value: unknown, taskId: string) => {
-            const task = readEntity<Task>(value);
-
-            if (!task || task.quotedAmountBilling?.invoiceId !== invoiceId) {
-                return;
-            }
-
-            const updates = buildReleasedQuotedTaskUpdates({
-                task,
-                updatedAt,
-            });
-
-            if (updates) {
-                updateEntityFields(taskMap as any, taskId, updates);
-            }
-        });
-    });
 }
 
 async function collectTaskMapsForInvoiceFinalization(context: AgentCommandContext): Promise<Array<any>> {
@@ -1457,36 +1717,4 @@ function applyEntryMutations(entryMaps: Array<any>, mutate: () => void): void {
     }
 
     mutate();
-}
-
-function buildDraftInvoiceItems(project: Project, preview: ProjectInvoicePreview): InvoiceItem[] {
-    const items: InvoiceItem[] = [];
-
-    if (preview.taskAmount > 0) {
-        const quantity = preview.unbilledHours > 0 ? preview.unbilledHours : 1;
-        const rate = Math.round((preview.taskAmount / quantity) * 100) / 100;
-
-        items.push({
-            description: `${project.title} work`,
-            quantity,
-            rate,
-            amount: preview.taskAmount,
-            projectId: project.id,
-            lineType: 'project-subtotal',
-            pricingMode: project.flatRate ? 'flat' : 'hourly',
-        });
-    }
-
-    if (preview.expenseAmount > 0) {
-        items.push({
-            description: `${project.title} billable expenses`,
-            quantity: 1,
-            rate: preview.expenseAmount,
-            amount: preview.expenseAmount,
-            projectId: project.id,
-            lineType: 'expense',
-        });
-    }
-
-    return items;
 }

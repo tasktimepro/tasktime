@@ -29,6 +29,7 @@ import {
     DEFAULT_PROJECT_FILTER,
     DEFAULT_TASK_FILTER,
 } from './dashboard/dashboardOverviewUtils.ts';
+import { buildTaskDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import { CornerDownRightIcon } from '@/components/ui/icons';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
@@ -98,7 +99,7 @@ const buildTodoNotificationBody = ({ taskCount, expenseCount, firstTitle }) => {
     return `${itemSummary} are due today.`;
 };
 
-const getTaskDeletePlanIds = (taskId, tasks) => {
+const getTaskDeleteApplication = (taskId, tasks) => {
     const plan = buildTaskDeleteImpactPlan({
         taskId,
         activeTasks: tasks.filter(task => !task.archived),
@@ -109,7 +110,12 @@ const getTaskDeletePlanIds = (taskId, tasks) => {
         plannerAttachments: [],
     });
 
-    return plan?.taskIdsToDelete || [taskId];
+    return plan ? buildTaskDeleteApplicationPlan(plan) : {
+        taskIdsToDelete: [taskId],
+        timeEntryIdsToDelete: [],
+        timerKeysToClear: [],
+        plannerAttachmentIdsToDelete: [],
+    };
 };
 
 /**
@@ -1063,18 +1069,23 @@ const Dashboard = ({
             ? [...activeTasks, ...archivedTasks]
             : activeTasks;
 
-        const taskIdsToDelete = task.parentTaskId
-            ? [task.id]
-            : getTaskDeletePlanIds(task.id, availableTasks);
-
-        const entriesToDelete = timeEntries.filter(entry => taskIdsToDelete.includes(entry.taskId));
-        entriesToDelete.forEach(entry => deleteEntry(entry.id));
-
-        timers.forEach(timer => {
-            if (taskIdsToDelete.includes(timer.taskId)) {
-                clearTimer(timer.projectId);
+        const deleteApplication = task.parentTaskId
+            ? {
+                taskIdsToDelete: [task.id],
+                timeEntryIdsToDelete: timeEntries
+                    .filter(entry => entry.taskId === task.id)
+                    .map(entry => entry.id),
+                timerKeysToClear: timers
+                    .filter(timer => timer.taskId === task.id)
+                    .map(timer => timer.projectId),
+                plannerAttachmentIdsToDelete: [],
             }
-        });
+            : getTaskDeleteApplication(task.id, availableTasks);
+        const taskIdsToDelete = deleteApplication.taskIdsToDelete;
+
+        deleteApplication.timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
+
+        deleteApplication.timerKeysToClear.forEach(timerKey => clearTimer(timerKey));
 
         Promise.all(taskIdsToDelete.map(id => deleteTask(id))).then(() => {
             showSuccess('Task deleted');
