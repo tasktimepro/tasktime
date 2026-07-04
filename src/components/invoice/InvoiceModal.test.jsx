@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 import InvoiceModal from './InvoiceModal'
 
@@ -227,7 +227,7 @@ describe('InvoiceModal', () => {
         expect(screen.getByRole('button', { name: /client & project details/i })).not.toHaveAttribute('data-autofocus')
     })
 
-    it('shows additional projects only when the modal is opened from a client dashboard', () => {
+    it('shows additional projects when multi-project selection is enabled', () => {
         render(
             <InvoiceModal
                 {...baseProps}
@@ -244,7 +244,7 @@ describe('InvoiceModal', () => {
         expect(screen.getByText('Additional Projects')).toBeInTheDocument()
     })
 
-    it('hides additional projects outside the client dashboard flow', () => {
+    it('hides additional projects when multi-project selection is disabled', () => {
         render(
             <InvoiceModal
                 {...baseProps}
@@ -257,6 +257,28 @@ describe('InvoiceModal', () => {
             />
         )
 
+        expect(screen.queryByText('Additional Projects')).not.toBeInTheDocument()
+    })
+
+    it('shows a multi-project invoice notice in project-scoped invoice creation', () => {
+        render(
+            <InvoiceModal
+                {...baseProps}
+                openedFromProjectContext
+                selectedClient={{ id: 'client-1', title: 'Acme' }}
+                selectedProject={{ id: 'project-1', title: 'Website' }}
+                projects={[
+                    { id: 'project-1', title: 'Website', preferredClientId: 'client-1' },
+                    { id: 'project-2', title: 'Retainer', preferredClientId: 'client-1' },
+                ]}
+            />
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: /client & project details/i }))
+
+        expect(screen.getByText(/Single-project invoice/)).toBeInTheDocument()
+        expect(screen.getByText(/To include multiple projects, create the invoice from the client page./)).toBeInTheDocument()
+        expect(screen.queryByText('You can create invoices with custom rates')).not.toBeInTheDocument()
         expect(screen.queryByText('Additional Projects')).not.toBeInTheDocument()
     })
 })

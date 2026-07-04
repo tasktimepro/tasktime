@@ -433,12 +433,20 @@ const InvoiceModal = ({
                                                 </SelectContent>
                                             </Select>
 
-                                            {selectedProject && (
+                                            {selectedProject && !openedFromProjectContext && (
                                                 <Notice
                                                     title={selectedProject.title}
                                                     description={!selectedProject.flatRate && selectedProject.hourlyRate ? (
                                                         <span className="sensitive-data">Rate: {getCurrencySymbol(getInvoiceCurrency())}{selectedProject.hourlyRate}/hour</span>
                                                     ) : (!selectedProject.flatRate ? 'You can create invoices with custom rates' : undefined)}
+                                                    className="py-2 px-3"
+                                                />
+                                            )}
+
+                                            {!isQuoteMode && openedFromProjectContext && !editingInvoice && (
+                                                <Notice
+                                                    title="Single-project invoice"
+                                                    description="To include multiple projects, create the invoice from the client page."
                                                     className="py-2 px-3"
                                                 />
                                             )}
