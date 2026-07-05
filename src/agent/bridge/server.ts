@@ -3,7 +3,20 @@ import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
 import { createAgentBridgeSession, type AgentBridgeSession } from '@/agent/session';
-import { AGENT_APP_SESSION_PROTOCOL_VERSION, isAgentAppSessionControlMessage, type AgentAppSessionControlMessage, type AgentAppSessionPairingMessage, type AgentAppSessionRequest, type AgentAppSessionResponse } from '@/agent/transport/protocol';
+import {
+    AGENT_APP_SESSION_PROTOCOL_VERSION,
+    isAgentAppSessionApprovalGrantMessage,
+    isAgentAppSessionApprovalGrantRevocationMessage,
+    isAgentAppSessionControlMessage,
+    type AgentAppSessionApprovalGrantMessage,
+    type AgentAppSessionApprovalGrantPayload,
+    type AgentAppSessionApprovalGrantRevocationMessage,
+    type AgentAppSessionApprovalToken,
+    type AgentAppSessionControlMessage,
+    type AgentAppSessionPairingMessage,
+    type AgentAppSessionRequest,
+    type AgentAppSessionResponse,
+} from '@/agent/transport/protocol';
 import { AgentCommandError } from '@/agent/types';
 import { BridgeAuditLog, type BridgeAuditEvent } from './auditLog';
 import { assertAllowedTaskTimeOrigin, assertLoopbackHost, DEFAULT_ALLOWED_TASKTIME_ORIGINS } from './originPolicy';
@@ -24,6 +37,8 @@ export interface BridgeWebSocketServerOptions {
     onClientConnected?: (client: BridgeWebSocketClient) => void;
     onClientDisconnected?: (client: BridgeWebSocketClient) => void;
     onSessionCreated?: (session: AgentBridgeSession, client: BridgeWebSocketClient, challenge: BridgePairingChallenge) => void;
+    onApprovalGrantReceived?: (grant: AgentAppSessionApprovalGrantPayload, client: BridgeWebSocketClient) => void;
+    onApprovalGrantRevoked?: (grantId: string, revokedAt: number, client: BridgeWebSocketClient) => void;
     onAudit?: (event: BridgeAuditEvent) => void;
 }
 
@@ -37,6 +52,7 @@ interface PendingAppSessionResponse {
 export interface BridgeAppSessionRequestOptions {
     client?: BridgeWebSocketClient;
     timeoutMs?: number;
+    approval?: AgentAppSessionApprovalToken;
 }
 
 export interface BridgeAppSessionPairingOptions {
@@ -285,19 +301,26 @@ export class BridgeAppSessionServer {
         client: BridgeWebSocketClient,
         requestId: string,
         command: string,
-        input?: unknown
+        input?: unknown,
+        approval?: AgentAppSessionApprovalToken
     ): AgentAppSessionRequest {
         if (!client.session) {
             throw new AgentCommandError('PERMISSION_DENIED', 'TaskTime app session is not paired.');
         }
 
-        return {
+        const request: AgentAppSessionRequest = {
             protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
             requestId,
             sessionToken: client.session.sessionToken,
             command,
             input,
         };
+
+        if (approval) {
+            request.approval = approval;
+        }
+
+        return request;
     }
 
     sendPairedAppSessionCommand(
@@ -307,7 +330,7 @@ export class BridgeAppSessionServer {
         options: Omit<BridgeAppSessionRequestOptions, 'client'> = {}
     ): Promise<AgentAppSessionResponse> {
         const client = this.getAuthoritativeClient();
-        const request = this.createSessionRequest(client, requestId, command, input);
+        const request = this.createSessionRequest(client, requestId, command, input, options.approval);
 
         return this.sendAppSessionRequest(request, {
             ...options,
@@ -420,6 +443,46 @@ export class BridgeAppSessionServer {
         }
 
         return false;
+    }
+
+    private handleApprovalGrantMessage(message: AgentAppSessionApprovalGrantMessage, client: BridgeWebSocketClient): boolean {
+        if (!client.session || message.sessionToken !== client.session.sessionToken) {
+            client.close();
+            return true;
+        }
+
+        this.audit({
+            action: 'approval_grant_received',
+            clientId: client.id,
+            details: {
+                grantId: message.grant.id,
+                grantClientId: message.grant.clientId,
+                scopes: message.grant.scopes,
+                expiresAt: message.grant.expiresAt ?? null,
+            },
+        });
+        this.options.onApprovalGrantReceived?.(message.grant, client);
+
+        return true;
+    }
+
+    private handleApprovalGrantRevocationMessage(message: AgentAppSessionApprovalGrantRevocationMessage, client: BridgeWebSocketClient): boolean {
+        if (!client.session || message.sessionToken !== client.session.sessionToken) {
+            client.close();
+            return true;
+        }
+
+        this.audit({
+            action: 'approval_grant_revoked',
+            clientId: client.id,
+            details: {
+                grantId: message.grantId,
+                revokedAt: message.revokedAt,
+            },
+        });
+        this.options.onApprovalGrantRevoked?.(message.grantId, message.revokedAt, client);
+
+        return true;
     }
 
     private rejectPendingResponses(error: Error, client?: BridgeWebSocketClient): void {
@@ -553,6 +616,14 @@ export class BridgeAppSessionServer {
                     }
 
                     if (isAgentAppSessionControlMessage(parsed) && this.handleControlMessage(parsed, client)) {
+                        continue;
+                    }
+
+                    if (isAgentAppSessionApprovalGrantMessage(parsed) && this.handleApprovalGrantMessage(parsed, client)) {
+                        continue;
+                    }
+
+                    if (isAgentAppSessionApprovalGrantRevocationMessage(parsed) && this.handleApprovalGrantRevocationMessage(parsed, client)) {
                         continue;
                     }
 

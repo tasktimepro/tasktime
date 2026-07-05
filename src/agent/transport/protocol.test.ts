@@ -2,7 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import * as Y from 'yjs';
 import { readEntity } from '@/stores/yjs/entityUtils';
 import type { AgentCommandContext } from '@/agent/types';
-import { getAgentAppSessionRequestMetadata, handleAgentAppSessionRequest, isAgentAppSessionControlMessage } from './protocol';
+import {
+    createAgentCommandInputHash,
+    getAgentAppSessionRequestMetadata,
+    handleAgentAppSessionRequest,
+    isAgentAppSessionApprovalGrantMessage,
+    isAgentAppSessionApprovalGrantRevocationMessage,
+    isAgentAppSessionControlMessage,
+} from './protocol';
 
 vi.mock('@/utils/usageMetrics', () => ({
     markMeaningfulActivity: vi.fn(),
@@ -67,6 +74,53 @@ describe('agent app-session protocol', () => {
             protocolVersion: 1,
             sessionToken: 'session-token',
             action: 'disconnect',
+        })).toBe(false);
+    });
+
+    it('validates approval grant control messages', () => {
+        expect(isAgentAppSessionApprovalGrantMessage({
+            type: 'agent_bridge_approval_grant',
+            protocolVersion: 1,
+            sessionToken: 'session-token',
+            grant: {
+                id: 'grant-1',
+                clientId: 'openclaw-local',
+                label: 'OpenClaw',
+                scopes: ['read', 'write', 'billing'],
+                secretKeyBase64Url: 'secret-key',
+                createdAt: 1_700_000_000_000,
+                expiresAt: null,
+            },
+        })).toBe(true);
+
+        expect(isAgentAppSessionApprovalGrantMessage({
+            type: 'agent_bridge_approval_grant',
+            protocolVersion: 1,
+            sessionToken: 'session-token',
+            grant: {
+                id: 'grant-1',
+                clientId: 'openclaw-local',
+                scopes: ['read'],
+                createdAt: 1_700_000_000_000,
+            },
+        })).toBe(false);
+    });
+
+    it('validates approval grant revocation messages', () => {
+        expect(isAgentAppSessionApprovalGrantRevocationMessage({
+            type: 'agent_bridge_approval_grant_revoke',
+            protocolVersion: 1,
+            sessionToken: 'session-token',
+            grantId: 'grant-1',
+            revokedAt: 1_700_000_010_000,
+        })).toBe(true);
+
+        expect(isAgentAppSessionApprovalGrantRevocationMessage({
+            type: 'agent_bridge_approval_grant_revoke',
+            protocolVersion: 1,
+            sessionToken: 'session-token',
+            grantId: '',
+            revokedAt: 1_700_000_010_000,
         })).toBe(false);
     });
 
@@ -237,11 +291,131 @@ describe('agent app-session protocol', () => {
             },
         });
 
-        expect(approvalRequests).toEqual([{
+        expect(approvalRequests).toEqual([expect.objectContaining({
             requestId: 'request-approval-approved',
             command: 'mark_invoice_paid',
-        }]);
+            category: 'billing',
+            scopes: ['read', 'write', 'billing'],
+            inputHash: await createAgentCommandInputHash({
+                invoiceId: 'invoice-approval',
+                confirmPaid: true,
+            }),
+        })]);
         expect(approved.response).toEqual(expect.objectContaining({
+            ok: true,
+            command: 'mark_invoice_paid',
+        }));
+    });
+
+    it('accepts a verified chat-mediated approval token without showing the app prompt', async () => {
+        const context = createContext();
+        context.store.invoices.set('invoice-token-approval', {
+            id: 'invoice-token-approval',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-TOKEN',
+            date: '2026-06-25',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+            currency: 'USD',
+        });
+        const input = {
+            invoiceId: 'invoice-token-approval',
+            confirmPaid: true,
+        };
+        const inputHash = await createAgentCommandInputHash(input);
+        const prompt = vi.fn(async () => false);
+        const verifier = vi.fn(async (request) => (
+            request.approval.token === 'signed-openclaw-token'
+            && request.command === 'mark_invoice_paid'
+            && request.inputHash === inputHash
+        ));
+
+        const response = await handleAgentAppSessionRequest(context, {
+            sessionToken: 'session-token',
+            scopes: new Set(['read', 'write', 'billing']),
+        }, {
+            protocolVersion: 1,
+            requestId: 'request-token-approval',
+            sessionToken: 'session-token',
+            command: 'mark_invoice_paid',
+            input,
+            approval: {
+                format: 'test-signature',
+                token: 'signed-openclaw-token',
+                command: 'mark_invoice_paid',
+                inputHash,
+                scopes: ['read', 'write', 'billing'],
+                category: 'billing',
+                nonce: 'nonce-1',
+                expiresAt: Date.now() + 60_000,
+            },
+        }, {
+            requestApproval: prompt,
+            verifyApprovalToken: verifier,
+        });
+
+        expect(verifier).toHaveBeenCalledWith(expect.objectContaining({
+            requestId: 'request-token-approval',
+            command: 'mark_invoice_paid',
+            inputHash,
+            category: 'billing',
+            scopes: ['read', 'write', 'billing'],
+            approval: expect.objectContaining({
+                token: 'signed-openclaw-token',
+            }),
+        }));
+        expect(prompt).not.toHaveBeenCalled();
+        expect(response.response).toEqual(expect.objectContaining({
+            ok: true,
+            command: 'mark_invoice_paid',
+        }));
+    });
+
+    it('falls back to app approval when a provided approval token is not verified', async () => {
+        const context = createContext();
+        context.store.invoices.set('invoice-token-fallback', {
+            id: 'invoice-token-fallback',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-FALLBACK',
+            date: '2026-06-25',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+            currency: 'USD',
+        });
+        const prompt = vi.fn(async () => true);
+        const verifier = vi.fn(async () => false);
+
+        const response = await handleAgentAppSessionRequest(context, {
+            sessionToken: 'session-token',
+            scopes: new Set(['read', 'write', 'billing']),
+        }, {
+            protocolVersion: 1,
+            requestId: 'request-token-fallback',
+            sessionToken: 'session-token',
+            command: 'mark_invoice_paid',
+            input: {
+                invoiceId: 'invoice-token-fallback',
+                confirmPaid: true,
+            },
+            approval: {
+                token: 'bad-token',
+            },
+        }, {
+            requestApproval: prompt,
+            verifyApprovalToken: verifier,
+        });
+
+        expect(verifier).toHaveBeenCalledTimes(1);
+        expect(prompt).toHaveBeenCalledTimes(1);
+        expect(response.response).toEqual(expect.objectContaining({
             ok: true,
             command: 'mark_invoice_paid',
         }));

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "id": "pro.tasktime",
+    "name": "TaskTime",
+    "category": "task-time-invoicing",
+    "localFirst": true
+  },
+  "bridge": {
+    "packageName": "tasktime",
+    "binary": "tasktime-agent-bridge",
+    "transport": "mcp-stdio-json-rpc",
+    "appSession": {
+      "protocol": "websocket",
+      "defaultPath": "/tasktime-agent",
+      "allowedHosts": ["127.0.0.1", "localhost", "::1"],
+      "pairingRequired": true
+    },
+    "defaultScopes": ["read", "write", "navigation"],
+    "optionalScopes": ["billing", "export", "email"],
+    "methods": {
+      "mcp": ["initialize", "ping", "tools/list", "tools/call"],
+      "tasktime": ["tasktime/create_approval_token"]
+    },
+    "approvalTokens": {
+      "format": "tasktime-hmac-sha256-v1",
+      "requiresTrustedGrant": true,
+      "maxTtlMs": 300000,
+      "singleUse": true
+    },
+    "launch": {
+      "accountPath": "/account",
+      "sectionParam": {
+        "name": "section",
+        "value": "agent"
+      },
+      "pairingParams": {
+        "endpoint": "agentBridgeEndpoint",
+        "pairingId": "agentBridgePairingId",
+        "pairingCode": "agentBridgePairingCode"
+      }
+    },
+    "recovery": {
+      "unavailableAction": "launch_tasktime",
+      "reason": "authoritative_app_session_required"
+    }
+  }
+}

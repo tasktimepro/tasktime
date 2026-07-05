@@ -7,7 +7,9 @@ import {
     getAgentAppSessionRequestMetadata,
     handleAgentAppSessionRequest,
     isAgentAppSessionPairingMessage,
+    type AgentAppSessionApprovalGrantPayload,
     type AgentAppSessionApprovalRequest,
+    type AgentAppSessionApprovalVerificationRequest,
     type AgentAppSessionResponse,
 } from './protocol';
 
@@ -45,6 +47,7 @@ export type AgentWebSocketConstructor = new (url: string) => AgentWebSocketLike;
 export interface AgentAppSessionWebSocketClientOptions {
     url: string;
     context: AgentCommandContext;
+    getContext?: () => AgentCommandContext;
     session?: AgentBridgeSession;
     WebSocketCtor?: AgentWebSocketConstructor;
     requestTimeoutMs?: number;
@@ -54,6 +57,7 @@ export interface AgentAppSessionWebSocketClientOptions {
     onStatusChange?: (status: AgentWebSocketStatus) => void;
     onSessionChange?: (session: AgentBridgeSession) => void;
     onCommandApprovalRequest?: (request: AgentAppSessionApprovalRequest) => Promise<boolean>;
+    verifyApprovalToken?: (request: AgentAppSessionApprovalVerificationRequest) => Promise<boolean>;
     onCommandStart?: (activity: AgentAppSessionCommandStart) => void;
     onCommandActivity?: (activity: AgentAppSessionCommandActivity) => void;
 }
@@ -181,6 +185,41 @@ export class AgentAppSessionWebSocketClient {
         this.close();
     }
 
+    sendApprovalGrant(grant: AgentAppSessionApprovalGrantPayload): boolean {
+        const socket = this.socket;
+
+        if (!socket || socket.readyState !== 1 || !this.session || isAgentBridgeSessionExpired(this.session)) {
+            return false;
+        }
+
+        socket.send(JSON.stringify({
+            type: 'agent_bridge_approval_grant',
+            protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
+            sessionToken: this.session.sessionToken,
+            grant,
+        }));
+
+        return true;
+    }
+
+    sendApprovalGrantRevocation(grantId: string, revokedAt: number): boolean {
+        const socket = this.socket;
+
+        if (!socket || socket.readyState !== 1 || !this.session || isAgentBridgeSessionExpired(this.session)) {
+            return false;
+        }
+
+        socket.send(JSON.stringify({
+            type: 'agent_bridge_approval_grant_revoke',
+            protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
+            sessionToken: this.session.sessionToken,
+            grantId,
+            revokedAt,
+        }));
+
+        return true;
+    }
+
     private setStatus(status: AgentWebSocketStatus): void {
         this.status = status;
         this.options.onStatusChange?.(status);
@@ -254,8 +293,9 @@ export class AgentAppSessionWebSocketClient {
         const requestMetadata = getAgentAppSessionRequestMetadata(parsed);
         if (!requestMetadata) {
             const response = await Promise.race([
-                handleAgentAppSessionRequest(this.options.context, this.session, parsed, {
+                handleAgentAppSessionRequest(this.options.getContext?.() ?? this.options.context, this.session, parsed, {
                     requestApproval: this.options.onCommandApprovalRequest,
+                    verifyApprovalToken: this.options.verifyApprovalToken,
                 }),
                 timeoutAfter(this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
             ]);
@@ -285,8 +325,9 @@ export class AgentAppSessionWebSocketClient {
                 this.options.onCommandStart?.(requestMetadata);
 
                 const response = await Promise.race([
-                    handleAgentAppSessionRequest(this.options.context, this.session, parsed, {
+                    handleAgentAppSessionRequest(this.options.getContext?.() ?? this.options.context, this.session, parsed, {
                         requestApproval: this.options.onCommandApprovalRequest,
+                        verifyApprovalToken: this.options.verifyApprovalToken,
                     }),
                     timeoutAfter(this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
                 ]);

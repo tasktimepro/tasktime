@@ -3,6 +3,7 @@ import { Socket, type AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
 import { AgentCommandError } from '@/agent/types';
 import type { AgentAppSessionRequest, AgentAppSessionResponse } from '@/agent/transport/protocol';
+import { verifyAgentBridgeApprovalToken } from '@/agent/browser/approvalTokens';
 import {
     BridgeAuditLog,
     type BridgeWebSocketClient,
@@ -592,6 +593,137 @@ describe('agent bridge websocket helpers', () => {
             await firstConnection?.close();
             await secondConnection?.close();
             await server.stop();
+        }
+    });
+
+    it('stores approval grants delivered by an authenticated paired app session', async () => {
+        const bridge = new LocalAgentBridge({
+            host: '127.0.0.1',
+            port: 0,
+            allowedOrigins: ['http://localhost:3101'],
+            sessionTtlMs: 10_000,
+            tokenFactory: () => 'paired-grant-token',
+        });
+        let connection: TestWebSocketConnection | null = null;
+
+        try {
+            await bridge.start();
+            const challenge = bridge.createPairingChallenge({
+                scopes: ['read', 'write', 'billing'],
+                ttlMs: 5000,
+                idFactory: () => 'grant-pairing',
+                codeFactory: () => '333333',
+            });
+            const endpoint = new URL(challenge.endpoint);
+
+            connection = await connectTestWebSocket(
+                Number(endpoint.port),
+                `${endpoint.pathname}?pairingId=${challenge.id}&pairingCode=${challenge.code}`
+            );
+
+            await expect(connection.nextMessage()).resolves.toEqual(expect.objectContaining({
+                type: 'agent_bridge_session',
+                sessionToken: 'paired-grant-token',
+            }));
+
+            connection.sendJson({
+                type: 'agent_bridge_approval_grant',
+                protocolVersion: 1,
+                sessionToken: 'paired-grant-token',
+                grant: {
+                    id: 'approval-grant-1',
+                    clientId: 'openclaw-local',
+                    label: 'OpenClaw',
+                    scopes: ['read', 'write', 'billing'],
+                    secretKeyBase64Url: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+                    createdAt: 1_700_000_000_000,
+                    expiresAt: null,
+                },
+            });
+
+            await waitForCondition(() => bridge.listApprovalGrants().length === 1);
+
+            expect(bridge.getApprovalGrant('approval-grant-1')).toEqual({
+                id: 'approval-grant-1',
+                clientId: 'openclaw-local',
+                label: 'OpenClaw',
+                scopes: ['read', 'write', 'billing'],
+                secretKeyBase64Url: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+                createdAt: 1_700_000_000_000,
+                expiresAt: null,
+            });
+            const approval = bridge.createApprovalToken({
+                grantId: 'approval-grant-1',
+                command: 'mark_invoice_paid',
+                inputHash: 'sha256:paid',
+                scopes: ['read', 'write', 'billing'],
+                nonce: 'approval-nonce-1',
+            });
+
+            await expect(verifyAgentBridgeApprovalToken({
+                requestId: 'request-approval-token',
+                command: 'mark_invoice_paid',
+                inputHash: 'sha256:paid',
+                scopes: ['read', 'write', 'billing'],
+                category: 'billing',
+                approval,
+            }, {
+                now: () => Date.now(),
+                store: {
+                    getGrant: async () => ({
+                        id: 'approval-grant-1',
+                        clientId: 'openclaw-local',
+                        label: 'OpenClaw',
+                        scopes: ['read', 'write', 'billing'],
+                        secretKeyBase64Url: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+                        createdAt: 1_700_000_000_000,
+                        expiresAt: null,
+                        revokedAt: null,
+                    }),
+                    consumeNonce: async () => true,
+                },
+            })).resolves.toBe(true);
+            expect(bridge.getAuditEvents()).toEqual(expect.arrayContaining([
+                expect.objectContaining({
+                    action: 'approval_grant_received',
+                    details: expect.objectContaining({
+                        grantId: 'approval-grant-1',
+                        grantClientId: 'openclaw-local',
+                        scopes: ['read', 'write', 'billing'],
+                    }),
+                }),
+            ]));
+            expect(JSON.stringify(bridge.getAuditEvents())).not.toContain('secret-key');
+
+            connection.sendJson({
+                type: 'agent_bridge_approval_grant_revoke',
+                protocolVersion: 1,
+                sessionToken: 'paired-grant-token',
+                grantId: 'approval-grant-1',
+                revokedAt: 1_700_000_010_000,
+            });
+
+            await waitForCondition(() => bridge.listApprovalGrants().length === 0);
+
+            expect(bridge.getApprovalGrant('approval-grant-1')).toBeNull();
+            expect(() => bridge.createApprovalToken({
+                grantId: 'approval-grant-1',
+                command: 'mark_invoice_paid',
+                inputHash: 'sha256:paid',
+                scopes: ['read', 'write', 'billing'],
+            })).toThrow('No trusted TaskTime approval grant is available for this bridge process.');
+            expect(bridge.getAuditEvents()).toEqual(expect.arrayContaining([
+                expect.objectContaining({
+                    action: 'approval_grant_revoked',
+                    details: {
+                        grantId: 'approval-grant-1',
+                        revokedAt: 1_700_000_010_000,
+                    },
+                }),
+            ]));
+        } finally {
+            await connection?.close();
+            await bridge.stop();
         }
     });
 

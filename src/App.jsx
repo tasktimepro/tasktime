@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState, useMemo, useRef, useContext, useCallback } from 'react';
 import './App.css';
 import { YjsProvider, useYjs } from './contexts/YjsContext.tsx';
+import { AgentBridgeProvider } from './contexts/AgentBridgeContext.jsx';
+import { verifyStoredAgentBridgeApprovalToken } from './agent/browser/approvalTokens.ts';
 import { useProjects } from './hooks/useProjects.ts';
 import { useTasks } from './hooks/useTasks.ts';
 import { useTimeEntries } from './hooks/useTimeEntries.ts';
@@ -134,7 +136,9 @@ function App() {
     return (
         <ToastProvider>
             <YjsProvider>
-                <AppContent />
+                <AgentBridgeProvider verifyApprovalToken={verifyStoredAgentBridgeApprovalToken}>
+                    <AppContent />
+                </AgentBridgeProvider>
             </YjsProvider>
         </ToastProvider>
     );

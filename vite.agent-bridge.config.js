@@ -26,6 +26,7 @@ export default defineConfig({
       external: (id) => nodeBuiltins.has(id),
       output: {
         banner: '#!/usr/bin/env node',
+        inlineDynamicImports: true,
       },
     },
   },

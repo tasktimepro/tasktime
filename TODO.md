@@ -2,12 +2,12 @@
 
 ## Priority
 
+[ ] Check about indexing blog issues
+
 [ ] docs/todo/local-agent-bridge-proposal.md
-    - Make sure this is full-parity with UI
-
-[ ] Check about the current incidents on debugbundle
-
-[ ] Check about create invoice from main invoice page should allow multiple projects - and for within projects we should leave a notice that for multiple projects should be from the client main page
+    [ ] Make sure this is full-parity with UI and that the agent can really do anything a user can do currently
+    - Make sure to have easily discoverable docs on how to use debugbundle for agents
+    - Prepare MCP and Skill.md for openClaw and publishing
 
 ---
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as Y from 'yjs';
 import { readEntity } from '@/stores/yjs/entityUtils';
-import type { AgentCommandContext } from '@/agent/types';
+import type { AgentCommandContext, AgentPermissionScope } from '@/agent/types';
 import type { AgentBridgeSession } from '@/agent/session';
 import { AgentAppSessionWebSocketClient, type AgentWebSocketLike } from './websocketClient';
 
@@ -46,6 +46,18 @@ class FakeWebSocket implements AgentWebSocketLike {
 
 function flushPromises(): Promise<void> {
     return new Promise((resolve) => window.setTimeout(resolve, 0));
+}
+
+async function waitForCondition(predicate: () => boolean): Promise<void> {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (predicate()) {
+            return;
+        }
+
+        await flushPromises();
+    }
+
+    throw new Error('Timed out waiting for condition.');
 }
 
 function createDeferred<T>() {
@@ -225,12 +237,13 @@ describe('AgentAppSessionWebSocketClient', () => {
                 confirmPaid: true,
             },
         }));
-        await flushPromises();
+        await waitForCondition(() => approvals.length === 1 && socket.sent.length === 1);
 
-        expect(approvals).toEqual([{
+        expect(approvals).toEqual([expect.objectContaining({
             requestId: 'request-approval',
             command: 'mark_invoice_paid',
-        }]);
+            category: 'billing',
+        })]);
         expect(JSON.parse(socket.sent[0])).toEqual(expect.objectContaining({
             requestId: 'request-approval',
             response: expect.objectContaining({
@@ -239,6 +252,71 @@ describe('AgentAppSessionWebSocketClient', () => {
             }),
         }));
         expect(readEntity<{ status: string }>(context.store.invoices.get('invoice-approval'))?.status).toBe('paid');
+    });
+
+    it('uses verified approval tokens without showing browser approval', async () => {
+        const context = createContext();
+        context.store.invoices.set('invoice-token-approval', {
+            id: 'invoice-token-approval',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-TOKEN',
+            date: '2026-06-25',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+            currency: 'USD',
+        });
+        const approvalPrompt = vi.fn(async () => false);
+        const verifier = vi.fn(async (request) => request.approval.token === 'signed-chat-approval');
+        const client = new AgentAppSessionWebSocketClient({
+            url: 'ws://127.0.0.1:39876/tasktime-agent',
+            context,
+            session: createSession({ scopes: new Set(['read', 'write', 'billing']) }),
+            WebSocketCtor: FakeWebSocket,
+            onCommandApprovalRequest: approvalPrompt,
+            verifyApprovalToken: verifier,
+        });
+
+        client.connect();
+        const socket = FakeWebSocket.instances[0];
+        socket.open();
+        socket.message(JSON.stringify({
+            protocolVersion: 1,
+            requestId: 'request-token-approval',
+            sessionToken: 'session-token',
+            command: 'mark_invoice_paid',
+            input: {
+                invoiceId: 'invoice-token-approval',
+                confirmPaid: true,
+            },
+            approval: {
+                token: 'signed-chat-approval',
+                command: 'mark_invoice_paid',
+                category: 'billing',
+            },
+        }));
+        await waitForCondition(() => verifier.mock.calls.length === 1 && socket.sent.length === 1);
+
+        expect(verifier).toHaveBeenCalledWith(expect.objectContaining({
+            requestId: 'request-token-approval',
+            command: 'mark_invoice_paid',
+            category: 'billing',
+            approval: expect.objectContaining({
+                token: 'signed-chat-approval',
+            }),
+        }));
+        expect(approvalPrompt).not.toHaveBeenCalled();
+        expect(JSON.parse(socket.sent[0])).toEqual(expect.objectContaining({
+            requestId: 'request-token-approval',
+            response: expect.objectContaining({
+                ok: true,
+                command: 'mark_invoice_paid',
+            }),
+        }));
+        expect(readEntity<{ status: string }>(context.store.invoices.get('invoice-token-approval'))?.status).toBe('paid');
     });
 
     it('serializes app-session command execution in the browser client', async () => {
@@ -598,5 +676,69 @@ describe('AgentAppSessionWebSocketClient', () => {
             }),
         ]);
         expect(client.getStatus()).toBe('closed');
+    });
+
+    it('sends approval grants only over an active paired session', () => {
+        const client = new AgentAppSessionWebSocketClient({
+            url: 'ws://127.0.0.1:39876/tasktime-agent',
+            context: createContext(),
+            session: createSession(),
+            WebSocketCtor: FakeWebSocket,
+        });
+        const grant = {
+            id: 'grant-1',
+            clientId: 'openclaw-local',
+            label: 'OpenClaw',
+            scopes: ['read', 'write', 'billing'] as AgentPermissionScope[],
+            secretKeyBase64Url: 'secret-key',
+            createdAt: 1_700_000_000_000,
+            expiresAt: null,
+        };
+
+        expect(client.sendApprovalGrant(grant)).toBe(false);
+
+        client.connect();
+        const socket = FakeWebSocket.instances[0];
+
+        expect(client.sendApprovalGrant(grant)).toBe(false);
+        socket.open();
+        expect(client.sendApprovalGrant(grant)).toBe(true);
+
+        expect(socket.sent).toEqual([
+            JSON.stringify({
+                type: 'agent_bridge_approval_grant',
+                protocolVersion: 1,
+                sessionToken: 'session-token',
+                grant,
+            }),
+        ]);
+    });
+
+    it('sends approval grant revocations only over an active paired session', () => {
+        const client = new AgentAppSessionWebSocketClient({
+            url: 'ws://127.0.0.1:39876/tasktime-agent',
+            context: createContext(),
+            session: createSession(),
+            WebSocketCtor: FakeWebSocket,
+        });
+
+        expect(client.sendApprovalGrantRevocation('grant-1', 1_700_000_010_000)).toBe(false);
+
+        client.connect();
+        const socket = FakeWebSocket.instances[0];
+
+        expect(client.sendApprovalGrantRevocation('grant-1', 1_700_000_010_000)).toBe(false);
+        socket.open();
+        expect(client.sendApprovalGrantRevocation('grant-1', 1_700_000_010_000)).toBe(true);
+
+        expect(socket.sent).toEqual([
+            JSON.stringify({
+                type: 'agent_bridge_approval_grant_revoke',
+                protocolVersion: 1,
+                sessionToken: 'session-token',
+                grantId: 'grant-1',
+                revokedAt: 1_700_000_010_000,
+            }),
+        ]);
     });
 });

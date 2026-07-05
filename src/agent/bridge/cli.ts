@@ -26,7 +26,9 @@ export interface TaskTimeAgentBridgeCliOptions {
     commandTimeoutMs: number;
     toolCallRateLimit: number;
     toolCallRateWindowMs: number;
+    appUrl?: string;
     help: boolean;
+    manifest: boolean;
 }
 
 export interface TaskTimeAgentBridgeCliIo {
@@ -58,7 +60,9 @@ export function parseTaskTimeAgentBridgeCliOptions(
         commandTimeoutMs: parseIntegerOption(env.TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS, DEFAULT_COMMAND_TIMEOUT_MS, 'TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS'),
         toolCallRateLimit: parseIntegerOption(env.TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT, DEFAULT_TOOL_CALL_RATE_LIMIT, 'TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT'),
         toolCallRateWindowMs: parsePositiveIntegerOption(env.TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS, DEFAULT_TOOL_CALL_RATE_WINDOW_MS, 'TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS'),
+        appUrl: parseOptionalAppUrl(env.TASKTIME_APP_URL, 'TASKTIME_APP_URL'),
         help: false,
+        manifest: false,
     };
 
     const cliScopes: AgentPermissionScope[] = [];
@@ -71,6 +75,10 @@ export function parseTaskTimeAgentBridgeCliOptions(
             case '--help':
             case '-h':
                 options.help = true;
+                break;
+
+            case '--manifest':
+                options.manifest = true;
                 break;
 
             case '--host':
@@ -117,6 +125,10 @@ export function parseTaskTimeAgentBridgeCliOptions(
                 options.toolCallRateWindowMs = parsePositiveIntegerOption(readOptionValue(args, ++index, arg), DEFAULT_TOOL_CALL_RATE_WINDOW_MS, arg);
                 break;
 
+            case '--app-url':
+                options.appUrl = parseAppUrl(readOptionValue(args, ++index, arg), arg);
+                break;
+
             default:
                 throw new Error(`Unsupported option: ${arg}`);
         }
@@ -155,6 +167,8 @@ export function getTaskTimeAgentBridgeCliUsage(): string {
         '  --command-timeout-ms <ms>     App command timeout. Default: 120000',
         '  --tool-rate-limit <count>     Max MCP tools/call requests per window. Default: 120. Use 0 to disable.',
         '  --tool-rate-window-ms <ms>    MCP tools/call rate-limit window. Default: 60000',
+        '  --app-url <url>               Print a TaskTime launch URL with pairing details.',
+        '  --manifest                    Print local agent discovery metadata as JSON and exit.',
         '  --help                        Show this help.',
         '',
         'MCP JSON-RPC messages are read from stdin and written to stdout.',
@@ -162,17 +176,91 @@ export function getTaskTimeAgentBridgeCliUsage(): string {
     ].join('\n');
 }
 
-export function formatPairingInstructions(challenge: BridgePairingChallenge): string {
-    return [
+export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
+    return {
+        schemaVersion: 1,
+        app: {
+            id: 'pro.tasktime',
+            name: 'TaskTime',
+            category: 'task-time-invoicing',
+            localFirst: true,
+        },
+        bridge: {
+            packageName: 'tasktime',
+            binary: 'tasktime-agent-bridge',
+            transport: 'mcp-stdio-json-rpc',
+            appSession: {
+                protocol: 'websocket',
+                defaultPath: DEFAULT_PATH,
+                allowedHosts: ['127.0.0.1', 'localhost', '::1'],
+                pairingRequired: true,
+            },
+            defaultScopes: DEFAULT_SCOPES,
+            optionalScopes: VALID_SCOPES.filter((scope) => !DEFAULT_SCOPES.includes(scope)),
+            methods: {
+                mcp: ['initialize', 'ping', 'tools/list', 'tools/call'],
+                tasktime: ['tasktime/create_approval_token'],
+            },
+            approvalTokens: {
+                format: 'tasktime-hmac-sha256-v1',
+                requiresTrustedGrant: true,
+                maxTtlMs: 300000,
+                singleUse: true,
+            },
+            launch: {
+                accountPath: '/account',
+                sectionParam: {
+                    name: 'section',
+                    value: 'agent',
+                },
+                pairingParams: {
+                    endpoint: 'agentBridgeEndpoint',
+                    pairingId: 'agentBridgePairingId',
+                    pairingCode: 'agentBridgePairingCode',
+                },
+            },
+            recovery: {
+                unavailableAction: 'launch_tasktime',
+                reason: 'authoritative_app_session_required',
+            },
+        },
+    };
+}
+
+export function buildTaskTimeAgentBridgeLaunchUrl(challenge: BridgePairingChallenge, appUrl: string): string {
+    const url = new URL(parseAppUrl(appUrl, 'app URL'));
+
+    url.pathname = '/account';
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('section', 'agent');
+    url.searchParams.set('agentBridgeEndpoint', challenge.endpoint);
+    url.searchParams.set('agentBridgePairingId', challenge.id);
+    url.searchParams.set('agentBridgePairingCode', challenge.code);
+
+    return url.toString();
+}
+
+export function formatPairingInstructions(challenge: BridgePairingChallenge, appUrl?: string): string {
+    const lines = [
         'TaskTime local agent bridge is running.',
         `App endpoint: ${challenge.endpoint}`,
         `Pairing ID: ${challenge.id}`,
         `Pairing code: ${challenge.code}`,
         `Scopes: ${challenge.scopes.join(',')}`,
         `Pairing expires at: ${new Date(challenge.expiresAt).toISOString()}`,
+    ];
+
+    if (appUrl) {
+        lines.push(`TaskTime launch URL: ${buildTaskTimeAgentBridgeLaunchUrl(challenge, appUrl)}`);
+    }
+
+    lines.push(
         '',
-        'Open TaskTime and connect the agent bridge using the endpoint, pairing ID, and pairing code above.',
-    ].join('\n');
+        'Open TaskTime and connect the agent bridge using the endpoint, pairing ID, and pairing code above.'
+    );
+
+    return lines.join('\n');
 }
 
 export async function startTaskTimeAgentBridgeCli(
@@ -209,7 +297,7 @@ export async function startTaskTimeAgentBridgeCli(
         },
     });
 
-    io.stderr.write(`${formatPairingInstructions(challenge)}\n`);
+    io.stderr.write(`${formatPairingInstructions(challenge, options.appUrl)}\n`);
 
     return {
         bridge,
@@ -234,6 +322,11 @@ export async function runTaskTimeAgentBridgeCli(
 
     if (options.help) {
         io.stderr.write(`${getTaskTimeAgentBridgeCliUsage()}\n`);
+        return null;
+    }
+
+    if (options.manifest) {
+        io.stdout.write(`${JSON.stringify(getTaskTimeAgentBridgeManifest(), null, 2)}\n`);
         return null;
     }
 
@@ -343,6 +436,30 @@ function parsePositiveIntegerOption(value: string | undefined, fallback: number,
     }
 
     return parsed;
+}
+
+function parseOptionalAppUrl(value: string | undefined, label: string): string | undefined {
+    if (!value) {
+        return undefined;
+    }
+
+    return parseAppUrl(value, label);
+}
+
+function parseAppUrl(value: string, label: string): string {
+    let url: URL;
+
+    try {
+        url = new URL(value);
+    } catch {
+        throw new Error(`${label} must be a valid http:// or https:// URL.`);
+    }
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        throw new Error(`${label} must be a valid http:// or https:// URL.`);
+    }
+
+    return url.toString();
 }
 
 function isCliEntrypoint(): boolean {

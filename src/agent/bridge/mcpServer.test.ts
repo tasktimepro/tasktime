@@ -9,7 +9,7 @@ import {
     listMcpToolDefinitions,
     startMcpLineDelimitedStdioTransport,
 } from './index';
-import type { AgentAppSessionResponse } from '@/agent/transport/protocol';
+import { AGENT_APPROVAL_TOKEN_FORMAT, createAgentCommandInputHash, type AgentAppSessionApprovalToken, type AgentAppSessionResponse } from '@/agent/transport/protocol';
 
 function createBridge(response: AgentAppSessionResponse = {
     protocolVersion: 1,
@@ -27,13 +27,24 @@ function createBridge(response: AgentAppSessionResponse = {
         command: string;
         input: unknown;
         timeoutMs?: number;
+        approval?: AgentAppSessionApprovalToken;
+    }> = [];
+    const approvalTokenCalls: Array<{
+        grantId?: string;
+        command: string;
+        inputHash: string;
+        scopes: string[];
+        category?: string;
+        ttlMs?: number;
+        nonce?: string;
     }> = [];
 
     return {
         calls,
+        approvalTokenCalls,
         bridge: {
-            sendCommand: async (requestId: string, command: string, input?: unknown, timeoutMs?: number) => {
-                calls.push({ requestId, command, input, timeoutMs });
+            sendCommand: async (requestId: string, command: string, input?: unknown, timeoutMs?: number, approval?: AgentAppSessionApprovalToken) => {
+                calls.push({ requestId, command, input, timeoutMs, approval });
                 return {
                     ...response,
                     requestId,
@@ -41,6 +52,21 @@ function createBridge(response: AgentAppSessionResponse = {
                         ...response.response,
                         command,
                     },
+                };
+            },
+            createApprovalToken: (options) => {
+                approvalTokenCalls.push(options);
+                return {
+                    format: AGENT_APPROVAL_TOKEN_FORMAT,
+                    grantId: options.grantId ?? 'grant-1',
+                    token: 'signed-token',
+                    issuedAt: 1_700_000_000_000,
+                    expiresAt: 1_700_000_060_000,
+                    nonce: options.nonce ?? 'nonce-1',
+                    command: options.command,
+                    inputHash: options.inputHash,
+                    scopes: options.scopes,
+                    category: options.category ?? 'billing',
                 };
             },
         },
@@ -343,6 +369,7 @@ describe('McpBridgeJsonRpcServer', () => {
                     title: 'From MCP',
                 },
                 timeoutMs: 1000,
+                approval: undefined,
             },
         ]);
         expect(response).toEqual({
@@ -369,6 +396,115 @@ describe('McpBridgeJsonRpcServer', () => {
                     },
                 },
                 isError: false,
+            },
+        });
+    });
+
+    it('forwards chat-mediated approval metadata separately from tool arguments', async () => {
+        const { bridge, calls } = createBridge();
+        const server = new McpBridgeJsonRpcServer({
+            bridge,
+            scopes: ['read', 'write', 'billing'],
+            requestIdFactory: () => 'mcp-approval-1',
+            commandTimeoutMs: 1000,
+        });
+
+        await server.handleMessage({
+            jsonrpc: '2.0',
+            id: 'approval-call-1',
+            method: 'tools/call',
+            params: {
+                name: 'mark_invoice_paid',
+                arguments: {
+                    invoiceId: 'invoice-1',
+                    confirmPaid: true,
+                },
+                approval: {
+                    format: 'test-signature',
+                    token: 'signed-chat-approval',
+                    command: 'mark_invoice_paid',
+                    inputHash: 'sha256:abc',
+                    scopes: ['read', 'write', 'billing'],
+                    category: 'billing',
+                    nonce: 'nonce-1',
+                },
+            },
+        });
+
+        expect(calls).toEqual([
+            {
+                requestId: 'mcp-approval-1',
+                command: 'mark_invoice_paid',
+                input: {
+                    invoiceId: 'invoice-1',
+                    confirmPaid: true,
+                },
+                timeoutMs: 1000,
+                approval: {
+                    format: 'test-signature',
+                    token: 'signed-chat-approval',
+                    command: 'mark_invoice_paid',
+                    inputHash: 'sha256:abc',
+                    scopes: ['read', 'write', 'billing'],
+                    category: 'billing',
+                    nonce: 'nonce-1',
+                },
+            },
+        ]);
+    });
+
+    it('creates chat approval tokens for exact tool arguments through a trusted bridge grant', async () => {
+        const { bridge, approvalTokenCalls } = createBridge();
+        const server = new McpBridgeJsonRpcServer({
+            bridge,
+            scopes: ['read', 'write', 'billing'],
+        });
+        const input = {
+            invoiceId: 'invoice-1',
+            confirmPaid: true,
+        };
+        const expectedInputHash = await createAgentCommandInputHash(input);
+
+        const response = await server.handleMessage({
+            jsonrpc: '2.0',
+            id: 'approval-token',
+            method: 'tasktime/create_approval_token',
+            params: {
+                grantId: 'grant-1',
+                command: 'mark_invoice_paid',
+                arguments: input,
+                ttlMs: 60_000,
+                nonce: 'nonce-from-chat',
+            },
+        });
+
+        expect(approvalTokenCalls).toEqual([
+            {
+                grantId: 'grant-1',
+                command: 'mark_invoice_paid',
+                inputHash: expectedInputHash,
+                scopes: ['read', 'write', 'billing'],
+                category: undefined,
+                ttlMs: 60_000,
+                nonce: 'nonce-from-chat',
+            },
+        ]);
+        expect(response).toEqual({
+            jsonrpc: '2.0',
+            id: 'approval-token',
+            result: {
+                approval: {
+                    format: AGENT_APPROVAL_TOKEN_FORMAT,
+                    grantId: 'grant-1',
+                    token: 'signed-token',
+                    issuedAt: 1_700_000_000_000,
+                    expiresAt: 1_700_000_060_000,
+                    nonce: 'nonce-from-chat',
+                    command: 'mark_invoice_paid',
+                    inputHash: expectedInputHash,
+                    scopes: ['read', 'write', 'billing'],
+                    category: 'billing',
+                },
             },
         });
     });
@@ -545,6 +681,13 @@ describe('McpBridgeJsonRpcServer', () => {
                     error: expect.objectContaining({
                         code: 'UNAVAILABLE',
                         message: 'No TaskTime app session is connected.',
+                        details: {
+                            recovery: {
+                                action: 'launch_tasktime',
+                                reason: 'authoritative_app_session_required',
+                                message: 'Open TaskTime and connect the local agent bridge, then retry the tool call.',
+                            },
+                        },
                     }),
                 }),
             }));

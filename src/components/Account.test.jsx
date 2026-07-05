@@ -75,6 +75,14 @@ vi.mock('../hooks/usePreferences.ts', () => ({
 vi.mock('./ExportImport', () => ({ default: () => <div data-testid="backup-content" /> }));
 vi.mock('./Preferences', () => ({ default: () => <div data-testid="preferences-content" /> }));
 vi.mock('./sync/YjsSyncSettings', () => ({ default: () => <div data-testid="sync-content" /> }));
+vi.mock('./agent/AgentBridgeSettings', () => ({
+    default: () => (
+        <div>
+            <h2>Agent Access</h2>
+            <div>Local Agent Bridge</div>
+        </div>
+    ),
+}));
 vi.mock('./Modal', () => ({
     default: ({ isOpen, title, children, footer }) => isOpen ? (
         <div role="dialog" aria-label={title}>

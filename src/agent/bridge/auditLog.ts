@@ -4,6 +4,8 @@ export type BridgeAuditAction =
     | 'session_connected'
     | 'session_disconnected'
     | 'pairing_succeeded'
+    | 'approval_grant_received'
+    | 'approval_grant_revoked'
     | 'access_revoked'
     | 'command_dispatched'
     | 'command_completed'

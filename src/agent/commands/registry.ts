@@ -1076,6 +1076,21 @@ export function agentCommandRequiresApproval(command: string): boolean {
     return AGENT_COMMAND_REGISTRY[command as AgentCommandName]?.requiresApproval === true;
 }
 
+export function getAgentCommandMetadata(command: string): Omit<AgentCommandDefinition, 'handler'> | null {
+    const definition = AGENT_COMMAND_REGISTRY[command as AgentCommandName];
+
+    if (!definition) {
+        return null;
+    }
+
+    return {
+        name: definition.name,
+        description: definition.description,
+        scopes: definition.scopes,
+        requiresApproval: definition.requiresApproval,
+    };
+}
+
 function normalizeError(command: string, error: unknown): AgentCommandResponse {
     if (error instanceof AgentCommandError) {
         return {
