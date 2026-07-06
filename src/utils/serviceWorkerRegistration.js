@@ -6,6 +6,12 @@ function requestWaitingWorkerActivation(worker) {
     worker.postMessage({ type: 'SKIP_WAITING' });
 }
 
+function ignoreServiceWorkerFailure(promise) {
+    if (promise && typeof promise.catch === 'function') {
+        promise.catch(() => {});
+    }
+}
+
 /**
  * Register the production service worker and let updates take effect on the next app load.
  */
@@ -23,7 +29,7 @@ export function registerAppServiceWorker({
     if (isProd) {
         windowObject.addEventListener('load', () => {
             serviceWorker.register('/sw.js').then((registration) => {
-                registration.update();
+                ignoreServiceWorkerFailure(registration.update());
 
                 if (registration.waiting) {
                     requestWaitingWorkerActivation(registration.waiting);
@@ -39,7 +45,7 @@ export function registerAppServiceWorker({
                         }
                     });
                 });
-            });
+            }).catch(() => {});
         });
 
         return;
@@ -48,5 +54,5 @@ export function registerAppServiceWorker({
     // Ensure dev is not controlled by an old service worker.
     serviceWorker.getRegistrations().then((registrations) => {
         registrations.forEach((registration) => registration.unregister());
-    });
+    }).catch(() => {});
 }

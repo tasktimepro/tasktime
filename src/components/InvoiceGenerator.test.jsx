@@ -497,12 +497,26 @@ describe('InvoiceGenerator', () => {
         expect(screen.getByTestId('tax-status')).toBeInTheDocument()
     })
 
-    it('allows additional project selection only in client dashboard context', async () => {
+    it('allows additional project selection in client dashboard context', async () => {
         const user = userEvent.setup()
 
         renderGenerator({
             project: null,
             client: baseClient,
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+
+        expect(capturedInvoiceModalProps?.allowAdditionalProjectsSelection).toBe(true)
+        expect(capturedInvoiceModalProps?.openedFromProjectContext).toBe(false)
+    })
+
+    it('allows additional project selection in standalone invoice creation', async () => {
+        const user = userEvent.setup()
+
+        renderGenerator({
+            project: null,
+            client: null,
         })
 
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))

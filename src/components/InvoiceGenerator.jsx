@@ -263,7 +263,7 @@ const InvoiceGenerator = ({
 }) => {
     const isQuoteMode = mode === 'quote';
     const openedFromProjectContext = Boolean(project && !client);
-    const allowAdditionalProjectsSelection = Boolean(client && !project);
+    const allowAdditionalProjectsSelection = !project;
     // Yjs hooks for data access
     const { invoices, createInvoice, updateInvoice, undoLatestInvoice, canUndoInvoice } = useInvoices();
     const { projects, updateProject } = useProjects();

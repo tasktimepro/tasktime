@@ -20,6 +20,7 @@ import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
 import { parseStoredDate, toStorageDate } from '../../utils/dateUtils.ts';
 import { formatDurationWithSeconds } from '../../utils/dateUtils.ts';
+import { useTodayString } from '@/hooks/useDayRollover';
 
 /**
  * @param {Object} props
@@ -59,7 +60,7 @@ const ToDoToday = ({
     const [showUpcomingExpenses, setShowUpcomingExpenses] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
-    const todayStr = useMemo(() => toStorageDate(new Date()) || '', []);
+    const todayStr = useTodayString() || '';
 
     // Combine and deduplicate tasks (a task might be both overdue and planned for today)
     const combinedTasks = [...overdueTasks, ...tasksForToday].reduce((acc, current) => {

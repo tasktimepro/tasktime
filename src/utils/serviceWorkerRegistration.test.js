@@ -129,6 +129,64 @@ describe('registerAppServiceWorker', () => {
         expect(postReloadToastMocks.queuePostReloadToast).not.toHaveBeenCalled();
     });
 
+    it('handles production service worker registration failures as non-fatal', async () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
+        const windowObject = {
+            ...createEventTarget(),
+            location: { reload: vi.fn() },
+        };
+        const serviceWorker = {
+            ...createEventTarget(),
+            controller: { state: 'activated' },
+            register: vi.fn().mockRejectedValue(new Error('service worker unavailable')),
+        };
+
+        registerAppServiceWorker({
+            isProd: true,
+            navigatorObject: { serviceWorker },
+            windowObject,
+        });
+
+        windowObject.dispatch('load');
+        await flushPromises();
+
+        expect(serviceWorker.register).toHaveBeenCalledWith('/sw.js');
+        expect(windowObject.location.reload).not.toHaveBeenCalled();
+        expect(postReloadToastMocks.queuePostReloadToast).not.toHaveBeenCalled();
+    });
+
+    it('handles production service worker update failures as non-fatal', async () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
+        const updateCatch = vi.fn();
+        const windowObject = {
+            ...createEventTarget(),
+            location: { reload: vi.fn() },
+        };
+        const registration = createRegistration();
+        registration.update = vi.fn(() => ({ catch: updateCatch }));
+        const serviceWorker = {
+            ...createEventTarget(),
+            controller: { state: 'activated' },
+            register: vi.fn().mockResolvedValue(registration),
+        };
+
+        registerAppServiceWorker({
+            isProd: true,
+            navigatorObject: { serviceWorker },
+            windowObject,
+        });
+
+        windowObject.dispatch('load');
+        await flushPromises();
+
+        expect(registration.update).toHaveBeenCalled();
+        expect(updateCatch).toHaveBeenCalledWith(expect.any(Function));
+        expect(windowObject.location.reload).not.toHaveBeenCalled();
+        expect(postReloadToastMocks.queuePostReloadToast).not.toHaveBeenCalled();
+    });
+
     it('does not force reload when an existing production service worker is replaced', async () => {
         postReloadToastMocks.queuePostReloadToast.mockClear();
 
@@ -234,5 +292,24 @@ describe('registerAppServiceWorker', () => {
 
         expect(serviceWorker.getRegistrations).toHaveBeenCalled();
         expect(unregister).toHaveBeenCalledTimes(2);
+    });
+
+    it('handles development service worker lookup failures as non-fatal', async () => {
+        postReloadToastMocks.queuePostReloadToast.mockClear();
+
+        const serviceWorker = {
+            getRegistrations: vi.fn().mockRejectedValue(new Error('indexed service worker state unavailable')),
+        };
+
+        registerAppServiceWorker({
+            isProd: false,
+            navigatorObject: { serviceWorker },
+            windowObject: { addEventListener: vi.fn(), location: { reload: vi.fn() } },
+        });
+
+        await flushPromises();
+
+        expect(serviceWorker.getRegistrations).toHaveBeenCalled();
+        expect(postReloadToastMocks.queuePostReloadToast).not.toHaveBeenCalled();
     });
 });
