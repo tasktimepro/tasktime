@@ -185,10 +185,24 @@ export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
             category: 'task-time-invoicing',
             localFirst: true,
         },
+        docs: {
+            llmsTxt: 'https://tasktime.pro/llms.txt',
+            agentDocs: 'https://tasktime.pro/agents/',
+            quickstart: 'https://tasktime.pro/agents/quickstart/',
+            security: 'https://tasktime.pro/agents/security/',
+            tools: 'https://tasktime.pro/agents/tools/',
+            mcpToolsJson: 'https://tasktime.pro/agents/mcp-tools.json',
+            skill: 'https://tasktime.pro/agents/skill.md',
+            debugging: 'https://tasktime.pro/agents/debugging/',
+        },
         bridge: {
-            packageName: 'tasktime',
+            packageName: '@tasktime/agent-bridge',
             binary: 'tasktime-agent-bridge',
             transport: 'mcp-stdio-json-rpc',
+            install: {
+                npmPackage: '@tasktime/agent-bridge',
+                openClawBundlePackage: '@tasktime/openclaw',
+            },
             appSession: {
                 protocol: 'websocket',
                 defaultPath: DEFAULT_PATH,

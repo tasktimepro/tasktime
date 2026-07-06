@@ -6,8 +6,8 @@
 
 [x] docs/todo/local-agent-bridge-proposal.md
     [x] Make sure this is full-parity with UI and that the agent can really do anything a user can do currently
-    - Make sure to have easily discoverable docs on how to use debugbundle for agents
-    - Prepare MCP and Skill.md for openClaw and publishing
+    [x] Add public Astro agent docs at `/agents/` with `llms.txt`, generated MCP tool JSON, and Skill/OpenClaw pointers
+    [x] Prepare final MCP/OpenClaw skill and plugin for publishing package metadata and so on
 
 ---
 

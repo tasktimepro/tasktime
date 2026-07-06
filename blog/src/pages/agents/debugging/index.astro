@@ -1,0 +1,88 @@
+---
+import AgentDocsLayout from '../../../layouts/AgentDocsLayout.astro';
+
+const highlights = [
+    'Use MCP recovery hints before retrying blindly.',
+    'Run bridge smoke tests after changing the agent surface.',
+    'Use DebugBundle for production/runtime incidents, not deterministic local code checks.',
+    'Do not ask users to reset local data or Drive state as a first response.',
+];
+---
+
+<AgentDocsLayout
+    pageKey="debugging"
+    title="Debugging TaskTime Agent Access"
+    description="Troubleshooting guide for TaskTime local MCP bridge pairing, unavailable app-session recovery, smoke tests, DebugBundle usage, and production-safe agent debugging."
+    canonicalPath="/agents/debugging/"
+    highlights={highlights}
+>
+    <section>
+        <h2>Common Recovery Hints</h2>
+        <div class="agent-table-wrap">
+            <table class="agent-table">
+                <thead>
+                    <tr>
+                        <th>Signal</th>
+                        <th>Agent response</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>UNAVAILABLE</code> with <code>launch_tasktime</code></td>
+                        <td>Open TaskTime, pair Account &gt; Agent Access, then retry the tool call.</td>
+                    </tr>
+                    <tr>
+                        <td>Missing scope</td>
+                        <td>Explain the required scope and ask the user whether to relaunch or reconnect with that scope.</td>
+                    </tr>
+                    <tr>
+                        <td>Approval gated</td>
+                        <td>Use a valid exact-input approval token from a trusted local grant or wait for visible browser approval.</td>
+                    </tr>
+                    <tr>
+                        <td>Pairing failure</td>
+                        <td>Check endpoint host, port, path, pairing code expiry, browser CSP, and local-network policy.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <h2>Local Verification</h2>
+        <p>
+            After changing the bridge, tool definitions, docs generation, or Agent Access UI, run the focused bridge
+            checks through Docker.
+        </p>
+        <pre><code>make npm CMD="run build:agent-bridge"
+make npm CMD="run smoke:agent-bridge"
+make npm CMD="run smoke:agent-live"
+make npm CMD="run test:run -- src/agent/bridge/mcpServer.test.ts src/agent/bridge/bridge.test.ts src/agent/commands/commands.test.ts"</code></pre>
+        <p>
+            Use <code>make build</code> before release to verify the merged React app and Astro public docs artifact.
+        </p>
+    </section>
+
+    <section>
+        <h2>DebugBundle Usage</h2>
+        <p>
+            Use DebugBundle when the problem is a runtime or customer-facing incident: endpoint downtime, production
+            failures, health-check failures, webhook or notification delivery issues, noisy captured incidents, or
+            symptoms likely to have generated captured events.
+        </p>
+        <p>
+            For deterministic local source issues, UI layout issues, copy changes, refactors, and test-only failures,
+            inspect source and tests first. Do not check DebugBundle incidents unless runtime evidence is needed.
+        </p>
+    </section>
+
+    <section>
+        <h2>Production Data Rules</h2>
+        <ul class="agent-check-list">
+            <li>Do not tell users to clear browser data or Drive sync state as a normal fix.</li>
+            <li>Do not auto-sync destructive resets across devices.</li>
+            <li>Preserve existing IndexedDB, Yjs, Google Drive sync, invoice, billing, and backup contracts.</li>
+            <li>Use preview commands before destructive delete, restore, billing, or account-data operations.</li>
+        </ul>
+    </section>
+</AgentDocsLayout>

@@ -26,6 +26,42 @@ const STATIC_ENTRIES = [
         changefreq: 'monthly',
         priority: '0.4',
     },
+    {
+        pathname: '/agents/',
+        lastmod: '2026-07-06',
+        changefreq: 'monthly',
+        priority: '0.7',
+    },
+    {
+        pathname: '/agents/quickstart/',
+        lastmod: '2026-07-06',
+        changefreq: 'monthly',
+        priority: '0.6',
+    },
+    {
+        pathname: '/agents/security/',
+        lastmod: '2026-07-06',
+        changefreq: 'monthly',
+        priority: '0.6',
+    },
+    {
+        pathname: '/agents/tools/',
+        lastmod: '2026-07-06',
+        changefreq: 'weekly',
+        priority: '0.6',
+    },
+    {
+        pathname: '/agents/openclaw/',
+        lastmod: '2026-07-06',
+        changefreq: 'monthly',
+        priority: '0.5',
+    },
+    {
+        pathname: '/agents/debugging/',
+        lastmod: '2026-07-06',
+        changefreq: 'monthly',
+        priority: '0.5',
+    },
 ];
 
 function toIsoDate(value) {

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "tasktime": {
+      "command": "node",
+      "args": [
+        "./scripts/run-tasktime-agent-bridge.mjs",
+        "--app-url",
+        "https://tasktime.pro"
+      ]
+    }
+  }
+}

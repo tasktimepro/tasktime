@@ -163,7 +163,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'cascade_delete_project',
-        description: 'Delete a project and related non-billed tasks, active time entries, timers, expenses, recurring templates, and planner attachments after preview matching, explicit confirmation, and visible browser approval. Invoice-linked, billed, or tax-claimed records are rejected.',
+        description: 'Delete a project and related non-billed tasks, active time entries, timers, expenses, recurring templates, and planner attachments after preview matching, explicit confirmation, and TaskTime approval. Invoice-linked, billed, or tax-claimed records are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -202,7 +202,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_project',
-        description: 'Delete one unreferenced project after explicit command confirmation and visible browser approval.',
+        description: 'Delete one unreferenced project after explicit command confirmation and TaskTime approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -321,7 +321,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'cascade_delete_client',
-        description: 'Delete a client and either convert linked projects to personal or delete related non-billed project data after preview matching, explicit confirmation, and visible browser approval. Invoice-linked, billed, or tax-claimed records are rejected.',
+        description: 'Delete a client and either convert linked projects to personal or delete related non-billed project data after preview matching, explicit confirmation, and TaskTime approval. Invoice-linked, billed, or tax-claimed records are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -369,7 +369,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_client',
-        description: 'Delete one unreferenced client after explicit command confirmation and visible browser approval.',
+        description: 'Delete one unreferenced client after explicit command confirmation and TaskTime approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -449,7 +449,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_business_info',
-        description: 'Delete one unreferenced business profile after explicit command confirmation and visible browser approval. Profiles referenced by invoices, brand assets, expenses, recurring templates, or tax return periods are rejected.',
+        description: 'Delete one unreferenced business profile after explicit command confirmation and TaskTime approval. Profiles referenced by invoices, brand assets, expenses, recurring templates, or tax return periods are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -541,7 +541,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_business_brand_asset',
-        description: 'Delete one unreferenced business logo brand asset after explicit command confirmation and visible browser approval. Assets referenced by business profiles or invoice snapshots are rejected.',
+        description: 'Delete one unreferenced business logo brand asset after explicit command confirmation and TaskTime approval. Assets referenced by business profiles or invoice snapshots are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -613,7 +613,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_payment_method',
-        description: 'Delete one unreferenced payment method after explicit command confirmation and visible browser approval. Payment methods referenced by invoices are rejected.',
+        description: 'Delete one unreferenced payment method after explicit command confirmation and TaskTime approval. Payment methods referenced by invoices are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -688,7 +688,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_invoice_template',
-        description: 'Delete one unreferenced invoice template after explicit command confirmation and visible browser approval. Templates referenced by invoices are rejected.',
+        description: 'Delete one unreferenced invoice template after explicit command confirmation and TaskTime approval. Templates referenced by invoices are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -765,7 +765,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_email_template',
-        description: 'Delete one invoice or quote email template after explicit command confirmation and visible browser approval.',
+        description: 'Delete one invoice or quote email template after explicit command confirmation and TaskTime approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -850,7 +850,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_expense_category',
-        description: 'Delete one unreferenced expense category after explicit command confirmation and visible browser approval. Categories referenced by expenses or recurring templates are rejected.',
+        description: 'Delete one unreferenced expense category after explicit command confirmation and TaskTime approval. Categories referenced by expenses or recurring templates are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1001,7 +1001,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'cascade_delete_task',
-        description: 'Delete a task, descendant tasks, related active time entries, matching timers, and planner attachments after preview matching, explicit confirmation, and visible browser approval. Billed or invoice-linked tasks are rejected.',
+        description: 'Delete a task, descendant tasks, related active time entries, matching timers, and planner attachments after preview matching, explicit confirmation, and TaskTime approval. Billed or invoice-linked tasks are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1032,7 +1032,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_task',
-        description: 'Delete one unreferenced active or archived task after explicit command confirmation and visible browser approval.',
+        description: 'Delete one unreferenced active or archived task after explicit command confirmation and TaskTime approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1108,7 +1108,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'clear_timer',
-        description: 'Discard an active timer without creating a time entry after explicit confirmation and visible browser approval.',
+        description: 'Discard an active timer without creating a time entry after explicit confirmation and TaskTime approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1175,7 +1175,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_time_entry',
-        description: 'Delete one active unbilled time entry after explicit command confirmation and visible browser approval. Historical and billed entries are rejected.',
+        description: 'Delete one active unbilled time entry after explicit command confirmation and TaskTime approval. Historical and billed entries are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1362,7 +1362,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_expense',
-        description: 'Delete one active unbilled and unclaimed expense after explicit command confirmation and visible browser approval. Billed and tax-claimed expenses are rejected.',
+        description: 'Delete one active unbilled and unclaimed expense after explicit command confirmation and TaskTime approval. Billed and tax-claimed expenses are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1471,7 +1471,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_expense_recurrence',
-        description: 'Delete one recurring expense template after explicit command confirmation and visible browser approval without deleting generated expenses.',
+        description: 'Delete one recurring expense template after explicit command confirmation and TaskTime approval without deleting generated expenses.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1561,7 +1561,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_tax_return_period_filed',
-        description: 'Mark a tax return period filed after explicit confirmation and browser approval.',
+        description: 'Mark a tax return period filed after explicit confirmation and TaskTime approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1576,7 +1576,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_tax_return_period_paid',
-        description: 'Mark a tax return period paid after explicit confirmation and browser approval.',
+        description: 'Mark a tax return period paid after explicit confirmation and TaskTime approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1592,7 +1592,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_expenses_tax_claimed',
-        description: 'Mark selected expenses as tax claimed against an existing tax return period after explicit confirmation and browser approval.',
+        description: 'Mark selected expenses as tax claimed against an existing tax return period after explicit confirmation and TaskTime approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1611,7 +1611,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_expenses_tax_unclaimed',
-        description: 'Clear tax claim status and period links from selected expenses after explicit confirmation and browser approval.',
+        description: 'Clear tax claim status and period links from selected expenses after explicit confirmation and TaskTime approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1820,7 +1820,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'send_project_quote_email',
-        description: 'Send a non-persistent project quote email through the paired browser app session after explicit confirmation and browser approval. Generates the quote PDF in-browser and does not update invoice records.',
+        description: 'Send a non-persistent project quote email through the paired browser app session after explicit confirmation and TaskTime approval. Generates the quote PDF in-browser and does not update invoice records.',
         scopes: ['read', 'email'],
         inputSchema: {
             type: 'object',
@@ -1857,7 +1857,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'send_invoice_email',
-        description: 'Send an invoice, reminder, or quote email through the paired browser app session after explicit confirmation and browser approval. Generates the PDF in-browser and updates invoice sent metadata when applicable.',
+        description: 'Send an invoice, reminder, or quote email through the paired browser app session after explicit confirmation and TaskTime approval. Generates the PDF in-browser and updates invoice sent metadata when applicable.',
         scopes: ['read', 'write', 'email'],
         inputSchema: {
             type: 'object',
@@ -2068,7 +2068,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'restore_backup_json',
-        description: 'Replace current local TaskTime data with a validated backup JSON payload after explicit confirmation and browser approval. Requires confirmationText to equal RESTORE.',
+        description: 'Replace current local TaskTime data with a validated backup JSON payload after explicit confirmation and TaskTime approval. Requires confirmationText to equal RESTORE.',
         scopes: ['read', 'write', 'export'],
         inputSchema: {
             type: 'object',
@@ -2083,7 +2083,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'restore_drive_backup',
-        description: 'Replace current local TaskTime data from a selected Google Drive backup after explicit confirmation and browser approval. Requires confirmationText to equal RESTORE.',
+        description: 'Replace current local TaskTime data from a selected Google Drive backup after explicit confirmation and TaskTime approval. Requires confirmationText to equal RESTORE.',
         scopes: ['read', 'write', 'export'],
         inputSchema: {
             type: 'object',
@@ -2121,7 +2121,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_all_account_data',
-        description: 'Delete all local TaskTime data and, when Drive is connected, wipe Drive sync data and backups after explicit confirmation and browser approval. Requires confirmationText to equal DELETE ALL DATA.',
+        description: 'Delete all local TaskTime data and, when Drive is connected, wipe Drive sync data and backups after explicit confirmation and TaskTime approval. Requires confirmationText to equal DELETE ALL DATA.',
         scopes: ['read', 'write', 'export'],
         inputSchema: {
             type: 'object',

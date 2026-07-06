@@ -1,0 +1,99 @@
+---
+import AgentDocsLayout from '../../../layouts/AgentDocsLayout.astro';
+
+const highlights = [
+    'Install or launch the packaged bridge binary.',
+    'Open TaskTime with the bridge pairing URL or Account > Agent Access.',
+    'Use MCP tools only after the browser app is paired.',
+    'Retry with the launch recovery hint when no app session is available.',
+];
+const listToolsExample = [
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}',
+    '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}',
+].join('\n');
+const callToolExample = JSON.stringify({
+    jsonrpc: '2.0',
+    id: 3,
+    method: 'tools/call',
+    params: {
+        name: 'list_projects',
+        arguments: {},
+    },
+}, null, 2);
+---
+
+<AgentDocsLayout
+    pageKey="quickstart"
+    title="TaskTime MCP Quickstart"
+    description="Launch the TaskTime local agent bridge, pair it with the browser app, and make the first MCP tool call from a same-device AI agent."
+    canonicalPath="/agents/quickstart/"
+    highlights={highlights}
+>
+    <section>
+        <h2>1. Discover TaskTime</h2>
+        <p>
+            Start from <a href="/llms.txt">llms.txt</a> or
+            <a href="/.well-known/tasktime-agent.json">/.well-known/tasktime-agent.json</a>. The manifest identifies
+            TaskTime as a local-first task, time tracking, expense, invoicing, and reporting app with a local MCP bridge.
+        </p>
+    </section>
+
+    <section>
+        <h2>2. Launch The Local Bridge</h2>
+        <p>
+            Agent hosts should launch the packaged bridge as an MCP stdio server. The bridge reads MCP JSON-RPC messages
+            from stdin and writes MCP responses to stdout. Status and pairing details are written to stderr.
+        </p>
+        <pre><code>tasktime-agent-bridge --app-url https://tasktime.pro</code></pre>
+        <p>
+            The bridge binary package is <code>@tasktime/agent-bridge</code>. OpenClaw-compatible installs can use the
+            <code>@tasktime/openclaw</code> bundle, which contributes the TaskTime skill and MCP server config. For
+            local development, point <code>--app-url</code> at the local app origin, usually
+            <code>http://localhost:3101</code>. The bridge prints a launch URL for
+            <code>/account?section=agent</code> with the endpoint, pairing ID, and pairing code already filled in.
+        </p>
+    </section>
+
+    <section>
+        <h2>3. Pair The Browser App</h2>
+        <p>
+            TaskTime must be open in a browser tab. The user approves the local bridge in Account &gt; Agent Access.
+            First-use access is explicit; localhost discovery is not treated as permission.
+        </p>
+        <ul class="agent-check-list">
+            <li>The app-session WebSocket target must be loopback, such as <code>ws://127.0.0.1:39123/tasktime-agent</code>.</li>
+            <li>The pairing ID and pairing code are time-limited and single-use.</li>
+            <li>The paired browser app becomes the authoritative app session for command execution.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>4. List Tools</h2>
+        <p>
+            After the bridge starts, an MCP host can initialize and list scoped tools. The public reference at
+            <a href="/agents/tools/">/agents/tools/</a> and machine-readable catalog at
+            <a href="/agents/mcp-tools.json">/agents/mcp-tools.json</a> come from the same MCP tool definitions used by
+            the bridge.
+        </p>
+        <pre><code>{listToolsExample}</code></pre>
+    </section>
+
+    <section>
+        <h2>5. Call A Tool</h2>
+        <p>
+            Use <code>tools/call</code> with a supported TaskTime tool name and JSON arguments. The bridge forwards the
+            request to the paired browser app, which returns structured results.
+        </p>
+        <pre><code>{callToolExample}</code></pre>
+    </section>
+
+    <section>
+        <h2>Recovery Behavior</h2>
+        <p>
+            If a tool call fails because no authoritative TaskTime app session is paired, the MCP error includes a
+            recovery hint with <code>action: "launch_tasktime"</code> and
+            <code>reason: "authoritative_app_session_required"</code>. Agent hosts should guide the user to launch and
+            pair TaskTime, then retry the tool call.
+        </p>
+    </section>
+</AgentDocsLayout>

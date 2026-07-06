@@ -1,0 +1,30 @@
+{
+  "name": "@tasktime/openclaw",
+  "version": "0.1.0",
+  "description": "OpenClaw-compatible TaskTime bundle with MCP server configuration and skill instructions.",
+  "type": "module",
+  "files": [
+    ".codex-plugin/",
+    ".mcp.json",
+    "README.md",
+    "scripts/",
+    "skills/"
+  ],
+  "dependencies": {
+    "@tasktime/agent-bridge": "^0.1.0"
+  },
+  "keywords": [
+    "tasktime",
+    "openclaw",
+    "mcp",
+    "ai-agent",
+    "time-tracking",
+    "invoicing",
+    "local-first"
+  ],
+  "homepage": "https://tasktime.pro/agents/openclaw/",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

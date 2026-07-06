@@ -27,7 +27,21 @@ make dev
 
 App runs at http://localhost:3101
 
-During normal local development, the Astro blog is also proxied through the same origin, so you can open http://localhost:3101/blog without switching to preview mode.
+During normal local development, the Astro public site is also proxied through the same origin, so you can open http://localhost:3101/blog, http://localhost:3101/agents, and http://localhost:3101/llms.txt without switching to preview mode.
+
+## AI Agent Access
+
+TaskTime exposes a same-device local MCP bridge for AI agents through the packaged `tasktime-agent-bridge` binary. Public agent documentation is built with the Astro public site:
+
+- `/agents/` - overview and integration model
+- `/agents/quickstart/` - bridge launch, pairing, and first MCP call
+- `/agents/security/` - scopes, approvals, revocation, and local-only rules
+- `/agents/tools/` - generated MCP tool reference
+- `/agents/mcp-tools.json` - machine-readable tool catalog from `src/agent/bridge/mcpTools.ts`
+- `/agents/skill.md` - Skill-style instructions for agent platforms
+- `/llms.txt` and `/.well-known/tasktime-agent.json` - public discovery entry points
+- `agent-bridge/package.json` - publishable `@tasktime/agent-bridge` metadata for the bridge binary
+- `integrations/openclaw/tasktime/` - OpenClaw-compatible bundle with skill and MCP server metadata
 
 ### Build
 

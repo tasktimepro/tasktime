@@ -8,6 +8,7 @@ const nodeBuiltins = new Set([
 ])
 
 export default defineConfig({
+  publicDir: false,
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

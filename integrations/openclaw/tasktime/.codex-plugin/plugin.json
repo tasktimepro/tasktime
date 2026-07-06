@@ -1,0 +1,43 @@
+{
+  "name": "tasktime",
+  "version": "0.1.0",
+  "description": "TaskTime local MCP bridge bundle for OpenClaw-compatible agent platforms.",
+  "author": {
+    "name": "TaskTime",
+    "url": "https://tasktime.pro"
+  },
+  "homepage": "https://tasktime.pro/agents/openclaw/",
+  "license": "MIT",
+  "keywords": [
+    "tasktime",
+    "openclaw",
+    "mcp",
+    "ai-agent",
+    "time-tracking",
+    "invoicing",
+    "local-first"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "TaskTime",
+    "shortDescription": "Use TaskTime through its local MCP bridge.",
+    "longDescription": "Adds TaskTime skill guidance and MCP server configuration for same-device agents to manage tasks, timers, expenses, invoices, reports, planning, sync, and navigation after explicit TaskTime pairing.",
+    "developerName": "TaskTime",
+    "category": "Productivity",
+    "capabilities": [
+      "MCP",
+      "Local",
+      "Write"
+    ],
+    "websiteURL": "https://tasktime.pro/agents/openclaw/",
+    "privacyPolicyURL": "https://tasktime.pro/privacy/",
+    "termsOfServiceURL": "https://tasktime.pro/terms/",
+    "defaultPrompt": [
+      "Set up TaskTime agent access.",
+      "List my TaskTime projects and active timers.",
+      "Draft an invoice from unbilled TaskTime work."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

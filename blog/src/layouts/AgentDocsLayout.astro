@@ -1,6 +1,12 @@
 ---
 import '../styles/global.css';
 import {
+    AGENT_DISCOVERY_LINKS,
+    AGENT_DOCS_KEYWORDS,
+    AGENT_DOCS_LAST_UPDATED,
+    AGENT_DOCS_NAV_ITEMS,
+} from '../config/agents.js';
+import {
     DEFAULT_SOCIAL_IMAGE,
     DEFAULT_SOCIAL_IMAGE_ALT,
     SITE_DESCRIPTION,
@@ -16,43 +22,27 @@ import { THEME_INIT_SCRIPT, THEME_TOGGLE_SCRIPT } from '../config/theme.js';
 const {
     pageKey,
     title,
-    summary,
-    lastUpdated,
-    lastUpdatedIso,
-    highlights = [],
+    description,
     canonicalPath = Astro.url.pathname,
-    socialTitle = `${title} | TaskTime`,
-    socialDescription = summary,
+    highlights = [],
+    keywords = AGENT_DOCS_KEYWORDS,
+    socialTitle = `${title} | TaskTime Agent Docs`,
+    socialDescription = description,
     socialImage = DEFAULT_SOCIAL_IMAGE,
     socialImageAlt = DEFAULT_SOCIAL_IMAGE_ALT,
 } = Astro.props;
 
 const siteUrl = Astro.site ?? new URL(SITE_URL);
 const canonicalUrl = toCanonicalUrl(canonicalPath, siteUrl);
-const pageTitle = `${title} | TaskTime`;
+const pageTitle = `${title} | TaskTime Agent Docs`;
 const socialImageUrl = new URL(socialImage, SITE_URL).toString();
+const keywordsContent = keywords.join(', ');
 const currentYear = new Date().getFullYear();
 const organizationId = toAbsoluteUrl('/#organization', SITE_URL);
 const websiteId = toAbsoluteUrl('/#website', SITE_URL);
 const webpageId = `${canonicalUrl}#webpage`;
-const breadcrumbSchemaId = `${canonicalUrl}#breadcrumb`;
-const navItems = [
-    {
-        href: '/privacy/',
-        key: 'privacy',
-        label: 'Privacy Policy',
-    },
-    {
-        href: '/terms/',
-        key: 'terms',
-        label: 'Terms & Conditions',
-    },
-    {
-        href: '/contact/',
-        key: 'contact',
-        label: 'Contact',
-    },
-];
+const breadcrumbId = `${canonicalUrl}#breadcrumb`;
+const docsId = `${toCanonicalUrl('/agents/', siteUrl)}#agent-docs`;
 const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -78,22 +68,42 @@ const structuredData = {
             },
         },
         {
-            '@type': 'WebPage',
+            '@type': 'TechArticle',
             '@id': webpageId,
             url: canonicalUrl,
-            name: pageTitle,
-            description: summary,
-            dateModified: lastUpdatedIso,
+            headline: title,
+            description,
+            dateModified: AGENT_DOCS_LAST_UPDATED,
             isPartOf: {
-                '@id': websiteId,
+                '@id': docsId,
             },
+            publisher: {
+                '@id': organizationId,
+            },
+            about: [
+                'Model Context Protocol',
+                'local-first software',
+                'AI agent integration',
+                'time tracking',
+                'freelance invoicing',
+            ],
             breadcrumb: {
-                '@id': breadcrumbSchemaId,
+                '@id': breadcrumbId,
+            },
+        },
+        {
+            '@type': 'CreativeWorkSeries',
+            '@id': docsId,
+            name: 'TaskTime Agent Docs',
+            url: toCanonicalUrl('/agents/', siteUrl),
+            description: 'TaskTime local AI agent and MCP bridge documentation.',
+            publisher: {
+                '@id': organizationId,
             },
         },
         {
             '@type': 'BreadcrumbList',
-            '@id': breadcrumbSchemaId,
+            '@id': breadcrumbId,
             itemListElement: [
                 {
                     '@type': 'ListItem',
@@ -104,6 +114,12 @@ const structuredData = {
                 {
                     '@type': 'ListItem',
                     position: 2,
+                    name: 'Agent Docs',
+                    item: toCanonicalUrl('/agents/', siteUrl),
+                },
+                {
+                    '@type': 'ListItem',
+                    position: 3,
                     name: title,
                     item: canonicalUrl,
                 },
@@ -120,14 +136,18 @@ const structuredData = {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <script is:inline set:html={THEME_INIT_SCRIPT}></script>
         <title>{pageTitle}</title>
-        <meta name="description" content={summary} />
+        <meta name="description" content={description} />
         <meta name="robots" content="index,follow" />
+        <meta name="keywords" content={keywordsContent} />
         <link rel="canonical" href={canonicalUrl} />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
         <link rel="shortcut icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-        <meta property="og:type" content="website" />
+        <link rel="alternate" type="application/rss+xml" title="TaskTime Blog" href="/blog/rss.xml" />
+        <link rel="alternate" type="text/plain" title="TaskTime llms.txt" href="/llms.txt" />
+        <link rel="alternate" type="application/json" title="TaskTime MCP tools" href="/agents/mcp-tools.json" />
+        <meta property="og:type" content="article" />
         <meta property="og:title" content={socialTitle} />
         <meta property="og:description" content={socialDescription} />
         <meta property="og:url" content={canonicalUrl} />
@@ -135,6 +155,8 @@ const structuredData = {
         <meta property="og:image:alt" content={socialImageAlt} />
         <meta property="og:site_name" content="TaskTime" />
         <meta property="og:locale" content="en_US" />
+        <meta property="article:modified_time" content={AGENT_DOCS_LAST_UPDATED} />
+        <meta property="article:section" content="Agent Documentation" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={socialTitle} />
         <meta name="twitter:description" content={socialDescription} />
@@ -145,12 +167,11 @@ const structuredData = {
     <body>
         <div class="page-shell">
             <header class="site-header">
-                <a class="brand" href="/">
+                <a class="brand" href="/agents/">
                     <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
-                    <span class="brand-label">TaskTime</span>
+                    <span class="brand-label">TaskTime Agent Docs</span>
                 </a>
                 <nav class="site-nav" aria-label="Primary">
-                    <a href="/agents/">Agents</a>
                     <a href="/blog/">Blog</a>
                     <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle color theme">
                         <span class="sr-only">Toggle color theme</span>
@@ -173,13 +194,13 @@ const structuredData = {
                 </nav>
             </header>
 
-            <main class="site-main public-page-shell">
-                <div class="public-page-grid">
-                    <aside class="public-page-sidebar">
-                        <section class="public-page-panel">
-                            <h2>Public pages</h2>
-                            <nav class="public-page-nav" aria-label="Public pages">
-                                {navItems.map((item) => (
+            <main class="site-main agent-docs-shell">
+                <div class="agent-docs-grid">
+                    <aside class="agent-docs-sidebar">
+                        <section class="agent-docs-panel">
+                            <h2>Agent docs</h2>
+                            <nav class="agent-docs-nav" aria-label="Agent documentation">
+                                {AGENT_DOCS_NAV_ITEMS.map((item) => (
                                     <a
                                         href={item.href}
                                         aria-current={item.key === pageKey ? 'page' : undefined}
@@ -187,30 +208,46 @@ const structuredData = {
                                             'is-active': item.key === pageKey,
                                         }}
                                     >
-                                        {item.label}
+                                        <span>{item.label}</span>
+                                        <small>{item.summary}</small>
                                     </a>
                                 ))}
                             </nav>
                         </section>
 
-                        <section class="public-page-panel">
-                            <h2>At a glance</h2>
-                            <p class="public-page-updated">Last updated {lastUpdated}</p>
-                            <ul class="public-page-highlights">
-                                {highlights.map((item) => (
-                                    <li>{item}</li>
+                        <section class="agent-docs-panel">
+                            <h2>Discovery files</h2>
+                            <ul class="agent-discovery-list">
+                                {AGENT_DISCOVERY_LINKS.map((link) => (
+                                    <li>
+                                        <a href={link.href}>{link.label}</a>
+                                        <p>{link.summary}</p>
+                                    </li>
                                 ))}
                             </ul>
                         </section>
+
+                        {highlights.length > 0 && (
+                            <section class="agent-docs-panel">
+                                <h2>At a glance</h2>
+                                <p class="agent-docs-updated">Updated {AGENT_DOCS_LAST_UPDATED}</p>
+                                <ul class="agent-highlight-list">
+                                    {highlights.map((item) => (
+                                        <li>{item}</li>
+                                    ))}
+                                </ul>
+                            </section>
+                        )}
                     </aside>
 
-                    <article class="public-page-card">
-                        <header class="article-header">
+                    <article class="agent-docs-content">
+                        <header class="agent-docs-header">
+                            <p class="eyebrow">TaskTime local agent bridge</p>
                             <h1>{title}</h1>
-                            <p class="article-summary">{summary}</p>
+                            <p>{description}</p>
                         </header>
 
-                        <div class="public-page-copy">
+                        <div class="agent-docs-copy">
                             <slot />
                         </div>
                     </article>
@@ -231,7 +268,6 @@ const structuredData = {
                     <a href="/contact/">Contact</a>
                     <a href="/privacy/">Privacy</a>
                     <a href="/terms/">Terms</a>
-                    <a href="/blog/rss.xml">RSS</a>
                 </div>
             </footer>
         </div>

@@ -1,0 +1,95 @@
+---
+import AgentDocsLayout from '../../../layouts/AgentDocsLayout.astro';
+import {
+    formatInputFields,
+    getAgentToolCatalog,
+    getAgentToolGroups,
+} from '../../../lib/agentTools.js';
+
+const catalog = getAgentToolCatalog();
+const groups = getAgentToolGroups();
+const highlights = [
+    `${catalog.toolCount} MCP tools are currently exposed by the source definitions.`,
+    'Tool visibility is scope-gated by the local bridge.',
+    'JSON schemas come from src/agent/bridge/mcpTools.ts.',
+    'Approval-gated command flags are read from src/agent/commands/registry.ts.',
+];
+---
+
+<AgentDocsLayout
+    pageKey="tools"
+    title="TaskTime MCP Tools"
+    description="Generated reference for TaskTime local agent bridge MCP tools, scopes, input schemas, approval-gated commands, and workflow groups."
+    canonicalPath="/agents/tools/"
+    highlights={highlights}
+>
+    <section>
+        <h2>Generated Tool Catalog</h2>
+        <p>
+            This reference is generated from the same bridge source used by <code>tasktime-agent-bridge</code>. Agent
+            hosts should still call <code>tools/list</code> at runtime because granted scopes determine the exact tool
+            set available to the current local session.
+        </p>
+        <p>
+            Machine-readable version:
+            <a href="/agents/mcp-tools.json"><code>/agents/mcp-tools.json</code></a>.
+        </p>
+        <p>
+            The <strong>Approval gated</strong> badge means the command requires TaskTime approval before mutation. A
+            trusted local approval token can satisfy that gate for the exact command input; otherwise the paired browser
+            app shows a visible approval prompt and remains the final verifier.
+        </p>
+    </section>
+
+    <section>
+        <h2>Scope Coverage</h2>
+        <div class="agent-pill-row" aria-label="MCP tool scope counts">
+            {catalog.scopes.map((item) => (
+                <span class="agent-scope-pill">
+                    <code>{item.scope}</code>
+                    <span>{item.toolCount} tools</span>
+                </span>
+            ))}
+        </div>
+    </section>
+
+    {groups.map((group) => (
+        <section id={group.id}>
+            <h2>{group.title}</h2>
+            <p>{group.description}</p>
+            <div class="agent-tool-list">
+                {group.tools.map((tool) => (
+                    <article class="agent-tool-card">
+                        <header>
+                            <h3><code>{tool.name}</code></h3>
+                            {tool.requiresApproval && (
+                                <span class="agent-approval-badge">Approval gated</span>
+                            )}
+                        </header>
+                        <p>{tool.description}</p>
+                        <dl>
+                            <div>
+                                <dt>Scopes</dt>
+                                <dd>
+                                    {tool.scopes.map((scope) => (
+                                        <code>{scope}</code>
+                                    ))}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Input fields</dt>
+                                <dd>{formatInputFields(tool)}</dd>
+                            </div>
+                            {tool.requiresApproval && (
+                                <div>
+                                    <dt>Approval</dt>
+                                    <dd>Valid exact-input approval token or visible prompt</dd>
+                                </div>
+                            )}
+                        </dl>
+                    </article>
+                ))}
+            </div>
+        </section>
+    ))}
+</AgentDocsLayout>

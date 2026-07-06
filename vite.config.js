@@ -18,6 +18,14 @@ const publicRouteProxy = isPreviewCommand
         target: 'http://127.0.0.1:4321',
         changeOrigin: false,
       },
+      '/agents': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
+      '/llms.txt': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
       '/privacy': {
         target: 'http://127.0.0.1:4321',
         changeOrigin: false,
