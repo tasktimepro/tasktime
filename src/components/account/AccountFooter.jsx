@@ -23,7 +23,7 @@ const AccountFooter = ({ className }) => {
                     <img src="/x.svg" alt="" aria-hidden="true" className="h-6 w-6" />
                 </a>
                 <a
-                    href="/blog"
+                    href="/blog/"
                     className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
                     target="_blank"
                     rel="noreferrer noopener"
@@ -31,7 +31,7 @@ const AccountFooter = ({ className }) => {
                     Blog
                 </a>
                 <a
-                    href="/contact"
+                    href="/contact/"
                     className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
                     target="_blank"
                     rel="noreferrer noopener"
@@ -39,7 +39,7 @@ const AccountFooter = ({ className }) => {
                     Contact
                 </a>
                 <a
-                    href="/privacy"
+                    href="/privacy/"
                     className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
                     target="_blank"
                     rel="noreferrer noopener"
@@ -47,7 +47,7 @@ const AccountFooter = ({ className }) => {
                     Privacy Policy
                 </a>
                 <a
-                    href="/terms"
+                    href="/terms/"
                     className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
                     target="_blank"
                     rel="noreferrer noopener"

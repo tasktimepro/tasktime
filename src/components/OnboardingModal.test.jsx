@@ -33,8 +33,8 @@ describe('OnboardingModal', () => {
         expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Skip Step' })).not.toBeInTheDocument()
         expect(screen.getByText(/By using this app, you also agree to our/i)).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
-        expect(screen.getByRole('link', { name: 'Terms & Conditions' })).toHaveAttribute('href', '/terms')
+        expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy/')
+        expect(screen.getByRole('link', { name: 'Terms & Conditions' })).toHaveAttribute('href', '/terms/')
         expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Next' }))
     })
 

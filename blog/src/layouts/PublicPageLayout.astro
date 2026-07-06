@@ -1,6 +1,16 @@
 ---
 import '../styles/global.css';
-import { DEFAULT_SOCIAL_IMAGE, DEFAULT_SOCIAL_IMAGE_ALT, SITE_URL } from '../config/site.js';
+import {
+    DEFAULT_SOCIAL_IMAGE,
+    DEFAULT_SOCIAL_IMAGE_ALT,
+    SITE_DESCRIPTION,
+    SITE_NAME,
+    SITE_URL,
+    TASKTIME_SOCIAL_URL,
+    toAbsoluteUrl,
+    toCanonicalUrl,
+    toJsonLd,
+} from '../config/site.js';
 import { THEME_INIT_SCRIPT, THEME_TOGGLE_SCRIPT } from '../config/theme.js';
 
 const {
@@ -8,6 +18,7 @@ const {
     title,
     summary,
     lastUpdated,
+    lastUpdatedIso,
     highlights = [],
     canonicalPath = Astro.url.pathname,
     socialTitle = `${title} | TaskTime`,
@@ -17,27 +28,89 @@ const {
 } = Astro.props;
 
 const siteUrl = Astro.site ?? new URL(SITE_URL);
-const canonicalUrl = new URL(canonicalPath, siteUrl).toString();
+const canonicalUrl = toCanonicalUrl(canonicalPath, siteUrl);
 const pageTitle = `${title} | TaskTime`;
 const socialImageUrl = new URL(socialImage, SITE_URL).toString();
 const currentYear = new Date().getFullYear();
+const organizationId = toAbsoluteUrl('/#organization', SITE_URL);
+const websiteId = toAbsoluteUrl('/#website', SITE_URL);
+const webpageId = `${canonicalUrl}#webpage`;
+const breadcrumbSchemaId = `${canonicalUrl}#breadcrumb`;
 const navItems = [
     {
-        href: '/privacy',
+        href: '/privacy/',
         key: 'privacy',
         label: 'Privacy Policy',
     },
     {
-        href: '/terms',
+        href: '/terms/',
         key: 'terms',
         label: 'Terms & Conditions',
     },
     {
-        href: '/contact',
+        href: '/contact/',
         key: 'contact',
         label: 'Contact',
     },
 ];
+const structuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+        {
+            '@type': 'Organization',
+            '@id': organizationId,
+            name: SITE_NAME,
+            url: toCanonicalUrl('/', siteUrl),
+            logo: {
+                '@type': 'ImageObject',
+                url: toAbsoluteUrl(DEFAULT_SOCIAL_IMAGE, SITE_URL),
+            },
+            sameAs: [TASKTIME_SOCIAL_URL],
+        },
+        {
+            '@type': 'WebSite',
+            '@id': websiteId,
+            name: SITE_NAME,
+            url: toCanonicalUrl('/', siteUrl),
+            description: SITE_DESCRIPTION,
+            publisher: {
+                '@id': organizationId,
+            },
+        },
+        {
+            '@type': 'WebPage',
+            '@id': webpageId,
+            url: canonicalUrl,
+            name: pageTitle,
+            description: summary,
+            dateModified: lastUpdatedIso,
+            isPartOf: {
+                '@id': websiteId,
+            },
+            breadcrumb: {
+                '@id': breadcrumbSchemaId,
+            },
+        },
+        {
+            '@type': 'BreadcrumbList',
+            '@id': breadcrumbSchemaId,
+            itemListElement: [
+                {
+                    '@type': 'ListItem',
+                    position: 1,
+                    name: SITE_NAME,
+                    item: toCanonicalUrl('/', siteUrl),
+                },
+                {
+                    '@type': 'ListItem',
+                    position: 2,
+                    name: title,
+                    item: canonicalUrl,
+                },
+            ],
+        },
+    ],
+};
 ---
 
 <!doctype html>
@@ -67,6 +140,7 @@ const navItems = [
         <meta name="twitter:description" content={socialDescription} />
         <meta name="twitter:image" content={socialImageUrl} />
         <meta name="twitter:image:alt" content={socialImageAlt} />
+        <script type="application/ld+json" set:html={toJsonLd(structuredData)}></script>
     </head>
     <body>
         <div class="page-shell">
@@ -76,7 +150,7 @@ const navItems = [
                     <span class="brand-label">TaskTime</span>
                 </a>
                 <nav class="site-nav" aria-label="Primary">
-                    <a href="/blog">Blog</a>
+                    <a href="/blog/">Blog</a>
                     <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle color theme">
                         <span class="sr-only">Toggle color theme</span>
                         <svg class="theme-toggle__icon theme-toggle__icon--moon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
@@ -151,10 +225,10 @@ const navItems = [
                     <a class="footer-icon-link" href="https://x.com/tasktimepro" target="_blank" rel="noreferrer noopener" aria-label="TaskTime on X">
                         <img src="/x.svg" alt="" aria-hidden="true" width="16" height="16" loading="lazy" />
                     </a>
-                    <a href="/blog">Blog</a>
-                    <a href="/contact">Contact</a>
-                    <a href="/privacy">Privacy</a>
-                    <a href="/terms">Terms</a>
+                    <a href="/blog/">Blog</a>
+                    <a href="/contact/">Contact</a>
+                    <a href="/privacy/">Privacy</a>
+                    <a href="/terms/">Terms</a>
                     <a href="/blog/rss.xml">RSS</a>
                 </div>
             </footer>
