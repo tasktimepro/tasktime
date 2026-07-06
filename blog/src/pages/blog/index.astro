@@ -38,7 +38,7 @@ function formatDate(value) {
                     <time datetime={post.data.publishedAt.toISOString()}>{formatDate(post.data.publishedAt)}</time>
                 </p>
                 <h2>
-                    <a href={`/blog/${post.slug}`}>{post.data.title}</a>
+                    <a href={`/blog/${post.slug}/`}>{post.data.title}</a>
                 </h2>
                 <p>{post.data.excerpt}</p>
                 <ul class="tag-list" aria-label={`Tags for ${post.data.title}`}>

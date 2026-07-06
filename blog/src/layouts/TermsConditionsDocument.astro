@@ -3,6 +3,7 @@ import PublicPageLayout from './PublicPageLayout.astro';
 
 const { canonicalPath = '/terms' } = Astro.props;
 const LAST_UPDATED = '14 April 2026';
+const LAST_UPDATED_ISO = '2026-04-14';
 ---
 
 <PublicPageLayout
@@ -10,6 +11,7 @@ const LAST_UPDATED = '14 April 2026';
     title="Terms & Conditions"
     summary="These are the ground rules for using TaskTime. The short version: your data is yours, the app is provided as-is, and you are responsible for your own records and backups."
     lastUpdated={LAST_UPDATED}
+    lastUpdatedIso={LAST_UPDATED_ISO}
     highlights={[
         'TaskTime is a local-first tool — your data lives in your browser, not on our servers.',
         'The app is provided as-is without warranties. Keep your own backups.',

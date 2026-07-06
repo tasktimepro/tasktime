@@ -132,8 +132,8 @@ describe('Account', () => {
         const privacyLink = screen.getByRole('link', { name: 'Privacy Policy' });
         const termsLink = screen.getByRole('link', { name: 'Terms & Conditions' });
 
-        expect(privacyLink.getAttribute('href')).toBe('/privacy');
-        expect(termsLink.getAttribute('href')).toBe('/terms');
+        expect(privacyLink.getAttribute('href')).toBe('/privacy/');
+        expect(termsLink.getAttribute('href')).toBe('/terms/');
         expect(privacyLink.getAttribute('target')).toBe('_blank');
         expect(termsLink.getAttribute('target')).toBe('_blank');
     });

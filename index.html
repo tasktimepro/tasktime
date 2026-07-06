@@ -19,11 +19,15 @@
     <meta property="og:description" content="Local-first task management, time tracking, expenses, and invoicing for freelancers and solo professionals." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://tasktime.pro/" />
+    <meta property="og:image" content="https://tasktime.pro/icons/web-app-manifest-512x512.png" />
+    <meta property="og:image:alt" content="TaskTime app icon" />
     <meta property="og:site_name" content="TaskTime" />
     <meta property="og:locale" content="en_US" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="TaskTime" />
     <meta name="twitter:description" content="Local-first task management, time tracking, expenses, and invoicing for freelancers and solo professionals." />
+    <meta name="twitter:image" content="https://tasktime.pro/icons/web-app-manifest-512x512.png" />
+    <meta name="twitter:image:alt" content="TaskTime app icon" />
     
     <!-- Apple PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -42,9 +46,67 @@
     <link rel="manifest" href="/manifest.json" />
 
     <title>TaskTime</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://tasktime.pro/#organization",
+            "name": "TaskTime",
+            "url": "https://tasktime.pro/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://tasktime.pro/icons/web-app-manifest-512x512.png"
+            },
+            "sameAs": ["https://x.com/tasktimepro"]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://tasktime.pro/#website",
+            "name": "TaskTime",
+            "url": "https://tasktime.pro/",
+            "description": "Local-first task management, time tracking, expenses, and invoicing for freelancers and solo professionals.",
+            "publisher": {
+              "@id": "https://tasktime.pro/#organization"
+            }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://tasktime.pro/#software",
+            "name": "TaskTime",
+            "url": "https://tasktime.pro/",
+            "description": "Local-first task management, time tracking, expenses, and invoicing for freelancers and solo professionals.",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Any",
+            "image": "https://tasktime.pro/icons/web-app-manifest-512x512.png",
+            "publisher": {
+              "@id": "https://tasktime.pro/#organization"
+            },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main>
+        <h1>TaskTime</h1>
+        <p>TaskTime is a free, local-first task management, time tracking, expense tracking, and invoicing app for freelancers and solo professionals.</p>
+        <nav aria-label="Public pages">
+          <a href="/blog/">Blog</a>
+          <a href="/contact/">Contact</a>
+          <a href="/privacy/">Privacy</a>
+          <a href="/terms/">Terms</a>
+        </nav>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

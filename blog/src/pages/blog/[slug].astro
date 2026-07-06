@@ -27,9 +27,10 @@ function formatDate(value) {
 <BlogLayout
     title={post.data.title}
     description={post.data.description}
-    canonicalPath={Astro.url.pathname}
+    canonicalPath={post.data.canonicalUrl ?? Astro.url.pathname}
     pageType="article"
     keywords={post.data.keywords}
+    tags={post.data.tags}
     publishedAt={post.data.publishedAt}
     updatedAt={post.data.updatedAt}
     socialTitle={post.data.socialTitle}

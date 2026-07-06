@@ -3,7 +3,7 @@ import { defineConfig } from 'astro/config';
 export default defineConfig({
     site: 'https://tasktime.pro',
     output: 'static',
-    trailingSlash: 'never',
+    trailingSlash: 'always',
     devToolbar: {
         enabled: false,
     },

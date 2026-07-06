@@ -29,14 +29,14 @@ const LegalInlineLinks = ({ className, linkClassName, openInNewTab = true, prefi
         <p className={cn('text-sm leading-6 text-muted-foreground', className)}>
             <span>{prefix}</span>
             <LegalLink
-                href="/privacy"
+                href="/privacy/"
                 label="Privacy Policy"
                 linkClassName={linkClassName}
                 openInNewTab={openInNewTab}
             />
             <span> and </span>
             <LegalLink
-                href="/terms"
+                href="/terms/"
                 label="Terms & Conditions"
                 linkClassName={linkClassName}
                 openInNewTab={openInNewTab}

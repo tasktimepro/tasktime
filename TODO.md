@@ -2,7 +2,7 @@
 
 ## Priority
 
-
+[ ] Check about indexing blog issues
 
 ---
 
